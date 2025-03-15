@@ -57,6 +57,9 @@ namespace osu.Game.Rulesets.Mania.UI
         protected new ManiaRulesetConfigManager Config => (ManiaRulesetConfigManager)base.Config;
 
         private readonly Bindable<ManiaScrollingDirection> configDirection = new Bindable<ManiaScrollingDirection>();
+        private readonly Bindable<ManiaScrollingStyle> scrollingStyle = new Bindable<ManiaScrollingStyle>();
+        private readonly BindableDouble configBaseMs = new BindableDouble();
+        private readonly BindableDouble configTimePerSpeed = new BindableDouble();
         private readonly BindableDouble configScrollSpeed = new BindableDouble();
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
 
@@ -108,10 +111,16 @@ namespace osu.Game.Rulesets.Mania.UI
             Config.BindWith(ManiaRulesetSetting.ScrollDirection, configDirection);
             configDirection.BindValueChanged(direction => Direction.Value = (ScrollingDirection)direction.NewValue, true);
 
-            Config.BindWith(ManiaRulesetSetting.ScrollSpeed, configScrollSpeed);
-            configScrollSpeed.BindValueChanged(speed => TargetTimeRange = ComputeScrollTime(speed.NewValue));
+            // Config.BindWith(ManiaRulesetSetting.ScrollSpeed, configScrollSpeed);
+            // configScrollSpeed.BindValueChanged(speed => TargetTimeRange = ComputeScrollTime(speed.NewValue));
 
-            TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value);
+            // TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value);
+            Config.BindWith(ManiaRulesetSetting.ScrollBaseSpeed, configBaseMs);
+            Config.BindWith(ManiaRulesetSetting.ScrollTimePerSpeed, configTimePerSpeed);
+            Config.BindWith(ManiaRulesetSetting.ScrollSpeed, configScrollSpeed);
+            configScrollSpeed.BindValueChanged(speed => TargetTimeRange = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value));
+
+            TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
             mobileLayout.BindValueChanged(_ => updateMobileLayout(), true);
@@ -170,7 +179,21 @@ namespace osu.Game.Rulesets.Mania.UI
             float lengthToHitPosition = 768 - hitPosition;
 
             // This scaling factor preserves the scroll speed as the scroll length varies from changes to the hit position.
-            float scale = lengthToHitPosition / length_to_default_hit_position;
+            float scale = 1.0f;
+
+            switch (scrollingStyle.Value)
+            {
+                case ManiaScrollingStyle.ScrollSpeedStyle:
+                case ManiaScrollingStyle.ScrollTimeStyle:
+                    // Preserve the scroll speed as the scroll length varies from changes to the hit position.
+                    scale = lengthToHitPosition / length_to_default_hit_position;
+                    break;
+
+                case ManiaScrollingStyle.ScrollTimeStyleFixed:
+                    // Ensure the travel time from the top of the screen to the hit position remains constant.
+                    scale = length_to_default_hit_position / lengthToHitPosition;
+                    break;
+            }
 
             // we're intentionally using the game host's update clock here to decouple the time range tween from the gameplay clock (which can be arbitrarily paused, or even rewinding)
             currentTimeRange = Interpolation.DampContinuously(currentTimeRange, TargetTimeRange, 50, gameHost.UpdateThread.Clock.ElapsedFrameTime);
@@ -181,8 +204,13 @@ namespace osu.Game.Rulesets.Mania.UI
         /// Computes a scroll time (in milliseconds) from a scroll speed in the range of 1-40.
         /// </summary>
         /// <param name="scrollSpeed">The scroll speed.</param>
+        /// <param name="baseSpeed"></param>
+        /// <param name="timePerSpeed"></param>
         /// <returns>The scroll time.</returns>
-        public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / scrollSpeed;
+        public static double ComputeScrollTime(double scrollSpeed, double baseSpeed, double timePerSpeed)
+        {
+            return baseSpeed - (scrollSpeed - 200) * timePerSpeed;
+        }
 
         public override PlayfieldAdjustmentContainer CreatePlayfieldAdjustmentContainer() => new ManiaPlayfieldAdjustmentContainer(this);
 

@@ -1,7 +1,6 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
@@ -34,33 +33,62 @@ namespace osu.Game.Rulesets.Mania
                     LabelText = RulesetSettingsStrings.ScrollingDirection,
                     Current = config.GetBindable<ManiaScrollingDirection>(ManiaRulesetSetting.ScrollDirection)
                 },
+                new SettingsEnumDropdown<ManiaScrollingStyle>
+                {
+                    LabelText = RulesetSettingsStrings.ScrollingStyle,
+                    Current = config.GetBindable<ManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle)
+                },
                 new SettingsSlider<double, ManiaScrollSlider>
                 {
                     LabelText = RulesetSettingsStrings.ScrollSpeed,
                     Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed),
-                    KeyboardStep = 1
+                    KeyboardStep = 1,
+                },
+                new SettingsSlider<double, ManiaScrollBaseSpeedSlider>
+                {
+                    LabelText = RulesetSettingsStrings.ScrollBaseSpeed,
+                    Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollBaseSpeed),
+                    KeyboardStep = 1,
+                },
+                new SettingsSlider<double, ManiaScrollTimePerSpeedSlider>
+                {
+                    LabelText = RulesetSettingsStrings.ScrollTimePrecision,
+                    Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollTimePerSpeed),
+                    KeyboardStep = 1,
                 },
                 new SettingsCheckbox
                 {
                     Keywords = new[] { "color" },
                     LabelText = RulesetSettingsStrings.TimingBasedColouring,
                     Current = config.GetBindable<bool>(ManiaRulesetSetting.TimingBasedNoteColouring),
-                },
+                }
             };
-
-            if (RuntimeInfo.IsMobile)
-            {
-                Add(new SettingsEnumDropdown<ManiaMobileLayout>
-                {
-                    LabelText = RulesetSettingsStrings.MobileLayout,
-                    Current = config.GetBindable<ManiaMobileLayout>(ManiaRulesetSetting.MobileLayout),
-                });
-            }
         }
 
         private partial class ManiaScrollSlider : RoundedSliderBar<double>
         {
-            public override LocalisableString TooltipText => RulesetSettingsStrings.ScrollSpeedTooltip((int)DrawableManiaRuleset.ComputeScrollTime(Current.Value), Current.Value);
+            private ManiaRulesetConfigManager config = null!;
+
+            [BackgroundDependencyLoader]
+            private void load(ManiaRulesetConfigManager config)
+            {
+                this.config = config;
+            }
+
+            public override LocalisableString TooltipText => RulesetSettingsStrings.ScrollSpeedTooltip(
+                (int)DrawableManiaRuleset.ComputeScrollTime(Current.Value, config.Get<double>(ManiaRulesetSetting.ScrollBaseSpeed), config.Get<double>(ManiaRulesetSetting.ScrollTimePerSpeed)),
+                Current.Value
+            );
+        }
+
+        private partial class ManiaScrollBaseSpeedSlider : RoundedSliderBar<double>
+        {
+            public override LocalisableString TooltipText => RulesetSettingsStrings.ScrollSpeedTooltip(
+                Current.Value, 200);
+        }
+
+        private partial class ManiaScrollTimePerSpeedSlider : RoundedSliderBar<double>
+        {
         }
     }
 }
