@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Scoring
@@ -13,9 +14,9 @@ namespace osu.Game.Rulesets.Scoring
     /// <summary>
     /// A structure containing timing data for hit window based gameplay.
     /// </summary>
-    public class HitWindows
+    public class HitWindows : IHitWindows
     {
-        private static readonly DifficultyRange[] base_ranges =
+        public static DifficultyRange[] BaseRanges =
         {
             new DifficultyRange(HitResult.Perfect, 22.4D, 19.4D, 13.9D),
             new DifficultyRange(HitResult.Great, 64, 49, 34),
@@ -25,12 +26,33 @@ namespace osu.Game.Rulesets.Scoring
             new DifficultyRange(HitResult.Miss, 188, 173, 158),
         };
 
-        private double perfect;
-        private double great;
-        private double good;
-        private double ok;
-        private double meh;
-        private double miss;
+        private static double perfect;
+        private static double great;
+        private static double good;
+        private static double ok;
+        private static double meh;
+        private static double miss;
+
+        private static bool isModActive;
+
+        public static void SetCustomRanges(IHitWindows? customHitWindows)
+        {
+            if (isModActive && customHitWindows != null)
+            {
+                BaseRanges = customHitWindows.GetRanges();
+            }
+        }
+
+        public static void SetModActive(bool isActive)
+        {
+            isModActive = isActive;
+        }
+
+        public enum HitMode
+        {
+            Standardised,
+            Classic
+        }
 
         /// <summary>
         /// An empty <see cref="HitWindows"/> with only <see cref="HitResult.Miss"/> and <see cref="HitResult.Perfect"/>.
@@ -180,7 +202,7 @@ namespace osu.Game.Rulesets.Scoring
         /// Retrieve a valid list of <see cref="DifficultyRange"/>s representing hit windows.
         /// Defaults are provided but can be overridden to customise for a ruleset.
         /// </summary>
-        protected virtual DifficultyRange[] GetRanges() => base_ranges;
+        public virtual DifficultyRange[] GetRanges() => BaseRanges;
 
         private class EmptyHitWindows : HitWindows
         {
@@ -202,7 +224,7 @@ namespace osu.Game.Rulesets.Scoring
                 return false;
             }
 
-            protected override DifficultyRange[] GetRanges() => ranges;
+            public override DifficultyRange[] GetRanges() => ranges;
         }
     }
 

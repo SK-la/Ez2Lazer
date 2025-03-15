@@ -1,7 +1,6 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.ComponentModel;
 using osu.Framework.Localisation;
 using osu.Game.Resources.Localisation.Web;
 
@@ -12,22 +11,22 @@ namespace osu.Game.Screens.Select.Filter
         [LocalisableDescription(typeof(BeatmapsStrings), nameof(BeatmapsStrings.ListingSearchSortingArtist))]
         Artist,
 
-        [Description("Author")]
+        [LocalisableDescription(typeof(BeatmapsStrings), nameof(BeatmapsStrings.ListingSearchSortingAuthor))]
         Author,
 
         [LocalisableDescription(typeof(SortStrings), nameof(SortStrings.ArtistTracksBpm))]
         BPM,
 
-        [Description("Date Submitted")]
+        [LocalisableDescription(typeof(SortStrings), nameof(SortStrings.DateSubmitted))]
         DateSubmitted,
 
-        [Description("Date Added")]
+        [LocalisableDescription(typeof(SortStrings), nameof(SortStrings.DateAdded))]
         DateAdded,
 
-        [Description("Date Ranked")]
+        [LocalisableDescription(typeof(SortStrings), nameof(SortStrings.DateRanked))]
         DateRanked,
 
-        [Description("Last Played")]
+        [LocalisableDescription(typeof(SortStrings), nameof(SortStrings.LastPlayed))]
         LastPlayed,
 
         [LocalisableDescription(typeof(BeatmapsStrings), nameof(BeatmapsStrings.ListingSearchSortingDifficulty))]
@@ -40,7 +39,7 @@ namespace osu.Game.Screens.Select.Filter
         // [Description("Rank Achieved")]
         // RankAchieved,
 
-        [Description("Source")]
+        [LocalisableDescription(typeof(SortStrings), nameof(SortStrings.ArtistTracksSource))]
         Source,
 
         [LocalisableDescription(typeof(BeatmapsStrings), nameof(BeatmapsStrings.ListingSearchSortingTitle))]

@@ -21,6 +21,8 @@ namespace osu.Game.Skinning
         internal static readonly Guid ARGON_PRO_SKIN = new Guid("9FC9CF5D-0F16-4C71-8256-98868321AC43");
         internal static readonly Guid CLASSIC_SKIN = new Guid("81F02CD3-EEC6-4865-AC23-FAE26A386187");
         internal static readonly Guid RANDOM_SKIN = new Guid("D39DFEFB-477C-4372-B1EA-2BCEA5FB8908");
+        internal static readonly Guid EZ2_SKIN = new Guid("fc372386-381d-4f8e-897a-c1d89ef39f9c");
+        internal static readonly Guid SBI_SKIN = new Guid("fc372386-381d-4f8e-897a-c1d89ef39f2c");
 
         [PrimaryKey]
         [JsonProperty]

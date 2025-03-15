@@ -35,7 +35,7 @@ namespace osu.Game.Storyboards.Drawables
 
         protected override Container<DrawableStoryboardLayer> Content { get; }
 
-        protected override Vector2 DrawScale => new Vector2((Parent?.DrawHeight ?? 0) / 480);
+        protected override Vector2 DrawScale => new Vector2(Parent!.DrawWidth / 640);
 
         public override bool RemoveCompletedTransforms => false;
 
@@ -67,7 +67,9 @@ namespace osu.Game.Storyboards.Drawables
 
             bool onlyHasVideoElements = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
 
-            Width = Height * (storyboard.Beatmap.WidescreenStoryboard || onlyHasVideoElements ? 16 / 9f : 4 / 3f);
+            // Width = Height * (storyboard.BeatmapInfo.WidescreenStoryboard || onlyHasVideoElements ? 9 / 16f : 3 / 4f);
+            // Width = Parent!.DrawWidth; // Adjust width to match parent's width
+            Height = Width * (storyboard.Beatmap.WidescreenStoryboard || onlyHasVideoElements ? 9 / 16f : 3 / 4f);
 
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;

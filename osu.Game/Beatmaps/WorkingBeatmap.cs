@@ -29,6 +29,8 @@ namespace osu.Game.Beatmaps
         public readonly BeatmapInfo BeatmapInfo;
         public readonly BeatmapSetInfo BeatmapSetInfo;
 
+        public IBeatmap BeatmapAfterConverted { get; set; }
+
         // TODO: remove once the fallback lookup is not required (and access via `working.BeatmapInfo.Metadata` directly).
         public BeatmapMetadata Metadata => BeatmapInfo.Metadata;
 
@@ -347,6 +349,7 @@ namespace osu.Game.Beatmaps
                 mod.ApplyToBeatmap(converted);
             }
 
+            BeatmapAfterConverted = converted;
             return converted;
         }
 

@@ -21,12 +21,15 @@ namespace osu.Desktop
     public static class Program
     {
 #if DEBUG
-        private const string base_game_name = @"osu-development";
+        private const string base_game_name = @"osu-Ez2Lazer-development";
 #else
-        private const string base_game_name = @"osu";
+        private const string base_game_name = @"osu-Ez2Lazer";
 #endif
 
         private static LegacyTcpIpcProvider? legacyIpc;
+
+        // [DllImport("kernel32.dll", SetLastError = true)]
+        // private static extern bool SetDllDirectory(string lpPathName);
 
         [STAThread]
         public static void Main(string[] args)
@@ -58,6 +61,8 @@ namespace osu.Desktop
                         return;
                     }
                 }
+
+                // SetDllDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "C:\\Users\\12456\\.nuget\\packages\\bass.asio\\1.3.1.2\\build\\native\\x64"));
             }
 
             // NVIDIA profiles are based on the executable name of a process.

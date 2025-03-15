@@ -101,8 +101,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)
                     {
-                        case ManiaSkinComponents.StageBackground:
-                            return new SbIStageBackground();
+                        // case ManiaSkinComponents.StageBackground:
+                        //     return new SbIStageBackground();
 
                         case ManiaSkinComponents.ColumnBackground:
                             // if (Skin is SbISkin && resultComponent.Component >= HitResult.Perfect)

@@ -26,6 +26,27 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = config.GetBindable<ScoringMode>(OsuSetting.ScoreDisplayMode),
                     Keywords = new[] { "scoring" }
                 },
+                new SettingsEnumDropdown<HitWindows.HitMode>
+                {
+                    ClassicDefault = HitWindows.HitMode.Classic,
+                    LabelText = GameplaySettingsStrings.HitMode,
+                    Current = config.GetBindable<HitWindows.HitMode>(OsuSetting.HitMode),
+                    Keywords = new[] { "scoring" }
+                },
+                new SettingsSlider<double>
+                {
+                    LabelText = GameplaySettingsStrings.AccuracyCutoffS,
+                    Current = config.GetBindable<double>(OsuSetting.AccuracyCutoffS),
+                    KeyboardStep = 0.01f,
+                    DisplayAsPercentage = true
+                },
+                new SettingsSlider<double>
+                {
+                    LabelText = GameplaySettingsStrings.AccuracyCutoffA,
+                    Current = config.GetBindable<double>(OsuSetting.AccuracyCutoffA),
+                    KeyboardStep = 0.01f,
+                    DisplayAsPercentage = true
+                },
                 new SettingsCheckbox
                 {
                     LabelText = GraphicsSettingsStrings.HitLighting,

@@ -6,9 +6,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using MessagePack;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Judgements;
@@ -37,6 +39,16 @@ namespace osu.Game.Rulesets.Scoring
         private const double accuracy_cutoff_b = 0.8;
         private const double accuracy_cutoff_c = 0.7;
         private const double accuracy_cutoff_d = 0;
+
+        public Bindable<double> AccS { get; set; } = null!;
+        public Bindable<double> AccA { get; set; } = null!;
+
+        [BackgroundDependencyLoader]
+        private void load(OsuConfigManager config)
+        {
+            AccS = config.GetBindable<double>(OsuSetting.AccuracyCutoffS);
+            AccA = config.GetBindable<double>(OsuSetting.AccuracyCutoffA);
+        }
 
         /// <summary>
         /// Whether <see cref="HitEvents"/> should be populated during application of results.
@@ -532,9 +544,9 @@ namespace osu.Game.Rulesets.Scoring
         {
             if (accuracy == accuracy_cutoff_x)
                 return ScoreRank.X;
-            if (accuracy >= accuracy_cutoff_s)
+            if (accuracy >= accuracy_cutoff_s) //AccS.Value)
                 return ScoreRank.S;
-            if (accuracy >= accuracy_cutoff_a)
+            if (accuracy >= accuracy_cutoff_a) //AccA.Value)
                 return ScoreRank.A;
             if (accuracy >= accuracy_cutoff_b)
                 return ScoreRank.B;

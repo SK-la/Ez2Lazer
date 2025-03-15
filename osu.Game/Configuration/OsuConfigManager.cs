@@ -39,17 +39,18 @@ namespace osu.Game.Configuration
         {
             // UI/selection defaults
             SetDefault(OsuSetting.Ruleset, string.Empty);
-            SetDefault(OsuSetting.Skin, SkinInfo.ARGON_SKIN.ToString());
+            SetDefault(OsuSetting.Skin, SkinInfo.EZ2_SKIN.ToString());
 
             SetDefault(OsuSetting.BeatmapDetailTab, PlayBeatmapDetailArea.TabType.Local);
             SetDefault(OsuSetting.BeatmapDetailModsFilter, false);
 
-            SetDefault(OsuSetting.ShowConvertedBeatmaps, true);
+            SetDefault(OsuSetting.ShowConvertedBeatmaps, false);
             SetDefault(OsuSetting.DisplayStarsMinimum, 0.0, 0, 10, 0.1);
             SetDefault(OsuSetting.DisplayStarsMaximum, 10.1, 0, 10.1, 0.1);
 
             SetDefault(OsuSetting.SongSelectGroupingMode, GroupMode.All);
             SetDefault(OsuSetting.SongSelectSortingMode, SortMode.Title);
+            SetDefault(OsuSetting.SelectEzMode, SelectEzMode.All);
 
             SetDefault(OsuSetting.RandomSelectAlgorithm, RandomSelectAlgorithm.RandomPermutation);
             SetDefault(OsuSetting.ModSelectHotkeyStyle, ModSelectHotkeyStyle.Sequential);
@@ -120,7 +121,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.TouchDisableGameplayTaps, false);
 
             // Graphics
-            SetDefault(OsuSetting.ShowFpsDisplay, false);
+            SetDefault(OsuSetting.ShowFpsDisplay, true);
 
             SetDefault(OsuSetting.ShowStoryboard, true);
             SetDefault(OsuSetting.BeatmapSkins, true);
@@ -135,7 +136,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.Prefer24HourTime, !CultureInfoHelper.SystemCulture.DateTimeFormat.ShortTimePattern.Contains(@"tt"));
 
             // Gameplay
-            SetDefault(OsuSetting.PositionalHitsoundsLevel, 0.2f, 0, 1, 0.01f);
+            SetDefault(OsuSetting.PositionalHitsoundsLevel, 0.8f, 0, 1, 0.01f);
             SetDefault(OsuSetting.DimLevel, 0.7, 0, 1, 0.01);
             SetDefault(OsuSetting.BlurLevel, 0, 0, 1, 0.01);
             SetDefault(OsuSetting.LightenDuringBreaks, true);
@@ -146,7 +147,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.HUDVisibilityMode, HUDVisibilityMode.Always);
             SetDefault(OsuSetting.ShowHealthDisplayWhenCantFail, true);
             SetDefault(OsuSetting.FadePlayfieldWhenHealthLow, true);
-            SetDefault(OsuSetting.KeyOverlay, false);
+            SetDefault(OsuSetting.KeyOverlay, true);
             SetDefault(OsuSetting.ReplaySettingsOverlay, true);
             SetDefault(OsuSetting.ReplayPlaybackControlsExpanded, true);
             SetDefault(OsuSetting.GameplayLeaderboard, true);
@@ -155,6 +156,9 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.FloatingComments, false);
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
+            SetDefault(OsuSetting.HitMode, HitWindows.HitMode.Standardised);
+            SetDefault(OsuSetting.AccuracyCutoffS, 0.9, 0.95, 1, 0.01);
+            SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.01);
 
             SetDefault(OsuSetting.IncreaseFirstObjectVisibility, true);
             SetDefault(OsuSetting.GameplayDisableWinKey, true);
@@ -169,6 +173,8 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ScreenshotFormat, ScreenshotFormat.Jpg);
             SetDefault(OsuSetting.ScreenshotCaptureMenuCursor, false);
+
+            SetDefault(OsuSetting.SongSelectRightMouseScroll, true);
 
             SetDefault(OsuSetting.Scaling, ScalingMode.Off);
             SetDefault(OsuSetting.SafeAreaConsiderations, true);
@@ -217,8 +223,8 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.EditorContractSidebars, false);
 
-            SetDefault(OsuSetting.AlwaysShowHoldForMenuButton, false);
-            SetDefault(OsuSetting.AlwaysRequireHoldingForPause, false);
+            SetDefault(OsuSetting.AlwaysShowHoldForMenuButton, true);
+            SetDefault(OsuSetting.AlwaysRequireHoldingForPause, true);
             SetDefault(OsuSetting.EditorShowStoryboard, true);
 
             SetDefault(OsuSetting.EditorSubmissionNotifyOnDiscussionReplies, true);
@@ -405,11 +411,16 @@ namespace osu.Game.Configuration
         Skin,
         ScreenshotFormat,
         ScreenshotCaptureMenuCursor,
+        SongSelectRightMouseScroll,
         BeatmapSkins,
         BeatmapColours,
         BeatmapHitsounds,
         IncreaseFirstObjectVisibility,
         ScoreDisplayMode,
+        SelectEzMode,
+        HitMode,
+        AccuracyCutoffS,
+        AccuracyCutoffA,
         ExternalLinkWarning,
         PreferNoVideo,
         Scaling,
@@ -451,7 +462,6 @@ namespace osu.Game.Configuration
         /// The status for the current user to broadcast to other players.
         /// </summary>
         UserOnlineStatus,
-
         MultiplayerRoomFilter,
         HideCountryFlags,
         EditorTimelineShowTimingChanges,

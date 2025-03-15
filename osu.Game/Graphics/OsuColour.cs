@@ -154,6 +154,9 @@ namespace osu.Game.Graphics
         {
             switch (modType)
             {
+                case ModType.CustomMod:
+                    return BlueLight;
+
                 case ModType.Automation:
                     return Blue1;
 

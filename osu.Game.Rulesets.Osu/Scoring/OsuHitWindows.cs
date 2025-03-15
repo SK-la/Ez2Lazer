@@ -34,6 +34,6 @@ namespace osu.Game.Rulesets.Osu.Scoring
             return false;
         }
 
-        protected override DifficultyRange[] GetRanges() => OSU_RANGES;
+        public override DifficultyRange[] GetRanges() => OSU_RANGES;
     }
 }

@@ -105,10 +105,10 @@ namespace osu.Game.Screens.Play
             bool isRotated = absRotation > allowance && absRotation < (180 - allowance);
 
             keyNameText.Anchor =
-                keyNameText.Origin = isRotated ? Anchor.TopCentre : Anchor.TopLeft;
+                keyNameText.Origin = Anchor.TopCentre;
 
             countText.Anchor =
-                countText.Origin = isRotated ? Anchor.BottomCentre : Anchor.BottomLeft;
+                countText.Origin = Anchor.BottomCentre;
         }
 
         protected override void Activate(bool forwardPlayback = true)

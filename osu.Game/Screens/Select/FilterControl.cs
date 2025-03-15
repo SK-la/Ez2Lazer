@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>.Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
@@ -34,7 +35,7 @@ namespace osu.Game.Screens.Select
 {
     public partial class FilterControl : Container
     {
-        public const float HEIGHT = 2 * side_margin + 120;
+        public const float HEIGHT = 4 * side_margin + 120;
 
         private const float side_margin = 10;
 
@@ -54,6 +55,9 @@ namespace osu.Game.Screens.Select
         private FilterControlTextBox searchTextBox;
         private CollectionDropdown collectionDropdown;
 
+        // private OsuTabControl<SelectEzMode> ezModeTabs;
+        private Bindable<SelectEzMode> ezMode;
+
         [CanBeNull]
         private FilterCriteria currentCriteria;
 
@@ -70,6 +74,22 @@ namespace osu.Game.Screens.Select
                 Mods = mods.Value,
                 CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet()
             };
+
+            if (ezMode?.Value != null && ezMode.Value != SelectEzMode.All)
+            {
+                float keyCount;
+
+                if (float.TryParse(EzModeHelper.GetKeyCountFromEzMode(ezMode.Value).ToString(CultureInfo.InvariantCulture), out keyCount))
+                {
+                    criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                    {
+                        Min = keyCount,
+                        Max = keyCount,
+                        IsLowerInclusive = true,
+                        IsUpperInclusive = true
+                    };
+                }
+            }
 
             if (!minimumStars.IsDefault)
                 criteria.UserStarDifficulty.Min = minimumStars.Value;
@@ -91,6 +111,7 @@ namespace osu.Game.Screens.Select
         {
             sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
             groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupingMode);
+            ezMode = config.GetBindable<SelectEzMode>(OsuSetting.SelectEzMode);
 
             Children = new Drawable[]
             {
@@ -169,6 +190,45 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.BottomRight,
                                             Origin = Anchor.BottomRight,
                                         },
+                                    },
+                                }
+                            },
+                            new GridContainer
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                AutoSizeAxes = Axes.Y,
+                                ColumnDimensions = new[]
+                                {
+                                    new Dimension(GridSizeMode.AutoSize),
+                                    new Dimension(GridSizeMode.Absolute, OsuTabControl<SortMode>.HORIZONTAL_SPACING),
+                                    new Dimension(),
+                                    new Dimension(GridSizeMode.Absolute, OsuTabControl<SortMode>.HORIZONTAL_SPACING),
+                                    new Dimension(GridSizeMode.AutoSize),
+                                },
+                                RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                                Content = new[]
+                                {
+                                    new[]
+                                    {
+                                        new OsuSpriteText
+                                        {
+                                            Text = "Keys",
+                                            Font = OsuFont.GetFont(size: 12),
+                                            Margin = new MarginPadding(5),
+                                            Anchor = Anchor.BottomRight,
+                                            Origin = Anchor.BottomRight,
+                                        },
+                                        Empty(),
+                                        new OsuTabControl<SelectEzMode>
+                                        {
+                                            RelativeSizeAxes = Axes.X,
+                                            Height = 24,
+                                            AutoSort = false,
+                                            Anchor = Anchor.BottomRight,
+                                            Origin = Anchor.BottomRight,
+                                            AccentColour = colours.BlueLight,
+                                            Current = { BindTarget = ezMode }
+                                        },
                                     }
                                 }
                             },
@@ -231,6 +291,10 @@ namespace osu.Game.Screens.Select
                     updateCriteria();
             });
 
+            // ezModeTabs.Current.BindValueChanged(OnEzModeChanged, true);
+            // ezMode?.BindValueChanged(_ => updateCriteria());
+            ezMode.ValueChanged += _ => updateCriteria();
+
             groupMode.BindValueChanged(_ => updateCriteria());
             sortMode.BindValueChanged(_ => updateCriteria());
 
@@ -239,6 +303,12 @@ namespace osu.Game.Screens.Select
             updateCriteria();
         }
 
+        // private void OnEzModeChanged(ValueChangedEvent<SelectEzMode> args)
+        // {
+        //     string filterString = EzModeHelper.GenerateFilterString(args.NewValue);
+        //     // currentCriteria!.CircleSize.Min = currentCriteria.CircleSize.Max = EzModeHelper.GetKeyCountFromEzMode(args.NewValue);
+        //     CurrentTextSearch.Value = filterString;
+        // }
         public void Deactivate()
         {
             searchTextBox.ReadOnly = true;
@@ -307,3 +377,48 @@ namespace osu.Game.Screens.Select
         }
     }
 }
+
+// private void OnEzModeChanged(ValueChangedEvent<SelectEzMode> args)
+// {
+//     string filterString = EzModeHelper.GenerateFilterString(args.NewValue);
+//     FilterCriteria criteria = new FilterCriteria
+//     {
+//         Group = groupMode?.Value ?? default,
+//         Sort = sortMode?.Value ?? default,
+//         AllowConvertedBeatmaps = showConverted?.Value ?? false,
+//         EzMode = ezMode?.Value ?? default,
+//         Ruleset = ruleset?.Value,
+//         Mods = mods?.Value ?? new List<Mod>(),
+//         CollectionBeatmapMD5Hashes = collectionDropdown?.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet()
+//     };
+//     FilterQueryParser.ApplyQueries(criteria, filterString);
+//     // CurrentTextSearch.Value = filterString;
+// }
+
+// public event Action<SelectEzMode, bool> Clicked;
+
+// protected override bool OnClick(ClickEvent e)
+// {
+//     if (e.Button == MouseButton.Left || e.Button == MouseButton.Right)
+//     {
+//         // 确定点击的是哪个模式
+//         var selectedItem = ezModeTabs.Current.Value;
+//
+//         if (e.Button == MouseButton.Left)
+//         {
+//             Clicked?.Invoke(selectedItem, true);
+//         }
+//         // else if (e.Button == MouseButton.Right)
+//         // {
+//         //     if (control.GetSelectedMode() = selectedItem)
+//         //     {
+//         //         control.ToggleMode(selectedItem);
+//         //         Clicked?.Invoke(selectedItem, false);
+//         //     }
+//         // }
+//
+//         return true;
+//     }
+//
+//     return base.OnClick(e);
+// }

@@ -27,6 +27,7 @@ namespace osu.Game.Screens.Select
 
         public BeatmapSetInfo? SelectedBeatmapSet;
 
+        // public List<float> EzK { get; set; } = new List<float>();
         public OptionalRange<double> StarDifficulty;
         public OptionalRange<float> ApproachRate;
         public OptionalRange<float> DrainRate;

@@ -470,13 +470,13 @@ namespace osu.Game.Screens.Play.HUD.HitErrorMeters
                 base.PrepareForUse();
 
                 const int judgement_fade_in_duration = 100;
-                const int judgement_fade_out_duration = 5000;
+                const int judgement_fade_out_duration = 1200;
 
                 Alpha = 0;
                 Width = 0;
 
                 this
-                    .FadeTo(0.6f, judgement_fade_in_duration, Easing.OutQuint)
+                    .FadeTo(0.8f, judgement_fade_in_duration, Easing.OutQuint)
                     .ResizeWidthTo(1, judgement_fade_in_duration, Easing.OutQuint)
                     .Then()
                     .FadeOut(judgement_fade_out_duration)

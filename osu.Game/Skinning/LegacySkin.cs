@@ -379,8 +379,8 @@ namespace osu.Game.Skinning
 
                                     if (combo != null)
                                     {
-                                        combo.Anchor = Anchor.BottomLeft;
-                                        combo.Origin = Anchor.BottomLeft;
+                                        combo.Anchor = Anchor.Centre;
+                                        combo.Origin = Anchor.Centre;
                                         combo.Scale = new Vector2(1.28f);
 
                                         pos += new Vector2(10, -(combo.DrawHeight * 1.56f + 20) * combo.Scale.X);
@@ -388,8 +388,8 @@ namespace osu.Game.Skinning
 
                                     if (spectatorList != null)
                                     {
-                                        spectatorList.Anchor = Anchor.BottomLeft;
-                                        spectatorList.Origin = Anchor.BottomLeft;
+                                        spectatorList.Anchor = Anchor.Centre;
+                                        spectatorList.Origin = Anchor.Centre;
                                         spectatorList.Position = pos;
                                     }
                                 })

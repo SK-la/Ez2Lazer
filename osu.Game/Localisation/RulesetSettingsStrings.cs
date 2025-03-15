@@ -82,7 +82,7 @@ namespace osu.Game.Localisation
         /// <summary>
         /// "{0}ms (speed {1:N1})"
         /// </summary>
-        public static LocalisableString ScrollSpeedTooltip(int scrollTime, double scrollSpeed) => new TranslatableString(getKey(@"ruleset"), @"{0}ms (speed {1:N1})", scrollTime, scrollSpeed);
+        public static LocalisableString ScrollSpeedTooltip(double scrollTime, double scrollSpeed) => new TranslatableString(getKey(@"ruleset"), @"{0}ms (speed {1:N1})", scrollTime, scrollSpeed);
 
         /// <summary>
         /// "Touch control scheme"
@@ -108,6 +108,21 @@ namespace osu.Game.Localisation
         /// "Landscape (touch overlay)"
         /// </summary>
         public static LocalisableString LandscapeTouchOverlay => new TranslatableString(getKey(@"landscape_touch_overlay"), @"Landscape (touch overlay)");
+
+        /// <summary>
+        /// "Scrolling style"
+        /// </summary>
+        public static LocalisableString ScrollingStyle => new TranslatableString(getKey(@"scrolling_style"), @"Scrolling style");
+
+        /// <summary>
+        /// "Scroll Base MS (200 Speed)"
+        /// </summary>
+        public static LocalisableString ScrollBaseSpeed => new TranslatableString(getKey(@"scroll_base_speed"), @"Scroll Base MS (200 Speed)");
+
+        /// <summary>
+        /// "Scroll time precision"
+        /// </summary>
+        public static LocalisableString ScrollTimePrecision => new TranslatableString(getKey(@"scrolling_time_precision"), @"Scroll time precision");
 
         private static string getKey(string key) => $@"{prefix}:{key}";
     }

@@ -23,11 +23,16 @@ using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
 using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mania.Mods.LAsMods;
+using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.Skinning.Argon;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
+using osu.Game.Rulesets.Mania.Skinning.SbI;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Replays.Types;
@@ -46,7 +51,7 @@ namespace osu.Game.Rulesets.Mania
         /// <summary>
         /// The maximum number of supported keys in a single stage.
         /// </summary>
-        public const int MAX_STAGE_KEYS = 10;
+        public const int MAX_STAGE_KEYS = 18;
 
         public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) => new DrawableManiaRuleset(this, beatmap, mods);
 
@@ -75,6 +80,12 @@ namespace osu.Game.Rulesets.Mania
 
                 case ArgonSkin:
                     return new ManiaArgonSkinTransformer(skin, beatmap);
+
+                case Ez2Skin:
+                    return new ManiaEz2SkinTransformer(skin, beatmap);
+
+                case SbISkin:
+                    return new ManiaSbISkinTransformer(skin, beatmap);
 
                 case DefaultLegacySkin:
                     return new ManiaClassicSkinTransformer(skin, beatmap);
@@ -265,24 +276,52 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModInvert(),
                         new ManiaModConstantSpeed(),
                         new ManiaModHoldOff(),
-                        new MultiMod(
-                            new ManiaModKey1(),
-                            new ManiaModKey2(),
-                            new ManiaModKey3(),
-                            new ManiaModKey4(),
-                            new ManiaModKey5(),
-                            new ManiaModKey6(),
-                            new ManiaModKey7(),
-                            new ManiaModKey8(),
-                            new ManiaModKey9(),
-                            new ManiaModKey10()
-                        ),
+                        // new MultiMod(
+                        //     new ManiaModKey1(),
+                        //     new ManiaModKey2(),
+                        //     new ManiaModKey3(),
+                        //     new ManiaModKey4(),
+                        //     new ManiaModKey5(),
+                        //     new ManiaModKey6(),
+                        //     new ManiaModKey7(),
+                        //     new ManiaModKey8(),
+                        //     new ManiaModKey9(),
+                        //     new ManiaModKey10()
+                        // ),
                     };
 
                 case ModType.Automation:
                     return new Mod[]
                     {
                         new MultiMod(new ManiaModAutoplay(), new ManiaModCinema()),
+                    };
+
+                case ModType.CustomMod:
+                    return new Mod[]
+                    {
+                        new ManiaModEz2Settings(),
+                        new ManiaModCustomHit(),
+                        new ManiaModNiceBPM(),
+                        new ManiaModSpaceBody(),
+                        // new ManiaModAdjust(),
+                        new StarRatingRebirth(),
+                        new ManiaModNtoMAnother(),
+                        new ManiaModNtoM(),
+                        new ManiaModDuplicate(),
+                        new ManiaModDoublePlay(),
+                        new ManiaModNoteAdjust(),
+                        new ManiaModLNTransformer(),
+                        new ManiaModLNLongShortAddition(),
+                        new ManiaModLNDoubleDistribution(),
+                        new ManiaModLNSimplify(),
+                        new ManiaModJackAdjust(),
+                        new ManiaModDeleteSpace(),
+                        new ManiaModCleaner(),
+                        // new ManiaModNewJudgement(),
+                        // new ManiaModJudgmentsAdjust(),
+                        new ManiaModRemedy(),
+                        new ManiaModGracer(),
+                        new ManiaModReleaseAdjust(),
                     };
 
                 case ModType.Fun:
@@ -330,8 +369,8 @@ namespace osu.Game.Rulesets.Mania
             {
                 for (int i = 1; i <= MAX_STAGE_KEYS; i++)
                     yield return (int)PlayfieldType.Single + i;
-                for (int i = 2; i <= MAX_STAGE_KEYS * 2; i += 2)
-                    yield return (int)PlayfieldType.Dual + i;
+                // for (int i = 2; i <= MAX_STAGE_KEYS * 2; i += 2)
+                //     yield return (int)PlayfieldType.Dual + i;
             }
         }
 
@@ -342,8 +381,8 @@ namespace osu.Game.Rulesets.Mania
                 case PlayfieldType.Single:
                     return new SingleStageVariantGenerator(variant).GenerateMappings();
 
-                case PlayfieldType.Dual:
-                    return new DualStageVariantGenerator(getDualStageKeyCount(variant)).GenerateMappings();
+                // case PlayfieldType.Dual:
+                //     return new DualStageVariantGenerator(getDualStageKeyCount(variant)).GenerateMappings();
             }
 
             return Array.Empty<KeyBinding>();
@@ -356,19 +395,19 @@ namespace osu.Game.Rulesets.Mania
                 default:
                     return $"{variant}K";
 
-                case PlayfieldType.Dual:
-                {
-                    int keys = getDualStageKeyCount(variant);
-                    return $"{keys}K + {keys}K";
-                }
+                // case PlayfieldType.Dual:
+                // {
+                //     int keys = getDualStageKeyCount(variant);
+                //     return $"{keys}K + {keys}K";
+                // }
             }
         }
 
-        /// <summary>
-        /// Finds the number of keys for each stage in a <see cref="PlayfieldType.Dual"/> variant.
-        /// </summary>
-        /// <param name="variant">The variant.</param>
-        private int getDualStageKeyCount(int variant) => (variant - (int)PlayfieldType.Dual) / 2;
+        // /// <summary>
+        // /// Finds the number of keys for each stage in a <see cref="PlayfieldType.Dual"/> variant.
+        // /// </summary>
+        // /// <param name="variant">The variant.</param>
+        // private int getDualStageKeyCount(int variant) => (variant - (int)PlayfieldType.Dual) / 2;
 
         /// <summary>
         /// Finds the <see cref="PlayfieldType"/> that corresponds to a variant value.
@@ -389,30 +428,82 @@ namespace osu.Game.Rulesets.Mania
                 HitResult.Good,
                 HitResult.Ok,
                 HitResult.Meh,
+                HitResult.IgnoreHit,
+                HitResult.IgnoreMiss,
 
                 // HitResult.SmallBonus is used for awarding perfect bonus score but is not included here as
                 // it would be a bit redundant to show this to the user.
             };
         }
 
-        public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
+        // public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
+        // {
+        //     new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+        //     {
+        //         RelativeSizeAxes = Axes.X,
+        //         AutoSizeAxes = Axes.Y
+        //     }),
+        //     new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents) //判定偏移
+        //     {
+        //         RelativeSizeAxes = Axes.X,
+        //         Height = 200
+        //     }, true),
+        //     new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
+        //     {
+        //         new AverageHitError(score.HitEvents),
+        //         new UnstableRate(score.HitEvents)
+        //     }), true),
+        // };
+
+        public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) //单轨道判定分布
         {
-            new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+            var hitEventsByColumn = score.HitEvents
+                                         .Where(e => e.HitObject is ManiaHitObject)
+                                         .GroupBy(e => ((ManiaHitObject)e.HitObject).Column)
+                                         .OrderBy(g => g.Key)
+                                         .ToList();
+
+            var statistics = new List<StatisticItem>
             {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y
-            }),
-            new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
+                new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y
+                }),
+                new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 300
+                }, true),
+                new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
+                {
+                    new AverageHitError(score.HitEvents),
+                    new UnstableRate(score.HitEvents)
+                }), true)
+            };
+
+            foreach (var column in hitEventsByColumn)
             {
-                RelativeSizeAxes = Axes.X,
-                Height = 250
-            }, true),
-            new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
-            {
-                new AverageHitError(score.HitEvents),
-                new UnstableRate(score.HitEvents)
-            }), true)
-        };
+                statistics.Add(new StatisticItem($"Timing Distribution - Column {column.Key + 1}", () => new HitEventTimingDistributionGraph(column.ToList())
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 80,
+                }, true));
+            }
+
+            return statistics.ToArray();
+        }
+
+        // public override DrawableCarouselBeatmap updateKeyCount()
+        // {
+        //     base.UpdateKeyCount();
+        //
+        //     // Assuming you have access to the beatmap instance
+        //     if (calculator1S(beatmap))
+        //     {
+        //         keyCountText.Text = $"[{keyCount - 1}K1S]";
+        //     }
+        // }
 
         public override IRulesetFilterCriteria CreateRulesetFilterCriteria()
         {
