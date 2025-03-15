@@ -1,14 +1,12 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.Extensions;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -24,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => "Modify your judgement.";
 
-        public override ModType Type => ModType.Fun;
+        public override ModType Type => ModType.CustomMod;
 
         public override IconUsage? Icon => FontAwesome.Solid.Shower;
 
@@ -37,6 +35,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             get
             {
                 List<string> descriptions = new List<string>();
+
                 if (CustomHitRange.Value)
                 {
                     descriptions.AddRange(new[]
@@ -50,6 +49,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         $"Miss Hit {MissHit.Value:0.#}"
                     });
                 }
+
                 if (CustomProportionScore.Value)
                 {
                     descriptions.AddRange(new[]
@@ -63,10 +63,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         $"Miss {Miss.Value:0.#}"
                     });
                 }
+
                 return string.Join(", ", descriptions);
             }
         }
-
 
         [SettingSource("Custom Hit Range", "Adjust the hit range of notes.")]
         public BindableBool CustomHitRange { get; set; } = new BindableBool(true);

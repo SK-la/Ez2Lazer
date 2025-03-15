@@ -16,6 +16,26 @@ namespace osu.Game.Rulesets.Scoring
     /// </summary>
     public class HitWindows : IHitWindows
     {
+        private static readonly DifficultyRange[] base_ranges =
+        {
+            new DifficultyRange(HitResult.Perfect, 22.4D, 19.4D, 13.9D),
+            new DifficultyRange(HitResult.Great, 64, 49, 34),
+            new DifficultyRange(HitResult.Good, 97, 82, 67),
+            new DifficultyRange(HitResult.Ok, 127, 112, 97),
+            new DifficultyRange(HitResult.Meh, 151, 136, 121),
+            new DifficultyRange(HitResult.Miss, 188, 173, 158),
+        };
+
+        public readonly DifficultyRange[] DefaultRange =
+        {
+            new DifficultyRange(HitResult.Perfect, 22.4D, 19.4D, 13.9D),
+            new DifficultyRange(HitResult.Great, 64, 49, 34),
+            new DifficultyRange(HitResult.Good, 97, 82, 67),
+            new DifficultyRange(HitResult.Ok, 127, 112, 97),
+            new DifficultyRange(HitResult.Meh, 151, 136, 121),
+            new DifficultyRange(HitResult.Miss, 188, 173, 158),
+        };
+
         public static DifficultyRange[] BaseRanges =
         {
             new DifficultyRange(HitResult.Perfect, 22.4D, 19.4D, 13.9D),
@@ -52,6 +72,31 @@ namespace osu.Game.Rulesets.Scoring
         {
             Standardised,
             Classic
+        }
+
+        public void SetDifficultyRange(DifficultyRange[] range)
+        {
+            // base_range = range;
+
+            range.CopyTo(base_ranges, 0);
+        }
+
+        public void SetDifficultyRange(double perfect, double great, double good, double ok, double meh, double miss)
+        {
+            SetDifficultyRange(new[]
+            {
+                new DifficultyRange(HitResult.Perfect, perfect, perfect, perfect),
+                new DifficultyRange(HitResult.Great, great, great, great),
+                new DifficultyRange(HitResult.Good, good, good, good),
+                new DifficultyRange(HitResult.Ok, ok, ok, ok),
+                new DifficultyRange(HitResult.Meh, meh, meh, meh),
+                new DifficultyRange(HitResult.Miss, miss, miss, miss)
+            });
+        }
+
+        public void ResetRange()
+        {
+            SetDifficultyRange(DefaultRange);
         }
 
         /// <summary>

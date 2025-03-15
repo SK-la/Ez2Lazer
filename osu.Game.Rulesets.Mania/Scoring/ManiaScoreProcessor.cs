@@ -9,13 +9,14 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaScoreProcessor : ScoreProcessor
     {
         private const double combo_base = 4;
+
+        public (int Perfect, int Great, int Good, int Ok, int Meh, int Miss) HitProportionScore = (305, 300, 200, 100, 50, 0);
 
         public ManiaScoreProcessor()
             : base(new ManiaRuleset())
@@ -42,7 +43,17 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Perfect:
-                    return 305;
+                    return HitProportionScore.Perfect;
+                case HitResult.Great:
+                    return HitProportionScore.Great;
+                case HitResult.Good:
+                    return HitProportionScore.Good;
+                case HitResult.Ok:
+                    return HitProportionScore.Ok;
+                case HitResult.Meh:
+                    return HitProportionScore.Meh;
+                case HitResult.Miss:
+                    return HitProportionScore.Miss;
             }
 
             return base.GetBaseScoreForResult(result);
@@ -57,24 +68,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
 
             return GetBaseScoreForResult(result);
-        }
-
-        public override ScoreRank RankFromScore(double accuracy, IReadOnlyDictionary<HitResult, int> results)
-        {
-            ScoreRank rank = base.RankFromScore(accuracy, results);
-
-            if (rank != ScoreRank.S)
-                return rank;
-
-            // SS is expected as long as all hitobjects have been hit with either a GREAT or PERFECT result.
-
-            bool anyImperfect =
-                results.GetValueOrDefault(HitResult.Good) > 0
-                || results.GetValueOrDefault(HitResult.Ok) > 0
-                || results.GetValueOrDefault(HitResult.Meh) > 0
-                || results.GetValueOrDefault(HitResult.Miss) > 0;
-
-            return anyImperfect ? rank : ScoreRank.X;
         }
 
         private class JudgementOrderComparer : IComparer<HitObject>
