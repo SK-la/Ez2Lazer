@@ -1,0 +1,93 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
+using osu.Game.Configuration;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Rulesets.UI.Scrolling.Algorithms;
+
+namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+{
+    public class ManiaModBasicScrollSpeed : Mod, ISupportConstantAlgorithmToggle, IDrawableScrollingRuleset
+    {
+        public override string Name => "Adjust Basic Scroll Speed";
+        public override string Acronym => "ABSS";
+        public override LocalisableString Description => "LaMod: Adjust the basic scrolling speed of different keys.";
+        public override ModType Type => ModType.CustomMod;
+        public override double ScoreMultiplier => 1;
+
+        [SettingSource("Basic Scrolling Speed", "基础落速")]
+        public BindableNumber<double> BasicScrollingSpeed { get; } = new BindableNumber<double>
+        {
+            MinValue = 200,
+            MaxValue = 2000,
+            Default = 500,
+            Value = 1,
+        };
+
+        public BindableBool ShowSpeedChanges { get; } = new BindableBool();
+
+        public double? TimelineTimeRange { get; set; }
+
+        public required IScrollingInfo ScrollingInfo;
+
+        [BackgroundDependencyLoader]
+        private void load(IScrollingInfo scrollingInfo)
+        {
+            this.ScrollingInfo = scrollingInfo;
+        }
+
+        protected void LoadComplete()
+        {
+            ShowSpeedChanges.BindValueChanged(showChanges => VisualisationMethod = showChanges.NewValue ? ScrollVisualisationMethod.Sequential : ScrollVisualisationMethod.Constant, true);
+        }
+
+        public void ApplyToBeatmap(IBeatmap beatmap)
+        {
+            double currentScrollSpeed = ScrollingInfo.TimeRange.Value;
+
+            int totalKeys = beatmap.HitObjects.OfType<ManiaHitObject>().Max(h => h.Column) + 1;
+            double speedMultiplier = BasicScrollingSpeed.Value / 1000.0;
+
+            double newScrollSpeed = currentScrollSpeed * speedMultiplier * totalKeys;
+
+            ScrollingInfo.TimeRange.Value = newScrollSpeed;
+        }
+
+        private ScrollVisualisationMethod visualisationMethod = ScrollVisualisationMethod.Sequential;
+
+        public ScrollVisualisationMethod VisualisationMethod
+        {
+            get => visualisationMethod;
+            set
+            {
+                visualisationMethod = value;
+                updateScrollAlgorithm();
+            }
+        }
+
+        private void updateScrollAlgorithm()
+        {
+            switch (VisualisationMethod)
+            {
+                case ScrollVisualisationMethod.Sequential:
+                    ScrollingInfo.Algorithm = new SequentialScrollAlgorithm(ControlPoints);
+                    break;
+
+                case ScrollVisualisationMethod.Overlapping:
+                    ScrollingInfo.Algorithm.Value = new OverlappingScrollAlgorithm(ControlPoints);
+                    break;
+
+                case ScrollVisualisationMethod.Constant:
+                    ScrollingInfo.Algorithm.Value = new ConstantScrollAlgorithm();
+                    break;
+            }
+        }
+    }
+}

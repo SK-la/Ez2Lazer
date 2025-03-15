@@ -1,0 +1,585 @@
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Audio;
+using osu.Framework.Bindables;
+using osu.Framework.Extensions.IEnumerableExtensions;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Localisation;
+using osu.Framework.Utils;
+using osu.Game.Beatmaps;
+using osu.Game.Configuration;
+using osu.Game.Overlays.Settings;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.UI;
+using osu.Game.Scoring;
+using osu.Game.Screens.Play;
+using osu.Game.Screens.Select;
+
+namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+{
+    public class ManiaModAdjust : ModRateAdjust, IApplicableToBeatmap, IManiaRateAdjustmentMod, IApplicableToDrawableRuleset<ManiaHitObject>, IApplicableFailOverride,
+                                  IApplicableToHUD, IReadFromConfig, IApplicableToHealthProcessor, IApplicableToScoreProcessor //, IUpdatableByPlayfield
+    {
+        public override string Name => @"Adjust";
+
+        public override LocalisableString Description => @"Set your settings.";
+
+        public override string Acronym => "AJ";
+
+        public override ModType Type => ModType.Conversion;
+
+        public override IconUsage? Icon => FontAwesome.Solid.Atlas;
+
+        public override double ScoreMultiplier => ScoreMultiplierAdjust.Value;
+        //{
+        //    get
+        //    {
+        //        double SpeedValue = SpeedChange.Value;
+        //        float? ODValue = OverallDifficulty.Value;
+        //        if (ODValue is not null)
+        //        {
+        //            return SpeedValue * (double)(ODValue / 5 + 1);
+        //        }
+        //        return SpeedValue;
+        //    }
+        //}
+
+        public override bool Ranked => false;
+
+        public override Type[] IncompatibleMods => new[] { typeof(ModEasy), typeof(ModHardRock), typeof(ModTimeRamp), typeof(ModAdaptiveSpeed), typeof(ModRateAdjust) };
+
+        protected const int FIRST_SETTING_ORDER = 1;
+
+        protected const int LAST_SETTING_ORDER = 2;
+
+        public BindableDouble OriginalOD = new BindableDouble();
+
+        [SettingSource("Score Multiplier")]
+        public BindableNumber<double> ScoreMultiplierAdjust { get; } = new BindableDouble(1)
+        {
+            MinValue = 0,
+            MaxValue = 10,
+            Precision = 0.01
+        };
+
+        [SettingSource("Custom HP")]
+        public BindableBool CustomHP { get; } = new BindableBool(false);
+
+        public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
+
+        [SettingSource("HP Drain", "Override a beatmap's set HP.", FIRST_SETTING_ORDER, SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        public DifficultyBindable DrainRate { get; } = new DifficultyBindable(0)
+        {
+            Precision = 0.1f,
+            MinValue = 0,
+            MaxValue = 10,
+            ExtendedMaxValue = 12,
+            ReadCurrentFromDifficulty = diff => diff.DrainRate
+        };
+
+        [SettingSource("Custom OD")]
+        public BindableBool CustomOD { get; } = new BindableBool(true);
+
+        [SettingSource("Accuracy", "Override a beatmap's set OD.", LAST_SETTING_ORDER, SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable(0)
+        {
+            Precision = 0.1f,
+            MinValue = 0,
+            MaxValue = 10,
+            ExtendedMaxValue = 12,
+            ReadCurrentFromDifficulty = diff => diff.OverallDifficulty
+        };
+
+        [SettingSource("Extended Limits", "Adjust difficulty beyond sane limits.")]
+        public BindableBool ExtendedLimits { get; } = new BindableBool();
+
+        [SettingSource("Constant Speed", "No more tricky speed changes.")]
+        public BindableBool ConstantSpeed { get; } = new BindableBool(true);
+
+        public override string SettingDescription
+        {
+            get
+            {
+                List<string> descriptions = [];
+                if (CustomHP.Value) descriptions.Add("HP " + DrainRate.Value);
+
+                if (CustomOD.Value) descriptions.Add("OD " + OverallDifficulty.Value);
+
+                if (ScoreMultiplierAdjust.Value != 1) descriptions.Add($"Score Multiplier {ScoreMultiplierAdjust.Value:N3}");
+
+                if (SpeedChange.Value != 1) descriptions.Add($"Speed {SpeedChange.Value:N3}");
+
+                if (AdjustPitch.Value) descriptions.Add("Adjust Pitch");
+
+                if (ConstantSpeed.Value) descriptions.Add("Constant Speed");
+
+                if (Mirror.Value) descriptions.Add("Mirror");
+
+                if (RandomMirror.Value) descriptions.Add("Random Mirror");
+
+                if (NoFail.Value) descriptions.Add("No Fail");
+
+                if (Restart.Value) descriptions.Add("Restart");
+
+                if (RandomSelect.Value) descriptions.Add("Random");
+
+                if (TrueRandom.Value) descriptions.Add("True Random");
+
+                if (Seed.Value is not null) descriptions.Add($"Seed {Seed.Value}");
+
+                if (CustomHitRange.Value)
+                {
+                    //str.Add("Custom Hit Range" );
+                    descriptions.Add("Perfect Hit " + PerfectHit.Value + "ms");
+                    descriptions.Add("Great Hit " + GreatHit.Value + "ms");
+                    descriptions.Add("Good Hit " + GoodHit.Value + "ms");
+                    descriptions.Add("Ok Hit " + OkHit.Value + "ms");
+                    descriptions.Add("Meh Hit " + MehHit.Value + "ms");
+                    descriptions.Add("Miss Hit " + MissHit.Value + "ms");
+                }
+
+                if (CustomProportionScore.Value)
+                {
+                    //str.Add("Custom Proportion Score" );
+                    descriptions.Add("Perfect " + Perfect.Value);
+                    descriptions.Add("Great " + Great.Value);
+                    descriptions.Add("Good " + Good.Value);
+                    descriptions.Add("Ok " + Ok.Value);
+                    descriptions.Add("Meh " + Meh.Value);
+                    descriptions.Add("Miss " + Miss.Value);
+                }
+
+                return string.Join(", ", descriptions.Where(s => !string.IsNullOrEmpty(s)));
+            }
+        }
+
+        public override string ExtendedIconInformation => "";
+
+        [SettingSource("Speed rate", "The actual increase to apply.", SettingControlType = typeof(MultiplierSettingsSlider))]
+        public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
+        {
+            MinValue = 0.1,
+            MaxValue = 2.5,
+            Precision = 0.025
+        };
+
+        public override void ApplyToSample(IAdjustableAudioComponent sample)
+        {
+            if (UseBPM.Value && BPM.Value is not null)
+            {
+                var newBindable = new Bindable<double>
+                {
+                    Value = (double)BPM.Value / NowBeatmapBPM
+                };
+                sample.AddAdjustment(AdjustableProperty.Frequency, newBindable);
+            }
+            else
+                base.ApplyToSample(sample);
+        }
+
+        public override double ApplyToRate(double time, double rate)
+        {
+            if (UseBPM.Value && BPM.Value is not null) return rate * (double)(BPM.Value / NowBeatmapBPM);
+
+            return base.ApplyToRate(time, rate);
+        }
+
+        [SettingSource("Adjust pitch", "Should pitch be adjusted with speed.")]
+        public virtual BindableBool AdjustPitch { get; } = new BindableBool();
+
+        private readonly RateAdjustModHelper rateAdjustHelper;
+
+        public double NowBeatmapBPM
+        {
+            get
+            {
+                double result;
+                if (PlayBeatmapDetailArea.SelectedBeatmapInfo is not null)
+                    result = PlayBeatmapDetailArea.SelectedBeatmapInfo.BPM;
+                else
+                    result = 200;
+
+                if (BPM.Value is not null) SpeedChange.Value = (double)BPM.Value / result;
+                return result;
+            }
+        }
+
+        [SettingSource("BPM", "Change the BPM of the beatmap.", SettingControlType = typeof(SettingsNumberBox))]
+        public Bindable<int?> BPM { get; set; } = new Bindable<int?>(200);
+
+        [SettingSource("Use BPM", "Use BPM instead of speed rate.")]
+        public BindableBool UseBPM { get; set; } = new BindableBool(false);
+
+        public void ReadFromDifficulty(IBeatmapDifficultyInfo difficulty)
+        {
+        }
+
+        public ManiaModAdjust()
+        {
+            if (UseBPM.Value && BPM.Value is not null)
+            {
+                var newBindable = new BindableNumber<double>
+                {
+                    Value = (double)BPM.Value / NowBeatmapBPM
+                };
+                rateAdjustHelper = new RateAdjustModHelper(newBindable);
+            }
+            else
+                rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
+
+            foreach (var (_, property) in this.GetOrderedSettingsSourceProperties())
+            {
+                if (property.GetValue(this) is DifficultyBindable diffAdjustBindable)
+                    diffAdjustBindable.ExtendedLimits.BindTo(ExtendedLimits);
+            }
+
+            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
+        }
+
+        /// <summary>
+        /// Apply all custom settings to the provided beatmap.
+        /// </summary>
+        /// <param name="difficulty">The beatmap to have settings applied.</param>
+        protected virtual void ApplySettings(BeatmapDifficulty difficulty)
+        {
+            if (DrainRate.Value != null && CustomHP.Value) difficulty.DrainRate = DrainRate.Value.Value;
+
+            if (OverallDifficulty.Value != null && CustomOD.Value)
+            {
+                OriginalOD.Value = difficulty.OverallDifficulty;
+                difficulty.OverallDifficulty = OverallDifficulty.Value.Value;
+            }
+        }
+
+        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
+        {
+            ApplySettings(difficulty);
+            if (UseBPM.Value && BPM.Value is not null)
+                HitWindows = new ManiaHitWindows((double)BPM.Value / NowBeatmapBPM);
+            else
+                HitWindows = new ManiaHitWindows(SpeedChange.Value);
+            HitWindows.SetDifficulty(difficulty.OverallDifficulty);
+
+            if (CustomHitRange.Value)
+            {
+                DifficultyRange[] ranges =
+                {
+                    new DifficultyRange(HitResult.Perfect, PerfectHit.Value, PerfectHit.Value, PerfectHit.Value),
+                    new DifficultyRange(HitResult.Great, GreatHit.Value, GreatHit.Value, GreatHit.Value),
+                    new DifficultyRange(HitResult.Good, GoodHit.Value, GoodHit.Value, GoodHit.Value),
+                    new DifficultyRange(HitResult.Ok, OkHit.Value, OkHit.Value, OkHit.Value),
+                    new DifficultyRange(HitResult.Meh, MehHit.Value, MehHit.Value, MehHit.Value),
+                    new DifficultyRange(HitResult.Miss, MissHit.Value, MissHit.Value, MissHit.Value)
+                };
+                HitWindows.SetDifficultyRange(ranges);
+                OverallDifficulty.Value = 0;
+                ApplySettings(difficulty);
+                HitWindows.SetDifficulty(difficulty.OverallDifficulty);
+            }
+            //else if (Test.Value)
+            //{
+            //    double acc = accuracy.Value;
+            //    double com = combo.Value;
+            //    double coefficient = 3.25 / (1 + Math.Exp(-2.67 * (acc - 90)));
+            //    if (com > 100)
+            //    {
+            //        com = 100;
+            //    }
+            //    double resCom = (((100 - com) / 100) + 1) * 2.5;
+            //    DifficultyRange[] testRanges =
+            //    {
+            //        new DifficultyRange(HitResult.Perfect, 22.4D * resCom, 19.4D * resCom, 13.9D * resCom),
+            //        new DifficultyRange(HitResult.Great, 64 * resCom, 49 * resCom, 34 * resCom),
+            //        new DifficultyRange(HitResult.Good, 97 * resCom, 82 * resCom, 67 * resCom),
+            //        new DifficultyRange(HitResult.Ok, 127 * resCom, 112 * resCom, 97 * resCom),
+            //        new DifficultyRange(HitResult.Meh, 151 * resCom, 136 * resCom, 121 * resCom),
+            //        new DifficultyRange(HitResult.Miss, 188 * resCom, 173 * resCom, 158 * resCom),
+            //    };
+            //    HitWindows.SetDifficultyRange(testRanges);
+            //}
+            else
+                HitWindows.ResetRange();
+        }
+
+        public override void ApplyToTrack(IAdjustableAudioComponent track)
+        {
+            rateAdjustHelper.ApplyToTrack(track);
+        }
+
+        public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
+        {
+            var maniaRuleset = (DrawableManiaRuleset)drawableRuleset;
+            if (ConstantSpeed.Value) maniaRuleset.VisualisationMethod = ScrollVisualisationMethod.Constant;
+        }
+
+        [SettingSource("Mirror", "Notes are flipped horizontally.")]
+        public BindableBool Mirror { get; } = new BindableBool();
+
+        [SettingSource("Random Mirror", "Mirror or not mirror notes by random.")]
+        public BindableBool RandomMirror { get; } = new BindableBool(true);
+
+        [SettingSource("No Fail", "You can't fail, no matter what.")]
+        public BindableBool NoFail { get; } = new BindableBool(true);
+
+        [SettingSource("Restart on fail", "Automatically restarts when failed.")]
+        public BindableBool Restart { get; } = new BindableBool();
+
+        [SettingSource("Random", "Shuffle around the keys.")]
+        public BindableBool RandomSelect { get; } = new BindableBool();
+
+        [SettingSource("True Random", "Shuffle all notes(Use NoLN(LN Transformer Level -3), or you will get overlapping notes otherwise).")]
+        public BindableBool TrueRandom { get; } = new BindableBool();
+
+        [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
+        public Bindable<int?> Seed { get; } = new Bindable<int?>();
+
+        public void ApplyToBeatmap(IBeatmap beatmap)
+        {
+            if (RandomSelect.Value)
+            {
+                Seed.Value ??= RNG.Next();
+                var rng = new Random((int)Seed.Value);
+
+                int availableColumns = ((ManiaBeatmap)beatmap).TotalColumns;
+                var shuffledColumns = Enumerable.Range(0, availableColumns).OrderBy(_ => rng.Next()).ToList();
+                beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = shuffledColumns[h.Column]);
+            }
+
+            if (Mirror.Value)
+            {
+                int availableColumns = ((ManiaBeatmap)beatmap).TotalColumns;
+                beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = availableColumns - 1 - h.Column);
+            }
+
+            if (RandomMirror.Value)
+            {
+                Seed.Value ??= RNG.Next();
+                var rng = new Random((int)Seed.Value);
+
+                if (rng.Next() % 2 == 0)
+                {
+                    int availableColumns = ((ManiaBeatmap)beatmap).TotalColumns;
+                    beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = availableColumns - 1 - h.Column);
+                }
+            }
+
+            if (TrueRandom.Value)
+            {
+                Seed.Value ??= RNG.Next();
+                var rng = new Random((int)Seed.Value);
+                int availableColumns = ((ManiaBeatmap)beatmap).TotalColumns;
+
+                foreach (var obj in beatmap.HitObjects.OfType<ManiaHitObject>().GroupBy(c => c.StartTime))
+                {
+                    var columnList = new List<int>();
+                    foreach (var hit in obj) columnList.Add(hit.Column);
+                    var newColumn = Enumerable.Range(0, availableColumns).SelectRandom(rng, columnList.Count).ToList();
+                    int index = 0;
+
+                    foreach (var hit in obj)
+                    {
+                        hit.Column = newColumn[index];
+                        index++;
+                    }
+                }
+            }
+        }
+
+        //------Fail Condition------
+        private Action? triggerFailureDelegate;
+
+        private readonly Bindable<bool> showHealthBar = new Bindable<bool>();
+
+        public bool PerformFail()
+        {
+            return !NoFail.Value;
+        }
+
+        public bool RestartOnFail
+        {
+            get
+            {
+                if (NoFail.Value) return !NoFail.Value;
+
+                return Restart.Value;
+            }
+        }
+
+        public void ReadFromConfig(OsuConfigManager config)
+        {
+            config.BindWith(OsuSetting.ShowHealthDisplayWhenCantFail, showHealthBar);
+        }
+
+        public void ApplyToHUD(HUDOverlay overlay)
+        {
+            overlay.ShowHealthBar.BindTo(showHealthBar);
+        }
+
+        public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
+        {
+            triggerFailureDelegate = healthProcessor.TriggerFailure;
+            //healthProcessor.FailConditions += FailCondition;
+        }
+
+        protected void TriggerFailure()
+        {
+            triggerFailureDelegate?.Invoke();
+        }
+
+        //protected bool FailCondition(HealthProcessor healthProcessor, JudgementResult result)
+        //{
+        //    return result.Type.AffectsCombo()
+        //       && !result.IsHit;
+        //}
+        //------Fail Condition------
+
+        [SettingSource("Custom Hit Range", "Adjust the hit range of notes.")]
+        public BindableBool CustomHitRange { get; } = new BindableBool();
+
+        [SettingSource("Perfect")]
+        public BindableDouble PerfectHit { get; } = new BindableDouble(22.4D)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Great")]
+        public BindableDouble GreatHit { get; } = new BindableDouble(64)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Good")]
+        public BindableDouble GoodHit { get; } = new BindableDouble(97)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Ok")]
+        public BindableDouble OkHit { get; } = new BindableDouble(127)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Meh")]
+        public BindableDouble MehHit { get; } = new BindableDouble(151)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Miss")]
+        public BindableDouble MissHit { get; } = new BindableDouble(188)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Custom Proportion Score")]
+        public BindableBool CustomProportionScore { get; } = new BindableBool();
+
+        [SettingSource("Perfect")]
+        public BindableInt Perfect { get; } = new BindableInt(300)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Great")]
+        public BindableInt Great { get; } = new BindableInt(300)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Good")]
+        public BindableInt Good { get; } = new BindableInt(200)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Ok")]
+        public BindableInt Ok { get; } = new BindableInt(100)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Meh")]
+        public BindableInt Meh { get; } = new BindableInt(50)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Miss")]
+        public BindableInt Miss { get; } = new BindableInt(0)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Test")]
+        public BindableBool Test { get; } = new BindableBool();
+
+        private readonly BindableInt combo = new BindableInt();
+
+        private readonly BindableDouble accuracy = new BindableDouble();
+
+        public ScoreRank AdjustRank(ScoreRank rank, double accuracy)
+        {
+            return rank;
+        }
+
+        public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
+        {
+            var mania = (ManiaScoreProcessor)scoreProcessor;
+
+            if (CustomProportionScore.Value)
+            {
+                mania.HitProportionScore.Perfect = Perfect.Value;
+                mania.HitProportionScore.Great = Great.Value;
+                mania.HitProportionScore.Good = Good.Value;
+                mania.HitProportionScore.Ok = Ok.Value;
+                mania.HitProportionScore.Meh = Meh.Value;
+                mania.HitProportionScore.Miss = Miss.Value;
+            }
+
+            combo.UnbindAll();
+            accuracy.UnbindAll();
+            combo.BindTo(scoreProcessor.Combo);
+            accuracy.BindTo(scoreProcessor.Accuracy);
+        }
+
+        public override void ResetSettingsToDefaults()
+        {
+            base.ResetSettingsToDefaults();
+            HitWindows.ResetRange();
+        }
+    }
+}

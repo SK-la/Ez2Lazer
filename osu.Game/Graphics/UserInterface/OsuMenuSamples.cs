@@ -53,7 +53,7 @@ namespace osu.Game.Graphics.UserInterface
             Scheduler.AddOnce(resolvePlayback);
         }
 
-        private void playClickSample() => sampleClick.Play();
+        private void playClickSample() => sampleClick?.Play();
 
         private void resolvePlayback()
         {
