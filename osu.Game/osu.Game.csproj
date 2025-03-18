@@ -40,13 +40,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Realm" Version="20.1.0" />
-    <PackageReference Include="ppy.osu.Framework" Version="2025.313.0" />
-<!--    <PackageReference Include="ppy.osu.Game.Resources" Version="2025.313.0" />-->
+    <PackageReference Include="ppy.osu.Framework" Version="2025.318.1" />
+<!--    <PackageReference Include="ppy.osu.Game.Resources" Version="2025.318.0" />-->
     <PackageReference Include="Sentry" Version="5.1.1" />
     <!-- Held back due to 0.34.0 failing AOT compilation on ZstdSharp.dll dependency. -->
     <PackageReference Include="SharpCompress" Version="0.39.0" />
     <PackageReference Include="NUnit" Version="3.14.0" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.7" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.10" />
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />

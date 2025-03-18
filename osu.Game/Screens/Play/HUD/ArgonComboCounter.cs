@@ -19,7 +19,7 @@ namespace osu.Game.Screens.Play.HUD
 {
     public partial class ArgonComboCounter : ComboCounter
     {
-        public ArgonCounterTextComponent Text = null!;
+        protected ArgonCounterTextComponent Text = null!;
 
         protected override double RollingDuration => 250;
 

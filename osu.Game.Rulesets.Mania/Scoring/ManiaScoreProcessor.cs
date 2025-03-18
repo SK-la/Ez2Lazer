@@ -44,14 +44,19 @@ namespace osu.Game.Rulesets.Mania.Scoring
             {
                 case HitResult.Perfect:
                     return HitProportionScore.Perfect;
+
                 case HitResult.Great:
                     return HitProportionScore.Great;
+
                 case HitResult.Good:
                     return HitProportionScore.Good;
+
                 case HitResult.Ok:
                     return HitProportionScore.Ok;
+
                 case HitResult.Meh:
                     return HitProportionScore.Meh;
+
                 case HitResult.Miss:
                     return HitProportionScore.Miss;
             }
