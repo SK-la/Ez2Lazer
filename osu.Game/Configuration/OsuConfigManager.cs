@@ -156,7 +156,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.FloatingComments, false);
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
-            SetDefault(OsuSetting.HitMode, HitWindows.HitMode.Standardised);
+            SetDefault(OsuSetting.HitMode, HitWindows.HitMode.Ez2AcStyle);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.9, 0.95, 1, 0.01);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.01);
 

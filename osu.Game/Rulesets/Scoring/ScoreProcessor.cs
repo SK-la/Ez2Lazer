@@ -546,7 +546,7 @@ namespace osu.Game.Rulesets.Scoring
                 return ScoreRank.X;
             if (accuracy >= accuracy_cutoff_s) //AccS.Value)
                 return ScoreRank.S;
-            if (accuracy >= accuracy_cutoff_a) //AccA.Value)
+            if (accuracy >= AccA.Value) //AccA.Value)
                 return ScoreRank.A;
             if (accuracy >= accuracy_cutoff_b)
                 return ScoreRank.B;
@@ -570,7 +570,7 @@ namespace osu.Game.Rulesets.Scoring
 
                 case ScoreRank.S:
                 case ScoreRank.SH:
-                    return accuracy_cutoff_s;
+                    return AccA.Value;
 
                 case ScoreRank.A:
                     return accuracy_cutoff_a;

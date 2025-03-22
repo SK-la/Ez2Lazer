@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => "New judgement system.";
 
-        public override ModType Type => ModType.Fun;
+        public override ModType Type => ModType.CustomMod;
 
         public override double ScoreMultiplier => 1.0;
 
@@ -32,6 +32,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             get
             {
                 double result;
+
                 if (PlayBeatmapDetailArea.SelectedBeatmapInfo is not null)
                 {
                     result = PlayBeatmapDetailArea.SelectedBeatmapInfo.BPM;
@@ -40,6 +41,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     result = 200;
                 }
+
                 return result;
             }
         }
@@ -67,22 +69,27 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
             double perBeatLength = 60 / (NowBeatmapBPM) * 1000;
+
             if (BPM.Value is not null)
             {
                 perBeatLength = 60 / (double)BPM.Value * 1000;
             }
+
             if (For14Jack.Value)
             {
                 perBeatLength /= 2;
             }
+
             if (For16Stream.Value)
             {
                 perBeatLength /= 1.5;
             }
+
             if (For13Jack.Value)
             {
                 perBeatLength = perBeatLength * 4 / 6;
             }
+
             double perfectRange = perBeatLength / Divide.Value;
             double greatRange = perBeatLength / (Divide.Value / 1.5);
             double goodRange = perBeatLength / (Divide.Value / 2);

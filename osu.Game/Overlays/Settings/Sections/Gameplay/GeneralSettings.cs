@@ -28,7 +28,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 },
                 new SettingsEnumDropdown<HitWindows.HitMode>
                 {
-                    ClassicDefault = HitWindows.HitMode.Classic,
+                    ClassicDefault = HitWindows.HitMode.Ez2AcStyle,
                     LabelText = GameplaySettingsStrings.HitMode,
                     Current = config.GetBindable<HitWindows.HitMode>(OsuSetting.HitMode),
                     Keywords = new[] { "scoring" }

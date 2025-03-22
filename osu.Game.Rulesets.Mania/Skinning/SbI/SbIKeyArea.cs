@@ -7,7 +7,6 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -18,7 +17,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    public partial class SbIKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
+    public partial class SbIKeyArea : CompositeDrawable
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
@@ -90,13 +89,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     directionContainer.Origin = Anchor.BottomCentre;
                     break;
             }
-        }
-
-        public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
-        {
-            if (e.Action != column.Action.Value) return false;
-
-            return false;
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)

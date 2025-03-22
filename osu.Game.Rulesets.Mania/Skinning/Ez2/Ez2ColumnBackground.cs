@@ -115,11 +115,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             base.LoadComplete();
 
-            if (separator == null)
-            {
-                return;
-            }
-
             separator.Height = DrawHeight - Stage.HIT_TARGET_POSITION;
         }
 
@@ -145,11 +140,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
-            if (column == null || column.Action == null)
-            {
-                return false;
-            }
-            
             if (e.Action == column.Action.Value)
             {
                 var noteColour = column.AccentColour.Value;

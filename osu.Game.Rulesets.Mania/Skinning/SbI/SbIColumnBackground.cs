@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
-        private Box background = null!;
+        // private Box background = null!;
         private Box backgroundOverlay = null!;
 
         [Resolved]
@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             InternalChildren = new Drawable[]
             {
-                background = new Box
+                new Box
                 {
                     Name = "Background",
                     RelativeSizeAxes = Axes.Both,

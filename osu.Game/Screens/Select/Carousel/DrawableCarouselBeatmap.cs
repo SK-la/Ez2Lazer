@@ -127,28 +127,36 @@ namespace osu.Game.Screens.Select.Carousel
                 playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.Value, mods.Value);
             }
 
-            if (mods.Value == null)
+            if (playableBeatmap != null)
             {
-                // kpsCache.Clear();
-                string beatmapHash = beatmapInfo.Hash;
-
-                if (!kpsCache.TryGetValue(beatmapHash, out kpsResult))
+                if (mods.Value == null)
                 {
+                    // kpsCache.Clear();
+                    string beatmapHash = beatmapInfo.Hash;
+
+                    if (!kpsCache.TryGetValue(beatmapHash, out kpsResult))
+                    {
+                        kpsResult = ILAsBmCal.GetKps(playableBeatmap);
+                        kpsCache[beatmapHash] = kpsResult;
+                    }
+
+                    // if (!columnNoteCountsCache.TryGetValue(beatmapHash, out columnNoteCounts!))
+                    // {
+                    //     columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
+                    //     columnNoteCountsCache[beatmapHash] = columnNoteCounts;
+                    // }
                     kpsResult = ILAsBmCal.GetKps(playableBeatmap);
-                    kpsCache[beatmapHash] = kpsResult;
+                }
+                else
+                {
+                    columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
+                    kpsResult = ILAsBmCal.GetKps(playableBeatmap);
                 }
 
-                // if (!columnNoteCountsCache.TryGetValue(beatmapHash, out columnNoteCounts!))
-                // {
-                //     columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
-                //     columnNoteCountsCache[beatmapHash] = columnNoteCounts;
-                // }
-                kpsResult = ILAsBmCal.GetKps(playableBeatmap);
-            }
-            else
-            {
-                columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
-                kpsResult = ILAsBmCal.GetKps(playableBeatmap);
+                if (kpsResult.kpsList.Count == 0)
+                {
+                    kpsResult = (0, 0, new List<double>());
+                }
             }
 
             var (averageKps, maxKps, kpsList) = kpsResult;
@@ -216,17 +224,15 @@ namespace osu.Game.Screens.Select.Carousel
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
                                         },
-                                        kpsList != null && kpsList.Count > 0
-                                            ? new LineGraph
-                                            {
-                                                Size = new Vector2(450, 10),
-                                                Colour = OsuColour.Gray(0.8f),
-                                                Anchor = Anchor.CentreLeft,
-                                                Origin = Anchor.CentreLeft,
-                                                Values = kpsList.Select(kps => (float)kps).ToArray()
-                                            }
-                                            : null,
-                                    }.Where(child => child != null).ToArray(),
+                                        new LineGraph
+                                        {
+                                            Size = new Vector2(450, 10),
+                                            Colour = OsuColour.Gray(0.8f),
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                            Values = kpsList.Select(kps => (float)kps).ToArray()
+                                        }
+                                    }.Where(child => true).ToArray(),
                                 },
                                 new FillFlowContainer
                                 {
@@ -488,7 +494,7 @@ namespace osu.Game.Screens.Select.Carousel
                 items.Add(new OsuMenuItem("Collections") { Items = collectionItems });
 
                 if (beatmapInfo.GetOnlineURL(api, ruleset.Value) is string url)
-                    items.Add(new OsuMenuItem(CommonStrings.CopyLink, MenuItemType.Standard, () => game?.CopyUrlToClipboard(url)));
+                    items.Add(new OsuMenuItem(CommonStrings.CopyLink, MenuItemType.Standard, () => game?.CopyToClipboard(url)));
 
                 if (manager != null)
                     items.Add(new OsuMenuItem("Mark as played", MenuItemType.Standard, () => manager.MarkPlayed(beatmapInfo)));

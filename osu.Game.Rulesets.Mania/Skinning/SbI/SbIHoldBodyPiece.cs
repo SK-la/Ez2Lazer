@@ -4,7 +4,6 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Objects.Drawables;
 
@@ -14,7 +13,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     {
         // private readonly Bindable<Color4> AccentColour = new Bindable<Color4>();
 
-        private Drawable background = null!;
+        // private Drawable background = null!;
 
         public SbIHoldBodyPiece()
         {
@@ -28,14 +27,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [BackgroundDependencyLoader(true)]
         private void load(DrawableHitObject? drawableObject)
         {
-            InternalChildren = new[]
-            {
-                background = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Colour4.White,
-                },
-            };
+            // InternalChildren = new[]
+            // {
+            //     background = new Box
+            //     {
+            //         RelativeSizeAxes = Axes.Both,
+            //         Colour = Colour4.White,
+            //     },
+            // };
 
             // if (drawableObject != null)
             // {

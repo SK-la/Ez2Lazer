@@ -27,6 +27,6 @@ namespace osu.Game.Rulesets.Taiko.Scoring
             return false;
         }
 
-        public override DifficultyRange[] GetRanges() => TAIKO_RANGES;
+        protected override DifficultyRange[] GetRanges() => TAIKO_RANGES;
     }
 }

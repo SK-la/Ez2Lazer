@@ -484,7 +484,7 @@ namespace osu.Game.Rulesets.Osu.Tests
 
             public override bool IsHitResultAllowed(HitResult result) => result == HitResult.Great || result == HitResult.Miss;
 
-            public override DifficultyRange[] GetRanges() => ranges;
+            protected override DifficultyRange[] GetRanges() => ranges;
         }
 
         private partial class ScoreAccessibleReplayPlayer : ReplayPlayer

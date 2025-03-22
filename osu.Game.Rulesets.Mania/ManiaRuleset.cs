@@ -300,7 +300,7 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
-                        new ManiaModCustomHit(),
+                        // new ManiaModJudgmentStyle(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         // new ManiaModAdjust(),
@@ -317,8 +317,8 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModJackAdjust(),
                         new ManiaModDeleteSpace(),
                         new ManiaModCleaner(),
-                        // new ManiaModNewJudgement(),
-                        // new ManiaModJudgmentsAdjust(),
+                        new ManiaModNewJudgement(),
+                        new ManiaModJudgmentsAdjust(),
                         new ManiaModRemedy(),
                         new ManiaModGracer(),
                         new ManiaModReleaseAdjust(),

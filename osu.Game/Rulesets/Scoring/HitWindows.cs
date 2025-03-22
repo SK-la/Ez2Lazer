@@ -53,25 +53,11 @@ namespace osu.Game.Rulesets.Scoring
         private static double meh;
         private static double miss;
 
-        private static bool isModActive;
-
-        public static void SetCustomRanges(IHitWindows? customHitWindows)
-        {
-            if (isModActive && customHitWindows != null)
-            {
-                BaseRanges = customHitWindows.GetRanges();
-            }
-        }
-
-        public static void SetModActive(bool isActive)
-        {
-            isModActive = isActive;
-        }
-
         public enum HitMode
         {
             Standardised,
-            Classic
+            Ez2AcStyle,
+            IIDX,
         }
 
         public void SetDifficultyRange(DifficultyRange[] range)
@@ -247,7 +233,7 @@ namespace osu.Game.Rulesets.Scoring
         /// Retrieve a valid list of <see cref="DifficultyRange"/>s representing hit windows.
         /// Defaults are provided but can be overridden to customise for a ruleset.
         /// </summary>
-        public virtual DifficultyRange[] GetRanges() => BaseRanges;
+        protected virtual DifficultyRange[] GetRanges() => BaseRanges;
 
         private class EmptyHitWindows : HitWindows
         {
@@ -269,7 +255,7 @@ namespace osu.Game.Rulesets.Scoring
                 return false;
             }
 
-            public override DifficultyRange[] GetRanges() => ranges;
+            protected override DifficultyRange[] GetRanges() => ranges;
         }
     }
 

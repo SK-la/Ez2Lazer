@@ -1,34 +1,37 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Linq;
-using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModCustomHit : Mod, IHitWindows
+    public class ManiaModJudgmentStyle : Mod, IApplicableToDifficulty
     {
-        public override string Name => "Custom HitWindows";
+        public override string Name => "Other MUG-Game Judgment Style";
         public override string Acronym => "CH";
         public override double ScoreMultiplier => 1;
         public override bool Ranked => false;
-        public override LocalisableString Description => @"LaMod: Custom HitWindows. Free Hit ms.";
         public override ModType Type => ModType.CustomMod;
+        public override LocalisableString Description => @"LaMod: Custom HitWindows. Free Hit ms.";
 
         [SettingSource("Adaptive Judgement(No Active)")]
         public BindableBool AdaptiveJudgement { get; } = new BindableBool();
 
         [SettingSource("Easy Style Judgement")]
-        public BindableBool UseEasyTemplate { get; } = new BindableBool();
+        public BindableBool Ez2AcTemplate { get; } = new BindableBool();
 
         [SettingSource("Hard Style Judgement")]
         public BindableBool UseHardTemplate { get; } = new BindableBool();
+
+        [SettingSource("Custom Hit Range", "Adjust the hit range of notes.")]
+        public BindableBool CustomHitRange { get; set; } = new BindableBool(true);
 
         [SettingSource("Perfect Offset (ms)")]
         public BindableNumber<double> PerfectOffset { get; } = new BindableDouble(22)
@@ -78,14 +81,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [Resolved]
-        private ScoreProcessor scoreProcessor { get; set; } = null!;
-
-        public ManiaModCustomHit()
+        public ManiaModJudgmentStyle()
         {
-            // HitWindows.SetCustomRanges(this);
-
-            UseEasyTemplate.BindValueChanged(e =>
+            Ez2AcTemplate.BindValueChanged(e =>
             {
                 if (e.NewValue)
                 {
@@ -99,7 +97,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 if (e.NewValue)
                 {
                     applyTemplate(HitWindowTemplates.HARD);
-                    UseEasyTemplate.Value = false;
+                    Ez2AcTemplate.Value = false;
                     AdaptiveJudgement.Value = false;
                 }
             });
@@ -108,9 +106,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 if (e.NewValue)
                 {
                     UseHardTemplate.Value = false;
-                    UseEasyTemplate.Value = false;
-
-                    scoreProcessor?.Accuracy.BindValueChanged(acc => UpdateHitWindowsBasedOnScore(acc.NewValue), true);
+                    Ez2AcTemplate.Value = false;
                 }
                 // else
                 // {
@@ -125,25 +121,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             MissOffset.BindValueChanged(_ => updateHitWindows());
         }
 
-        ~ManiaModCustomHit()
-        {
-            HitWindows.SetModActive(false);
-        }
-
         private void updateHitWindows()
         {
-            HitWindows.SetModActive(true);
-            HitWindows.SetCustomRanges(this);
         }
-
-        // public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
-        // {
-        // }
-
-        // public AdjustRank(ScoreRank rank, double accuracy)
-        // {
-        //     return rank;
-        // }
 
         private void applyTemplate(HitWindowTemplate template)
         {
@@ -217,57 +197,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        public bool IsHitResultAllowed(HitResult result)
-        {
-            return result switch
-            {
-                HitResult.Perfect => true,
-                HitResult.Great => true,
-                HitResult.Good => true,
-                HitResult.Ok => true,
-                HitResult.Meh => true,
-                HitResult.Miss => true,
-                _ => false,
-            };
-        }
-
-        public double WindowFor(HitResult result)
-        {
-            switch (result)
-            {
-                case HitResult.Perfect:
-                    return PerfectOffset.Value;
-
-                case HitResult.Great:
-                    return GreatOffset.Value;
-
-                case HitResult.Good:
-                    return GoodOffset.Value;
-
-                case HitResult.Ok:
-                    return OkOffset.Value;
-
-                case HitResult.Meh:
-                    return MehOffset.Value;
-
-                case HitResult.Miss:
-                    return MissOffset.Value;
-
-                default:
-                    throw new ArgumentException("Unknown enum member", nameof(result));
-            }
-        }
-
-        public DifficultyRange[] GetRanges() => new[]
-        {
-            new DifficultyRange(HitResult.Perfect, PerfectOffset.Value, PerfectOffset.Value, PerfectOffset.Value),
-            new DifficultyRange(HitResult.Great, GreatOffset.Value, GreatOffset.Value, GreatOffset.Value),
-            new DifficultyRange(HitResult.Good, GoodOffset.Value, GoodOffset.Value, GoodOffset.Value),
-            new DifficultyRange(HitResult.Ok, OkOffset.Value, OkOffset.Value, OkOffset.Value),
-            new DifficultyRange(HitResult.Meh, MehOffset.Value, MehOffset.Value, MehOffset.Value),
-            new DifficultyRange(HitResult.Miss, MissOffset.Value, MissOffset.Value, MissOffset.Value),
-        };
-
         public override string SettingDescription
         {
             get
@@ -288,6 +217,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     miss
                 }.Where(s => !string.IsNullOrEmpty(s)));
             }
+        }
+
+        public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
+
+        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
+        {
+            HitWindows.SetDifficultyRange(PerfectOffset.Value, GreatOffset.Value, GoodOffset.Value, OkOffset.Value, MehOffset.Value, MissOffset.Value);
+            difficulty.OverallDifficulty = 0;
+            HitWindows.SetDifficulty(difficulty.OverallDifficulty);
+        }
+
+        public override void ResetSettingsToDefaults()
+        {
+            HitWindows.ResetRange();
         }
     }
 }

@@ -9,6 +9,7 @@ namespace osu.Game.Rulesets.Mods
     {
         bool IsHitResultAllowed(HitResult result);
         double WindowFor(HitResult result);
-        DifficultyRange[] GetRanges();
+
+        // internal DifficultyRange[] GetRanges();
     }
 }

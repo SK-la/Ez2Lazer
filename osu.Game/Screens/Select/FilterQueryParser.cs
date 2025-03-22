@@ -33,36 +33,9 @@ namespace osu.Game.Screens.Select
 
             criteria.SearchText = query;
         }
-        // private static readonly Regex query_syntax_regex = new Regex(
-        //     @"\b(?<key>\w+)(?<op>(:|=|(>|<)(:|=)?))(?<value>("".*""[!]?)|(\S+(\|\S+)*))",
-        //     RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        //
-        // internal static void ApplyQueries(FilterCriteria criteria, string query)
-        // {
-        //     foreach (Match match in query_syntax_regex.Matches(query))
-        //     {
-        //         string key = match.Groups["key"].Value.ToLowerInvariant();
-        //         var op = parseOperator(match.Groups["op"].Value);
-        //         string value = match.Groups["value"].Value;
-        //
-        //         string[] values = value.Split('|');
-        //
-        //         foreach (string val in values)
-        //         {
-        //             if (tryParseKeywordCriteria(criteria, key, val, op))
-        //                 query = query.Replace(match.ToString(), "");
-        //         }
-        //     }
-        //
-        //     criteria.SearchText = query;
-        // }
 
         private static bool tryParseKeywordCriteria(FilterCriteria criteria, string key, string value, Operator op)
         {
-            // string[] values = value.Split('|');
-
-            // foreach (string val in values)
-            // {
             switch (key)
             {
                 case "star":
@@ -79,18 +52,6 @@ namespace osu.Game.Screens.Select
 
                 case "cs":
                     return TryUpdateCriteriaRange(ref criteria.CircleSize, op, value);
-
-                    // case "EzK":
-                    //     if (float.TryParse(val, out float csValue))
-                    //     {
-                    //         criteria.EzK.Add(csValue);
-                    //     }
-                    //     else
-                    //     {
-                    //         return false;
-                    //     }
-                    //
-                    // break;
 
                 case "od":
                     return TryUpdateCriteriaRange(ref criteria.OverallDifficulty, op, value);
@@ -158,9 +119,6 @@ namespace osu.Game.Screens.Select
                 default:
                     return criteria.RulesetCriteria?.TryParseCustomKeywordCriteria(key, op, value) ?? false;
             }
-            // }
-            //
-            // return true;
         }
 
         private static Operator parseOperator(string value)

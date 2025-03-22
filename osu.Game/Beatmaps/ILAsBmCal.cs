@@ -170,7 +170,7 @@ namespace osu.Game.Beatmaps
             if (hitObjects.Count == 0)
                 return false;
 
-            var (averageKps, maxKps, kpsList) = GetKps(beatmap);
+            var (_, maxKps, kpsList) = GetKps(beatmap);
 
             double highSpeedThreshold = maxKps / 4;
 

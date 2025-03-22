@@ -36,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return false;
         }
 
-        public override DifficultyRange[] GetRanges() => base.GetRanges().Select(r =>
+        protected override DifficultyRange[] GetRanges() => base.GetRanges().Select(r =>
             new DifficultyRange(
                 r.Result,
                 r.Min * multiplier,
