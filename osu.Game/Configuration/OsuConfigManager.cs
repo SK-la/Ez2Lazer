@@ -55,7 +55,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.RandomSelectAlgorithm, RandomSelectAlgorithm.RandomPermutation);
             SetDefault(OsuSetting.ModSelectHotkeyStyle, ModSelectHotkeyStyle.Sequential);
-            SetDefault(OsuSetting.ModSelectTextSearchStartsActive, true);
+            SetDefault(OsuSetting.ModSelectTextSearchStartsActive, false);
 
             SetDefault(OsuSetting.ChatDisplayHeight, ChatOverlay.DEFAULT_HEIGHT, 0.2f, 1f, 0.01f);
 
@@ -143,7 +143,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.LightenDuringBreaks, true);
 
             SetDefault(OsuSetting.HitLighting, true);
-            SetDefault(OsuSetting.StarFountains, true);
+            SetDefault(OsuSetting.StarFountains, false);
 
             SetDefault(OsuSetting.HUDVisibilityMode, HUDVisibilityMode.Always);
             SetDefault(OsuSetting.ShowHealthDisplayWhenCantFail, true);
@@ -158,8 +158,8 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
             SetDefault(OsuSetting.HitMode, HitWindows.HitMode.Ez2AcStyle);
-            SetDefault(OsuSetting.AccuracyCutoffS, 0.9D, 0.95D, 1D, 0.005);
-            SetDefault(OsuSetting.AccuracyCutoffA, 0.9D, 0.9D, 1D, 0.005);
+            SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
+            SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
             SetDefault(OsuSetting.IncreaseFirstObjectVisibility, true);
             SetDefault(OsuSetting.GameplayDisableWinKey, true);

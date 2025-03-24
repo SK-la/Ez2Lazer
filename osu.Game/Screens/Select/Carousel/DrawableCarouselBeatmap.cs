@@ -30,6 +30,7 @@ using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.UI;
 using osuTK;
 using osuTK.Graphics;
 using CommonStrings = osu.Game.Localisation.CommonStrings;
@@ -123,11 +124,7 @@ namespace osu.Game.Screens.Select.Carousel
             {
                 hideRequested = manager.Hide;
                 working = manager.GetWorkingBeatmap(beatmapInfo);
-                Schedule(() =>
-                {
-                    playableBeatmap = working.GetPlayableBeatmap(ruleset.Value, mods.Value);
-                    updateCalculations();
-                });
+                Schedule(updateCalculations);
             }
         }
 
@@ -146,12 +143,21 @@ namespace osu.Game.Screens.Select.Carousel
             }
             else
             {
-                playableBeatmap = working.GetPlayableBeatmap(ruleset.Value, mods.Value);
-                columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
-                kpsResult = ILAsBmCal.GetKps(playableBeatmap);
                 kpsCache.Clear();
+
+                try
+                {
+                    playableBeatmap = working.GetPlayableBeatmap(ruleset.Value, mods.Value);
+                }
+                catch (BeatmapInvalidForRulesetException)
+                {
+                    playableBeatmap = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset, mods.Value);
+                }
+
+                kpsResult = ILAsBmCal.GetKps(playableBeatmap);
             }
 
+            columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
             var (averageKps, maxKps, kpsList) = kpsResult;
 
             Header.Children = new Drawable[]
@@ -279,7 +285,7 @@ namespace osu.Game.Screens.Select.Carousel
                                         },
                                         new OsuSpriteText
                                         {
-                                            Text = $"  KPS: {averageKps:F2} ({maxKps:F2} Max)",
+                                            Text = $"  KPS: {averageKps:F1} ({maxKps:F1} Max)",
                                             Font = OsuFont.GetFont(size: 18),
                                             Colour = Colour4.CornflowerBlue,
                                             Anchor = Anchor.CentreLeft,
@@ -342,17 +348,17 @@ namespace osu.Game.Screens.Select.Carousel
         {
             base.LoadComplete();
 
-            ruleset.BindValueChanged(_ => updateKeyCount());
+            ruleset.BindValueChanged(_ =>
+            {
+                updateCalculations();
+                updateKeyCount();
+            });
             mods.BindValueChanged(_ =>
             {
-                updateKeyCount();
                 updateCalculations();
+                updateKeyCount();
             });
         }
-
-        // private void updateCalculations()
-        // {
-        // }
 
         protected override void Selected()
         {
@@ -404,6 +410,7 @@ namespace osu.Game.Screens.Select.Carousel
                         difficultyIcon.Current.Value = d.NewValue.Value;
                 }, true);
 
+                updateCalculations();
                 updateKeyCount();
             }
 
@@ -422,7 +429,8 @@ namespace osu.Game.Screens.Select.Carousel
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
 
                 int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, mods.Value);
-                string keyCountTextValue = ILAsBmCal.GetScratch(working.Beatmap, keyCount);
+
+                string keyCountTextValue = ILAsBmCal.GetScratch(playableBeatmap, keyCount);
 
                 keyCountText.Alpha = 1;
                 keyCountText.Text = keyCountTextValue;
