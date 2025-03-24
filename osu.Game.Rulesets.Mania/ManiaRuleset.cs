@@ -470,6 +470,11 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
+                new StatisticItem("SHit Graph ", () => new LAsHitEventHeatmapGraph(score.HitEvents)
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 300
+                }, true),
                 new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
                 {
                     RelativeSizeAxes = Axes.X,
@@ -493,17 +498,6 @@ namespace osu.Game.Rulesets.Mania
 
             return statistics.ToArray();
         }
-
-        // public override DrawableCarouselBeatmap updateKeyCount()
-        // {
-        //     base.UpdateKeyCount();
-        //
-        //     // Assuming you have access to the beatmap instance
-        //     if (calculator1S(beatmap))
-        //     {
-        //         keyCountText.Text = $"[{keyCount - 1}K1S]";
-        //     }
-        // }
 
         public override IRulesetFilterCriteria CreateRulesetFilterCriteria()
         {

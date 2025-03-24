@@ -55,16 +55,4 @@
     <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
     <PackageReference Include="System.Runtime.Handles" Version="4.3.0" />
   </ItemGroup>
-
-<!--    <ProjectReference Include="..\..\osu-framework\osu.Framework\osu.Framework.csproj" />-->
-  <ItemGroup>
-    <Compile Remove="Screens\Edit\EditorManiaPlayableFeild.cs" />
-    <Compile Remove="Screens\Edit\EditorManiaPlayfield.cs" />
-    <Compile Remove="Screens\OnlinePlay\Components\RoomManager.cs" />
-    <Compile Remove="Screens\OnlinePlay\Components\RoomPollingComponent.cs" />
-    <Compile Remove="Screens\OnlinePlay\Components\SelectionPollingComponent.cs" />
-    <Compile Remove="Screens\OnlinePlay\Multiplayer\MultiplayerRoomManager.cs" />
-    <Compile Remove="Screens\SelectV2\BeatmapSetPanel.cs" />
-    <Compile Remove="Tests\Visual\Multiplayer\TestMultiplayerRoomManager.cs" />
-  </ItemGroup>
 </Project>

@@ -23,6 +23,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             };
         }
 
-        protected override KeyCounter CreateCounter(InputTrigger trigger) => new Ez2KeyCounter(trigger);
+        protected override Ez2KeyCounter CreateCounter(InputTrigger trigger) => new Ez2KeyCounter(trigger);
     }
 }

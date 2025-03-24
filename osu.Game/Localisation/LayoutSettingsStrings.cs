@@ -34,6 +34,11 @@ namespace osu.Game.Localisation
         /// </summary>
         public static LocalisableString ScaleEverythingExcludingOverlays => new TranslatableString(getKey(@"scale_everything_excluding_overlays"), @"Excluding overlays");
 
+        public static LocalisableString Standard => "Standard";
+        public static LocalisableString Taiko => "Taiko";
+        public static LocalisableString Mania => "Mania";
+        public static LocalisableString CatchTheBeat => "CatchTheBeat";
+
         /// <summary>
         /// "Everything"
         /// </summary>

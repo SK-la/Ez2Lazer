@@ -46,7 +46,7 @@ namespace osu.Game.Screens.Select.Carousel
         /// </summary>
         public const float HEIGHT = height + CAROUSEL_BEATMAP_SPACING;
 
-        private const float height = MAX_HEIGHT * 1f;
+        private const float height = MAX_HEIGHT * 0.8f;
 
         private readonly BeatmapInfo beatmapInfo;
 
@@ -94,20 +94,19 @@ namespace osu.Game.Screens.Select.Carousel
         private IBindable<StarDifficulty?> starDifficultyBindable = null!;
         private CancellationTokenSource? starDifficultyCancellationSource;
 
+        private IBeatmap playableBeatmap = null!;
+        private WorkingBeatmap working = null!;
+        private Dictionary<int, int> columnNoteCounts = new Dictionary<int, int>();
+
+        private readonly Dictionary<string, (double averageKps, double maxKps, List<double> kpsList)> kpsCache = new Dictionary<string, (double, double, List<double>)>();
+
+        private (double averageKps, double maxKps, List<double> kpsList) kpsResult;
+
         public DrawableCarouselBeatmap(CarouselBeatmap panel)
         {
             beatmapInfo = panel.BeatmapInfo;
             Item = panel;
         }
-
-        private IBeatmap playableBeatmap = null!;
-        private WorkingBeatmap workingBeatmap = null!;
-        private Dictionary<int, int> columnNoteCounts = new Dictionary<int, int>();
-
-        private readonly Dictionary<string, (double averageKps, double maxKps, List<double> kpsList)> kpsCache = new Dictionary<string, (double, double, List<double>)>();
-        // private readonly Dictionary<string, Dictionary<int, int>> columnNoteCountsCache = new Dictionary<string, Dictionary<int, int>>();
-
-        private (double averageKps, double maxKps, List<double> kpsList) kpsResult;
 
         [BackgroundDependencyLoader]
         private void load(SongSelect? songSelect)
@@ -123,40 +122,34 @@ namespace osu.Game.Screens.Select.Carousel
             if (manager != null)
             {
                 hideRequested = manager.Hide;
-                workingBeatmap = manager.GetWorkingBeatmap(beatmapInfo);
-                playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.Value, mods.Value);
+                working = manager.GetWorkingBeatmap(beatmapInfo);
+                Schedule(() =>
+                {
+                    playableBeatmap = working.GetPlayableBeatmap(ruleset.Value, mods.Value);
+                    updateCalculations();
+                });
             }
+        }
 
-            if (playableBeatmap != null)
+        private void updateCalculations()
+        {
+            if (mods.Value == null)
             {
-                if (mods.Value == null)
+                string beatmapHash = beatmapInfo.Hash;
+
+                if (!kpsCache.TryGetValue(beatmapHash, out kpsResult))
                 {
-                    // kpsCache.Clear();
-                    string beatmapHash = beatmapInfo.Hash;
-
-                    if (!kpsCache.TryGetValue(beatmapHash, out kpsResult))
-                    {
-                        kpsResult = ILAsBmCal.GetKps(playableBeatmap);
-                        kpsCache[beatmapHash] = kpsResult;
-                    }
-
-                    // if (!columnNoteCountsCache.TryGetValue(beatmapHash, out columnNoteCounts!))
-                    // {
-                    //     columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
-                    //     columnNoteCountsCache[beatmapHash] = columnNoteCounts;
-                    // }
                     kpsResult = ILAsBmCal.GetKps(playableBeatmap);
+                    kpsCache[beatmapHash] = kpsResult;
                 }
-                else
-                {
-                    columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
-                    kpsResult = ILAsBmCal.GetKps(playableBeatmap);
-                }
-
-                if (kpsResult.kpsList.Count == 0)
-                {
-                    kpsResult = (0, 0, new List<double>());
-                }
+                else kpsResult = kpsCache[beatmapHash];
+            }
+            else
+            {
+                playableBeatmap = working.GetPlayableBeatmap(ruleset.Value, mods.Value);
+                columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
+                kpsResult = ILAsBmCal.GetKps(playableBeatmap);
+                kpsCache.Clear();
             }
 
             var (averageKps, maxKps, kpsList) = kpsResult;
@@ -172,7 +165,25 @@ namespace osu.Game.Screens.Select.Carousel
                     TriangleScale = 2,
                     RelativeSizeAxes = Axes.Both,
                     ColourLight = Color4Extensions.FromHex(@"3a7285"),
-                    ColourDark = Color4Extensions.FromHex(@"123744")
+                    ColourDark = Color4Extensions.FromHex(@"123744"),
+                    Alpha = 0.8f,
+                },
+                new FillFlowContainer
+                {
+                    AutoSizeAxes = Axes.Both,
+                    Direction = FillDirection.Horizontal,
+                    Padding = new MarginPadding { Left = 4 },
+                    Children = new Drawable[]
+                    {
+                        new LineGraph
+                        {
+                            Size = new Vector2(600, 50),
+                            Colour = OsuColour.Gray(0.25f),
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Values = kpsList.Count > 0 ? kpsList.Select(kps => (float)kps).ToArray() : new[] { 0f },
+                        }
+                    },
                 },
                 new FillFlowContainer
                 {
@@ -185,22 +196,26 @@ namespace osu.Game.Screens.Select.Carousel
                     {
                         new FillFlowContainer
                         {
-                            AutoSizeAxes = Axes.Both,
+                            Padding = new MarginPadding { Left = 2 },
                             Direction = FillDirection.Vertical,
+                            AutoSizeAxes = Axes.X,
                             Children = new Drawable[]
                             {
                                 difficultyIcon = new DifficultyIcon(beatmapInfo)
                                 {
-                                    TooltipType = DifficultyIconTooltipType.None,
+                                    TooltipType = DifficultyIconTooltipType.StarRating,
                                     Scale = new Vector2(1.8f),
                                 },
                                 new Box
                                 {
                                     RelativeSizeAxes = Axes.X,
-                                    Height = 5,
+                                    Height = 2,
                                     Colour = Colour4.Transparent
                                 },
-                                new TopLocalRank(beatmapInfo),
+                                new TopLocalRank(beatmapInfo)
+                                {
+                                    Scale = new Vector2(0.9f),
+                                },
                             }
                         },
                         new FillFlowContainer
@@ -212,36 +227,11 @@ namespace osu.Game.Screens.Select.Carousel
                             {
                                 new FillFlowContainer
                                 {
-                                    AutoSizeAxes = Axes.Both,
-                                    Direction = FillDirection.Horizontal,
-                                    Children = new Drawable[]
-                                    {
-                                        new OsuSpriteText
-                                        {
-                                            Text = "KPS: ",
-                                            Font = OsuFont.GetFont(size: 14),
-                                            Colour = Colour4.GhostWhite,
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft,
-                                        },
-                                        new LineGraph
-                                        {
-                                            Size = new Vector2(450, 10),
-                                            Colour = OsuColour.Gray(0.8f),
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft,
-                                            Values = kpsList.Select(kps => (float)kps).ToArray()
-                                        }
-                                    }.Where(child => true).ToArray(),
-                                },
-                                new FillFlowContainer
-                                {
                                     Direction = FillDirection.Horizontal,
                                     Spacing = new Vector2(4, 0),
                                     AutoSizeAxes = Axes.Both,
                                     Children = new Drawable[]
                                     {
-                                        // new TopLocalRank(beatmapInfo),
                                         keyCountText = new OsuSpriteText
                                         {
                                             Font = OsuFont.GetFont(size: 20),
@@ -289,7 +279,7 @@ namespace osu.Game.Screens.Select.Carousel
                                         },
                                         new OsuSpriteText
                                         {
-                                            Text = $"  KPS: {averageKps:F2} Avg  {maxKps:F2} Max",
+                                            Text = $"  KPS: {averageKps:F2} ({maxKps:F2} Max)",
                                             Font = OsuFont.GetFont(size: 18),
                                             Colour = Colour4.CornflowerBlue,
                                             Anchor = Anchor.CentreLeft,
@@ -346,42 +336,22 @@ namespace osu.Game.Screens.Select.Carousel
                     }
                 },
             };
-            // }
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            updateKeyCount();
+
             ruleset.BindValueChanged(_ => updateKeyCount());
             mods.BindValueChanged(_ =>
             {
                 updateKeyCount();
+                updateCalculations();
             });
         }
 
         // private void updateCalculations()
         // {
-        //     ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
-        //     IBeatmap playableBeatmap;
-        //
-        //     try
-        //     {
-        //         playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.Value, mods.Value);
-        //     }
-        //     catch (BeatmapInvalidForRulesetException)
-        //     {
-        //         playableBeatmap = workingBeatmap.GetPlayableBeatmap(workingBeatmap.BeatmapInfo.Ruleset, mods.Value);
-        //     }
-        //
-        //     columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
-        //
-        //     int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, mods.Value);
-        //
-        //     // Schedule(() =>
-        //     // {
-        //     //     columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
-        //     // });
         // }
 
         protected override void Selected()
@@ -451,19 +421,9 @@ namespace osu.Game.Screens.Select.Carousel
                 // Eventually this should be handled in a more modular way, allowing rulesets to add more information to the panel.
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
 
-                try
-                {
-                    playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.Value, mods.Value);
-                }
-                catch (EntryPointNotFoundException)
-                {
-                    playableBeatmap = workingBeatmap.GetPlayableBeatmap(workingBeatmap.BeatmapInfo.Ruleset, mods.Value);
-                }
-
                 int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, mods.Value);
-                string keyCountTextValue = ILAsBmCal.GetScratch(playableBeatmap, keyCount);
-                columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
-                kpsResult = ILAsBmCal.GetKps(playableBeatmap);
+                string keyCountTextValue = ILAsBmCal.GetScratch(working.Beatmap, keyCount);
+
                 keyCountText.Alpha = 1;
                 keyCountText.Text = keyCountTextValue;
             }

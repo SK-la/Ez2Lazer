@@ -12,6 +12,7 @@ using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps.Drawables.Cards;
+using osu.Game.Graphics.Containers;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
@@ -157,8 +158,8 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
             SetDefault(OsuSetting.HitMode, HitWindows.HitMode.Ez2AcStyle);
-            SetDefault(OsuSetting.AccuracyCutoffS, 0.9, 0.95, 1, 0.01);
-            SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.01);
+            SetDefault(OsuSetting.AccuracyCutoffS, 0.9D, 0.95D, 1D, 0.005);
+            SetDefault(OsuSetting.AccuracyCutoffA, 0.9D, 0.9D, 1D, 0.005);
 
             SetDefault(OsuSetting.IncreaseFirstObjectVisibility, true);
             SetDefault(OsuSetting.GameplayDisableWinKey, true);
@@ -177,6 +178,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.SongSelectRightMouseScroll, true);
 
             SetDefault(OsuSetting.Scaling, ScalingMode.Off);
+            SetDefault(OsuSetting.ScalingGameMode, ScalingGameMode.Mania);
             SetDefault(OsuSetting.SafeAreaConsiderations, true);
             SetDefault(OsuSetting.ScalingBackgroundDim, 0.9f, 0.5f, 1f, 0.01f);
 
@@ -418,6 +420,7 @@ namespace osu.Game.Configuration
         IncreaseFirstObjectVisibility,
         ScoreDisplayMode,
         SelectEzMode,
+        ScalingGameMode,
         HitMode,
         AccuracyCutoffS,
         AccuracyCutoffA,

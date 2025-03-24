@@ -88,10 +88,10 @@ namespace osu.Game.Skinning
                                 }
                             })
                             {
-                                Children = new Drawable[]
-                                {
-                                    // new SkinCom6DimPanel(),
-                                }
+                                // Children = new Drawable[]
+                                // {
+                                //     new SkinCom6DimPanel(),
+                                // }
                             };
 
                             return songSelectComponents;
@@ -112,7 +112,7 @@ namespace osu.Game.Skinning
                                 {
                                     health.Anchor = Anchor.BottomLeft;
                                     health.Origin = Anchor.CentreLeft;
-                                    // health.RelativeSizeAxes = Axes.Y;
+                                    // health.BypassAutoSizeAxes = Axes.Y;
                                     health.Width = 0.5f;
                                     // health.BarHeight.Value = 0f;
                                     // health.Height = 0.4f;

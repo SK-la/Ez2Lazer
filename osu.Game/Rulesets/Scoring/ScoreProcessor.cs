@@ -40,16 +40,6 @@ namespace osu.Game.Rulesets.Scoring
         private const double accuracy_cutoff_c = 0.7;
         private const double accuracy_cutoff_d = 0;
 
-        public Bindable<double> AccS { get; set; } = null!;
-        public Bindable<double> AccA { get; set; } = null!;
-
-        [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
-        {
-            AccS = config.GetBindable<double>(OsuSetting.AccuracyCutoffS);
-            AccA = config.GetBindable<double>(OsuSetting.AccuracyCutoffA);
-        }
-
         /// <summary>
         /// Whether <see cref="HitEvents"/> should be populated during application of results.
         /// </summary>
@@ -209,6 +199,17 @@ namespace osu.Game.Rulesets.Scoring
         private HitObject? lastHitObject;
 
         public bool ApplyNewJudgementsWhenFailed { get; set; }
+
+        private static double accS;
+
+        private static double accA;
+
+        [BackgroundDependencyLoader]
+        private void load(OsuConfigManager config)
+        {
+            accS = config.Get<double>(OsuSetting.AccuracyCutoffS);
+            accA = config.Get<double>(OsuSetting.AccuracyCutoffA);
+        }
 
         public ScoreProcessor(Ruleset ruleset)
         {
@@ -544,9 +545,9 @@ namespace osu.Game.Rulesets.Scoring
         {
             if (accuracy == accuracy_cutoff_x)
                 return ScoreRank.X;
-            if (accuracy >= accuracy_cutoff_s) //AccS.Value)
+            if (accuracy >= accS)
                 return ScoreRank.S;
-            if (accuracy >= AccA.Value) //AccA.Value)
+            if (accuracy >= accA)
                 return ScoreRank.A;
             if (accuracy >= accuracy_cutoff_b)
                 return ScoreRank.B;
@@ -570,7 +571,7 @@ namespace osu.Game.Rulesets.Scoring
 
                 case ScoreRank.S:
                 case ScoreRank.SH:
-                    return AccA.Value;
+                    return accuracy_cutoff_s;
 
                 case ScoreRank.A:
                     return accuracy_cutoff_a;

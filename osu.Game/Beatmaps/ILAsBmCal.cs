@@ -3,137 +3,105 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
 namespace osu.Game.Beatmaps
 {
     public class ILAsBmCal
     {
-        // [Resolved]
-        // private IBindable<RulesetInfo> ruleset { get; set; } = null!;
-        //
-        // [Resolved]
-        // private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
-
-        // private readonly BeatmapInfo beatmapInfo;
-        // private IBeatmap playableBeatmap = null!;
-
-        // public void CalculateAll(WorkingBeatmap workingBeatmap)
-        // {
-        //     ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
-        //
-        //     playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.Value, mods.Value);
-        //
-        //     int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, mods.Value);
-        //     // Calculate KPS
-        //     var (averageKps, maxKps, kpsList) = GetKps(playableBeatmap);
-        //     beatmapInfo.AverageKps = averageKps;
-        //     beatmapInfo.MaxKps = maxKps;
-        //     beatmapInfo.KpsList = kpsList;
-        //
-        //     // Calculate Column Note Counts
-        //     var columnNoteCounts = GetColumnNoteCounts(playableBeatmap);
-        //     beatmapInfo.ColumnNoteCounts = columnNoteCounts;
-        //
-        //     // Calculate Key Count Text
-        //     string keyCountText = GetScratch(playableBeatmap, keyCount);
-        //     beatmapInfo.KeyCountText = keyCountText;
-        // }
-        // public static void CalculateAndStoreKps(IBeatmap beatmap, BeatmapInfo beatmapInfo)
-        // {
-        //     var (averageKps, maxKps, kpsList) = GetKps(beatmap);
-        //     beatmapInfo.AverageKps = averageKps;
-        //     beatmapInfo.MaxKps = maxKps;
-        //     beatmapInfo.KpsList = kpsList;
-        // }
-        //
-        // public static void CalculateAndStoreColumnNoteCounts(IBeatmap beatmap, BeatmapInfo beatmapInfo)
-        // {
-        //     var columnNoteCounts = GetColumnNoteCounts(beatmap);
-        //     beatmapInfo.ColumnNoteCounts = columnNoteCounts;
-        // }
-        //
-        // public static void CalculateAndStoreKeyCountText(IBeatmap beatmap, int keyCount, BeatmapInfo beatmapInfo)
-        // {
-        //     string keyCountText = GetScratch(beatmap, keyCount);
-        //     beatmapInfo.KeyCountText = keyCountText;
-        // }
         public static (double averageKps, double maxKps, List<double> kpsList) GetKps(IBeatmap beatmap)
         {
+            var kpsList = new List<double>();
             var hitObjects = beatmap.HitObjects;
             if (hitObjects.Count == 0)
-                return (0, 0, new List<double>());
+                return (0, 0, kpsList);
 
-            double totalDuration = double.Abs(hitObjects.Last().StartTime - hitObjects.First().StartTime) / 1000.0;
-            double totalHits = hitObjects.Count;
+            double interval = 4 * 60000 / beatmap.BeatmapInfo.BPM;
+            double songEndTime = hitObjects[^1].StartTime;
+            const double start_time = 0;
 
-            double averageKps = totalHits / totalDuration;
-
-            double interval = 60000.0 / (beatmap.BeatmapInfo.BPM);
-            List<double> kpsList = new List<double>();
-
-            const double song_start_time = 0;
-            double songEndTime = hitObjects.Last().StartTime;
-
-            for (double currentTime = song_start_time; currentTime < songEndTime; currentTime += interval)
+            // 预处理HitObjects按StartTime排序（假设原列表已排序，可省略）
+            // 使用二分查找优化区间查询
+            for (double currentTime = start_time; currentTime < songEndTime; currentTime += interval)
             {
                 double endTime = currentTime + interval;
-                int hitsInInterval = hitObjects.Count(h => h.StartTime >= currentTime && h.StartTime < endTime);
+                int startIdx = findFirstIndexGreaterOrEqual(hitObjects, currentTime);
+                int endIdx = findFirstIndexGreaterOrEqual(hitObjects, endTime);
+                int hits = endIdx - startIdx;
 
-                double kps = hitsInInterval / (interval / 1000.0);
-                kpsList.Add(kps);
+                kpsList.Add(hits / (interval / 1000));
             }
 
-            double maxKps = kpsList.Max();
+            if (kpsList.Count == 0)
+                return (0, 0, kpsList);
 
-            return (averageKps, maxKps, kpsList);
+            return (kpsList.Average(), kpsList.Max(), kpsList);
+        }
+
+        private static int findFirstIndexGreaterOrEqual(IReadOnlyList<HitObject> hitObjects, double targetTime)
+        {
+            int low = 0, high = hitObjects.Count;
+
+            while (low < high)
+            {
+                int mid = (low + high) / 2;
+                if (hitObjects[mid].StartTime < targetTime)
+                    low = mid + 1;
+                else
+                    high = mid;
+            }
+
+            return low;
         }
 
         public static Dictionary<int, int> GetColumnNoteCounts(IBeatmap beatmap)
         {
-            var columnNoteCounts = new Dictionary<int, int>();
+            var counts = new Dictionary<int, int>();
 
-            foreach (var hitObject in beatmap.HitObjects.OfType<IHasColumn>())
+            foreach (var obj in beatmap.HitObjects.OfType<IHasColumn>())
             {
-                if (hitObject is IHasDuration)
-                    continue;
+                if (obj is IHasDuration) continue;
 
-                if (!columnNoteCounts.TryGetValue(hitObject.Column, out int value))
-                {
-                    value = 0;
-                }
-
-                columnNoteCounts[hitObject.Column] = ++value;
+                counts[obj.Column] = counts.TryGetValue(obj.Column, out int c) ? c + 1 : 1;
             }
 
-            return columnNoteCounts;
+            return counts;
         }
 
         public static string GetScratch(IBeatmap beatmap, int keyCount)
         {
-            var columnNoteCounts = GetColumnNoteCounts(beatmap);
-            if (columnNoteCounts.Count == 0)
+            // 预处理：获取列分组数据和KPS数据
+            var columnGroups = beatmap.HitObjects.OfType<IHasColumn>()
+                                      .Where(h => !(h is IHasDuration))
+                                      .GroupBy(h => h.Column)
+                                      .ToDictionary(g => g.Key, g => g.Count());
+
+            if (columnGroups.Count == 0)
                 return $"[{keyCount}K]";
 
-            var sortedColumns = columnNoteCounts.OrderBy(c => c.Key).ToList();
-            int firstColumnNotes = sortedColumns.First().Value;
-            int lastColumnNotes = sortedColumns.Last().Value;
-            var remainingColumns = sortedColumns.Skip(1).Take(sortedColumns.Count - 2).ToList();
+            var (_, maxKps, kpsList) = GetKps(beatmap);
+            var sorted = columnGroups.OrderBy(kv => kv.Key).ToList();
+
+            // 列统计优化
+            int firstCol = sorted.First().Key;
+            int lastCol = sorted.Last().Key;
+            bool isFirstHigh = checkHighSpeed(beatmap, firstCol, maxKps, kpsList);
+            bool isLastHigh = checkHighSpeed(beatmap, lastCol, maxKps, kpsList);
+
+            var remainingColumns = sorted.Skip(1).Take(sorted.Count - 2).ToList();
 
             double averageNotes = remainingColumns.Any() ? remainingColumns.Average(c => c.Value) : 0;
             int maxNotesInRemainingColumns = remainingColumns.Any() ? remainingColumns.Max(c => c.Value) : 0;
 
-            bool isFirstColumnHighSpeed = checkHighSpeedNotes(beatmap, sortedColumns.First().Key);
-            bool isLastColumnHighSpeed = checkHighSpeedNotes(beatmap, sortedColumns.Last().Key);
-
-            bool isFirstColumnLow = firstColumnNotes < averageNotes * 0.3 || firstColumnNotes < maxNotesInRemainingColumns / 3;
-            bool isLastColumnLow = lastColumnNotes < averageNotes * 0.3 || lastColumnNotes < maxNotesInRemainingColumns / 3;
+            bool isFirstColumnLow = firstCol < averageNotes * 0.3 || firstCol < maxNotesInRemainingColumns / 3;
+            bool isLastColumnLow = lastCol < averageNotes * 0.3 || lastCol < maxNotesInRemainingColumns / 3;
 
             string result = $"[{keyCount}K]";
 
             if (keyCount == 6 || keyCount == 8)
             {
-                if (isFirstColumnHighSpeed || isLastColumnHighSpeed)
+                if (isFirstHigh || isLastHigh)
                 {
                     result = $"[{keyCount - 1}K1S]";
                 }
@@ -144,7 +112,7 @@ namespace osu.Game.Beatmaps
             }
             else if (keyCount >= 7)
             {
-                if (isFirstColumnHighSpeed || isLastColumnHighSpeed)
+                if (isFirstHigh || isLastHigh)
                 {
                     result = $"[{keyCount - 2}K2S]";
                 }
@@ -154,7 +122,7 @@ namespace osu.Game.Beatmaps
                 }
             }
 
-            int emptyColumns = columnNoteCounts.Count(c => c.Value == 0);
+            int emptyColumns = sorted.Count(c => c.Value == 0);
 
             if (emptyColumns > 0)
             {
@@ -164,17 +132,18 @@ namespace osu.Game.Beatmaps
             return result;
         }
 
-        private static bool checkHighSpeedNotes(IBeatmap beatmap, int column)
+        private static bool checkHighSpeed(IBeatmap beatmap, int column, double maxKps, List<double> kpsList)
         {
-            var hitObjects = beatmap.HitObjects.OfType<IHasColumn>().Where(h => h.Column == column).ToList();
-            if (hitObjects.Count == 0)
-                return false;
+            // 使用预处理的分组数据优化（需调整参数传递）
+            double threshold = maxKps / 4;
 
-            var (_, maxKps, kpsList) = GetKps(beatmap);
+            foreach (double kps in kpsList)
+            {
+                if (kps > threshold)
+                    return true;
+            }
 
-            double highSpeedThreshold = maxKps / 4;
-
-            return kpsList.Any(kps => kps > highSpeedThreshold);
+            return false;
         }
     }
 }
@@ -280,4 +249,84 @@ namespace osu.Game.Beatmaps
         //     }
         //
         //     return false;
+        // }
+
+        // [Resolved]
+        // private IBindable<RulesetInfo> ruleset { get; set; } = null!;
+        //
+        // [Resolved]
+        // private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
+
+        // private readonly BeatmapInfo beatmapInfo;
+        // private IBeatmap playableBeatmap = null!;
+
+        // public void CalculateAll(WorkingBeatmap workingBeatmap)
+        // {
+        //     ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
+        //
+        //     playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.Value, mods.Value);
+        //
+        //     int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, mods.Value);
+        //     // Calculate KPS
+        //     var (averageKps, maxKps, kpsList) = GetKps(playableBeatmap);
+        //     beatmapInfo.AverageKps = averageKps;
+        //     beatmapInfo.MaxKps = maxKps;
+        //     beatmapInfo.KpsList = kpsList;
+        //
+        //     // Calculate Column Note Counts
+        //     var columnNoteCounts = GetColumnNoteCounts(playableBeatmap);
+        //     beatmapInfo.ColumnNoteCounts = columnNoteCounts;
+        //
+        //     // Calculate Key Count Text
+        //     string keyCountText = GetScratch(playableBeatmap, keyCount);
+        //     beatmapInfo.KeyCountText = keyCountText;
+        // }
+        // public static void CalculateAndStoreKps(IBeatmap beatmap, BeatmapInfo beatmapInfo)
+        // {
+        //     var (averageKps, maxKps, kpsList) = GetKps(beatmap);
+        //     beatmapInfo.AverageKps = averageKps;
+        //     beatmapInfo.MaxKps = maxKps;
+        //     beatmapInfo.KpsList = kpsList;
+        // }
+        //
+        // public static void CalculateAndStoreColumnNoteCounts(IBeatmap beatmap, BeatmapInfo beatmapInfo)
+        // {
+        //     var columnNoteCounts = GetColumnNoteCounts(beatmap);
+        //     beatmapInfo.ColumnNoteCounts = columnNoteCounts;
+        // }
+        //
+        // public static void CalculateAndStoreKeyCountText(IBeatmap beatmap, int keyCount, BeatmapInfo beatmapInfo)
+        // {
+        //     string keyCountText = GetScratch(beatmap, keyCount);
+        //     beatmapInfo.KeyCountText = keyCountText;
+        // }
+
+        // public static Dictionary<int, int> GetColumnNoteCounts(IBeatmap beatmap)
+        // {
+        //     var columnNoteCounts = new Dictionary<int, int>();
+        //     var relevantObjects = beatmap.HitObjects.OfType<IHasColumn>().Where(h => !(h is IHasDuration));
+        //
+        //     foreach (var hitObject in relevantObjects)
+        //     {
+        //         int column = hitObject.Column;
+        //
+        //         if (columnNoteCounts.TryGetValue(column, out int count))
+        //         {
+        //             columnNoteCounts[column] = count + 1;
+        //         }
+        //         else
+        //         {
+        //             columnNoteCounts[column] = 1;
+        //         }
+        //     }
+        //
+        //     return columnNoteCounts;
+        // }
+
+        // public static Dictionary<int, int> GetColumnNoteCounts(IBeatmap beatmap)
+        // {
+        //     return beatmap.HitObjects.OfType<IHasColumn>()
+        //                   .Where(h => !(h is IHasDuration))
+        //                   .GroupBy(h => h.Column)
+        //                   .ToDictionary(g => g.Key, g => g.Count());
         // }
