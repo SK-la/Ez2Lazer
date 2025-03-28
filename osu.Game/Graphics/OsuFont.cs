@@ -28,7 +28,7 @@ namespace osu.Game.Graphics
 
         public static FontUsage Inter => GetFont(Typeface.Inter, weight: FontWeight.Regular);
 
-        public static FontUsage Stat => GetFont(Typeface.Stat, weight: FontWeight.Light);
+        public static FontUsage Stat => GetFont(Typeface.Stat, weight: FontWeight.Regular);
 
         /// <summary>
         /// Retrieves a <see cref="FontUsage"/>.
@@ -121,11 +121,11 @@ namespace osu.Game.Graphics
     {
         Venera,
         Torus,
+        Stat,
 
         [Description("Torus (alternate)")]
         TorusAlternate,
         Inter,
-        Stat,
     }
 
     public enum FontWeight

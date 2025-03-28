@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     Name = "Separator",
                     Anchor = Anchor.TopRight,
                     Origin = Anchor.TopRight,
-                    RelativeSizeAxes = Axes.None,
+                    // RelativeSizeAxes = Axes.None,
                     Width = 2,
                     // Height = DrawHeight - Stage.HIT_TARGET_POSITION,
                     Colour = Color4.White,
@@ -117,14 +117,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             separator.Height = DrawHeight - Stage.HIT_TARGET_POSITION;
         }
-
-        // public void UpdateBackgroundColour(List<int> processedTracks)
-        // {
-        //     if (processedTracks.Contains(column.Index))
-        //     {
-        //         background.Colour = new Color4(0, 0, 0, 0);
-        //     }
-        // }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
         {

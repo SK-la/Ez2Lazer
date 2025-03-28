@@ -84,17 +84,5 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             // No breaks
             maniaBeatmap.Breaks.Clear();
         }
-
-        public override string SettingDescription
-        {
-            get
-            {
-                string spaceBeat = $"FULL-LN 1/{SpaceBeat.Value} Beat";
-                return string.Join(", ", new[]
-                {
-                    spaceBeat,
-                }.Where(s => !string.IsNullOrEmpty(s)));
-            }
-        }
     }
 }

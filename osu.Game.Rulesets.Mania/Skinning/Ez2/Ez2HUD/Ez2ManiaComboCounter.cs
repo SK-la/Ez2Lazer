@@ -56,24 +56,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             });
         }
 
-        public override int DisplayedCount
-        {
-            get => base.DisplayedCount;
-            set
-            {
-                base.DisplayedCount = value;
-                updateWireframe();
-            }
-        }
-
-        private void updateWireframe()
-        {
-            int digitsRequiredForDisplayCount = getDigitsRequiredForDisplayCount();
-
-            if (digitsRequiredForDisplayCount != Text.WireframeTemplate.Length)
-                Text.WireframeTemplate = new string('#', digitsRequiredForDisplayCount);
-        }
-
         private int getDigitsRequiredForDisplayCount()
         {
             // one for the single presumed starting digit, one for the "x" at the end (unless disabled).

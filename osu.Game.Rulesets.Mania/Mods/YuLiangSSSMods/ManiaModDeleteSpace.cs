@@ -30,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override string SettingDescription => "";
+        // public override string SettingDescription => "";
 
         //[SettingSource("Column", "Select the column you delete.")]
         //public BindableInt Column { get; set; } = new BindableInt(4)

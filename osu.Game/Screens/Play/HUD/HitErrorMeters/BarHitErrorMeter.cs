@@ -35,7 +35,7 @@ namespace osu.Game.Screens.Play.HUD.HitErrorMeters
             Precision = 0.1f,
         };
 
-        [SettingSource(typeof(BarHitErrorMeterStrings), "JudgementIcon Fade Out Duration", "JudgementIcon Fade Out Duration")]
+        [SettingSource(typeof(BarHitErrorMeterStrings), nameof(BarHitErrorMeterStrings.JudgementIconFadeOutDuration))]
         public BindableNumber<int> JudgementFadeOutDuration { get; } = new BindableNumber<int>(1200)
         {
             MinValue = 100,

@@ -97,7 +97,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Y = 200;
                                     combo1.ShowLabel.Value = false;
-                                    combo1.WireframeOpacity.Value = 0;
                                     combo1.Alpha = 1f;
                                     combo1.Current.BindValueChanged(changedEvent =>
                                     {
@@ -122,7 +121,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo2.Origin = Anchor.Centre;
                                     combo2.Y = 200;
                                     combo2.ShowLabel.Value = false;
-                                    combo2.WireframeOpacity.Value = 0;
                                     combo2.Alpha = 0.6f;
                                     combo2.Colour = Colour4.White.Opacity(0.4f);
                                     combo2.Current.BindValueChanged(changedEvent =>
@@ -200,6 +198,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         case ManiaSkinComponents.ColumnBackground:
                             // if (Skin is Ez2Skin && resultComponent.Component >= HitResult.Perfect)
                             //     return Drawable.Empty();
+
                             return new Ez2ColumnBackground();
 
                         case ManiaSkinComponents.HoldNoteBody:

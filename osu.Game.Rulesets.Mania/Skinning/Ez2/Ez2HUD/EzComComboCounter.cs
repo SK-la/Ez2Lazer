@@ -4,13 +4,13 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
-using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
@@ -26,16 +26,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected virtual bool DisplayXSymbol => true;
 
-        [SettingSource("Wireframe opacity", "Controls the opacity of the wireframes behind the digits.")]
-        public BindableFloat WireframeOpacity { get; } = new BindableFloat(0)
-        {
-            Precision = 0.01f,
-            MinValue = 0,
-            MaxValue = 1,
-        };
-
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel), nameof(SkinnableComponentStrings.ShowLabelDescription))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.TextElementText), nameof(SkinnableComponentStrings.TextElementTextDescription))]
+        public Bindable<string> LabelContent { get; } = new Bindable<string>("Combo");
+
+        [SettingSource("Alpha", "The alpha value of this box")]
+        public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
+        {
+            MinValue = 0,
+            MaxValue = 1,
+            Precision = 0.01f,
+        };
+
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), nameof(SkinnableComponentStrings.ColourDescription))]
+        public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
         [BackgroundDependencyLoader]
         private void load(ScoreProcessor scoreProcessor)
@@ -59,40 +65,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             });
         }
 
-        public override int DisplayedCount
-        {
-            get => base.DisplayedCount;
-            set
-            {
-                base.DisplayedCount = value;
-                updateWireframe();
-            }
-        }
-
-        private void updateWireframe()
-        {
-            int digitsRequiredForDisplayCount = getDigitsRequiredForDisplayCount();
-
-            if (digitsRequiredForDisplayCount != Text.WireframeTemplate.Length)
-                Text.WireframeTemplate = new string('#', digitsRequiredForDisplayCount);
-        }
-
-        private int getDigitsRequiredForDisplayCount()
-        {
-            // one for the single presumed starting digit, one for the "x" at the end (unless disabled).
-            int digitsRequired = DisplayXSymbol ? 2 : 1;
-            long c = DisplayedCount;
-            while ((c /= 10) > 0)
-                digitsRequired++;
-            return digitsRequired;
-        }
-
         protected override LocalisableString FormatCount(int count) => DisplayXSymbol ? $@"{count}" : count.ToString();
 
-        protected override IHasText CreateText() => Text = new EzComCounterText(Anchor.TopLeft, MatchesStrings.MatchScoreStatsCombo.ToUpper())
+        protected override IHasText CreateText() => Text = new EzComCounterText(Anchor.TopLeft, LabelContent.Value.ToUpperInvariant())
         {
-            WireframeOpacity = { BindTarget = WireframeOpacity },
             ShowLabel = { BindTarget = ShowLabel },
         };
+
+        protected override OsuSpriteText CreateSpriteText() => new OsuSpriteText
+        {
+            Font = OsuFont.Stat.With(size: 40f, family: "Ez"),
+        };
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
+            AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
+        }
     }
 }

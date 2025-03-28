@@ -1,7 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Linq;
+using System.Collections.Generic;
+using System.Globalization;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -197,25 +198,21 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        public override string SettingDescription
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
             get
             {
-                string perfect = $"Perfect {PerfectOffset.Value}";
-                string great = $"Great {GreatOffset.Value}";
-                string good = $"Good {GoodOffset.Value}";
-                string ok = $"Ok {OkOffset.Value}";
-                string meh = $"Meh {MehOffset.Value}";
-                string miss = $"Miss {MissOffset.Value}";
-                return string.Join(", ", new[]
+                var settings = new List<(LocalisableString setting, LocalisableString value)>
                 {
-                    perfect,
-                    great,
-                    good,
-                    ok,
-                    meh,
-                    miss
-                }.Where(s => !string.IsNullOrEmpty(s)));
+                    (new LocalisableString("Perfect"), new LocalisableString(PerfectOffset.Value.ToString(CultureInfo.CurrentCulture))),
+                    (new LocalisableString("Great"), new LocalisableString(GreatOffset.Value.ToString(CultureInfo.InvariantCulture))),
+                    (new LocalisableString("Good"), new LocalisableString(GoodOffset.Value.ToString(CultureInfo.InvariantCulture))),
+                    (new LocalisableString("Ok"), new LocalisableString(OkOffset.Value.ToString(CultureInfo.InvariantCulture))),
+                    (new LocalisableString("Meh"), new LocalisableString(MehOffset.Value.ToString(CultureInfo.InvariantCulture))),
+                    (new LocalisableString("Miss"), new LocalisableString(MissOffset.Value.ToString(CultureInfo.InvariantCulture)))
+                };
+
+                return settings;
             }
         }
 

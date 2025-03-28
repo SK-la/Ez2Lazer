@@ -14,12 +14,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
     public partial class EzComCounterText : CompositeDrawable, IHasText
     {
-        private readonly Ez2CounterSpriteText wireframesPart;
         private readonly Ez2CounterSpriteText textPart;
         private readonly OsuSpriteText labelText;
-
-        public FontUsage ComboFont { get; set; } = new FontUsage("Stat", 40);
-
+        private readonly OsuSpriteText text;
         public IBindable<float> WireframeOpacity { get; } = new BindableFloat();
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
 
@@ -30,14 +27,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             get => textPart.Text;
             set => textPart.Text = value;
         }
-
-        public string WireframeTemplate
-        {
-            get => wireframeTemplate;
-            set => wireframesPart.Text = wireframeTemplate = value;
-        }
-
-        private string wireframeTemplate = string.Empty;
 
         public EzComCounterText(Anchor anchor, LocalisableString? label = null)
         {
@@ -65,20 +54,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                     Origin = anchor,
                     Children = new[]
                     {
-                        wireframesPart = new Ez2CounterSpriteText
+                        text = new OsuSpriteText
                         {
-                            Anchor = Anchor.BottomCentre,
+                            Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
-                            Font = new FontUsage("Stat", 20),
+                            Font = OsuFont.Default.With(size: 40)
                         },
                         textPart = new Ez2CounterSpriteText
                         {
                             Anchor = Anchor.BottomCentre,
                             Origin = Anchor.Centre,
-                            Font = new FontUsage("Stat", 40),
+                            Font = OsuFont.Stat.With(size: 40)
                         },
                     }
-                }
+                },
             };
         }
 
@@ -91,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            WireframeOpacity.BindValueChanged(v => wireframesPart.Alpha = v.NewValue, true);
+
             ShowLabel.BindValueChanged(s =>
             {
                 labelText.Alpha = s.NewValue ? 0.8f : 0;
@@ -107,5 +96,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                 UseFullGlyphHeight = false;
             }
         }
+
+        protected void SetFont(FontUsage font) => text.Font = font.With(size: 40);
+
+        protected void SetTextColour(Colour4 textColour) => text.Colour = textColour;
     }
 }

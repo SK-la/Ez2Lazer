@@ -40,23 +40,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override string SettingDescription
-        {
-            get
-            {
-                string seed = $"Seed {(Seed.Value is null ? "Null" : Seed.Value)}";
-                return string.Join(", ", new[]
-                {
-                    $"Key {Key.Value}",
-                    $"Blank Column {BlankColumn.Value}",
-                    $"Gap {Gap.Value}",
-                    $"Clean {Clean.Value}",
-                    $"Clean Divide 1/{CleanDivide.Value}",
-                    seed
-                });
-            }
-        }
-
         [SettingSource("Key", "To Keys")]
         public BindableNumber<int> Key { get; set; } = new BindableInt(8)
         {

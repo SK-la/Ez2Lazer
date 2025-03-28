@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
@@ -17,8 +16,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
     public partial class Ez2ScoreCounter : GameplayScoreCounter, ISerialisableDrawable
     {
-        private EzComScoreText scoreText = null!;
-
         protected override double RollingDuration => 250;
 
         [SettingSource("Wireframe opacity", "Controls the opacity of the wireframes behind the digits.")]
@@ -36,43 +33,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected override LocalisableString FormatCount(long count) => count.ToString();
 
-        protected override IHasText CreateText() => scoreText = new EzComScoreText(Anchor.TopRight, BeatmapsetsStrings.ShowScoreboardHeadersScore.ToUpper())
+        protected override IHasText CreateText() => new EzComScoreText(Anchor.TopRight, BeatmapsetsStrings.ShowScoreboardHeadersScore.ToUpper())
         {
-            WireframeOpacity = { BindTarget = WireframeOpacity },
             ShowLabel = { BindTarget = ShowLabel },
         };
-
-        public Ez2ScoreCounter()
-        {
-            RequiredDisplayDigits.BindValueChanged(_ => updateWireframe());
-        }
-
-        public override long DisplayedCount
-        {
-            get => base.DisplayedCount;
-            set
-            {
-                base.DisplayedCount = value;
-                updateWireframe();
-            }
-        }
-
-        private void updateWireframe()
-        {
-            int digitsRequiredForDisplayCount = Math.Max(RequiredDisplayDigits.Value, getDigitsRequiredForDisplayCount());
-
-            if (digitsRequiredForDisplayCount != scoreText.WireframeTemplate.Length)
-                scoreText.WireframeTemplate = new string('#', digitsRequiredForDisplayCount);
-        }
-
-        private int getDigitsRequiredForDisplayCount()
-        {
-            int digitsRequired = 1;
-            long c = DisplayedCount;
-            while ((c /= 10) > 0)
-                digitsRequired++;
-            return digitsRequired;
-        }
 
         private partial class EzComScoreText : EzComCounterText
         {

@@ -39,10 +39,7 @@ namespace osu.Game.Screens.OnlinePlay.Match
 
         public override bool? ApplyModTrackAdjustments => true;
 
-        protected override BackgroundScreen CreateBackground() => new RoomBackgroundScreen(Room.Playlist.FirstOrDefault())
-        {
-            SelectedItem = { BindTarget = SelectedItem }
-        };
+        protected override BackgroundScreen CreateBackground() => new MultiplayerRoomBackgroundScreen();
 
         public override bool DisallowExternalBeatmapRulesetChanges => true;
 
@@ -94,13 +91,12 @@ namespace osu.Game.Screens.OnlinePlay.Match
         [Resolved(canBeNull: true)]
         protected IDialogOverlay? DialogOverlay { get; private set; }
 
-        [Cached]
-        private readonly OnlinePlayBeatmapAvailabilityTracker beatmapAvailabilityTracker = new OnlinePlayBeatmapAvailabilityTracker();
+        [Cached(typeof(OnlinePlayBeatmapAvailabilityTracker))]
+        private readonly MultiplayerBeatmapAvailabilityTracker beatmapAvailabilityTracker = new MultiplayerBeatmapAvailabilityTracker();
 
         protected IBindable<BeatmapAvailability> BeatmapAvailability => beatmapAvailabilityTracker.Availability;
 
         public readonly Room Room;
-        private readonly bool allowEdit;
 
         internal ModSelectOverlay UserModsSelectOverlay { get; private set; } = null!;
 
@@ -112,12 +108,9 @@ namespace osu.Game.Screens.OnlinePlay.Match
         /// Creates a new <see cref="RoomSubScreen"/>.
         /// </summary>
         /// <param name="room">The <see cref="Room"/>.</param>
-        /// <param name="allowEdit">Whether to allow editing room settings post-creation.</param>
-        protected RoomSubScreen(Room room, bool allowEdit = true)
+        protected RoomSubScreen(Room room)
         {
             Room = room;
-            this.allowEdit = allowEdit;
-
             Padding = new MarginPadding { Top = Header.HEIGHT };
         }
 
@@ -172,10 +165,9 @@ namespace osu.Game.Screens.OnlinePlay.Match
                                                     {
                                                         RelativeSizeAxes = Axes.X,
                                                         AutoSizeAxes = Axes.Y,
-                                                        Child = new DrawableMatchRoom(Room, allowEdit)
+                                                        Child = new MultiplayerRoomPanel(Room)
                                                         {
                                                             OnEdit = () => settingsOverlay.Show(),
-                                                            SelectedItem = SelectedItem
                                                         }
                                                     }
                                                 },
@@ -268,7 +260,6 @@ namespace osu.Game.Screens.OnlinePlay.Match
             SelectedItem.BindValueChanged(_ => updateSpecifics());
             UserMods.BindValueChanged(_ => updateSpecifics());
 
-            beatmapAvailabilityTracker.SelectedItem.BindTo(SelectedItem);
             beatmapAvailabilityTracker.Availability.BindValueChanged(_ => updateSpecifics());
 
             userModsSelectOverlayRegistration = overlayManager?.RegisterBlockingOverlay(UserModsSelectOverlay);
@@ -457,7 +448,7 @@ namespace osu.Game.Screens.OnlinePlay.Match
 
             // Retrieve the corresponding local beatmap, since we can't directly use the playlist's beatmap info
             int beatmapId = GetGameplayBeatmap().OnlineID;
-            var localBeatmap = beatmapManager.QueryBeatmap(b => b.OnlineID == beatmapId);
+            var localBeatmap = beatmapManager.QueryBeatmap($@"{nameof(BeatmapInfo.OnlineID)} == $0 AND {nameof(BeatmapInfo.MD5Hash)} == {nameof(BeatmapInfo.OnlineMD5Hash)}", beatmapId);
             Beatmap.Value = beatmapManager.GetWorkingBeatmap(localBeatmap);
             UserModsSelectOverlay.Beatmap.Value = Beatmap.Value;
 

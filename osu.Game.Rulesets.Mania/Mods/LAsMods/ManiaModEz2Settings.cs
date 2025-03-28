@@ -76,22 +76,22 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        public override string SettingDescription
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
             get
             {
-                var settings = new List<string>();
+                var settings = new List<(LocalisableString setting, LocalisableString value)>();
 
                 if (NoScratch.Value)
-                    settings.Add("noScratch");
+                    settings.Add((new LocalisableString("No Scratch"), new LocalisableString("Enabled")));
 
                 if (NoPanel.Value)
-                    settings.Add("noPanel");
+                    settings.Add((new LocalisableString("No Panel"), new LocalisableString("Enabled")));
 
                 if (HealthScratch.Value)
-                    settings.Add($"Scratch MAX 1/{MaxBeat.Value} Beat");
+                    settings.Add((new LocalisableString("Scratch MAX Beat Space"), new LocalisableString($"1/{MaxBeat.Value} Beat")));
 
-                return string.Join(", ", settings); //.Where(s => !string.IsNullOrEmpty(s)));
+                return settings;
             }
         }
 

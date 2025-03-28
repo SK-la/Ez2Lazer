@@ -30,41 +30,35 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override string SettingDescription
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
             get
             {
-                List<string> descriptions = new List<string>();
+                var settings = new List<(LocalisableString setting, LocalisableString value)>();
 
                 if (CustomHitRange.Value)
                 {
-                    descriptions.AddRange(new[]
-                    {
-                        "Custom Hit Range True",
-                        $"Perfect Hit {PerfectHit.Value:0.#}",
-                        $"Great Hit {GreatHit.Value:0.#}",
-                        $"Good Hit {GoodHit.Value:0.#}",
-                        $"Ok Hit {OkHit.Value:0.#}",
-                        $"Meh Hit {MehHit.Value:0.#}",
-                        $"Miss Hit {MissHit.Value:0.#}"
-                    });
+                    settings.Add((new LocalisableString("Custom Hit Range"), new LocalisableString("True")));
+                    settings.Add((new LocalisableString("Perfect Hit"), new LocalisableString(PerfectHit.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Great Hit"), new LocalisableString(GreatHit.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Good Hit"), new LocalisableString(GoodHit.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Ok Hit"), new LocalisableString(OkHit.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Meh Hit"), new LocalisableString(MehHit.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Miss Hit"), new LocalisableString(MissHit.Value.ToString("0.#"))));
                 }
 
                 if (CustomProportionScore.Value)
                 {
-                    descriptions.AddRange(new[]
-                    {
-                        "Custom Proportion Score True",
-                        $"Perfect {Perfect.Value:0.#}",
-                        $"Great {Great.Value:0.#}",
-                        $"Good {Good.Value:0.#}",
-                        $"Ok {Ok.Value:0.#}",
-                        $"Meh {Meh.Value:0.#}",
-                        $"Miss {Miss.Value:0.#}"
-                    });
+                    settings.Add((new LocalisableString("Custom Proportion Score"), new LocalisableString("True")));
+                    settings.Add((new LocalisableString("Perfect"), new LocalisableString(Perfect.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Great"), new LocalisableString(Great.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Good"), new LocalisableString(Good.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Ok"), new LocalisableString(Ok.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Meh"), new LocalisableString(Meh.Value.ToString("0.#"))));
+                    settings.Add((new LocalisableString("Miss"), new LocalisableString(Miss.Value.ToString("0.#"))));
                 }
 
-                return string.Join(", ", descriptions);
+                return settings;
             }
         }
 

@@ -36,14 +36,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override string SettingDescription => string.Join(", ", new[]
-        {
-            $"Probability {Probability.Value}",
-            $"Line {Line.Value}",
-            $"Align {Align.Value}",
-            $"Seed {Seed.Value}"
-        });
-
         [SettingSource("To Stream", "As Jumpjack as possible(Recommand to use a medium(50~80) probability).")]
         public BindableBool Stream { get; set; } = new BindableBool(true);
 

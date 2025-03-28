@@ -37,17 +37,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public readonly double ERROR = 2;
 
-        public override string SettingDescription => string.Join(", ", new[]
-        {
-            $"Divide 1/{Divide.Value}",
-            $"Level {Level.Value}",
-            $"Percentage {Percentage.Value}%",
-            $"Original LN {OriginalLN.Value}",
-            $"Column Num {SelectColumn.Value}",
-            $"Gap {Gap.Value}",
-            $"Seed {(Seed.Value == null ? "Null" : Seed.Value)}"
-        });
-
         [SettingSource("Divide", "Use 1/?")]
         public BindableNumber<int> Divide { get; set; } = new BindableInt(4)
         {

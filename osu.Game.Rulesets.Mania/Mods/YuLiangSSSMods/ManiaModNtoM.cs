@@ -35,13 +35,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override string SettingDescription => string.Join(", ", new[]
-        {
-            $"Probability {Probability.Value}%",
-            $"Key {Key.Value}",
-            $"Seed {(Seed.Value == null ? "Null" : Seed.Value)}"
-        });
-
         [SettingSource("Probability", "Needed convert column movement probability")]
         public BindableNumber<int> Probability { get; set; } = new BindableInt(70)
         {

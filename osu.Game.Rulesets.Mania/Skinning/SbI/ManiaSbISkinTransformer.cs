@@ -46,7 +46,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Y = 200;
                                     combo1.ShowLabel.Value = false;
-                                    combo1.WireframeOpacity.Value = 0;
                                     combo1.Alpha = 1f;
                                     combo1.Current.BindValueChanged(changedEvent =>
                                     {

@@ -28,16 +28,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override string SettingDescription => string.Join(", ", new[]
-        {
-            $"Perfect {Perfect.Value}",
-            $"Great {Great.Value}",
-            $"Good {Good.Value}",
-            $"Ok {Ok.Value}",
-            $"Meh {Meh.Value}",
-            $"Miss {Miss.Value}"
-        });
-
         [SettingSource("Perfect")]
         public BindableInt Perfect { get; } = new BindableInt(300)
         {

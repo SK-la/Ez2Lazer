@@ -30,24 +30,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override ModType Type => ModType.CustomMod;
 
-        public override string SettingDescription
-        {
-            get
-            {
-                List<string> descriptions = new List<string>();
-                if (Original.Value)
-                {
-                    descriptions.Add("Original OD");
-                }
-                if (!Original.Value && Custom.Value)
-                {
-                    descriptions.Add("Custom OD");
-                    descriptions.Add($"OD: {OD.Value}");
-                }
-                return string.Join(", ", descriptions);
-            }
-        }
-
         [SettingSource("Use original OD", "High Priority")]
         public BindableBool Original { get; set; } = new BindableBool(false);
 

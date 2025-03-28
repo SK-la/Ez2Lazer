@@ -23,6 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => //"Clean shit or bullet on map or eliminate impacts between mods(e.g. Overlap note).";
             "Clean bullet or other notes on map(e.g. Overlap note).";
+
         public override IconUsage? Icon => FontAwesome.Solid.Broom;
 
         public override ModType Type => ModType.CustomMod;
@@ -30,22 +31,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override double ScoreMultiplier => 1;
 
         public override bool Ranked => false;
-
-        public override string SettingDescription
-        {
-            get
-            {
-                string style = $"Style {Style.Value}";
-                string interval = $"Interval {Interval.Value}ms";
-                string LNinterval = $"LN Interval {LNInterval.Value}ms";
-                return string.Join(", ", new[]
-                {
-                    style,
-                    interval,
-                    LNinterval
-                }.Where(s => !string.IsNullOrEmpty(s)));
-            }
-        }
 
         [SettingSource("Style", "Choose your style.")]
         public BindableNumber<int> Style { get; set; } = new BindableInt(2)

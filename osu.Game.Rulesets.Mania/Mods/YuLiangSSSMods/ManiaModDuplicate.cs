@@ -37,14 +37,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override string SettingDescription => string.Join(", ", new[]
-        {
-            $"{Time.Value} Times",
-            $"Start " + (CutTimeStart.Value is null ? "Original Start Time" : CalculateTime((int)CutTimeStart.Value)),
-            $"End " + (CutTimeEnd.Value is null ? "Original End Time" : CalculateTime((int)CutTimeEnd.Value)),
-            $"Break {BreakTime:N1}s"
-        });
-
         [SettingSource("Time", "Duplicate times.")]
         public BindableInt Time { get; set; } = new BindableInt(20)
         {

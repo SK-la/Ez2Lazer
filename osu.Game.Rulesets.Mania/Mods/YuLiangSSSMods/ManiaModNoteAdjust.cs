@@ -34,19 +34,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override string SettingDescription
-        {
-            get
-            {
-                if (Style.Value != 6)
-                {
-                    return string.Join(", ", $"Style {Style.Value}", $"Probability {Probability.Value}%", $"Seed {(Seed.Value == null ? "Null" : Seed.Value)}");
-                }
-
-                return string.Join(", ", $"Style {Style.Value}", $"Probability {Probability.Value}%", $"Extremum {Extremum.Value}", $"Comparison Style {ComparisonStyle.Value}", $"Line {Line.Value}", $"Step {Step.Value}", $"Ignore Comparison {IgnoreComparison}", $"Ignore Interval {IgnoreInterval.Value}", $"Seed {(Seed.Value == null ? "Null" : Seed.Value)}");
-            }
-        }
-
         [SettingSource("Style",
             "1: Applicable to Jack Pattern.  2&3: Applicable to Stream Pattern.  4&5: Applicable to Speed Pattern(No Jack).  6: DIY(Will use ↓↓↓ all options) (1~5 will only use ↓ seed option).")]
         public BindableInt Style { get; set; } = new BindableInt(1)

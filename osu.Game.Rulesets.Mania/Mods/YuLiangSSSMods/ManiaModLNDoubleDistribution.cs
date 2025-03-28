@@ -36,20 +36,27 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public readonly int[] DivideNumber = [2, 4, 8, 3, 6, 9, 5, 7, 12, 16, 48, 35, 64];
 
         public readonly double ERROR = 2;
-        public override string SettingDescription => string.Join(", ", new[]
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
-            $"Divide 1 1/{Divide1.Value}",
-            $"Divide 2 1/{Divide2.Value}",
-            $"Mu 1 {Mu1.Value}",
-            $"Mu 2 {Mu2.Value}",
-            $"Mu 1 / Mu 2 {Mu1DMu2.Value}%",
-            $"Sigma {SigmaInteger.Value + SigmaDouble.Value}",
-            $"Percentage {Percentage.Value}%",
-            $"Original LN {OriginalLN.Value}",
-            $"Select Column {SelectColumn.Value}",
-            $"Gap {Gap.Value}",
-            $"Seed {(Seed.Value == null ? "Null" : Seed.Value)}"
-        });
+            get
+            {
+                return new List<(LocalisableString setting, LocalisableString value)>
+                {
+                    (new LocalisableString("Divide 1"), new LocalisableString($"1/{Divide1.Value}")),
+                    (new LocalisableString("Divide 2"), new LocalisableString($"1/{Divide2.Value}")),
+                    (new LocalisableString("Mu 1"), new LocalisableString(Mu1.Value.ToString())),
+                    (new LocalisableString("Mu 2"), new LocalisableString(Mu2.Value.ToString())),
+                    (new LocalisableString("Mu 1 / Mu 2"), new LocalisableString($"{Mu1DMu2.Value}%")),
+                    (new LocalisableString("Sigma"), new LocalisableString((SigmaInteger.Value + SigmaDouble.Value).ToString())),
+                    (new LocalisableString("Percentage"), new LocalisableString($"{Percentage.Value}%")),
+                    (new LocalisableString("Original LN"), new LocalisableString(OriginalLN.Value.ToString())),
+                    (new LocalisableString("Select Column"), new LocalisableString(SelectColumn.Value.ToString())),
+                    (new LocalisableString("Gap"), new LocalisableString(Gap.Value.ToString())),
+                    (new LocalisableString("Seed"), new LocalisableString(Seed.Value?.ToString() ?? "Null"))
+                };
+            }
+        }
 
         [SettingSource("Divide 1", "Use 1/?")]
         public BindableNumber<int> Divide1 { get; set; } = new BindableInt(4)

@@ -34,14 +34,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public readonly double ERROR = 1.5;
 
-        public override string SettingDescription => string.Join(", ",
-                [
-                    $"Limit Divide {LimitDivide.Value}",
-                    $"Easier Divide {EasierDivide.Value}",
-                    $"Gap {Gap.Value}",
-                    $"Len {Len.Value}",
-                ]);
-
         [SettingSource("Limit Divide", "Select limit.")]
         public BindableInt LimitDivide { get; set; } = new BindableInt(4)
         {
