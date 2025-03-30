@@ -78,7 +78,7 @@ namespace osu.Game.Skinning
                         case GlobalSkinnableContainers.SongSelect:
                             var songSelectComponents = new DefaultSkinComponentsContainer(c =>
                             {
-                                // var dim = c.OfType<SkinCom6DimPanel>().FirstOrDefault();
+                                // var dim = c.OfType<LAsSkinCom6DimPanel>().FirstOrDefault();
                                 //
                                 // if (dim != null)
                                 // {
@@ -89,7 +89,7 @@ namespace osu.Game.Skinning
                             {
                                 // Children = new Drawable[]
                                 // {
-                                //     new SkinCom6DimPanel(),
+                                //     new LAsSkinCom6DimPanel(),
                                 // }
                             };
 

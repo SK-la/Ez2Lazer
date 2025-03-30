@@ -28,7 +28,8 @@ namespace osu.Game.Rulesets.Mania.Configuration
             SetDefault(ManiaRulesetSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
             SetDefault(ManiaRulesetSetting.ScrollStyle, ManiaScrollingStyle.ScrollTimeStyleFixed);
             SetDefault(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
-            SetDefault(ManiaRulesetSetting.TimingBasedNoteColouring, false);
+            SetDefault(ManiaRulesetSetting.ScrollPerKeyMode, false);
+            SetDefault(ManiaRulesetSetting.TimingBasedNoteColouring, true);
             SetDefault(ManiaRulesetSetting.MobileLayout, ManiaMobileLayout.Portrait);
 
 #pragma warning disable CS0618
@@ -66,6 +67,7 @@ namespace osu.Game.Rulesets.Mania.Configuration
         ScrollBaseSpeed,
         ScrollTimePerSpeed,
         ScrollStyle,
+        ScrollPerKeyMode,
         ScrollDirection,
         TimingBasedNoteColouring,
         MobileLayout,

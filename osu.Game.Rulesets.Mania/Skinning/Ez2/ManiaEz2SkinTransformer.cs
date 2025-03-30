@@ -58,32 +58,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         case GlobalSkinnableContainers.MainHUDComponents:
                             return new DefaultSkinComponentsContainer(container =>
                             {
-                                var combotext = container.ChildrenOfType<EzComComboText>().FirstOrDefault();
+                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().FirstOrDefault();
 
-                                if (combotext != null)
+                                if (hitTiming != null)
                                 {
-                                    combotext.Anchor = Anchor.BottomCentre;
-                                    combotext.Origin = Anchor.Centre;
-                                    combotext.Y = 200 + 25;
-                                    combotext.Current.BindValueChanged(changedEvent =>
-                                    {
-                                        bool wasIncrease = changedEvent.NewValue > changedEvent.OldValue;
-                                        bool wasMiss = changedEvent.OldValue > 1 && changedEvent.NewValue == 0;
-                                        combotext.Text.NumberContainer.Origin = Anchor.BottomCentre;
-
-                                        if (wasIncrease)
-                                        {
-                                            combotext.Text.NumberContainer
-                                                     .ScaleTo(new Vector2(1.2f, 1.2f), 10, Easing.OutQuint)
-                                                     .Then()
-                                                     .ScaleTo(Vector2.One, 500, Easing.OutQuint);
-                                        }
-
-                                        if (wasMiss)
-                                        {
-                                            combotext.Text.FlashColour(Color4.Red, 500, Easing.OutQuint);
-                                        }
-                                    });
+                                    hitTiming.Anchor = Anchor.TopCentre;
+                                    hitTiming.Origin = Anchor.Centre;
+                                    hitTiming.Y = 500;
                                 }
 
                                 var combos = container.ChildrenOfType<EzComComboCounter>().ToArray();
@@ -95,52 +76,25 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                                     combo1.Anchor = Anchor.TopCentre;
                                     combo1.Origin = Anchor.Centre;
+                                    combo1.Colour = Colour4.White;
                                     combo1.Y = 200;
-                                    combo1.ShowLabel.Value = false;
-                                    combo1.Alpha = 1f;
-                                    combo1.Current.BindValueChanged(changedEvent =>
-                                    {
-                                        bool wasIncrease = changedEvent.NewValue > changedEvent.OldValue;
-                                        bool wasMiss = changedEvent.OldValue > 1 && changedEvent.NewValue == 0;
-
-                                        if (wasIncrease)
-                                        {
-                                            combo1.Text.NumberContainer
-                                                  .ScaleTo(new Vector2(1.5f, 1.5f), 10, Easing.OutQuint)
-                                                  .Then()
-                                                  .ScaleTo(Vector2.One, 500, Easing.OutQuint);
-                                        }
-
-                                        if (wasMiss)
-                                        {
-                                            combo1.Text.FlashColour(Color4.Red, 500, Easing.OutQuint);
-                                        }
-                                    });
+                                    combo1.ShowLabel.Value = true;
+                                    combo1.BoxAlpha.Value = 0.8f;
+                                    combo1.IncreaseScale.Value = 1.5f;
+                                    combo1.DecreaseScale.Value = 1f;
+                                    combo1.IncreaseDuration.Value = 10;
+                                    combo1.DecreaseDuration.Value = 500;
 
                                     combo2.Anchor = Anchor.TopCentre;
                                     combo2.Origin = Anchor.Centre;
-                                    combo2.Y = 200;
+                                    combo2.Colour = Colour4.White;
+                                    combo2.Y = 208;
                                     combo2.ShowLabel.Value = false;
-                                    combo2.Alpha = 0.6f;
-                                    combo2.Colour = Colour4.White.Opacity(0.4f);
-                                    combo2.Current.BindValueChanged(changedEvent =>
-                                    {
-                                        bool wasIncrease = changedEvent.NewValue > changedEvent.OldValue;
-                                        bool wasMiss = changedEvent.OldValue > 1 && changedEvent.NewValue == 0;
-
-                                        if (wasIncrease)
-                                        {
-                                            combo2.Text.NumberContainer
-                                                  .ScaleTo(new Vector2(3.5f, 3.5f), 10, Easing.OutQuint)
-                                                  .Then()
-                                                  .ScaleTo(Vector2.One, 300, Easing.OutQuint);
-                                        }
-
-                                        if (wasMiss)
-                                        {
-                                            combo2.Text.FlashColour(Color4.Red, 500, Easing.OutQuint);
-                                        }
-                                    });
+                                    combo2.BoxAlpha.Value = 0.2f;
+                                    combo2.IncreaseScale.Value = 3f;
+                                    combo2.DecreaseScale.Value = 1f;
+                                    combo2.IncreaseDuration.Value = 10;
+                                    combo2.DecreaseDuration.Value = 300;
                                 }
 
                                 var keyCounter = container.ChildrenOfType<Ez2KeyCounterDisplay>().FirstOrDefault();
@@ -150,9 +104,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     keyCounter.Anchor = Anchor.BottomCentre;
                                     keyCounter.Origin = Anchor.TopCentre;
                                     keyCounter.Position = new Vector2(0, -Stage.HIT_TARGET_POSITION - stage_padding_bottom);
-                                    // keyCounter.Child.Scale = new Vector2(0.8f, 1);
-                                    // keyCounter.Height = 2f;
-                                    // keyCounter.Child.Width = width;
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -172,22 +123,27 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 }
                             })
                             {
-                                new EzComComboText(),
+                                // new EzComComboText(),
                                 new EzComComboCounter(),
                                 new EzComComboCounter(),
                                 new Ez2KeyCounterDisplay(),
                                 // new ArgonKeyCounterDisplay(),
                                 new BarHitErrorMeter(),
+                                // new EzComHitTiming(),
                             };
                     }
 
                     return null;
 
                 case SkinComponentLookup<HitResult> resultComponent:
-                    if (Skin is Ez2Skin && resultComponent.Component > HitResult.Great)
-                        return Drawable.Empty();
+                    // if (Skin is Ez2Skin && resultComponent.Component > HitResult.Great)
+                    //     return Drawable.Empty();
 
                     return new Ez2JudgementPiece(resultComponent.Component);
+                    // return new GifJudgementPiece(resultComponent.Component);
+                    // return new DefaultSkinComponentsContainer(container =>
+                    // {
+                    // });
 
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)

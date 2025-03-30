@@ -22,7 +22,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
     public partial class Ez2ManiaComboCounter : ComboCounter
     {
         protected EzComCounterText Text = null!;
-        public IBindable<float> WireframeOpacity { get; } = new BindableFloat();
+
+        // public IBindable<float> WireframeOpacity { get; } = new BindableFloat();
         protected override double RollingDuration => 250;
         protected virtual bool DisplayXSymbol => true;
 
@@ -70,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected override IHasText CreateText() => Text = new EzComCounterText(Anchor.TopCentre, MatchesStrings.MatchScoreStatsCombo.ToUpper())
         {
-            WireframeOpacity = { BindTarget = WireframeOpacity },
+            // WireframeOpacity = { BindTarget = WireframeOpacity },
             ShowLabel = { BindTarget = ShowLabel },
         };
 

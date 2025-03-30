@@ -470,11 +470,11 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                new StatisticItem("SHit Graph ", () => new LAsHitEventHeatmapGraph(score.HitEvents)
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 300
-                }, true),
+                // new StatisticItem("SHit Graph ", () => new LAsHitEventHeatmapGraph(score.HitEvents)
+                // {
+                //     RelativeSizeAxes = Axes.X,
+                //     Height = 300
+                // }, true),
                 new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
                 {
                     RelativeSizeAxes = Axes.X,
@@ -492,7 +492,7 @@ namespace osu.Game.Rulesets.Mania
                 statistics.Add(new StatisticItem($"Timing Distribution - Column {column.Key + 1}", () => new HitEventTimingDistributionGraph(column.ToList())
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 80,
+                    Height = 50,
                 }, true));
             }
 

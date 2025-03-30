@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
@@ -94,8 +95,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 case SkinComponentLookup<HitResult> resultComponent:
                     // if (Skin is SbISkin && resultComponent.Component >= HitResult.Great)
                     //     return Drawable.Empty();
-
-                    return new SbIJudgementPiece(resultComponent.Component);
+                    return new GifJudgementPiece(resultComponent.Component);
+                    // return new SbIJudgementPiece(resultComponent.Component);
 
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)

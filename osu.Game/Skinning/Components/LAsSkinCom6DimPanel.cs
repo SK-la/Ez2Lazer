@@ -23,7 +23,7 @@ using Triangle = osu.Framework.Graphics.Primitives.Triangle;
 
 namespace osu.Game.Skinning.Components
 {
-    public partial class SkinCom6DimPanel : CompositeDrawable, ISerialisableDrawable
+    public partial class LAsSkinCom6DimPanel : CompositeDrawable, ISerialisableDrawable
     {
         public bool UsesFixedAnchor { get; set; }
 
@@ -56,7 +56,7 @@ namespace osu.Game.Skinning.Components
         private const float max_dr = 10f;
         private const float max_ar = 10f;
 
-        public SkinCom6DimPanel()
+        public LAsSkinCom6DimPanel()
         {
             Size = new Vector2(200);
 

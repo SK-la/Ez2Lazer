@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         private Box background = null!;
         private Box backgroundOverlay = null!;
-        private Box separator = null!;
+        private Box? separator;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -115,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             base.LoadComplete();
 
-            separator.Height = DrawHeight - Stage.HIT_TARGET_POSITION;
+            if (separator != null) separator.Height = DrawHeight - Stage.HIT_TARGET_POSITION;
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
