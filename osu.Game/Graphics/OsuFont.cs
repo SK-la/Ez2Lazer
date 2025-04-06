@@ -28,8 +28,6 @@ namespace osu.Game.Graphics
 
         public static FontUsage Inter => GetFont(Typeface.Inter, weight: FontWeight.Regular);
 
-        public static FontUsage Stat => GetFont(Typeface.Stat, weight: FontWeight.Regular);
-
         /// <summary>
         /// Retrieves a <see cref="FontUsage"/>.
         /// </summary>
@@ -72,9 +70,6 @@ namespace osu.Game.Graphics
 
                 case Typeface.Inter:
                     return @"Inter";
-
-                case Typeface.Stat:
-                    return @"Stat";
             }
 
             return null;
@@ -121,7 +116,6 @@ namespace osu.Game.Graphics
     {
         Venera,
         Torus,
-        Stat,
 
         [Description("Torus (alternate)")]
         TorusAlternate,

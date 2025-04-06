@@ -29,20 +29,20 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 new SettingsEnumDropdown<HitWindows.HitMode>
                 {
                     ClassicDefault = HitWindows.HitMode.Ez2AcStyle,
-                    LabelText = GameplaySettingsStrings.HitMode,
+                    LabelText = "Hit Mode(No Active)",
                     Current = config.GetBindable<HitWindows.HitMode>(OsuSetting.HitMode),
                     Keywords = new[] { "scoring" }
                 },
                 new SettingsSlider<double>
                 {
-                    LabelText = GameplaySettingsStrings.AccuracyCutoffS,
+                    LabelText = "Accuracy Cutoff S",
                     Current = config.GetBindable<double>(OsuSetting.AccuracyCutoffS),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true
                 },
                 new SettingsSlider<double>
                 {
-                    LabelText = GameplaySettingsStrings.AccuracyCutoffA,
+                    LabelText = "Accuracy Cutoff A",
                     Current = config.GetBindable<double>(OsuSetting.AccuracyCutoffA),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true

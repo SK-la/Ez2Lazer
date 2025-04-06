@@ -9,8 +9,6 @@ namespace osu.Game.Localisation.HUD
     {
         private const string prefix = @"osu.Game.Resources.Localisation.HUD.BarHitErrorMeter";
 
-        public static LocalisableString JudgementIconFadeOutDuration = new TranslatableString(getKey(@"Judgement_Icon_Fade_Out_Duration"), "Judgement Icon Fade Out Duration");
-
         /// <summary>
         /// "Judgement line thickness"
         /// </summary>

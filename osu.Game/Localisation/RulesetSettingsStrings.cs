@@ -82,7 +82,7 @@ namespace osu.Game.Localisation
         /// <summary>
         /// "{0}ms (speed {1:N1})"
         /// </summary>
-        public static LocalisableString ScrollSpeedTooltip(double scrollTime, double scrollSpeed) => new TranslatableString(getKey(@"ruleset"), @"{0}ms (speed {1:N1})", scrollTime, scrollSpeed);
+        public static LocalisableString ScrollSpeedTooltip(int scrollTime, double scrollSpeed) => new TranslatableString(getKey(@"ruleset"), @"{0}ms (speed {1:N1})", scrollTime, scrollSpeed);
 
         /// <summary>
         /// "Touch control scheme"

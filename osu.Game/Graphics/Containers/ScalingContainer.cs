@@ -7,11 +7,9 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Layout;
-using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Configuration;
-using osu.Game.Localisation;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Screens.Backgrounds;
@@ -211,9 +209,9 @@ namespace osu.Game.Graphics.Containers
             {
                 if (targetMode == ScalingMode.Gameplay)
                 {
-                    if ((scalingGameMode.Value == ScalingGameMode.Std && ruleset.Value.OnlineID == 0) ||
+                    if ((scalingGameMode.Value == ScalingGameMode.Standard && ruleset.Value.OnlineID == 0) ||
                         (scalingGameMode.Value == ScalingGameMode.Taiko && ruleset.Value.OnlineID == 1) ||
-                        (scalingGameMode.Value == ScalingGameMode.Ctb && ruleset.Value.OnlineID == 2) ||
+                        (scalingGameMode.Value == ScalingGameMode.Catch && ruleset.Value.OnlineID == 2) ||
                         (scalingGameMode.Value == ScalingGameMode.Mania && ruleset.Value.OnlineID == 3))
                     {
                         sizableContainer.RelativePositionAxes = Axes.Both;
@@ -316,16 +314,12 @@ namespace osu.Game.Graphics.Containers
 
     public enum ScalingGameMode
     {
-        [LocalisableDescription(typeof(LayoutSettingsStrings), "Standard")]
-        Std,
+        Standard,
 
-        [LocalisableDescription(typeof(LayoutSettingsStrings), "Taiko")]
         Taiko,
 
-        [LocalisableDescription(typeof(LayoutSettingsStrings), "Mania")]
         Mania,
 
-        [LocalisableDescription(typeof(LayoutSettingsStrings), "CatchTheBeat")]
-        Ctb,
+        Catch,
     }
 }

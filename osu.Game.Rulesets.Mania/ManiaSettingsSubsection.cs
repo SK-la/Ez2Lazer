@@ -94,7 +94,7 @@ namespace osu.Game.Rulesets.Mania
         private partial class ManiaScrollBaseSpeedSlider : RoundedSliderBar<double>
         {
             public override LocalisableString TooltipText => RulesetSettingsStrings.ScrollSpeedTooltip(
-                Current.Value, 200);
+                (int)Current.Value, 200);
         }
 
         private partial class ManiaScrollTimePerSpeedSlider : RoundedSliderBar<double>

@@ -140,6 +140,23 @@ namespace osu.Game.Screens.Backgrounds
 
         private Background createBackground()
         {
+            switch (source.Value)
+            {
+                case BackgroundSource.WebmSource:
+                {
+                    string[] videoFiles = System.IO.Directory.GetFiles(@"Textures/Webm", "*.webm");
+
+                    if (videoFiles.Length == 0)
+                    {
+                        // 没有找到视频文件，返回一个默认背景
+                        return new Background(getBackgroundTextureName());
+                    }
+
+                    string videoPath = videoFiles[RNG.Next(videoFiles.Length)];
+                    return new VideoBackgroundScreen(videoPath);
+                }
+            }
+
             // seasonal background loading gets highest priority.
             Background newBackground = seasonalBackgroundLoader.LoadNextBackground();
 

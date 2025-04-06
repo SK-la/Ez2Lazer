@@ -8,8 +8,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
@@ -122,17 +120,38 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private void applyBounceAnimation(bool wasIncrease, bool wasMiss)
         {
-            float factor = Math.Clamp(wasIncrease ? -10 * IncreaseScale.Value : 10 * DecreaseScale.Value, -100f, 100f);
+            float factor = Math.Clamp(wasIncrease ? 10 * IncreaseScale.Value : -10 * DecreaseScale.Value, -100f, 100f);
 
             Anchor originAnchor = Enum.Parse<Anchor>(AnimationOrigin.Value.ToString());
 
             Text.NumberContainer.Anchor = originAnchor;
             Text.NumberContainer.Origin = originAnchor;
 
+            float moveToYStart = 0;
+            float moveToYEnd = 0;
+
+            switch (AnimationOrigin.Value)
+            {
+                case OriginOptions.TopCentre:
+                    moveToYStart = factor;
+                    moveToYEnd = -5;
+                    break;
+
+                case OriginOptions.BottomCentre:
+                    moveToYStart = -factor;
+                    moveToYEnd = 5;
+                    break;
+
+                case OriginOptions.Centre:
+                    moveToYStart = factor;
+                    moveToYEnd = -5;
+                    break;
+            }
+
             Text.NumberContainer
-                .MoveToY(factor, IncreaseDuration.Value / 2, Easing.OutBounce)
+                .MoveToY(moveToYStart, IncreaseDuration.Value / 2, Easing.OutBounce)
                 .Then()
-                .MoveToY(0, DecreaseDuration.Value, Easing.OutBounce);
+                .MoveToY(moveToYEnd, DecreaseDuration.Value, Easing.OutBounce);
 
             if (wasMiss)
                 Text.FlashColour(Color4.Red, DecreaseDuration.Value, Easing.OutQuint);
@@ -143,11 +162,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         protected override IHasText CreateText() => Text = new EzComCounterText(Anchor.TopCentre, LabelContent.Value)
         {
             ShowLabel = { BindTarget = ShowLabel },
-        };
-
-        protected override OsuSpriteText CreateSpriteText() => new OsuSpriteText
-        {
-            Font = OsuFont.Stat.With(size: 40f, family: "Ez"),
         };
 
         protected override void LoadComplete()
@@ -162,7 +176,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
     public enum AnimationType
     {
         Scale,
-        Bounce
+        Bounce,
+        None
     }
 
     public enum OriginOptions

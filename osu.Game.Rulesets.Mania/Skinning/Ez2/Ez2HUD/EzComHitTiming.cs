@@ -21,22 +21,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         private readonly Bindable<HitResult> hitResult = new Bindable<HitResult>();
 
         [Resolved]
-        protected HitWindows HitWindows { get; private set; }
+        protected HitWindows HitWindows { get; private set; } = null!;
 
         [Resolved]
-        private ScoreProcessor processor { get; set; }
+        private ScoreProcessor processor { get; set; } = null!;
 
         [Resolved]
-        private OsuColour colours { get; set; }
+        private OsuColour colours { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
-        private GameplayClockContainer gameplayClockContainer { get; set; }
+        private GameplayClockContainer gameplayClockContainer { get; set; } = null!;
 
         [Resolved]
-        private DrawableRuleset drawableRuleset { get; set; }
+        private DrawableRuleset drawableRuleset { get; set; } = null!;
 
-        private OsuSpriteText offsetText;
-        private Box backgroundBox;
+        private OsuSpriteText offsetText = null!;
+        private Box backgroundBox = null!;
 
         public bool UsesFixedAnchor { get; set; }
 

@@ -110,21 +110,6 @@ namespace osu.Game.Localisation
         public static LocalisableString ScoreDisplayMode => new TranslatableString(getKey(@"score_display_mode"), @"Score display mode");
 
         /// <summary>
-        /// "Hit Mode(No Active)"
-        /// </summary>
-        public static LocalisableString HitMode => new TranslatableString(getKey(@"hit_mode"), @"Hit Mode(No Active)");
-
-        /// <summary>
-        /// "Accuracy Cutoff S"
-        /// </summary>
-        public static LocalisableString AccuracyCutoffS => new TranslatableString(getKey(@"accuracy_cutoff_s"), @"Accuracy Cutoff S");
-
-        /// <summary>
-        /// "Accuracy Cutoff A"
-        /// </summary>
-        public static LocalisableString AccuracyCutoffA => new TranslatableString(getKey(@"accuracy_cutoff_a"), @"Accuracy Cutoff A");
-
-        /// <summary>
         /// "Disable Windows key during gameplay"
         /// </summary>
         public static LocalisableString DisableWinKey => new TranslatableString(getKey(@"disable_win_key"), @"Disable Windows key during gameplay");

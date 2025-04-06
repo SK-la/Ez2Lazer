@@ -67,6 +67,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     hitTiming.Y = 500;
                                 }
 
+                                var comboSprite = container.ChildrenOfType<EzComComboSprite>().FirstOrDefault();
+
+                                if (comboSprite != null)
+                                {
+                                    comboSprite.Anchor = Anchor.TopCentre;
+                                    comboSprite.Origin = Anchor.Centre;
+                                    comboSprite.Scale = new Vector2(0.8f);
+                                    comboSprite.Y = 190;
+                                }
+
                                 var combos = container.ChildrenOfType<EzComComboCounter>().ToArray();
 
                                 if (combos.Length >= 2)
@@ -78,7 +88,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Colour = Colour4.White;
                                     combo1.Y = 200;
-                                    combo1.ShowLabel.Value = true;
+                                    combo1.ShowLabel.Value = false;
                                     combo1.BoxAlpha.Value = 0.8f;
                                     combo1.IncreaseScale.Value = 1.5f;
                                     combo1.DecreaseScale.Value = 1f;
@@ -88,7 +98,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo2.Anchor = Anchor.TopCentre;
                                     combo2.Origin = Anchor.Centre;
                                     combo2.Colour = Colour4.White;
-                                    combo2.Y = 208;
+                                    combo2.Y = 200;
                                     combo2.ShowLabel.Value = false;
                                     combo2.BoxAlpha.Value = 0.2f;
                                     combo2.IncreaseScale.Value = 3f;
@@ -121,15 +131,25 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     hitErrorMeter.CentreMarkerStyle.Value = BarHitErrorMeter.CentreMarkerStyles.Circle;
                                     hitErrorMeter.LabelStyle.Value = BarHitErrorMeter.LabelStyles.None;
                                 }
+
+                                var judgementPiece = container.OfType<EzComJudgementTexture>().FirstOrDefault();
+
+                                if (judgementPiece != null)
+                                {
+                                    judgementPiece.Anchor = Anchor.Centre;
+                                    judgementPiece.Origin = Anchor.Centre;
+                                    judgementPiece.Y = 50;
+                                }
                             })
                             {
-                                // new EzComComboText(),
+                                new EzComComboSprite(),
                                 new EzComComboCounter(),
                                 new EzComComboCounter(),
                                 new Ez2KeyCounterDisplay(),
                                 // new ArgonKeyCounterDisplay(),
                                 new BarHitErrorMeter(),
                                 // new EzComHitTiming(),
+                                new EzComJudgementTexture(),
                             };
                     }
 
@@ -139,8 +159,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     // if (Skin is Ez2Skin && resultComponent.Component > HitResult.Great)
                     //     return Drawable.Empty();
 
-                    return new Ez2JudgementPiece(resultComponent.Component);
-                    // return new GifJudgementPiece(resultComponent.Component);
+                    // return new Ez2JudgementPiece(resultComponent.Component);
+                    return Drawable.Empty();
                     // return new DefaultSkinComponentsContainer(container =>
                     // {
                     // });

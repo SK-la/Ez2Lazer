@@ -19,9 +19,9 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    public partial class Ez2JudgementPiece : TextJudgementPiece, IAnimatableJudgement
+    public partial class Ez2JudgementPiece : LAsJudgementText, IAnimatableJudgement
     {
-        private const float judgement_y_position = 140;
+        internal const float JUDGEMENT_Y_POSITION = 140;
 
         private RingExplosion? ringExplosion;
 
@@ -33,7 +33,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             AutoSizeAxes = Axes.Both;
             Origin = Anchor.Centre;
-            Y = judgement_y_position;
+            Y = JUDGEMENT_Y_POSITION;
+        }
+
+        public Ez2JudgementPiece()
+        {
         }
 
         [BackgroundDependencyLoader]
@@ -78,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     JudgementText
                         .ScaleTo(Vector2.One)
                         .ScaleTo(new Vector2(1.3f), 1800, Easing.OutQuint);
-                    this.MoveToY(judgement_y_position);
+                    this.MoveToY(JUDGEMENT_Y_POSITION);
 
                     applyFadeEffect(this, new[] { Color4.Red, Color4.IndianRed }, flash_speed);
                     applyScaleAndFadeOutEffect(this, new Vector2(1.5f), 300, new Vector2(1.5f, 0.1f), 300, 300);
@@ -88,7 +92,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     JudgementText
                         .ScaleTo(Vector2.One)
                         .ScaleTo(new Vector2(1.3f), 1800, Easing.OutQuint);
-                    this.MoveToY(judgement_y_position);
+                    this.MoveToY(JUDGEMENT_Y_POSITION);
 
                     applyFadeEffect(this, new[] { Color4.Purple, Color4.MediumPurple }, flash_speed);
                     applyScaleAndFadeOutEffect(this, new Vector2(1.5f), 300, new Vector2(1.5f, 0.1f), 300, 300);
@@ -98,14 +102,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     JudgementText
                         .ScaleTo(Vector2.One)
                         .ScaleTo(new Vector2(1.3f), 1800, Easing.OutQuint);
-                    this.MoveToY(judgement_y_position);
+                    this.MoveToY(JUDGEMENT_Y_POSITION);
 
                     applyFadeEffect(this, new[] { Color4.ForestGreen, Color4.SeaGreen }, flash_speed);
                     applyScaleAndFadeOutEffect(this, new Vector2(1.3f), 200, new Vector2(1.3f, 0.1f), 400, 400);
                     break;
 
                 case HitResult.Good:
-                    this.MoveToY(judgement_y_position);
+                    this.MoveToY(JUDGEMENT_Y_POSITION);
                     JudgementText
                         .ScaleTo(Vector2.One)
                         .ScaleTo(new Vector2(1.3f), 1800, Easing.OutQuint);

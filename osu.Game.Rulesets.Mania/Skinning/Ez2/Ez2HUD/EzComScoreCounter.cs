@@ -14,20 +14,12 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
-    public partial class Ez2ScoreCounter : GameplayScoreCounter, ISerialisableDrawable
+    public partial class EzComScoreCounter : GameplayScoreCounter, ISerialisableDrawable
     {
         protected override double RollingDuration => 250;
 
-        [SettingSource("Wireframe opacity", "Controls the opacity of the wireframes behind the digits.")]
-        public BindableFloat WireframeOpacity { get; } = new BindableFloat(0)
-        {
-            Precision = 0.01f,
-            MinValue = 0,
-            MaxValue = 1,
-        };
-
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel), nameof(SkinnableComponentStrings.ShowLabelDescription))]
-        public Bindable<bool> ShowLabel { get; } = new BindableBool(true);
+        public Bindable<bool> ShowLabel { get; } = new BindableBool(false);
 
         public bool UsesFixedAnchor { get; set; }
 

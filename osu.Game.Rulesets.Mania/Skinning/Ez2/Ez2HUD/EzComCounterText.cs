@@ -57,7 +57,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                             Anchor = Anchor.Centre,
                             Origin = Anchor.BottomCentre,
                             Text = label.GetValueOrDefault(),
-                            Font = OsuFont.Stat.With(size: 12, weight: FontWeight.Bold),
                             // Margin = new MarginPadding { Bottom = 1 },
                         },
                         textPart = new Ez2CounterSpriteText(textLookup)
@@ -138,7 +137,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
             private class GlyphStore : ITexturedGlyphLookupStore
             {
-                private readonly string fontName;
+                // private readonly string fontName;
                 private readonly TextureStore textures;
                 private readonly Func<char, string> getLookup;
 
@@ -146,17 +145,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
                 public GlyphStore(string fontName, TextureStore textures, Func<char, string> getLookup)
                 {
-                    this.fontName = fontName;
+                    // this.fontName = fontName;
                     this.textures = textures;
                     this.getLookup = getLookup;
                 }
 
                 public ITexturedCharacterGlyph? Get(string? fontName, char character)
                 {
-                    // We only service one font.
-                    if (fontName != this.fontName)
-                        return null;
-
                     if (cache.TryGetValue(character, out var cached))
                         return cached;
 
