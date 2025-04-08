@@ -4,10 +4,12 @@
 #nullable disable
 
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
@@ -138,18 +140,34 @@ namespace osu.Game.Screens.Backgrounds
             currentDisplay++;
         }
 
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private TextureStore textures { get; set; } = null!;
+
         private Background createBackground()
         {
             switch (source.Value)
             {
                 case BackgroundSource.WebmSource:
                 {
-                    string[] videoFiles = System.IO.Directory.GetFiles(@"Textures/Webm", "*.webm");
+                    const string relative_path = @"Textures/Webm";
+                    string dataFolderPath = storage.GetFullPath(relative_path);
+                    Debug.Assert(!string.IsNullOrEmpty(dataFolderPath));
+
+                    if (!Directory.Exists(dataFolderPath))
+                    {
+                        Directory.CreateDirectory(dataFolderPath);
+                    }
+
+                    string[] videoFiles = Directory.GetFiles(dataFolderPath, "*.webm");
 
                     if (videoFiles.Length == 0)
                     {
-                        // 没有找到视频文件，返回一个默认背景
-                        return new Background(getBackgroundTextureName());
+                        Stream videoName = textures.GetStream("Menu/default_video.webm");
+                        return new StreamVideoBackgroundScreen(videoName);
+                        // return new Background(getBackgroundTextureName());
                     }
 
                     string videoPath = videoFiles[RNG.Next(videoFiles.Length)];
