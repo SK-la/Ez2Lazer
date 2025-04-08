@@ -8,12 +8,8 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Logging;
-using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
@@ -21,14 +17,13 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
-using Texture = osu.Framework.Graphics.Textures.Texture;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
-    public partial class EzComComboSprite : CompositeDrawable, ISerialisableDrawable
+    public partial class EzComComboSprite : SkinnableDrawable, ISerialisableDrawable
     {
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.SpriteName), nameof(SkinnableComponentStrings.SpriteNameDescription), SettingControlType = typeof(SpriteSelectorControl))]
-        public Bindable<string> SpriteName { get; } = new Bindable<string>("default");
+        public Bindable<string> SpriteName { get; } = new Bindable<string>(string.Empty);
 
         [SettingSource("Animation Type", "The type of animation to apply")]
         public Bindable<AnimationType> Animation { get; } = new Bindable<AnimationType>(AnimationType.Scale);
@@ -68,70 +63,44 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             Precision = 0.01f,
         };
 
+        protected override bool ApplySizeRestrictionsToDefault => true;
         public Bindable<int> Current { get; } = new Bindable<int>();
         private Sprite comboSprite = null!;
+        private Texture texture = null!;
         private readonly Dictionary<string, Texture> textureMap = new Dictionary<string, Texture>();
+
+        // [Resolved]
+        // private ISkinSource source { get; set; } = null!;
 
         [Resolved]
         private TextureStore textures { get; set; } = null!;
 
-        [Resolved]
-        private IRenderer renderer { get; set; } = null!;
-
-        public EzComComboSprite(string textureName)
+        public EzComComboSprite(string textureName, Vector2? maxSize = null, ConfineMode confineMode = ConfineMode.NoScaling)
+            : base(new SpriteComponentLookup(textureName, maxSize), confineMode)
         {
             SpriteName.Value = textureName;
         }
 
         public EzComComboSprite()
+            : base(new SpriteComponentLookup(string.Empty), ConfineMode.NoScaling)
         {
             RelativeSizeAxes = Axes.None;
             AutoSizeAxes = Axes.Both;
-            Anchor = Anchor.TopCentre;
-            Origin = Anchor.Centre;
 
             SpriteName.BindValueChanged(name =>
             {
+                ((SpriteComponentLookup)ComponentLookup).LookupName = name.NewValue ?? string.Empty;
                 if (IsLoaded)
-                    updateTexture();
-            }, true);
-        }
-
-        private void updateTexture()
-        {
-            string lookupName = SpriteName.Value;
-            string localPath = Path.Combine("Skins/Ez2/combo", $"{lookupName}.png");
-
-            Texture? texture = null;
-
-            Logger.Log($"Found {localPath}");
-
-            if (File.Exists(localPath))
-            {
-                using (var stream = File.OpenRead(localPath))
-                {
-                    texture = Texture.FromStream(renderer, stream);
-                    Logger.Log($"Loaded texture from {localPath}");
-                }
-            }
-
-            texture ??= textures.Get(@"Gameplay/Ez2/combo/default_combo.png");
-
-            comboSprite.Texture = texture;
+                    SkinChanged(CurrentSkin);
+            });
         }
 
         [BackgroundDependencyLoader]
         private void load(ScoreProcessor scoreProcessor)
         {
-            InternalChild = comboSprite = new Sprite
-            {
-                Origin = Anchor.Centre,
-                Anchor = Anchor.Centre
-            };
-
             foreach (var item in SpriteSelectorControl.SPRITE_PATH_MAP)
             {
-                var texture = textures.Get(item.Value);
+                texture = textures.Get(item.Value);
 
                 if (texture != null)
                 {
@@ -156,8 +125,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                         break;
                 }
             });
-
-            updateTexture();
         }
 
         private void applyScaleAnimation(bool wasIncrease, bool wasMiss)
@@ -207,10 +174,59 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         public bool UsesFixedAnchor { get; set; }
 
+        // private void updateTexture()
+        // {
+        //     string lookupName = SpriteName.Value;
+        //     string localPath = Path.Combine(storage.GetFullPath(base_path), $"{lookupName}.png");
+        //     Logger.Log($"localPath {localPath}");
+        //
+        //     texture = textures.Get(lookupName);
+        //     Logger.Log($"texture {texture}");
+        //
+        //     if (texture == null || SpriteName.Value == string.Empty)
+        //         texture = textures.Get(@"Gameplay/Ez2/combo/default_combo.png");
+        //
+        //     comboSprite.Texture = texture;
+        // }
+
+        protected override Drawable CreateDefault(ISkinComponentLookup lookup)
+        {
+            var spriteLookup = (SpriteComponentLookup)lookup;
+            texture = textures.Get(spriteLookup.LookupName);
+
+            if (texture == null || SpriteName.Value == string.Empty)
+                texture = textures.Get(@"Gameplay/Ez2/combo/default_combo.png");
+
+            if (spriteLookup.MaxSize != null)
+                texture = texture.WithMaximumSize(spriteLookup.MaxSize.Value);
+
+            comboSprite = new Sprite
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Texture = texture
+            };
+            return comboSprite;
+        }
+
+        internal class SpriteComponentLookup : ISkinComponentLookup
+        {
+            public string LookupName { get; set; }
+            public Vector2? MaxSize { get; set; }
+
+            public SpriteComponentLookup(string textureName, Vector2? maxSize = null)
+            {
+                LookupName = textureName;
+                MaxSize = maxSize;
+            }
+        }
+
+        private const string base_path = @"Gameplay/Ez2/combo";
+
         public partial class SpriteSelectorControl : SettingsDropdown<string>
         {
             [Resolved]
-            private Storage storage { get; set; } = null!;
+            private TextureStore textures { get; set; } = null!;
 
             internal static readonly Dictionary<string, string> SPRITE_PATH_MAP = new Dictionary<string, string>();
 
@@ -218,21 +234,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             {
                 base.LoadComplete();
 
-                const string skin_path = @"Skins\Ez2\combo";
+                var resources = textures.GetAvailableResources();
                 SPRITE_PATH_MAP.Clear();
-                SPRITE_PATH_MAP["default"] = @"Gameplay/Ez2/combo/default_combo.png";
 
-                string fullPath = storage.GetFullPath(skin_path);
+                var matchingResources = resources
+                    .Where(r => r.StartsWith(base_path, StringComparison.OrdinalIgnoreCase)
+                                && Path.GetExtension(r).Equals(".png", StringComparison.OrdinalIgnoreCase));
 
-                if (!Directory.Exists(fullPath))
-                    Directory.CreateDirectory(fullPath);
-
-                string[] files = Directory.GetFiles(fullPath, "*.png", SearchOption.TopDirectoryOnly);
-
-                foreach (string file in files)
+                foreach (string? resource in matchingResources)
                 {
-                    string fileName = Path.GetFileNameWithoutExtension(file);
-                    SPRITE_PATH_MAP[fileName] = Path.Combine(skin_path, Path.GetFileName(file));
+                    string fileName = Path.GetFileNameWithoutExtension(resource);
+                    SPRITE_PATH_MAP[fileName] = resource;
                 }
 
                 Items = SPRITE_PATH_MAP.Keys.ToList();
@@ -243,6 +255,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                     {
                         if (Current.Value != path)
                             Current.Value = path;
+
+                        // Ensure the sprite is updated when the value changes
+                        // SpriteName.Value = e.NewValue;
                     }
                 };
             }
