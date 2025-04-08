@@ -18,7 +18,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
-    public partial class EzComCounterText : CompositeDrawable, IHasText
+    public partial class EzCounterText : CompositeDrawable, IHasText
     {
         private readonly Ez2CounterSpriteText textPart;
         private readonly OsuSpriteText labelText;
@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             set => textPart.Text = value;
         }
 
-        public EzComCounterText(Anchor anchor, LocalisableString? label = null)
+        public EzCounterText(Anchor anchor, LocalisableString? label = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;

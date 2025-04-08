@@ -25,14 +25,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected override LocalisableString FormatCount(long count) => count.ToString();
 
-        protected override IHasText CreateText() => new EzComScoreText(Anchor.TopRight, BeatmapsetsStrings.ShowScoreboardHeadersScore.ToUpper())
+        protected override IHasText CreateText() => new EzScoreText(Anchor.TopRight, BeatmapsetsStrings.ShowScoreboardHeadersScore.ToUpper())
         {
             ShowLabel = { BindTarget = ShowLabel },
         };
 
-        private partial class EzComScoreText : EzComCounterText
+        private partial class EzScoreText : EzCounterText
         {
-            public EzComScoreText(Anchor anchor, LocalisableString? label = null)
+            public EzScoreText(Anchor anchor, LocalisableString? label = null)
                 : base(anchor, label)
             {
             }

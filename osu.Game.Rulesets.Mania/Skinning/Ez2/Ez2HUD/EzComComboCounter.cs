@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
     public partial class EzComComboCounter : ComboCounter
     {
-        public EzComCounterText Text = null!;
+        public EzCounterText Text = null!;
         protected override double RollingDuration => 250;
         protected virtual bool DisplayXSymbol => true;
 
@@ -159,7 +159,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected override LocalisableString FormatCount(int count) => DisplayXSymbol ? $@"{count}" : count.ToString();
 
-        protected override IHasText CreateText() => Text = new EzComCounterText(Anchor.TopCentre, LabelContent.Value)
+        protected override IHasText CreateText() => Text = new EzCounterText(Anchor.TopCentre, LabelContent.Value)
         {
             ShowLabel = { BindTarget = ShowLabel },
         };
