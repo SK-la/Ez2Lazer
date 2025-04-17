@@ -106,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
-                // DefaultFrameLength = 1000 / PlaybackFps.Value,
+                DefaultFrameLength = 1000 / PlaybackFps.Value,
                 Loop = false
             };
 

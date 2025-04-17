@@ -88,7 +88,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Colour = Colour4.White;
                                     combo1.Y = 200;
-                                    combo1.ShowLabel.Value = false;
                                     combo1.BoxAlpha.Value = 0.8f;
                                     combo1.IncreaseScale.Value = 1.5f;
                                     combo1.DecreaseScale.Value = 1f;
@@ -99,15 +98,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo2.Origin = Anchor.Centre;
                                     combo2.Colour = Colour4.White;
                                     combo2.Y = 200;
-                                    combo2.ShowLabel.Value = false;
-                                    combo2.BoxAlpha.Value = 0.2f;
+                                    combo2.BoxAlpha.Value = 0.4f;
                                     combo2.IncreaseScale.Value = 3f;
                                     combo2.DecreaseScale.Value = 1f;
                                     combo2.IncreaseDuration.Value = 10;
                                     combo2.DecreaseDuration.Value = 300;
                                 }
 
-                                var keyCounter = container.ChildrenOfType<Ez2KeyCounterDisplay>().FirstOrDefault();
+                                var keyCounter = container.ChildrenOfType<EzComKeyCounterDisplay>().FirstOrDefault();
 
                                 if (keyCounter != null)
                                 {
@@ -145,7 +143,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 new EzComComboSprite(),
                                 new EzComComboCounter(),
                                 new EzComComboCounter(),
-                                new Ez2KeyCounterDisplay(),
+                                new EzComKeyCounterDisplay(),
                                 // new ArgonKeyCounterDisplay(),
                                 new BarHitErrorMeter(),
                                 // new EzComHitTiming(),

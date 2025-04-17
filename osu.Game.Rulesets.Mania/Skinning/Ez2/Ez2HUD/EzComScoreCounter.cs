@@ -2,13 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
-using osu.Game.Resources.Localisation.Web;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 
@@ -25,15 +23,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected override LocalisableString FormatCount(long count) => count.ToString();
 
-        protected override IHasText CreateText() => new EzScoreText(Anchor.TopRight, BeatmapsetsStrings.ShowScoreboardHeadersScore.ToUpper())
-        {
-            ShowLabel = { BindTarget = ShowLabel },
-        };
+        protected override IHasText CreateText() => new EzScoreText(Anchor.TopRight);
 
         private partial class EzScoreText : EzCounterText
         {
-            public EzScoreText(Anchor anchor, LocalisableString? label = null)
-                : base(anchor, label)
+            public EzScoreText(Anchor anchor)
+                : base(anchor)
             {
             }
         }

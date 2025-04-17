@@ -132,7 +132,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             float newScaleValue = Math.Clamp(comboSprite.Scale.X * (wasIncrease ? IncreaseScale.Value : 0.8f), 0.5f, 3f);
             Vector2 newScale = new Vector2(newScaleValue);
 
-            setSpriteAnchorAndOrigin();
+            Anchor originAnchor = Enum.Parse<Anchor>(AnimationOrigin.Value.ToString());
+            comboSprite.Anchor = originAnchor;
+            comboSprite.Origin = originAnchor;
 
             comboSprite
                 .ScaleTo(newScale, IncreaseDuration.Value, Easing.OutQuint)
@@ -145,9 +147,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private void applyBounceAnimation(bool wasIncrease, bool wasMiss)
         {
-            float factor = Math.Clamp(wasIncrease ? -10 * IncreaseScale.Value : 50, -100f, 100f);
+            float factor = 0;
 
-            setSpriteAnchorAndOrigin();
+            // 根据 AnimationOrigin 的值设置跳动方向
+            switch (AnimationOrigin.Value)
+            {
+                case OriginOptions.TopCentre:
+                    factor = Math.Clamp(wasIncrease ? 10 * IncreaseScale.Value : -50, -100f, 100f); // 向下跳
+                    break;
+
+                case OriginOptions.BottomCentre:
+                    factor = Math.Clamp(wasIncrease ? -10 * IncreaseScale.Value : 50, -100f, 100f); // 向上跳
+                    break;
+
+                case OriginOptions.Centre:
+                    factor = Math.Clamp(wasIncrease ? 10 * IncreaseScale.Value : -10 * IncreaseScale.Value, -100f, 100f); // 上下跳
+                    break;
+            }
 
             comboSprite
                 .MoveToY(factor, IncreaseDuration.Value / 2, Easing.OutBounce)
@@ -158,13 +174,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                 comboSprite.FlashColour(Color4.Red, DecreaseDuration.Value, Easing.OutQuint);
         }
 
-        private void setSpriteAnchorAndOrigin()
-        {
-            Anchor originAnchor = Enum.Parse<Anchor>(AnimationOrigin.Value.ToString());
-            comboSprite.Anchor = originAnchor;
-            comboSprite.Origin = originAnchor;
-        }
-
         protected override void LoadComplete()
         {
             base.LoadComplete();
@@ -173,21 +182,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         }
 
         public bool UsesFixedAnchor { get; set; }
-
-        // private void updateTexture()
-        // {
-        //     string lookupName = SpriteName.Value;
-        //     string localPath = Path.Combine(storage.GetFullPath(base_path), $"{lookupName}.png");
-        //     Logger.Log($"localPath {localPath}");
-        //
-        //     texture = textures.Get(lookupName);
-        //     Logger.Log($"texture {texture}");
-        //
-        //     if (texture == null || SpriteName.Value == string.Empty)
-        //         texture = textures.Get(@"Gameplay/Ez2/combo/default_combo.png");
-        //
-        //     comboSprite.Texture = texture;
-        // }
 
         protected override Drawable CreateDefault(ISkinComponentLookup lookup)
         {

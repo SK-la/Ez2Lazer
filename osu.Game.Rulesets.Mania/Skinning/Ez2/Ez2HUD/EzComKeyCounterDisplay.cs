@@ -9,11 +9,11 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
-    public partial class Ez2KeyCounterDisplay : KeyCounterDisplay
+    public partial class EzComKeyCounterDisplay : KeyCounterDisplay
     {
         protected override FillFlowContainer<KeyCounter> KeyFlow { get; }
 
-        public Ez2KeyCounterDisplay()
+        public EzComKeyCounterDisplay()
         {
             Child = KeyFlow = new FillFlowContainer<KeyCounter>
             {
@@ -23,6 +23,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             };
         }
 
-        protected override Ez2KeyCounter CreateCounter(InputTrigger trigger) => new Ez2KeyCounter(trigger);
+        protected override EzKeyCounter CreateCounter(InputTrigger trigger) => new EzKeyCounter(trigger);
     }
 }

@@ -15,6 +15,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
@@ -23,7 +24,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    public partial class Ez2KeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
+    public partial class Ez2KeyAreaPro : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
@@ -48,7 +49,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
-        public Ez2KeyArea()
+        public Ez2KeyAreaPro()
         {
             RelativeSizeAxes = Axes.Both;
         }
@@ -80,6 +81,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                             Alpha = 0,
                             RelativeSizeAxes = Axes.Both,
                         },
+                    },
+                    new Ez2KeyCounter(column.Action.Value)
+                    {
+                        Anchor = Anchor.BottomCentre,
+                        Origin = Anchor.TopCentre,
+                        Y = 10, // 调整计数器位置
                     },
                     hitTargetLine = new Circle
                     {

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -21,6 +22,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         public EzCounterText Text = null!;
         protected override double RollingDuration => 250;
         protected virtual bool DisplayXSymbol => true;
+
+        [SettingSource("Font", "Font", SettingControlType = typeof(FontNameSelector))]
+        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("stat");
 
         [SettingSource("Animation Type", "The type of animation to apply")]
         public Bindable<AnimationType> Animation { get; } = new Bindable<AnimationType>(AnimationType.Scale);
@@ -60,12 +64,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [SettingSource("Animation Origin", "The origin point for the animation")]
         public Bindable<OriginOptions> AnimationOrigin { get; } = new Bindable<OriginOptions>(OriginOptions.TopCentre);
 
-        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel), nameof(SkinnableComponentStrings.ShowLabelDescription))]
-        public Bindable<bool> ShowLabel { get; } = new BindableBool(true);
-
-        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.TextElementText), nameof(SkinnableComponentStrings.TextElementTextDescription))]
-        public Bindable<string> LabelContent { get; } = new Bindable<string>("combo");
-
         [SettingSource("Alpha", "The alpha value of this box")]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
         {
@@ -80,6 +78,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [BackgroundDependencyLoader]
         private void load(ScoreProcessor scoreProcessor)
         {
+            // FontNameDropdown.BindTo(Text.FontName);
+
             Current.BindTo(scoreProcessor.Combo);
             Current.BindValueChanged(combo =>
             {
@@ -97,6 +97,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                         break;
                 }
             });
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
+            AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
+
+            FontNameDropdown.BindValueChanged(e =>
+            {
+                Text.FontName.Value = e.NewValue;
+                Text.Invalidate(); // **强制刷新 EzCounterText**
+            }, true);
         }
 
         private void applyScaleAnimation(bool wasIncrease, bool wasMiss)
@@ -159,17 +173,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected override LocalisableString FormatCount(int count) => DisplayXSymbol ? $@"{count}" : count.ToString();
 
-        protected override IHasText CreateText() => Text = new EzCounterText(Anchor.TopCentre, LabelContent.Value)
+        protected override IHasText CreateText()
         {
-            ShowLabel = { BindTarget = ShowLabel },
-        };
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
-            AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
+            Text = new EzCounterText(Anchor.TopCentre, FontNameDropdown);
+            Debug.WriteLine("👀 FolderDropdown Updated:", FontNameDropdown.Value);
+            Debug.WriteLine("👀 Text.FontName Updated:", Text.FontName.Value);
+            return Text;
         }
     }
 
