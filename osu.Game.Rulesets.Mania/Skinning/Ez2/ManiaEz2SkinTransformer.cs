@@ -85,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     var combo2 = combos[1];
 
                                     combo1.Anchor = Anchor.TopCentre;
-                                    combo1.Origin = Anchor.Centre;
+                                    combo1.Origin = Anchor.TopCentre;
                                     combo1.Colour = Colour4.White;
                                     combo1.Y = 200;
                                     combo1.BoxAlpha.Value = 0.8f;
@@ -95,7 +95,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo1.DecreaseDuration.Value = 500;
 
                                     combo2.Anchor = Anchor.TopCentre;
-                                    combo2.Origin = Anchor.Centre;
+                                    combo2.Origin = Anchor.TopCentre;
                                     combo2.Colour = Colour4.White;
                                     combo2.Y = 200;
                                     combo2.BoxAlpha.Value = 0.4f;

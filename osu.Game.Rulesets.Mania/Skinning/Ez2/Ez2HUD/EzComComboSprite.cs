@@ -166,7 +166,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             }
 
             comboSprite
-                .MoveToY(factor, IncreaseDuration.Value / 2, Easing.OutBounce)
+                .MoveToY(factor, IncreaseDuration.Value / 4, Easing.OutBounce)
                 .Then()
                 .MoveToY(0, DecreaseDuration.Value, Easing.OutBounce);
 
