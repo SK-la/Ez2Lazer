@@ -40,7 +40,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Realm" Version="20.1.0" />
-    <PackageReference Include="ppy.osu.Framework" Version="2025.321.0" />
+    <PackageReference Include="ppy.osu.Framework" Version="2025.418.0" />
 <!--    <PackageReference Include="ppy.osu.Game.Resources" Version="2025.321.0" />-->
     <PackageReference Include="Sentry" Version="5.1.1" />
     <!-- Held back due to 0.34.0 failing AOT compilation on ZstdSharp.dll dependency. -->
@@ -54,5 +54,13 @@
     <PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
     <PackageReference Include="System.Runtime.InteropServices" Version="4.3.0" />
     <PackageReference Include="System.Runtime.Handles" Version="4.3.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Screens\SelectV2\Wedge\" />
+    <Folder Include="Screens\SelectV3\Leaderboards\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Screens\SelectV2\Wedge\LocalDifficultyNameContent.cs" />
+    <Compile Remove="Screens\SelectV3\SongSelectV3.cs" />
   </ItemGroup>
 </Project>

@@ -338,8 +338,7 @@ namespace osu.Game.Configuration
         }
 
         public Func<Guid, string> LookupSkinName { private get; set; } = _ => @"unknown";
-
-        public Func<GlobalAction, LocalisableString> LookupKeyBindings { get; set; } = _ => @"unknown";
+        public Func<GlobalAction, LocalisableString> LookupKeyBindings { private get; set; } = _ => @"unknown";
 
         IBindable<float> IGameplaySettings.ComboColourNormalisationAmount => GetOriginalBindable<float>(OsuSetting.ComboColourNormalisationAmount);
         IBindable<float> IGameplaySettings.PositionalHitsoundsLevel => GetOriginalBindable<float>(OsuSetting.PositionalHitsoundsLevel);
