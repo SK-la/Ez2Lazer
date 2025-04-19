@@ -19,6 +19,18 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
         {
             Children = new Drawable[]
             {
+                new SettingsSlider<double>
+                {
+                    LabelText = "Column Width",
+                    Current = config.GetBindable<double>(OsuSetting.ColumnWidth),
+                    KeyboardStep = 1,
+                },
+                new SettingsSlider<double>
+                {
+                    LabelText = "Special Column Width Factor",
+                    Current = config.GetBindable<double>(OsuSetting.SpecialFactor),
+                    KeyboardStep = 1,
+                },
                 new SettingsEnumDropdown<ScoringMode>
                 {
                     ClassicDefault = ScoringMode.Classic,

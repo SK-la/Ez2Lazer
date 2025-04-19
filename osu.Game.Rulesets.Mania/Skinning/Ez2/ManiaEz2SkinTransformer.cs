@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD;
 using osu.Game.Rulesets.Mania.UI;
@@ -22,12 +23,33 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     {
         private readonly ManiaBeatmap beatmap;
 
-        // private readonly float totalColumnWidth;
+        // private readonly Bindable<float> columnWidth = new Bindable<float>(50);
+        // private readonly Bindable<float> specialFactor = new Bindable<float>(1);
 
-        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap)
+        private readonly OsuConfigManager config;
+        // private readonly ManiaRulesetConfigManager config;
+
+        // private readonly float totalColumnWidth;
+        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
+
+            this.config = config ?? throw new ArgumentNullException(nameof(config));
+        }
+
+        // [BackgroundDependencyLoader]
+        // private void load(ManiaRulesetConfigManager config)
+        // {
+        //     // 将配置中的绑定值转换后绑定到我们自己的绑定变量上
+        //     // 假设你的 ManiaRulesetConfigManager 提供了一个 GetBindable<double> 方法：
+        //     columnWidth.BindTo(config.GetBindable<double>(ManiaRulesetSetting.ColumnWidth).ConvertToFloatBindable());
+        // }
+
+        // public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap)
+        //     : base(skin)
+        // {
+        //     this.beatmap = (ManiaBeatmap)beatmap;
 
             // if (this.beatmap.TotalColumns <= 10)
             // {
@@ -37,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             // {
             //     totalColumnWidth = 7 * 40f / 200f;
             // }
-        }
+        // }
 
         // private void calculateColumnWidth(int columnIndex, StageDefinition stage)
         // {
@@ -58,13 +80,25 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         case GlobalSkinnableContainers.MainHUDComponents:
                             return new DefaultSkinComponentsContainer(container =>
                             {
-                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().FirstOrDefault();
+                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().ToArray();
 
-                                if (hitTiming != null)
+                                if (hitTiming.Length >= 2)
                                 {
-                                    hitTiming.Anchor = Anchor.TopCentre;
-                                    hitTiming.Origin = Anchor.Centre;
-                                    hitTiming.Y = 500;
+                                    var hitTiming1 = hitTiming[0];
+                                    var hitTiming2 = hitTiming[1];
+                                    const float mirror_x = 500;
+
+                                    hitTiming1.Anchor = Anchor.Centre;
+                                    hitTiming1.Origin = Anchor.Centre;
+                                    hitTiming1.X = -mirror_x;
+                                    hitTiming1.Scale = new Vector2(1.5f);
+                                    hitTiming1.AloneShow.Value = AloneShowMenu.Early;
+
+                                    hitTiming2.Anchor = Anchor.Centre;
+                                    hitTiming2.Origin = Anchor.Centre;
+                                    hitTiming2.X = mirror_x;
+                                    hitTiming2.Scale = new Vector2(1.5f);
+                                    hitTiming2.AloneShow.Value = AloneShowMenu.Late;
                                 }
 
                                 var comboSprite = container.ChildrenOfType<EzComComboSprite>().FirstOrDefault();
@@ -146,14 +180,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 new EzComKeyCounterDisplay(),
                                 // new ArgonKeyCounterDisplay(),
                                 new BarHitErrorMeter(),
-                                // new EzComHitTiming(),
                                 new EzComJudgementTexture(),
+                                new EzComHitTiming(),
+                                new EzComHitTiming(),
                             };
                     }
 
                     return null;
 
-                case SkinComponentLookup<HitResult> resultComponent:
+                case SkinComponentLookup<HitResult>:
                     // if (Skin is Ez2Skin && resultComponent.Component > HitResult.Great)
                     //     return Drawable.Empty();
 
@@ -226,7 +261,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
                 bool isSpecialColumn = stage.IsSpecialColumn(columnIndex);
-                float width = (float)(46 * (isSpecialColumn ? 1.2 : 1));
+
+                float columnWidth = (float)config.Get<double>(OsuSetting.ColumnWidth);
+                float specialFactor = (float)config.Get<double>(OsuSetting.SpecialFactor);
+                // float columnWidth = (float)config.Get<double>(ManiaRulesetSetting.ColumnWidth);
+                // float specialFactor = (float)config.Get<double>(ManiaRulesetSetting.SpecialFactor);
+                float width = columnWidth * (isSpecialColumn ? specialFactor : 1);
 
                 switch (maniaLookup.Lookup)
                 {

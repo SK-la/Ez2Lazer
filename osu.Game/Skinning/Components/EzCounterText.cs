@@ -18,7 +18,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
+namespace osu.Game.Skinning.Components
 {
     public partial class EzCounterText : CompositeDrawable, IHasText
     {

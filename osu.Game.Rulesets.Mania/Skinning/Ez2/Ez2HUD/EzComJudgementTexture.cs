@@ -162,13 +162,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         {
             return hitResult switch
             {
-                HitResult.Miss => @"Gameplay/Ez2/Miss",
-                HitResult.Meh => @"Gameplay/Ez2/Fail1",
-                HitResult.Ok => @"Gameplay/Ez2/Fail",
-                HitResult.Good => @"Gameplay/Ez2/Good",
-                HitResult.Great => @"Gameplay/Ez2/Cool",
-                HitResult.Perfect => @"Gameplay/Ez2/Kool",
-                _ => @"Gameplay/Ez2",
+                HitResult.Miss => @"Gameplay/Ez2/score/Miss",
+                HitResult.Meh => @"Gameplay/Ez2/score/Fail1",
+                HitResult.Ok => @"Gameplay/Ez2/score/Fail",
+                HitResult.Good => @"Gameplay/Ez2/score/Good",
+                HitResult.Great => @"Gameplay/Ez2/score/Cool",
+                HitResult.Perfect => @"Gameplay/Ez2/score/Kool",
+                _ => @"Gameplay/Ez2/score",
             };
         }
 

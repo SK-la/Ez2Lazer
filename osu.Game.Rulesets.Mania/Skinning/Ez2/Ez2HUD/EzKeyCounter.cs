@@ -6,6 +6,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -41,7 +42,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuConfigManager config)
         {
             Children = new Drawable[]
             {
@@ -93,7 +94,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             // Values from Figma didn't match visually
             // So these were just eyeballed
             Height = 30 * scale_factor;
-            Width = Ez2NotePiece.NOTE_HEIGHT;
+            Width = (float)config.Get<double>(OsuSetting.ColumnWidth);
         }
 
         protected override void LoadComplete()

@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     internal partial class Ez2NotePiece : CompositeDrawable
     {
-        public const float NOTE_HEIGHT = 45;
+        public static float NoteHeight = 45;
         public const float NOTE_ACCENT_RATIO = 1f;
         public const float CORNER_RADIUS = 0;
 
@@ -87,12 +87,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             };
         }
 
+        // private readonly ManiaRulesetConfigManager config;
+        // private float columnWidth;
+        // private float specialFactor;
+
         protected override void Update()
         {
             base.Update();
             Height = DrawWidth;
+            // NoteHeight = columnWidth;
+            // NoteHeight = (float)config.Get<double>(ManiaRulesetSetting.ColumnWidth);
+            // specialFactor = (float)config.Get<double>(ManiaRulesetSetting.SpecialFactor);
 
-            CreateIcon().Size = new Vector2(DrawWidth / NOTE_HEIGHT * 0.7f);
+            CreateIcon().Size = new Vector2(DrawWidth / NoteHeight * 0.7f);
         }
 
         protected virtual Drawable CreateIcon() => new Container

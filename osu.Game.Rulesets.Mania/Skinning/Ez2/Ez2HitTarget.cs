@@ -40,8 +40,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             RelativeSizeAxes = Axes.X;
             // Masking = true;
-            Height = NOTE_HEIGHT * NOTE_ACCENT_RATIO;
-            CornerRadius = NOTE_HEIGHT;
+            Height = NoteHeight * NOTE_ACCENT_RATIO;
+            CornerRadius = NoteHeight;
             Alpha = 0.3f;
             Blending = BlendingParameters.Mixture;
             Colour = Color4.Gray;

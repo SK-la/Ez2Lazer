@@ -3,7 +3,6 @@
 
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
 
@@ -19,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             {
                 Direction = FillDirection.Horizontal,
                 AutoSizeAxes = Axes.Both,
-                Spacing = new Vector2(Stage.COLUMN_SPACING),
+                Spacing = new Vector2(0),
             };
         }
 

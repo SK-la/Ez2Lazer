@@ -158,6 +158,8 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
             SetDefault(OsuSetting.HitMode, HitWindows.HitMode.Ez2AcStyle);
+            SetDefault(OsuSetting.ColumnWidth, 46, 9, 90, 1.0);
+            SetDefault(OsuSetting.SpecialFactor, 1, 0.1, 4, 0.1);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
@@ -420,6 +422,8 @@ namespace osu.Game.Configuration
         ScoreDisplayMode,
         SelectEzMode,
         ScalingGameMode,
+        ColumnWidth,
+        SpecialFactor,
         HitMode,
         AccuracyCutoffS,
         AccuracyCutoffA,

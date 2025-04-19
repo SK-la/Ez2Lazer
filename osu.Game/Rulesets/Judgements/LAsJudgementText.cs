@@ -7,11 +7,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Judgements
 {
-    public abstract partial class LAsJudgementText : CompositeDrawable, ISerialisableDrawable
+    public abstract partial class LAsJudgementText : CompositeDrawable //, ISerialisableDrawable
     {
         protected readonly HitResult Result;
 
@@ -20,7 +19,7 @@ namespace osu.Game.Rulesets.Judgements
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
-        public bool UsesFixedAnchor { get; set; }
+        // public bool UsesFixedAnchor { get; set; }
 
         protected LAsJudgementText(HitResult result)
         {

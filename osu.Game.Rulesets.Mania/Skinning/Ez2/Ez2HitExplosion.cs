@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 {
                     Type = EdgeEffectType.Glow,
                     Colour = colour.NewValue,
-                    Roundness = Ez2NotePiece.NOTE_HEIGHT,
+                    Roundness = Ez2NotePiece.NoteHeight,
                     Radius = 50,
                 };
             }, true);

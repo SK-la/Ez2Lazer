@@ -40,6 +40,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Edit.Setup;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
@@ -82,7 +83,10 @@ namespace osu.Game.Rulesets.Mania
                     return new ManiaArgonSkinTransformer(skin, beatmap);
 
                 case Ez2Skin:
-                    return new ManiaEz2SkinTransformer(skin, beatmap);
+                    if (GlobalConfigStore.Config == null)
+                        throw new InvalidOperationException("Global config 未初始化！");
+
+                    return new ManiaEz2SkinTransformer(skin, beatmap, GlobalConfigStore.Config);
 
                 case SbISkin:
                     return new ManiaSbISkinTransformer(skin, beatmap);

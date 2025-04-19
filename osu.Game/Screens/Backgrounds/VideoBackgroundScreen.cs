@@ -1,9 +1,11 @@
 // VideoBackgroundScreen.cs
 
+using System;
 using System.IO;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Video;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 
 namespace osu.Game.Screens.Backgrounds
@@ -18,7 +20,7 @@ namespace osu.Game.Screens.Backgrounds
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(OsuConfigManager config)
         {
             var video = new Video(videoPath)
             {
@@ -26,7 +28,18 @@ namespace osu.Game.Screens.Backgrounds
                 Loop = true
             };
             AddInternal(video);
+
+            GlobalConfigStore.Config = config;
         }
+    }
+
+    public static class GlobalConfigStore
+    {
+        public static OsuConfigManager? Config { get; set; }
+
+        public static event Action? OnRefresh;
+
+        public static void TriggerRefresh() => OnRefresh?.Invoke();
     }
 
     public partial class StreamVideoBackgroundScreen : Background

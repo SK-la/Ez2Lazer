@@ -13,7 +13,6 @@ using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
@@ -44,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo, ISkinSource skin, StageDefinition stageDefinition)
+        private void load(IScrollingInfo scrollingInfo, StageDefinition stageDefinition)
         {
             if (stageDefinition.Columns == 14 && column.Index == 13)
             {

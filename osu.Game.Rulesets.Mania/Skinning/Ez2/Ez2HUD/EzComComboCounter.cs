@@ -12,6 +12,7 @@ using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
+using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 
