@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
         }
 
-        internal void TriggerResult(bool hit)
+        internal virtual void TriggerResult(bool hit)
         {
             if (AllJudged) return;
 

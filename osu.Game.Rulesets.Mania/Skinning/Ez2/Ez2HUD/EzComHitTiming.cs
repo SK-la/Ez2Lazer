@@ -88,7 +88,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                         {
                             Anchor = Anchor.BottomCentre,
                             Origin = Anchor.BottomCentre,
-                            Text = "±0.00",
+                            Text = "±000",
                         },
                         timingText = new OsuSpriteText
                         {
@@ -130,7 +130,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                 return;
 
             timingText.Text = judgement.TimeOffset < 0 ? "Early" : "Late";
-            offsetText.Text = $"{judgement.TimeOffset:+0.00;-0.00}";
+            offsetText.Text = $"{judgement.TimeOffset:+0;-0}";
             backgroundBox.Colour = GetColourForHitResult(judgement.Type);
 
             errorContainer.FadeTo(BoxAlpha.Value, 10); // 渐现动画

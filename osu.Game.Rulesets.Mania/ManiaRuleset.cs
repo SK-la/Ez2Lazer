@@ -309,6 +309,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModSpaceBody(),
                         // new ManiaModAdjust(),
                         new StarRatingRebirth(),
+                        new ManiaModNoLNJudgement(),
                         new ManiaModNtoMAnother(),
                         new ManiaModNtoM(),
                         new ManiaModDuplicate(),
