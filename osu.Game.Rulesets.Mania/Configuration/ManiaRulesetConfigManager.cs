@@ -23,8 +23,9 @@ namespace osu.Game.Rulesets.Mania.Configuration
         {
             base.InitialiseDefaults();
 
-            // SetDefault(ManiaRulesetSetting.ColumnWidth, 46, 9, 90, 1.0);
-            // SetDefault(ManiaRulesetSetting.SpecialFactor, 1, 0.1, 4, 0.1);
+            SetDefault(ManiaRulesetSetting.ColumnWidth, 46, 9, 90, 1.0);
+            SetDefault(ManiaRulesetSetting.SpecialFactor, 1, 0.1, 4, 0.1);
+            // SetDefault(ManiaRulesetSetting.HitMode, MUGHitMode.EZ2AC);
             SetDefault(ManiaRulesetSetting.ScrollSpeed, 200, 1.0, 401.0, current_scroll_speed_precision);
             SetDefault(ManiaRulesetSetting.ScrollBaseSpeed, 500, 100, 1000, 1.0);
             SetDefault(ManiaRulesetSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
@@ -69,8 +70,10 @@ namespace osu.Game.Rulesets.Mania.Configuration
         ScrollBaseSpeed,
         ScrollTimePerSpeed,
         ScrollStyle,
-        // ColumnWidth,
-        // SpecialFactor,
+        // HitMode,
+
+        ColumnWidth,
+        SpecialFactor,
         ScrollPerKeyMode,
         ScrollDirection,
         TimingBasedNoteColouring,

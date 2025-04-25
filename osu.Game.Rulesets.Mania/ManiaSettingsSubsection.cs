@@ -29,17 +29,23 @@ namespace osu.Game.Rulesets.Mania
 
             Children = new Drawable[]
             {
-                // new SettingsSlider<double, ManiaColumnWidth>
+                // new SettingsSlider<double>
                 // {
                 //     LabelText = "Column Width(Not Active)",
                 //     Current = config.GetBindable<double>(ManiaRulesetSetting.ColumnWidth),
                 //     KeyboardStep = 1,
                 // },
-                // new SettingsSlider<double, ManiaSpecialFactor>
+                // new SettingsSlider<double>
                 // {
                 //     LabelText = "Special Column Width Factor(Not Active)",
                 //     Current = config.GetBindable<double>(ManiaRulesetSetting.SpecialFactor),
                 //     KeyboardStep = 1,
+                // },
+                // new SettingsEnumDropdown<MUGHitMode>
+                // {
+                //     ClassicDefault = MUGHitMode.EZ2AC,
+                //     LabelText = "MUG HitMode(No Active)",
+                //     Current = config.GetBindable<MUGHitMode>(ManiaRulesetSetting.HitMode)
                 // },
                 new SettingsEnumDropdown<ManiaScrollingDirection>
                 {
@@ -112,13 +118,5 @@ namespace osu.Game.Rulesets.Mania
         private partial class ManiaScrollTimePerSpeedSlider : RoundedSliderBar<double>
         {
         }
-
-        // private partial class ManiaColumnWidth : RoundedSliderBar<double>
-        // {
-        // }
-        //
-        // private partial class ManiaSpecialFactor : RoundedSliderBar<double>
-        // {
-        // }
     }
 }

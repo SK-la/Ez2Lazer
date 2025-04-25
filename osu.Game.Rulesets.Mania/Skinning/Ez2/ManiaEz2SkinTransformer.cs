@@ -91,13 +91,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     hitTiming1.Anchor = Anchor.Centre;
                                     hitTiming1.Origin = Anchor.Centre;
                                     hitTiming1.X = -mirror_x;
-                                    hitTiming1.Scale = new Vector2(1.5f);
+                                    // hitTiming1.Scale = new Vector2(2);
                                     hitTiming1.AloneShow.Value = AloneShowMenu.Early;
 
                                     hitTiming2.Anchor = Anchor.Centre;
                                     hitTiming2.Origin = Anchor.Centre;
                                     hitTiming2.X = mirror_x;
-                                    hitTiming2.Scale = new Vector2(1.5f);
+                                    // hitTiming2.Scale = new Vector2(2);
                                     hitTiming2.AloneShow.Value = AloneShowMenu.Late;
                                 }
 

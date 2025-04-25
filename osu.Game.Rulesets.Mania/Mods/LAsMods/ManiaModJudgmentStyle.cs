@@ -9,7 +9,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
@@ -88,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 if (e.NewValue)
                 {
-                    applyTemplate(HitWindowTemplates.EASY);
+                    ApplyTemplate(HitWindowTemplates.EASY);
                     UseHardTemplate.Value = false;
                     AdaptiveJudgement.Value = false;
                 }
@@ -97,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 if (e.NewValue)
                 {
-                    applyTemplate(HitWindowTemplates.HARD);
+                    ApplyTemplate(HitWindowTemplates.HARD);
                     Ez2AcTemplate.Value = false;
                     AdaptiveJudgement.Value = false;
                 }
@@ -126,76 +125,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
         }
 
-        private void applyTemplate(HitWindowTemplate template)
+        public void ApplyTemplate(HitWindowTemplate template)
         {
-            PerfectOffset.Value = template.PerfectOffset;
-            GreatOffset.Value = template.GreatOffset;
-            GoodOffset.Value = template.GoodOffset;
-            OkOffset.Value = template.OkOffset;
-            MehOffset.Value = template.MehOffset;
-            MissOffset.Value = template.MissOffset;
-        }
-
-        public class HitWindowTemplate
-        {
-            public double PerfectOffset { get; set; }
-            public double GreatOffset { get; set; }
-            public double GoodOffset { get; set; }
-            public double OkOffset { get; set; }
-            public double MehOffset { get; set; }
-            public double MissOffset { get; set; }
-        }
-
-        public static class HitWindowTemplates
-        {
-            public static readonly HitWindowTemplate EASY = new HitWindowTemplate
-            {
-                PerfectOffset = 50,
-                GreatOffset = 100,
-                GoodOffset = 150,
-                OkOffset = 200,
-                MehOffset = 250,
-                MissOffset = 300
-            };
-
-            public static readonly HitWindowTemplate HARD = new HitWindowTemplate
-            {
-                PerfectOffset = 20,
-                GreatOffset = 40,
-                GoodOffset = 60,
-                OkOffset = 80,
-                MehOffset = 100,
-                MissOffset = 120
-            };
-
-            // 可以添加更多模板
-        }
-
-        public void UpdateHitWindowsBasedOnScore(double accuracy)
-        {
-            if (accuracy != 0)
-            {
-                if (accuracy > 0.95)
-                {
-                    // 缩小判定区间
-                    PerfectOffset.Value = 10;
-                    GreatOffset.Value = 20;
-                    GoodOffset.Value = 21;
-                    OkOffset.Value = 90;
-                    MehOffset.Value = 100;
-                    MissOffset.Value = 120;
-                }
-                else if (accuracy < 0.95)
-                {
-                    // 放宽判定区间
-                    PerfectOffset.Value = 30;
-                    GreatOffset.Value = 60;
-                    GoodOffset.Value = 100;
-                    OkOffset.Value = 150;
-                    MehOffset.Value = 151;
-                    MissOffset.Value = 200;
-                }
-            }
+            PerfectOffset.Value = template.TemplatePerfect;
+            GreatOffset.Value = template.TemplateGreat;
+            GoodOffset.Value = template.TemplateGood;
+            OkOffset.Value = template.TemplateOk;
+            MehOffset.Value = template.TemplateMeh;
+            MissOffset.Value = template.TemplateMiss;
         }
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
@@ -216,18 +153,41 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
+        public ManiaHitWindows ManiaHitWindows { get; set; } = null!;
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            HitWindows.SetDifficultyRange(PerfectOffset.Value, GreatOffset.Value, GoodOffset.Value, OkOffset.Value, MehOffset.Value, MissOffset.Value);
+            ManiaHitWindows.SetDifficultyRange(PerfectOffset.Value, GreatOffset.Value, GoodOffset.Value, OkOffset.Value, MehOffset.Value, MissOffset.Value);
             difficulty.OverallDifficulty = 0;
-            HitWindows.SetDifficulty(difficulty.OverallDifficulty);
+            ManiaHitWindows.SetDifficulty(difficulty.OverallDifficulty);
         }
 
         public override void ResetSettingsToDefaults()
         {
-            HitWindows.ResetRange();
+            ManiaHitWindows.ResetRange();
         }
+    }
+
+    public static class HitWindowTemplates
+    {
+        public static readonly HitWindowTemplate EASY = new HitWindowTemplate
+        {
+            TemplatePerfect = 50,
+            TemplateGreat = 100,
+            TemplateGood = 150,
+            TemplateOk = 200,
+            TemplateMeh = 250,
+            TemplateMiss = 300
+        };
+
+        public static readonly HitWindowTemplate HARD = new HitWindowTemplate
+        {
+            TemplatePerfect = 20,
+            TemplateGreat = 40,
+            TemplateGood = 60,
+            TemplateOk = 80,
+            TemplateMeh = 100,
+            TemplateMiss = 120
+        };
     }
 }

@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Track;
@@ -15,7 +14,6 @@ using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
-using osu.Game.Configuration;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -64,8 +62,10 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
         private readonly BindableDouble configScrollSpeed = new BindableDouble();
-        private readonly BindableDouble configColumnWidth = new BindableDouble();
-        private readonly BindableDouble configSpecialFactor = new BindableDouble();
+
+        // private readonly ManiaHitModeConvertor hitModeConvertor;
+
+        // private readonly Bindable<MUGHitMode> hitMode = new Bindable<MUGHitMode>();
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
 
         public double TargetTimeRange { get; protected set; }
@@ -90,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.UI
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource source, OsuConfigManager globalConfig)
+        private void load(ISkinSource source)
         {
             currentSkin = source;
             currentSkin.SourceChanged += onSkinChange;
@@ -118,10 +118,6 @@ namespace osu.Game.Rulesets.Mania.UI
             Config.BindWith(ManiaRulesetSetting.ScrollDirection, configDirection);
             configDirection.BindValueChanged(direction => Direction.Value = (ScrollingDirection)direction.NewValue, true);
 
-            // Config.BindWith(ManiaRulesetSetting.ScrollSpeed, configScrollSpeed);
-            // configScrollSpeed.BindValueChanged(speed => TargetTimeRange = ComputeScrollTime(speed.NewValue));
-
-            // TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value);
             Config.BindWith(ManiaRulesetSetting.ScrollBaseSpeed, configBaseMs);
             Config.BindWith(ManiaRulesetSetting.ScrollTimePerSpeed, configTimePerSpeed);
             Config.BindWith(ManiaRulesetSetting.ScrollSpeed, configScrollSpeed);
@@ -129,29 +125,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
-            GlobalConfigStore.Config = globalConfig;
-            globalConfig.BindWith(OsuSetting.SpecialFactor, configSpecialFactor);
-            globalConfig.BindWith(OsuSetting.ColumnWidth, configColumnWidth);
-            configSpecialFactor.BindValueChanged(_ =>
-            {
-                GlobalConfigStore.TriggerRefresh();
-            }, true);
-
-            configColumnWidth.BindValueChanged(_ =>
-            {
-                GlobalConfigStore.TriggerRefresh();
-            }, true);
-
-            Debug.WriteLine($"🔥Column Width: {configSpecialFactor}");
-            Debug.WriteLine($"🔥Special Factor: {configColumnWidth}");
-
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
             mobileLayout.BindValueChanged(_ => updateMobileLayout(), true);
-        }
-
-        public static class GlobalManiaConfigStore
-        {
-            public static ManiaRulesetConfigManager? Config { get; set; }
         }
 
         private ManiaTouchInputArea? touchInputArea;

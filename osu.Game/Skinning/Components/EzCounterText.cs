@@ -24,7 +24,8 @@ namespace osu.Game.Skinning.Components
     {
         private readonly Ez2CounterSpriteText textPart;
         public Bindable<string> FontName { get; } = new Bindable<string>("stat");
-        public FillFlowContainer NumberContainer { get; private set; }
+        public FillFlowContainer TextContainer { get; private set; }
+        public float DefaultWidth { get; set; } = 100; // 默认宽度
 
         public LocalisableString Text
         {
@@ -46,7 +47,7 @@ namespace osu.Game.Skinning.Components
 
             InternalChildren = new Drawable[]
             {
-                NumberContainer = new FillFlowContainer
+                TextContainer = new FillFlowContainer
                 {
                     AutoSizeAxes = Axes.Both,
                     Direction = FillDirection.Vertical,
@@ -66,20 +67,23 @@ namespace osu.Game.Skinning.Components
         {
             switch (c)
             {
-                case '.':
-                    return @"dot";
+                case '.': return @"dot";
 
-                case '%':
-                    return @"percentage";
+                case '%': return @"percentage";
 
-                default:
-                    return c.ToString();
+                case 'e': return @"Early";
+
+                case 'l': return @"Late";
+
+                default: return c.ToString();
             }
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            // textPart.Width = DefaultWidth;
 
             FontName.BindValueChanged(e =>
             {
@@ -96,7 +100,7 @@ namespace osu.Game.Skinning.Components
             private readonly Func<char, string> getLookup;
             private GlyphStore glyphStore = null!;
 
-            protected override char FixedWidthReferenceCharacter => '5';
+            protected override char FixedWidthReferenceCharacter => '6';
 
             public Ez2CounterSpriteText(Func<char, string> getLookup, Bindable<string> fontName)
             {
@@ -116,7 +120,7 @@ namespace osu.Game.Skinning.Components
                     Font = new FontUsage(FontName.Value, 1);
                     glyphStore = new GlyphStore(textures, getLookup);
 
-                    foreach (char c in new[] { '.', '%' })
+                    foreach (char c in new[] { '.', '%', 'e', 'l' })
                         glyphStore.Get(FontName.Value, c);
                     for (int i = 0; i < 10; i++)
                         glyphStore.Get(FontName.Value, (char)('0' + i));
@@ -146,11 +150,35 @@ namespace osu.Game.Skinning.Components
                         return cached;
 
                     string lookup = getLookup(character);
-                    var texture = textures.Get($"Gameplay/Fonts/{textureName}/{textureName}-counter-{lookup}") ?? textures.Get($"Gameplay/Fonts/{textureName}-counter-{lookup}");
                     TexturedCharacterGlyph? glyph = null;
 
-                    if (texture != null)
-                        glyph = new TexturedCharacterGlyph(new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null), texture, 0.125f);
+                    // var texture = textures.Get($"Gameplay/Fonts/{textureName}/{textureName}-counter-{lookup}") ?? textures.Get($"Gameplay/Fonts/{textureName}-counter-{lookup}");
+                    // if (texture != null)
+                    //     glyph = new TexturedCharacterGlyph(new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null), texture, 0.125f);
+
+                    string[] possiblePaths = new[]
+                    {
+                        $"Gameplay/Fonts/{textureName}/{textureName}-counter-{lookup}",
+                        $"Gameplay/Fonts/{textureName}-counter-{lookup}",
+                    };
+
+                    if (lookup == "Early")
+                        possiblePaths = [$"Gameplay/Early/{textureName}-Early"];
+                    if (lookup == "Late")
+                        possiblePaths = [$"Gameplay/Late/{textureName}-Late"];
+
+                    foreach (string path in possiblePaths)
+                    {
+                        var texture = textures.Get(path);
+
+                        if (texture != null)
+                        {
+                            glyph = new TexturedCharacterGlyph(new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
+                                texture,
+                                0.125f);
+                            break;
+                        }
+                    }
 
                     cache[character] = glyph;
                     return glyph;
@@ -170,14 +198,14 @@ namespace osu.Game.Skinning.Components
             Items = new List<string>
             {
                 "argon",
+                "stat",
+                "TOMATO",
                 "Gold",
                 "green",
                 "Italics2",
                 "purple",
                 "sb1",
-                "stat",
                 "Sliver",
-                "TOMATO",
             };
             Log.Debug("Items", Items.ToString());
         }

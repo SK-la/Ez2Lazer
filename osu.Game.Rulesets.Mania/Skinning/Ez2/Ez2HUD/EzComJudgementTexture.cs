@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         public EzComJudgementTexture()
         {
-            AutoSizeAxes = Axes.Both;
+            Size = new Vector2(200, 50);
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
         }

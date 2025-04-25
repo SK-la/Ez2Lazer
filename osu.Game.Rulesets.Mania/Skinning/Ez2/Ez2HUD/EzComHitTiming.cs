@@ -4,15 +4,13 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Threading;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning.Components;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
@@ -20,14 +18,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
     public partial class EzComHitTiming : HitErrorMeter
     {
         private FillFlowContainer errorContainer = null!;
-        private SpriteText timingText = null!;
+        private FillFlowContainer timingContainer = null!;
+        private EzCounterText timingText1 = null!;
+        private EzCounterText timingText = null!;
+        private EzCounterText timingText3 = null!;
         private EzCounterText offsetText = null!;
         private Box backgroundBox = null!;
 
         [SettingSource("AloneShow", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
 
-        [SettingSource("Threshold", "Adjust the threshold for displaying values")]
+        [SettingSource("Displaying Threshold", "(显示阈值) Displaying Threshold")]
         public BindableNumber<double> Threshold { get; } = new BindableNumber<double>(22)
         {
             MinValue = 0.0,
@@ -35,16 +36,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             Precision = 1
         };
 
-        [SettingSource("Display Duration", "Duration (in seconds) before text disappears")]
+        [SettingSource("Display Duration", "(持续时间) Duration disappears")]
         public BindableNumber<double> DisplayDuration { get; } = new BindableNumber<double>(300)
         {
-            MinValue = 10, // 最小持续时间
+            MinValue = 10,
             MaxValue = 1000, // 最大持续时间
             Precision = 1, // 精度
         };
 
+        [SettingSource("Symmetrical spacing", "(对称间距) Symmetrical spacing")]
+        public BindableNumber<float> SymmetryOffset { get; } = new BindableNumber<float>(70)
+        {
+            MinValue = 0,
+            MaxValue = 100,
+            Precision = 1,
+        };
+
         [SettingSource("Font", "Font", SettingControlType = typeof(FontNameSelector))]
-        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("argon");
+        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("TOMATO");
 
         [SettingSource("Alpha", "The alpha value of this box")]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
@@ -59,7 +68,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         public EzComHitTiming()
         {
-            AutoSizeAxes = Axes.Both;
+            Size = new Vector2(300, 80);
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
         }
@@ -81,6 +90,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                     AutoSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
+                    Scale = new Vector2(2.5f),
                     Alpha = 0,
                     Children = new Drawable[]
                     {
@@ -90,13 +100,40 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                             Origin = Anchor.BottomCentre,
                             Text = "±000",
                         },
-                        timingText = new OsuSpriteText
+                        timingContainer = new FillFlowContainer
                         {
+                            // Direction = FillDirection.Horizontal,
+                            AutoSizeAxes = Axes.Both,
                             Anchor = Anchor.BottomCentre,
                             Origin = Anchor.BottomCentre,
-                            Text = "Early/Late",
-                            Font = OsuFont.GetFont(size: 20),
-                        },
+                            Spacing = new Vector2(SymmetryOffset.Value),
+                            Children = new Drawable[]
+                            {
+                                timingText1 = new EzCounterText(Anchor.Centre, FontNameDropdown)
+                                {
+                                    Anchor = Anchor.BottomCentre,
+                                    Origin = Anchor.BottomCentre,
+                                    Text = "e",
+                                    // X = -SymmetryOffset.Value,
+                                    Alpha = 1
+                                },
+                                timingText = new EzCounterText(Anchor.Centre, FontNameDropdown)
+                                {
+                                    Anchor = Anchor.BottomCentre,
+                                    Origin = Anchor.BottomCentre,
+                                    Text = "e/l",
+                                    Alpha = 0
+                                },
+                                timingText3 = new EzCounterText(Anchor.Centre, FontNameDropdown)
+                                {
+                                    Anchor = Anchor.BottomCentre,
+                                    Origin = Anchor.BottomCentre,
+                                    Text = "l",
+                                    // X = -SymmetryOffset.Value,
+                                    Alpha = 1
+                                },
+                            }
+                        }
                     }
                 }
             };
@@ -115,11 +152,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                 offsetText.Invalidate();
             }, true);
 
-            AloneShow.BindValueChanged(_ => Invalidate(), true);
-            Threshold.BindValueChanged(_ => Invalidate(), true);
+            AloneShow.BindValueChanged(_ => updateTimingTextVisibility(), true);
+            SymmetryOffset.BindValueChanged(_ => updateTimingTextPositions(), true);
         }
 
-        private ScheduledDelegate disappearTask = null!;
+        private void updateTimingTextVisibility()
+        {
+            timingText1.Alpha = AloneShow.Value == AloneShowMenu.None ? 1 : 0;
+            timingText.Alpha = AloneShow.Value == AloneShowMenu.None ? 0 : 1;
+            timingText3.Alpha = AloneShow.Value == AloneShowMenu.None ? 1 : 0;
+        }
+
+        private void updateTimingTextPositions()
+        {
+            // timingText1.X = -SymmetryOffset.Value;
+            // timingText3.X = SymmetryOffset.Value;
+            timingContainer.Spacing = new Vector2(SymmetryOffset.Value);
+            timingContainer.Invalidate();
+        }
 
         protected override void OnNewJudgement(JudgementResult judgement)
         {
@@ -129,7 +179,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             if (!shouldDisplayJudgement(AloneShow.Value, judgement.TimeOffset))
                 return;
 
-            timingText.Text = judgement.TimeOffset < 0 ? "Early" : "Late";
+            if (judgement.TimeOffset < 0)
+            {
+                timingText.Text = "e";
+                timingText1.Text = "e";
+                timingText3.Text = string.Empty;
+            }
+            else if (judgement.TimeOffset > 0)
+            {
+                timingText.Text = "l";
+                timingText1.Text = string.Empty;
+                timingText3.Text = "l";
+            }
+
             offsetText.Text = $"{judgement.TimeOffset:+0;-0}";
             backgroundBox.Colour = GetColourForHitResult(judgement.Type);
 
@@ -137,10 +199,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             resetDisappearTask();
         }
 
+        private ScheduledDelegate disappearTask = null!;
+
         private void resetDisappearTask()
         {
             // 如果已有任务在运行，取消它
+            // ReSharper disable ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
             disappearTask?.Cancel();
+            // ReSharper restore ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
 
             // 启动新的任务，在持续时间后渐隐至透明度为零
             disappearTask = Scheduler.AddDelayed(() =>
@@ -158,7 +224,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             {
                 AloneShowMenu.Early => timeOffset < 0, // 仅显示负值
                 AloneShowMenu.Late => timeOffset > 0, // 仅显示正值
-                AloneShowMenu.None => true, // 显示全部
+                // AloneShowMenu.None => true, // 显示全部
                 _ => true
             };
         }
@@ -166,6 +232,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         public override void Clear()
         {
             timingText.Text = string.Empty;
+            timingText1.Text = string.Empty;
+            timingText3.Text = string.Empty;
             offsetText.Text = string.Empty;
             backgroundBox.Colour = Colour4.Black;
         }

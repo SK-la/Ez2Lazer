@@ -116,15 +116,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private void applyScaleAnimation(bool wasIncrease, bool wasMiss)
         {
-            float newScaleValue = Math.Clamp(Text.NumberContainer.Scale.X * (wasIncrease ? IncreaseScale.Value : DecreaseScale.Value), 0.5f, 3f);
+            float newScaleValue = Math.Clamp(Text.TextContainer.Scale.X * (wasIncrease ? IncreaseScale.Value : DecreaseScale.Value), 0.5f, 3f);
             Vector2 newScale = new Vector2(newScaleValue);
 
             Anchor originAnchor = Enum.Parse<Anchor>(AnimationOrigin.Value.ToString());
 
-            Text.NumberContainer.Anchor = originAnchor;
-            Text.NumberContainer.Origin = originAnchor;
+            Text.TextContainer.Anchor = originAnchor;
+            Text.TextContainer.Origin = originAnchor;
 
-            Text.NumberContainer
+            Text.TextContainer
                 .ScaleTo(newScale, IncreaseDuration.Value, Easing.OutQuint)
                 .Then()
                 .ScaleTo(Vector2.One, DecreaseDuration.Value, Easing.OutQuint);
@@ -139,8 +139,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
             Anchor originAnchor = Enum.Parse<Anchor>(AnimationOrigin.Value.ToString());
 
-            Text.NumberContainer.Anchor = originAnchor;
-            Text.NumberContainer.Origin = originAnchor;
+            Text.TextContainer.Anchor = originAnchor;
+            Text.TextContainer.Origin = originAnchor;
 
             float moveToYStart = 0;
             float moveToYEnd = 0;
@@ -163,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                     break;
             }
 
-            Text.NumberContainer
+            Text.TextContainer
                 .MoveToY(moveToYStart, IncreaseDuration.Value / 2, Easing.OutBounce)
                 .Then()
                 .MoveToY(moveToYEnd, DecreaseDuration.Value, Easing.OutBounce);

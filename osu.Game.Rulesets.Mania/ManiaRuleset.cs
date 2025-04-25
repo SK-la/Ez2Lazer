@@ -304,6 +304,7 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
+                        new ManiaHitModeConvertor(),
                         // new ManiaModJudgmentStyle(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),

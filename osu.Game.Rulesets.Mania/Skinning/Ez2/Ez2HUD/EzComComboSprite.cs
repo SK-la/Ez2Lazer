@@ -189,7 +189,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             texture = textures.Get(spriteLookup.LookupName);
 
             if (texture == null || SpriteName.Value == string.Empty)
-                texture = textures.Get(@"Gameplay/Ez2/combo/default_combo.png");
+                texture = textures.Get(@"Gameplay/combo/default_combo.png");
 
             if (spriteLookup.MaxSize != null)
                 texture = texture.WithMaximumSize(spriteLookup.MaxSize.Value);
@@ -215,7 +215,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             }
         }
 
-        private const string base_path = @"Gameplay/Ez2/combo";
+        private const string base_path = @"Gameplay/combo";
 
         public partial class SpriteSelectorControl : SettingsDropdown<string>
         {
