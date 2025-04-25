@@ -38,11 +38,11 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = config.GetBindable<ScoringMode>(OsuSetting.ScoreDisplayMode),
                     Keywords = new[] { "scoring" }
                 },
-                new SettingsEnumDropdown<HitWindows.HitMode>
+                new SettingsEnumDropdown<MUGHitMode>
                 {
-                    ClassicDefault = HitWindows.HitMode.Ez2AcStyle,
+                    ClassicDefault = MUGHitMode.EZ2AC,
                     LabelText = "Hit Mode(No Active)",
-                    Current = config.GetBindable<HitWindows.HitMode>(OsuSetting.HitMode),
+                    Current = config.GetBindable<MUGHitMode>(OsuSetting.HitMode),
                     Keywords = new[] { "scoring" }
                 },
                 new SettingsSlider<double>

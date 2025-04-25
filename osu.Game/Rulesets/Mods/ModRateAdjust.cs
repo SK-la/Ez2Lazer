@@ -11,6 +11,7 @@ namespace osu.Game.Rulesets.Mods
 {
     public abstract class ModRateAdjust : Mod, IApplicableToRate
     {
+        public sealed override bool ValidForFreestyleAsRequiredMod => true;
         public sealed override bool ValidForMultiplayerAsFreeMod => false;
 
         public abstract BindableNumber<double> SpeedChange { get; }
@@ -22,7 +23,7 @@ namespace osu.Game.Rulesets.Mods
             sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
         }
 
-        public virtual double ApplyToRate(double time, double rate) => rate * SpeedChange.Value;
+        public double ApplyToRate(double time, double rate) => rate * SpeedChange.Value;
 
         public override Type[] IncompatibleMods => new[] { typeof(ModTimeRamp), typeof(ModAdaptiveSpeed), typeof(ModRateAdjust) };
 
@@ -34,5 +35,7 @@ namespace osu.Game.Rulesets.Mods
                     yield return ("Speed change", $"{SpeedChange.Value:N2}x");
             }
         }
+
+        public override string ExtendedIconInformation => SpeedChange.IsDefault ? string.Empty : FormattableString.Invariant($"{SpeedChange.Value:N2}x");
     }
 }

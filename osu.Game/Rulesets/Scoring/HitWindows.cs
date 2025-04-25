@@ -11,22 +11,20 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Scoring
 {
+    public enum MUGHitMode
+    {
+        Lazer,
+        EZ2AC,
+        IIDX,
+        Melody,
+    }
+
     /// <summary>
     /// A structure containing timing data for hit window based gameplay.
     /// </summary>
     public class HitWindows : IHitWindows
     {
         private static readonly DifficultyRange[] base_ranges =
-        {
-            new DifficultyRange(HitResult.Perfect, 22.4D, 19.4D, 13.9D),
-            new DifficultyRange(HitResult.Great, 64, 49, 34),
-            new DifficultyRange(HitResult.Good, 97, 82, 67),
-            new DifficultyRange(HitResult.Ok, 127, 112, 97),
-            new DifficultyRange(HitResult.Meh, 151, 136, 121),
-            new DifficultyRange(HitResult.Miss, 188, 173, 158),
-        };
-
-        public readonly DifficultyRange[] DefaultRange =
         {
             new DifficultyRange(HitResult.Perfect, 22.4D, 19.4D, 13.9D),
             new DifficultyRange(HitResult.Great, 64, 49, 34),
@@ -53,11 +51,28 @@ namespace osu.Game.Rulesets.Scoring
         private static double meh;
         private static double miss;
 
-        public enum HitMode
+        // private static bool isModActive;
+
+        // public void SetCustomRanges(IHitWindows? customHitWindows)
+        // {
+        //     if (isModActive == false && customHitWindows == null)
+        //     {
+        //         ResetRange();
+        //     }
+        //     // else
+        //     // {
+        //     //     customHitWindows.
+        //     // }
+        // }
+        //
+        // public void SetActive(bool isActive)
+        // {
+        //     isModActive = isActive;
+        // }
+
+        public void ResetRange()
         {
-            Standardised,
-            Ez2AcStyle,
-            IIDX,
+            SetDifficultyRange(BaseRanges);
         }
 
         public void SetDifficultyRange(DifficultyRange[] range)
@@ -78,11 +93,6 @@ namespace osu.Game.Rulesets.Scoring
                 new DifficultyRange(HitResult.Meh, meh, meh, meh),
                 new DifficultyRange(HitResult.Miss, miss, miss, miss)
             });
-        }
-
-        public void ResetRange()
-        {
-            SetDifficultyRange(DefaultRange);
         }
 
         /// <summary>

@@ -73,7 +73,7 @@ namespace osu.Game.Screens.SelectV2
 
             Icon = difficultyIcon = new ConstrainedIconContainer
             {
-                Size = new Vector2(20),
+                Size = new Vector2(16f),
                 Margin = new MarginPadding { Horizontal = 5f },
                 Colour = colourProvider.Background5,
             };
@@ -100,12 +100,13 @@ namespace osu.Game.Screens.SelectV2
                                 {
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
+                                    Scale = new Vector2(0.875f),
                                 },
                                 localRank = new PanelLocalRankDisplay
                                 {
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
-                                    Scale = new Vector2(0.75f)
+                                    Scale = new Vector2(0.65f)
                                 },
                                 starCounter = new StarCounter
                                 {
@@ -123,22 +124,22 @@ namespace osu.Game.Screens.SelectV2
                             {
                                 keyCountText = new OsuSpriteText
                                 {
-                                    Font = OsuFont.GetFont(size: 18, weight: FontWeight.SemiBold),
+                                    Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
                                     Anchor = Anchor.BottomLeft,
                                     Origin = Anchor.BottomLeft,
                                     Alpha = 0,
                                 },
                                 difficultyText = new OsuSpriteText
                                 {
-                                    Font = OsuFont.GetFont(size: 18, weight: FontWeight.SemiBold),
+                                    Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
                                     Anchor = Anchor.BottomLeft,
                                     Origin = Anchor.BottomLeft,
-                                    Margin = new MarginPadding { Right = 8f },
+                                    Margin = new MarginPadding { Right = 5f },
                                 },
                                 authorText = new OsuSpriteText
                                 {
                                     Colour = colourProvider.Content2,
-                                    Font = OsuFont.GetFont(weight: FontWeight.SemiBold),
+                                    Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
                                     Anchor = Anchor.BottomLeft,
                                     Origin = Anchor.BottomLeft
                                 }
@@ -235,7 +236,7 @@ namespace osu.Game.Screens.SelectV2
             starRatingDisplay.Current.Value = starDifficulty;
             starCounter.Current = (float)starDifficulty.Stars;
 
-            difficultyIcon.FadeColour(starDifficulty.Stars > 6.5f ? colours.Orange1 : colourProvider.Background5, duration, Easing.OutQuint);
+            difficultyIcon.FadeColour(starDifficulty.Stars > OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF ? colours.Orange1 : colourProvider.Background5, duration, Easing.OutQuint);
 
             var starRatingColour = colours.ForStarDifficulty(starDifficulty.Stars);
             starCounter.FadeColour(starRatingColour, duration, Easing.OutQuint);
