@@ -107,7 +107,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 {
                                     comboSprite.Anchor = Anchor.TopCentre;
                                     comboSprite.Origin = Anchor.Centre;
-                                    comboSprite.Scale = new Vector2(0.8f);
                                     comboSprite.Y = 190;
                                 }
 
@@ -120,23 +119,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                                     combo1.Anchor = Anchor.TopCentre;
                                     combo1.Origin = Anchor.TopCentre;
-                                    combo1.Colour = Colour4.White;
                                     combo1.Y = 200;
                                     combo1.BoxAlpha.Value = 0.8f;
-                                    combo1.IncreaseScale.Value = 1.5f;
-                                    combo1.DecreaseScale.Value = 1f;
-                                    combo1.IncreaseDuration.Value = 10;
-                                    combo1.DecreaseDuration.Value = 500;
+                                    combo1.EffectStartFactor.Value = 1.5f;
+                                    combo1.EffectEndFactor.Value = 1f;
+                                    combo1.EffectStartTime.Value = 10;
+                                    combo1.EffectEndDuration.Value = 500;
 
                                     combo2.Anchor = Anchor.TopCentre;
                                     combo2.Origin = Anchor.TopCentre;
-                                    combo2.Colour = Colour4.White;
                                     combo2.Y = 200;
                                     combo2.BoxAlpha.Value = 0.4f;
-                                    combo2.IncreaseScale.Value = 3f;
-                                    combo2.DecreaseScale.Value = 1f;
-                                    combo2.IncreaseDuration.Value = 10;
-                                    combo2.DecreaseDuration.Value = 300;
+                                    combo2.EffectStartFactor.Value = 3f;
+                                    combo2.EffectEndFactor.Value = 1f;
+                                    combo2.EffectStartTime.Value = 10;
+                                    combo2.EffectEndDuration.Value = 300;
                                 }
 
                                 var keyCounter = container.ChildrenOfType<EzComKeyCounterDisplay>().FirstOrDefault();

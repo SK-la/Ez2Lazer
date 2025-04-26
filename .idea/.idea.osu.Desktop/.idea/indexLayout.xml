@@ -4,7 +4,6 @@
     <attachedFolders />
     <explicitIncludes />
     <explicitExcludes>
-      <Path>osu.Game.Rulesets.Mania/Skinning/Ez2/Ez2HUD/EzComComboSpritebackup.csss</Path>
     </explicitExcludes>
   </component>
 </project>

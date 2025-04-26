@@ -446,7 +446,7 @@ namespace osu.Game.Tests.Visual.Navigation
             {
                 AddUntilStep($"config value is {configValue}", () => getConfigManager().Get<double>(ManiaRulesetSetting.ScrollSpeed), () => Is.EqualTo(configValue));
                 AddUntilStep($"gameplay value is {gameplayValue}", () => this.ChildrenOfType<DrawableManiaRuleset>().Single().TargetTimeRange,
-                    () => Is.EqualTo(DrawableManiaRuleset.ComputeScrollTime(gameplayValue)));
+                    () => Is.EqualTo(DrawableManiaRuleset.ComputeScrollTime(gameplayValue, 200, 1)));
             }
 
             ManiaRulesetConfigManager getConfigManager() => ((ManiaRulesetConfigManager)Game.Dependencies.Get<IRulesetConfigCache>().GetConfigFor(new ManiaRuleset())!);

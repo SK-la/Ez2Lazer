@@ -53,7 +53,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
                                         if (wasIncrease)
                                         {
-                                            combo1.Text.TextContainer
+                                            combo1.Text
                                                   .ScaleTo(new Vector2(1.5f, 1.5f), 10, Easing.OutQuint)
                                                   .Then()
                                                   .ScaleTo(Vector2.One, 500, Easing.OutQuint);

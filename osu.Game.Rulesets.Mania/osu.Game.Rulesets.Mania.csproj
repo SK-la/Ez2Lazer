@@ -15,4 +15,8 @@
   <ItemGroup Label="Project References">
     <ProjectReference Include="..\osu.Game\osu.Game.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Skinning\Ez2\Ez2HUD\EzComComboSprite.txt" />
+  </ItemGroup>
 </Project>

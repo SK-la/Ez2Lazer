@@ -15,11 +15,11 @@ namespace osu.Game.Skinning.Components
     {
         protected override double RollingDuration => 250;
 
-        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel), nameof(SkinnableComponentStrings.ShowLabelDescription))]
-        public Bindable<bool> ShowLabel { get; } = new BindableBool(false);
+        [SettingSource("Font", "Font", SettingControlType = typeof(OffsetNumberNameSelector))]
+        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("NIGHTwhite");
 
-        [SettingSource("Font", "Font", SettingControlType = typeof(FontNameSelector))]
-        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("stat");
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel), nameof(SkinnableComponentStrings.ShowLabelDescription))]
+        public Bindable<bool> ShowLabel { get; } = new BindableBool();
 
         [SettingSource("Alpha", "The alpha value of this box")]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
@@ -48,11 +48,17 @@ namespace osu.Game.Skinning.Components
                 Text.FontName.Value = e.NewValue;
                 Text.Invalidate(); // **强制刷新 EzCounterText**
             }, true);
+
+            Padding = new MarginPadding
+            {
+                Left = 2,
+                Right = 2,
+            };
         }
 
         protected override IHasText CreateText()
         {
-            Text = new EzCounterText(Anchor.TopRight, FontNameDropdown);
+            Text = new EzCounterText(FontNameDropdown);
             return Text;
         }
     }

@@ -121,6 +121,7 @@ namespace osu.Game.Skinning
 
                                     if (score != null)
                                     {
+                                        score.Anchor = Anchor.TopLeft;
                                         score.Origin = Anchor.TopLeft;
                                         score.Position = new Vector2(x_offset, 20);
                                         // score.FontNameDropdown =

@@ -1,8 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
-using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -13,57 +11,55 @@ using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning.Components;
-using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
     public partial class EzComComboCounter : ComboCounter
     {
-        public EzCounterText Text = null!;
-        protected override double RollingDuration => 250;
-        protected virtual bool DisplayXSymbol => true;
+        [SettingSource("Font", "Font", SettingControlType = typeof(OffsetNumberNameSelector))]
+        public Bindable<string> NameDropdown { get; } = new Bindable<string>("EZ2DJ-4th");
 
-        [SettingSource("Font", "Font", SettingControlType = typeof(FontNameSelector))]
-        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("stat");
+        [SettingSource("Effect Type", "Effect Type")]
+        public Bindable<EffectType> Effect { get; } = new Bindable<EffectType>(EffectType.Scale);
 
-        [SettingSource("Animation Type", "The type of animation to apply")]
-        public Bindable<AnimationType> Animation { get; } = new Bindable<AnimationType>(AnimationType.Scale);
+        // [SettingSource("Effect Origin", "Effect Origin", SettingControlType = typeof(AnchorDropdown))]
+        // public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
+        // {
+        //     Default = Anchor.TopCentre,
+        //     Value = Anchor.TopCentre
+        // };
 
-        [SettingSource("Increase Scale", "The scale factor when the combo increases")]
-        public BindableNumber<float> IncreaseScale { get; } = new BindableNumber<float>(1.2f)
+        [SettingSource("Effect Start Factor", "Effect Start Factor")]
+        public BindableNumber<float> EffectStartFactor { get; } = new BindableNumber<float>(1.5f)
         {
-            MinValue = 0.5f,
+            MinValue = 0.1f,
             MaxValue = 5f,
             Precision = 0.05f,
         };
 
-        [SettingSource("Decrease Scale", "The scale factor when the combo decreases")]
-        public BindableNumber<float> DecreaseScale { get; } = new BindableNumber<float>(0.8f)
+        [SettingSource("Effect End Factor", "Effect End Factor")]
+        public BindableNumber<float> EffectEndFactor { get; } = new BindableNumber<float>(1f)
         {
-            MinValue = 0.5f,
-            MaxValue = 1.5f,
-            Precision = 0.1f,
+            MinValue = 0.1f,
+            MaxValue = 5f,
+            Precision = 0.05f,
         };
 
-        [SettingSource("Increase Duration", "The scale duration time when the combo increases")]
-        public BindableNumber<float> IncreaseDuration { get; } = new BindableNumber<float>(10)
+        [SettingSource("Effect Start Duration", "Effect Start Duration")]
+        public BindableNumber<float> EffectStartTime { get; } = new BindableNumber<float>(10)
         {
             MinValue = 1,
             MaxValue = 300,
             Precision = 1f,
         };
 
-        [SettingSource("Decrease Duration", "The scale duration time when the combo decrease")]
-        public BindableNumber<float> DecreaseDuration { get; } = new BindableNumber<float>(200)
+        [SettingSource("Effect End Duration", "Effect End Duration")]
+        public BindableNumber<float> EffectEndDuration { get; } = new BindableNumber<float>(300)
         {
             MinValue = 10,
             MaxValue = 500,
             Precision = 10f,
         };
-
-        [SettingSource("Animation Origin", "The origin point for the animation")]
-        public Bindable<OriginOptions> AnimationOrigin { get; } = new Bindable<OriginOptions>(OriginOptions.TopCentre);
 
         [SettingSource("Alpha", "The alpha value of this box")]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
@@ -76,28 +72,26 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), nameof(SkinnableComponentStrings.ColourDescription))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
+        public EzCounterText Text = null!;
+        protected override double RollingDuration => 250;
+        protected virtual bool DisplayXSymbol => true;
+
         [BackgroundDependencyLoader]
         private void load(ScoreProcessor scoreProcessor)
         {
-            // FontNameDropdown.BindTo(Text.FontName);
-
             Current.BindTo(scoreProcessor.Combo);
             Current.BindValueChanged(combo =>
             {
                 bool wasIncrease = combo.NewValue > combo.OldValue;
                 bool wasMiss = combo.OldValue > 1 && combo.NewValue == 0;
 
-                switch (Animation.Value)
-                {
-                    case AnimationType.Scale:
-                        applyScaleAnimation(wasIncrease, wasMiss);
-                        break;
-
-                    case AnimationType.Bounce:
-                        applyBounceAnimation(wasIncrease, wasMiss);
-                        break;
-                }
+                applyAnimation(wasIncrease, wasMiss);
             });
+
+            // EffectOrigin.BindValueChanged(e =>
+            // {
+            //     Text.TextPart.Origin = e.NewValue;
+            // }, true);
         }
 
         protected override void LoadComplete()
@@ -107,93 +101,47 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
 
-            FontNameDropdown.BindValueChanged(e =>
+            NameDropdown.BindValueChanged(e =>
             {
                 Text.FontName.Value = e.NewValue;
                 Text.Invalidate(); // **强制刷新 EzCounterText**
             }, true);
         }
 
-        private void applyScaleAnimation(bool wasIncrease, bool wasMiss)
+        private void applyAnimation(bool wasIncrease, bool wasMiss)
         {
-            float newScaleValue = Math.Clamp(Text.TextContainer.Scale.X * (wasIncrease ? IncreaseScale.Value : DecreaseScale.Value), 0.5f, 3f);
-            Vector2 newScale = new Vector2(newScaleValue);
-
-            Anchor originAnchor = Enum.Parse<Anchor>(AnimationOrigin.Value.ToString());
-
-            Text.TextContainer.Anchor = originAnchor;
-            Text.TextContainer.Origin = originAnchor;
-
-            Text.TextContainer
-                .ScaleTo(newScale, IncreaseDuration.Value, Easing.OutQuint)
-                .Then()
-                .ScaleTo(Vector2.One, DecreaseDuration.Value, Easing.OutQuint);
-
-            if (wasMiss)
-                Text.FlashColour(Color4.Red, DecreaseDuration.Value, Easing.OutQuint);
-        }
-
-        private void applyBounceAnimation(bool wasIncrease, bool wasMiss)
-        {
-            float factor = Math.Clamp(wasIncrease ? 10 * IncreaseScale.Value : -10 * DecreaseScale.Value, -100f, 100f);
-
-            Anchor originAnchor = Enum.Parse<Anchor>(AnimationOrigin.Value.ToString());
-
-            Text.TextContainer.Anchor = originAnchor;
-            Text.TextContainer.Origin = originAnchor;
-
-            float moveToYStart = 0;
-            float moveToYEnd = 0;
-
-            switch (AnimationOrigin.Value)
+            switch (Effect.Value)
             {
-                case OriginOptions.TopCentre:
-                    moveToYStart = factor;
-                    moveToYEnd = -5;
+                case EffectType.Scale:
+                    EzAnimationHelper.ApplyScaleAnimation(
+                        Text.TextContainer,
+                        wasIncrease,
+                        wasMiss,
+                        EffectStartFactor.Value,
+                        EffectEndFactor.Value,
+                        EffectStartTime.Value,
+                        EffectEndDuration.Value);
                     break;
 
-                case OriginOptions.BottomCentre:
-                    moveToYStart = -factor;
-                    moveToYEnd = 5;
-                    break;
-
-                case OriginOptions.Centre:
-                    moveToYStart = factor;
-                    moveToYEnd = -5;
+                case EffectType.Bounce:
+                    EzAnimationHelper.ApplyBounceAnimation(
+                        Text.TextContainer,
+                        wasIncrease,
+                        wasMiss,
+                        EffectStartFactor.Value,
+                        EffectEndFactor.Value,
+                        EffectStartTime.Value,
+                        EffectEndDuration.Value);
                     break;
             }
-
-            Text.TextContainer
-                .MoveToY(moveToYStart, IncreaseDuration.Value / 2, Easing.OutBounce)
-                .Then()
-                .MoveToY(moveToYEnd, DecreaseDuration.Value, Easing.OutBounce);
-
-            if (wasMiss)
-                Text.FlashColour(Color4.Red, DecreaseDuration.Value, Easing.OutQuint);
         }
 
         protected override LocalisableString FormatCount(int count) => DisplayXSymbol ? $@"{count}" : count.ToString();
 
         protected override IHasText CreateText()
         {
-            Text = new EzCounterText(Anchor.TopCentre, FontNameDropdown);
-            Debug.WriteLine("👀 FolderDropdown Updated:", FontNameDropdown.Value);
-            Debug.WriteLine("👀 Text.FontName Updated:", Text.FontName.Value);
+            Text = new EzCounterText(NameDropdown);
             return Text;
         }
-    }
-
-    public enum AnimationType
-    {
-        Scale,
-        Bounce,
-        None
-    }
-
-    public enum OriginOptions
-    {
-        TopCentre,
-        Centre,
-        BottomCentre
     }
 }
