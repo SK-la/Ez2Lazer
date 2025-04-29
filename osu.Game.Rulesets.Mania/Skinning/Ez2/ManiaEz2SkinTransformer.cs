@@ -161,7 +161,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     hitErrorMeter.LabelStyle.Value = BarHitErrorMeter.LabelStyles.None;
                                 }
 
-                                var judgementPiece = container.OfType<EzComJudgementTexture>().FirstOrDefault();
+                                var judgementPiece = container.OfType<EzComHitResultScore>().FirstOrDefault();
 
                                 if (judgementPiece != null)
                                 {
@@ -177,7 +177,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 new EzComKeyCounterDisplay(),
                                 // new ArgonKeyCounterDisplay(),
                                 new BarHitErrorMeter(),
-                                new EzComJudgementTexture(),
+                                new EzComHitResultScore(),
                                 new EzComHitTiming(),
                                 new EzComHitTiming(),
                             };

@@ -12,7 +12,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
+namespace osu.Game.Skinning.Components
 {
     public partial class EzSelectorTextures : CompositeDrawable
     {
@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         {
             var resources = textures.GetAvailableResources();
             var matchingResources = resources
-                .Where(r => r.StartsWith("Gameplay/Combo", StringComparison.OrdinalIgnoreCase)
+                .Where(r => r.StartsWith("Gameplay/EarlyOrLate", StringComparison.OrdinalIgnoreCase)
                             && Path.GetExtension(r).Equals(".png", StringComparison.OrdinalIgnoreCase));
 
             foreach (string? resource in matchingResources)

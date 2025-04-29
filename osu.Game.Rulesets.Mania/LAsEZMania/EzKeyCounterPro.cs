@@ -12,7 +12,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         }
     }
 
-    public partial class Ez2KeyCounter : Container
+    public partial class EzKeyCounterPro : Container
     {
         public readonly InputTrigger Trigger;
         public IBindable<int> CountPresses => Trigger.ActivationCount;
@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private readonly Bindable<bool> isActive = new BindableBool();
 
-        public Ez2KeyCounter(ManiaAction action)
+        public EzKeyCounterPro(ManiaAction action)
         {
             // 将 ManiaAction 转换为 InputTrigger
             Trigger = new ManiaActionInputTrigger(action.ToString());

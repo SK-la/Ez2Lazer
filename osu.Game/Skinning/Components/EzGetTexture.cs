@@ -10,11 +10,10 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Text;
 using osu.Game.Graphics.Sprites;
-using osuTK;
 
 namespace osu.Game.Skinning.Components
 {
-    public partial class EzTextureSprite : OsuSpriteText
+    public partial class EzGetTexture : OsuSpriteText
     {
         public Bindable<string> FontName { get; }
 
@@ -23,7 +22,7 @@ namespace osu.Game.Skinning.Components
 
         protected override char FixedWidthReferenceCharacter => '6';
 
-        public EzTextureSprite(Func<char, string> getLookup, Bindable<string> fontName)
+        public EzGetTexture(Func<char, string> getLookup, Bindable<string> fontName)
         {
             this.getLookup = getLookup;
             FontName = fontName;
@@ -35,7 +34,7 @@ namespace osu.Game.Skinning.Components
         [BackgroundDependencyLoader]
         private void load(TextureStore textures)
         {
-            Spacing = new Vector2(-2f, 0f);
+            // Spacing = new Vector2(-2f, 0f);
             FontName.BindValueChanged(e =>
             {
                 Font = new FontUsage(FontName.Value, 1);
@@ -88,8 +87,7 @@ namespace osu.Game.Skinning.Components
                     if (texture != null)
                     {
                         glyph = new TexturedCharacterGlyph(new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
-                            texture,
-                            0.125f);
+                            texture, 0.125f);
                         break;
                     }
                 }

@@ -4,7 +4,7 @@
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 
-namespace osu.Game.Rulesets.Mania.UI.Components
+namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
     public partial class CustomVisibilityContainer : VisibilityContainer
     {

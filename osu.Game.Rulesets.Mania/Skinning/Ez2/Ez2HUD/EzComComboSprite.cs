@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning.Components;
@@ -17,20 +18,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
     public partial class EzComComboSprite : HitErrorMeter
     {
         [SettingSource("Combo Text Font", "Combo Text Font", SettingControlType = typeof(OffsetNumberNameSelector))]
-        public Bindable<string> NameDropdown { get; } = new Bindable<string>("NIGHTFALL");
+        public Bindable<string> NameDropdown { get; } = new Bindable<string>("EZ2DJ-4th");
 
         [SettingSource("Effect Type", "Effect Type")]
         public Bindable<EffectType> Effect { get; } = new Bindable<EffectType>(EffectType.Scale);
 
-        // [SettingSource("Effect Origin", "Effect Origin", SettingControlType = typeof(AnchorDropdown))]
-        // public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
-        // {
-        //     Default = Anchor.TopCentre,
-        //     Value = Anchor.TopCentre
-        // };
+        [SettingSource("Effect Origin", "Effect Origin", SettingControlType = typeof(AnchorDropdown))]
+        public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
+        {
+            Default = Anchor.TopCentre,
+            Value = Anchor.TopCentre
+        };
 
         [SettingSource("Effect Start Factor", "Effect Start Factor")]
-        public BindableNumber<float> EffectStartFactor { get; } = new BindableNumber<float>(1.5f)
+        public BindableNumber<float> EffectStartFactor { get; } = new BindableNumber<float>(2f)
         {
             MinValue = 0.1f,
             MaxValue = 5f,
@@ -70,6 +71,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         public EzComComboSprite()
         {
+            // Anchor = Anchor.Centre;
+            Origin = Anchor.Centre;
             Size = new Vector2(120, 30);
         }
 
@@ -80,10 +83,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             {
                 Text = new EzCounterText(NameDropdown)
                 {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Scale = new Vector2(2.5f),
-                    Text = "e",
+                    Scale = new Vector2(0.8f),
+                    Text = "c",
                     Alpha = 1
                 },
             };
@@ -105,15 +106,26 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
 
-            // EffectOrigin.BindValueChanged(e =>
-            // {
-            //     if (e.NewValue != Anchor.TopCentre && e.NewValue != Anchor.Centre && e.NewValue != Anchor.BottomCentre)
-            //     {
-            //         EffectOrigin.Value = Anchor.TopCentre; // 设置为默认值
-            //     }
-            //
-            //     Text.TextContainer.Origin = EffectOrigin.Value;
-            // }, true);
+            EffectOrigin.BindValueChanged(e =>
+            {
+                if (e.NewValue != Anchor.TopCentre && e.NewValue != Anchor.Centre && e.NewValue != Anchor.BottomCentre)
+                {
+                    EffectOrigin.Value = Anchor.TopCentre; // 设置为默认值
+                }
+
+                // switch (EffectOrigin.Value)
+                // {
+                //     case Anchor.TopCentre:
+                //         Text.TextContainer.Anchor = Anchor.BottomCentre;
+                //         break;
+                //
+                //     case Anchor.BottomCentre:
+                //         Text.TextContainer.Anchor = Anchor.TopCentre;
+                //         break;
+                // }
+
+                Text.TextContainer.Anchor = EffectOrigin.Value;
+            }, true);
             NameDropdown.BindValueChanged(e =>
             {
                 Text.FontName.Value = e.NewValue;
@@ -126,7 +138,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             switch (Effect.Value)
             {
                 case EffectType.Scale:
-                    EzAnimationHelper.ApplyScaleAnimation(
+                    EzEffectHelper.ApplyScaleAnimation(
                         Text.TextContainer,
                         wasIncrease,
                         wasMiss,
@@ -137,7 +149,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                     break;
 
                 case EffectType.Bounce:
-                    EzAnimationHelper.ApplyBounceAnimation(
+                    EzEffectHelper.ApplyBounceAnimation(
                         Text.TextContainer,
                         wasIncrease,
                         wasMiss,

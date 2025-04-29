@@ -12,7 +12,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Screens.Play.HUD;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
+namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
     public partial class EzKeyCounter : KeyCounter
     {
@@ -91,8 +91,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                 },
             };
 
-            // Values from Figma didn't match visually
-            // So these were just eyeballed
             Height = 30 * scale_factor;
             Width = (float)config.Get<double>(OsuSetting.ColumnWidth);
         }

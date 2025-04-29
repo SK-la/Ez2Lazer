@@ -25,7 +25,7 @@ namespace osu.Game.Skinning
         public static SkinInfo CreateInfo() => new SkinInfo
         {
             ID = Skinning.SkinInfo.EZ2_SKIN,
-            Name = "LA's \"Ez2\" Circle(2025)",
+            Name = "LA's \"EzStyle\" Circle(2025)",
             Creator = "SK_la",
             Protected = true,
             InstantiationInfo = typeof(Ez2Skin).GetInvariantInstantiationInfo()
@@ -102,8 +102,8 @@ namespace osu.Game.Skinning
                             {
                                 var health = container.OfType<HealthDisplay>().FirstOrDefault();
                                 var score = container.OfType<EzComScoreCounter>().FirstOrDefault();
-                                var accuracy = container.OfType<ArgonAccuracyCounter>().FirstOrDefault();
-                                var performancePoints = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
+                                var acc = container.OfType<ArgonAccuracyCounter>().FirstOrDefault();
+                                var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
                                 var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
 
                                 const float x_offset = 20;
@@ -124,22 +124,23 @@ namespace osu.Game.Skinning
                                         score.Anchor = Anchor.TopLeft;
                                         score.Origin = Anchor.TopLeft;
                                         score.Position = new Vector2(x_offset, 20);
+                                        score.ShowLabel.Value = false;
                                         // score.FontNameDropdown =
                                     }
 
-                                    if (accuracy != null)
+                                    if (acc != null)
                                     {
-                                        accuracy.Position = new Vector2(-x_offset, 20);
-                                        accuracy.Anchor = Anchor.TopRight;
-                                        accuracy.Origin = Anchor.TopRight;
+                                        acc.Position = new Vector2(-x_offset, 20);
+                                        acc.Anchor = Anchor.TopRight;
+                                        acc.Origin = Anchor.TopRight;
                                     }
 
-                                    if (performancePoints != null && accuracy != null)
+                                    if (pps != null && acc != null)
                                     {
-                                        performancePoints.Position = new Vector2(accuracy.X, accuracy.Y + accuracy.DrawHeight + 10);
-                                        performancePoints.Anchor = Anchor.TopRight;
-                                        performancePoints.Origin = Anchor.TopRight;
-                                        performancePoints.Scale = new Vector2(0.8f);
+                                        pps.Position = new Vector2(acc.X, acc.Y + acc.DrawHeight + 10);
+                                        pps.Anchor = Anchor.TopRight;
+                                        pps.Origin = Anchor.TopRight;
+                                        pps.Scale = new Vector2(0.8f);
                                     }
 
                                     if (songProgress != null)
@@ -158,18 +159,18 @@ namespace osu.Game.Skinning
                                         var attributeText3 = attributeTexts[2];
                                         var attributeText4 = attributeTexts[3];
 
-                                        if (performancePoints != null)
+                                        if (pps != null)
                                         {
                                             attributeText.Anchor = Anchor.TopRight;
                                             attributeText.Origin = Anchor.TopRight;
-                                            attributeText.Position = new Vector2(-x_offset, performancePoints.Y + performancePoints.DrawHeight * 0.8f + 10);
+                                            attributeText.Position = new Vector2(-x_offset, pps.Y + pps.DrawHeight * pps.Scale.Y + 10);
                                             attributeText.Scale = new Vector2(0.65f);
                                             attributeText.Attribute.Value = BeatmapAttribute.StarRating;
                                         }
 
                                         attributeText2.Anchor = Anchor.TopRight;
                                         attributeText2.Origin = Anchor.TopRight;
-                                        attributeText2.Position = new Vector2(-x_offset, attributeText.Y + attributeText.DrawHeight * 0.65f + 10);
+                                        attributeText2.Position = new Vector2(-x_offset, attributeText.Y + attributeText.DrawHeight * attributeText.Scale.Y + 10);
                                         attributeText2.Scale = new Vector2(0.65f);
                                         attributeText2.Attribute.Value = BeatmapAttribute.DifficultyName;
                                         attributeText2.Template.Value = "{Value}";
@@ -179,14 +180,14 @@ namespace osu.Game.Skinning
                                             attributeText3.Anchor = Anchor.TopLeft;
                                             attributeText3.Origin = Anchor.TopLeft;
                                             attributeText3.Scale = new Vector2(0.65f);
-                                            attributeText3.Position = new Vector2(x_offset, score.Y + score.DrawHeight + 10);
+                                            attributeText3.Position = new Vector2(x_offset, score.Y + score.DrawHeight * score.Scale.Y + 10);
                                             attributeText3.Attribute.Value = BeatmapAttribute.Artist;
                                         }
 
                                         attributeText4.Anchor = Anchor.TopLeft;
                                         attributeText4.Origin = Anchor.TopLeft;
                                         attributeText4.Scale = new Vector2(0.65f);
-                                        attributeText4.Position = new Vector2(x_offset, attributeText3.Y + attributeText3.DrawHeight * 0.65f + 10);
+                                        attributeText4.Position = new Vector2(x_offset, attributeText3.Y + attributeText3.DrawHeight * attributeText3.Scale.Y + 10);
                                         attributeText4.Attribute.Value = BeatmapAttribute.Title;
                                     }
                                 }
@@ -194,11 +195,12 @@ namespace osu.Game.Skinning
                             {
                                 Children = new Drawable[]
                                 {
-                                    new EzComScoreCounter
-                                    {
-                                        ShowLabel = { Value = false },
-                                        // WireframeOpacity = { Value = 0 },
-                                    },
+                                    new EzComScoreCounter(),
+                                    new BeatmapAttributeText(),
+                                    new BeatmapAttributeText(),
+                                    new BeatmapAttributeText(),
+                                    new BeatmapAttributeText(),
+
                                     new DefaultHealthDisplay(),
                                     new ArgonAccuracyCounter
                                     {
@@ -217,10 +219,6 @@ namespace osu.Game.Skinning
                                         Origin = Anchor.CentreLeft,
                                         Position = new Vector2(20, 0),
                                     },
-                                    new BeatmapAttributeText(),
-                                    new BeatmapAttributeText(),
-                                    new BeatmapAttributeText(),
-                                    new BeatmapAttributeText(),
                                 }
                             };
 
@@ -235,8 +233,6 @@ namespace osu.Game.Skinning
 
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {
-            // todo: this code is pulled from LegacySkin and should not exist.
-            // will likely change based on how databased storage of skin configuration goes.
             switch (lookup)
             {
                 case GlobalSkinColours global:

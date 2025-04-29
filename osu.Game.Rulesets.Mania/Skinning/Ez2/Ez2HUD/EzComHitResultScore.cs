@@ -1,8 +1,11 @@
+using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Game.Configuration;
@@ -10,13 +13,14 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
-    public partial class EzComJudgementTexture : CompositeDrawable, ISerialisableDrawable //, IAnimatableJudgement
+    public partial class EzComHitResultScore : CompositeDrawable, ISerialisableDrawable //, IAnimatableJudgement
     {
         public bool UsesFixedAnchor { get; set; }
 
@@ -42,7 +46,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [Resolved(canBeNull: true)]
         private GameplayClockContainer gameplayClockContainer { get; set; } = null!;
 
-        public EzComJudgementTexture()
+        [Resolved]
+        private JudgementCountController judgementCountController { get; set; } = null!;
+
+        [Resolved]
+        private ISampleStore sampleStore { get; set; } = null!;
+
+        public EzComHitResultScore()
         {
             Size = new Vector2(200, 50);
             Anchor = Anchor.Centre;
@@ -60,6 +70,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             AlwaysPresent = true;
         }
 
+        private Sprite? fullComboSprite;
+        private Sample? fullComboSound;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
@@ -67,9 +80,32 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             gameplayClockContainer.OnSeek += Clear;
 
             processor.NewJudgement += processorNewJudgement;
+
+            // 加载 FULL COMBO 贴图和音效
+            fullComboSprite = new Sprite
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Scale = new Vector2(2f),
+                // Y = -20,
+                Alpha = 0, // 初始隐藏
+                Texture = textures.Get("Gameplay/AllCombo/ALL-COMBO2"), // 替换为你的贴图路径
+            };
+            AddInternal(fullComboSprite);
+
+            fullComboSound = sampleStore.Get("Gameplay/full_combo_sound"); // 替换为你的音效路径
         }
 
-        private void processorNewJudgement(JudgementResult j) => Schedule(() => OnNewJudgement(j));
+        private void processorNewJudgement(JudgementResult j)
+        {
+            Schedule(() =>
+            {
+                OnNewJudgement(j);
+
+                if (processor.JudgedHits == processor.MaximumCombo)
+                    checkFullCombo();
+            });
+        }
 
         protected void OnNewJudgement(JudgementResult judgement)
         {
@@ -83,6 +119,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
             var judgementText = CreateJudgementTexture(judgement.Type);
             AddInternal(judgementText);
+        }
+
+        private void checkFullCombo()
+        {
+            var missCounter = judgementCountController.Counters
+                                                      .FirstOrDefault(counter => counter.Types.Contains(HitResult.Miss));
+
+            if (missCounter.ResultCount.Value == 0 && fullComboSprite != null)
+            {
+                // 显示 FULL COMBO 贴图
+                fullComboSprite.FadeIn(200).Then().FadeOut(5000);
+
+                // 播放音效
+                fullComboSound?.Play();
+            }
         }
 
         protected virtual void Clear()
@@ -106,6 +157,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
+                Scale = new Vector2(1.2f),
                 DefaultFrameLength = 1000 / PlaybackFps.Value,
                 Loop = false
             };

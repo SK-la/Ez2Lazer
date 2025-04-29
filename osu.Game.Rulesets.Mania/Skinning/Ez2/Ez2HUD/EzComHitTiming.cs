@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [SettingSource("AloneShow", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
 
-        [SettingSource("Displaying Threshold", "(显示阈值) Displaying Threshold")]
+        [SettingSource("(显示阈值) Displaying Threshold", "(显示阈值) Displaying Threshold")]
         public BindableNumber<double> Threshold { get; } = new BindableNumber<double>(22)
         {
             MinValue = 0.0,
@@ -42,7 +42,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             Precision = 1
         };
 
-        [SettingSource("Display Duration", "(持续时间) Duration disappears")]
+        [SettingSource("(持续时间) Display Duration", "(持续时间) Duration disappears")]
         public BindableNumber<double> DisplayDuration { get; } = new BindableNumber<double>(300)
         {
             MinValue = 10,
@@ -50,11 +50,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             Precision = 1, // 精度
         };
 
-        [SettingSource("Symmetrical spacing", "(对称间距) Symmetrical spacing")]
-        public BindableNumber<float> SymmetryOffset { get; } = new BindableNumber<float>(70)
+        [SettingSource("(对称间距) Symmetrical spacing", "(对称间距) Symmetrical spacing")]
+        public BindableNumber<float> SymmetryOffset { get; } = new BindableNumber<float>(80)
         {
             MinValue = 0,
-            MaxValue = 100,
+            MaxValue = 500,
             Precision = 1,
         };
 
@@ -93,6 +93,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                     AutoSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
+                    Scale = new Vector2(1.2f),
                     Alpha = 0,
                     Children = new Drawable[]
                     {
@@ -104,18 +105,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                         },
                         timingContainer = new FillFlowContainer
                         {
-                            // Direction = FillDirection.Horizontal,
+                            Direction = FillDirection.Horizontal,
                             AutoSizeAxes = Axes.Both,
                             Anchor = Anchor.BottomCentre,
                             Origin = Anchor.BottomCentre,
-                            Spacing = new Vector2(SymmetryOffset.Value),
+                            // Spacing = new Vector2(SymmetryOffset.Value),
                             Children = new Drawable[]
                             {
                                 timingText1 = new EzCounterText(TextNameDropdown)
                                 {
                                     Anchor = Anchor.Centre,
-                                    Origin = Anchor.CentreRight,
+                                    Origin = Anchor.Centre,
                                     Text = "e",
+                                    X = -SymmetryOffset.Value,
                                     Alpha = 1
                                 },
                                 timingText = new EzCounterText(TextNameDropdown)
@@ -128,8 +130,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                                 timingText3 = new EzCounterText(TextNameDropdown)
                                 {
                                     Anchor = Anchor.Centre,
-                                    Origin = Anchor.CentreLeft,
+                                    Origin = Anchor.Centre,
                                     Text = "l",
+                                    X = SymmetryOffset.Value,
                                     Alpha = 1
                                 },
                             }
@@ -175,7 +178,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private void updateTimingTextPositions()
         {
-            timingContainer.Spacing = new Vector2(SymmetryOffset.Value);
+            timingText1.X = -SymmetryOffset.Value;
+            timingText3.X = SymmetryOffset.Value;
+            // timingContainer.Spacing = new Vector2(SymmetryOffset.Value);
+            timingText1.Invalidate();
+            timingText3.Invalidate();
             timingContainer.Invalidate();
         }
 
@@ -219,14 +226,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                 return true;
             if (Math.Abs(timeOffset) < Threshold.Value)
                 return false;
-            // return aloneShowMenu switch
-            // {
-            //     AloneShowMenu.Early => timeOffset < 0, // 仅显示负值
-            //     AloneShowMenu.Late => timeOffset > 0, // 仅显示正值
-            //     // AloneShowMenu.None => true, // 显示全部
-            //     _ => true
-            // };
-            return true;
+
+            return aloneShowMenu switch
+            {
+                AloneShowMenu.Early => timeOffset < 0, // 仅显示负值
+                AloneShowMenu.Late => timeOffset > 0, // 仅显示正值
+                AloneShowMenu.None => true, // 显示全部
+                _ => true
+            };
+            // return true;
         }
 
         private ScheduledDelegate disappearTask = null!;
@@ -252,6 +260,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             timingText3.Text = string.Empty;
             offsetText.Text = string.Empty;
             backgroundBox.Colour = Colour4.Black;
+
+            foreach (var j in errorContainer)
+            {
+                j.ClearTransforms();
+                j.Expire();
+            }
         }
     }
 

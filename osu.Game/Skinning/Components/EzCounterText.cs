@@ -1,21 +1,18 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections.Generic;
-using OpenTabletDriver.Plugin;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.Overlays.Settings;
 using osuTK;
 
 namespace osu.Game.Skinning.Components
 {
     public partial class EzCounterText : CompositeDrawable, IHasText
     {
-        public readonly EzTextureSprite TextPart;
+        public readonly EzGetTexture TextPart;
         public Bindable<string> FontName { get; } = new Bindable<string>("EZ2DJ-4th");
 
         public FillFlowContainer TextContainer { get; private set; }
@@ -50,9 +47,8 @@ namespace osu.Game.Skinning.Components
 
                     Children = new Drawable[]
                     {
-                        TextPart = new EzTextureSprite(textLookup, FontName)
+                        TextPart = new EzGetTexture(textLookup, FontName)
                         {
-                            Scale = new Vector2(2.2f),
                             Padding = new MarginPadding(1),
                         }
                     }
@@ -82,7 +78,8 @@ namespace osu.Game.Skinning.Components
         {
             base.LoadComplete();
 
-            // textPart.Width = DefaultWidth;
+            float scale = calculateScale(TextPart.Height);
+            TextPart.Scale = new Vector2(scale);
 
             FontName.BindValueChanged(e =>
             {
@@ -92,69 +89,9 @@ namespace osu.Game.Skinning.Components
             }, true);
         }
 
-        public Vector2 Spacing
+        private float calculateScale(float textureHeight, float targetHeight = 25f)
         {
-            get => TextContainer.Spacing;
-            set => TextContainer.Spacing = value;
-        }
-    }
-
-    public partial class OffsetNumberNameSelector : SettingsDropdown<string>
-    {
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            Items = new List<string>
-            {
-                "Air",
-                "Aqua",
-                "Cricket",
-                "D2D",
-                "DarkConcert",
-                "DJMAX",
-                "EMOTIONAL",
-                "ENDLESS",
-                "EZ2AC-AE",
-                "EZ2AC-CV",
-                "EZ2AC-EVOLVE",
-                "EZ2AC-TT",
-                "EZ2DJ-1thSE",
-                "EZ2DJ-2nd",
-                "EZ2DJ-4th",
-                "EZ2DJ-6th",
-                "EZ2DJ-7th",
-                "EZ2DJ-Platinum",
-                "EZ2ON",
-                "F3-ANCIENT",
-                "F3-CONTEMP",
-                "F3-FUTURE",
-                "F3-MODERN",
-                "FiND A WAY",
-                "FORTRESS2",
-                "GC-TYPE2",
-                "Gem",
-                "Gem2",
-                "Gold",
-                "HX STD",
-                "HX STD黄色",
-                "HX-1121",
-                "Kings",
-                "M250",
-                "NIGHTFALL",
-                "NIGHTwhite",
-                "QTZ-02",
-                "REBOOT",
-                "REBOOT GOLD",
-                "SG-701",
-                "SH-512",
-                "Star",
-                "TCEZ-001",
-                "TECHNIKA",
-                "Tomato",
-                "VariousWays",
-            };
-            Log.Debug("Items", Items.ToString());
+            return targetHeight / textureHeight;
         }
     }
 
@@ -163,21 +100,5 @@ namespace osu.Game.Skinning.Components
         Scale,
         Bounce,
         None
-    }
-
-    public partial class AnchorDropdown : SettingsDropdown<Anchor>
-    {
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            // 限制选项范围
-            Items = new List<Anchor>
-            {
-                Anchor.TopCentre,
-                Anchor.Centre,
-                Anchor.BottomCentre
-            };
-        }
     }
 }

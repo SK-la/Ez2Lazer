@@ -8,9 +8,11 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning.Components;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
@@ -113,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             switch (Effect.Value)
             {
                 case EffectType.Scale:
-                    EzAnimationHelper.ApplyScaleAnimation(
+                    EzEffectHelper.ApplyScaleAnimation(
                         Text.TextContainer,
                         wasIncrease,
                         wasMiss,
@@ -124,7 +126,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                     break;
 
                 case EffectType.Bounce:
-                    EzAnimationHelper.ApplyBounceAnimation(
+                    EzEffectHelper.ApplyBounceAnimation(
                         Text.TextContainer,
                         wasIncrease,
                         wasMiss,
@@ -140,7 +142,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected override IHasText CreateText()
         {
-            Text = new EzCounterText(NameDropdown);
+            Text = new EzCounterText(NameDropdown)
+            {
+                Scale = new Vector2(2.2f),
+            };
             return Text;
         }
     }

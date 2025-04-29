@@ -6,9 +6,9 @@ using osu.Framework.Graphics;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
-    public static class EzAnimationHelper
+    public static class EzEffectHelper
     {
         public static void ApplyScaleAnimation(Drawable target, bool wasIncrease, bool wasMiss, float increaseFactor, float decreaseFactor, float increaseDuration, float decreaseDuration)
         {

@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                             RelativeSizeAxes = Axes.Both,
                         },
                     },
-                    new Ez2KeyCounter(column.Action.Value)
+                    new EzKeyCounterPro(column.Action.Value)
                     {
                         Anchor = Anchor.BottomCentre,
                         Origin = Anchor.TopCentre,
