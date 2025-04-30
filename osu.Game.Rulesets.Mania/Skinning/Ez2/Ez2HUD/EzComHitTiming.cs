@@ -17,14 +17,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
     [Cached]
     public partial class EzComHitTiming : HitErrorMeter
     {
-        private FillFlowContainer errorContainer = null!;
-        private FillFlowContainer timingContainer = null!;
-        private EzCounterText timingText1 = null!;
-        private EzCounterText timingText = null!;
-        private EzCounterText timingText3 = null!;
-        private EzCounterText offsetText = null!;
-        private Box backgroundBox = null!;
-
         [SettingSource("Offset Number Font", "Offset Number Font", SettingControlType = typeof(OffsetNumberNameSelector))]
         public Bindable<string> NumberNameDropdown { get; } = new Bindable<string>("Tomato");
 
@@ -51,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         };
 
         [SettingSource("(对称间距) Symmetrical spacing", "(对称间距) Symmetrical spacing")]
-        public BindableNumber<float> SymmetryOffset { get; } = new BindableNumber<float>(80)
+        public BindableNumber<float> SymmetryOffset { get; } = new BindableNumber<float>(60)
         {
             MinValue = 0,
             MaxValue = 500,
@@ -68,6 +60,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), nameof(SkinnableComponentStrings.ColourDescription))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
+
+        private Container timingContainer = null!;
+        private FillFlowContainer errorContainer = null!;
+        private EzCounterText timingText1 = null!;
+        private EzCounterText timingText = null!;
+        private EzCounterText timingText3 = null!;
+        private EzCounterText offsetText = null!;
+        private Box backgroundBox = null!;
 
         public EzComHitTiming()
         {
@@ -93,22 +93,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                     AutoSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Scale = new Vector2(1.2f),
                     Alpha = 0,
                     Children = new Drawable[]
                     {
-                        offsetText = new EzCounterText(NumberNameDropdown)
+                        timingContainer = new Container
                         {
-                            Anchor = Anchor.BottomCentre,
-                            Origin = Anchor.BottomCentre,
-                            Text = "±000",
-                        },
-                        timingContainer = new FillFlowContainer
-                        {
-                            Direction = FillDirection.Horizontal,
                             AutoSizeAxes = Axes.Both,
-                            Anchor = Anchor.BottomCentre,
-                            Origin = Anchor.BottomCentre,
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
                             // Spacing = new Vector2(SymmetryOffset.Value),
                             Children = new Drawable[]
                             {
@@ -117,14 +109,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
                                     Text = "e",
-                                    X = -SymmetryOffset.Value,
-                                    Alpha = 1
+                                    Alpha = 1,
+                                    Position = new Vector2(-SymmetryOffset.Value, 0)
                                 },
                                 timingText = new EzCounterText(TextNameDropdown)
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
-                                    // Text = "e/l",
+                                    Text = "e/l",
                                     Alpha = 0
                                 },
                                 timingText3 = new EzCounterText(TextNameDropdown)
@@ -132,11 +124,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
                                     Text = "l",
-                                    X = SymmetryOffset.Value,
-                                    Alpha = 1
+                                    Alpha = 1,
+                                    Position = new Vector2(SymmetryOffset.Value, 0)
                                 },
                             }
-                        }
+                        },
+                        offsetText = new EzCounterText(NumberNameDropdown)
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            Text = "±000",
+                        },
                     }
                 }
             };
@@ -160,29 +158,27 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                 timingText.FontName.Value = e.NewValue;
                 timingText1.FontName.Value = e.NewValue;
                 timingText3.FontName.Value = e.NewValue;
-                timingText.Invalidate();
-                timingText1.Invalidate();
-                timingText3.Invalidate();
+                Invalidate();
+                // timingText1.Invalidate();
+                // timingText3.Invalidate();
             }, true);
 
-            AloneShow.BindValueChanged(_ => updateTimingTextVisibility(), true);
-            SymmetryOffset.BindValueChanged(_ => updateTimingTextPositions(), true);
+            AloneShow.BindValueChanged(_ => updateAlpha(), true);
+            SymmetryOffset.BindValueChanged(_ => updateSpacing(), true);
         }
 
-        private void updateTimingTextVisibility()
+        private void updateAlpha()
         {
             timingText1.Alpha = AloneShow.Value == AloneShowMenu.None ? 1 : 0;
             timingText.Alpha = AloneShow.Value == AloneShowMenu.None ? 0 : 1;
             timingText3.Alpha = AloneShow.Value == AloneShowMenu.None ? 1 : 0;
         }
 
-        private void updateTimingTextPositions()
+        private void updateSpacing()
         {
-            timingText1.X = -SymmetryOffset.Value;
-            timingText3.X = SymmetryOffset.Value;
-            // timingContainer.Spacing = new Vector2(SymmetryOffset.Value);
-            timingText1.Invalidate();
-            timingText3.Invalidate();
+            timingText1.Position = new Vector2(-SymmetryOffset.Value, 0);
+            timingText3.Position = new Vector2(SymmetryOffset.Value, 0);
+
             timingContainer.Invalidate();
         }
 
@@ -194,23 +190,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             if (!shouldDisplayJudgement(AloneShow.Value, judgement.TimeOffset))
                 return;
 
-            if (judgement.TimeOffset < 0)
+            if (judgement.TimeOffset == 0)
             {
-                timingText.Text = "e";
-                timingText1.Text = "e";
-                timingText3.Text = string.Empty;
-            }
-            else if (judgement.TimeOffset > 0)
-            {
-                timingText.Text = "l";
-                timingText1.Text = string.Empty;
-                timingText3.Text = "l";
-            }
-            else if (judgement.TimeOffset == 0)
-            {
-                timingText.Text = string.Empty;
+                timingText.Text = "e/l";
                 timingText1.Text = "e";
                 timingText3.Text = "l";
+            }
+            else
+            {
+                timingText.Text = judgement.TimeOffset < 0 ? "e" : string.Empty;
+                timingText1.Text = judgement.TimeOffset < 0 ? "e" : "l";
+                timingText3.Text = judgement.TimeOffset < 0 ? string.Empty : "l";
             }
 
             offsetText.Text = judgement.TimeOffset == 0 ? "0" : $"{judgement.TimeOffset:+0;-0}";
@@ -229,9 +219,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
             return aloneShowMenu switch
             {
-                AloneShowMenu.Early => timeOffset < 0, // 仅显示负值
-                AloneShowMenu.Late => timeOffset > 0, // 仅显示正值
-                AloneShowMenu.None => true, // 显示全部
+                AloneShowMenu.Early => timeOffset < 0,
+                AloneShowMenu.Late => timeOffset > 0,
                 _ => true
             };
             // return true;
@@ -250,7 +239,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             disappearTask = Scheduler.AddDelayed(() =>
             {
                 errorContainer.FadeOutFromOne(300); // 渐隐动画
-            }, DisplayDuration.Value); // 延时 DisplayDuration 的值（单位为毫秒）
+            }, DisplayDuration.Value);
         }
 
         public override void Clear()

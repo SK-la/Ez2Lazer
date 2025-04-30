@@ -34,7 +34,7 @@ namespace osu.Game.Skinning.Components
             Origin = Anchor.Centre;
             if (externalFontName is not null)
                 FontName.BindTo(externalFontName);
-
+            TextPart = new EzGetTexture(textLookup, FontName);
             InternalChildren = new Drawable[]
             {
                 TextContainer = new FillFlowContainer
@@ -47,10 +47,7 @@ namespace osu.Game.Skinning.Components
 
                     Children = new Drawable[]
                     {
-                        TextPart = new EzGetTexture(textLookup, FontName)
-                        {
-                            Padding = new MarginPadding(1),
-                        }
+                        TextPart
                     }
                 },
             };
@@ -79,7 +76,8 @@ namespace osu.Game.Skinning.Components
             base.LoadComplete();
 
             float scale = calculateScale(TextPart.Height);
-            TextPart.Scale = new Vector2(scale);
+            if (scale > 0)
+                TextPart.Scale = new Vector2(scale);
 
             FontName.BindValueChanged(e =>
             {
