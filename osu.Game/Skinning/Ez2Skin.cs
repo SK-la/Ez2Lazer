@@ -52,15 +52,15 @@ namespace osu.Game.Skinning
 
         public override ISample? GetSample(ISampleInfo sampleInfo)
         {
-            foreach (string lookup in sampleInfo.LookupNames)
-            {
-                var sample = Samples?.Get(lookup)
-                             ?? Resources.AudioManager?.Samples.Get(lookup.Replace(@"Gameplay/", @"Gameplay/Argon/"))
-                             ?? Resources.AudioManager?.Samples.Get(lookup);
-
-                if (sample != null)
-                    return sample;
-            }
+            // foreach (string lookup in sampleInfo.LookupNames)
+            // {
+            //     var sample = Samples?.Get(lookup)
+            //                  ?? Resources.AudioManager?.Samples.Get(lookup.Replace(@"Gameplay/", @"Gameplay/Argon/"))
+            //                  ?? Resources.AudioManager?.Samples.Get(lookup);
+            //
+            //     if (sample != null)
+            //         return sample;
+            // }
 
             return null;
         }
@@ -78,7 +78,7 @@ namespace osu.Game.Skinning
                         case GlobalSkinnableContainers.SongSelect:
                             var songSelectComponents = new DefaultSkinComponentsContainer(c =>
                             {
-                                var dim = c.OfType<LAsSkinCom6DimPanel>().FirstOrDefault();
+                                var dim = c.OfType<EzComRadarPanel>().FirstOrDefault();
 
                                 if (dim != null)
                                 {

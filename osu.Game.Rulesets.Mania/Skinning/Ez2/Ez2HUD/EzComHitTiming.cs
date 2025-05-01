@@ -63,9 +63,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private Container timingContainer = null!;
         private FillFlowContainer errorContainer = null!;
-        private EzCounterText timingText1 = null!;
+        private EzCounterText timingTextL = null!;
         private EzCounterText timingText = null!;
-        private EzCounterText timingText3 = null!;
+        private EzCounterText timingTextR = null!;
         private EzCounterText offsetText = null!;
         private Box backgroundBox = null!;
 
@@ -104,7 +104,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                             // Spacing = new Vector2(SymmetryOffset.Value),
                             Children = new Drawable[]
                             {
-                                timingText1 = new EzCounterText(TextNameDropdown)
+                                timingTextL = new EzCounterText(TextNameDropdown)
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -119,7 +119,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                                     Text = "e/l",
                                     Alpha = 0
                                 },
-                                timingText3 = new EzCounterText(TextNameDropdown)
+                                timingTextR = new EzCounterText(TextNameDropdown)
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -156,8 +156,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             TextNameDropdown.BindValueChanged(e =>
             {
                 timingText.FontName.Value = e.NewValue;
-                timingText1.FontName.Value = e.NewValue;
-                timingText3.FontName.Value = e.NewValue;
+                timingTextL.FontName.Value = e.NewValue;
+                timingTextR.FontName.Value = e.NewValue;
                 Invalidate();
                 // timingText1.Invalidate();
                 // timingText3.Invalidate();
@@ -169,15 +169,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private void updateAlpha()
         {
-            timingText1.Alpha = AloneShow.Value == AloneShowMenu.None ? 1 : 0;
+            timingTextL.Alpha = AloneShow.Value == AloneShowMenu.None ? 1 : 0;
             timingText.Alpha = AloneShow.Value == AloneShowMenu.None ? 0 : 1;
-            timingText3.Alpha = AloneShow.Value == AloneShowMenu.None ? 1 : 0;
+            timingTextR.Alpha = AloneShow.Value == AloneShowMenu.None ? 1 : 0;
         }
 
         private void updateSpacing()
         {
-            timingText1.Position = new Vector2(-SymmetryOffset.Value, 0);
-            timingText3.Position = new Vector2(SymmetryOffset.Value, 0);
+            timingTextL.Position = new Vector2(-SymmetryOffset.Value, 0);
+            timingTextR.Position = new Vector2(SymmetryOffset.Value, 0);
 
             timingContainer.Invalidate();
         }
@@ -193,14 +193,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             if (judgement.TimeOffset == 0)
             {
                 timingText.Text = "e/l";
-                timingText1.Text = "e";
-                timingText3.Text = "l";
+                timingTextL.Text = "e";
+                timingTextR.Text = "l";
             }
             else
             {
-                timingText.Text = judgement.TimeOffset < 0 ? "e" : string.Empty;
-                timingText1.Text = judgement.TimeOffset < 0 ? "e" : "l";
-                timingText3.Text = judgement.TimeOffset < 0 ? string.Empty : "l";
+                timingTextL.Text = judgement.TimeOffset < 0 ? "e" : string.Empty;
+                timingText.Text = judgement.TimeOffset < 0 ? "e" : "l";
+                timingTextR.Text = judgement.TimeOffset < 0 ? string.Empty : "l";
             }
 
             offsetText.Text = judgement.TimeOffset == 0 ? "0" : $"{judgement.TimeOffset:+0;-0}";
@@ -245,8 +245,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         public override void Clear()
         {
             timingText.Text = string.Empty;
-            timingText1.Text = string.Empty;
-            timingText3.Text = string.Empty;
+            timingTextL.Text = string.Empty;
+            timingTextR.Text = string.Empty;
             offsetText.Text = string.Empty;
             backgroundBox.Colour = Colour4.Black;
 

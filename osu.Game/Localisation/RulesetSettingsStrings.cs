@@ -114,14 +114,8 @@ namespace osu.Game.Localisation
         /// </summary>
         public static LocalisableString ScrollingStyle => new TranslatableString(getKey(@"scrolling_style"), @"Scrolling style");
 
-        /// <summary>
-        /// "Scroll Base MS (200 Speed)"
-        /// </summary>
         public static LocalisableString ScrollBaseSpeed => new TranslatableString(getKey(@"scroll_base_speed"), @"Scroll Base MS (when 200 Speed)");
 
-        /// <summary>
-        /// "Scroll time precision"
-        /// </summary>
         public static LocalisableString ScrollTimePrecision => new TranslatableString(getKey(@"scrolling_time_precision"), @"Scroll MS per 1 Speed");
 
         private static string getKey(string key) => $@"{prefix}:{key}";
