@@ -54,7 +54,7 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsEnumDropdown<ManiaScrollingStyle>
                 {
-                    LabelText = RulesetSettingsStrings.ScrollingStyle,
+                    LabelText = "Scrolling style",
                     Current = config.GetBindable<ManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle)
                 },
                 new SettingsSlider<double, ManiaScrollSlider>
@@ -65,13 +65,13 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsSlider<double, ManiaScrollBaseSpeedSlider>
                 {
-                    LabelText = RulesetSettingsStrings.ScrollBaseSpeed,
+                    LabelText = "Scroll Base MS (when 200 Speed)",
                     Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollBaseSpeed),
                     KeyboardStep = 1,
                 },
                 new SettingsSlider<double, ManiaScrollTimePerSpeedSlider>
                 {
-                    LabelText = RulesetSettingsStrings.ScrollTimePrecision,
+                    LabelText = "MS / Scroll Speed",
                     Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollTimePerSpeed),
                     KeyboardStep = 1,
                 },

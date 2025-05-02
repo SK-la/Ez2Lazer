@@ -72,23 +72,28 @@ namespace osu.Game.Skinning.Components
                 string lookup = getLookup(character);
                 TexturedCharacterGlyph? glyph = null;
 
-                string[] possiblePaths = new[]
+                if (textureName != null)
                 {
-                    $"Gameplay/Combo/{textureName}/{textureName}-counter-{lookup}",
-                    $"Gameplay/Combo/{textureName}/{textureName}-Title-{lookup}",
-                    $"Gameplay/EarlyOrLate/{textureName}-{lookup}",
-                    $"Gameplay/HitResult/{textureName}-{lookup}"
-                };
+                    string textureNameReplace = textureName.Replace(" ", "_");
 
-                foreach (string path in possiblePaths)
-                {
-                    var texture = textures.Get(path);
-
-                    if (texture != null)
+                    string[] possiblePaths = new[]
                     {
-                        glyph = new TexturedCharacterGlyph(new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
-                            texture, 0.125f);
-                        break;
+                        $"Gameplay/Combo/{textureNameReplace}/{textureNameReplace}-counter-{lookup}",
+                        $"Gameplay/Combo/{textureNameReplace}/{textureNameReplace}-Title-{lookup}",
+                        $"Gameplay/EarlyOrLate/{textureNameReplace}-{lookup}",
+                        $"Gameplay/HitResult/{textureNameReplace}-{lookup}"
+                    };
+
+                    foreach (string path in possiblePaths)
+                    {
+                        var texture = textures.Get(path);
+
+                        if (texture != null)
+                        {
+                            glyph = new TexturedCharacterGlyph(new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
+                                texture, 0.125f);
+                            break;
+                        }
                     }
                 }
 

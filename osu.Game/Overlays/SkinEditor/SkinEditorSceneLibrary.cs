@@ -31,6 +31,9 @@ namespace osu.Game.Overlays.SkinEditor
         [Resolved]
         private SkinEditorOverlay? skinEditorOverlay { get; set; }
 
+        [Resolved]
+        private EzSkinEditorOverlay? ezSkinEditorOverlay { get; set; }
+
         public SkinEditorSceneLibrary()
         {
             Height = HEIGHT;
@@ -87,6 +90,17 @@ namespace osu.Game.Overlays.SkinEditor
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
                                     Action = () => skinEditorOverlay?.PresentGameplay(),
+                                },
+                                new SceneButton
+                                {
+                                    Text = "Skin.ini(Null)",
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Action = () =>
+                                    {
+                                        skinEditorOverlay?.PresentGameplay();
+                                        ezSkinEditorOverlay?.PopulateSettings();
+                                    },
                                 },
                             }
                         },

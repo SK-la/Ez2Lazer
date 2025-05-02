@@ -109,15 +109,6 @@ namespace osu.Game.Localisation
         /// </summary>
         public static LocalisableString LandscapeTouchOverlay => new TranslatableString(getKey(@"landscape_touch_overlay"), @"Landscape (touch overlay)");
 
-        /// <summary>
-        /// "Scrolling style"
-        /// </summary>
-        public static LocalisableString ScrollingStyle => new TranslatableString(getKey(@"scrolling_style"), @"Scrolling style");
-
-        public static LocalisableString ScrollBaseSpeed => new TranslatableString(getKey(@"scroll_base_speed"), @"Scroll Base MS (when 200 Speed)");
-
-        public static LocalisableString ScrollTimePrecision => new TranslatableString(getKey(@"scrolling_time_precision"), @"Scroll MS per 1 Speed");
-
         private static string getKey(string key) => $@"{prefix}:{key}";
     }
 }

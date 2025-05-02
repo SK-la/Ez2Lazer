@@ -4,14 +4,17 @@
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
+using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
+using EffectType = osu.Game.Skinning.Components.EffectType;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
@@ -38,6 +41,29 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         case GlobalSkinnableContainers.MainHUDComponents:
                             return new DefaultSkinComponentsContainer(container =>
                             {
+                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().ToArray();
+
+                                if (hitTiming.Length >= 2)
+                                {
+                                    var hitTiming1 = hitTiming[0];
+                                    var hitTiming2 = hitTiming[1];
+                                    const float mirror_x = 350;
+
+                                    hitTiming1.Anchor = Anchor.Centre;
+                                    hitTiming1.Origin = Anchor.Centre;
+                                    hitTiming1.DisplayDuration.Value = hitTiming1.DisplayDuration.MinValue;
+                                    hitTiming1.X = -mirror_x;
+                                    // hitTiming1.Scale = new Vector2(2);
+                                    hitTiming1.AloneShow.Value = AloneShowMenu.Early;
+
+                                    hitTiming2.Anchor = Anchor.Centre;
+                                    hitTiming2.Origin = Anchor.Centre;
+                                    hitTiming2.DisplayDuration.Value = hitTiming2.DisplayDuration.MinValue;
+                                    hitTiming2.X = mirror_x;
+                                    // hitTiming2.Scale = new Vector2(2);
+                                    hitTiming2.AloneShow.Value = AloneShowMenu.Late;
+                                }
+
                                 var combo1 = container.OfType<EzComComboCounter>().FirstOrDefault();
 
                                 if (combo1 != null)
@@ -45,25 +71,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     combo1.Anchor = Anchor.TopCentre;
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Y = 200;
-                                    combo1.Alpha = 1f;
-                                    combo1.Current.BindValueChanged(changedEvent =>
-                                    {
-                                        bool wasIncrease = changedEvent.NewValue > changedEvent.OldValue;
-                                        bool wasMiss = changedEvent.OldValue > 1 && changedEvent.NewValue == 0;
-
-                                        if (wasIncrease)
-                                        {
-                                            combo1.Text
-                                                  .ScaleTo(new Vector2(1.5f, 1.5f), 10, Easing.OutQuint)
-                                                  .Then()
-                                                  .ScaleTo(Vector2.One, 500, Easing.OutQuint);
-                                        }
-
-                                        if (wasMiss)
-                                        {
-                                            combo1.Text.FlashColour(Color4.Red, 500, Easing.OutQuint);
-                                        }
-                                    });
+                                    combo1.Effect.Value = EffectType.None;
+                                    combo1.NameDropdown.Value = OffsetNumberName.EZ2AC_EVOLVE;
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -76,13 +85,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     hitErrorMeter.Position = new Vector2(0, -15);
                                     hitErrorMeter.Scale = new Vector2(1.4f, 1.4f);
                                     hitErrorMeter.JudgementLineThickness.Value = 2;
-                                    hitErrorMeter.ShowMovingAverage.Value = true;
+                                    hitErrorMeter.JudgementFadeOutDuration.Value = hitErrorMeter.JudgementFadeOutDuration.MinValue;
+                                    hitErrorMeter.ShowMovingAverage.Value = false;
                                     hitErrorMeter.ColourBarVisibility.Value = false;
-                                    hitErrorMeter.CentreMarkerStyle.Value = BarHitErrorMeter.CentreMarkerStyles.Circle;
+                                    hitErrorMeter.CentreMarkerStyle.Value = BarHitErrorMeter.CentreMarkerStyles.Line;
                                     hitErrorMeter.LabelStyle.Value = BarHitErrorMeter.LabelStyles.None;
                                 }
                             })
                             {
+                                new EzComHitTiming(),
+                                new EzComHitTiming(),
                                 new EzComComboCounter(),
                                 new BarHitErrorMeter(),
                             };
@@ -90,11 +102,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
                     return null;
 
-                case SkinComponentLookup<HitResult> resultComponent:
+                case SkinComponentLookup<HitResult>:
                     // if (Skin is SbISkin && resultComponent.Component >= HitResult.Great)
                     //     return Drawable.Empty();
                     // return new EzComJudgementTexture(resultComponent.Component);
-                    return new SbIJudgementPiece(resultComponent.Component);
+                    // return new SbIJudgementPiece(resultComponent.Component);
+                    return Drawable.Empty();
 
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)

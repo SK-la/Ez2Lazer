@@ -136,7 +136,6 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 {
                     LabelText = "Scaling To Game Mode",
                     Current = osuConfig.GetBindable<ScalingGameMode>(OsuSetting.ScalingGameMode),
-                    Keywords = new[] { "scale", "letterbox" },
                 },
                 scalingSettings = new FillFlowContainer<SettingsSlider<float>>
                 {

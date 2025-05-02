@@ -16,7 +16,7 @@ namespace osu.Game.Skinning.Components
         protected override double RollingDuration => 250;
 
         [SettingSource("Font", "Font", SettingControlType = typeof(OffsetNumberNameSelector))]
-        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("NIGHTwhite");
+        public Bindable<OffsetNumberName> FontNameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.NIGHTWhite);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel), nameof(SkinnableComponentStrings.ShowLabelDescription))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();

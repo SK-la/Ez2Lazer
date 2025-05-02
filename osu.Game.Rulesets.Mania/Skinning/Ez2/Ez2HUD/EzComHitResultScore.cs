@@ -86,7 +86,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
-                Scale = new Vector2(2f),
+                Scale = new Vector2(1.5f),
                 // Y = -20,
                 Alpha = 0, // 初始隐藏
                 Texture = textures.Get("Gameplay/AllCombo/ALL-COMBO2"), // 替换为你的贴图路径

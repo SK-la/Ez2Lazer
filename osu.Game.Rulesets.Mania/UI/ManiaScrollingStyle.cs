@@ -12,10 +12,10 @@ namespace osu.Game.Rulesets.Mania.UI
         ScrollSpeedStyle,
 
         // [LocalisableDescription(typeof(RulesetSettingsStrings), nameof(RulesetSettingsStrings.ScrollingDirectionDown))]
-        [Description("ms值 通配速度风格")]
+        [Description("ms值 恒定速度")]
         ScrollTimeStyle,
 
-        [Description("ms值 恒定反应时间")]
+        [Description("ms值 恒定时间")]
         ScrollTimeStyleFixed,
     }
 }

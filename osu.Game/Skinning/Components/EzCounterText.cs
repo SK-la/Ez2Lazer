@@ -13,7 +13,7 @@ namespace osu.Game.Skinning.Components
     public partial class EzCounterText : CompositeDrawable, IHasText
     {
         public readonly EzGetTexture TextPart;
-        public Bindable<string> FontName { get; } = new Bindable<string>("EZ2DJ-4th");
+        public Bindable<OffsetNumberName> FontName { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.EZ2DJ_4th);
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -27,14 +27,20 @@ namespace osu.Game.Skinning.Components
 
         // public object Spacing { get; set; }
 
-        public EzCounterText(Bindable<string>? externalFontName = null)
+        public EzCounterText(Bindable<OffsetNumberName>? externalFontName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
+
             if (externalFontName is not null)
                 FontName.BindTo(externalFontName);
-            TextPart = new EzGetTexture(textLookup, FontName);
+
+            var fontNameString = new Bindable<string>();
+            FontName.BindValueChanged(e => fontNameString.Value = e.NewValue.ToString(), true);
+
+            TextPart = new EzGetTexture(textLookup, fontNameString);
+
             InternalChildren = new Drawable[]
             {
                 TextContainer = new FillFlowContainer
@@ -76,12 +82,11 @@ namespace osu.Game.Skinning.Components
             base.LoadComplete();
 
             float scale = calculateScale(TextPart.Height);
-            if (scale > 0)
-                TextPart.Scale = new Vector2(scale);
+            TextPart.Scale = new Vector2(scale);
 
             FontName.BindValueChanged(e =>
             {
-                TextPart.FontName.Value = e.NewValue;
+                TextPart.FontName.Value = e.NewValue.ToString();
                 // textPart.LoadAsync(); // **强制重新加载字体**
                 TextPart.Invalidate(); // **确保 UI 立即刷新**
             }, true);
@@ -89,6 +94,9 @@ namespace osu.Game.Skinning.Components
 
         private float calculateScale(float textureHeight, float targetHeight = 25f)
         {
+            if (textureHeight <= 0)
+                return 1;
+
             return targetHeight / textureHeight;
         }
     }

@@ -25,8 +25,12 @@ namespace osu.Game.Screens.Backgrounds
             var video = new Video(videoPath)
             {
                 RelativeSizeAxes = Axes.Both,
-                Loop = true
+                Loop = true,
             };
+
+            video.FillMode = FillMode.Fill;
+            video.FillAspectRatio = 1.0f * video.DrawSize.X / video.DrawSize.Y;
+
             AddInternal(video);
 
             GlobalConfigStore.Config = config;

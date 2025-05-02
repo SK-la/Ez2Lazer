@@ -3,7 +3,9 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
@@ -20,14 +22,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
-        // private Box background = null!;
+        private Color4 brightColour;
+        private Color4 dimColour;
+
         private Box backgroundOverlay = null!;
+        // private Box background = null!;
+        // private Box? separator;
 
         [Resolved]
         private Column column { get; set; } = null!;
 
         // private Bindable<Color4> accentColour = null!;
-        // private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
+        private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
 
         public SbIColumnBackground()
         {
@@ -46,19 +52,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     Name = "Background",
                     RelativeSizeAxes = Axes.Both,
                     Colour = Color4.Black,
+                    Alpha = 1,
                 },
                 backgroundOverlay = new Box
                 {
                     Name = "Background Gradient Overlay",
                     RelativeSizeAxes = Axes.Both,
-                    Height = 0.5f,
+                    Height = 0.1f,
                     Blending = BlendingParameters.Additive,
-                    Alpha = 1,
-                    Colour = Color4.Black,
+                    Alpha = 0,
+                    Colour = Color4.White,
                 },
             };
 
-            // overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
+            overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
             // accentColour.BindValueChanged(colour =>
             // {
             //     var newColour = colour.NewValue.Darken(3);
@@ -92,20 +99,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
-            // if (e.Action == column.Action.Value)
-            // {
-            //     var noteColour = column.AccentColour.Value;
-            //     brightColour = noteColour.Opacity(1f);
-            //     dimColour = noteColour.Opacity(0);
-            //
-            //     backgroundOverlay.Colour = direction.Value == ScrollingDirection.Up
-            //         ? ColourInfo.GradientVertical(brightColour, dimColour)
-            //         : ColourInfo.GradientVertical(dimColour, brightColour);
-            //
-            //     overlayHeight.Value = 0.75f;
-            //
-            //     backgroundOverlay.FadeTo(1, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
-            // }
+            if (e.Action == column.Action.Value)
+            {
+                var noteColour = column.AccentColour.Value;
+                brightColour = noteColour.Opacity(1f);
+                dimColour = noteColour.Opacity(0);
+
+                backgroundOverlay.Colour = direction.Value == ScrollingDirection.Up
+                    ? ColourInfo.GradientVertical(brightColour, dimColour)
+                    : ColourInfo.GradientVertical(dimColour, brightColour);
+
+                overlayHeight.Value = 0.1f;
+
+                backgroundOverlay.FadeTo(1, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
+            }
 
             return false;
         }

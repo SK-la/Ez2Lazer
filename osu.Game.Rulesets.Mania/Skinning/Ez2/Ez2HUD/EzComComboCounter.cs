@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
     public partial class EzComComboCounter : ComboCounter
     {
         [SettingSource("Font", "Font", SettingControlType = typeof(OffsetNumberNameSelector))]
-        public Bindable<string> NameDropdown { get; } = new Bindable<string>("EZ2DJ-4th");
+        public Bindable<OffsetNumberName> NameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.EZ2DJ_4th);
 
         [SettingSource("Effect Type", "Effect Type")]
         public Bindable<EffectType> Effect { get; } = new Bindable<EffectType>(EffectType.Scale);

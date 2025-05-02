@@ -18,10 +18,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
     public partial class EzComHitTiming : HitErrorMeter
     {
         [SettingSource("Offset Number Font", "Offset Number Font", SettingControlType = typeof(OffsetNumberNameSelector))]
-        public Bindable<string> NumberNameDropdown { get; } = new Bindable<string>("Tomato");
+        public Bindable<OffsetNumberName> NumberNameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.Tomato);
 
         [SettingSource("Offset Text Font", "Offset Text Font", SettingControlType = typeof(OffsetTextNameSelector))]
-        public Bindable<string> TextNameDropdown { get; } = new Bindable<string>("Tomato");
+        public Bindable<OffsetNumberName> TextNameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.Tomato);
 
         [SettingSource("AloneShow", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         public BindableNumber<double> DisplayDuration { get; } = new BindableNumber<double>(300)
         {
             MinValue = 10,
-            MaxValue = 1000, // 最大持续时间
+            MaxValue = 10000, // 最大持续时间
             Precision = 1, // 精度
         };
 
@@ -101,6 +101,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                             AutoSizeAxes = Axes.Both,
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
+                            Scale = new Vector2(0.8f),
                             // Spacing = new Vector2(SymmetryOffset.Value),
                             Children = new Drawable[]
                             {
@@ -133,6 +134,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                         {
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
+                            Scale = new Vector2(1.2f),
                             Text = "±000",
                         },
                     }
