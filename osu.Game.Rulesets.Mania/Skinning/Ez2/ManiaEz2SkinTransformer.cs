@@ -270,7 +270,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:
                         return SkinUtils.As<TValue>(new Bindable<float>(1));
 
-                    case LegacyManiaSkinConfigurationLookups.ColumnSpacing:
+                    case LegacyManiaSkinConfigurationLookups.LeftColumnSpacing:
+                    case LegacyManiaSkinConfigurationLookups.RightColumnSpacing:
                         return SkinUtils.As<TValue>(new Bindable<float>(0));
 
                     case LegacyManiaSkinConfigurationLookups.StagePaddingBottom:

@@ -35,7 +35,8 @@ namespace osu.Game.Storyboards.Drawables
 
         protected override Container<DrawableStoryboardLayer> Content { get; }
 
-        protected override Vector2 DrawScale => new Vector2(Parent!.DrawWidth / 640);
+        protected override Vector2 DrawScale => new Vector2((Parent?.DrawHeight ?? 0) / 480);
+        // protected override Vector2 DrawScale => new Vector2(Parent!.DrawWidth / 640);
 
         public override bool RemoveCompletedTransforms => false;
 
@@ -67,9 +68,16 @@ namespace osu.Game.Storyboards.Drawables
 
             bool onlyHasVideoElements = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
 
-            // Width = Height * (storyboard.BeatmapInfo.WidescreenStoryboard || onlyHasVideoElements ? 9 / 16f : 3 / 4f);
-            // Width = Parent!.DrawWidth; // Adjust width to match parent's width
-            Height = Width * (storyboard.Beatmap.WidescreenStoryboard || onlyHasVideoElements ? 9 / 16f : 3 / 4f);
+            // 如果只有视频元素，动态调整宽高
+            if (onlyHasVideoElements)
+            {
+                Size = Vector2.One; // 填满窗口
+                FillMode = FillMode.Fit; // 保持比例
+            }
+            else
+            {
+                Height = Width * (storyboard.Beatmap.WidescreenStoryboard ? 9 / 16f : 3 / 4f);
+            }
 
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
@@ -108,6 +116,18 @@ namespace osu.Game.Storyboards.Drawables
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            // 动态计算视频的宽高比
+            if (Storyboard.Layers.SelectMany(l => l.Elements).FirstOrDefault() is StoryboardVideo videoElement)
+            {
+                if (videoElement.CreateDrawable() is DrawableStoryboardVideo drawableVideo)
+                {
+                    Schedule(() =>
+                    {
+                        FillAspectRatio = drawableVideo.DrawSize.X / drawableVideo.DrawSize.Y;
+                    });
+                }
+            }
 
             health.BindValueChanged(val => passing.Value = val.NewValue >= 0.5, true);
             passing.BindValueChanged(_ => updateLayerVisibility(), true);

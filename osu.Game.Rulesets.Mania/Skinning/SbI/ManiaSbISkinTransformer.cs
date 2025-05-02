@@ -160,7 +160,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
                 switch (maniaLookup.Lookup)
                 {
-                    case LegacyManiaSkinConfigurationLookups.ColumnSpacing:
+                    case LegacyManiaSkinConfigurationLookups.LeftColumnSpacing:
+                    case LegacyManiaSkinConfigurationLookups.RightColumnSpacing:
                         return SkinUtils.As<TValue>(new Bindable<float>(0));
 
                     case LegacyManiaSkinConfigurationLookups.StagePaddingBottom:
