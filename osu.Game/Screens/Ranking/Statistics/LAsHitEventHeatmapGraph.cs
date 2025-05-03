@@ -5,28 +5,30 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Layout;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
+using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Screens.Ranking.Statistics
 {
     public partial class LAsHitEventHeatmapGraph : CompositeDrawable
     {
-        private const int time_bins = 50;
+        private const int time_bins = 50; // 时间分段数
+        private const float circle_size = 5f; // 圆形大小
         private readonly IReadOnlyList<HitEvent> hitEvents;
-        private readonly IDictionary<HitResult, int>[] bins;
         private double binSize;
-        private double hitOffset;
 
-        private Dot[]? dotDrawables;
+        [Resolved]
+        private OsuColour colours { get; set; } = null!;
 
-        public LAsHitEventHeatmapGraph(IReadOnlyList<HitEvent> hitEvents)
+        private readonly HitWindows hitWindows;
+
+        public LAsHitEventHeatmapGraph(IReadOnlyList<HitEvent> hitEvents, HitWindows hitWindows)
         {
             this.hitEvents = hitEvents.Where(e => e.HitObject.HitWindows != HitWindows.Empty && e.Result.IsBasic() && e.Result.IsHit()).ToList();
-            bins = Enumerable.Range(0, time_bins).Select(_ => new Dictionary<HitResult, int>()).ToArray<IDictionary<HitResult, int>>();
+            this.hitWindows = hitWindows;
         }
 
         [BackgroundDependencyLoader]
@@ -36,249 +38,98 @@ namespace osu.Game.Screens.Ranking.Statistics
                 return;
 
             binSize = Math.Ceiling(hitEvents.Max(e => e.HitObject.StartTime) / time_bins);
-
             binSize = Math.Max(1, binSize);
 
             Scheduler.AddOnce(updateDisplay);
         }
 
-        public void UpdateOffset(double hitOffset)
-        {
-            this.hitOffset = hitOffset;
-            Scheduler.AddOnce(updateDisplay);
-        }
-
         private void updateDisplay()
         {
-            foreach (var bin in bins)
-                bin.Clear();
+            ClearInternal();
 
+            // var allAvailableWindows = hitWindows.GetAllAvailableWindows();
+
+            // 遍历所有有效的 HitResult，绘制边界线
+            foreach (HitResult result in Enum.GetValues(typeof(HitResult)).Cast<HitResult>())
+            {
+                if (!result.IsBasic() || !result.IsHit())
+                    continue;
+
+                double boundary = hitWindows.WindowFor(result);
+
+                if (boundary <= 0)
+                    continue;
+
+                drawBoundaryLine(boundary, result);
+                drawBoundaryLine(-boundary, result);
+            }
+
+            const float left_margin = 45; // 左侧预留空间
+            const float right_margin = 50; // 右侧预留空间
+
+            // 绘制每个 HitEvent 的圆点
             foreach (var e in hitEvents)
             {
-                double time = e.HitObject.StartTime + hitOffset;
-                int index = (int)(time / binSize);
+                double time = e.HitObject.StartTime;
+                float xPosition = (float)(time / (time_bins * binSize)); // 计算 x 轴位置
+                float yPosition = (float)(e.TimeOffset);
 
-                if (index >= 0 && index < bins.Length)
+                AddInternal(new Circle
                 {
-                    bins[index].TryGetValue(e.Result, out int value);
-                    bins[index][e.Result] = ++value;
-                }
-            }
-
-            if (dotDrawables == null)
-                createDotDrawables();
-            else
-            {
-                for (int i = 0; i < dotDrawables.Length; i++)
-                    dotDrawables[i].UpdateOffset(bins[i].Sum(b => b.Value));
-            }
-        }
-
-        private void createDotDrawables()
-        {
-            int maxCount = bins.Max(b => b.Values.Sum());
-            dotDrawables = bins.Select((_, i) => new Dot(bins[i], maxCount)).ToArray();
-
-            Container axisFlow;
-
-            Padding = new MarginPadding { Horizontal = 5 };
-
-            InternalChild = new GridContainer
-            {
-                RelativeSizeAxes = Axes.Both,
-                Content = new[]
-                {
-                    new Drawable[]
-                    {
-                        new GridContainer
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Content = new[] { dotDrawables }
-                        }
-                    },
-                    new Drawable[]
-                    {
-                        axisFlow = new Container
-                        {
-                            RelativeSizeAxes = Axes.X,
-                            Height = StatisticItem.FONT_SIZE,
-                        }
-                    },
-                },
-                RowDimensions = new[]
-                {
-                    new Dimension(),
-                    new Dimension(GridSizeMode.AutoSize),
-                }
-            };
-
-            double maxValue = time_bins * binSize;
-            double axisValueStep = maxValue / 5;
-
-            for (int i = -5; i <= 5; i++)
-            {
-                double axisValue = i * axisValueStep;
-                float position = maxValue == 0 ? 0 : (float)(axisValue / maxValue);
-                float alpha = 1f - Math.Abs(position) * 0.8f;
-
-                TimeSpan time = TimeSpan.FromMilliseconds(axisValue);
-                string timeText = $"{(i < 0 ? "-" : "+")}{time.Minutes:D2}:{time.Seconds:D2}";
-
-                axisFlow.Add(new OsuSpriteText
-                {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                    RelativePositionAxes = Axes.X,
-                    X = position / 2,
-                    Alpha = alpha,
-                    Text = timeText,
-                    Font = OsuFont.GetFont(size: StatisticItem.FONT_SIZE, weight: FontWeight.SemiBold)
+                    Size = new Vector2(circle_size),
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    X = (xPosition * (DrawWidth - left_margin - right_margin)) - (DrawWidth / 2) + left_margin,
+                    Y = yPosition,
+                    Alpha = 0.8f,
+                    Colour = colours.ForHitResult(e.Result),
                 });
             }
         }
 
-        private partial class Dot : CompositeDrawable
+        private void drawBoundaryLine(double boundary, HitResult result)
         {
-            private readonly IReadOnlyList<KeyValuePair<HitResult, int>> values;
-            private readonly float maxValue;
-            private readonly float totalValue;
-
-            private const float minimum_height = 0.02f;
-
-            private float offsetAdjustment;
-
-            private Circle[] dotOriginals = null!;
-
-            private Circle? dotAdjustment;
-
-            private float? lastDrawHeight;
-
-            [Resolved]
-            private OsuColour colours { get; set; } = null!;
-
-            private const double duration = 300;
-
-            public Dot(IDictionary<HitResult, int> values, float maxValue)
+            // // 计算当前区间内的 note 数量占比
+            // int notesInBoundary = hitEvents.Count(e => e.TimeOffset <= boundary);
+            // float noteRatio = (float)notesInBoundary / hitEvents.Count;
+            //
+            // // 根据 noteRatio 动态调整透明度，noteRatio 越大透明度越低
+            // float adjustedAlpha = 0.1f + (1 - noteRatio) * 0.3f; // 最低透明度为 0.2f，最高为 0.5f
+            const float margin = 30;
+            // 绘制中心轴 (0ms)
+            AddInternal(new Box
             {
-                this.values = values.OrderBy(v => v.Key.GetIndexForOrderedDisplay()).ToList();
-                this.maxValue = maxValue;
-                totalValue = values.Sum(v => v.Value);
-                offsetAdjustment = totalValue;
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                RelativeSizeAxes = Axes.X,
+                Height = 2,
+                Width = 1 - (2 * margin / DrawWidth),
+                Alpha = 0.1f,
+                Colour = Color4.Gray,
+            });
 
-                RelativeSizeAxes = Axes.Both;
-                Masking = true;
-            }
-
-            [BackgroundDependencyLoader]
-            private void load()
+            AddInternal(new Box
             {
-                if (values.Any())
-                {
-                    dotOriginals = values.Select((v, i) => new Circle
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Colour = colours.ForHitResult(v.Key),
-                        Height = 0,
-                    }).ToArray();
-                    InternalChildren = dotOriginals.Reverse().ToArray();
-                }
-                else
-                {
-                    InternalChildren = dotOriginals = new[]
-                    {
-                        new Circle
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
-                            Colour = Color4.Gray,
-                            Height = 0,
-                        }
-                    };
-                }
-            }
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                RelativeSizeAxes = Axes.X,
+                Height = 2,
+                Width = 1 - (2 * margin / DrawWidth),
+                Alpha = 0.1f,
+                Colour = colours.ForHitResult(result),
+                Y = (float)(boundary),
+            });
 
-            protected override void LoadComplete()
+            AddInternal(new OsuSpriteText
             {
-                base.LoadComplete();
-
-                Scheduler.AddOnce(updateMetrics, true);
-            }
-
-            protected override bool OnInvalidate(Invalidation invalidation, InvalidationSource source)
-            {
-                if (invalidation.HasFlag(Invalidation.DrawSize))
-                {
-                    if (lastDrawHeight != null && lastDrawHeight != DrawHeight)
-                        Scheduler.AddOnce(updateMetrics, false);
-                }
-
-                return base.OnInvalidate(invalidation, source);
-            }
-
-            public void UpdateOffset(float adjustment)
-            {
-                bool hasAdjustment = adjustment != totalValue;
-
-                if (dotAdjustment == null)
-                {
-                    if (!hasAdjustment)
-                        return;
-
-                    AddInternal(dotAdjustment = new Circle
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Colour = Color4.Yellow,
-                        Blending = BlendingParameters.Additive,
-                        Alpha = 0.6f,
-                        Height = 0,
-                    });
-                }
-
-                offsetAdjustment = adjustment;
-
-                Scheduler.AddOnce(updateMetrics, true);
-            }
-
-            private void updateMetrics(bool animate = true)
-            {
-                float offsetValue = 0;
-
-                for (int i = 0; i < dotOriginals.Length; i++)
-                {
-                    int value = i < values.Count ? values[i].Value : 0;
-
-                    var dot = dotOriginals[i];
-
-                    dot.MoveToY(offsetForValue(offsetValue) * BoundingBox.Height, duration, Easing.OutQuint);
-                    dot.ResizeHeightTo(heightForValue(value), duration, Easing.OutQuint);
-                    offsetValue -= value;
-                }
-
-                if (dotAdjustment != null)
-                    drawAdjustmentDot();
-
-                if (!animate)
-                    FinishTransforms(true);
-
-                lastDrawHeight = DrawHeight;
-            }
-
-            private void drawAdjustmentDot()
-            {
-                bool hasAdjustment = offsetAdjustment != totalValue;
-
-                dotAdjustment.ResizeHeightTo(heightForValue(offsetAdjustment), duration, Easing.OutQuint);
-                dotAdjustment.FadeTo(!hasAdjustment ? 0 : 1, duration, Easing.OutQuint);
-            }
-
-            private float offsetForValue(float value) => maxValue == 0 ? 0 : (1 - minimum_height) * value / maxValue;
-
-            private float heightForValue(float value) => minimum_height + offsetForValue(value);
+                Text = $"{boundary:+0.##;-0.##}",
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreRight,
+                Font = OsuFont.GetFont(size: 14),
+                Colour = Color4.White,
+                X = 25,
+                Y = (float)(boundary),
+            });
         }
     }
 }

@@ -476,11 +476,11 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                // new StatisticItem("SHit Graph ", () => new LAsHitEventHeatmapGraph(score.HitEvents)
-                // {
-                //     RelativeSizeAxes = Axes.X,
-                //     Height = 300
-                // }, true),
+                new StatisticItem("SHit Graph ", () => new LAsHitEventHeatmapGraph(score.HitEvents, new HitWindows())
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 300
+                }, true),
                 new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
                 {
                     RelativeSizeAxes = Axes.X,

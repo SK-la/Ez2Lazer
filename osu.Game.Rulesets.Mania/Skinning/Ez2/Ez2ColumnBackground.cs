@@ -24,14 +24,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private Color4 brightColour;
         private Color4 dimColour;
 
-        private Box background = null!;
+        // private Box background = null!;
         private Box backgroundOverlay = null!;
         private Box? separator;
 
         [Resolved]
         private Column column { get; set; } = null!;
 
-        private Bindable<Color4> accentColour = null!;
+        // private Bindable<Color4> accentColour = null!;
         private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
 
         public Ez2ColumnBackground()
@@ -52,10 +52,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             InternalChildren = new Drawable[]
             {
-                background = new Box
+                new Box
                 {
                     Name = "Background",
                     RelativeSizeAxes = Axes.Both,
+                    Colour = Color4.Black.Opacity(0.8f),
                 },
                 backgroundOverlay = new Box
                 {
@@ -80,21 +81,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
 
-            accentColour = new Bindable<Color4>(DrawColoursForColumns(column.Index, stageDefinition));
-            accentColour.BindValueChanged(colour =>
-            {
-                var newColour = colour.NewValue.Darken(3);
-
-                if (newColour.A != 0)
-                {
-                    newColour = newColour.Opacity(0.8f);
-                }
-
-                background.Colour = newColour;
-                // background.Colour = colour.NewValue.Darken(3);
-                // brightColour = colour.NewValue.Opacity(0.6f);
-                // dimColour = colour.NewValue.Opacity(0);
-            }, true);
+            // accentColour = new Bindable<Color4>(DrawColoursForColumns(column.Index, stageDefinition));
+            // accentColour.BindValueChanged(colour =>
+            // {
+            //     var newColour = colour.NewValue.Darken(3);
+            //
+            //     if (newColour.A != 0)
+            //     {
+            //         newColour = newColour.Opacity(0.8f);
+            //     }
+            //
+            //     backgroundOverlay.Colour = newColour;
+            //     // background.Colour = colour.NewValue.Darken(3);
+            //     // brightColour = colour.NewValue.Opacity(0.6f);
+            //     // dimColour = colour.NewValue.Opacity(0);
+            // }, true);
 
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
@@ -141,7 +142,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     ? ColourInfo.GradientVertical(brightColour, dimColour)
                     : ColourInfo.GradientVertical(dimColour, brightColour);
 
-                overlayHeight.Value = 0.75f;
+                overlayHeight.Value = 0.5f;
 
                 backgroundOverlay.FadeTo(1, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
             }
