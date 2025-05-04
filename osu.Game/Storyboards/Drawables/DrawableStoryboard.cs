@@ -66,17 +66,17 @@ namespace osu.Game.Storyboards.Drawables
 
             Size = new Vector2(640, 480);
 
-            bool onlyHasVideoElements = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
+            // 动态计算视频的宽高比
+            bool hasVideoElement = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
 
-            // 如果只有视频元素，动态调整宽高
-            if (onlyHasVideoElements)
+            if (hasVideoElement)
             {
                 Size = Vector2.One; // 填满窗口
                 FillMode = FillMode.Fit; // 保持比例
             }
             else
             {
-                Height = Width * (storyboard.Beatmap.WidescreenStoryboard ? 9 / 16f : 3 / 4f);
+                Width = Height * (storyboard.Beatmap.WidescreenStoryboard ? 16 / 9f : 4 / 3f);
             }
 
             Anchor = Anchor.Centre;
@@ -117,14 +117,33 @@ namespace osu.Game.Storyboards.Drawables
         {
             base.LoadComplete();
 
-            // 动态计算视频的宽高比
             if (Storyboard.Layers.SelectMany(l => l.Elements).FirstOrDefault() is StoryboardVideo videoElement)
             {
                 if (videoElement.CreateDrawable() is DrawableStoryboardVideo drawableVideo)
                 {
                     Schedule(() =>
                     {
-                        FillAspectRatio = drawableVideo.DrawSize.X / drawableVideo.DrawSize.Y;
+                        if (Parent != null)
+                        {
+                            float windowAspectRatio = Parent.DrawWidth / Parent.DrawHeight;
+                            float videoAspectRatio = drawableVideo.DrawSize.X / drawableVideo.DrawSize.Y;
+
+                            if (windowAspectRatio > videoAspectRatio)
+                            {
+                                // 窗口更高，以宽度为基准调整高度
+                                Width = Parent.DrawWidth;
+                                Height = Width / videoAspectRatio;
+                            }
+                            else
+                            {
+                                // 窗口更宽，以高度为基准调整宽度
+                                Height = Parent.DrawHeight;
+                                Width = Height * videoAspectRatio;
+                            }
+                        }
+
+                        Anchor = Anchor.Centre;
+                        Origin = Anchor.Centre;
                     });
                 }
             }

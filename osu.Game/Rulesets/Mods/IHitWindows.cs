@@ -22,7 +22,5 @@ namespace osu.Game.Rulesets.Mods
             new DifficultyRange(HitResult.Meh, 151, 136, 121),
             new DifficultyRange(HitResult.Miss, 188, 173, 158),
         };
-
-
     }
 }

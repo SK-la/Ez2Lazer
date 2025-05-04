@@ -23,9 +23,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     {
         private readonly ManiaBeatmap beatmap;
 
-        // private readonly Bindable<float> columnWidth = new Bindable<float>(50);
-        // private readonly Bindable<float> specialFactor = new Bindable<float>(1);
-
         private readonly OsuConfigManager config;
         // private readonly ManiaRulesetConfigManager config;
 
@@ -37,14 +34,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             this.config = config ?? throw new ArgumentNullException(nameof(config));
         }
-
-        // [BackgroundDependencyLoader]
-        // private void load(ManiaRulesetConfigManager config)
-        // {
-        //     // 将配置中的绑定值转换后绑定到我们自己的绑定变量上
-        //     // 假设你的 ManiaRulesetConfigManager 提供了一个 GetBindable<double> 方法：
-        //     columnWidth.BindTo(config.GetBindable<double>(ManiaRulesetSetting.ColumnWidth).ConvertToFloatBindable());
-        // }
 
         // public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap)
         //     : base(skin)
@@ -59,12 +48,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             // {
             //     totalColumnWidth = 7 * 40f / 200f;
             // }
-        // }
-
-        // private void calculateColumnWidth(int columnIndex, StageDefinition stage)
-        // {
-        //     bool isSpecialColumn = stage.IsSpecialColumn(columnIndex);
-        //     width = (float)(46 * (isSpecialColumn ? 1.2 : 1));
         // }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -145,6 +128,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     keyCounter.Position = new Vector2(0, -Stage.HIT_TARGET_POSITION - stage_padding_bottom);
                                 }
 
+                                var columnHitErrorMeter = container.OfType<EzColumnHitErrorMeter>().FirstOrDefault();
+
+                                if (columnHitErrorMeter != null)
+                                {
+                                    columnHitErrorMeter.Anchor = Anchor.Centre;
+                                    columnHitErrorMeter.Origin = Anchor.Centre;
+                                    columnHitErrorMeter.Position = new Vector2(0, 20);
+                                }
+
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
 
                                 if (hitErrorMeter != null)
@@ -175,7 +167,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 new EzComComboCounter(),
                                 new EzComComboCounter(),
                                 new EzComKeyCounterDisplay(),
-                                // new ArgonKeyCounterDisplay(),
+                                new EzColumnHitErrorMeter(),
                                 new BarHitErrorMeter(),
                                 new EzComHitResultScore(),
                                 new EzComHitTiming(),

@@ -212,12 +212,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             resetDisappearTask();
         }
 
+        private bool hasTriggeredReset;
+
         private bool shouldDisplayJudgement(AloneShowMenu aloneShowMenu, double timeOffset)
         {
+            if (!hasTriggeredReset)
+            {
+                resetDisappearTask(); // 第一次判定时触发任务
+                hasTriggeredReset = true;
+            }
+
             if (timeOffset == 0)
                 return true;
+
             if (Math.Abs(timeOffset) < Threshold.Value)
+            {
                 return false;
+            }
 
             return aloneShowMenu switch
             {
