@@ -14,35 +14,14 @@ using osu.Game.Overlays.Settings;
 
 namespace osu.Game.Skinning.Components
 {
-    public partial class EzSelector
+    public partial class EzEnumListSelector : SettingsDropdown<OffsetNumberName>
     {
-        protected virtual string SetPath => @"Gameplay/Fonts/";
-
-        public Bindable<string> Selected { get; } = new Bindable<string>();
-
-        private Dropdown<string> dropdown = null!;
-
-        [BackgroundDependencyLoader]
-        private void load()
+        protected override void LoadComplete()
         {
-            string[] folders = Directory.GetDirectories(SetPath)
-                                        .Select(Path.GetFileName)
-                                        .Where(name => name != null)
-                                        .ToArray()!;
+            base.LoadComplete();
 
-            InternalChild = dropdown = new OsuDropdown<string>
-            {
-                RelativeSizeAxes = Axes.X,
-                Items = folders
-            };
-
-            dropdown.Current.BindTo(Selected);
-
-            if (folders.Length > 0)
-                Selected.Value = folders[0];
+            Items = Enum.GetValues(typeof(OffsetNumberName)).Cast<OffsetNumberName>().ToList();
         }
-
-        public Dropdown<string> InternalChild { get; set; } = null!;
     }
 
     public partial class AnchorDropdown : SettingsDropdown<Anchor>
@@ -124,13 +103,34 @@ namespace osu.Game.Skinning.Components
         // ReSharper restore InconsistentNaming
     }
 
-    public partial class EzEnumListSelector : SettingsDropdown<OffsetNumberName>
+    public partial class EzSelector
     {
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
+        protected virtual string SetPath => @"Gameplay/Fonts/";
 
-            Items = Enum.GetValues(typeof(OffsetNumberName)).Cast<OffsetNumberName>().ToList();
+        public Bindable<string> Selected { get; } = new Bindable<string>();
+
+        private Dropdown<string> dropdown = null!;
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            string[] folders = Directory.GetDirectories(SetPath)
+                                        .Select(Path.GetFileName)
+                                        .Where(name => name != null)
+                                        .ToArray()!;
+
+            InternalChild = dropdown = new OsuDropdown<string>
+            {
+                RelativeSizeAxes = Axes.X,
+                Items = folders
+            };
+
+            dropdown.Current.BindTo(Selected);
+
+            if (folders.Length > 0)
+                Selected.Value = folders[0];
         }
+
+        public Dropdown<string> InternalChild { get; set; } = null!;
     }
 }

@@ -50,11 +50,11 @@ namespace osu.Game.Skinning.Components
                 Text.Invalidate(); // **强制刷新 EzCounterText**
             }, true);
 
-            Padding = new MarginPadding
-            {
-                Left = 1,
-                Right = 1,
-            };
+            // Padding = new MarginPadding
+            // {
+            //     Left = 1,
+            //     Right = 1,
+            // };
         }
 
         protected override IHasText CreateText()

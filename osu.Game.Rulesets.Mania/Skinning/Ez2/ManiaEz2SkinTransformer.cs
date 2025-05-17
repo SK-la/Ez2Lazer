@@ -138,9 +138,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                                 if (columnHitErrorMeter != null)
                                 {
-                                    columnHitErrorMeter.Anchor = Anchor.Centre;
+                                    columnHitErrorMeter.Anchor = Anchor.BottomCentre;
                                     columnHitErrorMeter.Origin = Anchor.Centre;
-                                    columnHitErrorMeter.Y = 100;
+                                    columnHitErrorMeter.Position = new Vector2(0, -Stage.HIT_TARGET_POSITION - stage_padding_bottom);
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();

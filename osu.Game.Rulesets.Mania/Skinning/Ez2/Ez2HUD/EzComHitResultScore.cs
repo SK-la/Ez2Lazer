@@ -20,7 +20,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
-    public partial class EzComHitResultScore : CompositeDrawable, ISerialisableDrawable //, IAnimatableJudgement
+    public partial class EzComHitResultScore : CompositeDrawable, ISerialisableDrawable, IPreviewable //, IAnimatableJudgement
     {
         public bool UsesFixedAnchor { get; set; }
 
@@ -34,6 +34,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         [SettingSource("HitResult Text Font", "HitResult Text Font", SettingControlType = typeof(EzEnumListSelector))]
         public Bindable<OffsetNumberName> NameDropdown { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)49);
+
+        // private EzComsPreviewOverlay previewOverlay = null!;
+        // private IconButton previewButton = null!;
+
+        public Bindable<string> TextureNameBindable { get; } = new Bindable<string>();
+        public string TextureBasePath => @"EzResources/enumBase/enumJudgement";
 
         // [SettingSource("Effect Type", "Effect Type")]
         // public Bindable<EffectType> Effect { get; } = new Bindable<EffectType>(EffectType.Scale);
@@ -53,6 +59,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         [Resolved]
         private TextureStore textures { get; set; } = null!;
+
+        // [Resolved]
+        // private OsuGame game { get; set; } = null!;
 
         [Resolved]
         private ScoreProcessor processor { get; set; } = null!;
@@ -76,23 +85,81 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [BackgroundDependencyLoader]
         private void load()
         {
+            // Schedule(() =>
+            // {
+            //     AddInternal(previewButton = new IconButton
+            //     {
+            //         Anchor = Anchor.TopRight,
+            //         Origin = Anchor.TopRight,
+            //         Position = new Vector2(-5, 5),
+            //         Icon = FontAwesome.Solid.Eye,
+            //         Action = showPreview
+            //     });
+            //
+            //     previewOverlay = new EzComsPreviewOverlay(this);
+            //     game.Add(previewOverlay);
+            // });
+
             AlwaysPresent = true;
 
-            fullComboSprite = new Container
+            Schedule(() =>
             {
-                Child = new Sprite
+                fullComboSprite = new Container
                 {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Scale = new Vector2(1.5f),
-                    Alpha = 0, // 初始隐藏
-                    Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2"),
+                    Child = new Sprite
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Scale = new Vector2(1.5f),
+                        Alpha = 0, // 初始隐藏
+                        Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2"),
+                    }
+                };
+
+                AddInternal(fullComboSprite);
+
+                fullComboSound = sampleStore.Get("EzResources/AllCombo/full_combo_sound");
+            });
+        }
+
+        // private void showPreview() => previewOverlay.Show();
+
+        public Drawable CreatePreviewDrawable(OffsetNumberName name)
+        {
+            var container = new Container
+            {
+                AutoSizeAxes = Axes.Both,
+                Child = new FillFlowContainer
+                {
+                    AutoSizeAxes = Axes.Both,
+                    Direction = FillDirection.Horizontal,
+                    Spacing = new Vector2(10),
+                    Children = new[]
+                    {
+                        createPreviewSprite(name, HitResult.Perfect),
+                        createPreviewSprite(name, HitResult.Great),
+                        createPreviewSprite(name, HitResult.Good),
+                        createPreviewSprite(name, HitResult.Ok),
+                        createPreviewSprite(name, HitResult.Meh),
+                        createPreviewSprite(name, HitResult.Miss)
+                    }
                 }
             };
 
-            AddInternal(fullComboSprite);
+            return container;
+        }
 
-            fullComboSound = sampleStore.Get("EzResources/AllCombo/full_combo_sound");
+        private Sprite createPreviewSprite(OffsetNumberName name, HitResult result)
+        {
+            string basePath = $@"EzResources/enumBase/enumJudgement/{name}";
+            var texture = textures.Get($"{basePath}.png");
+
+            return new Sprite
+            {
+                Texture = texture,
+                Size = new Vector2(50),
+                Alpha = 1
+            };
         }
 
         protected override void LoadComplete()

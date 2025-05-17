@@ -98,7 +98,6 @@ namespace osu.Game.Overlays.SkinEditor
                                     Origin = Anchor.CentreLeft,
                                     Action = () =>
                                     {
-                                        skinEditorOverlay?.PresentGameplay();
                                         ezSkinEditorOverlay?.PopulateSettings();
                                     },
                                 },

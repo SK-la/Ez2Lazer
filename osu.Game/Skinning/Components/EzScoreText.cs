@@ -88,7 +88,7 @@ namespace osu.Game.Skinning.Components
             }, true);
         }
 
-        private float calculateScale(float textureHeight, float targetHeight = 25f)
+        private float calculateScale(float textureHeight, float targetHeight = 35f)
         {
             if (textureHeight <= 0)
                 return 1;

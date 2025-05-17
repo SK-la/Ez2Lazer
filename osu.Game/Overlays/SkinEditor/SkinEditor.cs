@@ -81,7 +81,7 @@ namespace osu.Game.Overlays.SkinEditor
 
         private Container? content;
 
-        private EditorSidebar componentsSidebar = null!;
+        private MainEditorSidebar componentsSidebar = null!;
         private EditorSidebar settingsSidebar = null!;
 
         private SkinEditorChangeHandler? changeHandler;
@@ -214,7 +214,7 @@ namespace osu.Game.Overlays.SkinEditor
                                     {
                                         new Drawable[]
                                         {
-                                            componentsSidebar = new EditorSidebar(),
+                                            componentsSidebar = new MainEditorSidebar(),
                                             content = new Container
                                             {
                                                 Depth = float.MaxValue,
