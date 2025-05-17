@@ -24,7 +24,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private readonly ManiaBeatmap beatmap;
 
         private readonly OsuConfigManager config;
-        // private readonly ManiaRulesetConfigManager config;
+
+        // private readonly Dictionary<int, Bindable<float>> columnWidths = new Dictionary<int, Bindable<float>>();
+        // private readonly IBindable<double> columnWidthBindable;
+        // private readonly IBindable<double> specialFactorBindable;
 
         // private readonly float totalColumnWidth;
         public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config)
@@ -33,6 +36,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             this.beatmap = (ManiaBeatmap)beatmap;
 
             this.config = config ?? throw new ArgumentNullException(nameof(config));
+
+            // columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
+            // specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
         }
 
         // public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap)
@@ -197,7 +203,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                             // if (Skin is Ez2Skin && resultComponent.Component >= HitResult.Perfect)
                             //     return Drawable.Empty();
 
-                            return new Ez2ColumnBackground();
+                            return new Ez2ColumnBackground(config);
 
                         case ManiaSkinComponents.HoldNoteBody:
                             return new Ez2HoldBodyPiece();
@@ -253,8 +259,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                 float columnWidth = (float)config.Get<double>(OsuSetting.ColumnWidth);
                 float specialFactor = (float)config.Get<double>(OsuSetting.SpecialFactor);
-                // float columnWidth = (float)config.Get<double>(ManiaRulesetSetting.ColumnWidth);
-                // float specialFactor = (float)config.Get<double>(ManiaRulesetSetting.SpecialFactor);
                 float width = columnWidth * (isSpecialColumn ? specialFactor : 1);
 
                 switch (maniaLookup.Lookup)
@@ -273,7 +277,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         return SkinUtils.As<TValue>(new Bindable<float>(0));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-
                         return SkinUtils.As<TValue>(new Bindable<float>(width));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:

@@ -10,6 +10,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -27,6 +28,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         // private Box background = null!;
         private Box backgroundOverlay = null!;
         private Box? separator;
+        private readonly OsuConfigManager config;
+        private readonly IBindable<double> columnWidthBindable;
+        private readonly IBindable<double> specialFactorBindable;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -34,10 +38,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         // private Bindable<Color4> accentColour = null!;
         private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
 
-        public Ez2ColumnBackground()
+        public Ez2ColumnBackground(OsuConfigManager config)
         {
-            RelativeSizeAxes = Axes.Both;
-
+            this.config = config;
+            RelativeSizeAxes = Axes.Y;
+            columnWidthBindable = new Bindable<double>();
+            specialFactorBindable = new Bindable<double>();
             Masking = true;
             // CornerRadius = 6; //设置圆角, 轨道间会出现缝隙
         }
@@ -45,6 +51,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo, StageDefinition stageDefinition)
         {
+            columnWidthBindable.BindTo(config.GetBindable<double>(OsuSetting.ColumnWidth));
+            specialFactorBindable.BindTo(config.GetBindable<double>(OsuSetting.SpecialFactor));
+
+            columnWidthBindable.BindValueChanged(_ => updateWidth(stageDefinition));
+            specialFactorBindable.BindValueChanged(_ => updateWidth(stageDefinition));
+
+            updateWidth(stageDefinition);
+
             if (stageDefinition.Columns == 14 && column.Index == 13)
             {
                 return;
@@ -217,6 +231,36 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 default:
                     return colour_column;
             }
+        }
+
+        private void updateWidth(StageDefinition stageDefinition)
+        {
+            float baseWidth = (float)columnWidthBindable.Value;
+            float multiplier = 1.0f;
+
+            switch (stageDefinition.Columns)
+            {
+                case 12:
+                    if (column.Index == 0 || column.Index == 11)
+                        multiplier = (float)specialFactorBindable.Value; // scratch 列
+                    break;
+
+                case 14:
+                    if (column.Index == 0 || column.Index == 12)
+                        multiplier = (float)specialFactorBindable.Value; // scratch 列
+                    else if (column.Index == 6)
+                        multiplier = 1f; // panel 列
+                    break;
+
+                case 16:
+                    if (column.Index == 0 || column.Index == 15)
+                        multiplier = (float)specialFactorBindable.Value; // scratch 列
+                    else if (column.Index >= 6 && column.Index <= 9)
+                        multiplier = 1; // effect 列
+                    break;
+            }
+
+            Width = baseWidth * multiplier;
         }
 
         private bool drawSeparator(int columnIndex, StageDefinition stage, bool isSeparator)
