@@ -165,7 +165,7 @@ namespace osu.Game.Screens.Backgrounds
 
                     if (videoFiles.Length == 0)
                     {
-                        Stream videoName = textures.GetStream("Menu/default_video.webm");
+                        Stream videoName = textures.GetStream("EzResources/default_video.webm");
                         return new StreamVideoBackgroundScreen(videoName);
                         // return new Background(getBackgroundTextureName());
                     }

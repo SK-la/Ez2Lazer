@@ -120,6 +120,16 @@ namespace osu.Game.Screens.Select
         /// </summary>
         public IEnumerable<string>? CollectionBeatmapMD5Hashes { get; set; }
 
+        public IEnumerable<string>? ManiaRulesetSubset { get; set; }
+
+        public IEnumerable<BeatmapInfo> FilterVisibleBeatmaps(IEnumerable<BeatmapInfo> beatmaps)
+        {
+            if (RulesetCriteria == null)
+                return beatmaps;
+
+            return beatmaps.Where(beatmap => RulesetCriteria.Matches(beatmap, this));
+        }
+
         public IRulesetFilterCriteria? RulesetCriteria { get; set; }
 
         public readonly struct OptionalSet<T> : IEquatable<OptionalSet<T>>

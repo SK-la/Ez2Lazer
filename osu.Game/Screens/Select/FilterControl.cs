@@ -17,6 +17,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
@@ -55,8 +56,11 @@ namespace osu.Game.Screens.Select
         private FilterControlTextBox searchTextBox;
         private CollectionDropdown collectionDropdown;
 
-        // private OsuTabControl<SelectEzMode> ezModeTabs;
+        private CollectionDropdown ezToCollection;
         private Bindable<SelectEzMode> ezMode;
+
+        // TODO:多子集切换
+        // private ManiaRulesetDropdown maniaRulesetDropdown;
 
         [CanBeNull]
         private FilterCriteria currentCriteria;
@@ -72,6 +76,9 @@ namespace osu.Game.Screens.Select
                 AllowConvertedBeatmaps = showConverted.Value,
                 Ruleset = ruleset.Value,
                 Mods = mods.Value,
+                // currentCriteria?.RulesetCriteria?.FilterBeatmaps(beatmapList) ?? Enumerable.Empty<BeatmapInfo>(),
+                // ManiaRulesetSubset = maniaRulesetDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet(),
+                ManiaRulesetSubset = ezToCollection.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet(),
                 CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet()
             };
 
@@ -229,6 +236,31 @@ namespace osu.Game.Screens.Select
                                             AccentColour = colours.BlueLight,
                                             Current = { BindTarget = ezMode }
                                         },
+                                        new OsuSpriteText
+                                        {
+                                            Text = "保存当前图池",
+                                            Font = OsuFont.GetFont(size: 12),
+                                            Margin = new MarginPadding(5),
+                                            Anchor = Anchor.TopRight,
+                                            Origin = Anchor.TopRight,
+                                        },
+                                        // maniaRulesetDropdown = new ManiaRulesetDropdown
+                                        // {
+                                        //     Anchor = Anchor.TopRight,
+                                        //     Origin = Anchor.TopRight,
+                                        //     RequestFilter = updateCriteria,
+                                        //     RelativeSizeAxes = Axes.X,
+                                        //     Y = 4,
+                                        //     Width = 0.5f,
+                                        // }
+                                        ezToCollection = new CollectionDropdown
+                                        {
+                                            Anchor = Anchor.TopRight,
+                                            Origin = Anchor.TopRight,
+                                            RelativeSizeAxes = Axes.X,
+                                            // Y = 4,
+                                            Width = 0.5f,
+                                        }
                                     }
                                 }
                             },
@@ -294,6 +326,12 @@ namespace osu.Game.Screens.Select
             // ezModeTabs.Current.BindValueChanged(OnEzModeChanged, true);
             // ezMode?.BindValueChanged(_ => updateCriteria());
             ezMode.ValueChanged += _ => updateCriteria();
+            // ezToCollection.Current.ValueChanged += _ => collectionChanged();
+            // maniaRulesetDropdown.Current.BindValueChanged(_ =>
+            // {
+            //     // 根据用户选择的子集更新筛选逻辑
+            //     updateCriteria();
+            // }, true);
 
             groupMode.BindValueChanged(_ => updateCriteria());
             sortMode.BindValueChanged(_ => updateCriteria());
@@ -303,12 +341,36 @@ namespace osu.Game.Screens.Select
             updateCriteria();
         }
 
-        // private void OnEzModeChanged(ValueChangedEvent<SelectEzMode> args)
+        // private void collectionChanged(ValueChangedEvent<CollectionFilterMenuItem> filter)
         // {
-        //     string filterString = EzModeHelper.GenerateFilterString(args.NewValue);
-        //     // currentCriteria!.CircleSize.Min = currentCriteria.CircleSize.Max = EzModeHelper.GetKeyCountFromEzMode(args.NewValue);
-        //     CurrentTextSearch.Value = filterString;
+        //     var selectedCollection = filter.NewValue?.Collection;
+        //     if (selectedCollection == null)
+        //         return;
+        //
+        //     var criteria = CreateCriteria();
+        //     var visibleBeatmaps = criteria.FilterVisibleBeatmaps(beatmapList);
+        //
+        //     if (visibleBeatmaps == null || !visibleBeatmaps.Any())
+        //         return;
+        //
+        //     selectedCollection.PerformWrite(collection =>
+        //     {
+        //         foreach (var beatmap in visibleBeatmaps)
+        //         {
+        //             if (!collection.BeatmapMD5Hashes.Contains(beatmap.MD5Hash))
+        //                 collection.BeatmapMD5Hashes.Add(beatmap.MD5Hash);
+        //         }
+        //     });
         // }
+
+        private IEnumerable<BeatmapInfo> getVisibleBeatmaps(IEnumerable<BeatmapInfo> beatmapList)
+        {
+            if (currentCriteria == null || beatmapList == null)
+                return Enumerable.Empty<BeatmapInfo>();
+
+            return currentCriteria.FilterVisibleBeatmaps(beatmapList);
+        }
+
         public void Deactivate()
         {
             searchTextBox.ReadOnly = true;
@@ -377,48 +439,3 @@ namespace osu.Game.Screens.Select
         }
     }
 }
-
-// private void OnEzModeChanged(ValueChangedEvent<SelectEzMode> args)
-// {
-//     string filterString = EzModeHelper.GenerateFilterString(args.NewValue);
-//     FilterCriteria criteria = new FilterCriteria
-//     {
-//         Group = groupMode?.Value ?? default,
-//         Sort = sortMode?.Value ?? default,
-//         AllowConvertedBeatmaps = showConverted?.Value ?? false,
-//         EzMode = ezMode?.Value ?? default,
-//         Ruleset = ruleset?.Value,
-//         Mods = mods?.Value ?? new List<Mod>(),
-//         CollectionBeatmapMD5Hashes = collectionDropdown?.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet()
-//     };
-//     FilterQueryParser.ApplyQueries(criteria, filterString);
-//     // CurrentTextSearch.Value = filterString;
-// }
-
-// public event Action<SelectEzMode, bool> Clicked;
-
-// protected override bool OnClick(ClickEvent e)
-// {
-//     if (e.Button == MouseButton.Left || e.Button == MouseButton.Right)
-//     {
-//         // 确定点击的是哪个模式
-//         var selectedItem = ezModeTabs.Current.Value;
-//
-//         if (e.Button == MouseButton.Left)
-//         {
-//             Clicked?.Invoke(selectedItem, true);
-//         }
-//         // else if (e.Button == MouseButton.Right)
-//         // {
-//         //     if (control.GetSelectedMode() = selectedItem)
-//         //     {
-//         //         control.ToggleMode(selectedItem);
-//         //         Clicked?.Invoke(selectedItem, false);
-//         //     }
-//         // }
-//
-//         return true;
-//     }
-//
-//     return base.OnClick(e);
-// }

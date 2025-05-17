@@ -6,6 +6,15 @@ using System.ComponentModel;
 
 namespace osu.Game.Screens.Select.Filter
 {
+    public enum SelectManiaRulesetSubset
+    {
+        All, // 默认子集
+        Osu,
+        Bms,
+        Ez,
+        Convertor,
+    }
+
     public enum SelectEzMode
     {
         [Description("ALL")]

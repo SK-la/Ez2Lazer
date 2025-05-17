@@ -2,7 +2,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Screens.Play.HUD;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
+namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
     public partial class ManiaActionInputTrigger : InputTrigger
     {

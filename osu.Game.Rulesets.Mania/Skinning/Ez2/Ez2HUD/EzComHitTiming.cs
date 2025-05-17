@@ -17,11 +17,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
     [Cached]
     public partial class EzComHitTiming : HitErrorMeter
     {
-        [SettingSource("Offset Number Font", "Offset Number Font", SettingControlType = typeof(OffsetNumberNameSelector))]
-        public Bindable<OffsetNumberName> NumberNameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.Tomato);
+        [SettingSource("Offset Number Font", "Offset Number Font", SettingControlType = typeof(EzEnumListSelector))]
+        public Bindable<OffsetNumberName> NumberNameDropdown { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)28);
 
         [SettingSource("Offset Text Font", "Offset Text Font", SettingControlType = typeof(OffsetTextNameSelector))]
-        public Bindable<OffsetNumberName> TextNameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.Tomato);
+        public Bindable<OffsetNumberName> TextNameDropdown { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)28);
 
         [SettingSource("AloneShow", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
@@ -63,10 +63,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private Container timingContainer = null!;
         private FillFlowContainer errorContainer = null!;
-        private EzCounterText timingTextL = null!;
-        private EzCounterText timingText = null!;
-        private EzCounterText timingTextR = null!;
-        private EzCounterText offsetText = null!;
+        private EzComboText timingTextL = null!;
+        private EzComboText timingText = null!;
+        private EzComboText timingTextR = null!;
+        private EzComboText offsetText = null!;
         private Box backgroundBox = null!;
 
         public EzComHitTiming()
@@ -101,11 +101,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                             AutoSizeAxes = Axes.Both,
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
-                            Scale = new Vector2(0.8f),
+                            Scale = new Vector2(2f),
                             // Spacing = new Vector2(SymmetryOffset.Value),
                             Children = new Drawable[]
                             {
-                                timingTextL = new EzCounterText(TextNameDropdown)
+                                timingTextL = new EzComboText(TextNameDropdown)
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -113,14 +113,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                                     Alpha = 1,
                                     Position = new Vector2(-SymmetryOffset.Value, 0)
                                 },
-                                timingText = new EzCounterText(TextNameDropdown)
+                                timingText = new EzComboText(TextNameDropdown)
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
                                     Text = "e/l",
                                     Alpha = 0
                                 },
-                                timingTextR = new EzCounterText(TextNameDropdown)
+                                timingTextR = new EzComboText(TextNameDropdown)
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -130,11 +130,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                                 },
                             }
                         },
-                        offsetText = new EzCounterText(NumberNameDropdown)
+                        offsetText = new EzComboText(NumberNameDropdown)
                         {
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
-                            Scale = new Vector2(1.2f),
+                            Scale = new Vector2(1.5f),
                             Text = "±000",
                         },
                     }
@@ -278,7 +278,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         None,
     }
 
-    public partial class OffsetTextNameSelector : OffsetNumberNameSelector
+    public partial class OffsetTextNameSelector : EzEnumListSelector
     {
     }
 }

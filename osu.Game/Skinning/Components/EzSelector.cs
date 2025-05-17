@@ -61,60 +61,70 @@ namespace osu.Game.Skinning.Components
         }
     }
 
+    public enum EffectType
+    {
+        Scale,
+        Bounce,
+        None
+    }
+
     public enum OffsetNumberName
     {
         // ReSharper disable InconsistentNaming
-        Air,
-        Aqua,
-        Cricket,
-        D2D,
-        DarkConcert,
-        DJMAX,
-        EMOTIONAL,
-        ENDLESS,
-        EZ2AC_AE,
-        EZ2AC_CV,
-        EZ2AC_EVOLVE,
-        EZ2AC_TT,
-        EZ2DJ_1thSE,
+        EZ2DJ_1st,
+        EZ2DJ_1stSE,
         EZ2DJ_2nd,
+        EZ2DJ_3rd,
         EZ2DJ_4th,
         EZ2DJ_6th,
         EZ2DJ_7th,
-        EZ2DJ_Platinum,
+        AIR,
+        AZURE_EXPRESSION,
+        CV_CRAFT,
+        D2D_Station,
+        Dark_Concert,
+        DJMAX,
+        EC_1304,
+        EC_Wheel,
+        EVOLVE,
         EZ2ON,
-        F3_ANCIENT,
-        F3_CONTEMP,
-        F3_FUTURE,
-        F3_MODERN,
-        FiND_A_WAY,
-        FORTRESS2,
-        GC_TYPE2,
+        FIND_A_WAY,
+        Fortress2,
+        Fortress3_Future,
+        Fortress3_Gear,
+        Fortress3_Green,
+        Fortress3_Modern,
+        GC,
+        GC_EZ,
         Gem,
-        Gem2,
-        Gold,
-        HX_STD,
-        HX_STD_Yellow,
         HX_1121,
+        HX_STANDARD,
+        JIYU,
         Kings,
-        M250,
-        NIGHTFALL,
-        NIGHTWhite,
+        Limited,
+        NIGHT_FALL,
+        O2_A9100,
+        O2_EA05,
+        O2_Jam,
+        Platinum,
+        QTZ_01,
         QTZ_02,
         REBOOT,
-        REBOOT_GOLD,
         SG_701,
         SH_512,
         Star,
-        TCEZ_001,
+        TANOc,
+        TANOc2,
         TECHNIKA,
-        Tomato,
-        VariousWays
-
+        TIME_TRAVELER,
+        TOMATO,
+        Turtle,
+        Various_Ways,
+        ArcadeScore,
         // ReSharper restore InconsistentNaming
     }
 
-    public partial class OffsetNumberNameSelector : SettingsDropdown<OffsetNumberName>
+    public partial class EzEnumListSelector : SettingsDropdown<OffsetNumberName>
     {
         protected override void LoadComplete()
         {

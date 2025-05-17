@@ -10,10 +10,10 @@ using osuTK;
 
 namespace osu.Game.Skinning.Components
 {
-    public partial class EzCounterText : CompositeDrawable, IHasText
+    public partial class EzScoreText : CompositeDrawable, IHasText
     {
-        public readonly EzGetTexture TextPart;
-        public Bindable<OffsetNumberName> FontName { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.EZ2DJ_4th);
+        public readonly EzGetScoreTexture TextPart;
+        public Bindable<OffsetNumberName> FontName { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)7);
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -27,7 +27,7 @@ namespace osu.Game.Skinning.Components
 
         // public object Spacing { get; set; }
 
-        public EzCounterText(Bindable<OffsetNumberName>? externalFontName = null)
+        public EzScoreText(Bindable<OffsetNumberName>? externalFontName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
@@ -39,7 +39,7 @@ namespace osu.Game.Skinning.Components
             var fontNameString = new Bindable<string>();
             FontName.BindValueChanged(e => fontNameString.Value = e.NewValue.ToString(), true);
 
-            TextPart = new EzGetTexture(textLookup, fontNameString);
+            TextPart = new EzGetScoreTexture(textLookup, fontNameString);
 
             InternalChildren = new Drawable[]
             {
@@ -67,12 +67,6 @@ namespace osu.Game.Skinning.Components
 
                 case '%': return @"percentage";
 
-                case 'c': return @"Combo";
-
-                case 'e': return @"Early";
-
-                case 'l': return @"Late";
-
                 default: return c.ToString();
             }
         }
@@ -88,6 +82,8 @@ namespace osu.Game.Skinning.Components
             {
                 TextPart.FontName.Value = e.NewValue.ToString();
                 // textPart.LoadAsync(); // **强制重新加载字体**
+                scale = calculateScale(TextPart.Height);
+                TextPart.Scale = new Vector2(scale);
                 TextPart.Invalidate(); // **确保 UI 立即刷新**
             }, true);
         }
@@ -99,12 +95,5 @@ namespace osu.Game.Skinning.Components
 
             return targetHeight / textureHeight;
         }
-    }
-
-    public enum EffectType
-    {
-        Scale,
-        Bounce,
-        None
     }
 }

@@ -32,6 +32,7 @@ namespace osu.Game.Rulesets.Mania.Configuration
             SetDefault(ManiaRulesetSetting.ScrollStyle, ManiaScrollingStyle.ScrollTimeStyleFixed);
             SetDefault(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
             SetDefault(ManiaRulesetSetting.ScrollPerKeyMode, false);
+            SetDefault(ManiaRulesetSetting.PerspectiveAngle, 90.0f, 30.0f, 90.0f);
             SetDefault(ManiaRulesetSetting.TimingBasedNoteColouring, true);
             SetDefault(ManiaRulesetSetting.MobileLayout, ManiaMobileLayout.Portrait);
 
@@ -72,6 +73,7 @@ namespace osu.Game.Rulesets.Mania.Configuration
         ScrollStyle,
         // HitMode,
 
+        PerspectiveAngle,
         ColumnWidth,
         SpecialFactor,
         ScrollPerKeyMode,

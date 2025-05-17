@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
@@ -15,8 +16,8 @@ namespace osu.Game.Skinning.Components
     {
         protected override double RollingDuration => 250;
 
-        [SettingSource("Font", "Font", SettingControlType = typeof(OffsetNumberNameSelector))]
-        public Bindable<OffsetNumberName> FontNameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.NIGHTWhite);
+        [SettingSource("Font", "Font", SettingControlType = typeof(EzEnumListSelector))]
+        public Bindable<OffsetNumberName> FontNameDropdown { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)Enum.ToObject(typeof(OffsetNumberName), 43));
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel), nameof(SkinnableComponentStrings.ShowLabelDescription))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
@@ -33,7 +34,7 @@ namespace osu.Game.Skinning.Components
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
         public bool UsesFixedAnchor { get; set; }
-        public EzCounterText Text = null!;
+        public EzScoreText Text = null!;
         protected override LocalisableString FormatCount(long count) => count.ToString();
 
         protected override void LoadComplete()
@@ -51,14 +52,14 @@ namespace osu.Game.Skinning.Components
 
             Padding = new MarginPadding
             {
-                Left = 2,
-                Right = 2,
+                Left = 1,
+                Right = 1,
             };
         }
 
         protected override IHasText CreateText()
         {
-            Text = new EzCounterText(FontNameDropdown);
+            Text = new EzScoreText(FontNameDropdown);
             return Text;
         }
     }

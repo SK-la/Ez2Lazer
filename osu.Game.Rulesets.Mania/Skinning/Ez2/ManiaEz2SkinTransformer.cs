@@ -128,13 +128,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     keyCounter.Position = new Vector2(0, -Stage.HIT_TARGET_POSITION - stage_padding_bottom);
                                 }
 
-                                var columnHitErrorMeter = container.OfType<EzColumnHitErrorMeter>().FirstOrDefault();
+                                var columnHitErrorMeter = container.OfType<EzComHitTimingColumns>().FirstOrDefault();
 
                                 if (columnHitErrorMeter != null)
                                 {
                                     columnHitErrorMeter.Anchor = Anchor.Centre;
                                     columnHitErrorMeter.Origin = Anchor.Centre;
-                                    columnHitErrorMeter.Position = new Vector2(0, 20);
+                                    columnHitErrorMeter.Y = 100;
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -167,7 +167,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 new EzComComboCounter(),
                                 new EzComComboCounter(),
                                 new EzComKeyCounterDisplay(),
-                                new EzColumnHitErrorMeter(),
+                                new EzComHitTimingColumns(),
                                 new BarHitErrorMeter(),
                                 new EzComHitResultScore(),
                                 new EzComHitTiming(),

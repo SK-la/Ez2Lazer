@@ -13,7 +13,7 @@ using osu.Game.Graphics.Sprites;
 
 namespace osu.Game.Skinning.Components
 {
-    public partial class EzGetTexture : OsuSpriteText
+    public partial class EzGetComboTexture : OsuSpriteText
     {
         public Bindable<string> FontName { get; }
 
@@ -22,7 +22,7 @@ namespace osu.Game.Skinning.Components
 
         protected override char FixedWidthReferenceCharacter => '6';
 
-        public EzGetTexture(Func<char, string> getLookup, Bindable<string> fontName)
+        public EzGetComboTexture(Func<char, string> getLookup, Bindable<string> fontName)
         {
             this.getLookup = getLookup;
             FontName = fontName;
@@ -40,7 +40,7 @@ namespace osu.Game.Skinning.Components
                 Font = new FontUsage(FontName.Value, 1);
                 glyphStore = new GlyphStore(textures, getLookup);
 
-                foreach (char c in new[] { '.', '%', 'c', 'e', 'l' })
+                foreach (char c in new[] { '.', '%', 'c', 'e', 'l', 'j' })
                     glyphStore.Get(FontName.Value, c);
                 for (int i = 0; i < 10; i++)
                     glyphStore.Get(FontName.Value, (char)('0' + i));
@@ -76,13 +76,42 @@ namespace osu.Game.Skinning.Components
                 {
                     string textureNameReplace = textureName.Replace(" ", "_");
 
-                    string[] possiblePaths = new[]
+                    string[] possiblePaths;
+
+                    switch (character)
                     {
-                        $"Gameplay/Combo/{textureNameReplace}/{textureNameReplace}-counter-{lookup}",
-                        $"Gameplay/Combo/{textureNameReplace}/{textureNameReplace}-Title-{lookup}",
-                        $"Gameplay/EarlyOrLate/{textureNameReplace}-{lookup}",
-                        $"Gameplay/HitResult/{textureNameReplace}-{lookup}"
-                    };
+                        case '.':
+                        case '%':
+                        case 'e':
+                        case 'l':
+                            possiblePaths = new[]
+                            {
+                                $"EzResources/GameTheme/{textureNameReplace}/{lookup}",
+                            };
+                            break;
+
+                        case 'c':
+                            possiblePaths = new[]
+                            {
+                                $"EzResources/GameTheme/{textureNameReplace}/combo/{lookup}", //combo图
+                            };
+                            break;
+
+                        case 'j':
+                            possiblePaths = new[]
+                            {
+                                $"EzResources/GameTheme/{textureNameReplace}/judgement/",
+                            };
+                            break;
+
+                        default:
+                            possiblePaths = new[]
+                            {
+                                $"EzResources/GameTheme/{textureNameReplace}/combo/number/{lookup}", //数字
+                                $"EzResources/GameTheme/{textureNameReplace}/judgement/{lookup}", //判定
+                            };
+                            break;
+                    }
 
                     foreach (string path in possiblePaths)
                     {
@@ -92,7 +121,6 @@ namespace osu.Game.Skinning.Components
                         {
                             glyph = new TexturedCharacterGlyph(new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
                                 texture, 0.125f);
-                            break;
                         }
                     }
                 }

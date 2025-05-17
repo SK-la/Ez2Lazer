@@ -72,7 +72,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Y = 200;
                                     combo1.Effect.Value = EffectType.None;
-                                    combo1.NameDropdown.Value = OffsetNumberName.EZ2AC_EVOLVE;
+                                    combo1.NameDropdown.Value = (OffsetNumberName)43;
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();

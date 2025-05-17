@@ -39,7 +39,7 @@ namespace osu.Game.Configuration
         {
             // UI/selection defaults
             SetDefault(OsuSetting.Ruleset, string.Empty);
-            SetDefault(OsuSetting.Skin, SkinInfo.EZ2_SKIN.ToString());
+            SetDefault(OsuSetting.Skin, SkinInfo.ARGON_SKIN.ToString());
 
             SetDefault(OsuSetting.BeatmapDetailTab, PlayBeatmapDetailArea.TabType.Local);
             SetDefault(OsuSetting.BeatmapDetailModsFilter, false);
@@ -157,7 +157,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
             SetDefault(OsuSetting.HitMode, MUGHitMode.EZ2AC);
-            SetDefault(OsuSetting.ColumnWidth, 46, 9, 90, 1.0);
+            SetDefault(OsuSetting.ColumnWidth, 50, 9, 90, 1.0);
             SetDefault(OsuSetting.SpecialFactor, 1, 0.1, 4, 0.1);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
@@ -235,6 +235,8 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.EditorSubmissionNotifyOnDiscussionReplies, true);
             SetDefault(OsuSetting.EditorSubmissionLoadInBrowserAfterSubmission, true);
+
+            SetDefault(OsuSetting.WasSupporter, false);
         }
 
         protected override bool CheckLookupContainsPrivateInformation(OsuSetting lookup)
@@ -486,5 +488,11 @@ namespace osu.Game.Configuration
         EditorShowStoryboard,
         EditorSubmissionNotifyOnDiscussionReplies,
         EditorSubmissionLoadInBrowserAfterSubmission,
+
+        /// <summary>
+        /// Cached state of whether local user is a supporter.
+        /// Used to allow early checks (ie for startup samples) to be in the correct state, even if the API authentication process has not completed.
+        /// </summary>
+        WasSupporter
     }
 }

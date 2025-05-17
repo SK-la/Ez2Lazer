@@ -52,17 +52,7 @@ namespace osu.Game.Skinning
 
         public override ISample? GetSample(ISampleInfo sampleInfo)
         {
-            // foreach (string lookup in sampleInfo.LookupNames)
-            // {
-            //     var sample = Samples?.Get(lookup)
-            //                  ?? Resources.AudioManager?.Samples.Get(lookup.Replace(@"Gameplay/", @"Gameplay/Argon/"))
-            //                  ?? Resources.AudioManager?.Samples.Get(lookup);
-            //
-            //     if (sample != null)
-            //         return sample;
-            // }
-
-            return null;
+            return Resources.AudioManager?.Samples.Get("Gameplay/Ez/hit.wav");
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)

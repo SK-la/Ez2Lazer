@@ -15,7 +15,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;

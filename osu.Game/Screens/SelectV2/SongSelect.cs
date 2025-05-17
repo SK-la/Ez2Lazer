@@ -1,7 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
@@ -9,15 +12,29 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Bindings;
+using osu.Framework.Input.Events;
 using osu.Framework.Screens;
+using osu.Framework.Threading;
+using osu.Game.Beatmaps;
+using osu.Game.Collections;
 using osu.Game.Graphics.Containers;
+using osu.Game.Input.Bindings;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Mods;
+using osu.Game.Overlays.Volume;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Scoring;
+using osu.Game.Screens.Edit;
 using osu.Game.Screens.Footer;
 using osu.Game.Screens.Menu;
+using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Select;
+using osu.Game.Skinning;
+using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
+using osuTK.Input;
 
 namespace osu.Game.Screens.SelectV2
 {
@@ -25,7 +42,8 @@ namespace osu.Game.Screens.SelectV2
     /// This screen is intended to house all components introduced in the new song select design to add transitions and examine the overall look.
     /// This will be gradually built upon and ultimately replace <see cref="Select.SongSelect"/> once everything is in place.
     /// </summary>
-    public abstract partial class SongSelect : OsuScreen
+    [Cached(typeof(ISongSelect))]
+    public abstract partial class SongSelect : OsuScreen, IKeyBindingHandler<GlobalAction>, ISongSelect
     {
         private const float logo_scale = 0.4f;
         private const double fade_duration = 300;
@@ -39,6 +57,8 @@ namespace osu.Game.Screens.SelectV2
             ShowPresets = true,
         };
 
+        private ModSpeedHotkeyHandler modSpeedHotkeyHandler = null!;
+
         [Cached]
         private readonly OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Aquamarine);
 
@@ -49,16 +69,33 @@ namespace osu.Game.Screens.SelectV2
         private BeatmapDetailsArea detailsArea = null!;
         private FillFlowContainer wedgesContainer = null!;
 
+        private NoResultsPlaceholder noResultsPlaceholder = null!;
+
+        public override bool? ApplyModTrackAdjustments => true;
+
         public override bool ShowFooter => true;
 
         [Resolved]
+        private OsuGameBase game { get; set; } = null!;
+
+        [Resolved]
         private OsuLogo? logo { get; set; }
+
+        [Resolved]
+        private IDialogOverlay? dialogOverlay { get; set; }
+
+        [Resolved]
+        private BeatmapManager beatmaps { get; set; } = null!;
+
+        [Resolved]
+        private ManageCollectionsDialog? collectionsDialog { get; set; }
 
         [BackgroundDependencyLoader]
         private void load()
         {
             AddRangeInternal(new Drawable[]
             {
+                new GlobalScrollAdjustsVolume(),
                 new Box
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -125,8 +162,10 @@ namespace osu.Game.Screens.SelectV2
                                                             BleedTop = FilterControl.HEIGHT_FROM_SCREEN_TOP + 5,
                                                             BleedBottom = ScreenFooter.HEIGHT + 5,
                                                             RequestPresentBeatmap = _ => OnStart(),
+                                                            NewItemsPresented = newItemsPresented,
                                                             RelativeSizeAxes = Axes.Both,
                                                         },
+                                                        noResultsPlaceholder = new NoResultsPlaceholder(),
                                                     }
                                                 },
                                                 filterControl = new FilterControl
@@ -143,13 +182,28 @@ namespace osu.Game.Screens.SelectV2
                         }
                     },
                 },
+                new SkinnableContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.SongSelect))
+                {
+                    RelativeSizeAxes = Axes.Both,
+                },
+                modSpeedHotkeyHandler = new ModSpeedHotkeyHandler(),
                 modSelectOverlay,
             });
         }
 
+        /// <summary>
+        /// Called when a selection is made.
+        /// </summary>
+        /// <returns>If a resultant action occurred that takes the user away from SongSelect.</returns>
+        protected abstract bool OnStart();
+
         public override IReadOnlyList<ScreenFooterButton> CreateFooterButtons() => new ScreenFooterButton[]
         {
-            new FooterButtonMods(modSelectOverlay) { Current = Mods },
+            new FooterButtonMods(modSelectOverlay)
+            {
+                Current = Mods,
+                RequestDeselectAllMods = () => Mods.Value = Array.Empty<Mod>()
+            },
             new FooterButtonRandom(),
             new FooterButtonOptions(),
         };
@@ -158,12 +212,23 @@ namespace osu.Game.Screens.SelectV2
         {
             base.LoadComplete();
 
+            filterControl.CriteriaChanged += criteriaChanged;
+
             modSelectOverlay.State.BindValueChanged(v =>
             {
                 logo?.ScaleTo(v.NewValue == Visibility.Visible ? 0f : logo_scale, 400, Easing.OutQuint)
                     .FadeTo(v.NewValue == Visibility.Visible ? 0f : 1f, 200, Easing.OutQuint);
             }, true);
         }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            detailsArea.Height = wedgesContainer.DrawHeight - titleWedge.LayoutSize.Y - 4;
+        }
+
+        #region Transitions
 
         public override void OnEntering(ScreenTransitionEvent e)
         {
@@ -244,12 +309,6 @@ namespace osu.Game.Screens.SelectV2
             };
         }
 
-        /// <summary>
-        /// Called when a selection is made.
-        /// </summary>
-        /// <returns>If a resultant action occurred that takes the user away from SongSelect.</returns>
-        protected abstract bool OnStart();
-
         protected override void LogoSuspending(OsuLogo logo)
         {
             base.LogoSuspending(logo);
@@ -264,23 +323,122 @@ namespace osu.Game.Screens.SelectV2
             logo.FadeOut(120, Easing.Out);
         }
 
+        #endregion
+
+        #region Filtering
+
+        private const double filter_delay = 250;
+
+        private ScheduledDelegate? filterDebounce;
+
         /// <summary>
         /// Set the query to the search text box.
         /// </summary>
         /// <param name="query">The string to search.</param>
-        public void Search(string query)
+        public void Search(string query) => filterControl.Search(query);
+
+        private void criteriaChanged(FilterCriteria criteria)
         {
-            carousel.Filter(new FilterCriteria
+            filterDebounce?.Cancel();
+            filterDebounce = Scheduler.AddDelayed(() =>
             {
-                // TODO: this should only set the text of the current criteria, not use a completely new criteria.
-                SearchText = query,
-            });
+                noResultsPlaceholder.Filter = criteria;
+                carousel.Filter(criteria);
+            }, filter_delay);
         }
 
-        protected override void Update()
+        private void newItemsPresented()
         {
-            base.Update();
-            detailsArea.Height = wedgesContainer.DrawHeight - titleWedge.LayoutSize.Y - 4;
+            int count = carousel.MatchedBeatmapsCount;
+
+            noResultsPlaceholder.State.Value = count == 0 ? Visibility.Visible : Visibility.Hidden;
+
+            // Intentionally not localised until we have proper support for this (see https://github.com/ppy/osu-framework/pull/4918
+            // but also in this case we want support for formatting a number within a string).
+            filterControl.StatusText = count != 1 ? $"{count:#,0} matches" : $"{count:#,0} match";
         }
+
+        #endregion
+
+        #region Hotkeys
+
+        public virtual bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
+        {
+            if (!this.IsCurrentScreen()) return false;
+
+            switch (e.Action)
+            {
+                case GlobalAction.IncreaseModSpeed:
+                    return modSpeedHotkeyHandler.ChangeSpeed(0.05, ModUtils.FlattenMods(game.AvailableMods.Value.SelectMany(kv => kv.Value)));
+
+                case GlobalAction.DecreaseModSpeed:
+                    return modSpeedHotkeyHandler.ChangeSpeed(-0.05, ModUtils.FlattenMods(game.AvailableMods.Value.SelectMany(kv => kv.Value)));
+            }
+
+            return false;
+        }
+
+        public void OnReleased(KeyBindingReleaseEvent<GlobalAction> e)
+        {
+        }
+
+        protected override bool OnKeyDown(KeyDownEvent e)
+        {
+            if (e.Repeat) return false;
+
+            switch (e.Key)
+            {
+                case Key.Delete:
+                    if (e.ShiftPressed)
+                    {
+                        if (!Beatmap.IsDefault)
+                            Delete(Beatmap.Value.BeatmapSetInfo);
+                        return true;
+                    }
+
+                    break;
+            }
+
+            return base.OnKeyDown(e);
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Opens results screen with the given score.
+        /// This assumes active beatmap and ruleset selection matches the score.
+        /// </summary>
+        public void PresentScore(ScoreInfo score)
+        {
+            Debug.Assert(Beatmap.Value.BeatmapInfo.Equals(score.BeatmapInfo));
+            Debug.Assert(Ruleset.Value.Equals(score.Ruleset));
+
+            this.Push(new SoloResultsScreen(score));
+        }
+
+        #region Beatmap management
+
+        public virtual bool EditingAllowed => false;
+
+        public void ManageCollections() => collectionsDialog?.Show();
+
+        public void MarkPlayed(BeatmapInfo beatmap) => beatmaps.MarkPlayed(beatmap);
+
+        public void Hide(BeatmapInfo beatmap) => beatmaps.Hide(beatmap);
+
+        public void Edit(BeatmapInfo beatmap)
+        {
+            if (!EditingAllowed) return;
+
+            // Forced refetch is important here to guarantee correct invalidation across all difficulties.
+            Beatmap.Value = beatmaps.GetWorkingBeatmap(beatmap, true);
+            this.Push(new EditorLoader());
+        }
+
+        public void Delete(BeatmapSetInfo beatmapSet) => dialogOverlay?.Push(new BeatmapDeleteDialog(beatmapSet));
+
+        public void ClearScores(BeatmapInfo beatmap) => dialogOverlay?.Push(new BeatmapClearScoresDialog(beatmap));
+
+        #endregion
     }
 }

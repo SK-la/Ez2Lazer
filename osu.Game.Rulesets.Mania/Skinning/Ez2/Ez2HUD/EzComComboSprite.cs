@@ -17,8 +17,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
     public partial class EzComComboSprite : HitErrorMeter
     {
-        [SettingSource("Combo Text Font", "Combo Text Font", SettingControlType = typeof(OffsetNumberNameSelector))]
-        public Bindable<OffsetNumberName> NameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.EZ2DJ_4th);
+        [SettingSource("Combo Text Font", "Combo Text Font", SettingControlType = typeof(EzEnumListSelector))]
+        public Bindable<OffsetNumberName> NameDropdown { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)4);
 
         [SettingSource("Effect Type", "Effect Type")]
         public Bindable<EffectType> Effect { get; } = new Bindable<EffectType>(EffectType.Scale);
@@ -65,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), nameof(SkinnableComponentStrings.ColourDescription))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
-        public EzCounterText Text = null!;
+        public EzComboText Text = null!;
 
         public Bindable<int> Current { get; } = new Bindable<int>();
 
@@ -81,7 +81,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         {
             InternalChildren = new Drawable[]
             {
-                Text = new EzCounterText(NameDropdown)
+                Text = new EzComboText(NameDropdown)
                 {
                     Scale = new Vector2(0.8f),
                     Text = "c",

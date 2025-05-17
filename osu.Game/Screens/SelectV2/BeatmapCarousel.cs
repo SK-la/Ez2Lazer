@@ -11,6 +11,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Pooling;
+using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
@@ -31,12 +32,22 @@ namespace osu.Game.Screens.SelectV2
 
         private readonly LoadingLayer loading;
 
+        private readonly BeatmapCarouselFilterMatching matching;
         private readonly BeatmapCarouselFilterGrouping grouping;
+
+        /// <summary>
+        /// Total number of beatmap difficulties displayed with the filter.
+        /// </summary>
+        public int MatchedBeatmapsCount => matching.BeatmapItemsCount;
 
         protected override float GetSpacingBetweenPanels(CarouselItem top, CarouselItem bottom)
         {
-            if (top.Model is BeatmapInfo || bottom.Model is BeatmapInfo)
-                // Beatmap difficulty panels do not overlap with themselves or any other panel.
+            // Group panels do not overlap with any other panel but should overlap with themselves.
+            if ((top.Model is GroupDefinition) ^ (bottom.Model is GroupDefinition))
+                return SPACING * 2;
+
+            // Beatmap difficulty panels do not overlap with themselves or any other panel.
+            if (grouping.BeatmapSetsGroupedTogether && (top.Model is BeatmapInfo || bottom.Model is BeatmapInfo))
                 return SPACING;
 
             return -SPACING;
@@ -49,6 +60,7 @@ namespace osu.Game.Screens.SelectV2
 
             Filters = new ICarouselFilter[]
             {
+                matching = new BeatmapCarouselFilterMatching(() => Criteria),
                 new BeatmapCarouselFilterSorting(() => Criteria),
                 grouping = new BeatmapCarouselFilterGrouping(() => Criteria),
             };
@@ -331,11 +343,21 @@ namespace osu.Game.Screens.SelectV2
 
         public FilterCriteria Criteria { get; private set; } = new FilterCriteria();
 
+        private ScheduledDelegate? loadingDebounce;
+
         public void Filter(FilterCriteria criteria)
         {
             Criteria = criteria;
-            loading.Show();
-            FilterAsync().ContinueWith(_ => Schedule(() => loading.Hide()));
+
+            loadingDebounce ??= Scheduler.AddDelayed(() => loading.Show(), 250);
+
+            FilterAsync().ContinueWith(_ => Schedule(() =>
+            {
+                loadingDebounce?.Cancel();
+                loadingDebounce = null;
+
+                loading.Hide();
+            }));
         }
 
         #endregion
@@ -343,13 +365,17 @@ namespace osu.Game.Screens.SelectV2
         #region Drawable pooling
 
         private readonly DrawablePool<PanelBeatmap> beatmapPanelPool = new DrawablePool<PanelBeatmap>(100);
+        private readonly DrawablePool<PanelBeatmapStandalone> standalonePanelPool = new DrawablePool<PanelBeatmapStandalone>(100);
         private readonly DrawablePool<PanelBeatmapSet> setPanelPool = new DrawablePool<PanelBeatmapSet>(100);
         private readonly DrawablePool<PanelGroup> groupPanelPool = new DrawablePool<PanelGroup>(100);
+        private readonly DrawablePool<PanelGroupStarDifficulty> starsGroupPanelPool = new DrawablePool<PanelGroupStarDifficulty>(11);
 
         private void setupPools()
         {
+            AddInternal(starsGroupPanelPool);
             AddInternal(groupPanelPool);
             AddInternal(beatmapPanelPool);
+            AddInternal(standalonePanelPool);
             AddInternal(setPanelPool);
         }
 
@@ -375,12 +401,16 @@ namespace osu.Game.Screens.SelectV2
         {
             switch (item.Model)
             {
-                case GroupDefinition:
+                case GroupDefinition group:
+                    if (group.Data is StarDifficulty)
+                        return starsGroupPanelPool.Get();
+
                     return groupPanelPool.Get();
 
                 case BeatmapInfo:
-                    // TODO: if beatmap is a group selection target, it needs to be a different drawable
-                    // with more information attached.
+                    if (!grouping.BeatmapSetsGroupedTogether)
+                        return standalonePanelPool.Get();
+
                     return beatmapPanelPool.Get();
 
                 case BeatmapSetInfo:

@@ -18,8 +18,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 {
     public partial class EzComComboCounter : ComboCounter
     {
-        [SettingSource("Font", "Font", SettingControlType = typeof(OffsetNumberNameSelector))]
-        public Bindable<OffsetNumberName> NameDropdown { get; } = new Bindable<OffsetNumberName>(OffsetNumberName.EZ2DJ_4th);
+        [SettingSource("Font", "Font", SettingControlType = typeof(EzEnumListSelector))]
+        public Bindable<OffsetNumberName> NameDropdown { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)4);
 
         [SettingSource("Effect Type", "Effect Type")]
         public Bindable<EffectType> Effect { get; } = new Bindable<EffectType>(EffectType.Scale);
@@ -74,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), nameof(SkinnableComponentStrings.ColourDescription))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
-        public EzCounterText Text = null!;
+        public EzComboText Text = null!;
         protected override double RollingDuration => 250;
         protected virtual bool DisplayXSymbol => true;
 
@@ -142,9 +142,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         protected override IHasText CreateText()
         {
-            Text = new EzCounterText(NameDropdown)
+            Text = new EzComboText(NameDropdown)
             {
-                Scale = new Vector2(2.2f),
+                Scale = new Vector2(1.8f),
             };
             return Text;
         }

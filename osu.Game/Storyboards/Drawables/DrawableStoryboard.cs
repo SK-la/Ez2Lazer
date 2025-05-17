@@ -66,10 +66,9 @@ namespace osu.Game.Storyboards.Drawables
 
             Size = new Vector2(640, 480);
 
-            // 动态计算视频的宽高比
-            bool hasVideoElement = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
+            bool onlyHasVideoElements = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
 
-            if (hasVideoElement)
+            if (onlyHasVideoElements)
             {
                 Size = Vector2.One; // 填满窗口
                 FillMode = FillMode.Fit; // 保持比例

@@ -6,7 +6,6 @@ using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Carousel;
-using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
 using osu.Game.Screens.SelectV2;
 using osuTK;
@@ -22,7 +21,6 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         {
             RemoveAllBeatmaps();
             CreateCarousel();
-            SortBy(new FilterCriteria { Sort = SortMode.Title });
         }
 
         /// <summary>
@@ -221,7 +219,8 @@ namespace osu.Game.Tests.Visual.SongSelectV2
 
             AddAssert("no beatmaps visible", () => !GetVisiblePanels<PanelBeatmap>().Any());
 
-            ClickVisiblePanelWithOffset<PanelBeatmapSet>(0, new Vector2(0, -(PanelBeatmapSet.HEIGHT / 2)));
+            // add lenience to avoid floating-point inaccuracies at edge.
+            ClickVisiblePanelWithOffset<PanelBeatmapSet>(0, new Vector2(0, -(PanelBeatmapSet.HEIGHT / 2 - 1)));
 
             AddUntilStep("wait for beatmaps visible", () => GetVisiblePanels<PanelBeatmap>().Any());
             WaitForSelection(0, 0);
@@ -236,6 +235,30 @@ namespace osu.Game.Tests.Visual.SongSelectV2
 
             ClickVisiblePanelWithOffset<PanelBeatmap>(3, new Vector2(0, (CarouselItem.DEFAULT_HEIGHT / 2 + 1)));
             WaitForSelection(0, 3);
+        }
+
+        [Test]
+        public void TestDifficultySortingWithNoGroups()
+        {
+            AddBeatmaps(2, 3);
+            WaitForDrawablePanels();
+
+            SortAndGroupBy(SortMode.Difficulty, GroupMode.All);
+            WaitForFiltering();
+
+            AddUntilStep("standalone panels displayed", () => GetVisiblePanels<PanelBeatmapStandalone>().Any());
+
+            SelectNextGroup();
+            // both sets have a difficulty with 0.00* star rating.
+            // in the case of a tie when sorting, the first tie-breaker is `DateAdded` descending, which will pick the last set added (see `TestResources.CreateTestBeatmapSetInfo()`).
+            WaitForSelection(1, 0);
+
+            SelectNextGroup();
+            WaitForSelection(0, 0);
+
+            SelectNextPanel();
+            Select();
+            WaitForSelection(1, 1);
         }
 
         private void checkSelectionIterating(bool isIterating)

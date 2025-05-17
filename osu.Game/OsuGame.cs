@@ -67,6 +67,7 @@ using osu.Game.Screens.Footer;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.OnlinePlay.DailyChallenge;
 using osu.Game.Screens.OnlinePlay.Multiplayer;
+using osu.Game.Screens.OnlinePlay.Playlists;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Select;
@@ -79,6 +80,7 @@ using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
 using Sentry;
+using MatchType = osu.Game.Online.Rooms.MatchType;
 
 namespace osu.Game
 {
@@ -186,7 +188,7 @@ namespace osu.Game
         /// <summary>
         /// Whether the back button is currently displayed.
         /// </summary>
-        private readonly IBindable<bool> backButtonVisibility = new Bindable<bool>();
+        private readonly IBindable<bool> backButtonVisibility = new BindableBool();
 
         IBindable<LocalUserPlayingState> ILocalUserPlayInfo.PlayingState => UserPlayingState;
 
@@ -491,7 +493,6 @@ namespace osu.Game
                     HandleTimestamp(argString);
                     break;
 
-                case LinkAction.JoinMultiplayerMatch:
                 case LinkAction.Spectate:
                     waitForReady(() => Notifications, _ => Notifications.Post(new SimpleNotification
                     {
@@ -521,6 +522,11 @@ namespace osu.Game
                         ShowChangelogBuild(changelogArgs[0], changelogArgs[1]);
                     }
 
+                    break;
+
+                case LinkAction.JoinRoom:
+                    if (long.TryParse(argString, out long roomId))
+                        JoinRoom(roomId);
                     break;
 
                 default:
@@ -597,6 +603,28 @@ namespace osu.Game
         /// <param name="updateStream">The update stream name</param>
         /// <param name="version">The build version of the update stream</param>
         public void ShowChangelogBuild(string updateStream, string version) => waitForReady(() => changelogOverlay, _ => changelogOverlay.ShowBuild(updateStream, version));
+
+        /// <summary>
+        /// Joins a multiplayer or playlists room with the given <paramref name="id"/>.
+        /// </summary>
+        public void JoinRoom(long id)
+        {
+            var request = new GetRoomRequest(id);
+            request.Success += room =>
+            {
+                switch (room.Type)
+                {
+                    case MatchType.Playlists:
+                        PresentPlaylist(room);
+                        break;
+
+                    default:
+                        PresentMultiplayerMatch(room, string.Empty);
+                        break;
+                }
+            };
+            API.Queue(request);
+        }
 
         /// <summary>
         /// Seeks to the provided <paramref name="timestamp"/> if the editor is currently open.
@@ -725,6 +753,22 @@ namespace osu.Game
         /// <param name="password">The password to join the room, if any is given.</param>
         public void PresentMultiplayerMatch(Room room, string password)
         {
+            if (room.HasEnded)
+            {
+                // TODO: Eventually it should be possible to display ended multiplayer rooms in game too,
+                // but it generally will require turning off the entirety of communication with spectator server which is currently embedded into multiplayer screens.
+                Notifications.Post(new SimpleNotification
+                {
+                    Text = NotificationsStrings.MultiplayerRoomEnded,
+                    Activated = () =>
+                    {
+                        OpenUrlExternally($@"/multiplayer/rooms/{room.RoomID}");
+                        return true;
+                    }
+                });
+                return;
+            }
+
             PerformFromScreen(screen =>
             {
                 if (!(screen is Multiplayer multiplayer))
@@ -733,6 +777,23 @@ namespace osu.Game
                 multiplayer.Join(room, password);
             });
             // TODO: We should really be able to use `validScreens: new[] { typeof(Multiplayer) }` here
+            // but `PerformFromScreen` doesn't understand nested stacks.
+        }
+
+        /// <summary>
+        /// Join a playlist immediately.
+        /// </summary>
+        /// <param name="room">The playlist to join.</param>
+        public void PresentPlaylist(Room room)
+        {
+            PerformFromScreen(screen =>
+            {
+                if (!(screen is Playlists playlists))
+                    screen.Push(playlists = new Playlists());
+
+                playlists.Join(room);
+            });
+            // TODO: We should really be able to use `validScreens: new[] { typeof(Playlists) }` here
             // but `PerformFromScreen` doesn't understand nested stacks.
         }
 
@@ -1044,7 +1105,7 @@ namespace osu.Game
                                 {
                                     Anchor = Anchor.BottomLeft,
                                     Origin = Anchor.BottomLeft,
-                                    Action = () => ScreenFooter.OnBack?.Invoke(),
+                                    Action = handleBackButton,
                                 },
                                 logoContainer = new Container { RelativeSizeAxes = Axes.Both },
                                 footerBasedOverlayContent = new Container
@@ -1059,14 +1120,7 @@ namespace osu.Game
                                     Child = ScreenFooter = new ScreenFooter(backReceptor)
                                     {
                                         RequestLogoInFront = inFront => ScreenContainer.ChangeChildDepth(logoContainer, inFront ? float.MinValue : 0),
-                                        OnBack = () =>
-                                        {
-                                            if (!(ScreenStack.CurrentScreen is IOsuScreen currentScreen))
-                                                return;
-
-                                            if (!((Drawable)currentScreen).IsLoaded || (currentScreen.AllowUserExit && !currentScreen.OnBackButton()))
-                                                ScreenStack.Exit();
-                                        }
+                                        BackButtonPressed = handleBackButton
                                     },
                                 },
                             }
@@ -1245,6 +1299,13 @@ namespace osu.Game
 
             // Importantly, this should be run after binding PostNotification to the import handlers so they can present the import after game startup.
             handleStartupImport();
+        }
+
+        private void handleBackButton()
+        {
+            if (!(ScreenStack.CurrentScreen is IOsuScreen currentScreen)) return;
+
+            if (!((Drawable)currentScreen).IsLoaded || (currentScreen.AllowUserExit && !currentScreen.OnBackButton())) ScreenStack.Exit();
         }
 
         private void handleStartupImport()
@@ -1657,7 +1718,6 @@ namespace osu.Game
             // Bind to new screen.
             if (newScreen != null)
             {
-                backButtonVisibility.BindTo(newScreen.BackButtonVisibility);
                 OverlayActivationMode.BindTo(newScreen.OverlayActivationMode);
                 configUserActivity.BindTo(newScreen.Activity);
 
@@ -1669,19 +1729,36 @@ namespace osu.Game
                 else
                     Toolbar.Show();
 
+                var newOsuScreen = (OsuScreen)newScreen;
+
                 if (newScreen.ShowFooter)
                 {
+                    // the legacy back button should never display while the new footer is in use, as it
+                    // contains its own local back button.
+                    ((BindableBool)backButtonVisibility).Value = false;
+
                     BackButton.Hide();
-                    ScreenFooter.SetButtons(newScreen.CreateFooterButtons());
                     ScreenFooter.Show();
+
+                    newOsuScreen.OnLoadComplete += _ =>
+                    {
+                        var buttons = newScreen.CreateFooterButtons();
+
+                        newOsuScreen.LoadComponentsAgainstScreenDependencies(buttons);
+
+                        ScreenFooter.SetButtons(buttons);
+                        ScreenFooter.Show();
+                    };
                 }
                 else
                 {
+                    backButtonVisibility.BindTo(newScreen.BackButtonVisibility);
+
                     ScreenFooter.SetButtons(Array.Empty<ScreenFooterButton>());
                     ScreenFooter.Hide();
                 }
 
-                skinEditor.SetTarget((OsuScreen)newScreen);
+                skinEditor.SetTarget(newOsuScreen);
             }
         }
 
