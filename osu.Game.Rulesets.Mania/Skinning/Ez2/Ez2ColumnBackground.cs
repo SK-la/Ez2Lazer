@@ -12,6 +12,7 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osuTK.Graphics;
@@ -28,36 +29,35 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         // private Box background = null!;
         private Box backgroundOverlay = null!;
         private Box? separator;
-        private readonly OsuConfigManager config;
-        private readonly IBindable<double> columnWidthBindable;
-        private readonly IBindable<double> specialFactorBindable;
+
+        // private readonly OsuConfigManager config;
+        private readonly IBindable<double> columnWidth;
+        private readonly IBindable<double> specialFactor;
 
         [Resolved]
         private Column column { get; set; } = null!;
+
+        [Resolved]
+        private StageDefinition stageDefinition { get; set; } = null!;
 
         // private Bindable<Color4> accentColour = null!;
         private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
 
         public Ez2ColumnBackground(OsuConfigManager config)
         {
-            this.config = config;
+            // this.config = config;
             RelativeSizeAxes = Axes.Y;
-            columnWidthBindable = new Bindable<double>();
-            specialFactorBindable = new Bindable<double>();
             Masking = true;
             // CornerRadius = 6; //设置圆角, 轨道间会出现缝隙
+
+            columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
+            specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
         }
 
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo, StageDefinition stageDefinition)
         {
-            columnWidthBindable.BindTo(config.GetBindable<double>(OsuSetting.ColumnWidth));
-            specialFactorBindable.BindTo(config.GetBindable<double>(OsuSetting.SpecialFactor));
-
-            columnWidthBindable.BindValueChanged(_ => updateWidth(stageDefinition));
-            specialFactorBindable.BindValueChanged(_ => updateWidth(stageDefinition));
-
-            updateWidth(stageDefinition);
+            // updateWidth(stageDefinition);
 
             if (stageDefinition.Columns == 14 && column.Index == 13)
             {
@@ -129,7 +129,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             base.LoadComplete();
 
-            if (separator != null) separator.Height = DrawHeight - Stage.HIT_TARGET_POSITION;
+            if (separator != null)
+                separator.Height = DrawHeight - Stage.HIT_TARGET_POSITION;
+
+            float width = (float)columnWidth.Value;
+
+            if (stageDefinition.EzIsSpecialColumn(column.Index))
+                width *= (float)specialFactor.Value;
+
+            Width = width;
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
@@ -170,97 +178,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 backgroundOverlay.FadeTo(0, 250, Easing.OutQuint);
         }
 
-        private static readonly Color4 colour_column = new Color4(4, 4, 4, 255);
-        private static readonly Color4 colour_scratch = new Color4(20, 0, 0, 255);
-        private static readonly Color4 colour_panel = new Color4(0, 20, 0, 255);
-        private static readonly Color4 colour_alpha = new Color4(0, 0, 0, 0);
-
         public static Color4 DrawColoursForColumns(int columnIndex, StageDefinition stage)
         {
-            columnIndex %= stage.Columns;
-
-            // bool noScratch = NoScratch.Value;
-            // bool noPanel = NoPanel.Value;
-            switch (stage.Columns)
-            {
-                case 12:
-                    switch (columnIndex)
-                    {
-                        case 0:
-                        case 11:
-                            return colour_scratch;
-
-                        default:
-                            return colour_column;
-                    }
-
-                case 14:
-                    switch (columnIndex)
-                    {
-                        case 0:
-                        case 12:
-                            return colour_scratch;
-
-                        case 13:
-                            return colour_alpha;
-
-                        case 6:
-                            return colour_panel;
-
-                        default:
-                            return colour_column;
-                    }
-
-                case 16:
-                    switch (columnIndex)
-                    {
-                        case 0:
-                        case 15:
-                            return colour_scratch;
-
-                        case 6:
-                        case 7:
-                        case 8:
-                        case 9:
-                            return colour_panel;
-
-                        default:
-                            return colour_column;
-                    }
-
-                default:
-                    return colour_column;
-            }
-        }
-
-        private void updateWidth(StageDefinition stageDefinition)
-        {
-            float baseWidth = (float)columnWidthBindable.Value;
-            float multiplier = 1.0f;
-
-            switch (stageDefinition.Columns)
-            {
-                case 12:
-                    if (column.Index == 0 || column.Index == 11)
-                        multiplier = (float)specialFactorBindable.Value; // scratch 列
-                    break;
-
-                case 14:
-                    if (column.Index == 0 || column.Index == 12)
-                        multiplier = (float)specialFactorBindable.Value; // scratch 列
-                    else if (column.Index == 6)
-                        multiplier = 1f; // panel 列
-                    break;
-
-                case 16:
-                    if (column.Index == 0 || column.Index == 15)
-                        multiplier = (float)specialFactorBindable.Value; // scratch 列
-                    else if (column.Index >= 6 && column.Index <= 9)
-                        multiplier = 1; // effect 列
-                    break;
-            }
-
-            Width = baseWidth * multiplier;
+            return stage.EzGetColumnColor(columnIndex);
         }
 
         private bool drawSeparator(int columnIndex, StageDefinition stage, bool isSeparator)

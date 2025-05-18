@@ -128,7 +128,6 @@ namespace osu.Game.Screens.Edit.Components
 
         private void loadEzSettingsComponents()
         {
-            // 这里只加载EZ设置相关的组件
             Add(new EzSkinSettings
             {
                 RelativeSizeAxes = Axes.X,
@@ -137,8 +136,6 @@ namespace osu.Game.Screens.Edit.Components
 
         private void loadDefaultComponents()
         {
-            // 这里恢复默认编辑器的组件
-            // 将原有的组件重新添加到Content中
         }
     }
 }

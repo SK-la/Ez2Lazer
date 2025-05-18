@@ -5,16 +5,27 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Skinning;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Screens
 {
     public partial class EzSkinSettings : EditorSidebarSection
     {
+        public Bindable<double> HitPosition { get; } = new BindableNumber<double>(110f)
+        {
+            MinValue = 0f,
+            MaxValue = 300f,
+            Precision = 10f,
+        };
+
         private Bindable<double>? columnWidth;
         private Bindable<double>? specialFactor;
 
@@ -34,6 +45,11 @@ namespace osu.Game.Screens
         {
             columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
             specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
+
+            // 这种刷新会卡，所以先不直接追踪刷新，用按钮手动刷新比较好
+            // columnWidth.ValueChanged += _ => RefreshSkin();
+            // specialFactor.ValueChanged += _ => RefreshSkin();
+            // HitPosition.ValueChanged += _ => RefreshSkin();
 
             Children = new Drawable[]
             {
@@ -57,24 +73,76 @@ namespace osu.Game.Screens
                             Current = specialFactor,
                             KeyboardStep = 0.1f,
                         },
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "(判定线)Hit Position",
+                            Current = HitPosition,
+                            KeyboardStep = 0.1f,
+                        },
                         new SettingsButton
                         {
-                            Text = "(刷新皮肤)Update Skin No Active",
                             Action = () =>
                             {
-                                var currentSkin = skinManager.CurrentSkin.Value;
+                                RefreshSkin();
+                            },
+                        }.WithTwoLineText("(刷新并保存皮肤)", "Refresh & Save Skin")
+                    }
+                }
+            };
+        }
 
-                                if (currentSkin is LegacySkin legacySkin)
-                                {
-                                    var info = legacySkin.SkinInfo;
-                                    skinManager.CurrentSkinInfo.Value = null;
-                                    skinManager.CurrentSkinInfo.Value = info;
-                                }
+        public void RefreshSkin()
+        {
+            skinManager.CurrentSkinInfo.TriggerChange();
+        }
+    }
+
+    public static class SettingsButtonExtensions
+    {
+        public static SettingsButton WithTwoLineText(this SettingsButton button, string topText, string bottomText, int fontSize = 14)
+        {
+            button.Child = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Children = new Drawable[]
+                {
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.AliceBlue,
+                        Alpha = 0.1f
+                    },
+                    // 文本层
+                    new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(0, 2),
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Children = new Drawable[]
+                        {
+                            new OsuSpriteText
+                            {
+                                Text = topText,
+                                Font = OsuFont.GetFont(size: fontSize),
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre
+                            },
+                            new OsuSpriteText
+                            {
+                                Text = bottomText,
+                                Font = OsuFont.GetFont(size: fontSize),
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre
                             }
                         }
                     }
                 }
             };
+
+            return button;
         }
     }
 
@@ -82,11 +150,5 @@ namespace osu.Game.Screens
     {
         Default,
         EzSettings
-    }
-
-    public enum SidebarPosition
-    {
-        Left,
-        Right
     }
 }

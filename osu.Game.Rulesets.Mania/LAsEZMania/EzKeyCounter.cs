@@ -1,14 +1,11 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.Configuration;
 using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Screens.Play.HUD;
 
@@ -20,15 +17,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         private OsuSpriteText keyNameText = null!;
         private OsuSpriteText countText = null!;
 
-        // private OsuSpriteText comboText = null!;
-
-        private UprightAspectMaintainingContainer uprightContainer = null!;
-
-        // These values were taken from Figma
         private const float line_height = 3;
         private const float name_font_size = 10;
         private const float count_font_size = 14;
-
         private const float scale_factor = 1.5f;
 
         private const float indicator_press_offset = 4;
@@ -42,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load()
         {
             Children = new Drawable[]
             {
@@ -58,63 +49,31 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
                     Padding = new MarginPadding { Top = line_height * scale_factor + indicator_press_offset },
                     Children = new Drawable[]
                     {
-                        uprightContainer = new UprightAspectMaintainingContainer
+                        keyNameText = new OsuSpriteText
                         {
-                            RelativeSizeAxes = Axes.Both,
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
-                            Children = new Drawable[]
-                            {
-                                keyNameText = new OsuSpriteText
-                                {
-                                    Anchor = Anchor.TopLeft,
-                                    Origin = Anchor.TopLeft,
-                                    Font = OsuFont.Torus.With(size: name_font_size * scale_factor, weight: FontWeight.Bold),
-                                    Colour = colours.Blue0,
-                                    Text = Trigger.Name,
-                                },
-                                countText = new OsuSpriteText
-                                {
-                                    Anchor = Anchor.BottomLeft,
-                                    Origin = Anchor.BottomLeft,
-                                    Font = OsuFont.Torus.With(size: count_font_size * scale_factor, weight: FontWeight.Bold),
-                                },
-                                // comboText = new OsuSpriteText
-                                // {
-                                //     Anchor = Anchor.Centre,
-                                //     Origin = Anchor.TopCentre,
-                                //     Font = OsuFont.Stat.With(size: count_font_size * scale_factor),
-                                // },
-                            }
-                        }
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Font = OsuFont.Torus.With(size: name_font_size * scale_factor, weight: FontWeight.Bold),
+                            Colour = colours.Blue0,
+                            Text = Trigger.Name
+                        },
+                        countText = new OsuSpriteText
+                        {
+                            Anchor = Anchor.BottomCentre,
+                            Origin = Anchor.BottomCentre,
+                            Font = OsuFont.Torus.With(size: count_font_size * scale_factor, weight: FontWeight.Bold),
+                        },
                     }
                 },
             };
 
             Height = 30 * scale_factor;
-            Width = (float)config.Get<double>(OsuSetting.ColumnWidth);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
             CountPresses.BindValueChanged(e => countText.Text = e.NewValue.ToString(@"#,0"), true);
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-
-            const float allowance = 6;
-            float absRotation = Math.Abs(uprightContainer.Rotation) % 180;
-            bool unused = absRotation > allowance && absRotation < (180 - allowance);
-
-            keyNameText.Anchor =
-                keyNameText.Origin = Anchor.TopCentre;
-
-            countText.Anchor =
-                countText.Origin = Anchor.BottomCentre;
         }
 
         protected override void Activate(bool forwardPlayback = true)

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -182,9 +183,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             double interval = 60000 / bpm;
 
+            double fadeTime = Math.Max(50, interval / 2);
+
             Scheduler.AddDelayed(() =>
             {
-                container.Children.OfType<Box>().First().FadeTo(1, interval / 2).Then().FadeTo(0, interval / 2);
+                container.Children.OfType<Box>().First()
+                         .FadeTo(1, fadeTime)
+                         .Then()
+                         .FadeTo(0, fadeTime);
             }, interval, true);
         }
 
