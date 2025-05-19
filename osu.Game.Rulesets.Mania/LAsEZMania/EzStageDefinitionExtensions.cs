@@ -10,18 +10,16 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
     {
         public static bool EzIsSpecialColumn(this StageDefinition stage, int columnIndex)
         {
-            // columnIndex %= stage.Columns;
             if (columnIndex < 0 || columnIndex >= stage.Columns)
                 return false;
 
             return stage.Columns switch
             {
-                5 when columnIndex == 2 => true,
-                7 when columnIndex == 3 => true,
-                9 when columnIndex == 4 => true,
-                12 when columnIndex == 0 || columnIndex == 11 => true,
-                14 when columnIndex == 0 || columnIndex == 12 => true,
-                16 when columnIndex == 0 || columnIndex == 15 => true,
+                7 when columnIndex is 3 => true,
+                9 when columnIndex is 4 => true,
+                12 when columnIndex is 0 or 11 => true,
+                14 when columnIndex is 0 or 12 => true,
+                16 when columnIndex is 0 or 15 => true,
                 _ => false
             };
         }
@@ -33,12 +31,12 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
 
             return stage.Columns switch
             {
-                12 when columnIndex == 0 || columnIndex == 11 => colour_scratch,
-                14 when columnIndex == 0 || columnIndex == 12 => colour_scratch,
-                14 when columnIndex == 13 => colour_alpha,
-                14 when columnIndex == 6 => colour_panel,
-                16 when columnIndex == 0 || columnIndex == 15 => colour_scratch,
-                16 when columnIndex == 6 || columnIndex == 7 || columnIndex == 8 || columnIndex == 9 => colour_panel,
+                12 when columnIndex is 0 or 11 => colour_scratch,
+                14 when columnIndex is 0 or 12 => colour_scratch,
+                14 when columnIndex is 13 => colour_alpha,
+                14 when columnIndex is 6 => colour_panel,
+                16 when columnIndex is 0 or 15 => colour_scratch,
+                16 when columnIndex is 6 or 7 or 8 or 9 => colour_scratch,
                 _ => colour_column
             };
         }

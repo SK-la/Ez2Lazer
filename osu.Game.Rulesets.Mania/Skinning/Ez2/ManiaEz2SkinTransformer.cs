@@ -9,8 +9,10 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osuTK;
@@ -22,40 +24,38 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     {
         private readonly ManiaBeatmap beatmap;
 
-        private readonly OsuConfigManager config;
-
-        // float hitPosition = (float)EzSkinSettings.HitPosition.Value;
-        private const float hit_position = 110;
-
-        // private readonly Dictionary<int, Bindable<float>> columnWidths = new Dictionary<int, Bindable<float>>();
-        // private readonly IBindable<double> columnWidthBindable;
-        // private readonly IBindable<double> specialFactorBindable;
-
+        // private readonly OsuConfigManager config;
+        // private readonly EzSkinSettings ezSkinSettings;
         // private readonly float totalColumnWidth;
-        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config)
+        private readonly IBindable<double> columnWidthBindable;
+        private readonly IBindable<double> specialFactorBindable;
+        private readonly IBindable<double> virtualHitPositionBindable;
+
+        private float hitPosition => (float)virtualHitPositionBindable.Value;
+
+        private float columnWidth { get; set; }
+
+        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config, EzSkinSettings ezSkinSettings)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            this.config = config ?? throw new ArgumentNullException(nameof(config));
+            // this.config = config ?? throw new ArgumentNullException(nameof(config));
+            // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
 
-            // columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            // specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
+            columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
+            specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
+            virtualHitPositionBindable = config.GetBindable<double>(OsuSetting.VirtualHitPosition);
+
+            // 注册值变化事件，自动触发SkinTransformer的更新
+            // columnWidthBindable.ValueChanged += _ => triggerSourceChanged();
+            // specialFactorBindable.ValueChanged += _ => triggerSourceChanged();
+            // virtualHitPositionBindable.ValueChanged += _ => triggerSourceChanged();
         }
 
-        // public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap)
-        //     : base(skin)
+        // private void triggerSourceChanged()
         // {
-        //     this.beatmap = (ManiaBeatmap)beatmap;
-
-            // if (this.beatmap.TotalColumns <= 10)
-            // {
-            // totalColumnWidth = 0.82f;
-            // }
-            // else
-            // {
-            //     totalColumnWidth = 7 * 40f / 200f;
-            // }
+        //     TriggerChange();
         // }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -128,21 +128,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 }
 
                                 var keyCounter = container.ChildrenOfType<EzComKeyCounterDisplay>().FirstOrDefault();
+                                var columnHitErrorMeter = container.OfType<EzComHitTimingColumns>().FirstOrDefault();
 
                                 if (keyCounter != null)
                                 {
                                     keyCounter.Anchor = Anchor.BottomCentre;
                                     keyCounter.Origin = Anchor.TopCentre;
-                                    keyCounter.Position = new Vector2(0, -hit_position - stage_padding_bottom);
+                                    keyCounter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
                                 }
-
-                                var columnHitErrorMeter = container.OfType<EzComHitTimingColumns>().FirstOrDefault();
 
                                 if (columnHitErrorMeter != null)
                                 {
                                     columnHitErrorMeter.Anchor = Anchor.BottomCentre;
                                     columnHitErrorMeter.Origin = Anchor.Centre;
-                                    columnHitErrorMeter.Position = new Vector2(0, -hit_position - stage_padding_bottom);
+                                    columnHitErrorMeter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -205,7 +204,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                             // if (Skin is Ez2Skin && resultComponent.Component >= HitResult.Perfect)
                             //     return Drawable.Empty();
 
-                            return new Ez2ColumnBackground(config);
+                            return new Ez2ColumnBackground();
 
                         case ManiaSkinComponents.HoldNoteBody:
                             return new Ez2HoldBodyPiece();
@@ -243,11 +242,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             {
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
-                bool isSpecialColumn = stage.IsSpecialColumn(columnIndex);
+                bool isSpecialColumn = stage.EzIsSpecialColumn(columnIndex);
 
-                float columnWidth = (float)config.Get<double>(OsuSetting.ColumnWidth);
-                float specialFactor = (float)config.Get<double>(OsuSetting.SpecialFactor);
-                float width = columnWidth * (isSpecialColumn ? specialFactor : 1);
+                // float columnWidth = (float)config.Get<double>(OsuSetting.ColumnWidth);
+                // float specialFactor = (float)config.Get<double>(OsuSetting.SpecialFactor);
+                // float width = columnWidth * (isSpecialColumn ? specialFactor : 1);
+                columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
 
                 switch (maniaLookup.Lookup)
                 {
@@ -265,10 +265,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         return SkinUtils.As<TValue>(new Bindable<float>(0));
 
                     case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(hit_position));
+                        return SkinUtils.As<TValue>(new Bindable<float>(hitPosition));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-                        return SkinUtils.As<TValue>(new Bindable<float>(width));
+                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
 
@@ -301,208 +301,95 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             switch (stage.Columns)
             {
-                case 1:
-                case 2:
-                case 3:
-                    return colour_special;
-
                 case 4:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 0: return colour_green;
-
-                        case 1: return colour_red;
-
-                        case 2: return colour_blue;
-
-                        case 3: return colour_cyan;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        0 => colour_green,
+                        1 => colour_red,
+                        2 => colour_blue,
+                        3 => colour_cyan,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
                 case 5:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 0: return colour_green;
-
-                        case 1: return colour_blue;
-
-                        case 2: return colour_red;
-
-                        case 3: return colour_cyan;
-
-                        case 4: return colour_purple;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        0 => colour_green,
+                        1 => colour_blue,
+                        2 => colour_red,
+                        3 => colour_cyan,
+                        4 => colour_purple,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
                 case 7:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 1:
-                        case 5:
-                            return colour_withe;
-
-                        case 0:
-                        case 2:
-                        case 4:
-                        case 6:
-                            return colour_blue;
-
-                        case 3:
-                            return colour_green;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        1 or 5 => colour_withe,
+                        0 or 2 or 4 or 6 => colour_blue,
+                        3 => colour_green,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
                 case 8:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 0:
-                        case 4:
-                            return colour_red;
-
-                        case 2:
-                        case 6:
-                            return colour_withe;
-
-                        case 1:
-                        case 3:
-                        case 5:
-                        case 7:
-                            return colour_blue;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        0 or 4 => colour_red,
+                        2 or 6 => colour_withe,
+                        1 or 3 or 5 or 7 => colour_blue,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
                 case 9:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 0:
-                        case 6:
-                        case 7:
-                            return colour_red;
-
-                        case 2:
-                        case 4:
-                            return colour_withe;
-
-                        case 1:
-                        case 3:
-                        case 5:
-                            return colour_blue;
-
-                        case 8:
-                            return colour_green;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        0 or 6 or 7 => colour_red,
+                        2 or 4 => colour_withe,
+                        1 or 3 or 5 => colour_blue,
+                        8 => colour_green,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
                 case 10:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 0:
-                        case 9:
-                            return colour_green;
-
-                        case 2:
-                        case 4:
-                        case 5:
-                        case 7:
-                            return colour_withe;
-
-                        case 1:
-                        case 3:
-                        case 6:
-                        case 8:
-                            return colour_blue;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        0 or 9 => colour_green,
+                        2 or 4 or 5 or 7 => colour_withe,
+                        1 or 3 or 6 or 8 => colour_blue,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
                 case 12:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 0:
-                        case 11:
-                            return colour_red;
-
-                        case 1:
-                        case 3:
-                        case 5:
-                        case 6:
-                        case 8:
-                        case 10:
-                            return colour_withe;
-
-                        case 2:
-                        case 4:
-                        case 7:
-                        case 9:
-                            return colour_blue;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        0 or 11 => colour_red,
+                        1 or 3 or 5 or 6 or 8 or 10 => colour_withe,
+                        2 or 4 or 7 or 9 => colour_blue,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
                 case 14:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 0:
-                        case 12:
-                        case 13:
-                            return colour_red;
-
-                        case 1:
-                        case 3:
-                        case 5:
-                        case 7:
-                        case 9:
-                        case 11:
-                            return colour_withe;
-
-                        case 2:
-                        case 4:
-                        case 8:
-                        case 10:
-                            return colour_blue;
-
-                        case 6:
-                            return colour_green;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        0 or 12 or 13 => colour_red,
+                        1 or 3 or 5 or 7 or 9 or 11 => colour_withe,
+                        2 or 4 or 8 or 10 => colour_blue,
+                        6 => colour_green,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
 
                 case 16:
-                    switch (columnIndex)
+                    return columnIndex switch
                     {
-                        case 0:
-                        case 6:
-                        case 7:
-                        case 8:
-                        case 9:
-                        case 15:
-                            return colour_red;
-
-                        case 1:
-                        case 3:
-                        case 5:
-                        case 10:
-                        case 12:
-                        case 14:
-                            return colour_withe;
-
-                        case 2:
-                        case 4:
-                        case 11:
-                        case 13:
-                            return colour_blue;
-
-                        default: throw new ArgumentOutOfRangeException();
-                    }
+                        0 or 6 or 7 or 8 or 9 or 15 => colour_red,
+                        1 or 3 or 5 or 10 or 12 or 14 => colour_withe,
+                        2 or 4 or 11 or 13 => colour_blue,
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
             }
 
-            // fallback for unhandled scenarios
-            if (stage.IsSpecialColumn(columnIndex))
+            // 后备逻辑保持不变
+            if (stage.EzIsSpecialColumn(columnIndex))
                 return colour_special;
 
             switch (columnIndex % total_colours)

@@ -10,11 +10,11 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Backgrounds;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
@@ -26,13 +26,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private Color4 brightColour;
         private Color4 dimColour;
 
-        // private Box background = null!;
+        private Box background = null!;
         private Box backgroundOverlay = null!;
         private Box? separator;
-
-        // private readonly OsuConfigManager config;
-        private readonly IBindable<double> columnWidth;
-        private readonly IBindable<double> specialFactor;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -40,76 +36,71 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
-        // private Bindable<Color4> accentColour = null!;
+        private float hitPosition => (float)(GlobalConfigStore.EZConfig?.VirtualHitPosition?.Value ?? 110f);
+
+        private Bindable<Color4> accentColour = null!;
         private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
 
-        public Ez2ColumnBackground(OsuConfigManager config)
+        public Ez2ColumnBackground()
         {
-            // this.config = config;
-            RelativeSizeAxes = Axes.Y;
+            RelativeSizeAxes = Axes.Both;
             Masking = true;
-            // CornerRadius = 6; //设置圆角, 轨道间会出现缝隙
-
-            columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo, StageDefinition stageDefinition)
+        private void load(IScrollingInfo scrollingInfo)
         {
-            // updateWidth(stageDefinition);
-
             if (stageDefinition.Columns == 14 && column.Index == 13)
-            {
                 return;
-            }
 
-            InternalChildren = new Drawable[]
+            InternalChild = new Container
             {
-                new Box
+                RelativeSizeAxes = Axes.Both,
+                Children = new Drawable[]
                 {
-                    Name = "Background",
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Color4.Black.Opacity(0.8f),
-                },
-                backgroundOverlay = new Box
-                {
-                    Name = "Background Gradient Overlay",
-                    RelativeSizeAxes = Axes.Both,
-                    Height = 0.5f,
-                    Blending = BlendingParameters.Additive,
-                    Alpha = 0
-                },
-                separator = new Box
-                {
-                    Name = "Separator",
-                    Anchor = Anchor.TopRight,
-                    Origin = Anchor.TopRight,
-                    // RelativeSizeAxes = Axes.None,
-                    Width = 2,
-                    // Height = DrawHeight - Stage.HIT_TARGET_POSITION,
-                    Colour = Color4.White,
-                    Alpha = 0,
+                    background = new Box
+                    {
+                        Name = "Background",
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.Black.Opacity(0.8f),
+                    },
+                    backgroundOverlay = new Box
+                    {
+                        Name = "Background Gradient Overlay",
+                        RelativeSizeAxes = Axes.Both,
+                        Height = 0.5f,
+                        Blending = BlendingParameters.Additive,
+                        Alpha = 0
+                    },
+                    separator = new Box
+                    {
+                        Name = "Separator",
+                        Anchor = Anchor.TopRight,
+                        Origin = Anchor.TopRight,
+                        Width = 2,
+                        Colour = Color4.White,
+                        Alpha = 0,
+                    }
                 }
             };
 
             overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
 
-            // accentColour = new Bindable<Color4>(DrawColoursForColumns(column.Index, stageDefinition));
-            // accentColour.BindValueChanged(colour =>
-            // {
-            //     var newColour = colour.NewValue.Darken(3);
-            //
-            //     if (newColour.A != 0)
-            //     {
-            //         newColour = newColour.Opacity(0.8f);
-            //     }
-            //
-            //     backgroundOverlay.Colour = newColour;
-            //     // background.Colour = colour.NewValue.Darken(3);
-            //     // brightColour = colour.NewValue.Opacity(0.6f);
-            //     // dimColour = colour.NewValue.Opacity(0);
-            // }, true);
+            accentColour = new Bindable<Color4>(DrawColoursForColumns(column.Index, stageDefinition));
+            accentColour.BindValueChanged(colour =>
+            {
+                var newColour = colour.NewValue.Darken(3);
+
+                if (newColour.A != 0)
+                {
+                    newColour = newColour.Opacity(0.8f);
+                }
+
+                backgroundOverlay.Colour = newColour;
+                background.Colour = colour.NewValue.Opacity(0.8f).Darken(3);
+                brightColour = colour.NewValue.Opacity(0.6f);
+                dimColour = colour.NewValue.Opacity(0);
+            }, true);
 
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
@@ -130,14 +121,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             base.LoadComplete();
 
             if (separator != null)
-                separator.Height = DrawHeight - Stage.HIT_TARGET_POSITION;
-
-            float width = (float)columnWidth.Value;
-
-            if (stageDefinition.EzIsSpecialColumn(column.Index))
-                width *= (float)specialFactor.Value;
-
-            Width = width;
+                separator.Height = DrawHeight - hitPosition;
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
@@ -185,49 +169,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         private bool drawSeparator(int columnIndex, StageDefinition stage, bool isSeparator)
         {
+            if (!isSeparator)
+                return false;
+
             columnIndex %= stage.Columns;
 
-            switch (stage.Columns)
+            return stage.Columns switch
             {
-                case 12:
-                    switch (columnIndex)
-                    {
-                        case 0:
-                        case 10:
-
-                            return isSeparator;
-
-                        default: return false;
-                    }
-
-                case 14:
-                    switch (columnIndex)
-                    {
-                        case 0:
-                        case 5:
-                        case 6:
-                        case 11:
-
-                            return isSeparator;
-
-                        default: return false;
-                    }
-
-                case 16:
-                    switch (columnIndex)
-                    {
-                        case 0:
-                        case 5:
-                        case 9:
-                        case 14:
-
-                            return isSeparator;
-
-                        default: return false;
-                    }
-
-                default: return false;
-            }
+                12 => columnIndex is 0 or 10,
+                14 => columnIndex is 0 or 5 or 6 or 11,
+                16 => columnIndex is 0 or 5 or 9 or 14,
+                _ => false
+            };
         }
     }
 }

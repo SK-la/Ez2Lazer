@@ -159,6 +159,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.HitMode, MUGHitMode.EZ2AC);
             SetDefault(OsuSetting.ColumnWidth, 50, 9, 90, 1.0);
             SetDefault(OsuSetting.SpecialFactor, 1, 0.1, 4, 0.1);
+            SetDefault(OsuSetting.VirtualHitPosition, 110, 0, 384, 1.0);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
@@ -425,6 +426,7 @@ namespace osu.Game.Configuration
         ScalingGameMode,
         ColumnWidth,
         SpecialFactor,
+        VirtualHitPosition,
 
         HitMode,
         AccuracyCutoffS,

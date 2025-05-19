@@ -47,10 +47,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         private Box[] judgementMarkers = null!;
         private Container[] columns = null!;
 
-        // private StageDefinition stage = null!;
         private int keyCount;
-
-        // private OsuConfigManager config = null!;
 
         private Bindable<double> columnWidth = null!;
         private Bindable<double> specialFactor = null!;
@@ -66,10 +63,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         [BackgroundDependencyLoader]
         private void load(OsuConfigManager config)
         {
-            keyCount = controller.Triggers.Count;
-            floatingAverages = new double[keyCount];
-            judgementMarkers = new Box[keyCount];
-
             columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
             specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
 
@@ -78,6 +71,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         private void recreateComponents()
         {
+            keyCount = controller.Triggers.Count;
+            floatingAverages = new double[keyCount];
+            judgementMarkers = new Box[keyCount];
             InternalChild = new Container
             {
                 Anchor = Anchor.Centre,
@@ -155,7 +151,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
                     marker.Y = newRelativeY;
 
-                    // 更新标识块的移动范围
                     marker.MoveToY(newRelativeY, 800, Easing.OutQuint);
                 }
 

@@ -1,0 +1,88 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
+using osu.Game.Graphics.UserInterface;
+
+namespace osu.Game.Screens.Edit.Components
+{
+    internal partial class EzEditorSidebar : EditorSidebar
+    {
+        public enum SidebarTab
+        {
+            Default,
+            EzSettings
+        }
+
+        private readonly OsuTabControl<SidebarTab> tabControl;
+        private EzSkinSettings? ezSkinSettings;
+        private SidebarTab currentTab = SidebarTab.Default;
+        private Action<Container<EditorSidebarSection>>? lastPopulator;
+
+        public EzEditorSidebar()
+        {
+            // 添加tabControl背景，防止内容遮挡tab标签
+            var tabBackground = new Box
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 30,
+                Colour = Colour4.FromHex("222831") // 可根据主题调整
+            };
+            AddInternal(tabBackground);
+
+            // 只添加tabControl，滚动和内容由基类EditorSidebar负责
+            AddInternal(tabControl = new OsuTabControl<SidebarTab>
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 30,
+                Margin = new MarginPadding { Left = 5 },
+                Items = new[] { SidebarTab.Default, SidebarTab.EzSettings }
+            });
+
+            // 设置内容区整体下移，避免与tab栏重叠
+            Content.Margin = new MarginPadding { Top = 30 };
+
+            tabControl.Current.ValueChanged += e =>
+            {
+                currentTab = e.NewValue;
+                Content.Clear();
+
+                if (currentTab == SidebarTab.EzSettings)
+                {
+                    showEzSettings();
+                }
+                else if (currentTab == SidebarTab.Default && lastPopulator != null)
+                {
+                    // 切回Default时自动刷新内容
+                    PopulateSettings(lastPopulator);
+                }
+            };
+        }
+
+        private void showEzSettings()
+        {
+            // 每次切换都新建，避免重复 Add 到容器导致异常
+            ezSkinSettings = new EzSkinSettings
+            {
+                RelativeSizeAxes = Axes.X
+            };
+            Content.Add(ezSkinSettings);
+        }
+
+        /// <summary>
+        /// 仅在 Default tab 下允许填充内容。
+        /// </summary>
+        public void PopulateSettings(Action<Container<EditorSidebarSection>> populator)
+        {
+            lastPopulator = populator;
+            if (currentTab != SidebarTab.Default)
+                return;
+
+            Content.Clear();
+            populator(Content);
+        }
+    }
+}

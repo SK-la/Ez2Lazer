@@ -81,8 +81,8 @@ namespace osu.Game.Overlays.SkinEditor
 
         private Container? content;
 
-        private MainEditorSidebar componentsSidebar = null!;
-        private EditorSidebar settingsSidebar = null!;
+        private EditorSidebar componentsSidebar = null!;
+        private EzEditorSidebar settingsSidebar = null!;
 
         private SkinEditorChangeHandler? changeHandler;
 
@@ -214,13 +214,13 @@ namespace osu.Game.Overlays.SkinEditor
                                     {
                                         new Drawable[]
                                         {
-                                            componentsSidebar = new MainEditorSidebar(),
+                                            componentsSidebar = new EditorSidebar(),
                                             content = new Container
                                             {
                                                 Depth = float.MaxValue,
                                                 RelativeSizeAxes = Axes.Both,
                                             },
-                                            settingsSidebar = new EditorSidebar(),
+                                            settingsSidebar = new EzEditorSidebar(),
                                         }
                                     }
                                 }
@@ -511,10 +511,11 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void populateSettings()
         {
-            settingsSidebar.Clear();
-
-            foreach (var component in SelectedComponents.OfType<Drawable>())
-                settingsSidebar.Add(new SkinSettingsToolbox(component));
+            settingsSidebar.PopulateSettings(content =>
+            {
+                foreach (var component in SelectedComponents.OfType<Drawable>())
+                    content.Add(new SkinSettingsToolbox(component));
+            });
         }
 
         private IEnumerable<SkinnableContainer> availableTargets => targetScreen.ChildrenOfType<SkinnableContainer>();
