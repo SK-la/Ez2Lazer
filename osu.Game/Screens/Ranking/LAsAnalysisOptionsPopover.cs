@@ -10,12 +10,12 @@ namespace osu.Game.Screens.Ranking
 {
     public partial class LAsAnalysisOptionsPopover : OsuPopover
     {
-        private readonly BeatmapInfo beatmapInfo;
+        // private readonly BeatmapInfo beatmapInfo;
 
         public LAsAnalysisOptionsPopover(BeatmapInfo beatmapInfo)
             : base(false)
         {
-            this.beatmapInfo = beatmapInfo;
+            // this.beatmapInfo = beatmapInfo;
 
             Body.CornerRadius = 4;
         }

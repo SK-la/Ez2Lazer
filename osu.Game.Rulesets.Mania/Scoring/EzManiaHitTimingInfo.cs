@@ -5,12 +5,12 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
-    public class ManiaHitTimingInfo
+    public class EzManiaHitTimingInfo
     {
         public double HitTime { get; set; }
         public HitResult Result { get; set; }
 
-        public ManiaHitTimingInfo(double hitTime, HitResult result)
+        public EzManiaHitTimingInfo(double hitTime, HitResult result)
         {
             HitTime = hitTime;
             Result = result;

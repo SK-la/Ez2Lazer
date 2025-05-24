@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.UI
         protected new ManiaRulesetConfigManager Config => (ManiaRulesetConfigManager)base.Config;
 
         private readonly Bindable<ManiaScrollingDirection> configDirection = new Bindable<ManiaScrollingDirection>();
-        private readonly Bindable<ManiaScrollingStyle> scrollingStyle = new Bindable<ManiaScrollingStyle>();
+        private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
         private readonly BindableDouble configScrollSpeed = new BindableDouble();
@@ -186,13 +186,13 @@ namespace osu.Game.Rulesets.Mania.UI
 
             switch (scrollingStyle.Value)
             {
-                case ManiaScrollingStyle.ScrollSpeedStyle:
-                case ManiaScrollingStyle.ScrollTimeStyle:
+                case EzManiaScrollingStyle.ScrollSpeedStyle:
+                case EzManiaScrollingStyle.ScrollTimeStyle:
                     // Preserve the scroll speed as the scroll length varies from changes to the hit position.
                     scale = lengthToHitPosition / length_to_default_hit_position;
                     break;
 
-                case ManiaScrollingStyle.ScrollTimeStyleFixed:
+                case EzManiaScrollingStyle.ScrollTimeStyleFixed:
                     // Ensure the travel time from the top of the screen to the hit position remains constant.
                     scale = length_to_default_hit_position / lengthToHitPosition;
                     break;

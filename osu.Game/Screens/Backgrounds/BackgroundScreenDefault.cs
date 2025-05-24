@@ -152,7 +152,7 @@ namespace osu.Game.Screens.Backgrounds
             {
                 case BackgroundSource.WebmSource:
                 {
-                    const string relative_path = @"Resource\Webm";
+                    const string relative_path = @"EzResources\Webm";
                     string dataFolderPath = storage.GetFullPath(relative_path);
                     Debug.Assert(!string.IsNullOrEmpty(dataFolderPath));
 

@@ -90,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.Objects
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
             // apply perfect once the tail is reached
-            if (HoldNote.HoldStartTime != null && timeOffset >= 0)
+            if (HoldNote.Head.IsHit && timeOffset >= 0)
                 ApplyResult(GetCappedResult(HitResult.Perfect));
             else
                 base.CheckForResult(userTriggered, timeOffset);

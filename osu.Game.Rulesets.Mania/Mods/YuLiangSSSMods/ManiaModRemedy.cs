@@ -256,27 +256,27 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             protected override void CheckForResult(bool userTriggered, double timeOffset)
             {
-                if (HoldNote.HoldStartTime != null && userTriggered && RemedyGreat > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Perfect)))
+                if (HoldNote.Head.IsHit && userTriggered && RemedyGreat > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Perfect)))
                 {
                     RemedyGreat--;
                     ApplyResult(GetCappedResult(HitResult.Perfect));
                 }
-                else if (HoldNote.HoldStartTime != null && userTriggered && RemedyGood > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Great)))
+                else if (HoldNote.Head.IsHit && userTriggered && RemedyGood > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Great)))
                 {
                     RemedyGood--;
                     ApplyResult(GetCappedResult(HitResult.Great));
                 }
-                else if (HoldNote.HoldStartTime != null && userTriggered && RemedyOk > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Good)))
+                else if (HoldNote.Head.IsHit && userTriggered && RemedyOk > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Good)))
                 {
                     RemedyOk--;
                     ApplyResult(GetCappedResult(HitResult.Good));
                 }
-                else if (HoldNote.HoldStartTime != null && userTriggered && RemedyMeh > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Ok)))
+                else if (HoldNote.Head.IsHit && userTriggered && RemedyMeh > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Ok)))
                 {
                     RemedyMeh--;
                     ApplyResult(GetCappedResult(HitResult.Ok));
                 }
-                else if (HoldNote.HoldStartTime != null && userTriggered && RemedyMiss > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Meh))
+                else if (HoldNote.Head.IsHit && userTriggered && RemedyMiss > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Meh))
                          && Math.Abs(timeOffset) <= Math.Abs(HitWindows.WindowFor(HitResult.Miss)))
                 {
                     RemedyMiss--;

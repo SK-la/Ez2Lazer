@@ -13,7 +13,7 @@ namespace osu.Game.Skinning.Components
     public partial class EzScoreText : CompositeDrawable, IHasText
     {
         public readonly EzGetScoreTexture TextPart;
-        public Bindable<OffsetNumberName> FontName { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)7);
+        public Bindable<EzSelectorNameSet> FontName { get; } = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)7);
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -27,7 +27,7 @@ namespace osu.Game.Skinning.Components
 
         // public object Spacing { get; set; }
 
-        public EzScoreText(Bindable<OffsetNumberName>? externalFontName = null)
+        public EzScoreText(Bindable<EzSelectorNameSet>? externalFontName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;

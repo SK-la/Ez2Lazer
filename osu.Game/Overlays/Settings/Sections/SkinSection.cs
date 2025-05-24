@@ -127,6 +127,7 @@ namespace osu.Game.Overlays.Settings.Sections
             dropdownItems.Clear();
 
             dropdownItems.Add(sender.Single(s => s.ID == SkinInfo.EZ2_SKIN).ToLive(realm));
+            dropdownItems.Add(sender.Single(s => s.ID == SkinInfo.EZ_STYLE_PRO_SKIN).ToLive(realm));
             dropdownItems.Add(sender.Single(s => s.ID == SkinInfo.SBI_SKIN).ToLive(realm));
             dropdownItems.Add(sender.Single(s => s.ID == SkinInfo.ARGON_SKIN).ToLive(realm));
             dropdownItems.Add(sender.Single(s => s.ID == SkinInfo.ARGON_PRO_SKIN).ToLive(realm));

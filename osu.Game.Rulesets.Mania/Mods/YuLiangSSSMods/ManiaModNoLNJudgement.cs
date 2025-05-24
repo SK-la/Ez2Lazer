@@ -160,7 +160,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             public new bool HasHoldBreak => false;
 
-            internal override void TriggerResult(bool hit)
+            internal new void TriggerResult(bool hit)
             {
                 if (AllJudged) return;
 
@@ -192,7 +192,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     return;
                 }
 
-                if (HoldNote.IsHitting.Value)
+                if (HoldNote.IsHolding.Value)
                 {
                     return;
                 }

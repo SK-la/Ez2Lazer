@@ -61,6 +61,7 @@ using osu.Game.Resources;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
+using osu.Game.Screens;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 using RuntimeInfo = osu.Framework.RuntimeInfo;
@@ -167,6 +168,12 @@ namespace osu.Game
         protected IAPIProvider API { get; set; }
 
         protected Storage Storage { get; set; }
+
+        protected EzSkinSettingsManager EzSkinSettingsManager { get; private set; }
+
+        protected EzLocalNoteFactory EzLocalNoteFactory { get; private set; }
+
+        // protected EzNoteFactory EzNoteFactory { get; private set; }
 
         /// <summary>
         /// The language in which the game is currently displayed in.
@@ -431,26 +438,35 @@ namespace osu.Game
             // if this becomes a more common thing, tracked settings should be reconsidered to allow local DI.
             LocalConfig.LookupSkinName = id => SkinManager.Query(s => s.ID == id)?.ToString() ?? "Unknown";
             LocalConfig.LookupKeyBindings = l => KeyBindingStore.GetBindingsStringFor(l);
+
+            // 初始化并注册EzSkinSettingsManager
+            dependencies.Cache(EzSkinSettingsManager = new EzSkinSettingsManager(Storage));
+            // dependencies.CacheAs<IEzSkinSettings>(EzSkinSettingsManager);
+            dependencies.Cache(EzLocalNoteFactory = new EzLocalNoteFactory(Storage));
+            // EzNoteFactory = new EzNoteFactory(Storage);
+            // dependencies.CacheAs(EzNoteFactory);
+            // dependencies.Cache(EzNoteFactory = new EzNoteFactory());
         }
 
         private void updateLanguage() => CurrentLanguage.Value = LanguageExtensions.GetLanguageFor(frameworkLocale.Value, localisationParameters.Value);
 
         private void addFilesWarning()
         {
-            var realmStore = new RealmFileStore(realm, Storage);
-
             const string filename = "IMPORTANT READ ME.txt";
 
-            if (!realmStore.Storage.Exists(filename))
+            if (!Storage.Exists(filename))
             {
-                using (var stream = realmStore.Storage.CreateFileSafely(filename))
+                using (var stream = Storage.CreateFileSafely(filename))
                 using (var textWriter = new StreamWriter(stream))
                 {
-                    textWriter.WriteLine(@"This folder contains all your user files (beatmaps, skins, replays etc.)");
-                    textWriter.WriteLine(@"Please do not touch or delete this folder!!");
+                    textWriter.WriteLine(@"This folder contains all your user files and configuration.");
+                    textWriter.WriteLine(@"Please DO NOT make manual changes to this folder.");
                     textWriter.WriteLine();
-                    textWriter.WriteLine(@"If you are really looking to completely delete user data, please delete");
-                    textWriter.WriteLine(@"the parent folder including all other files and directories");
+                    textWriter.WriteLine(@"- If you want to back up your game files, please back up THE ENTIRETY OF THIS DIRECTORY.");
+                    textWriter.WriteLine(@"- If you want to delete all of your game files, please delete THE ENTIRETY OF THIS DIRECTORY.");
+                    textWriter.WriteLine();
+                    textWriter.WriteLine(@"To be very clear, the ""files/"" directory inside this directory stores all the raw pieces of your beatmaps, skins, and replays.");
+                    textWriter.WriteLine(@"Importantly, it is NOT the only directory you need a backup of to avoid losing data. If you copy only the ""files/"" directory, YOU WILL LOSE DATA.");
                     textWriter.WriteLine();
                     textWriter.WriteLine(@"For more information on how these files are organised,");
                     textWriter.WriteLine(@"see https://github.com/ppy/osu/wiki/User-file-storage");

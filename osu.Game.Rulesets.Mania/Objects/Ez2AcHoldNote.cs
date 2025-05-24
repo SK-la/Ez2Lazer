@@ -70,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.Objects
 
     public partial class Ez2AcDrawableHoldNoteBody : DrawableHoldNoteBody
     {
-        internal override void TriggerResult(bool hit)
+        internal new void TriggerResult(bool hit)
         {
             if (AllJudged) return;
 
@@ -91,13 +91,13 @@ namespace osu.Game.Rulesets.Mania.Objects
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (HoldNote.IsHitting.Value && timeOffset >= 0)
+            if (HoldNote.IsHolding.Value && timeOffset >= 0)
             {
                 ApplyResult(GetCappedResult(HitResult.Perfect));
                 return;
             }
 
-            if (!HoldNote.IsHitting.Value && timeOffset < 0)
+            if (!HoldNote.IsHolding.Value && timeOffset < 0)
             {
                 ApplyResult(GetCappedResult(HitResult.ComboBreak));
                 return;

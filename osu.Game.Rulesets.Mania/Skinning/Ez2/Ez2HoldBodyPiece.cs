@@ -79,7 +79,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                 AccentColour.BindTo(holdNote.AccentColour);
                 hittingLayer.AccentColour.BindTo(holdNote.AccentColour);
-                ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHitting);
+                ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHolding);
             }
 
             AccentColour.BindValueChanged(colour =>

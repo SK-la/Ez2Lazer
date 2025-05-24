@@ -28,8 +28,7 @@ namespace osu.Desktop
 
         private static LegacyTcpIpcProvider? legacyIpc;
 
-        // [DllImport("kernel32.dll", SetLastError = true)]
-        // private static extern bool SetDllDirectory(string lpPathName);
+        private static bool isFirstRun;
 
         [STAThread]
         public static void Main(string[] args)
@@ -61,8 +60,6 @@ namespace osu.Desktop
                         return;
                     }
                 }
-
-                // SetDllDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "C:\\Users\\12456\\.nuget\\packages\\bass.asio\\1.3.1.2\\build\\native\\x64"));
             }
 
             // NVIDIA profiles are based on the executable name of a process.
@@ -140,7 +137,12 @@ namespace osu.Desktop
                 if (tournamentClient)
                     host.Run(new TournamentGame());
                 else
-                    host.Run(new OsuGameDesktop(args));
+                {
+                    host.Run(new OsuGameDesktop(args)
+                    {
+                        IsFirstRun = isFirstRun
+                    });
+                }
             }
         }
 
@@ -181,6 +183,8 @@ namespace osu.Desktop
             }
 
             var app = VelopackApp.Build();
+
+            app.WithFirstRun(_ => isFirstRun = true);
 
             if (OperatingSystem.IsWindows())
                 configureWindows(app);

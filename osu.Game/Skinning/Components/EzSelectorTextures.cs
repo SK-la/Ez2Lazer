@@ -19,13 +19,13 @@ using osuTK.Graphics;
 namespace osu.Game.Skinning.Components
 {
     //TODO 代码不对，无法加载
-    public partial class EzSelectorTextures : SettingsItem<OffsetNumberName>
+    public partial class EzSelectorTextures : SettingsItem<EzSelectorNameSet>
     {
-        private FillFlowContainer previewList = null!;
+        // private FillFlowContainer previewList = null!;
 
         public EzSelectorTextures()
         {
-            Current = new Bindable<OffsetNumberName>((OffsetNumberName)49);
+            Current = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)49);
         }
 
         protected override Drawable CreateControl()
@@ -34,7 +34,7 @@ namespace osu.Game.Skinning.Components
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
-                Child = previewList = new FillFlowContainer
+                Child = new FillFlowContainer
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
@@ -46,7 +46,7 @@ namespace osu.Game.Skinning.Components
 
         private IEnumerable<Drawable> createPreviewItems()
         {
-            foreach (OffsetNumberName value in Enum.GetValues(typeof(OffsetNumberName)))
+            foreach (EzSelectorNameSet value in Enum.GetValues(typeof(EzSelectorNameSet)))
             {
                 yield return new PreviewContainer
                 {
@@ -59,7 +59,7 @@ namespace osu.Game.Skinning.Components
 
         private partial class PreviewContainer : Container
         {
-            public OffsetNumberName Value { get; set; }
+            public EzSelectorNameSet Value { get; set; }
             public Action? Action { get; set; }
 
             private Box? background;

@@ -13,12 +13,10 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
-using osu.Game.Skinning;
-using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
+namespace osu.Game.Skinning.Components
 {
     public partial class EzComHitResultScore : CompositeDrawable, ISerialisableDrawable, IPreviewable //, IAnimatableJudgement
     {
@@ -32,8 +30,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             Precision = 1f,
         };
 
-        [SettingSource("HitResult Text Font", "HitResult Text Font", SettingControlType = typeof(EzEnumListSelector))]
-        public Bindable<OffsetNumberName> NameDropdown { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)49);
+        [SettingSource("HitResult Text Font", "HitResult Text Font", SettingControlType = typeof(EzSelectorEnumList))]
+        public Bindable<EzSelectorNameSet> NameDropdown { get; } = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)49);
 
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
@@ -59,9 +57,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         [Resolved]
         private TextureStore textures { get; set; } = null!;
-
-        // [Resolved]
-        // private OsuGame game { get; set; } = null!;
 
         [Resolved]
         private ScoreProcessor processor { get; set; } = null!;
@@ -124,43 +119,43 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
         // private void showPreview() => previewOverlay.Show();
 
-        public Drawable CreatePreviewDrawable(OffsetNumberName name)
-        {
-            var container = new Container
-            {
-                AutoSizeAxes = Axes.Both,
-                Child = new FillFlowContainer
-                {
-                    AutoSizeAxes = Axes.Both,
-                    Direction = FillDirection.Horizontal,
-                    Spacing = new Vector2(10),
-                    Children = new[]
-                    {
-                        createPreviewSprite(name, HitResult.Perfect),
-                        createPreviewSprite(name, HitResult.Great),
-                        createPreviewSprite(name, HitResult.Good),
-                        createPreviewSprite(name, HitResult.Ok),
-                        createPreviewSprite(name, HitResult.Meh),
-                        createPreviewSprite(name, HitResult.Miss)
-                    }
-                }
-            };
-
-            return container;
-        }
-
-        private Sprite createPreviewSprite(OffsetNumberName name, HitResult result)
-        {
-            string basePath = $@"EzResources/enumBase/enumJudgement/{name}";
-            var texture = textures.Get($"{basePath}.png");
-
-            return new Sprite
-            {
-                Texture = texture,
-                Size = new Vector2(50),
-                Alpha = 1
-            };
-        }
+        // public Drawable CreatePreviewDrawable(EzSelectorNameSet name)
+        // {
+        //     var container = new Container
+        //     {
+        //         AutoSizeAxes = Axes.Both,
+        //         Child = new FillFlowContainer
+        //         {
+        //             AutoSizeAxes = Axes.Both,
+        //             Direction = FillDirection.Horizontal,
+        //             Spacing = new Vector2(10),
+        //             Children = new[]
+        //             {
+        //                 createPreviewSprite(name, HitResult.Perfect),
+        //                 createPreviewSprite(name, HitResult.Great),
+        //                 createPreviewSprite(name, HitResult.Good),
+        //                 createPreviewSprite(name, HitResult.Ok),
+        //                 createPreviewSprite(name, HitResult.Meh),
+        //                 createPreviewSprite(name, HitResult.Miss)
+        //             }
+        //         }
+        //     };
+        //
+        //     return container;
+        // }
+        //
+        // private Sprite createPreviewSprite(EzSelectorNameSet name, HitResult result)
+        // {
+        //     string basePath = $@"EzResources/enumBase/enumJudgement/{name}";
+        //     var texture = textures.Get($"{basePath}.png");
+        //
+        //     return new Sprite
+        //     {
+        //         Texture = texture,
+        //         Size = new Vector2(50),
+        //         Alpha = 1
+        //     };
+        // }
 
         protected override void LoadComplete()
         {
@@ -314,11 +309,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
 
             if (missCounter.ResultCount.Value == 0 && fullComboSprite != null)
             {
-                // 显示 FULL COMBO 贴图
                 fullComboSprite.Alpha = 1;
                 fullComboSprite.FadeIn(50).Then().FadeOut(5000);
 
-                // 播放音效
                 fullComboSound?.Play();
             }
         }
@@ -334,7 +327,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
             if (!drawable.IsLoaded)
                 return;
 
-            // 为每种判定结果定义颜色数组
             var colors = hitResult switch
             {
                 HitResult.Miss => new[] { Color4.Red, Color4.IndianRed },
@@ -419,9 +411,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         {
             // 先结束之前的所有变换
             drawable.FinishTransforms();
-            // 固定拉长压扁比例
+
             var finalScale = new Vector2(1.5f, 0.05f);
-            // 固定动画持续时间
+
             const double scale_up_duration = 150; // 放大动画
             const double scale_down_duration = 180; // 压扁动画
             const double fade_out_duration = scale_down_duration + 10; // 淡出动画
@@ -440,6 +432,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
                 .MoveTo(new Vector2(0, -moveDistance / 10), fade_out_duration, Easing.InQuint)
                 .FadeOut(fade_out_duration, Easing.InQuint);
         }
+
+        #region Other
 
         protected virtual void Clear()
         {
@@ -477,5 +471,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         {
             isDragging = false;
         }
+
+        #endregion
     }
 }

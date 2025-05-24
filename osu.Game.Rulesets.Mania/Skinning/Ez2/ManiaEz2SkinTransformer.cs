@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -12,9 +11,9 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
+using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 
@@ -35,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         private float columnWidth { get; set; }
 
-        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config, EzSkinSettings ezSkinSettings)
+        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
@@ -190,9 +189,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                     // return new Ez2JudgementPiece(resultComponent.Component);
                     return Drawable.Empty();
-                    // return new DefaultSkinComponentsContainer(container =>
-                    // {
-                    // });
+                // return new DefaultSkinComponentsContainer(container =>
+                // {
+                // });
 
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)
@@ -206,23 +205,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                             return new Ez2ColumnBackground();
 
-                        case ManiaSkinComponents.HoldNoteBody:
-                            return new Ez2HoldBodyPiece();
-
-                        case ManiaSkinComponents.HoldNoteTail:
-                            return new Ez2HoldNoteTailPiece();
-
-                        case ManiaSkinComponents.HoldNoteHead:
-                            return new Ez2HoldNoteHeadPiece();
-
-                        case ManiaSkinComponents.Note:
-                            return new Ez2NotePiece();
+                        case ManiaSkinComponents.KeyArea:
+                            return new Ez2KeyArea();
 
                         case ManiaSkinComponents.HitTarget:
                             return new Ez2HitTarget();
 
-                        case ManiaSkinComponents.KeyArea:
-                            return new Ez2KeyArea();
+                        case ManiaSkinComponents.Note:
+                            return new Ez2NotePiece();
+
+                        case ManiaSkinComponents.HoldNoteTail:
+                            return new Ez2HoldNoteTailPiece();
+
+                        case ManiaSkinComponents.HoldNoteBody:
+                            return new Ez2HoldBodyPiece();
+
+                        case ManiaSkinComponents.HoldNoteHead:
+                            return new Ez2HoldNoteHeadPiece();
 
                         case ManiaSkinComponents.HitExplosion:
                             return new Ez2HitExplosion();
@@ -251,6 +250,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                 switch (maniaLookup.Lookup)
                 {
+                    case LegacyManiaSkinConfigurationLookups.ColumnWidth:
+                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
+
+                    case LegacyManiaSkinConfigurationLookups.HitPosition:
+                        return SkinUtils.As<TValue>(new Bindable<float>(hitPosition));
+
+                    case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
+
+                        var colour = stage.GetColourForLayout(columnIndex);
+
+                        return SkinUtils.As<TValue>(new Bindable<Color4>(colour));
+
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:
                         return SkinUtils.As<TValue>(new Bindable<float>(1));
 
@@ -263,145 +274,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
                     case LegacyManiaSkinConfigurationLookups.StagePaddingTop:
                         return SkinUtils.As<TValue>(new Bindable<float>(0));
-
-                    case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(hitPosition));
-
-                    case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
-
-                    case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
-
-                        var colour = getColourForLayout(columnIndex, stage);
-
-                        return SkinUtils.As<TValue>(new Bindable<Color4>(colour));
                 }
             }
 
             return base.GetConfig<TLookup, TValue>(lookup);
-        }
-
-        private static readonly Color4 colour_special = new Color4(206, 6, 3, 255);
-
-        private static readonly Color4 colour_green = new Color4(100, 192, 92, 255);
-        private static readonly Color4 colour_red = new Color4(206, 6, 3, 255);
-
-        private static readonly Color4 colour_withe = new Color4(222, 222, 222, 255);
-        private static readonly Color4 colour_blue = new Color4(55, 155, 255, 255);
-
-        private const int total_colours = 3;
-
-        private static readonly Color4 colour_cyan = new Color4(72, 198, 255, 255);
-        private static readonly Color4 colour_pink = new Color4(213, 35, 90, 255);
-        private static readonly Color4 colour_purple = new Color4(203, 60, 236, 255);
-
-        private Color4 getColourForLayout(int columnIndex, StageDefinition stage)
-        {
-            columnIndex %= stage.Columns;
-
-            switch (stage.Columns)
-            {
-                case 4:
-                    return columnIndex switch
-                    {
-                        0 => colour_green,
-                        1 => colour_red,
-                        2 => colour_blue,
-                        3 => colour_cyan,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-
-                case 5:
-                    return columnIndex switch
-                    {
-                        0 => colour_green,
-                        1 => colour_blue,
-                        2 => colour_red,
-                        3 => colour_cyan,
-                        4 => colour_purple,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-
-                case 7:
-                    return columnIndex switch
-                    {
-                        1 or 5 => colour_withe,
-                        0 or 2 or 4 or 6 => colour_blue,
-                        3 => colour_green,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-
-                case 8:
-                    return columnIndex switch
-                    {
-                        0 or 4 => colour_red,
-                        2 or 6 => colour_withe,
-                        1 or 3 or 5 or 7 => colour_blue,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-
-                case 9:
-                    return columnIndex switch
-                    {
-                        0 or 6 or 7 => colour_red,
-                        2 or 4 => colour_withe,
-                        1 or 3 or 5 => colour_blue,
-                        8 => colour_green,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-
-                case 10:
-                    return columnIndex switch
-                    {
-                        0 or 9 => colour_green,
-                        2 or 4 or 5 or 7 => colour_withe,
-                        1 or 3 or 6 or 8 => colour_blue,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-
-                case 12:
-                    return columnIndex switch
-                    {
-                        0 or 11 => colour_red,
-                        1 or 3 or 5 or 6 or 8 or 10 => colour_withe,
-                        2 or 4 or 7 or 9 => colour_blue,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-
-                case 14:
-                    return columnIndex switch
-                    {
-                        0 or 12 or 13 => colour_red,
-                        1 or 3 or 5 or 7 or 9 or 11 => colour_withe,
-                        2 or 4 or 8 or 10 => colour_blue,
-                        6 => colour_green,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-
-                case 16:
-                    return columnIndex switch
-                    {
-                        0 or 6 or 7 or 8 or 9 or 15 => colour_red,
-                        1 or 3 or 5 or 10 or 12 or 14 => colour_withe,
-                        2 or 4 or 11 or 13 => colour_blue,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-            }
-
-            // 后备逻辑保持不变
-            if (stage.EzIsSpecialColumn(columnIndex))
-                return colour_special;
-
-            switch (columnIndex % total_colours)
-            {
-                case 0: return colour_cyan;
-
-                case 1: return colour_pink;
-
-                case 2: return colour_purple;
-
-                default: throw new ArgumentOutOfRangeException();
-            }
         }
     }
 }

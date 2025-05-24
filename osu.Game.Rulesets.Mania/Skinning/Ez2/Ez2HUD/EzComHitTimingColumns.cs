@@ -240,7 +240,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
         private float getRelativeJudgementPosition(double value)
         {
             float moveRange = MoveHeight.Value;
-            return (float)Math.Clamp((value / HitWindows.WindowFor(HitResult.Miss)) * moveRange, -moveRange, moveRange);
+            double missWindow = HitWindows.WindowFor(HitResult.Miss);
+
+            if (moveRange == 0 || missWindow == 0)
+                return 0;
+
+            float pos = (float)(value / (missWindow * moveRange));
+            return Math.Clamp(pos, -moveRange, moveRange);
         }
 
         private int getColumnIndex(JudgementResult judgement)

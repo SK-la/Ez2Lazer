@@ -14,11 +14,11 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaScoreProcessor : ScoreProcessor
     {
-        public List<ManiaHitTimingInfo> HitTimings { get; private set; } = new List<ManiaHitTimingInfo>();
+        public List<EzManiaHitTimingInfo> HitTimings { get; private set; } = new List<EzManiaHitTimingInfo>();
 
         public void AddHitTiming(double hitTime, HitResult result)
         {
-            HitTimings.Add(new ManiaHitTimingInfo(hitTime, result));
+            HitTimings.Add(new EzManiaHitTimingInfo(hitTime, result));
         }
 
         public double CalculateScoreWithParameters(double comboProgress, double accuracyProgress, double bonusPortion, Dictionary<HitResult, int> customHitProportionScore)

@@ -72,6 +72,8 @@ namespace osu.Game.Storyboards.Drawables
             {
                 Size = Vector2.One; // 填满窗口
                 FillMode = FillMode.Fit; // 保持比例
+                Anchor = Anchor.Centre;
+                Origin = Anchor.Centre;
             }
             else
             {
@@ -139,6 +141,9 @@ namespace osu.Game.Storyboards.Drawables
                                 Height = Parent.DrawHeight;
                                 Width = Height * videoAspectRatio;
                             }
+
+                            Anchor = Anchor.Centre;
+                            Origin = Anchor.Centre;
                         }
 
                         Anchor = Anchor.Centre;

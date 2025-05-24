@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.ComponentModel;
 using osu.Framework.Configuration.Tracking;
 using osu.Game.Configuration;
 using osu.Game.Localisation;
@@ -29,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Configuration
             SetDefault(ManiaRulesetSetting.ScrollSpeed, 200, 1.0, 401.0, current_scroll_speed_precision);
             SetDefault(ManiaRulesetSetting.ScrollBaseSpeed, 500, 100, 1000, 1.0);
             SetDefault(ManiaRulesetSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
-            SetDefault(ManiaRulesetSetting.ScrollStyle, ManiaScrollingStyle.ScrollTimeStyleFixed);
+            SetDefault(ManiaRulesetSetting.ScrollStyle, EzManiaScrollingStyle.ScrollTimeStyleFixed);
             SetDefault(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
             SetDefault(ManiaRulesetSetting.ScrollPerKeyMode, false);
             SetDefault(ManiaRulesetSetting.PerspectiveAngle, 90.0f, 30.0f, 90.0f);
@@ -80,5 +81,19 @@ namespace osu.Game.Rulesets.Mania.Configuration
         ScrollDirection,
         TimingBasedNoteColouring,
         MobileLayout,
+    }
+
+    public enum EzManiaScrollingStyle
+    {
+        // [LocalisableDescription(typeof(RulesetSettingsStrings), nameof(RulesetSettingsStrings.ScrollingDirectionUp))]
+        [Description("40速 通配速度风格(不可用)")]
+        ScrollSpeedStyle,
+
+        // [LocalisableDescription(typeof(RulesetSettingsStrings), nameof(RulesetSettingsStrings.ScrollingDirectionDown))]
+        [Description("ms值 恒定速度")]
+        ScrollTimeStyle,
+
+        [Description("ms值 恒定时间")]
+        ScrollTimeStyleFixed,
     }
 }

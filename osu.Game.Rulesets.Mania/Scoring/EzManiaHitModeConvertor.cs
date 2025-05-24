@@ -22,7 +22,7 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
-    public class ManiaHitModeConvertor : Mod, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
+    public class EzManiaHitModeConvertor : Mod, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
         public override string Name => "Mania Hit Mode";
         public override LocalisableString Description => "LaMod: To Use Setting";
@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         // private readonly BindableDouble configColumnWidth = new BindableDouble();
         // private readonly BindableDouble configSpecialFactor = new BindableDouble();
 
-        public ManiaHitModeConvertor()
+        public EzManiaHitModeConvertor()
         {
             // if (GlobalConfigStore.Config != null)
             //     HitMode.Value = GlobalConfigStore.Config.Get<MUGHitMode>(OsuSetting.HitMode);

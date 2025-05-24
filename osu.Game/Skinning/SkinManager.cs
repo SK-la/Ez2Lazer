@@ -96,6 +96,7 @@ namespace osu.Game.Skinning
                 argonSkin = new ArgonSkin(this),
                 new ArgonProSkin(this),
                 new Ez2Skin(this),
+                new EzStyleProSkin(this),
                 new SbISkin(this),
             };
 

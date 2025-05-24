@@ -13,7 +13,7 @@ namespace osu.Game.Skinning.Components
     public partial class EzComboText : CompositeDrawable, IHasText
     {
         public readonly EzGetComboTexture TextPart;
-        public Bindable<OffsetNumberName> FontName { get; } = new Bindable<OffsetNumberName>((OffsetNumberName)4);
+        public Bindable<EzSelectorNameSet> FontName { get; } = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)4);
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -27,7 +27,7 @@ namespace osu.Game.Skinning.Components
 
         // public object Spacing { get; set; }
 
-        public EzComboText(Bindable<OffsetNumberName>? externalFontName = null)
+        public EzComboText(Bindable<EzSelectorNameSet>? externalFontName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;

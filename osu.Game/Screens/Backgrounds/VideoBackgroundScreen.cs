@@ -36,14 +36,8 @@ namespace osu.Game.Screens.Backgrounds
             //下面只用于注册全局设置
             GlobalConfigStore.Config = config;
 
-            var skinSettings = new EzSkinSettings();
-            GlobalConfigStore.EZConfig = skinSettings;
-        }
-
-        public void InjectDependencies(IReadOnlyDependencyContainer dependencies, DependencyContainer newDependencies)
-        {
-            // 在这里注册 EzSkinSettings
-            newDependencies.CacheAs(new EzSkinSettings());
+            var ezskinSettings = new EzSkinSettings();
+            GlobalConfigStore.EZConfig = ezskinSettings;
         }
     }
 
