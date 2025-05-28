@@ -67,9 +67,8 @@ namespace osu.Game.Screens
 
             var configBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
 
-            NonSquareNoteHeight = new BindableNumber<double>
+            NonSquareNoteHeight = new BindableDouble(configBindable.Value)
             {
-                Value = configBindable.Value,
                 MinValue = 1,
                 MaxValue = 100,
                 Precision = 1f,
@@ -163,7 +162,7 @@ namespace osu.Game.Screens
                         {
                             LabelText = "(note高)Note Height",
                             Current = NonSquareNoteHeight,
-                            KeyboardStep = 0.1f,
+                            KeyboardStep = 1.0f,
                         },
                         new SettingsButton
                         {

@@ -171,9 +171,7 @@ namespace osu.Game
 
         protected EzSkinSettingsManager EzSkinSettingsManager { get; private set; }
 
-        protected EzLocalNoteFactory EzLocalNoteFactory { get; private set; }
-
-        // protected EzNoteFactory EzNoteFactory { get; private set; }
+        protected EzLocalTextureFactory NoteFactory { get; private set; }
 
         /// <summary>
         /// The language in which the game is currently displayed in.
@@ -442,10 +440,11 @@ namespace osu.Game
             // 初始化并注册EzSkinSettingsManager
             dependencies.Cache(EzSkinSettingsManager = new EzSkinSettingsManager(Storage));
             // dependencies.CacheAs<IEzSkinSettings>(EzSkinSettingsManager);
-            dependencies.Cache(EzLocalNoteFactory = new EzLocalNoteFactory(Storage));
-            // EzNoteFactory = new EzNoteFactory(Storage);
-            // dependencies.CacheAs(EzNoteFactory);
-            // dependencies.Cache(EzNoteFactory = new EzNoteFactory());
+            dependencies.Cache(
+                NoteFactory = new EzLocalTextureFactory(
+                    EzSkinSettingsManager,
+                    new TextureStore(Host.Renderer),
+                    Storage));
         }
 
         private void updateLanguage() => CurrentLanguage.Value = LanguageExtensions.GetLanguageFor(frameworkLocale.Value, localisationParameters.Value);

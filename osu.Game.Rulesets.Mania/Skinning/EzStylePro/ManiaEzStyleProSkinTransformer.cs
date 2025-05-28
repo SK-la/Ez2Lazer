@@ -9,6 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens;
@@ -18,15 +19,12 @@ using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2
+namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public class ManiaEz2SkinTransformer : SkinTransformer
+    public class ManiaEzStyleProSkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
 
-        // private readonly OsuConfigManager config;
-        // private readonly EzSkinSettings ezSkinSettings;
-        // private readonly float totalColumnWidth;
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> virtualHitPositionBindable;
@@ -36,13 +34,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private float columnWidth { get; set; }
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
-        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config, EzSkinSettings ezSkinSettings)
+        public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config, EzSkinSettings ezSkinSettings)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
-
-            // this.config = config ?? throw new ArgumentNullException(nameof(config));
-            // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
 
             columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
             specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
@@ -53,6 +48,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             switch (lookup)
             {
+                #region HUD Components
+
                 case GlobalSkinnableContainerLookup containerLookup:
                     if (containerLookup.Ruleset == null)
                         return base.GetDrawableComponent(lookup);
@@ -182,6 +179,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     // return new Ez2JudgementPiece(resultComponent.Component);
                     return Drawable.Empty();
 
+                #endregion
+
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)
                     {
@@ -198,22 +197,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                             return new Ez2KeyArea();
 
                         case ManiaSkinComponents.HitTarget:
-                            return new Ez2HitTarget();
+                            return new EzHitTarget();
 
                         case ManiaSkinComponents.Note:
-                            return new Ez2NotePiece();
+                            return new EzNote();
+                            // return new EzTestNote();
 
                         case ManiaSkinComponents.HitExplosion:
-                            return new Ez2HitExplosion();
-
-                        case ManiaSkinComponents.HoldNoteTail:
-                            return new Ez2HoldNoteTailPiece();
-
-                        case ManiaSkinComponents.HoldNoteBody:
-                            return new Ez2HoldBodyPiece();
+                            return new EzHitExplosion();
 
                         case ManiaSkinComponents.HoldNoteHead:
-                            return new Ez2HoldNoteHeadPiece();
+                            return new EzHoldNoteHead();
+
+                        case ManiaSkinComponents.HoldNoteBody:
+                            return new EzHoldNoteMiddle();
+                            // return new ArgonHoldBodyPiece();
+
+                        // case ManiaSkinComponents.HoldNoteTail:
+                        //     return new EzHoldNoteTail();
                     }
 
                     break;
@@ -224,6 +225,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         private const int stage_padding_bottom = 0;
 
+        #region GetConfig
+
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {
             if (lookup is ManiaSkinConfigurationLookup maniaLookup)
@@ -232,9 +235,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
                 bool isSpecialColumn = stage.EzIsSpecialColumn(columnIndex);
 
-                // float columnWidth = (float)config.Get<double>(OsuSetting.ColumnWidth);
-                // float specialFactor = (float)config.Get<double>(OsuSetting.SpecialFactor);
-                // float width = columnWidth * (isSpecialColumn ? specialFactor : 1);
                 columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
 
                 switch (maniaLookup.Lookup)
@@ -268,5 +268,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             return base.GetConfig<TLookup, TValue>(lookup);
         }
+
+        #endregion
     }
 }
