@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -63,33 +64,18 @@ namespace osu.Game.Screens
         {
         }
 
-        public event Action? OnTextureNameChanged;
-
-        private bool initialized;
-
-        private void initialize()
+        private bool isHitAnimation(string componentName)
         {
-            if (initialized) return;
-
-            initialized = true;
-
-            TextureNameBindable = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
-
-            TextureNameBindable.BindValueChanged(e =>
-            {
-                OnTextureNameChanged?.Invoke();
-            }, true);
+            return componentName.Contains("flare", StringComparison.InvariantCultureIgnoreCase);
         }
 
         public virtual Drawable CreateAnimation(string component)
         {
             // string getPath = hostStorage.GetFullPath(path);
 
-            string lower = component.ToLowerInvariant();
-            if (lower.Contains("flare"))
-                animationType = EzAnimationType.Hit;
-            else
-                animationType = EzAnimationType.Note;
+            animationType = isHitAnimation(component)
+                ? EzAnimationType.Hit
+                : EzAnimationType.Note;
 
             Container container;
             TextureAnimation animation;
@@ -109,7 +95,7 @@ namespace osu.Game.Screens
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
-                    DefaultFrameLength = 360f,
+                    DefaultFrameLength = 60,
                     Loop = true
                 };
             }
@@ -164,6 +150,70 @@ namespace osu.Game.Screens
 
             container.Add(animation);
             return container;
+        }
+
+        private readonly Dictionary<string, float> textureRatioCache = new Dictionary<string, float>();
+
+        private float calculateTextureRatio(Drawable animation, string componentName)
+        {
+            const float default_ratio = 1.0f;
+
+            if (!isHitAnimation(componentName) && animation is Container container &&
+                container.Children.FirstOrDefault() is TextureAnimation textureAnimation &&
+                textureAnimation.FrameCount > 0)
+            {
+                var texture = textureAnimation.CurrentFrame;
+                if (texture != null)
+                    return texture.Height / (float)texture.Width;
+            }
+
+            return default_ratio;
+        }
+
+        public float GetTextureRatio(string componentName)
+        {
+            if (isHitAnimation(componentName))
+                return 1.0f;
+
+            if (textureRatioCache.TryGetValue(componentName, out float ratio))
+                return ratio;
+
+            var animation = CreateAnimation(componentName);
+            ratio = calculateTextureRatio(animation, componentName);
+            textureRatioCache[componentName] = ratio;
+            return ratio;
+        }
+
+        public bool IsSquareNote(string componentName)
+        {
+            float ratio = GetTextureRatio(componentName);
+            return ratio >= 0.75f;
+        }
+
+        // 皮肤变更时清除缓存
+        public void ClearTextureRatioCache()
+        {
+            textureRatioCache.Clear();
+        }
+
+        public event Action? OnTextureNameChanged;
+
+        private bool initialized;
+
+        private void initialize()
+        {
+            if (initialized) return;
+
+            initialized = true;
+
+            TextureNameBindable = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
+
+            TextureNameBindable.BindValueChanged(e =>
+            {
+                // 清除纹理比例缓存
+                ClearTextureRatioCache();
+                OnTextureNameChanged?.Invoke();
+            }, true);
         }
 
         protected override void Dispose(bool isDisposing)

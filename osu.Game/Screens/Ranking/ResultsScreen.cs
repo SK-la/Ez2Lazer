@@ -233,7 +233,7 @@ namespace osu.Game.Screens.Ranking
 
             if (Score?.BeatmapInfo?.BeatmapSet != null && Score.BeatmapInfo.BeatmapSet.OnlineID > 0)
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
-
+// TODO 结算界面添加判定选择器
             if (Score?.BeatmapInfo != null)
                 buttons.Add(new LAsScoreAnalysisButton(Score.BeatmapInfo));
         }

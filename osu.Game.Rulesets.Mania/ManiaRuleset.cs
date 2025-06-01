@@ -447,7 +447,7 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                new StatisticItem("SHit Graph ", () => new LAsHitEventHeatmapGraph(score.HitEvents, new HitWindows())
+                new StatisticItem("Space Graph", () => new LAsHitEventHeatmapGraph(score.HitEvents, new HitWindows())
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 300
@@ -457,6 +457,11 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     Height = 300
                 }, true),
+                new StatisticItem("Column Timing Distributions", () => new CreateRotatedColumnGraphs(hitEventsByColumn)
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 300,
+                }, true),
                 new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
                 {
                     new AverageHitError(score.HitEvents),
@@ -464,14 +469,15 @@ namespace osu.Game.Rulesets.Mania
                 }), true)
             };
 
-            foreach (var column in hitEventsByColumn)
-            {
-                statistics.Add(new StatisticItem($"Timing Distribution - Column {column.Key + 1}", () => new HitEventTimingDistributionGraph(column.ToList())
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 50,
-                }, true));
-            }
+            //横向组件，纵向堆积
+            // foreach (var column in hitEventsByColumn)
+            // {
+            //     statistics.Add(new StatisticItem($"Timing Distribution - Column {column.Key + 1}", () => new HitEventTimingDistributionGraph(column.ToList())
+            //     {
+            //         RelativeSizeAxes = Axes.X,
+            //         Height = 50,
+            //     }, true));
+            // }
 
             return statistics.ToArray();
         }

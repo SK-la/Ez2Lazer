@@ -92,7 +92,7 @@ namespace osu.Game.Screens.Select.Carousel
         [Resolved]
         private BeatmapManager? manager { get; set; }
 
-        private IBindable<StarDifficulty?> starDifficultyBindable = null!;
+        private IBindable<StarDifficulty> starDifficultyBindable = null!;
         private CancellationTokenSource? starDifficultyCancellationSource;
 
         private IBeatmap playableBeatmap = null!;
@@ -415,13 +415,13 @@ namespace osu.Game.Screens.Select.Carousel
             if (Item?.State.Value != CarouselItemState.Collapsed)
             {
                 // We've potentially cancelled the computation above so a new bindable is required.
-                starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmapInfo, (starDifficultyCancellationSource = new CancellationTokenSource()).Token);
+                starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmapInfo, (starDifficultyCancellationSource = new CancellationTokenSource()).Token, 200);
                 starDifficultyBindable.BindValueChanged(d =>
-                {
-                    starCounter.Current = (float)(d.NewValue?.Stars ?? 0);
-                    if (d.NewValue != null)
-                        difficultyIcon.Current.Value = d.NewValue.Value;
-                }, true);
+                    {
+                        starCounter.Current = (float)(d.NewValue.Stars);
+                        difficultyIcon.Current.Value = d.NewValue;
+                    },
+                    true);
 
                 updateCalculations();
                 updateKeyCount();

@@ -41,14 +41,14 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.Ruleset, string.Empty);
             SetDefault(OsuSetting.Skin, SkinInfo.ARGON_SKIN.ToString());
 
-            SetDefault(OsuSetting.BeatmapDetailTab, PlayBeatmapDetailArea.TabType.Local);
+            SetDefault(OsuSetting.BeatmapDetailTab, BeatmapDetailTab.Local);
             SetDefault(OsuSetting.BeatmapDetailModsFilter, false);
 
             SetDefault(OsuSetting.ShowConvertedBeatmaps, false);
             SetDefault(OsuSetting.DisplayStarsMinimum, 0.0, 0, 10, 0.1);
             SetDefault(OsuSetting.DisplayStarsMaximum, 10.1, 0, 10.1, 0.1);
 
-            SetDefault(OsuSetting.SongSelectGroupingMode, GroupMode.All);
+            SetDefault(OsuSetting.SongSelectGroupMode, GroupMode.None);
             SetDefault(OsuSetting.SongSelectSortingMode, SortMode.Title);
             SetDefault(OsuSetting.SelectEzMode, SelectEzMode.All);
 
@@ -400,7 +400,7 @@ namespace osu.Game.Configuration
         SaveUsername,
         DisplayStarsMinimum,
         DisplayStarsMaximum,
-        SongSelectGroupingMode,
+        SongSelectGroupMode,
         SongSelectSortingMode,
         RandomSelectAlgorithm,
         ModSelectHotkeyStyle,

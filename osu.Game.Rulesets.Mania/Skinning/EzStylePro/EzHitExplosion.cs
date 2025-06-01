@@ -2,11 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Judgements;
@@ -25,9 +26,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
-        private double bpm;
         private OsuConfigManager config = null!;
-        private EzSkinSettingsManager? ezSkinConfig;
+        private double bpm;
+
         private readonly Bindable<double> columnWidth = new Bindable<double>();
 
         private IBindable<double> columnWidthBindable = new Bindable<double>();
@@ -49,10 +50,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private EzLocalTextureFactory factory { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config, EzSkinSettingsManager ezSkinConfig, IScrollingInfo scrollingInfo)
+        private void load(OsuConfigManager config, IScrollingInfo scrollingInfo)
         {
             this.config = config;
-            this.ezSkinConfig = ezSkinConfig;
             RelativeSizeAxes = Axes.Both;
             Blending = new BlendingParameters
             {
@@ -69,28 +69,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void Update()
         {
             base.Update();
-            // Height = DrawWidth;
 
             double interval = 60000 / bpm;
-            const double amplitude = 6.0;
             double progress = (gameplayClock.CurrentTime % interval) / interval;
             double smoothValue = smoothSineWave(progress);
-            // var hit = config.GetBindable<double>(OsuSetting.VirtualHitPosition);
 
             columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
             specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
             bool isSpecialColumn = stageDefinition.EzIsSpecialColumn(column.Index);
             columnWidth.Value = columnWidthBindable.Value * (isSpecialColumn ? specialFactorBindable.Value : 1);
 
-            double noteHeight = -(ezSkinConfig?.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value ?? 0);
+            var animationContainer = factory.CreateAnimation("bluenote");
+            double noteHeight = columnWidth.Value;
 
-            if (noteHeight == 0)
+            if (animationContainer is Container container &&
+                container.Children.FirstOrDefault() is TextureAnimation animation &&
+                animation.FrameCount > 0)
             {
-                noteHeight = -(columnWidth.Value / 2);
+                var texture = animation.CurrentFrame;
+
+                if (texture != null)
+                {
+                    float aspectRatio = texture.Height / (float)texture.Width;
+                    noteHeight = columnWidth.Value * aspectRatio;
+                }
             }
 
-            Logger.Log($"EzHitExplosion: noteHeight={noteHeight}", LoggingTarget.Runtime, LogLevel.Debug);
-            Y =  (float)noteHeight + (float)(smoothValue * amplitude);
+            // Framework.Logging.Logger.Log($"EzHitExplosion: noteHeight={noteHeight}");
+            Y =  -(float)noteHeight / 2 + (float)(smoothValue * 6);
         }
 
         private double smoothSineWave(double t)
@@ -135,7 +141,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-            factory.OnTextureNameChanged -= onSkinChanged; // 取消订阅，防止内存泄漏
+            factory.OnTextureNameChanged -= onSkinChanged;
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

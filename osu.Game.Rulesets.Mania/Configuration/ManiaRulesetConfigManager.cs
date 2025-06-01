@@ -31,22 +31,12 @@ namespace osu.Game.Rulesets.Mania.Configuration
             SetDefault(ManiaRulesetSetting.ScrollBaseSpeed, 500, 100, 1000, 1.0);
             SetDefault(ManiaRulesetSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
             SetDefault(ManiaRulesetSetting.ScrollStyle, EzManiaScrollingStyle.ScrollTimeStyleFixed);
-            SetDefault(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
+
             SetDefault(ManiaRulesetSetting.ScrollPerKeyMode, false);
             SetDefault(ManiaRulesetSetting.PerspectiveAngle, 90.0f, 30.0f, 90.0f);
-            SetDefault(ManiaRulesetSetting.TimingBasedNoteColouring, true);
+            SetDefault(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
+            SetDefault(ManiaRulesetSetting.TimingBasedNoteColouring, false);
             SetDefault(ManiaRulesetSetting.MobileLayout, ManiaMobileLayout.Portrait);
-
-#pragma warning disable CS0618
-            // Although obsolete, this is still required to populate the bindable from the database in case migration is required.
-            SetDefault<double?>(ManiaRulesetSetting.ScrollTime, null);
-
-            if (Get<double?>(ManiaRulesetSetting.ScrollTime) is double scrollTime)
-            {
-                SetValue(ManiaRulesetSetting.ScrollSpeed, Math.Round(DrawableManiaRuleset.MAX_TIME_RANGE / scrollTime));
-                SetValue<double?>(ManiaRulesetSetting.ScrollTime, null);
-            }
-#pragma warning restore CS0618
         }
 
         public override TrackedSettings CreateTrackedSettings() => new TrackedSettings
@@ -68,7 +58,6 @@ namespace osu.Game.Rulesets.Mania.Configuration
     {
         [Obsolete("Use ScrollSpeed instead.")] // Can be removed 2023-11-30
         ScrollTime,
-        ScrollSpeed,
         ScrollBaseSpeed,
         ScrollTimePerSpeed,
         ScrollStyle,
@@ -78,6 +67,7 @@ namespace osu.Game.Rulesets.Mania.Configuration
         ColumnWidth,
         SpecialFactor,
         ScrollPerKeyMode,
+        ScrollSpeed,
         ScrollDirection,
         TimingBasedNoteColouring,
         MobileLayout,

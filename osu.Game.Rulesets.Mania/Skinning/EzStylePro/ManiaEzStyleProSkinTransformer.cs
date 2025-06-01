@@ -211,10 +211,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
                         case ManiaSkinComponents.HoldNoteBody:
                             return new EzHoldNoteMiddle();
-                            // return new ArgonHoldBodyPiece();
 
-                        // case ManiaSkinComponents.HoldNoteTail:
-                        //     return new EzHoldNoteTail();
+                        case ManiaSkinComponents.HoldNoteTail:
+                            // return new EzHoldNoteTail();
+                            return Drawable.Empty();
                     }
 
                     break;

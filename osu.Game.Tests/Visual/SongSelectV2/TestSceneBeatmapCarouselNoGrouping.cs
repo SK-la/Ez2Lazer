@@ -191,6 +191,58 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         }
 
         [Test]
+        public void TestSingleItemTraversal()
+        {
+            CheckNoSelection();
+            AddBeatmaps(1, 3);
+
+            WaitForSelection(0, 0);
+            CheckActivationCount(0);
+
+            SelectNextGroup();
+            WaitForSelection(0, 0);
+
+            // In the case of a grouped beatmap set, the header gets activated and re-selects the recommended difficulty.
+            // This is probably fine.
+            CheckActivationCount(1);
+            // We don't want it to request present though, which would start gameplay.
+            CheckRequestPresentCount(0);
+
+            SelectPrevGroup();
+            WaitForSelection(0, 0);
+
+            CheckActivationCount(1);
+            CheckRequestPresentCount(0);
+        }
+
+        [Test]
+        public void TestSingleItemTraversal_DifficultySplit()
+        {
+            SortBy(SortMode.Difficulty);
+
+            CheckNoSelection();
+            AddBeatmaps(1, 1);
+
+            WaitForSelection(0, 0);
+            CheckActivationCount(0);
+
+            SelectNextGroup();
+            WaitForSelection(0, 0);
+
+            // In the case of a grouped beatmap set, the header gets activated and re-selects the recommended difficulty.
+            // This is probably fine.
+            CheckActivationCount(0);
+            // We don't want it to request present though, which would start gameplay.
+            CheckRequestPresentCount(0);
+
+            SelectPrevGroup();
+            WaitForSelection(0, 0);
+
+            CheckActivationCount(0);
+            CheckRequestPresentCount(0);
+        }
+
+        [Test]
         public void TestEmptyTraversal()
         {
             SelectNextPanel();
@@ -214,8 +266,7 @@ namespace osu.Game.Tests.Visual.SongSelectV2
 
             AddAssert("no beatmaps visible", () => !GetVisiblePanels<PanelBeatmap>().Any());
 
-            // Clicks just above the first group panel should not actuate any action.
-            ClickVisiblePanelWithOffset<PanelBeatmapSet>(0, new Vector2(0, -(PanelBeatmapSet.HEIGHT / 2 + 1)));
+            ClickVisiblePanelWithOffset<PanelBeatmapSet>(0, new Vector2(0, -(PanelBeatmapSet.HEIGHT / 2 + BeatmapCarousel.SPACING + 1)));
 
             AddAssert("no beatmaps visible", () => !GetVisiblePanels<PanelBeatmap>().Any());
 
@@ -243,7 +294,7 @@ namespace osu.Game.Tests.Visual.SongSelectV2
             AddBeatmaps(2, 3);
             WaitForDrawablePanels();
 
-            SortAndGroupBy(SortMode.Difficulty, GroupMode.All);
+            SortAndGroupBy(SortMode.Difficulty, GroupMode.None);
             WaitForFiltering();
 
             AddUntilStep("standalone panels displayed", () => GetVisiblePanels<PanelBeatmapStandalone>().Any());
@@ -259,6 +310,26 @@ namespace osu.Game.Tests.Visual.SongSelectV2
             SelectNextPanel();
             Select();
             WaitForSelection(1, 1);
+        }
+
+        [Test]
+        public void TestPanelChangesFromStandaloneToNormal()
+        {
+            AddBeatmaps(1, 3);
+            WaitForDrawablePanels();
+
+            SortBy(SortMode.Difficulty);
+            WaitForFiltering();
+
+            AddUntilStep("standalone panels displayed", () => GetVisiblePanels<PanelBeatmapStandalone>().Count(), () => Is.EqualTo(3));
+
+            WaitForSelection(0, 0);
+
+            SortBy(SortMode.Title);
+
+            AddUntilStep("set panel displayed", () => GetVisiblePanels<PanelBeatmapSet>().Count(), () => Is.EqualTo(1));
+            AddUntilStep("normal panels displayed", () => GetVisiblePanels<PanelBeatmap>().Count(), () => Is.EqualTo(3));
+            AddUntilStep("standalone panels not displayed", () => GetVisiblePanels<PanelBeatmapStandalone>().Count(), () => Is.EqualTo(0));
         }
 
         [Test]

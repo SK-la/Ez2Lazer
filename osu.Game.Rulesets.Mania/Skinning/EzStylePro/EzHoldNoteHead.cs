@@ -1,24 +1,29 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteHead : CompositeDrawable
     {
-        public EzHoldNoteHead()
-        {
-            RelativeSizeAxes = Axes.X;
-            FillMode = FillMode.Fill;
-        }
+        private EzSkinSettingsManager ezSkinConfig = null!;
+        private Bindable<bool> enabledColor = null!;
+        private Container? noteContainer;
 
-        private EzSkinSettingsManager? ezSkinConfig;
+        [Resolved]
+        private Column column { get; set; } = null!;
+
+        [Resolved]
+        private StageDefinition stageDefinition { get; set; } = null!;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
@@ -27,29 +32,46 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load(EzSkinSettingsManager ezSkinConfig)
         {
             this.ezSkinConfig = ezSkinConfig;
+            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            RelativeSizeAxes = Axes.X;
+            FillMode = FillMode.Fill;
         }
 
         protected override void Update()
         {
             base.Update();
 
-            if (IsSquare)
+            bool isSquare = factory.IsSquareNote($"{ColorPrefix}note");
+            float noteHeight = isSquare
+                ? DrawWidth
+                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
+
+            Height = noteHeight;
+
+            if (noteContainer != null)
             {
-                Height = DrawWidth;
-            }
-            else
-            {
-                Height = (float)(ezSkinConfig?.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value ?? DEFAULT_NON_SQUARE_HEIGHT);
+                noteContainer.Height = noteHeight / 2;
+
+                if (noteContainer.Child is Container containerA)
+                    containerA.Height = noteHeight;
             }
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
             ClearInternal();
             loadAnimation();
 
             factory.OnTextureNameChanged += onSkinChanged;
+            ezSkinConfig.OnSettingsChanged += onSettingsChanged;
+        }
+
+        private void onSettingsChanged()
+        {
+            if (enabledColor.Value && noteContainer != null)
+                noteContainer.Colour = NoteColor;
         }
 
         private void onSkinChanged()
@@ -64,51 +86,92 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-            // 取消订阅，防止内存泄漏
             factory.OnTextureNameChanged -= onSkinChanged;
+            ezSkinConfig.OnSettingsChanged -= onSettingsChanged;
         }
 
-        protected virtual string ColorPrefix => "blue";
-        protected virtual string ComponentSuffix => "longnote/head";
+        protected virtual Color4 NoteColor
+        {
+            get
+            {
+                int keyMode = stageDefinition.Columns;
+                int columnIndex = column.Index;
+                string keyName = $"{keyMode}K_{columnIndex}";
+                string fullKey = $"{EzSkinSetting.ColumnColorPrefix}:{keyName}";
+                string colorStr = ezSkinConfig.Get<string>(fullKey);
+                return Colour4.FromHex(colorStr);
+            }
+        }
 
-        protected virtual string ComponentName => $"{ColorPrefix}{ComponentSuffix}";
+        protected virtual string ColorPrefix
+        {
+            get
+            {
+                if (enabledColor.Value)
+                    return "white";
+
+                if (stageDefinition.EzIsSpecialColumn(column.Index))
+                    return "green";
+
+                int logicalIndex = 0;
+
+                for (int i = 0; i < column.Index; i++)
+                {
+                    if (!stageDefinition.EzIsSpecialColumn(i))
+                        logicalIndex++;
+                }
+
+                return logicalIndex % 2 == 0 ? "white" : "blue";
+            }
+        }
+
+        protected virtual string ComponentName => $"{ColorPrefix}longnote/head";
 
         private void loadAnimation()
         {
-            ClearInternal();
-            var animationContainer = factory.CreateAnimation(ComponentName);
+            var animation = factory.CreateAnimation(ComponentName);
 
-            if (animationContainer is Container containerx && containerx.Count == 0)
+            if (animation is Container container && container.Count == 0)
             {
                 string backupComponentName = $"{ColorPrefix}note";
-                animationContainer = factory.CreateAnimation(backupComponentName);
-            }
+                var animationContainer = factory.CreateAnimation(backupComponentName);
 
-            if (animationContainer is Container container &&
-                container.Children.FirstOrDefault() is TextureAnimation animation &&
-                animation.FrameCount > 0)
-            {
-                var texture = animation.CurrentFrame;
-
-                if (texture != null)
+                noteContainer = new Container
                 {
-                    float ratio = texture.Height / (float)texture.Width;
-                    IsSquare = ratio >= 0.7f;
-                    AspectRatio = ratio;
+                    RelativeSizeAxes = Axes.X,
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Masking = true,
+                    Child = new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Anchor = Anchor.BottomCentre,
+                        Origin = Anchor.BottomCentre,
+                        Child = animationContainer,
+                    }
+                };
+
+                if (enabledColor.Value)
+                {
+                    noteContainer.Colour = NoteColor;
                 }
+
+                AddInternal(noteContainer);
             }
+            else
+            {
+                if (enabledColor.Value)
+                {
+                    animation.Colour = NoteColor;
+                }
 
-            AddInternal(animationContainer);
+                AddInternal(animation);
+            }
         }
-
-        protected bool IsSquare { get; private set; } = true;
-        protected float AspectRatio { get; private set; } = 1.0f;
-        protected const float DEFAULT_NON_SQUARE_HEIGHT = 20f;
 
         public void Recycle()
         {
             ClearTransforms();
-            Alpha = 0;
         }
     }
 }

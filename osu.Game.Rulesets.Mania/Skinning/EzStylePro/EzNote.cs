@@ -1,66 +1,68 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Textures;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzNote : CompositeDrawable
     {
+        public const float DEFAULT_NON_SQUARE_HEIGHT = 20f;
+        private EzSkinSettingsManager ezSkinConfig = null!;
+        private Bindable<bool> enabledColor = null!;
+        private Drawable animation = null!;
+
+        [Resolved]
+        private Column column { get; set; } = null!;
+
+        [Resolved]
+        private StageDefinition stageDefinition { get; set; } = null!;
+
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
-
-        public EzNote()
-        {
-            RelativeSizeAxes = Axes.X;
-            FillMode = FillMode.Fill;
-        }
-
-        private EzSkinSettingsManager? ezSkinConfig;
-
-        // private EzLocalTextureFactory factory = null!;
-        // [Resolved]
-        // private EzLocalTexture factory { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load(EzSkinSettingsManager ezSkinConfig)
         {
             this.ezSkinConfig = ezSkinConfig;
-
-            // factory = new EzLocalTextureFactory(
-            //     ezSkinConfig,
-            //     new TextureStore(renderer),
-            //     host.Storage
-            // );
+            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            RelativeSizeAxes = Axes.X;
+            FillMode = FillMode.Fill;
         }
 
         protected override void Update()
         {
             base.Update();
 
-            if (IsSquare)
-            {
-                Height = DrawWidth;
-            }
-            else
-            {
-                Height = (float)(ezSkinConfig?.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value ?? DEFAULT_NON_SQUARE_HEIGHT);
-            }
+            bool isSquare = factory.IsSquareNote(ComponentName);
+            Height = isSquare
+                ? DrawWidth
+                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
             ClearInternal();
-            LoadAnimation();
+            loadAnimation();
 
             factory.OnTextureNameChanged += onSkinChanged;
+            ezSkinConfig.OnSettingsChanged += onSettingsChanged;
+        }
+
+        private void onSettingsChanged()
+        {
+            if (enabledColor.Value)
+                animation.Colour = NoteColor;
         }
 
         private void onSkinChanged()
@@ -68,58 +70,64 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Schedule(() =>
             {
                 ClearInternal();
-                LoadAnimation();
+                loadAnimation();
             });
         }
 
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-            // 取消订阅，防止内存泄漏
             factory.OnTextureNameChanged -= onSkinChanged;
+            ezSkinConfig.OnSettingsChanged -= onSettingsChanged;
         }
 
-        protected virtual string ColorPrefix => "blue";
-        protected virtual string ComponentSuffix => "note";
-        protected virtual string ComponentName => $"{ColorPrefix}{ComponentSuffix}";
-
-        public virtual void LoadAnimation()
+        protected virtual Color4 NoteColor
         {
-            var animationContainer = factory.CreateAnimation(ComponentName);
-
-            if (animationContainer is Container container &&
-                container.Children.FirstOrDefault() is TextureAnimation animation &&
-                animation.FrameCount > 0)
+            get
             {
-                var texture = animation.CurrentFrame;
+                int keyMode = stageDefinition.Columns;
+                int columnIndex = column.Index;
+                string keyName = $"{keyMode}K_{columnIndex}";
+                string fullKey = $"{EzSkinSetting.ColumnColorPrefix}:{keyName}";
+                string colorStr = ezSkinConfig.Get<string>(fullKey);
+                return Colour4.FromHex(colorStr);
+            }
+        }
 
-                if (texture != null)
+        protected virtual string ColorPrefix
+        {
+            get
+            {
+                if (enabledColor.Value)
+                    return "white";
+
+                if (stageDefinition.EzIsSpecialColumn(column.Index))
+                    return "green";
+
+                int logicalIndex = 0;
+
+                for (int i = 0; i < column.Index; i++)
                 {
-                    float ratio = texture.Height / (float)texture.Width;
-                    IsSquare = ratio >= 0.7f;
-                    AspectRatio = ratio;
+                    if (!stageDefinition.EzIsSpecialColumn(i))
+                        logicalIndex++;
                 }
+
+                return logicalIndex % 2 == 0 ? "white" : "blue";
+            }
+        }
+
+        protected virtual string ComponentName => $"{ColorPrefix}note";
+
+        private void loadAnimation()
+        {
+            animation = factory.CreateAnimation(ComponentName);
+
+            if (enabledColor.Value)
+            {
+                animation.Colour = NoteColor;
             }
 
-            AddInternal(animationContainer);
-        }
-
-        protected bool IsSquare { get; private set; } = true;
-        protected float AspectRatio { get; private set; } = 1.0f;
-        protected const float DEFAULT_NON_SQUARE_HEIGHT = 20f;
-
-        public float GetCurrentDrawHeight()
-        {
-            return DrawHeight;
-        }
-
-        public Texture? GetFinalTexture()
-        {
-            // 获取动画容器
-            if (InternalChildren.FirstOrDefault() is TextureAnimation animation && animation.FrameCount > 0)
-                return animation.CurrentFrame;
-
-            return null;
+            AddInternal(animation);
         }
     }
 }

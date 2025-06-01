@@ -203,6 +203,21 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         }
 
         [Test]
+        public void TestSelectionRetainedWhenFilteringAllPanelsAway()
+        {
+            ImportBeatmapForRuleset(0);
+
+            LoadSongSelect();
+
+            AddAssert("has selection", () => Beatmap.IsDefault, () => Is.False);
+
+            AddStep("change star filter", () => Config.SetValue(OsuSetting.DisplayStarsMinimum, 10.0));
+            AddUntilStep("wait for placeholder visible", () => getPlaceholder()?.State.Value == Visibility.Visible);
+
+            AddAssert("still has selection", () => Beatmap.IsDefault, () => Is.False);
+        }
+
+        [Test]
         public void TestPlaceholderVisibleWithConvertSetting()
         {
             ImportBeatmapForRuleset(0);
@@ -249,21 +264,24 @@ namespace osu.Game.Tests.Visual.SongSelectV2
         [Test]
         public void TestHideBeatmap()
         {
+            BeatmapInfo? hiddenBeatmap = null;
+
             LoadSongSelect();
             ImportBeatmapForRuleset(0);
 
             checkMatchedBeatmaps(3);
 
-            // song select should automatically select the beatmap for us but this is not implemented yet.
-            // todo: remove when that's the case.
-            AddAssert("no beatmap selected", () => Beatmap.IsDefault);
-            AddStep("select beatmap", () => Beatmap.Value = Beatmaps.GetWorkingBeatmap(Beatmaps.GetAllUsableBeatmapSets().Single().Beatmaps.First()));
-
-            AddStep("hide", () => Beatmaps.Hide(Beatmap.Value.BeatmapInfo));
+            AddStep("hide selected", () =>
+            {
+                hiddenBeatmap = Beatmap.Value.BeatmapInfo;
+                Beatmaps.Hide(hiddenBeatmap);
+            });
 
             checkMatchedBeatmaps(2);
 
-            AddStep("restore", () => Beatmaps.Restore(Beatmap.Value.BeatmapInfo));
+            AddAssert("selection changed", () => Beatmap.Value.BeatmapInfo, () => Is.Not.EqualTo(hiddenBeatmap));
+
+            AddStep("restore", () => Beatmaps.Restore(hiddenBeatmap!));
 
             checkMatchedBeatmaps(3);
         }

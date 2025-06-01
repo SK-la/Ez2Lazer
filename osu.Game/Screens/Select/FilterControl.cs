@@ -117,7 +117,7 @@ namespace osu.Game.Screens.Select
         private void load(OsuColour colours, OsuConfigManager config)
         {
             sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
-            groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupingMode);
+            groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupMode);
             ezMode = config.GetBindable<SelectEzMode>(OsuSetting.SelectEzMode);
 
             Children = new Drawable[]

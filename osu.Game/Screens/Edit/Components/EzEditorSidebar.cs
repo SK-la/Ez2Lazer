@@ -14,7 +14,8 @@ namespace osu.Game.Screens.Edit.Components
         public enum SidebarTab
         {
             Default,
-            EzSettings
+            EzSettings,
+            ColorSettings
         }
 
         private readonly OsuTabControl<SidebarTab> tabControl;
@@ -39,9 +40,9 @@ namespace osu.Game.Screens.Edit.Components
                 RelativeSizeAxes = Axes.X,
                 Height = 30,
                 Margin = new MarginPadding { Left = 5 },
-                Items = new[] { SidebarTab.Default, SidebarTab.EzSettings }
+                Items = new[] { SidebarTab.Default, SidebarTab.EzSettings, SidebarTab.ColorSettings }
             });
-
+            //TODO 添加多列颜色选择
             // 设置内容区整体下移，避免与tab栏重叠
             Content.Margin = new MarginPadding { Top = 30 };
 
@@ -50,14 +51,19 @@ namespace osu.Game.Screens.Edit.Components
                 currentTab = e.NewValue;
                 Content.Clear();
 
-                if (currentTab == SidebarTab.EzSettings)
+                switch (currentTab)
                 {
-                    showEzSettings();
-                }
-                else if (currentTab == SidebarTab.Default && lastPopulator != null)
-                {
-                    // 切回Default时自动刷新内容
-                    PopulateSettings(lastPopulator);
+                    case SidebarTab.EzSettings:
+                        showEzSettings();
+                        break;
+
+                    case SidebarTab.ColorSettings:
+                        showColorSettings();
+                        break;
+
+                    case SidebarTab.Default when lastPopulator != null:
+                        PopulateSettings(lastPopulator);
+                        break;
                 }
             };
         }
@@ -70,6 +76,15 @@ namespace osu.Game.Screens.Edit.Components
                 RelativeSizeAxes = Axes.X
             };
             Content.Add(ezSkinSettings);
+        }
+
+        private void showColorSettings()
+        {
+            var colorSettings = new EzColumnColorTab
+            {
+                RelativeSizeAxes = Axes.X
+            };
+            Content.Add(colorSettings);
         }
 
         /// <summary>

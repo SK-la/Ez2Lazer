@@ -123,44 +123,53 @@ namespace osu.Game.Screens
                     {
                         new SettingsCheckbox
                         {
-                            LabelText = "(动态刷新)Dynamic Tracking",
+                            LabelText = "Dynamic Tracking\n(动态刷新)",
+                            TooltipText = "开启后, 调整滑块时会实时 刷新并保存 皮肤, 可能导致卡顿\n"
+                                          + "Enable this to refresh and save the skin in real-time when adjusting sliders, may cause lag",
                             Current = dynamicTracking,
-                            TooltipText = "开启后滑动滑块时会实时刷新保存皮肤，可能导致卡顿"
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "(列宽)Column Width",
+                            LabelText = "Column Width",
+                            TooltipText = "设置每列的宽度",
                             Current = columnWidth,
                             KeyboardStep = 1.0f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "(特殊列倍率)Special Factor",
+                            LabelText = "Special Factor (特殊列倍率)",
+                            TooltipText = "设置特殊列的宽度倍率 //未来会联动特殊列颜色定义"
+                                          + "\nSet the width factor for special columns",
                             Current = specialFactor,
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "(判定线)Hit Position",
+                            LabelText = "Hit Position",
+                            TooltipText = "设置判定线位置",
                             Current = VirtualHitPosition,
                             KeyboardStep = 0.1f,
                         },
                         new EzGlobalTextureNameSelector
                         {
-                            LabelText = "(全局纹理名称)Global Texture Name",
+                            LabelText = "Global Texture Name",
+                            TooltipText = "(全局纹理名称)统一修改当前皮肤中所有组件的纹理名称\n"
+                                          + "Set a global texture name for all components in the current skin",
                             Current = globalTextureName,
-                            TooltipText = "统一修改当前皮肤中所有组件的纹理名称"
                         },
                         new SettingsDropdown<string>
                         {
                             LabelText = "(Note套图)Note Set",
+                            TooltipText = "统一指定note套图, 含note和打击光效\n"
+                                          + "Set a note set for all notes and hit effects",
                             Current = selectedNoteSet,
                             Items = availableNoteSets,
-                            TooltipText = "选择不同的Note套图，影响音符和打击光效果"
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "(note高)Note Height",
+                            TooltipText = "统一修改非圆形note的高度\n"
+                                          + "Fixed Height for square notes",
                             Current = NonSquareNoteHeight,
                             KeyboardStep = 1.0f,
                         },

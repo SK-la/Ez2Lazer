@@ -39,7 +39,7 @@ namespace osu.Game.Skinning.Components
         [Resolved]
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
 
-        private IBindable<StarDifficulty?>? difficultyBindable;
+        private IBindable<StarDifficulty>? difficultyBindable;
         private CancellationTokenSource? difficultyCancellationSource;
         private ModSettingChangeTracker? modSettingTracker;
 
@@ -119,7 +119,7 @@ namespace osu.Game.Skinning.Components
                 difficultyBindable = difficultyCache.GetBindableDifficulty(b.NewValue.BeatmapInfo, difficultyCancellationSource.Token);
                 difficultyBindable.BindValueChanged(d =>
                 {
-                    // 归一化参数到0-1范围
+                    // 归一化参数到0-1 范围
                     parameters[0].Value = (float)(beatmap.Value.BeatmapInfo.BPM / max_bpm);
                     parameters[1].Value = (float)beatmap.Value.BeatmapInfo.StarRating / max_star;
                     parameters[2].Value = beatmap.Value.BeatmapInfo.Difficulty.CircleSize / max_cs;
