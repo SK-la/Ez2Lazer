@@ -31,12 +31,6 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = config.GetBindable<double>(OsuSetting.SpecialFactor),
                     KeyboardStep = 1,
                 },
-                new SettingsSlider<double>
-                {
-                    LabelText = "Virtual Hit Position",
-                    Current = config.GetBindable<double>(OsuSetting.VirtualHitPosition),
-                    KeyboardStep = 1,
-                },
                 new SettingsEnumDropdown<ScoringMode>
                 {
                     ClassicDefault = ScoringMode.Classic,

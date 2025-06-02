@@ -29,7 +29,7 @@ namespace osu.Game.Screens
 {
     public partial class EzSkinSettings : EditorSidebarSection
     {
-        public BindableNumber<double>? NonSquareNoteHeight;
+        // public Bindable<double>? NonSquareNoteHeight;
         public Bindable<double>? VirtualHitPosition;
         private Bindable<double>? columnWidth;
         private Bindable<double>? specialFactor;
@@ -63,53 +63,17 @@ namespace osu.Game.Screens
         {
             columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
             specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
-            VirtualHitPosition = config.GetBindable<double>(OsuSetting.VirtualHitPosition);
-
-            var configBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
-
-            NonSquareNoteHeight = new BindableDouble(configBindable.Value)
-            {
-                MinValue = 1,
-                MaxValue = 100,
-                Precision = 1f,
-            };
-
-            NonSquareNoteHeight.ValueChanged += e => configBindable.Value = e.NewValue;
-            configBindable.ValueChanged += e => NonSquareNoteHeight.Value = e.NewValue;
+            VirtualHitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.VirtualHitPosition);
+            globalTextureName.Value = (EzSelectorNameSet)ezSkinConfig.GetBindable<int>(EzSkinSetting.GlobalTextureName).Value;
+            // dynamicTracking.BindTo(ezSkinConfig.GetBindable<bool>(EzSkinSetting.DynamicTracking));
             // NonSquareNoteHeight.ValueChanged += onSettingsValueChanged;
 
-            globalTextureName.Value = (EzSelectorNameSet)ezSkinConfig.GetBindable<int>(EzSkinSetting.GlobalTextureName).Value;
-            globalTextureName.ValueChanged += onTextureNameChanged;
-
-            dynamicTracking.BindTo(ezSkinConfig.GetBindable<bool>(EzSkinSetting.DynamicTracking));
-            dynamicTracking.ValueChanged += tracking =>
-            {
-                if (tracking.NewValue)
-                {
-                    columnWidth!.ValueChanged += onSettingsValueChanged;
-                    specialFactor!.ValueChanged += onSettingsValueChanged;
-                    VirtualHitPosition!.ValueChanged += onSettingsValueChanged;
-                }
-                else
-                {
-                    columnWidth!.ValueChanged -= onSettingsValueChanged;
-                    specialFactor!.ValueChanged -= onSettingsValueChanged;
-                    VirtualHitPosition!.ValueChanged -= onSettingsValueChanged;
-                }
-
-                ezSkinConfig.SetValue(EzSkinSetting.DynamicTracking, tracking.NewValue);
-            };
-
             loadAvailableNoteSets();
-
-            // 从配置中加载上次选择的note套图，如果有的话
             string configuredNoteSet = ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName);
             if (!string.IsNullOrEmpty(configuredNoteSet) && availableNoteSets.Contains(configuredNoteSet))
                 selectedNoteSet.Value = configuredNoteSet;
             else if (availableNoteSets.Count > 0)
                 selectedNoteSet.Value = availableNoteSets[1];
-
-            selectedNoteSet.ValueChanged += onNoteSetChanged;
 
             Children = new Drawable[]
             {
@@ -126,7 +90,7 @@ namespace osu.Game.Screens
                             LabelText = "Dynamic Tracking\n(动态刷新)",
                             TooltipText = "开启后, 调整滑块时会实时 刷新并保存 皮肤, 可能导致卡顿\n"
                                           + "Enable this to refresh and save the skin in real-time when adjusting sliders, may cause lag",
-                            Current = dynamicTracking,
+                            Current = ezSkinConfig.GetBindable<bool>(EzSkinSetting.DynamicTracking),
                         },
                         new SettingsSlider<double>
                         {
@@ -148,7 +112,7 @@ namespace osu.Game.Screens
                             LabelText = "Hit Position",
                             TooltipText = "设置判定线位置",
                             Current = VirtualHitPosition,
-                            KeyboardStep = 0.1f,
+                            KeyboardStep = 1f,
                         },
                         new EzGlobalTextureNameSelector
                         {
@@ -170,7 +134,7 @@ namespace osu.Game.Screens
                             LabelText = "(note高)Note Height",
                             TooltipText = "统一修改非圆形note的高度\n"
                                           + "Fixed Height for square notes",
-                            Current = NonSquareNoteHeight,
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight),
                             KeyboardStep = 1.0f,
                         },
                         new SettingsButton
@@ -179,6 +143,26 @@ namespace osu.Game.Screens
                         }.WithTwoLineText("(刷新&保存皮肤)", "Refresh & Save Skin")
                     }
                 }
+            };
+
+            globalTextureName.ValueChanged += onTextureNameChanged;
+            selectedNoteSet.ValueChanged += onNoteSetChanged;
+            dynamicTracking.ValueChanged += tracking =>
+            {
+                if (tracking.NewValue)
+                {
+                    columnWidth!.ValueChanged += onSettingsValueChanged;
+                    specialFactor!.ValueChanged += onSettingsValueChanged;
+                    VirtualHitPosition!.ValueChanged += onSettingsValueChanged;
+                }
+                else
+                {
+                    columnWidth!.ValueChanged -= onSettingsValueChanged;
+                    specialFactor!.ValueChanged -= onSettingsValueChanged;
+                    VirtualHitPosition!.ValueChanged -= onSettingsValueChanged;
+                }
+
+                ezSkinConfig.SetValue(EzSkinSetting.DynamicTracking, tracking.NewValue);
             };
         }
 
@@ -218,7 +202,7 @@ namespace osu.Game.Screens
 
         #endregion
 
-        #region MyRegion
+        #region updateAllSkinComponentsTextureNames
 
         private void updateAllSkinComponentsTextureNames(EzSelectorNameSet textureName)
         {
@@ -289,7 +273,7 @@ namespace osu.Game.Screens
                 if (!Directory.Exists(dataFolderPath))
                 {
                     Directory.CreateDirectory(dataFolderPath);
-                    Logger.Log($"EzSkinSettings create Note Path: {dataFolderPath}");
+                    Logger.Log($"EzSkinSettingsTab create Note Path: {dataFolderPath}");
                 }
 
                 // 获取所有子文件夹作为note套图选项
@@ -301,11 +285,11 @@ namespace osu.Game.Screens
                     availableNoteSets.Add(dirName);
                 }
 
-                Logger.Log($"EzSkinSettings Find {dataFolderPath} to {availableNoteSets.Count} Note Sets", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"EzSkinSettingsTab Find {dataFolderPath} to {availableNoteSets.Count} Note Sets", LoggingTarget.Runtime, LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "EzSkinSettings Load NoteSets Error");
+                Logger.Error(ex, "EzSkinSettingsTab Load NoteSets Error");
             }
         }
     }

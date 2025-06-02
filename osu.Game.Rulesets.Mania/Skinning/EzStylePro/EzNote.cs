@@ -15,7 +15,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzNote : CompositeDrawable
     {
-        public const float DEFAULT_NON_SQUARE_HEIGHT = 20f;
+        public const float DEFAULT_NON_SQUARE_HEIGHT = 25f;
         private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
         private Drawable animation = null!;
@@ -56,10 +56,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             loadAnimation();
 
             factory.OnTextureNameChanged += onSkinChanged;
-            ezSkinConfig.OnSettingsChanged += onSettingsChanged;
+            ezSkinConfig.OnSettingsChanged += OnConfigChanged;
         }
 
-        private void onSettingsChanged()
+        private void OnConfigChanged()
         {
             if (enabledColor.Value)
                 animation.Colour = NoteColor;
@@ -78,7 +78,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.Dispose(isDisposing);
             factory.OnTextureNameChanged -= onSkinChanged;
-            ezSkinConfig.OnSettingsChanged -= onSettingsChanged;
+            ezSkinConfig.OnSettingsChanged -= OnConfigChanged;
         }
 
         protected virtual Color4 NoteColor
@@ -118,6 +118,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected virtual string ComponentName => $"{ColorPrefix}note";
 
+        // protected virtual Colour4 NoteColorHSV =>
+        //     Colour4.FromHSV(0.1f, 0.5f, 1.0f);
+
         private void loadAnimation()
         {
             animation = factory.CreateAnimation(ComponentName);
@@ -125,9 +128,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (enabledColor.Value)
             {
                 animation.Colour = NoteColor;
+                animation.Blending = new BlendingParameters
+                {
+                    Source = BlendingType.SrcAlpha,
+                    Destination = BlendingType.One,
+                };
+                AddInternal(animation);
             }
-
-            AddInternal(animation);
         }
     }
 }

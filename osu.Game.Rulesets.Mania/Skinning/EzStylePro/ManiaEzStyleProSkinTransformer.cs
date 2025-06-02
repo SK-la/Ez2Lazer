@@ -24,24 +24,25 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public class ManiaEzStyleProSkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
+        // private readonly OsuConfigManager config;
+        // private readonly EzSkinSettingsManager ezSkinConfig;
 
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> virtualHitPositionBindable;
-
-        private float hitPosition => (float)virtualHitPositionBindable.Value;
-
         private float columnWidth { get; set; }
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
-        public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config, EzSkinSettings ezSkinSettings)
+        public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config, EzSkinSettingsManager ezSkinConfig)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
+            // this.config = config;
+            // this.ezSkinConfig = ezSkinConfig;
 
             columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
             specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
-            virtualHitPositionBindable = config.GetBindable<double>(OsuSetting.VirtualHitPosition);
+            virtualHitPositionBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.VirtualHitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -122,14 +123,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                 {
                                     keyCounter.Anchor = Anchor.BottomCentre;
                                     keyCounter.Origin = Anchor.TopCentre;
-                                    keyCounter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
+                                    keyCounter.Position = new Vector2(0, -(float)virtualHitPositionBindable.Value - stage_padding_bottom);
                                 }
 
                                 if (columnHitErrorMeter != null)
                                 {
                                     columnHitErrorMeter.Anchor = Anchor.BottomCentre;
                                     columnHitErrorMeter.Origin = Anchor.Centre;
-                                    columnHitErrorMeter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
+                                    columnHitErrorMeter.Position = new Vector2(0, -(float)virtualHitPositionBindable.Value - stage_padding_bottom);
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -243,7 +244,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
 
                     case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(hitPosition));
+                        return SkinUtils.As<TValue>(new Bindable<float>((float)virtualHitPositionBindable.Value));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
 

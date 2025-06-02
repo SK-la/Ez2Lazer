@@ -18,13 +18,13 @@ namespace osu.Game.Screens.Edit.Components
             ColorSettings
         }
 
-        private readonly OsuTabControl<SidebarTab> tabControl;
         private EzSkinSettings? ezSkinSettings;
         private SidebarTab currentTab = SidebarTab.Default;
         private Action<Container<EditorSidebarSection>>? lastPopulator;
 
         public EzEditorSidebar()
         {
+            OsuTabControl<SidebarTab> tabControl1;
             // 添加tabControl背景，防止内容遮挡tab标签
             var tabBackground = new Box
             {
@@ -35,7 +35,7 @@ namespace osu.Game.Screens.Edit.Components
             AddInternal(tabBackground);
 
             // 只添加tabControl，滚动和内容由基类EditorSidebar负责
-            AddInternal(tabControl = new OsuTabControl<SidebarTab>
+            AddInternal(tabControl1 = new OsuTabControl<SidebarTab>
             {
                 RelativeSizeAxes = Axes.X,
                 Height = 30,
@@ -46,7 +46,7 @@ namespace osu.Game.Screens.Edit.Components
             // 设置内容区整体下移，避免与tab栏重叠
             Content.Margin = new MarginPadding { Top = 30 };
 
-            tabControl.Current.ValueChanged += e =>
+            tabControl1.Current.ValueChanged += e =>
             {
                 currentTab = e.NewValue;
                 Content.Clear();
@@ -70,7 +70,6 @@ namespace osu.Game.Screens.Edit.Components
 
         private void showEzSettings()
         {
-            // 每次切换都新建，避免重复 Add 到容器导致异常
             ezSkinSettings = new EzSkinSettings
             {
                 RelativeSizeAxes = Axes.X

@@ -13,14 +13,15 @@ using osu.Game.Graphics.Sprites;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens
+namespace osu.Game.Screens.LAsEzExtensions
 {
-    public partial class ColorButtonSelector : CompositeDrawable
+    public partial class EzColorButtonSelector : CompositeDrawable
     {
         private readonly FillFlowContainer buttonsContainer;
         private readonly Dictionary<string, Color4> colorMap = new Dictionary<string, Color4>();
         private readonly Dictionary<string, ColorButton> buttonsByName = new Dictionary<string, ColorButton>();
         private readonly Lazy<Dictionary<string, Color4>> defaultColors;
+        private readonly Box backgroundBox;
         public Bindable<string> Current { get; }
         public float ButtonHeight { get; set; } = 30;
         private const float spacing_width = 5f;
@@ -31,7 +32,7 @@ namespace osu.Game.Screens
         /// <param name="label">选择器标签</param>
         /// <param name="items">可选项目</param>
         /// <param name="colorMapping">项目到颜色的映射</param>
-        public ColorButtonSelector(string label, string[] items, Dictionary<string, Color4>? colorMapping = null)
+        public EzColorButtonSelector(string label, string[] items, Dictionary<string, Color4>? colorMapping = null)
         {
             Current = new Bindable<string>();
             // 优化：使用懒加载初始化默认颜色
@@ -60,7 +61,7 @@ namespace osu.Game.Screens
 
             InternalChildren = new Drawable[]
             {
-                new Box
+                backgroundBox = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
                     Colour = Color4.Black.Opacity(0.05f)
@@ -70,7 +71,7 @@ namespace osu.Game.Screens
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
                     Direction = FillDirection.Vertical,
-                    Padding = new MarginPadding(10),
+                    Padding = new MarginPadding { Left = 10, Right = 5, Bottom = 5 },
                     Spacing = new Vector2(0, 8),
                     Children = new Drawable[]
                     {
@@ -78,7 +79,7 @@ namespace osu.Game.Screens
                         {
                             Text = label,
                             Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14),
-                            Margin = new MarginPadding { Left = 5 }
+                            Margin = new MarginPadding { Left = 5, Top = 5 }
                         },
                         buttonsContainer = new FillFlowContainer
                         {
@@ -102,6 +103,19 @@ namespace osu.Game.Screens
                 if (e.NewValue != null && buttonsByName.TryGetValue(e.NewValue, out var newButton))
                     newButton.Selected = true;
             };
+        }
+
+        // 添加悬浮事件处理
+        protected override bool OnHover(HoverEvent e)
+        {
+            backgroundBox.FadeColour(Color4.White.Opacity(0.1f), 200, Easing.OutQuint);
+            return base.OnHover(e);
+        }
+
+        protected override void OnHoverLost(HoverLostEvent e)
+        {
+            backgroundBox.FadeColour(Color4.Black.Opacity(0.05f), 200, Easing.OutQuint);
+            base.OnHoverLost(e);
         }
 
         public void AddButtons(IEnumerable<string> colorNames, Dictionary<string, Color4>? customColors = null)

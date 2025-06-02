@@ -20,7 +20,7 @@ namespace osu.Game.Screens.Backgrounds
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(OsuConfigManager config, EzSkinSettingsManager ezSkinConfig)
         {
             var video = new Video(videoPath)
             {
@@ -35,19 +35,30 @@ namespace osu.Game.Screens.Backgrounds
 
             //下面只用于注册全局设置
             GlobalConfigStore.Config = config;
-
-            var ezskinSettings = new EzSkinSettings();
-            GlobalConfigStore.EZConfig = ezskinSettings;
+            GlobalConfigStore.EZConfig = ezSkinConfig;
+            GlobalConfigStore.RegisterConfigListeners();
         }
     }
 
     public static class GlobalConfigStore
     {
         public static OsuConfigManager? Config { get; set; }
-        public static EzSkinSettings? EZConfig { get; set; }
+        public static EzSkinSettingsManager? EZConfig { get; set; }
         public static event Action? OnRefresh;
 
         public static void TriggerRefresh() => OnRefresh?.Invoke();
+
+        public static void RegisterConfigListeners()
+        {
+            if (Config == null || EZConfig == null) return;
+
+            // 监听常用的配置项
+            Config.GetBindable<double>(OsuSetting.ColumnWidth).ValueChanged += _ => TriggerRefresh();
+            Config.GetBindable<double>(OsuSetting.SpecialFactor).ValueChanged += _ => TriggerRefresh();
+            EZConfig.GetBindable<double>(EzSkinSetting.VirtualHitPosition).ValueChanged += _ => TriggerRefresh();
+
+            // 可以根据需要添加更多配置项的监听
+        }
     }
 
     public partial class StreamVideoBackgroundScreen : Background

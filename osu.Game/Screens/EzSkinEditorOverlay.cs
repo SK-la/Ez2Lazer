@@ -153,14 +153,14 @@ namespace osu.Game.Screens
             globallyReenableBeatmapSkinSetting();
         }
 
-        private EditorSidebar settingsSidebar = null!;
-        private EzSkinSettings ezSkinSettings = null!;
+        private readonly EditorSidebar settingsSidebar = null!;
+        private readonly EzSkinSettings ezSkinSettingsTab = null!;
 
         public void PopulateSettings()
         {
             settingsSidebar.Clear();
 
-            settingsSidebar.Add(new SkinSettingsToolbox(ezSkinSettings));
+            settingsSidebar.Add(new SkinSettingsToolbox(ezSkinSettingsTab));
         }
 
         public void PresentGameplay() => presentGameplay(false);
