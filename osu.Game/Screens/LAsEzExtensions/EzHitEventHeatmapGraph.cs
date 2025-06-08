@@ -8,12 +8,13 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.Ranking.Statistics
+namespace osu.Game.Screens.LAsEzExtensions
 {
-    public partial class LAsHitEventHeatmapGraph : CompositeDrawable
+    public partial class EzHitEventHeatmapGraph : CompositeDrawable
     {
         private const int time_bins = 50; // 时间分段数
         private const float circle_size = 5f; // 圆形大小
@@ -25,7 +26,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
         private readonly HitWindows hitWindows;
 
-        public LAsHitEventHeatmapGraph(IReadOnlyList<HitEvent> hitEvents, HitWindows hitWindows)
+        public EzHitEventHeatmapGraph(IReadOnlyList<HitEvent> hitEvents, HitWindows hitWindows)
         {
             this.hitEvents = hitEvents.Where(e => e.HitObject.HitWindows != HitWindows.Empty && e.Result.IsBasic() && e.Result.IsHit()).ToList();
             this.hitWindows = hitWindows;

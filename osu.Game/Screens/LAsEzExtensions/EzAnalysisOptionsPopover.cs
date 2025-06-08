@@ -6,13 +6,13 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 
-namespace osu.Game.Screens.Ranking
+namespace osu.Game.Screens.LAsEzExtensions
 {
-    public partial class LAsAnalysisOptionsPopover : OsuPopover
+    public partial class EzAnalysisOptionsPopover : OsuPopover
     {
         // private readonly BeatmapInfo beatmapInfo;
 
-        public LAsAnalysisOptionsPopover(BeatmapInfo beatmapInfo)
+        public EzAnalysisOptionsPopover(BeatmapInfo beatmapInfo)
             : base(false)
         {
             // this.beatmapInfo = beatmapInfo;

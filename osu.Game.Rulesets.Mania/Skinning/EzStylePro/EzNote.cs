@@ -19,6 +19,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
         private Drawable animation = null!;
+        protected virtual bool UseColorization => true;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -61,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
-            if (enabledColor.Value)
+            if (enabledColor.Value && UseColorization)
                 animation.Colour = NoteColor;
         }
 
@@ -87,10 +88,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 int keyMode = stageDefinition.Columns;
                 int columnIndex = column.Index;
-                string keyName = $"{keyMode}K_{columnIndex}";
-                string fullKey = $"{EzSkinSetting.ColumnColorPrefix}:{keyName}";
-                string colorStr = ezSkinConfig.Get<string>(fullKey);
-                return Colour4.FromHex(colorStr);
+                return ezSkinConfig.GetColumnColor(keyMode, columnIndex);
             }
         }
 
@@ -125,7 +123,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             animation = factory.CreateAnimation(ComponentName);
 
-            if (enabledColor.Value)
+            if (enabledColor.Value && UseColorization)
             {
                 animation.Colour = NoteColor;
                 animation.Blending = new BlendingParameters
@@ -133,8 +131,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     Source = BlendingType.SrcAlpha,
                     Destination = BlendingType.One,
                 };
-                AddInternal(animation);
             }
+
+            AddInternal(animation);
         }
     }
 }

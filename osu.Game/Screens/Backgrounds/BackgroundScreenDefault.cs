@@ -20,6 +20,7 @@ using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
 
 namespace osu.Game.Screens.Backgrounds

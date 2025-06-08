@@ -50,7 +50,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.SongSelectGroupMode, GroupMode.None);
             SetDefault(OsuSetting.SongSelectSortingMode, SortMode.Title);
-            SetDefault(OsuSetting.SelectEzMode, SelectEzMode.All);
+            SetDefault(OsuSetting.SelectEzMode, EzSelectMode.All);
 
             SetDefault(OsuSetting.RandomSelectAlgorithm, RandomSelectAlgorithm.RandomPermutation);
             SetDefault(OsuSetting.ModSelectHotkeyStyle, ModSelectHotkeyStyle.Sequential);

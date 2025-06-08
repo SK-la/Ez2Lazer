@@ -13,6 +13,7 @@ using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Caching;
 using osu.Framework.Development;
+using osu.Framework.Extensions.PolygonExtensions;
 using osu.Framework.Extensions.TypeExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -107,7 +108,7 @@ namespace osu.Game.Graphics.Carousel
             get => currentSelection.Model;
             set
             {
-                if (currentSelection.Model != value)
+                if (!CheckModelEquality(currentSelection.Model, value))
                 {
                     HandleItemSelected(value);
 
@@ -209,7 +210,7 @@ namespace osu.Game.Graphics.Carousel
         /// <summary>
         /// Check whether two models are the same for display purposes.
         /// </summary>
-        protected virtual bool CheckModelEquality(object x, object y) => ReferenceEquals(x, y);
+        protected virtual bool CheckModelEquality(object? x, object? y) => ReferenceEquals(x, y);
 
         /// <summary>
         /// Create a drawable for the given carousel item so it can be displayed.
@@ -394,6 +395,15 @@ namespace osu.Game.Graphics.Carousel
 
             offset += spacing;
             item.CarouselYPosition = offset;
+
+            // ensure there are no input gaps where clicking will fall through the carousel.
+            // notably, only do this where there's positive spacing between panels (negative spacing means they overlap already and there is no gap to fill).
+            if (spacing > 0)
+            {
+                item.CarouselInputLenienceAbove = spacing / 2;
+                if (previousVisible != null)
+                    previousVisible.CarouselInputLenienceBelow = item.CarouselInputLenienceAbove;
+            }
 
             if (item.IsVisible)
             {
@@ -845,6 +855,8 @@ namespace osu.Game.Graphics.Carousel
                     throw new InvalidOperationException($"Carousel panel drawables must implement {typeof(ICarouselPanel)}");
 
                 carouselPanel.Item = item;
+                carouselPanel.DrawYPosition = item.CarouselYPosition;
+
                 Scroll.Add(drawable);
             }
 
@@ -853,6 +865,7 @@ namespace osu.Game.Graphics.Carousel
                 // To make transitions of items appearing in the flow look good, do a pass and make sure newly added items spawn from
                 // just beneath the *current interpolated position* of the previous panel.
                 var orderedPanels = Scroll.Panels
+                                          .Where(p => Scroll.ScreenSpaceDrawQuad.Intersects(p.ScreenSpaceDrawQuad))
                                           .OfType<ICarouselPanel>()
                                           .Where(p => p.Item != null)
                                           .OrderBy(p => p.Item!.CarouselYPosition)
@@ -868,8 +881,6 @@ namespace osu.Game.Graphics.Carousel
                         // It's usually off-screen anyway.
                         if (i > 0 && i < orderedPanels.Count - 1)
                             panel.DrawYPosition = orderedPanels[i - 1].DrawYPosition;
-                        else
-                            panel.DrawYPosition = panel.Item!.CarouselYPosition;
                     }
                 }
             }

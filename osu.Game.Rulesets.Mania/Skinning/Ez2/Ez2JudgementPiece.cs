@@ -13,13 +13,14 @@ using osu.Framework.Utils;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    public partial class Ez2JudgementPiece : LAsJudgementText, IAnimatableJudgement
+    public partial class Ez2JudgementPiece : EzJudgementText, IAnimatableJudgement
     {
         internal const float JUDGEMENT_Y_POSITION = 140;
 

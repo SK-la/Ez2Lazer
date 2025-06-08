@@ -8,7 +8,7 @@ using osu.Framework.Graphics.Video;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 
-namespace osu.Game.Screens.Backgrounds
+namespace osu.Game.Screens.LAsEzExtensions
 {
     public partial class VideoBackgroundScreen : Background
     {

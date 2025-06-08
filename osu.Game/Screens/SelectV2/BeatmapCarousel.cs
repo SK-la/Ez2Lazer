@@ -13,6 +13,7 @@ using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
@@ -118,8 +119,15 @@ namespace osu.Game.Screens.SelectV2
 
         #region Beatmap source hookup
 
-        private void beatmapSetsChanged(object? beatmaps, NotifyCollectionChangedEventArgs changed)
+        private void beatmapSetsChanged(object? beatmaps, NotifyCollectionChangedEventArgs changed) => Schedule(() =>
         {
+            // This callback is scheduled to ensure there's no added overhead during gameplay.
+            // If this ever becomes an issue, it's important to note that the actual carousel filtering is already
+            // implemented in a way it will only run when at song select.
+            //
+            // The overhead we are avoiding here is that of this method directly – things like Items.IndexOf calls
+            // that can be slow for very large beatmap libraries. There are definitely ways to optimise this further.
+
             // TODO: moving management of BeatmapInfo tracking to BeatmapStore might be something we want to consider.
             // right now we are managing this locally which is a bit of added overhead.
             IEnumerable<BeatmapSetInfo>? newItems = changed.NewItems?.Cast<BeatmapSetInfo>();
@@ -190,7 +198,7 @@ namespace osu.Game.Screens.SelectV2
                     Items.Clear();
                     break;
             }
-        }
+        });
 
         #endregion
 
@@ -219,13 +227,7 @@ namespace osu.Game.Screens.SelectV2
                         return;
 
                     case BeatmapSetInfo setInfo:
-                        // Selecting a set isn't valid – let's re-select the first visible difficulty.
-                        if (grouping.SetItems.TryGetValue(setInfo, out var items))
-                        {
-                            var beatmaps = items.Select(i => i.Model).OfType<BeatmapInfo>();
-                            RequestRecommendedSelection(beatmaps);
-                        }
-
+                        selectRecommendedDifficultyForBeatmapSet(setInfo);
                         return;
 
                     case BeatmapInfo beatmapInfo:
@@ -261,7 +263,9 @@ namespace osu.Game.Screens.SelectV2
 
                     if (containingGroup != null)
                         setExpandedGroup(containingGroup);
-                    setExpandedSet(beatmapInfo);
+
+                    if (grouping.BeatmapSetsGroupedTogether)
+                        setExpandedSet(beatmapInfo);
                     break;
             }
         }
@@ -282,6 +286,16 @@ namespace osu.Game.Screens.SelectV2
             // If a group was selected that is not the one containing the selection, reselect it.
             if (groupForReselection != null)
                 setExpandedGroup(groupForReselection);
+        }
+
+        private void selectRecommendedDifficultyForBeatmapSet(BeatmapSetInfo beatmapSet)
+        {
+            // Selecting a set isn't valid – let's re-select the first visible difficulty.
+            if (grouping.SetItems.TryGetValue(beatmapSet, out var items))
+            {
+                var beatmaps = items.Select(i => i.Model).OfType<BeatmapInfo>();
+                RequestRecommendedSelection(beatmaps);
+            }
         }
 
         /// <summary>
@@ -311,7 +325,12 @@ namespace osu.Game.Screens.SelectV2
                 }
             }
 
-            RequestRecommendedSelection(items.Select(i => i.Model).OfType<BeatmapInfo>());
+            var beatmaps = items.Select(i => i.Model).OfType<BeatmapInfo>();
+
+            if (beatmaps.Any(b => b.Equals(CurrentSelection as BeatmapInfo)))
+                return;
+
+            RequestRecommendedSelection(beatmaps);
         }
 
         protected override bool CheckValidForGroupSelection(CarouselItem item)
@@ -489,7 +508,7 @@ namespace osu.Game.Screens.SelectV2
 
         private ScheduledDelegate? loadingDebounce;
 
-        public void Filter(FilterCriteria criteria)
+        public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
         {
             bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
 
@@ -497,9 +516,12 @@ namespace osu.Game.Screens.SelectV2
 
             loadingDebounce ??= Scheduler.AddDelayed(() =>
             {
+                if (loading.State.Value == Visibility.Visible)
+                    return;
+
                 Scroll.FadeColour(OsuColour.Gray(0.5f), 1000, Easing.OutQuint);
                 loading.Show();
-            }, 250);
+            }, showLoadingImmediately ? 0 : 250);
 
             FilterAsync(resetDisplay).ContinueWith(_ => Schedule(() =>
             {
@@ -538,7 +560,7 @@ namespace osu.Game.Screens.SelectV2
             AddInternal(setPanelPool);
         }
 
-        protected override bool CheckModelEquality(object x, object y)
+        protected override bool CheckModelEquality(object? x, object? y)
         {
             // In the confines of the carousel logic, we assume that CurrentSelection (and all items) are using non-stale
             // BeatmapInfo reference, and that we can match based on beatmap / beatmapset (GU)IDs.
@@ -603,15 +625,8 @@ namespace osu.Game.Screens.SelectV2
             if (carouselItems?.Any() != true)
                 return false;
 
-            // If set grouping is available, this is the fastest way to retrieve sets for randomisation.
+            // This is the fastest way to retrieve sets for randomisation.
             ICollection<BeatmapSetInfo> visibleSets = grouping.SetItems.Keys;
-
-            // If not, we need to do an expensive copy.
-            //
-            // There's probably a more efficient way to handle this. Maybe the grouping filter should always expose grouped sets regardless
-            // as that process is done asynchronously.
-            if (!visibleSets.Any())
-                visibleSets = carouselItems.Select(i => i.Model).OfType<BeatmapInfo>().Select(b => b.BeatmapSet!).Distinct().ToList();
 
             if (CurrentSelection is BeatmapInfo beatmapInfo)
             {
@@ -644,7 +659,7 @@ namespace osu.Game.Screens.SelectV2
             if (CurrentSelectionItem != null)
                 playSpinSample(distanceBetween(carouselItems.First(i => !ReferenceEquals(i.Model, set)), CurrentSelectionItem), visibleSets.Count);
 
-            RequestRecommendedSelection(set.Beatmaps.Where(b => !b.Hidden));
+            selectRecommendedDifficultyForBeatmapSet(set);
             return true;
         }
 

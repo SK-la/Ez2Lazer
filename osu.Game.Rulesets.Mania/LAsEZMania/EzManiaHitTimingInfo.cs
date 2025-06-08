@@ -3,7 +3,7 @@
 
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.Mania.Scoring
+namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
     public class EzManiaHitTimingInfo
     {

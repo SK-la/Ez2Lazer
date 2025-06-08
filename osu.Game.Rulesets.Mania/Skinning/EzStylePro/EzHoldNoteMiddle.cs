@@ -132,10 +132,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 int keyMode = stageDefinition.Columns;
                 int columnIndex = column.Index;
-                string keyName = $"{keyMode}K_{columnIndex}";
-                string fullKey = $"{EzSkinSetting.ColumnColorPrefix}:{keyName}";
-                string colorStr = ezSkinConfig.Get<string>(fullKey);
-                return Colour4.FromHex(colorStr);
+                return ezSkinConfig.GetColumnColor(keyMode, columnIndex);
             }
         }
 

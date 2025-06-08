@@ -15,7 +15,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Screens.LAsEzExtensions
 {
-    public partial class EzColorButtonSelector : CompositeDrawable
+    public partial class EzSelectorColour : CompositeDrawable
     {
         private readonly FillFlowContainer buttonsContainer;
         private readonly Dictionary<string, Color4> colorMap = new Dictionary<string, Color4>();
@@ -32,7 +32,7 @@ namespace osu.Game.Screens.LAsEzExtensions
         /// <param name="label">选择器标签</param>
         /// <param name="items">可选项目</param>
         /// <param name="colorMapping">项目到颜色的映射</param>
-        public EzColorButtonSelector(string label, string[] items, Dictionary<string, Color4>? colorMapping = null)
+        public EzSelectorColour(string label, string[] items, Dictionary<string, Color4>? colorMapping = null)
         {
             Current = new Bindable<string>();
             // 优化：使用懒加载初始化默认颜色

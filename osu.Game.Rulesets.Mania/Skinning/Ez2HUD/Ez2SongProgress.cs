@@ -14,7 +14,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
+namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
     public partial class Ez2SongProgress : SongProgress
     {

@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Testing;
+using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
@@ -34,6 +35,9 @@ namespace osu.Game.Screens
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;
 
+        [Resolved]
+        private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
+
         public EzColumnColorTab()
             : base("EZ Colour Settings")
         {
@@ -45,10 +49,10 @@ namespace osu.Game.Screens
             keyModeSelection = ezSkinConfig.GetBindable<int>(EzSkinSetting.SelectedKeyMode);
             colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
             // 设置双向绑定
-            aColorValue = createColorBindable(EzSkinSetting.AColorValue);
-            bColorValue = createColorBindable(EzSkinSetting.BColorValue);
-            s1ColorValue = createColorBindable(EzSkinSetting.Special1ColorValue);
-            s2ColorValue = createColorBindable(EzSkinSetting.Special2ColorValue);
+            aColorValue = createColorBindable(EzSkinSetting.ColorA);
+            bColorValue = createColorBindable(EzSkinSetting.ColorB);
+            s1ColorValue = createColorBindable(EzSkinSetting.ColorS1);
+            s2ColorValue = createColorBindable(EzSkinSetting.ColorS2);
 
             Children = new Drawable[]
             {
@@ -134,6 +138,24 @@ namespace osu.Game.Screens
                     }
                 }
             };
+            updateKeyModeFromCurrentBeatmap();
+        }
+
+        private void updateKeyModeFromCurrentBeatmap()
+        {
+            if (beatmap.Value?.Beatmap == null)
+                return;
+
+            int currentKeyCount = 0;
+
+            if (beatmap.Value.BeatmapInfo.Ruleset.OnlineID == 3)
+            {
+                currentKeyCount = (int)beatmap.Value.Beatmap.Difficulty.CircleSize;
+            }
+
+            // 如果无法获取键位数或键位数不在可用列表中，则不更改
+            if (currentKeyCount > 0 && availableKeyModes.Contains(currentKeyCount))
+                keyModeSelection.Value = currentKeyCount;
         }
 
         protected override void LoadComplete()
@@ -146,13 +168,13 @@ namespace osu.Game.Screens
                 ezSkinConfig.Save();
                 skinManager.CurrentSkinInfo.TriggerChange();
             };
-            aColorValue.ValueChanged += e => updateBaseColorSettings(e.NewValue, EzSkinSetting.AColorValue, "A");
-            bColorValue.ValueChanged += e => updateBaseColorSettings(e.NewValue, EzSkinSetting.BColorValue, "B");
-            s1ColorValue.ValueChanged += e => updateBaseColorSettings(e.NewValue, EzSkinSetting.Special1ColorValue, "S1");
-            s2ColorValue.ValueChanged += e => updateBaseColorSettings(e.NewValue, EzSkinSetting.Special2ColorValue, "S2");
-            keyModeSelection.ValueChanged += e => updateColumnsForKeyMode(e.NewValue);
+            aColorValue.ValueChanged += e => updateBaseColour(e.NewValue, EzSkinSetting.ColorA, "A");
+            bColorValue.ValueChanged += e => updateBaseColour(e.NewValue, EzSkinSetting.ColorB, "B");
+            s1ColorValue.ValueChanged += e => updateBaseColour(e.NewValue, EzSkinSetting.ColorS1, "S1");
+            s2ColorValue.ValueChanged += e => updateBaseColour(e.NewValue, EzSkinSetting.ColorS2, "S2");
+            keyModeSelection.ValueChanged += e => updateColumnsType(e.NewValue);
 
-            updateColumnsForKeyMode(keyModeSelection.Value);
+            updateColumnsType(keyModeSelection.Value);
         }
 
         private BindableColour4 createColorBindable(EzSkinSetting setting)
@@ -166,26 +188,24 @@ namespace osu.Game.Screens
             return result;
         }
 
-        private void updateBaseColorSettings(Colour4 newColor, EzSkinSetting setting, string colorType)
+        private void updateBaseColour(Colour4 newColor, EzSkinSetting setting, string colorType)
         {
-            ezSkinConfig.SetValue(setting.ToString(), newColor.ToHex());
+            ezSkinConfig.SetValue(setting, newColor);
 
             foreach (int keyMode in availableKeyModes)
             {
                 for (int columnIndex = 0; columnIndex < keyMode; columnIndex++)
                 {
-                    string keyName = $"{keyMode}K_{columnIndex}";
-                    string fullKey = $"{EzSkinSetting.ColumnColorPrefix}:{keyName}";
-                    string typeKey = $"{fullKey}_type";
+                    string currentType = ezSkinConfig.GetColumnType(keyMode, columnIndex);
 
-                    if (ezSkinConfig.Get<string>(typeKey) == colorType)
+                    if (currentType == colorType)
                     {
-                        ezSkinConfig.SetValue(fullKey, newColor.ToHex());
+                        ezSkinConfig.SetColumnType(keyMode, columnIndex, colorType);
                     }
                 }
             }
 
-            foreach (var selector in columnsContainer.ChildrenOfType<EzColorButtonSelector>())
+            foreach (var selector in columnsContainer.ChildrenOfType<EzSelectorColour>())
             {
                 selector.SetColorMapping(colorType, newColor);
             }
@@ -196,7 +216,7 @@ namespace osu.Game.Screens
 
         #region 创建选择器
 
-        private void updateColumnsForKeyMode(int keyMode)
+        private void updateColumnsType(int keyMode)
         {
             columnsContainer.Clear();
 
@@ -226,41 +246,33 @@ namespace osu.Game.Screens
                 ["S2"] = s2ColorValue.Value
             };
 
+            string[] currentColumnTypes = new string[keyMode];
+
+            for (int i = 0; i < keyMode; i++)
+            {
+                currentColumnTypes[i] = ezSkinConfig.GetColumnType(keyMode, i);
+            }
+
             for (int i = 0; i < keyMode; i++)
             {
                 int columnIndex = i;
-                string keyName = $"{keyMode}K_{columnIndex}";
-                string fullKey = $"{EzSkinSetting.ColumnColorPrefix}:{keyName}";
-                string typeKey = $"{fullKey}_type";
-
-                string savedType = ezSkinConfig.Get<string>(typeKey);
+                string savedType = currentColumnTypes[columnIndex];
 
                 if (string.IsNullOrEmpty(savedType))
                 {
-                    savedType = columnIndex % 2 == 0 ? "A" : "B";
-                    ezSkinConfig.SetValue(typeKey, savedType);
+                    savedType = EzColumnTypeManager.GetColumnColorType(keyMode, columnIndex);
+                    currentColumnTypes[columnIndex] = savedType;
+                    ezSkinConfig.SetColumnType(keyMode, columnIndex, savedType);
                 }
 
-                var selector = new EzColorButtonSelector($"Column {columnIndex + 1}", new[] { "A", "B", "S1", "S2" }, colorMapping);
+                var selector = new EzSelectorColour($"Column {columnIndex + 1}", new[] { "A", "B", "S1", "S2" }, colorMapping);
                 selector.Current.Value = savedType;
 
                 selector.Current.ValueChanged += e =>
                 {
-                    ezSkinConfig.SetValue(typeKey, e.NewValue);
-
-                    Color4 selectedColor = e.NewValue switch
-                    {
-                        "A" => aColorValue.Value,
-                        "B" => bColorValue.Value,
-                        "S1" => s1ColorValue.Value,
-                        "S2" => s2ColorValue.Value,
-                        _ => Color4.White
-                    };
-
-                    ezSkinConfig.SetValue(fullKey, selectedColor.ToHex());
+                    ezSkinConfig.SetColumnType(keyMode, columnIndex, e.NewValue);
                     ezSkinConfig.Save();
-
-                    Invalidate();
+                    // Invalidate();
                 };
 
                 columnsContainer.Add(selector);

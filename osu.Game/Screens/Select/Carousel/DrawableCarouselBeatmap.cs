@@ -31,6 +31,7 @@ using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
+using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
 using osuTK.Graphics;
 using CommonStrings = osu.Game.Localisation.CommonStrings;
@@ -317,7 +318,7 @@ namespace osu.Game.Screens.Select.Carousel
 
                 if (!kpsCache.TryGetValue(beatmapHash, out kpsResult))
                 {
-                    kpsResult = ILAsBmCal.GetKps(working.Beatmap);
+                    kpsResult = EzBeatmapCalculator.GetKps(working.Beatmap);
                     kpsCache[beatmapHash] = kpsResult;
                 }
                 else
@@ -338,10 +339,10 @@ namespace osu.Game.Screens.Select.Carousel
                     playableBeatmap = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset, mods.Value);
                 }
 
-                kpsResult = ILAsBmCal.GetKps(playableBeatmap);
+                kpsResult = EzBeatmapCalculator.GetKps(playableBeatmap);
             }
 
-            columnNoteCounts = ILAsBmCal.GetColumnNoteCounts(playableBeatmap);
+            columnNoteCounts = EzBeatmapCalculator.GetColumnNoteCounts(playableBeatmap);
             var (averageKps, maxKps, kpsList) = kpsResult;
             // Schedule(() =>
             // {
@@ -443,7 +444,7 @@ namespace osu.Game.Screens.Select.Carousel
 
                 int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, mods.Value);
 
-                string keyCountTextValue = ILAsBmCal.GetScratch(playableBeatmap, keyCount);
+                string keyCountTextValue = EzBeatmapCalculator.GetScratch(playableBeatmap, keyCount);
 
                 keyCountText.Alpha = 1;
                 keyCountText.Text = keyCountTextValue;

@@ -57,7 +57,7 @@ namespace osu.Game.Screens.Select
         private CollectionDropdown collectionDropdown;
 
         private CollectionDropdown ezToCollection;
-        private Bindable<SelectEzMode> ezMode;
+        private Bindable<EzSelectMode> ezMode;
 
         // TODO:多子集切换
         // private ManiaRulesetDropdown maniaRulesetDropdown;
@@ -82,7 +82,7 @@ namespace osu.Game.Screens.Select
                 CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet()
             };
 
-            if (ezMode?.Value != null && ezMode.Value != SelectEzMode.All)
+            if (ezMode?.Value != null && ezMode.Value != EzSelectMode.All)
             {
                 float keyCount;
 
@@ -118,7 +118,7 @@ namespace osu.Game.Screens.Select
         {
             sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
             groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupMode);
-            ezMode = config.GetBindable<SelectEzMode>(OsuSetting.SelectEzMode);
+            ezMode = config.GetBindable<EzSelectMode>(OsuSetting.SelectEzMode);
 
             Children = new Drawable[]
             {
@@ -226,7 +226,7 @@ namespace osu.Game.Screens.Select
                                             Origin = Anchor.BottomRight,
                                         },
                                         Empty(),
-                                        new OsuTabControl<SelectEzMode>
+                                        new OsuTabControl<EzSelectMode>
                                         {
                                             RelativeSizeAxes = Axes.X,
                                             Height = 24,

@@ -8,9 +8,9 @@ using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.Judgements
+namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
-    public abstract partial class LAsJudgementText : CompositeDrawable //, ISerialisableDrawable
+    public abstract partial class EzJudgementText : CompositeDrawable //, ISerialisableDrawable
     {
         protected readonly HitResult Result;
 
@@ -21,12 +21,12 @@ namespace osu.Game.Rulesets.Judgements
 
         // public bool UsesFixedAnchor { get; set; }
 
-        protected LAsJudgementText(HitResult result)
+        protected EzJudgementText(HitResult result)
         {
             Result = result;
         }
 
-        protected LAsJudgementText()
+        protected EzJudgementText()
         {
         }
 

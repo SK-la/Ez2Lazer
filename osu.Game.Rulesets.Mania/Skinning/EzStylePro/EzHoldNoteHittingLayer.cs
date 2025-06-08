@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Source = BlendingType.SrcAlpha,
                 Destination = BlendingType.One,
             };
-            Alpha = 0;
+            // Alpha = 0;
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
         }
 
@@ -75,11 +75,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             IsHolding.BindValueChanged(hitting =>
             {
                 const float animation_length = 80;
-                ClearTransforms();
+                // ClearTransforms();
 
                 if (hitting.NewValue)
                 {
-                    this.FadeTo(1, animation_length / 2);
+                    this.FadeTo(1, animation_length / 2)
+                        .Loop();
                 }
                 else
                 {

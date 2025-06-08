@@ -29,6 +29,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private IBindable<double> columnWidthBindable = new Bindable<double>();
         private IBindable<double> specialFactorBindable = new Bindable<double>();
 
+        protected override bool UseColorization => false; //不染色
+        protected override string ColorPrefix => "white";
+
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
 
@@ -55,7 +58,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             };
             // Masking = true;
             Alpha = 0.3f;
-            Blending = BlendingParameters.Mixture;
             InternalChild = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -69,7 +71,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                             new Box
                             {
                                 RelativeSizeAxes = Axes.Both,
-                                Colour = Colour4.Gray.Opacity(1f)
+                                Colour = Colour4.Gray.Opacity(1f),
+                                AlwaysPresent = true
                             },
                         }
                     }
@@ -85,7 +88,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void Update()
         {
             base.Update();
-            // Height = DrawWidth;
 
             double interval = 60000 / bpm;
             const double amplitude = 6.0;
@@ -112,18 +114,4 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Anchor = Origin = direction.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
         }
     }
-
-    // public class GrayscaleContainer : BufferedContainer
-    // {
-    //     private IShader? grayscaleShader;
-    //
-    //     [BackgroundDependencyLoader]
-    //     private void load(ShaderManager shaders)
-    //     {
-    //         grayscaleShader = shaders.Load(@"Shaders/grayscale", "Grayscale");
-    //         EffectPlacement = EffectPlacement.InFront;
-    //     }
-    //
-    //     protected IShader? CreateEffectShader() => grayscaleShader;
-    // }
 }

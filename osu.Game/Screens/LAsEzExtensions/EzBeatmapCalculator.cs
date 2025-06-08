@@ -3,12 +3,13 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
-namespace osu.Game.Beatmaps
+namespace osu.Game.Screens.LAsEzExtensions
 {
-    public class ILAsBmCal
+    public class EzBeatmapCalculator
     {
         public static (double averageKps, double maxKps, List<double> kpsList) GetKps(IBeatmap beatmap)
         {
@@ -144,6 +145,40 @@ namespace osu.Game.Beatmaps
             }
 
             return false;
+        }
+    }
+
+    public class KpsCalculator
+    {
+        public static (double averageKps, double maxKps, List<double> kpsList) CalculateKps(Beatmap beatmap)
+        {
+            var hitObjects = beatmap.HitObjects;
+            if (hitObjects.Count == 0)
+                return (0, 0, new List<double>());
+
+            double totalDuration = double.Abs(hitObjects.Last().StartTime - hitObjects.First().StartTime) / 1000.0;
+            double totalHits = hitObjects.Count;
+
+            double averageKps = totalHits / totalDuration;
+
+            double interval = 60000.0 / (beatmap.BeatmapInfo.BPM);
+            List<double> kpsList = new List<double>();
+
+            const double song_start_time = 0;
+            double songEndTime = hitObjects.Last().StartTime;
+
+            for (double currentTime = song_start_time; currentTime < songEndTime; currentTime += interval)
+            {
+                double endTime = currentTime + interval;
+                int hitsInInterval = hitObjects.Count(h => h.StartTime >= currentTime && h.StartTime < endTime);
+
+                double kps = hitsInInterval / (interval / 1000.0);
+                kpsList.Add(kps);
+            }
+
+            double maxKps = kpsList.Max();
+
+            return (averageKps, maxKps, kpsList);
         }
     }
 }

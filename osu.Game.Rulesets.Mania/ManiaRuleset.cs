@@ -22,6 +22,7 @@ using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
@@ -41,8 +42,8 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
-using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Edit.Setup;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
 
@@ -447,7 +448,7 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                new StatisticItem("Space Graph", () => new LAsHitEventHeatmapGraph(score.HitEvents, new HitWindows())
+                new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score.HitEvents, new HitWindows())
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 300

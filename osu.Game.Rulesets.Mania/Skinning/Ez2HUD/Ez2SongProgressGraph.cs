@@ -11,7 +11,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.Objects;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
+namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
     public partial class Ez2SongProgressGraph : SegmentedGraph<int>
     {

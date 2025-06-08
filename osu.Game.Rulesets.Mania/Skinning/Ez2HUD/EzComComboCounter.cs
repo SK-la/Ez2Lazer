@@ -14,7 +14,7 @@ using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning.Components;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2.Ez2HUD
+namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
     public partial class EzComComboCounter : ComboCounter
     {

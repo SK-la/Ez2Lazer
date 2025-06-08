@@ -14,9 +14,9 @@ using osu.Game.Graphics.UserInterface;
 using osuTK;
 using Realms;
 
-namespace osu.Game.Screens.Ranking
+namespace osu.Game.Screens.LAsEzExtensions
 {
-    public partial class LAsScoreAnalysisButton : GrayButton, IHasPopover
+    public partial class EzAnalysisScoreButton : GrayButton, IHasPopover
     {
         private readonly BeatmapInfo beatmapInfo;
         private readonly Bindable<bool> isInAnyCollection;
@@ -29,7 +29,7 @@ namespace osu.Game.Screens.Ranking
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
-        public LAsScoreAnalysisButton(BeatmapInfo beatmapInfo)
+        public EzAnalysisScoreButton(BeatmapInfo beatmapInfo)
             : base(FontAwesome.Solid.Book)
         {
             this.beatmapInfo = beatmapInfo;
@@ -72,11 +72,11 @@ namespace osu.Game.Screens.Ranking
             Background.FadeColour(isInAnyCollection.Value ? colours.Green : colours.Gray4, 500, Easing.InOutExpo);
         }
 
-        public Popover GetPopover() => new LAsAnalysisOptionsPopover(beatmapInfo);
+        public Popover GetPopover() => new EzAnalysisOptionsPopover(beatmapInfo);
 
         public void ShowPopover()
         {
-            var lAsAnalysisOptionsPopover = new LAsAnalysisOptionsPopover(beatmapInfo);
+            var lAsAnalysisOptionsPopover = new EzAnalysisOptionsPopover(beatmapInfo);
             if (lAsAnalysisOptionsPopover == null) throw new ArgumentNullException(nameof(lAsAnalysisOptionsPopover));
         }
     }

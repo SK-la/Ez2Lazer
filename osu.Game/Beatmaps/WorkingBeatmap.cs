@@ -126,18 +126,16 @@ namespace osu.Game.Beatmaps
             Track.Looping = looping;
             Track.RestartPoint = Metadata.PreviewTime;
 
-            if (Track.RestartPoint == -1)
-            {
                 if (!Track.IsLoaded)
                 {
                     // force length to be populated (https://github.com/ppy/osu-framework/issues/4202)
                     Track.Seek(Track.CurrentTime);
                 }
 
+            if (Track.RestartPoint < 0 || Track.RestartPoint > Track.Length)
                 Track.RestartPoint = 0.4f * Track.Length;
-            }
 
-            Track.RestartPoint += offsetFromPreviewPoint;
+            Track.RestartPoint = Math.Clamp(Track.RestartPoint + offsetFromPreviewPoint, 0, Track.Length);
         }
 
         /// <summary>

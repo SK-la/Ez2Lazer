@@ -18,6 +18,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
         private Container? noteContainer;
+        private Drawable animation = null!;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -70,8 +71,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void onSettingsChanged()
         {
-            if (enabledColor.Value && noteContainer != null)
-                noteContainer.Colour = NoteColor;
+            if (enabledColor.Value)
+                animation.Colour = NoteColor;
         }
 
         private void onSkinChanged()
@@ -96,10 +97,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 int keyMode = stageDefinition.Columns;
                 int columnIndex = column.Index;
-                string keyName = $"{keyMode}K_{columnIndex}";
-                string fullKey = $"{EzSkinSetting.ColumnColorPrefix}:{keyName}";
-                string colorStr = ezSkinConfig.Get<string>(fullKey);
-                return Colour4.FromHex(colorStr);
+                return ezSkinConfig.GetColumnColor(keyMode, columnIndex);
             }
         }
 
@@ -129,12 +127,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void loadAnimation()
         {
-            var animation = factory.CreateAnimation(ComponentName);
+            animation = factory.CreateAnimation(ComponentName);
 
             if (animation is Container container && container.Count == 0)
             {
                 string backupComponentName = $"{ColorPrefix}note";
-                var animationContainer = factory.CreateAnimation(backupComponentName);
+                animation = factory.CreateAnimation(backupComponentName);
 
                 noteContainer = new Container
                 {
@@ -147,13 +145,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         RelativeSizeAxes = Axes.X,
                         Anchor = Anchor.BottomCentre,
                         Origin = Anchor.BottomCentre,
-                        Child = animationContainer,
+                        Child = animation,
                     }
                 };
 
                 if (enabledColor.Value)
                 {
-                    noteContainer.Colour = NoteColor;
+                    animation.Colour = NoteColor;
                 }
 
                 AddInternal(noteContainer);
