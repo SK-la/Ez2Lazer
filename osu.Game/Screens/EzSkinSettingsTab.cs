@@ -28,9 +28,8 @@ namespace osu.Game.Screens
 {
     public partial class EzSkinSettings : EditorSidebarSection
     {
-        private Bindable<double>? hitPosition;
-        private Bindable<double>? columnWidth;
-        private Bindable<double>? specialFactor;
+        private Bindable<double> hitPosition = new Bindable<double>();
+
         private readonly Bindable<bool> dynamicTracking = new Bindable<bool>();
         private readonly Bindable<EzSelectorNameSet> globalTextureName = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)4);
         private readonly Bindable<string> selectedNoteSet = new Bindable<string>();
@@ -56,12 +55,9 @@ namespace osu.Game.Screens
         [BackgroundDependencyLoader]
         private void load()
         {
-            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
             hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+
             globalTextureName.Value = (EzSelectorNameSet)ezSkinConfig.GetBindable<int>(EzSkinSetting.GlobalTextureName).Value;
-            // dynamicTracking.BindTo(ezSkinConfig.GetBindable<bool>(EzSkinSetting.DynamicTracking));
-            // NonSquareNoteHeight.ValueChanged += onSettingsValueChanged;
 
             loadAvailableNoteSets();
             string configuredNoteSet = ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName);
@@ -89,25 +85,33 @@ namespace osu.Game.Screens
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "Column Width",
+                            LabelText = "Column Width (轨道宽度)",
                             TooltipText = "设置每列的宽度",
-                            Current = columnWidth,
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth),
                             KeyboardStep = 1.0f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "Special Factor (特殊列倍率)",
+                            LabelText = "Special Factor (特殊轨道倍率)",
                             TooltipText = "设置特殊列的宽度倍率 //未来会联动特殊列颜色定义"
                                           + "\nSet the width factor for special columns",
-                            Current = specialFactor,
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "Hit Position",
+                            LabelText = "Hit Position (可视判定线位置)",
                             TooltipText = "设置判定线位置",
                             Current = hitPosition,
                             KeyboardStep = 1f,
+                        },
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "Note Height (方形note 厚度)",
+                            TooltipText = "统一修改非圆形note的高度\n"
+                                          + "Fixed Height for square notes",
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight),
+                            KeyboardStep = 1.0f,
                         },
                         new EzGlobalTextureNameSelector
                         {
@@ -124,14 +128,6 @@ namespace osu.Game.Screens
                             Current = selectedNoteSet,
                             Items = availableNoteSets,
                         },
-                        new SettingsSlider<double>
-                        {
-                            LabelText = "(note高)Note Height",
-                            TooltipText = "统一修改非圆形note的高度\n"
-                                          + "Fixed Height for square notes",
-                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight),
-                            KeyboardStep = 1.0f,
-                        },
                         refreshSkinButton = new SettingsButton
                         {
                             Action = RefreshSkin,
@@ -146,24 +142,17 @@ namespace osu.Game.Screens
                 }
             };
 
-            // columnWidth.ValueChanged += onStageChanged;
-            // specialFactor.ValueChanged += onStageChanged;
-            // hitPosition.ValueChanged += onStageChanged;
             globalTextureName.ValueChanged += onTextureNameChanged;
             selectedNoteSet.ValueChanged += onNoteSetChanged;
             dynamicTracking.ValueChanged += tracking =>
             {
                 if (tracking.NewValue)
                 {
-                    columnWidth!.ValueChanged += onSettingsValueChanged;
-                    specialFactor!.ValueChanged += onSettingsValueChanged;
-                    hitPosition!.ValueChanged += onSettingsValueChanged;
+                    hitPosition.ValueChanged += onSettingsValueChanged;
                 }
                 else
                 {
-                    columnWidth!.ValueChanged -= onSettingsValueChanged;
-                    specialFactor!.ValueChanged -= onSettingsValueChanged;
-                    hitPosition!.ValueChanged -= onSettingsValueChanged;
+                    hitPosition.ValueChanged -= onSettingsValueChanged;
                 }
 
                 ezSkinConfig.SetValue(EzSkinSetting.DynamicTracking, tracking.NewValue);

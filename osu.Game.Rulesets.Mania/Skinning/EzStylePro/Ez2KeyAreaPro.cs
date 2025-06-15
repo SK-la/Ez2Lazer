@@ -14,15 +14,15 @@ using osu.Framework.Input.Events;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2
+namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class Ez2KeyAreaPro : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
@@ -46,9 +46,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
 
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
         public Ez2KeyAreaPro()
         {
             RelativeSizeAxes = Axes.Both;
@@ -60,9 +57,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             const float icon_circle_size = 8;
             const float icon_spacing = 7;
             const float icon_vertical_offset = -30;
-
-            if (stageDefinition.Columns == 14 && column.Index == 13)
-                return;
 
             InternalChild = directionContainer = new Container
             {

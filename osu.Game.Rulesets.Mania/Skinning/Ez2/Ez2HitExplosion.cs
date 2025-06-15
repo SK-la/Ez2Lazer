@@ -9,7 +9,6 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Utils;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osuTK;
@@ -23,9 +22,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         [Resolved]
         private Column column { get; set; } = null!;
-
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
 
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
@@ -43,9 +39,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
-            if (stageDefinition.Columns == 14 && column.Index == 13)
-                Alpha = 0;
-
             Size = new Vector2(2);
             Alpha = 1;
 

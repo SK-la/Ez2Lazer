@@ -34,8 +34,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private readonly FillFlowContainer<Container<TContent>> columns;
         private readonly StageDefinition stageDefinition;
-        private readonly IBindable<double> columnWidthBindable = new Bindable<double>();
-        private readonly IBindable<double> specialFactorBindable = new Bindable<double>();
 
         public new bool Masking
         {
@@ -70,16 +68,29 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private ISkinSource skin { get; set; } = null!;
 
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
+        private readonly Bindable<double> columnWidthBindable = new Bindable<double>();
+        private readonly Bindable<double> specialFactorBindable = new Bindable<double>();
 
         [BackgroundDependencyLoader]
-        private void load(ManiaRulesetConfigManager? rulesetConfig, EzSkinSettingsManager ezSkinConfig)
+        private void load(ManiaRulesetConfigManager? rulesetConfig)
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
-            columnWidthBindable.BindTo(ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth));
-            specialFactorBindable.BindTo(ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor));
-            columnWidthBindable.BindValueChanged(_ => invalidateLayout());
-            specialFactorBindable.BindValueChanged(_ => invalidateLayout());
+
+            ezSkinConfig.BindWith(EzSkinSetting.ColumnWidth, columnWidthBindable);
+            ezSkinConfig.BindWith(EzSkinSetting.SpecialFactor, specialFactorBindable);
+            columnWidthBindable.BindValueChanged(v =>
+            {
+                updateColumnSize();
+            });
+            specialFactorBindable.BindValueChanged(v =>
+            {
+                updateColumnSize();
+            });
+
             mobileLayout.BindValueChanged(_ => invalidateLayout());
             skin.SourceChanged += invalidateLayout;
         }
@@ -141,12 +152,20 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 columns[i].Margin = new MarginPadding { Left = leftSpacing, Right = rightSpacing };
 
-                // float? width = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                //                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
-                //                    ?.Value;
+                float? width = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                                       new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
+                                   ?.Value;
 
                 bool isSpecialColumn = stageDefinition.EzIsSpecialColumn(i);
-                float? width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
+
+                if (width == 0)
+                {
+                    columns[i].Width = 0;
+                    columns[i].Margin = new MarginPadding { Left = 0, Right = 0 };
+                    continue;
+                }
+
+                width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
 
                 // only used by default skin (legacy skins get defaults set in LegacyManiaSkinConfiguration)
                 width ??= isSpecialColumn ? Column.SPECIAL_COLUMN_WIDTH : Column.COLUMN_WIDTH;

@@ -22,16 +22,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     public class ManiaEz2SkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
-
-        // private readonly OsuConfigManager config;
-        // private readonly EzSkinSettingsTab ezSkinSettings;
-        // private readonly float totalColumnWidth;
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
-
-        private readonly float hitPosition;
-
-        private float columnWidth { get; set; }
+        private readonly IBindable<double> hitPosition;
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
         public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, EzSkinSettingsManager ezSkinConfig)
@@ -44,8 +37,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            IBindable<double> virtualHitPositionBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            hitPosition = (float)virtualHitPositionBindable.Value;
+            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -124,14 +116,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 {
                                     keyCounter.Anchor = Anchor.BottomCentre;
                                     keyCounter.Origin = Anchor.TopCentre;
-                                    keyCounter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
+                                    keyCounter.Position = new Vector2(0, -(float)hitPosition.Value - stage_padding_bottom);
                                 }
 
                                 if (columnHitErrorMeter != null)
                                 {
                                     columnHitErrorMeter.Anchor = Anchor.BottomCentre;
                                     columnHitErrorMeter.Origin = Anchor.Centre;
-                                    columnHitErrorMeter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
+                                    columnHitErrorMeter.Position = new Vector2(0, -(float)hitPosition.Value - stage_padding_bottom);
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -231,18 +223,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
                 bool isSpecialColumn = stage.EzIsSpecialColumn(columnIndex);
 
-                // float columnWidth = (float)config.Get<double>(OsuSetting.ColumnWidth);
-                // float specialFactor = (float)config.Get<double>(OsuSetting.SpecialFactor);
-                // float width = columnWidth * (isSpecialColumn ? specialFactor : 1);
-                columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
+                float width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
+                float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
+
+                if (stage.Columns == 14 && columnIndex == 13)
+                    width = 0f;
 
                 switch (maniaLookup.Lookup)
                 {
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
+                        return SkinUtils.As<TValue>(new Bindable<float>(width));
 
                     case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(hitPosition));
+                        return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
 

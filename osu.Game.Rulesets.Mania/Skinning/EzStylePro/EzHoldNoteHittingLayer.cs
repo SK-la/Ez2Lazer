@@ -65,8 +65,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             onSkinChanged();
             factory.OnTextureNameChanged += onSkinChanged;
-            noteHeightBindable.BindValueChanged(_ => updateY(), true);
             hitPosition.BindValueChanged(_ => updateY(), true);
+            noteHeightBindable.BindValueChanged(_ => updateY(), true);
             columnWidthBindable.BindValueChanged(_ => updateY());
             specialFactorBindable.BindValueChanged(_ => updateY());
 

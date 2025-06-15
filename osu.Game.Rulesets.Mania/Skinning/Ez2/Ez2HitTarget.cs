@@ -35,9 +35,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
-            if (stageDefinition.Columns == 14 && column.Index == 13)
-                Alpha = 0;
-
             RelativeSizeAxes = Axes.X;
             // Masking = true;
             Height = NoteHeight * NOTE_ACCENT_RATIO;

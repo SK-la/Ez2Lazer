@@ -85,13 +85,13 @@ namespace osu.Game.Rulesets.Mania
                     return new ManiaArgonSkinTransformer(skin, beatmap);
 
                 case Ez2Skin:
-                    if (GlobalConfigStore.Config == null || GlobalConfigStore.EzConfig == null)
+                    if (GlobalConfigStore.EzConfig == null)
                         throw new ArgumentNullException(nameof(GlobalConfigStore.Config));
 
                     return new ManiaEz2SkinTransformer(skin, beatmap, GlobalConfigStore.EzConfig);
 
                 case EzStyleProSkin:
-                    if (GlobalConfigStore.Config == null || GlobalConfigStore.EzConfig == null)
+                    if (GlobalConfigStore.EzConfig == null)
                         throw new ArgumentNullException(nameof(GlobalConfigStore.Config));
 
                     return new ManiaEzStyleProSkinTransformer(skin, beatmap, GlobalConfigStore.EzConfig);

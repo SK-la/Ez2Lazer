@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     public partial class Ez2ColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private readonly Bindable<float> overlayHeight = new Bindable<float>();
-        private readonly Bindable<float> hitPosition = new Bindable<float>();
+        private readonly Bindable<double> hitPosition = new Bindable<double>();
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private Color4 brightColour;
         private Color4 dimColour;
@@ -50,9 +50,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
-            if (stageDefinition.Columns == 14 && column.Index == 13)
-                return;
-
             InternalChild = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -72,17 +69,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         Blending = BlendingParameters.Additive,
                         Alpha = 0
                     },
-                    separator = new Box
-                    {
-                        Name = "Separator",
-                        Anchor = Anchor.TopRight,
-                        Origin = Anchor.TopRight,
-                        Width = 2,
-                        Colour = Color4.White,
-                        Alpha = 0,
-                    }
                 }
             };
+
+            separator = new Box
+            {
+                Name = "Separator",
+                Anchor = Anchor.TopRight,
+                Origin = Anchor.TopCentre,
+                Width = 2,
+                Colour = Color4.White,
+                Alpha = 0,
+            };
+            column.TopLevelContainer.Add(separator);
 
             overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
 
@@ -120,15 +119,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             base.LoadComplete();
 
-            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
-            ezSkinConfig.OnSettingsChanged += OnConfigChanged;
+            ezSkinConfig.BindWith(EzSkinSetting.HitPosition, hitPosition);
+            hitPosition.BindValueChanged(_ => OnConfigChanged(), true);
             OnConfigChanged();
         }
 
         private void OnConfigChanged()
         {
             if (separator != null)
-                separator.Height = DrawHeight - hitPosition.Value;
+                separator.Height = DrawHeight - (float)hitPosition.Value;
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

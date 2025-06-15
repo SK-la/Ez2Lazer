@@ -15,7 +15,6 @@ using osu.Framework.Input.Events;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
@@ -28,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     public partial class Ez2KeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly Bindable<float> hitPosition = new Bindable<float>();
+        private readonly Bindable<double> hitPosition = new Bindable<double>();
         private Container directionContainer = null!;
         private Drawable background = null!;
 
@@ -47,9 +46,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private IGameplayClock gameplayClock { get; set; } = null!;
 
         [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         public Ez2KeyArea()
@@ -62,15 +58,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             const float icon_vertical_offset = -30;
 
-            if (stageDefinition.Columns == 14 && column.Index == 13)
-                return;
-
-            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
-
             InternalChild = directionContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Height = hitPosition.Value,
+                Height = (float)hitPosition.Value,
                 Children = new Drawable[]
                 {
                     new Container
@@ -148,7 +139,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            Invalidate();
+            ezSkinConfig.BindWith(EzSkinSetting.HitPosition, hitPosition);
         }
 
         private void applyBlinkingEffect(CircularContainer container, double bpm)

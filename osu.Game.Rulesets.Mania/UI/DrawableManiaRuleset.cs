@@ -27,7 +27,6 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 
@@ -94,7 +93,6 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             currentSkin = source;
             currentSkin.SourceChanged += onSkinChange;
-            GlobalConfigStore.OnRefresh -= onSkinChange;
             skinChanged();
 
             foreach (var mod in Mods.OfType<IApplicableToTrack>())
@@ -233,7 +231,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override void Dispose(bool isDisposing)
         {
-            GlobalConfigStore.OnRefresh -= onSkinChange;
             base.Dispose(isDisposing);
 
             if (currentSkin.IsNotNull())

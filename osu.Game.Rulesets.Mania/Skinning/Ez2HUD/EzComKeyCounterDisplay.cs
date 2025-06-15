@@ -6,7 +6,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD;
@@ -15,27 +14,24 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
-    public partial class EzComKeyCounterDisplay : Container, ISerialisableDrawable
+    public partial class EzComKeyCounterDisplay : CompositeDrawable, ISerialisableDrawable
     {
         private readonly FillFlowContainer<EzKeyCounter> keyFlow;
         private readonly IBindableList<InputTrigger> triggers = new BindableList<InputTrigger>();
         private IBindable<double> columnWidth = null!;
         private IBindable<double> specialFactor = null!;
 
-        // private StageDefinition stage = null!;
-        // private int keyCount;
-
         [Resolved]
         private InputCountController controller { get; set; } = null!;
 
-        // public readonly KeyBindingContainer<ManiaAction> keyBindingContainer;
+        [Resolved]
+        private ISkinSource skin { get; set; } = null!;
 
-        public EzComKeyCounterDisplay() //(StageDefinition stageDefinition)
+        public EzComKeyCounterDisplay()
         {
-            // this.stageDefinition = stageDefinition;
             AutoSizeAxes = Axes.Y;
 
-            Child = keyFlow = new FillFlowContainer<EzKeyCounter>
+            InternalChild = keyFlow = new FillFlowContainer<EzKeyCounter>
             {
                 Direction = FillDirection.Horizontal,
                 RelativeSizeAxes = Axes.X,
@@ -71,17 +67,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             if (keyCount <= 0)
                 return;
 
-            StageDefinition stage = new StageDefinition(keyCount);
+            // StageDefinition stage = new StageDefinition(keyCount);
             float totalWidth = 0;
 
             for (int i = 0; i < keyCount; i++)
             {
-                float newWidth = (float)columnWidth.Value;
+                float? widthS = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
+                                    ?.Value;
 
-                if (stage.EzIsSpecialColumn(i))
-                {
-                    newWidth *= (float)specialFactor.Value;
-                }
+                float newWidth = widthS ?? (float)columnWidth.Value;
+
+                // if (stage.EzIsSpecialColumn(i))
+                // {
+                //     newWidth *= (float)specialFactor.Value;
+                // }
 
                 keyFlow[i].Width = newWidth;
                 totalWidth += newWidth;
@@ -93,18 +93,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         private void triggersChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             keyFlow.Clear();
-            // var keyBindings = keyBindingContainer.DefaultKeyBindings.ToList();
-            //
-            // for (int i = 0; i < controller.Triggers.Count; i++)
-            // {
-            //     var trigger = controller.Triggers[i];
-            //     // 这里假设 keyBindings[i] 和 trigger 顺序一致
-            //     var keyName = keyBindings[i].KeyCombination.ToString();
-            //     keyFlow.Add(new EzKeyCounter(trigger, keyName));
-            // }
 
-            foreach (var trigger in controller.Triggers)
-                keyFlow.Add(new EzKeyCounter(trigger));
+            for (int i = 0; i < controller.Triggers.Count; i++)
+            {
+                float? widthS = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
+                                    ?.Value;
+
+                if (widthS == 0)
+                    continue;
+
+                keyFlow.Add(new EzKeyCounter(controller.Triggers[i]));
+            }
+
+            // foreach (var trigger in controller.Triggers)
+            //     keyFlow.Add(new EzKeyCounter(trigger));
         }
 
         public bool UsesFixedAnchor { get; set; }

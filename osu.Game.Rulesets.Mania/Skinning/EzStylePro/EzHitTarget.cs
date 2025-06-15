@@ -15,10 +15,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     internal partial class EzHitTarget : EzNote
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-
-        // private IBindable<double> noteHeightBindable = new Bindable<double>();
-        // private IBindable<double> columnWidthBindable = new Bindable<double>();
-        // private IBindable<double> specialFactorBindable = new Bindable<double>();
         private IBindable<double> hitPosition = new Bindable<double>();
 
         protected override bool UseColorization => false; //不染色
@@ -53,9 +49,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             direction.BindValueChanged(onDirectionChanged, true);
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
-            // noteHeightBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
-            // columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            // specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
             hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
         }
 
@@ -83,19 +76,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            ezSkinConfig.OnSettingsChanged += updateY;
             hitPosition.BindValueChanged(_ => updateY(), true);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                ezSkinConfig.OnSettingsChanged -= updateY;
-            }
         }
 
         private void updateY()

@@ -26,10 +26,10 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.NoteSetName, "evolve");
             SetDefault(EzSkinSetting.GlobalTextureName, 4);
 
-            SetDefault(EzSkinSetting.ColumnWidth, 60, 1, 150.0, 1.0);
+            SetDefault(EzSkinSetting.ColumnWidth, 60, 5, 400.0, 1.0);
             SetDefault(EzSkinSetting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
             SetDefault(EzSkinSetting.HitPosition, 110.0, 0, 500, 1.0);
-            SetDefault(EzSkinSetting.VisualHitPosition, 110.0, 0, 500, 1.0);
+            SetDefault(EzSkinSetting.VisualHitPosition, 0.0, -100, 100, 1.0);
             SetDefault(EzSkinSetting.NonSquareNoteHeight, 28.0, 1.0, 100.0, 1.0);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
@@ -152,8 +152,10 @@ namespace osu.Game.Screens
         {
             GetBindable<double>(EzSkinSetting.ColumnWidth).ValueChanged += e => OnColumnChanged?.Invoke();
             GetBindable<double>(EzSkinSetting.SpecialFactor).ValueChanged += e => OnColumnChanged?.Invoke();
+
             GetBindable<double>(EzSkinSetting.HitPosition).ValueChanged += e => OnSettingsChanged?.Invoke();
             GetBindable<double>(EzSkinSetting.VisualHitPosition).ValueChanged += e => OnSettingsChanged?.Invoke();
+
             GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).ValueChanged += e => OnSettingsChanged?.Invoke();
         }
 

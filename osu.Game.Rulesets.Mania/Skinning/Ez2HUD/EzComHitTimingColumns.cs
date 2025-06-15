@@ -7,13 +7,12 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
@@ -55,6 +54,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         [Resolved]
         private InputCountController controller { get; set; } = null!;
+
+        [Resolved]
+        private ISkinSource skin { get; set; } = null!;
 
         public EzComHitTimingColumns()
         {
@@ -195,17 +197,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             if (keyCount <= 0)
                 return;
 
-            StageDefinition stage = new StageDefinition(keyCount);
             float totalWidth = 0;
 
             for (int i = 0; i < keyCount; i++)
             {
-                float newWidth = (float)columnWidth.Value;
+                float? widthS = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
+                                    ?.Value;
 
-                if (stage.EzIsSpecialColumn(i))
-                {
-                    newWidth *= (float)specialFactor.Value;
-                }
+                float newWidth = widthS ?? (float)columnWidth.Value;
 
                 columns[i].Width = newWidth;
                 totalWidth += newWidth;

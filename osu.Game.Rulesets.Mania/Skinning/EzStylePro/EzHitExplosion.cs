@@ -25,10 +25,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private readonly Bindable<double> columnWidth = new Bindable<double>();
 
-        private IBindable<double> noteHeightBindable = new Bindable<double>();
-        private IBindable<double> columnWidthBindable = new Bindable<double>();
-        private IBindable<double> specialFactorBindable = new Bindable<double>();
-        private IBindable<double> hitPosition = new Bindable<double>();
+        private readonly Bindable<double> noteHeightBindable = new Bindable<double>();
+        private readonly Bindable<double> columnWidthBindable = new Bindable<double>();
+        private readonly Bindable<double> specialFactorBindable = new Bindable<double>();
+        private readonly Bindable<double> hitPosition = new Bindable<double>();
 
         private TextureAnimation animation = null!;
         private TextureAnimation animationP = null!;
@@ -61,10 +61,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
-            noteHeightBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
-            columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            ezSkinConfig.BindWith(EzSkinSetting.NonSquareNoteHeight, noteHeightBindable);
+            ezSkinConfig.BindWith(EzSkinSetting.ColumnWidth, columnWidthBindable);
+            ezSkinConfig.BindWith(EzSkinSetting.SpecialFactor, specialFactorBindable);
+            ezSkinConfig.BindWith(EzSkinSetting.HitPosition, hitPosition);
         }
 
         protected override void LoadComplete()
