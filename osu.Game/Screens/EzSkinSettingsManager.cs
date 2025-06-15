@@ -26,8 +26,11 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.NoteSetName, "evolve");
             SetDefault(EzSkinSetting.GlobalTextureName, 4);
 
-            SetDefault(EzSkinSetting.NonSquareNoteHeight, 25.0, 1.0, 100.0, 1.0);
-            SetDefault(EzSkinSetting.VirtualHitPosition, 110.0, 0, 384.0, 1.0);
+            SetDefault(EzSkinSetting.ColumnWidth, 60, 1, 150.0, 1.0);
+            SetDefault(EzSkinSetting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
+            SetDefault(EzSkinSetting.HitPosition, 110.0, 0, 500, 1.0);
+            SetDefault(EzSkinSetting.VisualHitPosition, 110.0, 0, 500, 1.0);
+            SetDefault(EzSkinSetting.NonSquareNoteHeight, 28.0, 1.0, 100.0, 1.0);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
             SetDefault(EzSkinSetting.ColorA, Colour4.FromHex("#F5F5F5"));
@@ -76,6 +79,7 @@ namespace osu.Game.Screens
         public EzSkinSettingsManager(Storage storage)
             : base(storage)
         {
+            initializeEvents();
         }
 
         public string GetColumnType(int keyMode, int columnIndex)
@@ -136,6 +140,29 @@ namespace osu.Game.Screens
             return Get<Colour4>(setting);
         }
 
+        public new Bindable<T> GetBindable<T>(EzSkinSetting setting)
+        {
+            return base.GetBindable<T>(setting);
+        }
+
+        public event Action? OnSettingsChanged;
+        public event Action? OnColumnChanged;
+
+        private void initializeEvents()
+        {
+            GetBindable<double>(EzSkinSetting.ColumnWidth).ValueChanged += e => OnColumnChanged?.Invoke();
+            GetBindable<double>(EzSkinSetting.SpecialFactor).ValueChanged += e => OnColumnChanged?.Invoke();
+            GetBindable<double>(EzSkinSetting.HitPosition).ValueChanged += e => OnSettingsChanged?.Invoke();
+            GetBindable<double>(EzSkinSetting.VisualHitPosition).ValueChanged += e => OnSettingsChanged?.Invoke();
+            GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).ValueChanged += e => OnSettingsChanged?.Invoke();
+        }
+
+        protected void NotifySettingsChanged()
+        {
+            OnSettingsChanged?.Invoke();
+            OnColumnChanged?.Invoke();
+        }
+
         public new void SetValue<T>(EzSkinSetting lookup, T value)
         {
             base.SetValue(lookup, value);
@@ -148,18 +175,6 @@ namespace osu.Game.Screens
             NotifySettingsChanged();
         }
 
-        public new Bindable<T> GetBindable<T>(EzSkinSetting setting)
-        {
-            return base.GetBindable<T>(setting);
-        }
-
-        public event Action? OnSettingsChanged;
-
-        protected void NotifySettingsChanged()
-        {
-            OnSettingsChanged?.Invoke();
-        }
-
         IBindable<float> IGameplaySettings.ComboColourNormalisationAmount => null!;
         IBindable<float> IGameplaySettings.PositionalHitsoundsLevel => null!;
     }
@@ -168,11 +183,17 @@ namespace osu.Game.Screens
     {
         SelectedKeyMode,
 
+        // 轨道相关
+        ColumnWidth,
+        SpecialFactor,
+        HitPosition,
+        VisualHitPosition,
+        NonSquareNoteHeight,
+
+        // 皮肤设置
         DynamicTracking,
         GlobalTextureName,
         NoteSetName,
-        NonSquareNoteHeight,
-        VirtualHitPosition,
 
         // 着色系统
         ColorSettingsEnabled,

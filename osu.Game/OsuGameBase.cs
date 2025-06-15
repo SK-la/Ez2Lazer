@@ -62,6 +62,7 @@ using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 using RuntimeInfo = osu.Framework.RuntimeInfo;
@@ -277,6 +278,15 @@ namespace osu.Game
 
             Resources.AddStore(new DllResourceStore(OsuResources.ResourceAssembly));
 
+            // 初始化并注册EzSkinSettingsManager
+            dependencies.Cache(EzSkinSettingsManager = new EzSkinSettingsManager(Storage));
+            // dependencies.CacheAs<IEzSkinSettings>(EzSkinSettingsManager);
+            dependencies.Cache(
+                NoteFactory = new EzLocalTextureFactory(
+                    EzSkinSettingsManager,
+                    new TextureStore(Host.Renderer),
+                    Storage));
+
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 
             dependencies.CacheAs<RulesetStore>(RulesetStore = new RealmRulesetStore(realm, Storage));
@@ -436,15 +446,6 @@ namespace osu.Game
             // if this becomes a more common thing, tracked settings should be reconsidered to allow local DI.
             LocalConfig.LookupSkinName = id => SkinManager.Query(s => s.ID == id)?.ToString() ?? "Unknown";
             LocalConfig.LookupKeyBindings = l => KeyBindingStore.GetBindingsStringFor(l);
-
-            // 初始化并注册EzSkinSettingsManager
-            dependencies.Cache(EzSkinSettingsManager = new EzSkinSettingsManager(Storage));
-            // dependencies.CacheAs<IEzSkinSettings>(EzSkinSettingsManager);
-            dependencies.Cache(
-                NoteFactory = new EzLocalTextureFactory(
-                    EzSkinSettingsManager,
-                    new TextureStore(Host.Renderer),
-                    Storage));
         }
 
         private void updateLanguage() => CurrentLanguage.Value = LanguageExtensions.GetLanguageFor(frameworkLocale.Value, localisationParameters.Value);

@@ -498,7 +498,7 @@ namespace osu.Game.Screens.Menu
 
         private void loadPreferredSongSelect()
         {
-            if (holdTime >= required_hold_time)
+            if (holdTime >= required_hold_time || inputManager.CurrentState.Mouse.IsPressed(MouseButton.Right))
             {
                 ssv2Sample?.Play();
                 this.Push(new SoloSongSelect());

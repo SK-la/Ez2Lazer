@@ -6,9 +6,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 using osuTK;
@@ -28,6 +28,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [Resolved]
         private InputCountController controller { get; set; } = null!;
 
+        // public readonly KeyBindingContainer<ManiaAction> keyBindingContainer;
+
         public EzComKeyCounterDisplay() //(StageDefinition stageDefinition)
         {
             // this.stageDefinition = stageDefinition;
@@ -43,15 +45,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(EzSkinSettingsManager ezSkinConfig)
         {
-            columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
-
-            columnWidth.BindValueChanged(_ => updateWidths());
-            specialFactor.BindValueChanged(_ => updateWidths());
-
-            updateWidths();
+            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
         }
 
         protected override void LoadComplete()
@@ -96,6 +93,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         private void triggersChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             keyFlow.Clear();
+            // var keyBindings = keyBindingContainer.DefaultKeyBindings.ToList();
+            //
+            // for (int i = 0; i < controller.Triggers.Count; i++)
+            // {
+            //     var trigger = controller.Triggers[i];
+            //     // 这里假设 keyBindings[i] 和 trigger 顺序一致
+            //     var keyName = keyBindings[i].KeyCombination.ToString();
+            //     keyFlow.Add(new EzKeyCounter(trigger, keyName));
+            // }
+
             foreach (var trigger in controller.Triggers)
                 keyFlow.Add(new EzKeyCounter(trigger));
         }

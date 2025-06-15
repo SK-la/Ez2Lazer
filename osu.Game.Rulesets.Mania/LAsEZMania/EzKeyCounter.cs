@@ -27,9 +27,14 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
+        public bool ShowKeyName { get; set; } = false;
+
+        // private readonly string keyDisplayName;
+
         public EzKeyCounter(InputTrigger trigger)
             : base(trigger)
         {
+            // this.keyDisplayName = keyDisplayName;
         }
 
         [BackgroundDependencyLoader]
@@ -55,6 +60,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
                             Origin = Anchor.TopCentre,
                             Font = OsuFont.Torus.With(size: name_font_size * scale_factor, weight: FontWeight.Bold),
                             Colour = colours.Blue0,
+                            // Text = ShowKeyName ? keyDisplayName : Trigger.Name
                             Text = Trigger.Name
                         },
                         countText = new OsuSpriteText

@@ -19,6 +19,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Mods.Input;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Edit.Compose.Components;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.OnlinePlay.Lounge.Components;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
@@ -157,8 +158,6 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
             SetDefault(OsuSetting.HitMode, MUGHitMode.EZ2AC);
-            SetDefault(OsuSetting.ColumnWidth, 50, 9, 90, 1.0);
-            SetDefault(OsuSetting.SpecialFactor, 1, 0.1, 4, 0.1);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
@@ -423,8 +422,6 @@ namespace osu.Game.Configuration
         SelectEzMode,
         SelectManiaRulesetSubset,
         ScalingGameMode,
-        ColumnWidth,
-        SpecialFactor,
 
         HitMode,
         AccuracyCutoffS,

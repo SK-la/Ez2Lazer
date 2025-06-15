@@ -28,6 +28,7 @@ using osu.Game.Localisation;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Select.Filter;
 using osuTK;
 using osuTK.Input;

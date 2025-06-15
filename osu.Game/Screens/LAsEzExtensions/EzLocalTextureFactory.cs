@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -8,10 +7,9 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
 
-namespace osu.Game.Screens
+namespace osu.Game.Screens.LAsEzExtensions
 {
     public partial class EzLocalTextureFactory : CompositeDrawable
     {
@@ -64,57 +62,41 @@ namespace osu.Game.Screens
         {
         }
 
-        private bool isHitAnimation(string componentName)
+        private bool isHit(string componentName)
         {
             return componentName.Contains("flare", StringComparison.InvariantCultureIgnoreCase);
         }
 
-        public virtual Drawable CreateAnimation(string component)
+        public virtual TextureAnimation CreateAnimation(string component)
         {
             // string getPath = hostStorage.GetFullPath(path);
 
-            animationType = isHitAnimation(component)
+            animationType = isHit(component)
                 ? EzAnimationType.Hit
                 : EzAnimationType.Note;
 
-            Container container;
             TextureAnimation animation;
 
             if (animationType == EzAnimationType.Note)
             {
-                container = new Container
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Both,
-                    FillMode = FillMode.Stretch,
-                };
-
                 animation = new TextureAnimation
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
+                    FillMode = FillMode.Stretch,
                     DefaultFrameLength = 60,
                     Loop = true
                 };
             }
             else // Hit
             {
-                container = new Container
-                {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    RelativeSizeAxes = Axes.None,
-                };
-
                 animation = new TextureAnimation
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.None,
                     FillMode = FillMode.Fit,
-                    Loop = false,
                 };
             }
 
@@ -133,46 +115,38 @@ namespace osu.Game.Screens
 
             // Logger.Log($@"{getPath} Load {animation.FrameCount}", LoggingTarget.Runtime, LogLevel.Debug);
 
-            if (animation.FrameCount == 0)
-            {
-                Logger.Log($"{noteSetName}/{component} is 0", LoggingTarget.Runtime, LogLevel.Debug);
-                return container;
-            }
+            // if (animationType == EzAnimationType.Hit)
+            // {
+            //     animation.OnUpdate += _ =>
+            //     {
+            //         if (animation.CurrentFrameIndex == animation.FrameCount - 1)
+            //             animation.Expire();
+            //     };
+            // }
 
-            if (animationType == EzAnimationType.Hit)
-            {
-                animation.OnUpdate += _ =>
-                {
-                    if (animation.CurrentFrameIndex == animation.FrameCount - 1)
-                        animation.Expire();
-                };
-            }
-
-            container.Add(animation);
-            return container;
+            // container.Add(animation);
+            return animation;
         }
 
         private readonly Dictionary<string, float> textureRatioCache = new Dictionary<string, float>();
 
-        private float calculateTextureRatio(Drawable animation, string componentName)
+        private float calculateTextureRatio(TextureAnimation animation, string componentName)
         {
-            const float default_ratio = 1.0f;
+            float defaultRatio = 1.0f;
 
-            if (!isHitAnimation(componentName) && animation is Container container &&
-                container.Children.FirstOrDefault() is TextureAnimation textureAnimation &&
-                textureAnimation.FrameCount > 0)
+            if (!isHit(componentName) && animation.FrameCount > 0)
             {
-                var texture = textureAnimation.CurrentFrame;
+                var texture = animation.CurrentFrame;
                 if (texture != null)
-                    return texture.Height / (float)texture.Width;
+                    defaultRatio = texture.Height / (float)texture.Width;
             }
 
-            return default_ratio;
+            return defaultRatio;
         }
 
         public float GetTextureRatio(string componentName)
         {
-            if (isHitAnimation(componentName))
+            if (isHit(componentName))
                 return 1.0f;
 
             if (textureRatioCache.TryGetValue(componentName, out float ratio))
@@ -210,7 +184,6 @@ namespace osu.Game.Screens
 
             TextureNameBindable.BindValueChanged(e =>
             {
-                // 清除纹理比例缓存
                 ClearTextureRatioCache();
                 OnTextureNameChanged?.Invoke();
             }, true);
@@ -233,32 +206,4 @@ namespace osu.Game.Screens
         Key,
         Health,
     }
-
-    // /// <summary>
-    // /// 注册公开API
-    // /// </summary>
-    // public partial class EzLocalTexture : CompositeDrawable, ISerialisableDrawable
-    // {
-    //     public EzLocalTextureFactory NoteFactory { get; private set; } = null!;
-    //
-    //     [Resolved]
-    //     private GameHost host { get; set; } = null!;
-    //
-    //     [Resolved]
-    //     private IRenderer renderer { get; set; } = null!;
-    //
-    //     [BackgroundDependencyLoader]
-    //     private void load(EzSkinSettingsManager ezSkinConfig)
-    //     {
-    //         NoteFactory = new EzLocalTextureFactory(
-    //             ezSkinConfig,
-    //             new TextureStore(renderer),
-    //             host.Storage
-    //         );
-    //
-    //         AddInternal(NoteFactory);
-    //     }
-    //
-    //     public bool UsesFixedAnchor { get; set; }
-    // }
 }

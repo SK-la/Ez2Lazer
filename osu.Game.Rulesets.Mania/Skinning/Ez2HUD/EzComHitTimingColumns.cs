@@ -11,6 +11,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osuTK;
@@ -61,11 +62,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(EzSkinSettingsManager ezSkinConfig)
         {
-            columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
-
+            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
             recreateComponents();
         }
 

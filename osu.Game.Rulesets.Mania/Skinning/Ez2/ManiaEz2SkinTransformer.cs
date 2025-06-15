@@ -6,7 +6,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
@@ -35,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private float columnWidth { get; set; }
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
-        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config, EzSkinSettingsManager ezSkinConfig)
+        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, EzSkinSettingsManager ezSkinConfig)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
@@ -43,9 +42,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             // this.config = config ?? throw new ArgumentNullException(nameof(config));
             // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
 
-            columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
-            IBindable<double> virtualHitPositionBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.VirtualHitPosition);
+            columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            IBindable<double> virtualHitPositionBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             hitPosition = (float)virtualHitPositionBindable.Value;
         }
 

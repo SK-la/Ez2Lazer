@@ -5,14 +5,9 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
-using osu.Game.Configuration;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -21,16 +16,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
-        private double bpm;
-
-        private OsuConfigManager config = null!;
-        private readonly Bindable<double> columnWidth = new Bindable<double>();
-
-        private IBindable<double> columnWidthBindable = new Bindable<double>();
-        private IBindable<double> specialFactorBindable = new Bindable<double>();
+        // private IBindable<double> noteHeightBindable = new Bindable<double>();
+        // private IBindable<double> columnWidthBindable = new Bindable<double>();
+        // private IBindable<double> specialFactorBindable = new Bindable<double>();
+        private IBindable<double> hitPosition = new Bindable<double>();
 
         protected override bool UseColorization => false; //不染色
         protected override string ColorPrefix => "white";
+        private double bpm;
 
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
@@ -39,51 +32,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private IGameplayClock gameplayClock { get; set; } = null!;
 
         [Resolved]
-        private Column column { get; set; } = null!;
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config, IScrollingInfo scrollingInfo)
+        public EzHitTarget()
         {
-            this.config = config;
-            Anchor = Anchor.BottomCentre;
-            Origin = Anchor.BottomCentre;
-            RelativeSizeAxes = Axes.X;
+            RelativeSizeAxes = Axes.None;
+            Width = 1f;
             Blending = new BlendingParameters
             {
                 Source = BlendingType.SrcAlpha,
                 Destination = BlendingType.One,
             };
-            // Masking = true;
             Alpha = 0.3f;
-            InternalChild = new Container
-            {
-                RelativeSizeAxes = Axes.Both,
-                Children = new Drawable[]
-                {
-                    new Container
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Children = new Drawable[]
-                        {
-                            new Box
-                            {
-                                RelativeSizeAxes = Axes.Both,
-                                Colour = Colour4.Gray.Opacity(1f),
-                                AlwaysPresent = true
-                            },
-                        }
-                    }
-                }
-            };
+        }
 
+        [BackgroundDependencyLoader]
+        private void load(IScrollingInfo scrollingInfo)
+        {
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
+            // noteHeightBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
+            // columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            // specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
         }
+
+        private float baseYPosition;
 
         protected override void Update()
         {
@@ -94,12 +70,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             double progress = (gameplayClock.CurrentTime % interval) / interval;
             double smoothValue = smoothSineWave(progress);
 
-            columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
-            bool isSpecialColumn = stageDefinition.EzIsSpecialColumn(column.Index);
-            columnWidth.Value = columnWidthBindable.Value * (isSpecialColumn ? specialFactorBindable.Value : 1);
-
-            Y = (float)(smoothValue * amplitude);
+            Y = baseYPosition + (float)(smoothValue * amplitude);
         }
 
         private double smoothSineWave(double t)
@@ -107,6 +78,30 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             const double frequency = 1;
             const double amplitude = 0.3;
             return amplitude * Math.Sin(frequency * t * 2 * Math.PI);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            ezSkinConfig.OnSettingsChanged += updateY;
+            hitPosition.BindValueChanged(_ => updateY(), true);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (isDisposing)
+            {
+                ezSkinConfig.OnSettingsChanged -= updateY;
+            }
+        }
+
+        private void updateY()
+        {
+            baseYPosition = 110f - (float)hitPosition.Value;
+            Position = new osuTK.Vector2(0, baseYPosition);
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

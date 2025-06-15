@@ -4,11 +4,13 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
+using osu.Game.Screens.LAsEzExtensions;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -17,8 +19,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
-        private Container? noteContainer;
-        private Drawable animation = null!;
+        private Bindable<double> nonSquareNoteHeight = null!;
+
+        private TextureAnimation animation = null!;
+        private Container container = null!;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -29,67 +33,42 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
 
-        [BackgroundDependencyLoader]
-        private void load(EzSkinSettingsManager ezSkinConfig)
+        public EzHoldNoteHead()
         {
-            this.ezSkinConfig = ezSkinConfig;
-            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
             RelativeSizeAxes = Axes.X;
             FillMode = FillMode.Fill;
         }
 
-        protected override void Update()
+        [BackgroundDependencyLoader]
+        private void load(EzSkinSettingsManager ezSkinConfig)
         {
-            base.Update();
+            this.ezSkinConfig = ezSkinConfig;
 
-            bool isSquare = factory.IsSquareNote($"{ColorPrefix}note");
-            float noteHeight = isSquare
-                ? DrawWidth
-                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
-
-            Height = noteHeight;
-
-            if (noteContainer != null)
-            {
-                noteContainer.Height = noteHeight / 2;
-
-                if (noteContainer.Child is Container containerA)
-                    containerA.Height = noteHeight;
-            }
+            nonSquareNoteHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
+            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            ClearInternal();
-            loadAnimation();
-
-            factory.OnTextureNameChanged += onSkinChanged;
-            ezSkinConfig.OnSettingsChanged += onSettingsChanged;
-        }
-
-        private void onSettingsChanged()
-        {
-            if (enabledColor.Value)
-                animation.Colour = NoteColor;
-        }
-
-        private void onSkinChanged()
-        {
-            Schedule(() =>
-            {
-                ClearInternal();
-                loadAnimation();
-            });
+            OnSkinChanged();
+            nonSquareNoteHeight.ValueChanged += _ => updateSizes();
+            ezSkinConfig.OnSettingsChanged += OnSettingsChanged;
+            factory.OnTextureNameChanged += OnSkinChanged;
         }
 
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-            factory.OnTextureNameChanged -= onSkinChanged;
-            ezSkinConfig.OnSettingsChanged -= onSettingsChanged;
+
+            if (isDisposing)
+            {
+                ezSkinConfig.OnSettingsChanged -= OnSettingsChanged;
+                factory.OnTextureNameChanged -= OnSkinChanged;
+            }
         }
+
+        private void OnSkinChanged() => loadAnimation();
 
         protected virtual Color4 NoteColor
         {
@@ -127,49 +106,65 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void loadAnimation()
         {
+            ClearInternal();
             animation = factory.CreateAnimation(ComponentName);
 
-            if (animation is Container container && container.Count == 0)
+            container = new Container
             {
-                string backupComponentName = $"{ColorPrefix}note";
-                animation = factory.CreateAnimation(backupComponentName);
+                RelativeSizeAxes = Axes.X,
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
+                Masking = true,
+            };
 
-                noteContainer = new Container
+            if (animation.FrameCount == 0)
+            {
+                animation.Dispose();
+                animation = factory.CreateAnimation($"{ColorPrefix}note");
+
+                container.
+                    Child = new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
-                    Masking = true,
-                    Child = new Container
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Anchor = Anchor.BottomCentre,
-                        Origin = Anchor.BottomCentre,
-                        Child = animation,
-                    }
+                    Child = animation,
                 };
 
-                if (enabledColor.Value)
-                {
-                    animation.Colour = NoteColor;
-                }
-
-                AddInternal(noteContainer);
+                OnSettingsChanged();
+                AddInternal(container);
             }
             else
             {
-                if (enabledColor.Value)
-                {
-                    animation.Colour = NoteColor;
-                }
-
+                OnSettingsChanged();
                 AddInternal(animation);
             }
+
+            Schedule(() =>
+            {
+                updateSizes();
+                Invalidate();
+            });
         }
 
-        public void Recycle()
+        private void updateSizes()
         {
-            ClearTransforms();
+            bool isSquare = factory.IsSquareNote("whitenote");
+            float noteHeight = isSquare
+                ? DrawWidth
+                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
+
+            Height = noteHeight;
+
+            container.Height = noteHeight / 2;
+            if (container.Child is Container containerA)
+                containerA.Height = noteHeight;
+        }
+
+        private void OnSettingsChanged()
+        {
+            if (enabledColor.Value)
+                animation.Colour = NoteColor;
         }
     }
 }

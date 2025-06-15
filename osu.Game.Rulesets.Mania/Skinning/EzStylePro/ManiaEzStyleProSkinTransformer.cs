@@ -6,7 +6,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning.Ez2;
@@ -24,33 +23,27 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public class ManiaEzStyleProSkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
-        // private readonly OsuConfigManager config;
-        // private readonly EzSkinSettingsManager ezSkinConfig;
-
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
-        private readonly IBindable<double> virtualHitPositionBindable;
-        private float columnWidth { get; set; }
+        private readonly Bindable<float> hitPosition = new Bindable<float>();
+        private readonly Bindable<float> virtualHitPosition = new Bindable<float>();
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
-        public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap, OsuConfigManager config, EzSkinSettingsManager ezSkinConfig)
+        public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap, EzSkinSettingsManager ezSkinConfig)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
-            // this.config = config;
-            // this.ezSkinConfig = ezSkinConfig;
 
-            columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
-            virtualHitPositionBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.VirtualHitPosition);
+            columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            IBindable<double> hitPositionBindable1 = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            hitPosition.Value = (float)hitPositionBindable1.Value;
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
         {
             switch (lookup)
             {
-                #region HUD Components
-
                 case GlobalSkinnableContainerLookup containerLookup:
                     if (containerLookup.Ruleset == null)
                         return base.GetDrawableComponent(lookup);
@@ -110,7 +103,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     combo2.Origin = Anchor.TopCentre;
                                     combo2.Y = 200;
                                     combo2.BoxAlpha.Value = 0.4f;
-                                    combo2.EffectStartFactor.Value = 3f;
+                                    combo2.EffectStartFactor.Value = 2.5f;
                                     combo2.EffectEndFactor.Value = 1f;
                                     combo2.EffectStartTime.Value = 10;
                                     combo2.EffectEndDuration.Value = 300;
@@ -123,14 +116,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                 {
                                     keyCounter.Anchor = Anchor.BottomCentre;
                                     keyCounter.Origin = Anchor.TopCentre;
-                                    keyCounter.Position = new Vector2(0, -(float)virtualHitPositionBindable.Value - stage_padding_bottom);
+                                    keyCounter.Position = new Vector2(0, -hitPosition.Value - stage_padding_bottom);
                                 }
 
                                 if (columnHitErrorMeter != null)
                                 {
                                     columnHitErrorMeter.Anchor = Anchor.BottomCentre;
                                     columnHitErrorMeter.Origin = Anchor.Centre;
-                                    columnHitErrorMeter.Position = new Vector2(0, -(float)virtualHitPositionBindable.Value - stage_padding_bottom);
+                                    columnHitErrorMeter.Position = new Vector2(0, -hitPosition.Value - stage_padding_bottom);
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -141,7 +134,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     hitErrorMeter.Origin = Anchor.Centre;
                                     hitErrorMeter.Rotation = -90f;
                                     hitErrorMeter.Position = new Vector2(0, -15);
-                                    hitErrorMeter.Scale = new Vector2(1.4f, 1.4f);
+                                    hitErrorMeter.Scale = new Vector2(1.25f, 1.25f);
                                     hitErrorMeter.JudgementLineThickness.Value = 2;
                                     hitErrorMeter.ShowMovingAverage.Value = true;
                                     hitErrorMeter.ColourBarVisibility.Value = false;
@@ -155,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                 {
                                     judgementPiece.Anchor = Anchor.Centre;
                                     judgementPiece.Origin = Anchor.Centre;
-                                    judgementPiece.Y = 50;
+                                    judgementPiece.Y = 100;
                                 }
                             })
                             {
@@ -179,8 +172,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
                     // return new Ez2JudgementPiece(resultComponent.Component);
                     return Drawable.Empty();
-
-                #endregion
 
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)
@@ -236,20 +227,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
                 bool isSpecialColumn = stage.EzIsSpecialColumn(columnIndex);
 
-                columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
-
                 switch (maniaLookup.Lookup)
                 {
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
+                        if (isSpecialColumn)
+                        {
+                            var specialWidth = new Bindable<float>(
+                                (float)columnWidthBindable.Value * (float)specialFactorBindable.Value);
+                            return SkinUtils.As<TValue>(specialWidth);
+                        }
+
+                        var width = new Bindable<float>((float)columnWidthBindable.Value);
+                        return SkinUtils.As<TValue>(width);
 
                     case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>((float)virtualHitPositionBindable.Value));
+                        return SkinUtils.As<TValue>(hitPosition);
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
-
                         var colour = stage.GetColourForLayout(columnIndex);
-
                         return SkinUtils.As<TValue>(new Bindable<Color4>(colour));
 
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:

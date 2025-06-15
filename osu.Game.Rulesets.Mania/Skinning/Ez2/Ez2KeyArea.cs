@@ -18,6 +18,7 @@ using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
 using osuTK.Graphics;
@@ -27,13 +28,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     public partial class Ez2KeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-
+        private readonly Bindable<float> hitPosition = new Bindable<float>();
         private Container directionContainer = null!;
         private Drawable background = null!;
 
         private Circle hitTargetLine = null!;
 
-        private Container<Circle> bottomIcon = null!;
         private CircularContainer topIcon = null!;
         private Bindable<Color4> accentColour = null!;
 
@@ -49,6 +49,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+
         public Ez2KeyArea()
         {
             RelativeSizeAxes = Axes.Both;
@@ -57,17 +60,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
-            const float icon_circle_size = 8;
-            const float icon_spacing = 7;
             const float icon_vertical_offset = -30;
 
             if (stageDefinition.Columns == 14 && column.Index == 13)
                 return;
 
+            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
+
             InternalChild = directionContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Height = Stage.HIT_TARGET_POSITION + Ez2NotePiece.CORNER_RADIUS * 2,
+                Height = hitPosition.Value,
                 Children = new Drawable[]
                 {
                     new Container
@@ -100,42 +103,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         Origin = Anchor.TopCentre,
                         Children = new Drawable[]
                         {
-                            bottomIcon = new Container<Circle>
-                            {
-                                AutoSizeAxes = Axes.Both,
-                                Anchor = Anchor.BottomCentre,
-                                Origin = Anchor.Centre,
-                                Blending = BlendingParameters.Additive,
-                                Y = icon_vertical_offset + 5,
-                                Children = new[]
-                                {
-                                    new Circle
-                                    {
-                                        Size = new Vector2(icon_circle_size),
-                                        Anchor = Anchor.BottomCentre,
-                                        Origin = Anchor.Centre,
-                                        EdgeEffect = new EdgeEffectParameters { Type = EdgeEffectType.Glow },
-                                    },
-                                    new Circle
-                                    {
-                                        X = -icon_spacing,
-                                        Y = icon_spacing * 1.2f,
-                                        Size = new Vector2(icon_circle_size),
-                                        Anchor = Anchor.BottomCentre,
-                                        Origin = Anchor.Centre,
-                                        EdgeEffect = new EdgeEffectParameters { Type = EdgeEffectType.Glow },
-                                    },
-                                    new Circle
-                                    {
-                                        X = icon_spacing,
-                                        Y = icon_spacing * 1.2f,
-                                        Size = new Vector2(icon_circle_size),
-                                        Anchor = Anchor.BottomCentre,
-                                        Origin = Anchor.Centre,
-                                        EdgeEffect = new EdgeEffectParameters { Type = EdgeEffectType.Glow },
-                                    },
-                                }
-                            },
                             topIcon = new CircularContainer
                             {
                                 Anchor = Anchor.TopCentre,
@@ -161,7 +128,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 }
             };
 
-            // double bpm = beatmap.BeatmapInfo.BPM;
             double bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             applyBlinkingEffect(topIcon, bpm);
 
@@ -172,11 +138,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             accentColour.BindValueChanged(colour =>
                 {
                     background.Colour = colour.NewValue.Darken(0.2f);
-                    bottomIcon.Colour = colour.NewValue;
+                    topIcon.Colour = colour.NewValue;
                 },
                 true);
 
             column.TopLevelContainer.Add(CreateProxy());
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            Invalidate();
         }
 
         private void applyBlinkingEffect(CircularContainer container, double bpm)
@@ -241,18 +213,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 Radius = 20,
             }, lighting_fade_in_duration, Easing.OutQuint);
 
-            bottomIcon.FadeColour(Color4.White, lighting_fade_in_duration, Easing.OutQuint);
-
-            foreach (var circle in bottomIcon)
-            {
-                circle.TransformTo(nameof(EdgeEffect), new EdgeEffectParameters
-                {
-                    Type = EdgeEffectType.Glow,
-                    Colour = lightingColour.Opacity(0.2f),
-                    Radius = 60,
-                }, lighting_fade_in_duration, Easing.OutQuint);
-            }
-
+            topIcon.FadeColour(Color4.White, lighting_fade_in_duration, Easing.OutQuint);
             return false;
         }
 
@@ -285,17 +246,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 Radius = 25,
             }, lighting_fade_out_duration, Easing.OutQuint);
 
-            bottomIcon.FadeColour(accentColour.Value, lighting_fade_out_duration, Easing.OutQuint);
-
-            foreach (var circle in bottomIcon)
-            {
-                circle.TransformTo(nameof(EdgeEffect), new EdgeEffectParameters
-                {
-                    Type = EdgeEffectType.Glow,
-                    Colour = lightingColour,
-                    Radius = 30,
-                }, lighting_fade_out_duration, Easing.OutQuint);
-            }
+            topIcon.FadeColour(accentColour.Value, lighting_fade_out_duration, Easing.OutQuint);
         }
 
         private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColour.Value, Color4.White, 0, 1);

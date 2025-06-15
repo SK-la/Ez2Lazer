@@ -6,6 +6,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Game.Screens;
+using osu.Game.Screens.LAsEzExtensions;
 
 namespace osu.Game.Skinning.Components
 {

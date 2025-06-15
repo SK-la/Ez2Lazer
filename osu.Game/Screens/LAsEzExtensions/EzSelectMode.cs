@@ -4,7 +4,7 @@
 using System;
 using System.ComponentModel;
 
-namespace osu.Game.Screens.Select.Filter
+namespace osu.Game.Screens.LAsEzExtensions
 {
     public enum EzSelectManiaSubset
     {

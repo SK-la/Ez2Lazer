@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -13,12 +14,15 @@ using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
 using osuTK;
@@ -39,6 +43,8 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<SortMode> sortDropdown = null!;
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
+
+        private Bindable<EzSelectMode> ezMode = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -64,6 +70,7 @@ namespace osu.Game.Screens.SelectV2
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
+            ezMode = config.GetBindable<EzSelectMode>(OsuSetting.SelectEzMode);
 
             Shear = OsuGame.SHEAR;
             Margin = new MarginPadding { Top = -corner_radius, Right = -40 };
@@ -171,6 +178,44 @@ namespace osu.Game.Screens.SelectV2
                                 }
                             }
                         },
+                        new GridContainer
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Shear = -OsuGame.SHEAR,
+                            RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                            ColumnDimensions = new[]
+                            {
+                                new Dimension(GridSizeMode.AutoSize),
+                                new Dimension(GridSizeMode.Absolute),
+                                new Dimension(),
+                            },
+                            Content = new[]
+                            {
+                                new[]
+                                {
+                                    new OsuSpriteText
+                                    {
+                                        Text = "Keys",
+                                        Font = OsuFont.GetFont(size: 12),
+                                        Margin = new MarginPadding(5),
+                                        Anchor = Anchor.BottomRight,
+                                        Origin = Anchor.BottomRight,
+                                    },
+                                    Empty(),
+                                    new OsuTabControl<EzSelectMode>
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                        Height = 24,
+                                        AutoSort = false,
+                                        Anchor = Anchor.BottomRight,
+                                        Origin = Anchor.BottomRight,
+                                        AccentColour = Colour4.LightBlue,
+                                        Current = { BindTarget = ezMode }
+                                    },
+                                }
+                            }
+                        }
                     },
                 }
             };
@@ -202,7 +247,7 @@ namespace osu.Game.Screens.SelectV2
                 if (rulesetCriteria?.FilterMayChangeFromMods(m) == true)
                     updateCriteria();
             });
-
+            ezMode.ValueChanged += _ => updateCriteria();
             searchTextBox.Current.BindValueChanged(_ => updateCriteria());
             difficultyRangeSlider.LowerBound.BindValueChanged(_ => updateCriteria());
             difficultyRangeSlider.UpperBound.BindValueChanged(_ => updateCriteria());
@@ -229,6 +274,22 @@ namespace osu.Game.Screens.SelectV2
                 Mods = mods.Value,
                 CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet()
             };
+
+            if (ezMode.Value != EzSelectMode.All)
+            {
+                float keyCount;
+
+                if (float.TryParse(EzModeHelper.GetKeyCountFromEzMode(ezMode.Value).ToString(CultureInfo.InvariantCulture), out keyCount))
+                {
+                    criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                    {
+                        Min = keyCount,
+                        Max = keyCount,
+                        IsLowerInclusive = true,
+                        IsUpperInclusive = true
+                    };
+                }
+            }
 
             if (!difficultyRangeSlider.LowerBound.IsDefault)
                 criteria.UserStarDifficulty.Min = difficultyRangeSlider.LowerBound.Value;

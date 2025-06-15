@@ -20,7 +20,7 @@ using osu.Game.Graphics.UserInterface;
 using osuTK;
 using Realms;
 
-namespace osu.Game.Screens.Select.Filter
+namespace osu.Game.Screens.LAsEzExtensions
 {
     public partial class EzToCollection : OsuDropdown<CollectionFilterMenuItem>
     {

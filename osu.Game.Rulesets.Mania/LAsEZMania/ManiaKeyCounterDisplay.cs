@@ -6,8 +6,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
 
@@ -40,10 +40,10 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(EzSkinSettingsManager ezSkinConfig)
         {
-            columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
+            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
         }
 
         protected override void LoadComplete()

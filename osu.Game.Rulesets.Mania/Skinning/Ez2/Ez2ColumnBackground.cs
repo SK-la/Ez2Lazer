@@ -10,7 +10,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
@@ -22,14 +21,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     public partial class Ez2ColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
+        private readonly Bindable<float> overlayHeight = new Bindable<float>();
+        private readonly Bindable<float> hitPosition = new Bindable<float>();
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-
         private Color4 brightColour;
         private Color4 dimColour;
 
         private Box background = null!;
         private Box backgroundOverlay = null!;
         private Box? separator;
+        private Bindable<Color4> accentColour = null!;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -37,11 +38,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
-        private readonly Bindable<float> hitPosition = new Bindable<float>();
-
-        private Bindable<Color4> accentColour = null!;
-        private readonly Bindable<float> overlayHeight = new Bindable<float>();
-        private EzSkinSettingsManager ezSkinConfig = null!;
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         public Ez2ColumnBackground()
         {
@@ -50,9 +48,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo, EzSkinSettingsManager ezSkinConfig, OsuConfigManager config)
+        private void load(IScrollingInfo scrollingInfo)
         {
-            this.ezSkinConfig = ezSkinConfig;
             if (stageDefinition.Columns == 14 && column.Index == 13)
                 return;
 
@@ -117,24 +114,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             {
                 separator.Alpha = 0;
             }
-            // IBindable<double> columnWidthBindable = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            // IBindable<double> specialFactorBindable = config.GetBindable<double>(OsuSetting.SpecialFactor);
-            // bool isSpecialColumn = stageDefinition.EzIsSpecialColumn(column.Index);
-
-            // Width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
+            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
             ezSkinConfig.OnSettingsChanged += OnConfigChanged;
             OnConfigChanged();
         }
 
         private void OnConfigChanged()
         {
-            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(EzSkinSetting.VirtualHitPosition).Value;
             if (separator != null)
                 separator.Height = DrawHeight - hitPosition.Value;
         }
@@ -195,11 +187,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 16 => columnIndex is 0 or 5 or 9 or 14,
                 _ => false
             };
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
         }
     }
 }

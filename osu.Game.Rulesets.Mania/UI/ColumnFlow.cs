@@ -11,7 +11,9 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning;
+using osu.Game.Screens;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -32,6 +34,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private readonly FillFlowContainer<Container<TContent>> columns;
         private readonly StageDefinition stageDefinition;
+        private readonly IBindable<double> columnWidthBindable = new Bindable<double>();
+        private readonly IBindable<double> specialFactorBindable = new Bindable<double>();
 
         public new bool Masking
         {
@@ -69,10 +73,13 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
 
         [BackgroundDependencyLoader]
-        private void load(ManiaRulesetConfigManager? rulesetConfig)
+        private void load(ManiaRulesetConfigManager? rulesetConfig, EzSkinSettingsManager ezSkinConfig)
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
-
+            columnWidthBindable.BindTo(ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth));
+            specialFactorBindable.BindTo(ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor));
+            columnWidthBindable.BindValueChanged(_ => invalidateLayout());
+            specialFactorBindable.BindValueChanged(_ => invalidateLayout());
             mobileLayout.BindValueChanged(_ => invalidateLayout());
             skin.SourceChanged += invalidateLayout;
         }
@@ -134,11 +141,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 columns[i].Margin = new MarginPadding { Left = leftSpacing, Right = rightSpacing };
 
-                float? width = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                       new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
-                                   ?.Value;
+                // float? width = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                //                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
+                //                    ?.Value;
 
-                bool isSpecialColumn = stageDefinition.IsSpecialColumn(i);
+                bool isSpecialColumn = stageDefinition.EzIsSpecialColumn(i);
+                float? width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
 
                 // only used by default skin (legacy skins get defaults set in LegacyManiaSkinConfiguration)
                 width ??= isSpecialColumn ? Column.SPECIAL_COLUMN_WIDTH : Column.COLUMN_WIDTH;

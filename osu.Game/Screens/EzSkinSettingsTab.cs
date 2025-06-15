@@ -15,7 +15,6 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Framework.Threading;
-using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
@@ -29,20 +28,16 @@ namespace osu.Game.Screens
 {
     public partial class EzSkinSettings : EditorSidebarSection
     {
-        // public Bindable<double>? NonSquareNoteHeight;
-        public Bindable<double>? VirtualHitPosition;
+        private Bindable<double>? hitPosition;
         private Bindable<double>? columnWidth;
         private Bindable<double>? specialFactor;
         private readonly Bindable<bool> dynamicTracking = new Bindable<bool>();
-
         private readonly Bindable<EzSelectorNameSet> globalTextureName = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)4);
-
         private readonly Bindable<string> selectedNoteSet = new Bindable<string>();
-
         private readonly List<string> availableNoteSets = new List<string>();
 
-        [Resolved]
-        private OsuConfigManager config { get; set; } = null!;
+        private SettingsButton refreshSkinButton = null!;
+        private bool isAbsolutePosition = true;
 
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
@@ -61,9 +56,9 @@ namespace osu.Game.Screens
         [BackgroundDependencyLoader]
         private void load()
         {
-            columnWidth = config.GetBindable<double>(OsuSetting.ColumnWidth);
-            specialFactor = config.GetBindable<double>(OsuSetting.SpecialFactor);
-            VirtualHitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.VirtualHitPosition);
+            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             globalTextureName.Value = (EzSelectorNameSet)ezSkinConfig.GetBindable<int>(EzSkinSetting.GlobalTextureName).Value;
             // dynamicTracking.BindTo(ezSkinConfig.GetBindable<bool>(EzSkinSetting.DynamicTracking));
             // NonSquareNoteHeight.ValueChanged += onSettingsValueChanged;
@@ -111,7 +106,7 @@ namespace osu.Game.Screens
                         {
                             LabelText = "Hit Position",
                             TooltipText = "设置判定线位置",
-                            Current = VirtualHitPosition,
+                            Current = hitPosition,
                             KeyboardStep = 1f,
                         },
                         new EzGlobalTextureNameSelector
@@ -137,14 +132,23 @@ namespace osu.Game.Screens
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight),
                             KeyboardStep = 1.0f,
                         },
-                        new SettingsButton
+                        refreshSkinButton = new SettingsButton
                         {
                             Action = RefreshSkin,
-                        }.WithTwoLineText("(刷新&保存皮肤)", "Refresh & Save Skin")
+                            TooltipText = "1、强制刷新、保存皮肤,\n"
+                                          + "2、切换判定线标高为 绝对/相对位置,\n"
+                                          + "3、切换EzCom组件资源为 默认/设定 \n"
+                                          + "1. Refresh & Save Skin, \n"
+                                          + "2. Switch HitPosition to Absolute/Relative Position,\n"
+                                          + "3. Switch EzCom's Sprite to Default/Configured",
+                        }.WithTwoLineText("强制刷新, 并切换 绝对/相对位置", "Switch Absolute/Relative", 16)
                     }
                 }
             };
 
+            // columnWidth.ValueChanged += onStageChanged;
+            // specialFactor.ValueChanged += onStageChanged;
+            // hitPosition.ValueChanged += onStageChanged;
             globalTextureName.ValueChanged += onTextureNameChanged;
             selectedNoteSet.ValueChanged += onNoteSetChanged;
             dynamicTracking.ValueChanged += tracking =>
@@ -153,13 +157,13 @@ namespace osu.Game.Screens
                 {
                     columnWidth!.ValueChanged += onSettingsValueChanged;
                     specialFactor!.ValueChanged += onSettingsValueChanged;
-                    VirtualHitPosition!.ValueChanged += onSettingsValueChanged;
+                    hitPosition!.ValueChanged += onSettingsValueChanged;
                 }
                 else
                 {
                     columnWidth!.ValueChanged -= onSettingsValueChanged;
                     specialFactor!.ValueChanged -= onSettingsValueChanged;
-                    VirtualHitPosition!.ValueChanged -= onSettingsValueChanged;
+                    hitPosition!.ValueChanged -= onSettingsValueChanged;
                 }
 
                 ezSkinConfig.SetValue(EzSkinSetting.DynamicTracking, tracking.NewValue);
@@ -167,6 +171,11 @@ namespace osu.Game.Screens
         }
 
         #region 追踪处理
+
+        // private void onStageChanged(ValueChangedEvent<double> e)
+        // {
+        //     Invalidate();
+        // }
 
         private void onTextureNameChanged(ValueChangedEvent<EzSelectorNameSet> textureName)
         {
@@ -197,7 +206,41 @@ namespace osu.Game.Screens
 
         public void RefreshSkin()
         {
+            isAbsolutePosition = !isAbsolutePosition;
             skinManager.CurrentSkinInfo.TriggerChange();
+            // 更新按钮颜色
+            updateButtonColor(refreshSkinButton, isAbsolutePosition);
+            // 更新按钮文字
+            updateButtonText(refreshSkinButton, isAbsolutePosition);
+        }
+
+        private void updateButtonColor(SettingsButton button, bool isAbsolute)
+        {
+            Color4 color = isAbsolute ? new Color4(0.2f, 0.4f, 0.8f, 0.3f) : new Color4(0.8f, 0.2f, 0.4f, 0.3f);
+
+            // 找到按钮内的Box并更新颜色
+            var box = button.ChildrenOfType<Box>().FirstOrDefault();
+
+            box?.FadeColour(color, 200);
+        }
+
+        private void updateButtonText(SettingsButton button, bool isAbsolute)
+        {
+            string topText = isAbsolute ? "强制刷新, 并切换至 绝对位置" : "强制刷新, 并切换至 相对位置";
+            string bottomText = isAbsolute ? "Refresh, Switch to Absolute" : "Refresh, Switch to Relative";
+
+            var textContainer = button.ChildrenOfType<FillFlowContainer>().FirstOrDefault();
+
+            if (textContainer != null)
+            {
+                var texts = textContainer.ChildrenOfType<OsuSpriteText>().ToArray();
+
+                if (texts.Length >= 2)
+                {
+                    texts[0].Text = topText;
+                    texts[1].Text = bottomText;
+                }
+            }
         }
 
         #endregion

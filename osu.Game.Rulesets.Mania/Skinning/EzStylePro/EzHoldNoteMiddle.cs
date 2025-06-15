@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -9,9 +10,11 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Screens;
+using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
 using osuTK.Graphics;
 
@@ -19,14 +22,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteMiddle : CompositeDrawable, IHoldNoteBody
     {
-        private EzHoldNoteHittingLayer hittingLayer = null!;
-        private Container noteContainer = null!;
+        private readonly IBindable<bool> isHitting = new Bindable<bool>();
+
+        private DrawableHoldNote holdNote = null!;
+
         private Container topContainer = null!;
         private Container middleContainer = null!;
-        private DrawableHoldNote? holdNoteReference;
+        private Container middleScaleContainer = null!;
+        private Container middleInnerContainer = null!;
 
         private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
+        private Drawable container = new Container();
+        private Drawable? lightContainer;
+        private EzHoldNoteHittingLayer hittingLayer = null!;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -37,93 +46,95 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
 
-        [BackgroundDependencyLoader]
-        private void load(EzSkinSettingsManager ezSkinConfig, DrawableHitObject? drawableObject)
+        public EzHoldNoteMiddle()
         {
-            this.ezSkinConfig = ezSkinConfig;
-            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
             RelativeSizeAxes = Axes.Both;
             // FillMode = FillMode.Stretch;
 
             // Anchor = Anchor.BottomCentre;
             // Origin = Anchor.BottomCentre;
             // Masking = true;
+        }
 
-            hittingLayer = new EzHoldNoteHittingLayer();
-            AddInternal(hittingLayer);
+        [BackgroundDependencyLoader(true)]
+        private void load(EzSkinSettingsManager ezSkinConfig, DrawableHitObject drawableObject)
+        {
+            this.ezSkinConfig = ezSkinConfig;
+            holdNote = (DrawableHoldNote)drawableObject;
+            isHitting.BindTo(holdNote.IsHolding);
 
-            if (drawableObject != null)
-            {
-                holdNoteReference = (DrawableHoldNote)drawableObject;
-                //
-                // // AccentColour.BindTo(holdNote.AccentColour);
-                // hittingLayer.AccentColour.BindTo(holdNote.AccentColour);
-                ((IBindable<bool>)hittingLayer.IsHolding).BindTo(holdNoteReference.IsHolding);
-            }
+            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+        }
+
+        public void Recycle()
+        {
+            ClearTransforms();
+            hittingLayer.Recycle();
         }
 
         protected override void Update()
         {
             base.Update();
-
-            bool isSquare = factory.IsSquareNote($"{ColorPrefix}note");
-            float noteHeight = isSquare
-                ? DrawWidth
-                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
-
-            updateContainerSizes(noteHeight);
+            updateSizes();
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            loadAnimation();
-            factory.OnTextureNameChanged += onSkinChanged;
-            ezSkinConfig.OnSettingsChanged += onSettingsChanged;
-        }
-
-        private void updateContainerSizes(float noteHeight)
-        {
-            topContainer.Height = noteHeight / 2;
-            if (topContainer.Child is Container topInner)
-                topInner.Height = noteHeight;
-
-            middleContainer.Y = noteHeight / 2;
-            middleContainer.Height = DrawHeight - noteHeight / 2;
-
-            if (middleContainer.Child is Container middleScale)
-            {
-                middleScale.Scale = new Vector2(1, DrawHeight - noteHeight / 2);
-
-                if (middleScale.Child is Container innerContainer)
-                {
-                    innerContainer.Height = noteHeight;
-                    innerContainer.Y = -noteHeight / 2;
-                }
-            }
-        }
-
-        private void onSettingsChanged()
-        {
-            if (enabledColor.Value)
-                noteContainer.Colour = NoteColor;
-        }
-
-        private void onSkinChanged()
-        {
-            Schedule(() =>
-            {
-                ClearInternal();
-                loadAnimation();
-            });
+            OnSkinChanged();
+            factory.OnTextureNameChanged += OnSkinChanged;
+            ezSkinConfig.OnSettingsChanged += OnSettingsChanged;
+            isHitting.BindValueChanged(onIsHittingChanged, true);
         }
 
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-            factory.OnTextureNameChanged -= onSkinChanged;
-            ezSkinConfig.OnSettingsChanged -= onSettingsChanged;
+
+            if (isDisposing)
+            {
+                factory.OnTextureNameChanged -= OnSkinChanged;
+                ezSkinConfig.OnSettingsChanged -= OnSettingsChanged;
+                lightContainer?.Expire();
+            }
+        }
+
+        private void OnSkinChanged()
+        {
+            loadAnimation();
+            hittingLayer = new EzHoldNoteHittingLayer
+            {
+                Alpha = 0,
+                IsHitting = { BindTarget = isHitting }
+            };
+            lightContainer = new HitTargetInsetContainer
+            {
+                Alpha = 0,
+                Child = hittingLayer
+            };
+        }
+
+        private void onIsHittingChanged(ValueChangedEvent<bool> isHitting)
+        {
+            hittingLayer.IsHitting.Value = isHitting.NewValue;
+
+            if (lightContainer == null)
+                return;
+
+            if (isHitting.NewValue)
+            {
+                lightContainer.ClearTransforms();
+
+                if (lightContainer.Parent == null)
+                    column.TopLevelContainer.Add(lightContainer);
+
+                lightContainer.FadeIn(80);
+            }
+            else
+            {
+                lightContainer.FadeOut(120)
+                              .OnComplete(d => column.TopLevelContainer.Remove(d, false));
+            }
         }
 
         protected virtual Color4 NoteColor
@@ -163,46 +174,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void loadAnimation()
         {
+            ClearInternal();
             string backupComponentName = $"{ColorPrefix}note";
             var middleAnimation = factory.CreateAnimation(ComponentName);
             var tailAnimation = factory.CreateAnimation(ComponentName2);
 
-            if (!isAnimationValid(middleAnimation))
+            if (middleAnimation.FrameCount == 0)
+            {
+                middleAnimation.Dispose();
                 middleAnimation = factory.CreateAnimation(backupComponentName);
-
-            if (!isAnimationValid(tailAnimation))
-                tailAnimation = factory.CreateAnimation(backupComponentName);
-
-            topContainer = createTopContainer(tailAnimation);
-            middleContainer = createMiddleContainer(middleAnimation);
-
-            noteContainer = new Container
-            {
-                RelativeSizeAxes = Axes.Both,
-                Children = new[] { middleContainer, topContainer }
-            };
-
-            if (enabledColor.Value)
-            {
-                noteContainer.Colour = NoteColor;
             }
 
-            AddInternal(noteContainer);
+            if (tailAnimation.FrameCount == 0)
+            {
+                tailAnimation.Dispose();
+                tailAnimation = factory.CreateAnimation(backupComponentName);
+            }
 
-            Invalidate();
-        }
-
-        private bool isAnimationValid(Drawable animation)
-        {
-            if (animation is Container container && container.Count == 0)
-                return false;
-
-            return true;
-        }
-
-        private Container createTopContainer(Drawable animation)
-        {
-            return new Container
+            topContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
                 Anchor = Anchor.TopCentre,
@@ -213,37 +202,64 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     RelativeSizeAxes = Axes.X,
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    Child = animation
+                    Child = tailAnimation
                 }
             };
-        }
-
-        private Container createMiddleContainer(Drawable animation)
-        {
-            return new Container
+            middleContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
                 Masking = true,
-                Child = new Container
+                Child = middleScaleContainer = new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 1,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Child = new Container
+                    Child = middleInnerContainer = new Container
                     {
                         RelativeSizeAxes = Axes.X,
-                        Child = animation
+                        Child = middleAnimation
                     }
                 }
             };
+            container = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Children = new[] { middleContainer, topContainer }
+            };
+
+            OnSettingsChanged();
+            AddInternal(container);
         }
 
-        public void Recycle()
+        private void updateSizes()
         {
-            hittingLayer.Recycle();
+            bool isSquare = factory.IsSquareNote("whitenote");
+            float noteSize = isSquare
+                ? DrawWidth
+                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
+
+            topContainer.Height = noteSize / 2;
+            if (topContainer.Child is Container topInner)
+                topInner.Height = noteSize;
+
+            float middleHeight = Math.Max(DrawHeight - noteSize / 2, noteSize / 2);
+
+            middleContainer.Y = noteSize / 2;
+            middleContainer.Height = middleHeight + 2;
+            middleScaleContainer.Scale = new Vector2(1, DrawHeight - noteSize / 2);
+            middleInnerContainer.Height = noteSize;
+            middleInnerContainer.Y = -noteSize / 2;
+            Invalidate();
+        }
+
+        private void OnSettingsChanged()
+        {
+            if (enabledColor.Value)
+                container.Colour = NoteColor;
+            Schedule(updateSizes);
         }
     }
 }

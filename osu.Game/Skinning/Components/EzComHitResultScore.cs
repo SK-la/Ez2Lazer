@@ -377,7 +377,7 @@ namespace osu.Game.Skinning.Components
             {
                 case HitResult.Perfect:
                     // 中心直接绘制最大状态，向上移动并拉长压扁消失
-                    applyEzStyleEffect(drawable, new Vector2(1.2f), 15);
+                    applyEzStyleEffect(drawable, new Vector2(1.25f), 20);
                     break;
 
                 case HitResult.Great:
@@ -413,24 +413,50 @@ namespace osu.Game.Skinning.Components
             drawable.FinishTransforms();
 
             var finalScale = new Vector2(1.5f, 0.05f);
+            const double scale_phase_duration = 125; // 缩放
+            const double transform_phase_duration = 150; // 变形动画总时间
 
-            const double scale_up_duration = 150; // 放大动画
-            const double scale_down_duration = 180; // 压扁动画
-            const double fade_out_duration = scale_down_duration + 10; // 淡出动画
+            const double overlap_time = 5;
+
+            // 按分配变形动画时间
+            const double second_phase_duration = transform_phase_duration * 0.7;
+            const double third_phase_duration = transform_phase_duration * 0.3;
+
+            // 计算第二步和第三步的开始时间
+            const double second_phase_start = scale_phase_duration - overlap_time;
+            const double third_phase_start = second_phase_start + second_phase_duration - overlap_time;
+
+            // 计算第二步的中间缩放值（完成70%的变形）
+            var midScale = new Vector2(
+                1.0f + (finalScale.X - 1.0f) * 0.7f,
+                1.0f - (1.0f - finalScale.Y) * 0.7f
+            );
 
             // 重置状态
             drawable.Alpha = 1;
-            // drawable.Position = Vector2.Zero;
+            drawable.Scale = scaleUp;
+            drawable.Position = Vector2.Zero;
 
             drawable
-                // 第一步：放大动画，同时执行位移（如果有）
-                .ScaleTo(scaleUp, scale_up_duration, Easing.OutQuint)
-                .MoveTo(new Vector2(0, moveDistance), scale_up_duration, Easing.OutQuint)
-                .Delay(scale_up_duration + 20)
-                // 第二步：在放大基础上进行横向拉长和纵向压缩（使用固定比例）
-                .TransformTo(nameof(Scale), new Vector2(scaleUp.X * finalScale.X, scaleUp.Y * finalScale.Y), scale_down_duration, Easing.InQuint)
-                .MoveTo(new Vector2(0, -moveDistance / 10), fade_out_duration, Easing.InQuint)
-                .FadeOut(fade_out_duration, Easing.InQuint);
+                .Delay(2)
+                // 第一步：放大动画，同时执行位移
+                .ScaleTo(new Vector2(1.0f), scale_phase_duration, Easing.OutQuint)
+                .MoveTo(new Vector2(0, -moveDistance), scale_phase_duration, Easing.OutQuint);
+
+            using (drawable.BeginDelayedSequence(second_phase_start))
+            {
+                drawable
+                    // 第二步：完成70%的扁平化变形
+                    .TransformTo(nameof(Scale), midScale, second_phase_duration, Easing.InQuint);
+            }
+
+            using (drawable.BeginDelayedSequence(third_phase_start))
+            {
+                drawable
+                    // 第三步：完成剩余30%变形并淡出
+                    .TransformTo(nameof(Scale), finalScale, third_phase_duration, Easing.InQuint)
+                    .FadeOut(third_phase_duration - 5, Easing.InQuint);
+            }
         }
 
         #region Other
