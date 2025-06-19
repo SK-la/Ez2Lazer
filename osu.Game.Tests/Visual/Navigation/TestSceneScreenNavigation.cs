@@ -37,7 +37,7 @@ using osu.Game.Overlays.Toolbar;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Configuration;
-// using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Scoring;
@@ -503,8 +503,8 @@ namespace osu.Game.Tests.Visual.Navigation
             void checkScrollSpeed(double configValue, double gameplayValue)
             {
                 AddUntilStep($"config value is {configValue}", () => getConfigManager().Get<double>(ManiaRulesetSetting.ScrollSpeed), () => Is.EqualTo(configValue));
-                // AddUntilStep($"gameplay value is {gameplayValue}", () => this.ChildrenOfType<DrawableManiaRuleset>().Single().TargetTimeRange,
-                //     () => Is.EqualTo(DrawableManiaRuleset.ComputeScrollTime(gameplayValue)));
+                AddUntilStep($"gameplay value is {gameplayValue}", () => this.ChildrenOfType<DrawableManiaRuleset>().Single().TargetTimeRange,
+                    () => Is.EqualTo(DrawableManiaRuleset.ComputeScrollTime(gameplayValue)));
             }
 
             ManiaRulesetConfigManager getConfigManager() => ((ManiaRulesetConfigManager)Game.Dependencies.Get<IRulesetConfigCache>().GetConfigFor(new ManiaRuleset())!);

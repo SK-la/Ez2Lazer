@@ -15,6 +15,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
@@ -27,13 +28,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     public partial class Ez2KeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly Bindable<double> hitPosition = new Bindable<double>();
+        private readonly Bindable<float> hitPosition = new Bindable<float>();
         private Container directionContainer = null!;
         private Drawable background = null!;
 
         private Circle hitTargetLine = null!;
 
-        private CircularContainer topIcon = null!;
+        private CircularContainer? topIcon;
         private Bindable<Color4> accentColour = null!;
 
         [Resolved]
@@ -46,6 +47,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private IGameplayClock gameplayClock { get; set; } = null!;
 
         [Resolved]
+        private StageDefinition stageDefinition { get; set; } = null!;
+
+        [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         public Ez2KeyArea()
@@ -56,12 +60,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
-            const float icon_vertical_offset = -30;
+            if (stageDefinition.Columns == 14 && column.Index == 13)
+                return;
+
+            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
 
             InternalChild = directionContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Height = (float)hitPosition.Value,
+                Height = hitPosition.Value,
                 Children = new Drawable[]
                 {
                     new Container
@@ -98,7 +105,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                             {
                                 Anchor = Anchor.TopCentre,
                                 Origin = Anchor.Centre,
-                                Y = -icon_vertical_offset + 35,
+                                Y = 60,
                                 Size = new Vector2(22, 14),
                                 Masking = true,
                                 BorderThickness = 4,
@@ -119,9 +126,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 }
             };
 
-            double bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
-            applyBlinkingEffect(topIcon, bpm);
-
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
@@ -136,25 +140,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             column.TopLevelContainer.Add(CreateProxy());
         }
 
+        private double beatInterval;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            ezSkinConfig.BindWith(EzSkinSetting.HitPosition, hitPosition);
+
+            double bpm = beatmap.BeatmapInfo.BPM * gameplayClock.GetTrueGameplayRate();
+            beatInterval = 60000 / bpm;
         }
 
-        private void applyBlinkingEffect(CircularContainer container, double bpm)
+        protected override void Update()
         {
-            double interval = 60000 / bpm;
+            base.Update();
 
-            double fadeTime = Math.Max(50, interval / 2);
+            if (topIcon == null || !topIcon.Children.Any())
+                return;
 
-            Scheduler.AddDelayed(() =>
+            double progress = (gameplayClock.CurrentTime % beatInterval) / beatInterval;
+
+            if (progress < gameplayClock.ElapsedFrameTime / beatInterval)
             {
-                container.Children.OfType<Box>().First()
-                         .FadeTo(1, fadeTime)
-                         .Then()
-                         .FadeTo(0, fadeTime);
-            }, interval, true);
+                double fadeTime = Math.Max(1, beatInterval / 2);
+                var box = topIcon.Children.OfType<Box>().FirstOrDefault();
+
+                box?.FadeTo(1, fadeTime)
+                   .Then()
+                   .FadeTo(0, fadeTime);
+            }
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

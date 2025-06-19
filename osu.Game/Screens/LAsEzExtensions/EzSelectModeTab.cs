@@ -12,7 +12,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Layout;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Utils;
 using osuTK.Graphics;
@@ -35,10 +34,8 @@ namespace osu.Game.Screens.LAsEzExtensions
                 : base("Key Mode")
             {
                 NubWidth = ShearedNub.HEIGHT * 1.16f;
-                TooltipSuffix = "stars";
                 DefaultStringLowerBound = "0.0";
                 DefaultStringUpperBound = "∞";
-                DefaultTooltipUpperBound = UserInterfaceStrings.NoLimit;
 
                 AddLayout(drawSizeLayout);
             }

@@ -17,12 +17,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzNote : CompositeDrawable
     {
-        private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
         private Bindable<double> nonSquareNoteHeight = null!;
 
         private TextureAnimation animation = null!;
         private Drawable container = null!;
+        private EzNoteSeparators? noteSeparatorsL;
+        private EzNoteSeparators? noteSeparatorsR;
+
+        protected virtual bool ShowSeparators => true;
         protected virtual bool UseColorization => true;
 
         [Resolved]
@@ -34,22 +37,25 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
 
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+
         [BackgroundDependencyLoader]
-        private void load(EzSkinSettingsManager ezSkinConfig)
+        private void load()
         {
-            this.ezSkinConfig = ezSkinConfig;
             RelativeSizeAxes = Axes.X;
             FillMode = FillMode.Fill;
 
-            nonSquareNoteHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
             enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            nonSquareNoteHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
             OnSkinChanged();
-            nonSquareNoteHeight.ValueChanged += _ => updateSizes();
+            enabledColor.BindValueChanged(_ => OnConfigChanged(), true);
+            nonSquareNoteHeight.BindValueChanged(_ => updateSizes(), true);
             factory.OnTextureNameChanged += OnSkinChanged;
             ezSkinConfig.OnSettingsChanged += OnConfigChanged;
         }
@@ -102,6 +108,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void loadAnimation()
         {
             ClearInternal();
+
             animation = factory.CreateAnimation(ComponentName);
             container = new Container
             {
@@ -110,6 +117,37 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Origin = Anchor.Centre,
                 Child = animation
             };
+
+            if (ShowSeparators)
+            {
+                noteSeparatorsL = new EzNoteSeparators
+                {
+                    RelativeSizeAxes = Axes.X,
+                    FillMode = FillMode.Fill,
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.Centre,
+                };
+                noteSeparatorsR = new EzNoteSeparators
+                {
+                    RelativeSizeAxes = Axes.X,
+                    FillMode = FillMode.Fill,
+                    Anchor = Anchor.CentreRight,
+                    Origin = Anchor.Centre,
+                    // Rotation = 180,
+                };
+                AddInternal(new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    FillMode = FillMode.Stretch,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Children = new Drawable[]
+                    {
+                        noteSeparatorsL,
+                        noteSeparatorsR
+                    }
+                });
+            }
 
             OnConfigChanged();
             AddInternal(container);
@@ -125,8 +163,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
+            var noteColor = Color4.White;
             if (enabledColor.Value && UseColorization)
-                container.Colour = NoteColor;
+                noteColor = NoteColor;
+
+            container.Colour = noteColor;
+
+            noteSeparatorsL?.UpdateGlowEffect(noteColor);
+            noteSeparatorsR?.UpdateGlowEffect(noteColor);
+
             Schedule(() =>
             {
                 updateSizes();

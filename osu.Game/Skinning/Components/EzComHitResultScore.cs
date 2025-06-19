@@ -107,7 +107,7 @@ namespace osu.Game.Skinning.Components
                         Origin = Anchor.Centre,
                         Scale = new Vector2(1.5f),
                         Alpha = 0, // 初始隐藏
-                        Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2"),
+                        Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2.png"),
                     }
                 };
 

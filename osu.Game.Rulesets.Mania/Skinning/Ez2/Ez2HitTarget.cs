@@ -6,8 +6,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
 using osuTK.Graphics;
@@ -16,21 +14,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     internal partial class Ez2HitTarget : Ez2NotePiece
     {
-        [Resolved]
-        private Column column { get; set; } = null!;
+        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
+        private double bpm;
 
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
 
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
-
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-
-        private double bpm;
 
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
@@ -53,9 +45,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             base.Update();
             Height = DrawWidth;
-
-            if (stageDefinition.Columns == 14 && column.Index == 13)
-                Alpha = 0;
 
             double interval = 60000 / bpm;
             const double amplitude = 6.0;

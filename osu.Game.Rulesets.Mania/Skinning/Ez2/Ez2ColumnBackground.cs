@@ -74,11 +74,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             separator = new Box
             {
-                Name = "Separator",
                 Anchor = Anchor.TopRight,
                 Origin = Anchor.TopCentre,
                 Width = 2,
-                Colour = Color4.White,
+                Colour = Color4.White.Opacity(0.5f),
                 Alpha = 0,
             };
             column.TopLevelContainer.Add(separator);
@@ -103,16 +102,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
-
-            if (drawSeparator(column.Index, stageDefinition, true))
-            {
-                separator.Alpha = 0.2f;
-            }
-
-            if (drawSeparator(column.Index, stageDefinition, false))
-            {
-                separator.Alpha = 0;
-            }
         }
 
         protected override void LoadComplete()
@@ -127,7 +116,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private void OnConfigChanged()
         {
             if (separator != null)
+            {
                 separator.Height = DrawHeight - (float)hitPosition.Value;
+
+                if (drawSeparator(column.Index, stageDefinition))
+                {
+                    separator.Alpha = 0.2f;
+                }
+                else
+                {
+                    separator.Alpha = 0;
+                }
+            }
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
@@ -174,11 +174,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         }
 
         //TODO: 这里的逻辑可以优化，避免重复计算
-        private bool drawSeparator(int columnIndex, StageDefinition stage, bool isSeparator)
+        private bool drawSeparator(int columnIndex, StageDefinition stage)
         {
-            if (!isSeparator)
-                return false;
-
             return stage.Columns switch
             {
                 12 => columnIndex is 0 or 10,

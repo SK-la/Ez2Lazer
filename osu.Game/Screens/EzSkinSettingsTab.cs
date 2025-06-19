@@ -113,6 +113,14 @@ namespace osu.Game.Screens
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight),
                             KeyboardStep = 1.0f,
                         },
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "Note Track Line",
+                            TooltipText = "note两侧辅助轨道线的高度\n"
+                                          + "note side auxiliary track line height",
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteTrackLineHeight),
+                            KeyboardStep = 5f,
+                        },
                         new EzGlobalTextureNameSelector
                         {
                             LabelText = "Global Texture Name",

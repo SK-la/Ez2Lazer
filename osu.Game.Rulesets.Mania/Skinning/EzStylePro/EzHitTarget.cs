@@ -9,6 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -17,9 +18,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private IBindable<double> hitPosition = new Bindable<double>();
 
-        protected override bool UseColorization => false; //不染色
+        protected override bool ShowSeparators => false;
+        protected override bool UseColorization => false;
         protected override string ColorPrefix => "white";
-        private double bpm;
 
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
@@ -32,13 +33,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         public EzHitTarget()
         {
-            RelativeSizeAxes = Axes.None;
-            Width = 1f;
-            Blending = new BlendingParameters
-            {
-                Source = BlendingType.SrcAlpha,
-                Destination = BlendingType.One,
-            };
+            RelativeSizeAxes = Axes.X;
+            FillMode = FillMode.Fill;
             Alpha = 0.3f;
         }
 
@@ -48,41 +44,35 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
-            bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
         }
 
         private float baseYPosition;
-
-        protected override void Update()
-        {
-            base.Update();
-
-            double interval = 60000 / bpm;
-            const double amplitude = 6.0;
-            double progress = (gameplayClock.CurrentTime % interval) / interval;
-            double smoothValue = smoothSineWave(progress);
-
-            Y = baseYPosition + (float)(smoothValue * amplitude);
-        }
-
-        private double smoothSineWave(double t)
-        {
-            const double frequency = 1;
-            const double amplitude = 0.3;
-            return amplitude * Math.Sin(frequency * t * 2 * Math.PI);
-        }
+        private double beatInterval;
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
             hitPosition.BindValueChanged(_ => updateY(), true);
+
+            double bpm = beatmap.BeatmapInfo.BPM * gameplayClock.GetTrueGameplayRate();
+            beatInterval = 60000 / bpm;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            double progress = (gameplayClock.CurrentTime % beatInterval) / beatInterval;
+            // 平滑正弦波效果
+            double smoothValue = 0.3 * Math.Sin(progress * 2 * Math.PI);
+            Y = baseYPosition + (float)(smoothValue * 6);
         }
 
         private void updateY()
         {
             baseYPosition = 110f - (float)hitPosition.Value;
-            Position = new osuTK.Vector2(0, baseYPosition);
+            Position = new Vector2(0, baseYPosition);
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

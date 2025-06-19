@@ -219,7 +219,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             if (!judgement.IsHit || !judgement.Type.IsScorable())
                 return;
 
-            int columnIndex = getColumnIndex(judgement);
+            int columnIndex = -1;
+
+            if (judgement.HitObject is IHasColumn hasColumn)
+                columnIndex = hasColumn.Column;
+
             if (columnIndex < 0 || columnIndex >= keyCount)
                 return;
 
@@ -247,14 +251,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             float pos = (float)(value / (missWindow * moveRange));
             return Math.Clamp(pos, -moveRange, moveRange);
-        }
-
-        private int getColumnIndex(JudgementResult judgement)
-        {
-            if (judgement.HitObject is IHasColumn hasColumn)
-                return hasColumn.Column;
-
-            return -1;
         }
 
         public override void Clear()

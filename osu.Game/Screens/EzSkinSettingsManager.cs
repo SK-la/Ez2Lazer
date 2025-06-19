@@ -22,15 +22,18 @@ namespace osu.Game.Screens
         {
             SetDefault(EzSkinSetting.SelectedKeyMode, 4);
 
-            SetDefault(EzSkinSetting.DynamicTracking, false);
-            SetDefault(EzSkinSetting.NoteSetName, "evolve");
-            SetDefault(EzSkinSetting.GlobalTextureName, 4);
-
             SetDefault(EzSkinSetting.ColumnWidth, 60, 5, 400.0, 1.0);
             SetDefault(EzSkinSetting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
             SetDefault(EzSkinSetting.HitPosition, 110.0, 0, 500, 1.0);
             SetDefault(EzSkinSetting.VisualHitPosition, 0.0, -100, 100, 1.0);
+
+            SetDefault(EzSkinSetting.DynamicTracking, false);
+            SetDefault(EzSkinSetting.GlobalTextureName, 4);
+
+            SetDefault(EzSkinSetting.NoteSetName, "evolve");
             SetDefault(EzSkinSetting.NonSquareNoteHeight, 28.0, 1.0, 100.0, 1.0);
+            SetDefault(EzSkinSetting.NoteTrackLine, true);
+            SetDefault(EzSkinSetting.NoteTrackLineHeight, 100, 0, 1000, 1.0);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
             SetDefault(EzSkinSetting.ColorA, Colour4.FromHex("#F5F5F5"));
@@ -157,6 +160,7 @@ namespace osu.Game.Screens
             GetBindable<double>(EzSkinSetting.VisualHitPosition).ValueChanged += e => OnSettingsChanged?.Invoke();
 
             GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).ValueChanged += e => OnSettingsChanged?.Invoke();
+            GetBindable<double>(EzSkinSetting.NoteTrackLineHeight).ValueChanged += e => OnSettingsChanged?.Invoke();
         }
 
         protected void NotifySettingsChanged()
@@ -191,6 +195,8 @@ namespace osu.Game.Screens
         HitPosition,
         VisualHitPosition,
         NonSquareNoteHeight,
+        NoteTrackLine,
+        NoteTrackLineHeight,
 
         // 皮肤设置
         DynamicTracking,
