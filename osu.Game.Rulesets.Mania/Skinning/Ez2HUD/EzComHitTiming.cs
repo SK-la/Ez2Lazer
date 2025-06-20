@@ -14,7 +14,6 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
-    [Cached]
     public partial class EzComHitTiming : HitErrorMeter
     {
         [SettingSource("Offset Number Font", "Offset Number Font", SettingControlType = typeof(EzSelectorEnumList))]
