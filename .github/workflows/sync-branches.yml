@@ -1,0 +1,31 @@
+name: 同步分支
+
+on:
+  schedule:
+    # 每天凌晨2点运行（UTC时间，对应北京时间10点）
+    - cron: '0 2 * * *'
+  # 也可以手动触发
+  workflow_dispatch:
+
+jobs:
+  sync-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+        with:
+          ref: locmain  # 你当前的分支
+          fetch-depth: 0
+
+      - name: 配置Git
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+
+      - name: 同步上游分支
+        run: |
+          # 如果你需要同步upstream的某个分支到当前分支
+          git fetch upstream
+          git merge upstream/main --no-edit
+          # 推送到origin
+          git push origin locmain
