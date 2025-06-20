@@ -3,7 +3,7 @@ name: 同步上游仓库到main分支
 on:
   schedule:
     # 每周一凌晨2点运行（UTC时间）
-    - cron: '0 2 * * 1'
+    - cron: '0 2 * * *'
   # 也可以手动触发
   workflow_dispatch:
 
