@@ -2,9 +2,7 @@ name: 同步上游仓库到main分支
 
 on:
   schedule:
-    # 每周一凌晨2点运行（UTC时间）
-    - cron: '0 2 * * *'
-  # 也可以手动触发
+    - cron: '0 2 * * *'  # 每周一凌晨2点运行（UTC时间）
   workflow_dispatch:
 
 jobs:
@@ -14,7 +12,7 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v3
         with:
-          ref: main  # 检出main分支
+          ref: main
           fetch-depth: 0
 
       - name: 配置Git
@@ -26,8 +24,22 @@ jobs:
         run: |
           git remote add upstream https://github.com/ppy/osu.git || true
 
+      - name: 备份 workflow 文件
+        run: |
+          cp .github/workflows/sync-branches.yml /tmp/sync-branches.yml
+
       - name: 同步上游main分支
         run: |
           git fetch upstream
           git reset --hard upstream/main
-          git push origin main --force
+
+      - name: 恢复 workflow 文件
+        run: |
+          mv /tmp/sync-branches.yml .github/workflows/sync-branches.yml
+          git add .github/workflows/sync-branches.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: restore workflow after upstream sync"
+          fi
+
+      - name: 推送到 main 分支
+        run: git push origin main --force
