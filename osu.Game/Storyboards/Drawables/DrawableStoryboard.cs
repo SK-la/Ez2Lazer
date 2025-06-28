@@ -36,7 +36,6 @@ namespace osu.Game.Storyboards.Drawables
         protected override Container<DrawableStoryboardLayer> Content { get; }
 
         protected override Vector2 DrawScale => new Vector2((Parent?.DrawHeight ?? 0) / 480);
-        // protected override Vector2 DrawScale => new Vector2(Parent!.DrawWidth / 640);
 
         public override bool RemoveCompletedTransforms => false;
 
@@ -70,8 +69,9 @@ namespace osu.Game.Storyboards.Drawables
 
             if (onlyHasVideoElements)
             {
-                Size = Vector2.One; // 填满窗口
-                FillMode = FillMode.Fit; // 保持比例
+                RelativeSizeAxes = Axes.Both;
+                Size = Vector2.One;
+                FillMode = FillMode.Fill;
                 Anchor = Anchor.Centre;
                 Origin = Anchor.Centre;
             }
@@ -141,13 +141,7 @@ namespace osu.Game.Storyboards.Drawables
                                 Height = Parent.DrawHeight;
                                 Width = Height * videoAspectRatio;
                             }
-
-                            Anchor = Anchor.Centre;
-                            Origin = Anchor.Centre;
                         }
-
-                        Anchor = Anchor.Centre;
-                        Origin = Anchor.Centre;
                     });
                 }
             }

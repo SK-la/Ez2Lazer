@@ -448,7 +448,7 @@ namespace osu.Game.Overlays.Mods
                 }
                 else
                 {
-                    modState.Mod.ResetSettingsToDefaults();
+                    modState.Mod.ResetHitWindows();
                     modState.Active.Value = false;
                 }
             }

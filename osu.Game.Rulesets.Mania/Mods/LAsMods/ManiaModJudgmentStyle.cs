@@ -10,6 +10,7 @@ using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
@@ -154,18 +155,18 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        public ManiaHitWindows ManiaHitWindows { get; set; } = null!;
+        private HitWindows hitWindows { get; set; } = new ManiaHitWindows();
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            ManiaHitWindows.SetDifficultyRange(PerfectOffset.Value, GreatOffset.Value, GoodOffset.Value, OkOffset.Value, MehOffset.Value, MissOffset.Value);
+            hitWindows.SetDifficultyRange(PerfectOffset.Value, GreatOffset.Value, GoodOffset.Value, OkOffset.Value, MehOffset.Value, MissOffset.Value);
             difficulty.OverallDifficulty = 0;
-            ManiaHitWindows.SetDifficulty(difficulty.OverallDifficulty);
+            hitWindows.SetDifficulty(difficulty.OverallDifficulty);
         }
 
-        public override void ResetSettingsToDefaults()
+        public override void ResetHitWindows()
         {
-            ManiaHitWindows.ResetRange();
+            hitWindows.ResetHitWindows();
         }
     }
 

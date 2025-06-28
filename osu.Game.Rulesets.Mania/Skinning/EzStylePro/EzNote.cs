@@ -22,8 +22,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private TextureAnimation animation = null!;
         private Drawable container = null!;
-        private EzNoteSeparators? noteSeparatorsL;
-        private EzNoteSeparators? noteSeparatorsR;
+        private EzNoteSideLine? noteSeparatorsL;
+        private EzNoteSideLine? noteSeparatorsR;
 
         protected virtual bool ShowSeparators => true;
         protected virtual bool UseColorization => true;
@@ -56,8 +56,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             OnSkinChanged();
             enabledColor.BindValueChanged(_ => OnConfigChanged(), true);
             nonSquareNoteHeight.BindValueChanged(_ => updateSizes(), true);
-            factory.OnTextureNameChanged += OnSkinChanged;
             ezSkinConfig.OnSettingsChanged += OnConfigChanged;
+            factory.OnNoteChanged += OnSkinChanged;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -66,8 +66,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (isDisposing)
             {
-                factory.OnTextureNameChanged -= OnSkinChanged;
                 ezSkinConfig.OnSettingsChanged -= OnConfigChanged;
+                factory.OnNoteChanged -= OnSkinChanged;
             }
         }
 
@@ -108,7 +108,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void loadAnimation()
         {
             ClearInternal();
-
             animation = factory.CreateAnimation(ComponentName);
             container = new Container
             {
@@ -120,14 +119,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (ShowSeparators)
             {
-                noteSeparatorsL = new EzNoteSeparators
+                noteSeparatorsL = new EzNoteSideLine
                 {
                     RelativeSizeAxes = Axes.X,
                     FillMode = FillMode.Fill,
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.Centre,
                 };
-                noteSeparatorsR = new EzNoteSeparators
+                noteSeparatorsR = new EzNoteSideLine
                 {
                     RelativeSizeAxes = Axes.X,
                     FillMode = FillMode.Fill,

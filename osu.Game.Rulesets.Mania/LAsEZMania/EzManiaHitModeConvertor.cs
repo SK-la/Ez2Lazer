@@ -88,14 +88,19 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         private void OnHitModeChanged(ValueChangedEvent<MUGHitMode> e)
         {
             if (e.NewValue == MUGHitMode.Lazer)
-                HitWindows.ResetRange();
-
-            string mode = e.NewValue.ToString();
+            {
+                // 使用默认判定区间
+                HitWindows = new DefaultHitWindows();
+                return;
+            }
 
             try
             {
-                var template = HitWindowTemplates.GetTemplate(mode);
-                HitWindows.SetDifficultyRange(
+                var template = HitWindowTemplates.GetTemplate(e.NewValue.ToString());
+
+                // 创建DefaultHitWindows实例并设置自定义值
+                var customWindows = new DefaultHitWindows();
+                customWindows.SetCustomWindows(
                     template.TemplatePerfect,
                     template.TemplateGreat,
                     template.TemplateGood,
@@ -103,11 +108,15 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
                     template.TemplateMeh,
                     template.TemplateMiss
                 );
-                Debug.WriteLine($"Hit window set for mode: {mode}");
+
+                HitWindows = customWindows;
+                Debug.WriteLine($"设置了{e.NewValue}模式的判定区间");
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
+                // 出错时使用默认区间
+                HitWindows = new DefaultHitWindows();
             }
         }
 

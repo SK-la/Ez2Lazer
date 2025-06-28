@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.UI.Components
@@ -18,6 +19,9 @@ namespace osu.Game.Rulesets.Mania.UI.Components
 
         [Resolved]
         private ISkinSource skin { get; set; } = null!;
+
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)

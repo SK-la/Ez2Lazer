@@ -45,6 +45,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             direction.BindValueChanged(onDirectionChanged, true);
 
             hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            hitPosition.BindValueChanged(_ => updateY(), true);
         }
 
         private float baseYPosition;
@@ -53,8 +54,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            hitPosition.BindValueChanged(_ => updateY(), true);
-
             double bpm = beatmap.BeatmapInfo.BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm;
         }

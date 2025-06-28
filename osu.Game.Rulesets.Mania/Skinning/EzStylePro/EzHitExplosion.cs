@@ -15,6 +15,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -25,13 +26,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private readonly Bindable<double> columnWidth = new Bindable<double>();
 
-        private readonly Bindable<double> noteHeightBindable = new Bindable<double>();
-        private readonly Bindable<double> columnWidthBindable = new Bindable<double>();
-        private readonly Bindable<double> specialFactorBindable = new Bindable<double>();
-        private readonly Bindable<double> hitPosition = new Bindable<double>();
+        private IBindable<double> noteHeightBindable = new Bindable<double>();
+        private IBindable<double> columnWidthBindable = new Bindable<double>();
+        private IBindable<double> specialFactorBindable = new Bindable<double>();
+        private IBindable<double> hitPosition = new Bindable<double>();
 
-        private TextureAnimation animation = null!;
-        private TextureAnimation animationP = null!;
+        private TextureAnimation? animation;
+        private TextureAnimation? animationP;
         private Container container = null!;
 
         [UsedImplicitly]
@@ -61,10 +62,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
-            ezSkinConfig.BindWith(EzSkinSetting.NonSquareNoteHeight, noteHeightBindable);
-            ezSkinConfig.BindWith(EzSkinSetting.ColumnWidth, columnWidthBindable);
-            ezSkinConfig.BindWith(EzSkinSetting.SpecialFactor, specialFactorBindable);
-            ezSkinConfig.BindWith(EzSkinSetting.HitPosition, hitPosition);
+            noteHeightBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
+            columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+
+            noteHeightBindable.BindValueChanged(_ => updateY(), true);
+            columnWidthBindable.BindValueChanged(_ => updateY(), true);
+            specialFactorBindable.BindValueChanged(_ => updateY(), true);
+            hitPosition.BindValueChanged(_ => updateY(), true);
         }
 
         protected override void LoadComplete()
@@ -72,12 +78,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             onSkinChanged();
 
-            noteHeightBindable.BindValueChanged(_ => updateY());
-            columnWidthBindable.BindValueChanged(_ => updateY());
-            specialFactorBindable.BindValueChanged(_ => updateY());
-            hitPosition.BindValueChanged(_ => updateY(), true);
-
-            factory.OnTextureNameChanged += onSkinChanged;
+            factory.OnNoteChanged += onSkinChanged;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -86,13 +87,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (isDisposing)
             {
-                factory.OnTextureNameChanged -= onSkinChanged;
+                factory.OnNoteChanged -= onSkinChanged;
             }
         }
 
         private void loadAnimation()
         {
             ClearInternal();
+
             animation = factory.CreateAnimation("noteflare");
             animationP = factory.CreateAnimation("noteflaregood");
 
@@ -118,24 +120,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             columnWidth.Value = columnWidthBindable.Value * (isSpecialColumn ? specialFactorBindable.Value : 1);
 
             bool isSquare = factory.IsSquareNote("whitenote");
-            var tempContainer = factory.CreateAnimation("whitenote");
-            float aspectRatio = 1f;
-
-            if (tempContainer.FrameCount > 0)
-            {
-                aspectRatio = tempContainer.CurrentFrame.Height / (float)tempContainer.CurrentFrame.Width;
-            }
-
-            tempContainer.Dispose();
+            float aspectRatio = factory.GetRatio("whitenote");
 
             float moveY = isSquare
                 ? (float)columnWidth.Value / 2 * aspectRatio
-                : (float)noteHeightBindable.Value * aspectRatio;
+                : (float)noteHeightBindable.Value / 2 * aspectRatio;
 
             baseYPosition = 110f - (float)hitPosition.Value - moveY;
-            Position = new osuTK.Vector2(0, baseYPosition);
-
-            Invalidate();
+            Position = new Vector2(0, baseYPosition);
         }
 
         private void onSkinChanged()
@@ -155,7 +147,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (result.Type > HitResult.Great)
             {
-                container.Add(animationP);
+                if (animationP != null) container.Add(animationP);
             }
         }
     }

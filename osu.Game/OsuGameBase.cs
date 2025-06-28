@@ -284,7 +284,7 @@ namespace osu.Game
 
             // 初始化并注册EzSkinSettingsManager
             dependencies.Cache(EzSkinSettingsManager = new EzSkinSettingsManager(Storage));
-            // dependencies.CacheAs<IEzSkinSettings>(EzSkinSettingsManager);
+
             dependencies.Cache(
                 NoteFactory = new EzLocalTextureFactory(
                     EzSkinSettingsManager,

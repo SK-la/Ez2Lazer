@@ -5,6 +5,7 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
@@ -26,6 +27,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private DrawableHoldNote holdNote = null!;
 
+        private TextureAnimation? middleAnimation;
+        private TextureAnimation? tailAnimation;
         private Container topContainer = null!;
         private Container middleContainer = null!;
         private Container middleScaleContainer = null!;
@@ -33,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
-        private Drawable container = new Container();
+        private Drawable? container;
         private Drawable? lightContainer;
         private EzHoldNoteHittingLayer hittingLayer = null!;
 
@@ -82,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
             OnSkinChanged();
-            factory.OnTextureNameChanged += OnSkinChanged;
+            factory.OnNoteChanged += OnSkinChanged;
             ezSkinConfig.OnSettingsChanged += OnSettingsChanged;
             isHitting.BindValueChanged(onIsHittingChanged, true);
         }
@@ -93,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (isDisposing)
             {
-                factory.OnTextureNameChanged -= OnSkinChanged;
+                factory.OnNoteChanged -= OnSkinChanged;
                 ezSkinConfig.OnSettingsChanged -= OnSettingsChanged;
                 lightContainer?.Expire();
             }
@@ -176,8 +179,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             ClearInternal();
             string backupComponentName = $"{ColorPrefix}note";
-            var middleAnimation = factory.CreateAnimation(ComponentName);
-            var tailAnimation = factory.CreateAnimation(ComponentName2);
+            middleAnimation = factory.CreateAnimation(ComponentName);
+            tailAnimation = factory.CreateAnimation(ComponentName2);
 
             if (middleAnimation.FrameCount == 0)
             {
@@ -257,8 +260,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnSettingsChanged()
         {
-            if (enabledColor.Value)
+            if (enabledColor.Value && container != null)
+            {
                 container.Colour = NoteColor;
+            }
+
             Schedule(updateSizes);
         }
     }

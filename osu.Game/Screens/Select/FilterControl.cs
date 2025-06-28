@@ -17,7 +17,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
-using osu.Game.Beatmaps;
+// using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
@@ -57,7 +57,7 @@ namespace osu.Game.Screens.Select
         private FilterControlTextBox searchTextBox;
         private CollectionDropdown collectionDropdown;
 
-        private CollectionDropdown ezToCollection;
+        // private CollectionDropdown ezToCollection;
         private Bindable<EzSelectMode> ezMode;
 
         // TODO:多子集切换
@@ -79,7 +79,7 @@ namespace osu.Game.Screens.Select
                 Mods = mods.Value,
                 // currentCriteria?.RulesetCriteria?.FilterBeatmaps(beatmapList) ?? Enumerable.Empty<BeatmapInfo>(),
                 // ManiaRulesetSubset = maniaRulesetDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet(),
-                ManiaRulesetSubset = ezToCollection.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet(),
+                // ManiaRulesetSubset = ezToCollection.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet(),
                 CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet()
             };
 
@@ -254,14 +254,14 @@ namespace osu.Game.Screens.Select
                                         //     Y = 4,
                                         //     Width = 0.5f,
                                         // }
-                                        ezToCollection = new CollectionDropdown
-                                        {
-                                            Anchor = Anchor.TopRight,
-                                            Origin = Anchor.TopRight,
-                                            RelativeSizeAxes = Axes.X,
-                                            // Y = 4,
-                                            Width = 0.5f,
-                                        }
+                                        // ezToCollection = new CollectionDropdown
+                                        // {
+                                        //     Anchor = Anchor.TopRight,
+                                        //     Origin = Anchor.TopRight,
+                                        //     RelativeSizeAxes = Axes.X,
+                                        //     // Y = 4,
+                                        //     Width = 0.5f,
+                                        // }
                                     }
                                 }
                             },
@@ -324,9 +324,9 @@ namespace osu.Game.Screens.Select
                     updateCriteria();
             });
 
+            ezMode.ValueChanged += _ => updateCriteria();
             // ezModeTabs.Current.BindValueChanged(OnEzModeChanged, true);
             // ezMode?.BindValueChanged(_ => updateCriteria());
-            ezMode.ValueChanged += _ => updateCriteria();
             // ezToCollection.Current.ValueChanged += _ => collectionChanged();
             // maniaRulesetDropdown.Current.BindValueChanged(_ =>
             // {
@@ -364,13 +364,13 @@ namespace osu.Game.Screens.Select
         //     });
         // }
 
-        private IEnumerable<BeatmapInfo> getVisibleBeatmaps(IEnumerable<BeatmapInfo> beatmapList)
-        {
-            if (currentCriteria == null || beatmapList == null)
-                return Enumerable.Empty<BeatmapInfo>();
-
-            return currentCriteria.FilterVisibleBeatmaps(beatmapList);
-        }
+        // private IEnumerable<BeatmapInfo> getVisibleBeatmaps(IEnumerable<BeatmapInfo> beatmapList)
+        // {
+        //     if (currentCriteria == null || beatmapList == null)
+        //         return Enumerable.Empty<BeatmapInfo>();
+        //
+        //     return currentCriteria.FilterVisibleBeatmaps(beatmapList);
+        // }
 
         public void Deactivate()
         {

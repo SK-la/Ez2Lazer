@@ -288,18 +288,18 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModInvert(),
                         new ManiaModConstantSpeed(),
                         new ManiaModHoldOff(),
-                        // new MultiMod(
-                        //     new ManiaModKey1(),
-                        //     new ManiaModKey2(),
-                        //     new ManiaModKey3(),
-                        //     new ManiaModKey4(),
-                        //     new ManiaModKey5(),
-                        //     new ManiaModKey6(),
-                        //     new ManiaModKey7(),
-                        //     new ManiaModKey8(),
-                        //     new ManiaModKey9(),
-                        //     new ManiaModKey10()
-                        // ),
+                        new MultiMod(
+                            // new ManiaModKey1(),
+                            // new ManiaModKey2(),
+                            // new ManiaModKey3(),
+                            // new ManiaModKey4(),
+                            // new ManiaModKey5(),
+                            // new ManiaModKey6(),
+                            // new ManiaModKey7(),
+                            new ManiaModKey8(),
+                            new ManiaModKey9(),
+                            new ManiaModKey10()
+                        ),
                     };
 
                 case ModType.Automation:
@@ -448,7 +448,7 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score.HitEvents, new HitWindows())
+                new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score.HitEvents, new DefaultHitWindows()) //TODO:改成可实时变更
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 300

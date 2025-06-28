@@ -66,16 +66,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [BackgroundDependencyLoader]
         private void load(EzSkinSettingsManager ezSkinConfig)
         {
+            keyCount = controller.Triggers.Count;
+            floatingAverages = new double[keyCount];
+            judgementMarkers = new Box[keyCount];
+            recreateComponents();
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            recreateComponents();
         }
 
         private void recreateComponents()
         {
-            keyCount = controller.Triggers.Count;
-            floatingAverages = new double[keyCount];
-            judgementMarkers = new Box[keyCount];
             InternalChild = new Container
             {
                 Anchor = Anchor.Centre,
@@ -123,7 +123,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             columnWidth.BindValueChanged(_ => updateWidth(), true);
             specialFactor.BindValueChanged(_ => updateWidth(), true);
-
             // 更新标识块高度
             MarkerHeight.BindValueChanged(height =>
             {

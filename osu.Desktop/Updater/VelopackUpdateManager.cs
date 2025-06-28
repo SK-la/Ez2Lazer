@@ -53,7 +53,7 @@ namespace osu.Desktop.Updater
                 return false;
             }
 
-            IUpdateSource updateSource = new GithubSource(@"https://github.com/SK-la/Ez2Lazer", "locmain", true);
+            IUpdateSource updateSource = new GithubSource(@"https://github.com/ppy/osu", null, ReleaseStream.Value == Game.Configuration.ReleaseStream.Tachyon);
             Velopack.UpdateManager updateManager = new Velopack.UpdateManager(updateSource, new UpdateOptions
             {
                 AllowVersionDowngrade = true

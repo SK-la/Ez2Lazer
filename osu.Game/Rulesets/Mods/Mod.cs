@@ -257,7 +257,7 @@ namespace osu.Game.Rulesets.Mods
         /// <summary>
         /// Reset all custom settings for this mod back to their defaults.
         /// </summary>
-        public virtual void ResetSettingsToDefaults() => CopyFrom((Mod)Activator.CreateInstance(GetType())!);
+        public virtual void ResetHitWindows() => CopyFrom((Mod)Activator.CreateInstance(GetType())!);
 
         private class ModSettingsEqualityComparer : IEqualityComparer<IBindable>
         {

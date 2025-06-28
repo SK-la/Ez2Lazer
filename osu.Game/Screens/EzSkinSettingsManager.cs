@@ -31,9 +31,10 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.GlobalTextureName, 4);
 
             SetDefault(EzSkinSetting.NoteSetName, "evolve");
+            SetDefault(EzSkinSetting.StageName, "JIYU");
             SetDefault(EzSkinSetting.NonSquareNoteHeight, 28.0, 1.0, 100.0, 1.0);
             SetDefault(EzSkinSetting.NoteTrackLine, true);
-            SetDefault(EzSkinSetting.NoteTrackLineHeight, 100, 0, 1000, 1.0);
+            SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
             SetDefault(EzSkinSetting.ColorA, Colour4.FromHex("#F5F5F5"));
@@ -202,6 +203,7 @@ namespace osu.Game.Screens
         DynamicTracking,
         GlobalTextureName,
         NoteSetName,
+        StageName,
 
         // 着色系统
         ColorSettingsEnabled,

@@ -176,9 +176,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)
                     {
-                        case ManiaSkinComponents.StageBackground:
-                            return new Ez2StageBackground();
-
                         case ManiaSkinComponents.ColumnBackground:
                             // if (Skin is Ez2Skin && resultComponent.Component >= HitResult.Perfect)
                             //     return Drawable.Empty();
@@ -188,15 +185,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         case ManiaSkinComponents.KeyArea:
                             return new Ez2KeyArea();
 
-                        case ManiaSkinComponents.HitTarget:
-                            return new EzHitTarget();
-
                         case ManiaSkinComponents.Note:
                             return new EzNote();
-                            // return new EzTestNote();
-
-                        case ManiaSkinComponents.HitExplosion:
-                            return new EzHitExplosion();
 
                         case ManiaSkinComponents.HoldNoteHead:
                             return new EzHoldNoteHead();
@@ -207,6 +197,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         case ManiaSkinComponents.HoldNoteTail:
                             // return new EzHoldNoteTail();
                             return Drawable.Empty();
+
+                        case ManiaSkinComponents.HitTarget:
+                            return new EzHitTarget();
+
+                        case ManiaSkinComponents.HitExplosion:
+                            return new EzHitExplosion();
+
+                        case ManiaSkinComponents.StageBackground:
+                            return new Ez2StageBackground();
+
+                        case ManiaSkinComponents.StageForeground:
+                            return new EzStageBottom();
                     }
 
                     break;
@@ -227,7 +229,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
                 bool isSpecialColumn = stage.EzIsSpecialColumn(columnIndex);
                 float width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
-                float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
+                // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
 
                 if (stage.Columns == 14 && columnIndex == 13)
                     width = 0f;
@@ -237,8 +239,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
                         return SkinUtils.As<TValue>(new Bindable<float>(width));
 
-                    case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));
+                    // case LegacyManiaSkinConfigurationLookups.HitPosition:
+                    //     return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
                         var colour = stage.GetColourForLayout(columnIndex);

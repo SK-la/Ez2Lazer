@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzHoldNoteTail : CompositeDrawable
     {
         private EzHoldNoteHittingLayer hittingLayer = null!;
-        private TextureAnimation animation = null!;
+        private TextureAnimation? animation;
         private Container container = null!;
 
         private EzSkinSettingsManager ezSkinConfig = null!;
@@ -70,14 +70,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
 
             container.Height = noteSize / 2;
-            animation.Height = noteSize;
+            if (animation != null) animation.Height = noteSize;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
             loadAnimation();
-            factory.OnTextureNameChanged += onSkinChanged;
+            factory.OnNoteChanged += onSkinChanged;
             ezSkinConfig.OnSettingsChanged += onSettingsChanged;
         }
 
@@ -100,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-            factory.OnTextureNameChanged -= onSkinChanged;
+            factory.OnNoteChanged -= onSkinChanged;
             if (drawableObject != null)
                 drawableObject.HitObjectApplied -= hitObjectApplied;
         }

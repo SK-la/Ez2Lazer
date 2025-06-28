@@ -14,7 +14,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
-    public partial class EzComKeyCounterDisplay : CompositeDrawable, ISerialisableDrawable
+    public partial class EzComKeyCounterDisplay : Container, ISerialisableDrawable
     {
         private readonly FillFlowContainer<EzKeyCounter> keyFlow;
         private readonly IBindableList<InputTrigger> triggers = new BindableList<InputTrigger>();
@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             AutoSizeAxes = Axes.Y;
 
-            InternalChild = keyFlow = new FillFlowContainer<EzKeyCounter>
+            Child = keyFlow = new FillFlowContainer<EzKeyCounter>
             {
                 Direction = FillDirection.Horizontal,
                 RelativeSizeAxes = Axes.X,
@@ -45,19 +45,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            updateWidths();
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
+            updateWidths();
             triggers.BindTo(controller.Triggers);
             triggers.BindCollectionChanged(triggersChanged, true);
-
-            columnWidth.BindValueChanged(_ => updateWidths());
-            specialFactor.BindValueChanged(_ => updateWidths());
-
-            updateWidths();
+            columnWidth.BindValueChanged(_ => updateWidths(), true);
+            specialFactor.BindValueChanged(_ => updateWidths(), true);
         }
 
         private void updateWidths()
@@ -67,7 +65,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             if (keyCount <= 0)
                 return;
 
-            // StageDefinition stage = new StageDefinition(keyCount);
             float totalWidth = 0;
 
             for (int i = 0; i < keyCount; i++)
@@ -77,11 +74,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                                     ?.Value;
 
                 float newWidth = widthS ?? (float)columnWidth.Value;
-
-                // if (stage.EzIsSpecialColumn(i))
-                // {
-                //     newWidth *= (float)specialFactor.Value;
-                // }
 
                 keyFlow[i].Width = newWidth;
                 totalWidth += newWidth;

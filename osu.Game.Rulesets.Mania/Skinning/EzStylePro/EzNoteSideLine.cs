@@ -15,7 +15,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzNoteSeparators : CompositeDrawable
+    public partial class EzNoteSideLine : CompositeDrawable
     {
         private Drawable separator = null!;
         private Bindable<double> noteTrackLineHeight = null!;
@@ -29,10 +29,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader]
         private void load()
         {
-            // AlwaysPresent = true;
-
-            // var texture = textures.Get("EzResources/note/VerticalWhiteLong.png");
-            var texture = textures.Get("EzResources/note/VerticalWhiteSide.png");
+            AlwaysPresent = true;
+            var texture = textures.Get("EzResources/note/NoteSideLine.png");
 
             InternalChild = new Container
             {

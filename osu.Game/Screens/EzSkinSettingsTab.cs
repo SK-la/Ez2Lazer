@@ -35,6 +35,9 @@ namespace osu.Game.Screens
         private readonly Bindable<string> selectedNoteSet = new Bindable<string>();
         private readonly List<string> availableNoteSets = new List<string>();
 
+        private readonly Bindable<string> selectedStageSet = new Bindable<string>();
+        private readonly List<string> availableStageSets = new List<string>();
+
         private SettingsButton refreshSkinButton = null!;
         private bool isAbsolutePosition = true;
 
@@ -59,12 +62,19 @@ namespace osu.Game.Screens
 
             globalTextureName.Value = (EzSelectorNameSet)ezSkinConfig.GetBindable<int>(EzSkinSetting.GlobalTextureName).Value;
 
-            loadAvailableNoteSets();
+            loadFolderSets("note");
             string configuredNoteSet = ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName);
             if (!string.IsNullOrEmpty(configuredNoteSet) && availableNoteSets.Contains(configuredNoteSet))
                 selectedNoteSet.Value = configuredNoteSet;
             else if (availableNoteSets.Count > 0)
                 selectedNoteSet.Value = availableNoteSets[1];
+
+            loadFolderSets("Stage");
+            string configStageSet = ezSkinConfig.Get<string>(EzSkinSetting.StageName);
+            if (!string.IsNullOrEmpty(configStageSet) && availableStageSets.Contains(configStageSet))
+                selectedStageSet.Value = configStageSet;
+            else if (availableStageSets.Count > 0)
+                selectedStageSet.Value = availableStageSets[1];
 
             Children = new Drawable[]
             {
@@ -119,7 +129,6 @@ namespace osu.Game.Screens
                             TooltipText = "note两侧辅助轨道线的高度\n"
                                           + "note side auxiliary track line height",
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteTrackLineHeight),
-                            KeyboardStep = 5f,
                         },
                         new EzGlobalTextureNameSelector
                         {
@@ -127,6 +136,14 @@ namespace osu.Game.Screens
                             TooltipText = "(全局纹理名称)统一修改当前皮肤中所有组件的纹理名称\n"
                                           + "Set a global texture name for all components in the current skin",
                             Current = globalTextureName,
+                        },
+                        new SettingsDropdown<string>
+                        {
+                            LabelText = "(面板套图)Stage Set",
+                            TooltipText = "统一指定Stage Bottom, 关联实时BPM\n"
+                                          + "Set a stage set for Stage Bottom, related to real-time BPM",
+                            Current = selectedStageSet,
+                            Items = availableStageSets,
                         },
                         new SettingsDropdown<string>
                         {
@@ -150,21 +167,20 @@ namespace osu.Game.Screens
                 }
             };
 
-            globalTextureName.ValueChanged += onTextureNameChanged;
-            selectedNoteSet.ValueChanged += onNoteSetChanged;
-            dynamicTracking.ValueChanged += tracking =>
-            {
-                if (tracking.NewValue)
-                {
-                    hitPosition.ValueChanged += onSettingsValueChanged;
-                }
-                else
-                {
-                    hitPosition.ValueChanged -= onSettingsValueChanged;
-                }
-
-                ezSkinConfig.SetValue(EzSkinSetting.DynamicTracking, tracking.NewValue);
-            };
+            selectedNoteSet.BindValueChanged(onNoteSetChanged);
+            selectedStageSet.BindValueChanged(onStageSetChanged);
+            globalTextureName.BindValueChanged(OnTextureNameChanged);
+            // dynamicTracking.ValueChanged += tracking =>
+            // {
+            //     if (tracking.NewValue)
+            //     {
+            //     }
+            //     else
+            //     {
+            //     }
+            //
+            //     ezSkinConfig.SetValue(EzSkinSetting.DynamicTracking, tracking.NewValue);
+            // };
         }
 
         #region 追踪处理
@@ -174,7 +190,7 @@ namespace osu.Game.Screens
         //     Invalidate();
         // }
 
-        private void onTextureNameChanged(ValueChangedEvent<EzSelectorNameSet> textureName)
+        private void OnTextureNameChanged(ValueChangedEvent<EzSelectorNameSet> textureName)
         {
             updateAllSkinComponentsTextureNames(textureName.NewValue);
 
@@ -191,9 +207,17 @@ namespace osu.Game.Screens
             }
         }
 
-        private ScheduledDelegate? scheduledRefresh;
+        private void onStageSetChanged(ValueChangedEvent<string> e)
+        {
+            ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue);
 
-        private void onSettingsValueChanged(ValueChangedEvent<double> _) => ScheduleRefresh();
+            if (dynamicTracking.Value)
+            {
+                ScheduleRefresh();
+            }
+        }
+
+        private ScheduledDelegate? scheduledRefresh;
 
         public void ScheduleRefresh()
         {
@@ -214,7 +238,6 @@ namespace osu.Game.Screens
         private void updateButtonColor(SettingsButton button, bool isAbsolute)
         {
             Color4 color = isAbsolute ? new Color4(0.2f, 0.4f, 0.8f, 0.3f) : new Color4(0.8f, 0.2f, 0.4f, 0.3f);
-
             // 找到按钮内的Box并更新颜色
             var box = button.ChildrenOfType<Box>().FirstOrDefault();
 
@@ -242,7 +265,7 @@ namespace osu.Game.Screens
 
         #endregion
 
-        #region updateAllSkinComponentsTextureNames
+        #region 刷新所有EzComponent的纹理名称
 
         private void updateAllSkinComponentsTextureNames(EzSelectorNameSet textureName)
         {
@@ -300,36 +323,36 @@ namespace osu.Game.Screens
 
         #endregion
 
-        private void loadAvailableNoteSets()
+        private void loadFolderSets(string type)
         {
-            availableNoteSets.Clear();
+            List<string> targetList = type.Equals("note", StringComparison.OrdinalIgnoreCase) ? availableNoteSets : availableStageSets;
+            targetList.Clear();
 
             try
             {
-                const string relative_path = @"EzResources\note";
-                string dataFolderPath = storage.GetFullPath(relative_path);
+                string relativePath = $@"EzResources\{type}";
+                string dataFolderPath = storage.GetFullPath(relativePath);
                 Debug.Assert(!string.IsNullOrEmpty(dataFolderPath));
 
                 if (!Directory.Exists(dataFolderPath))
                 {
                     Directory.CreateDirectory(dataFolderPath);
-                    Logger.Log($"EzSkinSettingsTab create Note Path: {dataFolderPath}");
+                    Logger.Log($"EzSkinTab create {type} Path: {dataFolderPath}");
                 }
 
-                // 获取所有子文件夹作为note套图选项
                 string[] directories = Directory.GetDirectories(dataFolderPath);
 
                 foreach (string dir in directories)
                 {
                     string dirName = Path.GetFileName(dir);
-                    availableNoteSets.Add(dirName);
+                    targetList.Add(dirName);
                 }
 
-                Logger.Log($"EzSkinSettingsTab Find {dataFolderPath} to {availableNoteSets.Count} Note Sets", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"EzSkinTab Find {dataFolderPath} to {targetList.Count} {type} Sets", LoggingTarget.Runtime, LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "EzSkinSettingsTab Load NoteSets Error");
+                Logger.Error(ex, $"EzSkinTab Load {type} FolderSets Error");
             }
         }
     }

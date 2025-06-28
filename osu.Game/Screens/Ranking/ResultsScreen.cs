@@ -28,7 +28,6 @@ using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Volume;
 using osu.Game.Scoring;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osu.Game.Screens.Ranking.Statistics;
@@ -234,9 +233,6 @@ namespace osu.Game.Screens.Ranking
 
             if (Score?.BeatmapInfo?.BeatmapSet != null && Score.BeatmapInfo.BeatmapSet.OnlineID > 0)
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
-// TODO 结算界面添加判定选择器
-            if (Score?.BeatmapInfo != null)
-                buttons.Add(new EzAnalysisScoreButton(Score.BeatmapInfo));
         }
 
         protected override void LoadComplete()

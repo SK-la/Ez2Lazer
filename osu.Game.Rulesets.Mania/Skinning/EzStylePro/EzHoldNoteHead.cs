@@ -17,12 +17,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteHead : CompositeDrawable
     {
-        private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
         private Bindable<double> nonSquareNoteHeight = null!;
 
         private TextureAnimation animation = null!;
-        private Container container = null!;
+        private Container? container;
+        private EzNoteSideLine? noteSeparatorsL;
+        private EzNoteSideLine? noteSeparatorsR;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -33,16 +34,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
 
-        public EzHoldNoteHead()
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+
+        [BackgroundDependencyLoader]
+        private void load()
         {
             RelativeSizeAxes = Axes.X;
             FillMode = FillMode.Fill;
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(EzSkinSettingsManager ezSkinConfig)
-        {
-            this.ezSkinConfig = ezSkinConfig;
 
             nonSquareNoteHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
             enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
@@ -53,8 +52,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             OnSkinChanged();
             nonSquareNoteHeight.ValueChanged += _ => updateSizes();
-            ezSkinConfig.OnSettingsChanged += OnSettingsChanged;
-            factory.OnTextureNameChanged += OnSkinChanged;
+            ezSkinConfig.OnSettingsChanged += OnConfigChanged;
+            factory.OnNoteChanged += OnSkinChanged;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -63,12 +62,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (isDisposing)
             {
-                ezSkinConfig.OnSettingsChanged -= OnSettingsChanged;
-                factory.OnTextureNameChanged -= OnSkinChanged;
+                ezSkinConfig.OnSettingsChanged -= OnConfigChanged;
+                factory.OnNoteChanged -= OnSkinChanged;
             }
         }
-
-        private void OnSkinChanged() => loadAnimation();
 
         protected virtual Color4 NoteColor
         {
@@ -108,7 +105,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             ClearInternal();
             animation = factory.CreateAnimation(ComponentName);
-
             container = new Container
             {
                 RelativeSizeAxes = Axes.X,
@@ -117,34 +113,58 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Masking = true,
             };
 
+            noteSeparatorsL = new EzNoteSideLine
+            {
+                RelativeSizeAxes = Axes.X,
+                FillMode = FillMode.Fill,
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.Centre,
+            };
+            noteSeparatorsR = new EzNoteSideLine
+            {
+                RelativeSizeAxes = Axes.X,
+                FillMode = FillMode.Fill,
+                Anchor = Anchor.CentreRight,
+                Origin = Anchor.Centre,
+                // Rotation = 180,
+            };
+            AddInternal(new Container
+            {
+                RelativeSizeAxes = Axes.X,
+                FillMode = FillMode.Stretch,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Children = new Drawable[]
+                {
+                    noteSeparatorsL,
+                    noteSeparatorsR
+                }
+            });
+
             if (animation.FrameCount == 0)
             {
                 animation.Dispose();
                 animation = factory.CreateAnimation($"{ColorPrefix}note");
-
-                container.
-                    Child = new Container
+                var x = new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
                     Child = animation,
                 };
+                if (x.Child is TextureAnimation)
+                    container.Child = x;
 
-                OnSettingsChanged();
+                OnConfigChanged();
                 AddInternal(container);
             }
             else
             {
-                OnSettingsChanged();
+                OnConfigChanged();
                 AddInternal(animation);
             }
 
-            Schedule(() =>
-            {
-                updateSizes();
-                Invalidate();
-            });
+            Schedule(updateSizes);
         }
 
         private void updateSizes()
@@ -156,15 +176,32 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             Height = noteHeight;
 
-            container.Height = noteHeight / 2;
-            if (container.Child is Container containerA)
-                containerA.Height = noteHeight;
+            if (container != null)
+            {
+                container.Height = noteHeight / 2;
+                if (container.Child is Container containerA)
+                    containerA.Height = noteHeight;
+            }
         }
 
-        private void OnSettingsChanged()
+        private void OnConfigChanged()
         {
+            var noteColor = Color4.White;
             if (enabledColor.Value)
-                animation.Colour = NoteColor;
+                noteColor = NoteColor;
+
+            animation.Colour = noteColor;
+
+            noteSeparatorsL?.UpdateGlowEffect(noteColor);
+            noteSeparatorsR?.UpdateGlowEffect(noteColor);
+
+            Schedule(() =>
+            {
+                updateSizes();
+                Invalidate();
+            });
         }
+
+        private void OnSkinChanged() => loadAnimation();
     }
 }
