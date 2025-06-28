@@ -10,10 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
-        uses: actions/checkout@v3
-        with:
-          ref: main
-          fetch-depth: 0
+        run: |
+          git init
+          git remote add origin https://github.com/SK-la/Ez2Lazer.git
+          git fetch origin master
+          git checkout master
 
       - name: 配置Git
         run: |
