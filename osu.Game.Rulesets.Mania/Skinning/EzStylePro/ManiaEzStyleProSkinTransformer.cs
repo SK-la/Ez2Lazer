@@ -11,7 +11,6 @@ using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osu.Game.Skinning.Components;
@@ -21,6 +20,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public class ManiaEzStyleProSkinTransformer : SkinTransformer
     {
+        private readonly EzSkinSettingsManager ezSkinConfig;
         private readonly ManiaBeatmap beatmap;
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
-
+            this.ezSkinConfig = ezSkinConfig;
             columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
             hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
@@ -226,7 +226,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
-                bool isSpecialColumn = EzColumnTypeManager.GetColumnType(stage.Columns, columnIndex) == "S1";
+                bool isSpecialColumn = ezSkinConfig.GetColumnType(stage.Columns, columnIndex) == "S1";
                 float width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
                 // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
 

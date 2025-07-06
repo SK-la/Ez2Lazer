@@ -129,7 +129,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         public void UpdateLNsLight()
         {
-            bool isSpecialColumn = EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) == "S1";
+            bool isSpecialColumn = ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S1";
             double columnWidth = columnWidthBindable.Value * (isSpecialColumn ? specialFactorBindable.Value : 1);
 
             bool isSquare = factory.IsSquareNote("whitenote");

@@ -10,7 +10,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
-using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Screens;
@@ -122,11 +121,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Alpha = 0,
                 IsHitting = { BindTarget = isHitting }
             };
-            lightContainer = new HitTargetInsetContainer
+            lightContainer = new Container
             {
+                RelativeSizeAxes = Axes.Both,
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
                 Alpha = 0,
                 Child = hittingLayer
             };
+
             hittingLayer.HitPosition.BindTo(hitPosition);
         }
 
@@ -170,14 +173,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (enabledColor.Value)
                     return "white";
 
-                if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
+                if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
                     return "green";
 
                 int logicalIndex = 0;
 
                 for (int i = 0; i < column.Index; i++)
                 {
-                    if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) != "S1")
+                    if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) != "S1")
                         logicalIndex++;
                 }
 

@@ -8,7 +8,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
 
@@ -21,6 +20,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
 
         [Resolved]
         protected InputCountController Controller { get; private set; } = null!;
+
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         protected readonly FillFlowContainer<KeyCounter> KeyFlow;
 
@@ -41,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         }
 
         [BackgroundDependencyLoader]
-        private void load(EzSkinSettingsManager ezSkinConfig)
+        private void load()
         {
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
@@ -65,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
                 float width = (float)columnWidth.Value;
                 int index = KeyFlow.IndexOf(counter);
 
-                if (EzColumnTypeManager.GetColumnType(StageDefinition.Columns, index) == "S1")
+                if (ezSkinConfig.GetColumnType(StageDefinition.Columns, index) == "S1")
                     width *= (float)specialFactor.Value;
 
                 counter.Width = width;

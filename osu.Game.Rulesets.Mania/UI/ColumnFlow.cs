@@ -13,7 +13,6 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -164,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
 
                 bool isSpecialColumn =
-                    EzColumnTypeManager.GetColumnType(stageDefinition.Columns, i) == "S1";
+                    ezSkinConfig.GetColumnType(stageDefinition.Columns, i) == "S1";
                 float ezWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
 
                 switch (ezColumnWidthStyle.Value)

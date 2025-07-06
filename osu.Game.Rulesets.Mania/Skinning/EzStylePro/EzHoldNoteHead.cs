@@ -84,14 +84,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (enabledColor.Value)
                     return "white";
 
-                if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
+                if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
                     return "green";
 
                 int logicalIndex = 0;
 
                 for (int i = 0; i < column.Index; i++)
                 {
-                    if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, i) != "S1")
+                    if (ezSkinConfig.GetColumnType(stageDefinition.Columns, i) != "S1")
                         logicalIndex++;
                 }
 
