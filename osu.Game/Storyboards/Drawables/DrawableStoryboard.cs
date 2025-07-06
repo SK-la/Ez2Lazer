@@ -63,20 +63,11 @@ namespace osu.Game.Storyboards.Drawables
             Storyboard = storyboard;
             Mods = mods ?? Array.Empty<Mod>();
 
-            Size = new Vector2(640, 480);
-
             bool onlyHasVideoElements = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
 
-            if (onlyHasVideoElements)
+            if (!onlyHasVideoElements)
             {
-                RelativeSizeAxes = Axes.Both;
-                Size = Vector2.One;
-                FillMode = FillMode.Fill;
-                Anchor = Anchor.Centre;
-                Origin = Anchor.Centre;
-            }
-            else
-            {
+                Size = new Vector2(640, 480);
                 Width = Height * (storyboard.Beatmap.WidescreenStoryboard ? 16 / 9f : 4 / 3f);
             }
 
@@ -126,20 +117,17 @@ namespace osu.Game.Storyboards.Drawables
                     {
                         if (Parent != null)
                         {
-                            float windowAspectRatio = Parent.DrawWidth / Parent.DrawHeight;
                             float videoAspectRatio = drawableVideo.DrawSize.X / drawableVideo.DrawSize.Y;
 
-                            if (windowAspectRatio > videoAspectRatio)
+                            if (videoAspectRatio < 1.5f)
                             {
-                                // 窗口更高，以宽度为基准调整高度
-                                Width = Parent.DrawWidth;
-                                Height = Width / videoAspectRatio;
+                                RelativeSizeAxes = Axes.X;
+                                Width = 1f / DrawScale.X;
                             }
                             else
                             {
-                                // 窗口更宽，以高度为基准调整宽度
-                                Height = Parent.DrawHeight;
-                                Width = Height * videoAspectRatio;
+                                RelativeSizeAxes = Axes.Y;
+                                Height = 1f / DrawScale.Y;
                             }
                         }
                     });

@@ -30,9 +30,9 @@ namespace osu.Game.Screens.LAsEzExtensions
 
             AddInternal(video);
 
-            //下面只用于注册全局设置
-            GlobalConfigStore.Config = config;
-            GlobalConfigStore.EzConfig = ezSkinConfig;
+            // //下面只用于注册全局设置
+            // GlobalConfigStore.Config = config;
+            // GlobalConfigStore.EzConfig = ezSkinConfig;
         }
     }
 

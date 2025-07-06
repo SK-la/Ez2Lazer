@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -9,10 +8,8 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
@@ -21,22 +18,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHitExplosion : CompositeDrawable, IHitExplosion
     {
-        // public override bool RemoveWhenNotAlive => true;
-
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly Bindable<double> columnWidth = new Bindable<double>();
-
-        private IBindable<double> noteHeightBindable = new Bindable<double>();
-        private IBindable<double> columnWidthBindable = new Bindable<double>();
-        private IBindable<double> specialFactorBindable = new Bindable<double>();
-        private IBindable<double> hitPosition = new Bindable<double>();
-
         private TextureAnimation? animation;
         private TextureAnimation? animationP;
         private Container container = null!;
 
-        [UsedImplicitly]
-        private float baseYPosition;
+        private IBindable<double> noteHeightBindable = new Bindable<double>();
+        private IBindable<double> columnWidthBindable = new Bindable<double>();
+        private IBindable<double> specialFactorBindable = new Bindable<double>();
+
+        // public override bool RemoveWhenNotAlive => true;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -45,10 +35,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private StageDefinition stageDefinition { get; set; } = null!;
 
         [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private EzLocalTextureFactory factory { get; set; } = null!;
 
         public EzHitExplosion()
         {
@@ -57,27 +47,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo)
+        private void load()
         {
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
+            Anchor = Anchor.BottomCentre;
+            Origin = Anchor.BottomCentre;
 
             noteHeightBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
             columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
 
             noteHeightBindable.BindValueChanged(_ => updateY(), true);
             columnWidthBindable.BindValueChanged(_ => updateY(), true);
             specialFactorBindable.BindValueChanged(_ => updateY(), true);
-            hitPosition.BindValueChanged(_ => updateY(), true);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
             onSkinChanged();
-
             factory.OnNoteChanged += onSkinChanged;
         }
 
@@ -85,10 +72,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.Dispose(isDisposing);
 
-            if (isDisposing)
-            {
-                factory.OnNoteChanged -= onSkinChanged;
-            }
+            if (isDisposing) { factory.OnNoteChanged -= onSkinChanged; }
         }
 
         private void loadAnimation()
@@ -97,9 +81,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             animation = factory.CreateAnimation("noteflare");
             animationP = factory.CreateAnimation("noteflaregood");
-
-            animation.Loop = false;
-            animationP.Loop = false;
 
             container = new Container
             {
@@ -116,29 +97,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void updateY()
         {
-            bool isSpecialColumn = stageDefinition.EzIsSpecialColumn(column.Index);
-            columnWidth.Value = columnWidthBindable.Value * (isSpecialColumn ? specialFactorBindable.Value : 1);
+            bool isSpecialColumn = EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) == "S1";
+            double columnWidth = columnWidthBindable.Value * (isSpecialColumn ? specialFactorBindable.Value : 1);
 
             bool isSquare = factory.IsSquareNote("whitenote");
             float aspectRatio = factory.GetRatio("whitenote");
 
             float moveY = isSquare
-                ? (float)columnWidth.Value / 2 * aspectRatio
+                ? (float)columnWidth / 2 * aspectRatio
                 : (float)noteHeightBindable.Value / 2 * aspectRatio;
 
-            baseYPosition = 110f - (float)hitPosition.Value - moveY;
-            Position = new Vector2(0, baseYPosition);
+            // baseYPosition = LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION - (float)hitPosition.Value - moveY;
+            Position = new Vector2(0, -moveY);
         }
 
         private void onSkinChanged()
         {
             loadAnimation();
-        }
-
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
-        {
-            Rotation = direction.NewValue == ScrollingDirection.Up ?  90f : 0;
-            Anchor = Origin = direction.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
         }
 
         public void Animate(JudgementResult result)

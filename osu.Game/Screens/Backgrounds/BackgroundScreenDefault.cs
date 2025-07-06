@@ -20,6 +20,8 @@ using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
 
@@ -46,7 +48,7 @@ namespace osu.Game.Screens.Backgrounds
         protected virtual bool AllowStoryboardBackground => true;
 
         [BackgroundDependencyLoader]
-        private void load(IAPIProvider api, SkinManager skinManager, OsuConfigManager config)
+        private void load(IAPIProvider api, SkinManager skinManager, OsuConfigManager config, EzSkinSettingsManager ezSkinConfig)
         {
             user = api.LocalUser.GetBoundCopy();
             skin = skinManager.CurrentSkin.GetBoundCopy();
@@ -54,6 +56,8 @@ namespace osu.Game.Screens.Backgrounds
             introSequence = config.GetBindable<IntroSequence>(OsuSetting.IntroSequence);
 
             AddInternal(seasonalBackgroundLoader);
+            GlobalConfigStore.Config = config;
+            GlobalConfigStore.EzConfig = ezSkinConfig;
         }
 
         protected override void LoadComplete()
@@ -147,6 +151,9 @@ namespace osu.Game.Screens.Backgrounds
         [Resolved]
         private TextureStore textures { get; set; } = null!;
 
+        [Resolved(CanBeNull = true)]
+        private NotificationOverlay notifications { get; set; }
+
         private Background createBackground()
         {
             switch (source.Value)
@@ -160,6 +167,11 @@ namespace osu.Game.Screens.Backgrounds
                     if (!Directory.Exists(dataFolderPath))
                     {
                         Directory.CreateDirectory(dataFolderPath);
+                        //TODO： 改为游戏内提示空目录
+                        notifications?.Post(new SimpleErrorNotification
+                        {
+                            Text = $"已创建视频背景目录：{dataFolderPath}\n请将 .webm 文件放入该目录。"
+                        });
                     }
 
                     string[] videoFiles = Directory.GetFiles(dataFolderPath, "*.webm");

@@ -57,7 +57,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.01f,
         };
 
-        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), nameof(SkinnableComponentStrings.ColourDescription))]
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
         private Container timingContainer = null!;

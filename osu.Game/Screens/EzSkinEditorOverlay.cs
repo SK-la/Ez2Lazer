@@ -29,7 +29,6 @@ using osu.Game.Screens.Edit;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Screens.Menu;
 using osu.Game.Screens.Play;
-using osu.Game.Screens.Select;
 using osu.Game.Users;
 using osu.Game.Utils;
 
@@ -195,8 +194,8 @@ namespace osu.Game.Screens
 
                 // the validity of the current game-wide beatmap + ruleset combination is enforced by song select.
                 // if we're anywhere else, the state is unknown and may not make sense, so forcibly set something that does.
-                if (screen is not PlaySongSelect)
-                    ruleset.Value = beatmap.Value.BeatmapInfo.Ruleset;
+                // if (screen is not PlaySongSelect)
+                //     ruleset.Value = beatmap.Value.BeatmapInfo.Ruleset;
                 var replayGeneratingMod = ruleset.Value.CreateInstance().GetAutoplayMod();
 
                 IReadOnlyList<Mod> usableMods = mods.Value;
@@ -209,7 +208,7 @@ namespace osu.Game.Screens
 
                 if (replayGeneratingMod != null)
                     screen.Push(new EndlessPlayer((beatmap, mods) => replayGeneratingMod.CreateScoreFromReplayData(beatmap, mods)));
-            }, new[] { typeof(Player), typeof(PlaySongSelect) });
+            }, new[] { typeof(Player)});
         }
 
         protected override void Update()

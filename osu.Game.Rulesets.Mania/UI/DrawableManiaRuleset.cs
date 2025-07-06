@@ -18,6 +18,7 @@ using osu.Game.Input.Handlers;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -27,6 +28,7 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
+using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 
@@ -79,6 +81,12 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private GameHost gameHost { get; set; } = null!;
 
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+
+        private Bindable<double> hitPositonBindable = new Bindable<double>();
+        private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
+
         public DrawableManiaRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)
         {
@@ -125,6 +133,11 @@ namespace osu.Game.Rulesets.Mania.UI
 
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
             mobileLayout.BindValueChanged(_ => updateMobileLayout(), true);
+
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
+            ezSkinConfig.BindWith(EzSkinSetting.GlobalHitPosition, globalHitPosition);
+            globalHitPosition.BindValueChanged(_ => skinChanged(), true);
         }
 
         private ManiaTouchInputArea? touchInputArea;
@@ -167,9 +180,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void skinChanged()
         {
-            hitPosition = currentSkin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                              new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                          ?? Stage.HIT_TARGET_POSITION;
+            if (globalHitPosition.Value)
+                hitPosition = (float)hitPositonBindable.Value;
+            else
+            {
+                hitPosition = currentSkin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                                  new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
+                              ?? (float)hitPositonBindable.Value;
+            }
 
             pendingSkinChange = null;
         }
@@ -192,7 +210,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 case EzManiaScrollingStyle.ScrollTimeStyleFixed:
                     // Ensure the travel time from the top of the screen to the hit position remains constant.
-                    scale = length_to_default_hit_position / lengthToHitPosition;
+                    scale = lengthToHitPosition / 768;
                     break;
             }
 

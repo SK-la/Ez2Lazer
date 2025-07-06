@@ -49,8 +49,8 @@ namespace osu.Game.Skinning
         {
             AutoSizeAxes = Axes.Both;
 
-            Anchor = Anchor.Centre;
-            Origin = Anchor.Centre;
+            Anchor = Anchor.BottomLeft;
+            Origin = Anchor.BottomLeft;
 
             Margin = new MarginPadding(10);
 
@@ -67,14 +67,14 @@ namespace osu.Game.Skinning
                         {
                             Alpha = 0,
                             Blending = BlendingParameters.Additive,
-                            Anchor = Anchor.BottomCentre,
+                            Anchor = Anchor.BottomLeft,
                             BypassAutoSizeAxes = Axes.Both,
                         },
                         displayedCountSpriteText = new LegacySpriteText(LegacyFont.Combo)
                         {
                             Alpha = 0,
                             AlwaysPresent = true,
-                            Anchor = Anchor.BottomCentre,
+                            Anchor = Anchor.BottomLeft,
                             BypassAutoSizeAxes = Axes.Both,
                         },
                     }

@@ -23,12 +23,16 @@ namespace osu.Game.Rulesets.Mania.UI.Components
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
+        private Bindable<double> hitPositonBindable = new Bindable<double>();
+
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
             Direction.BindTo(scrollingInfo.Direction);
             Direction.BindValueChanged(_ => UpdateHitPosition(), true);
 
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            hitPositonBindable.BindValueChanged(_ => UpdateHitPosition(), true);
             skin.SourceChanged += onSkinChanged;
         }
 
@@ -38,7 +42,7 @@ namespace osu.Game.Rulesets.Mania.UI.Components
         {
             float hitPosition = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
                                     new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                                ?? Stage.HIT_TARGET_POSITION;
+                                ?? (float)hitPositonBindable.Value;
 
             Padding = Direction.Value == ScrollingDirection.Up
                 ? new MarginPadding { Top = hitPosition }

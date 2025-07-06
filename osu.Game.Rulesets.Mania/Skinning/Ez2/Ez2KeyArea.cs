@@ -15,7 +15,6 @@ using osu.Framework.Input.Events;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
@@ -47,9 +46,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private IGameplayClock gameplayClock { get; set; } = null!;
 
         [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         public Ez2KeyArea()
@@ -60,9 +56,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
-            if (stageDefinition.Columns == 14 && column.Index == 13)
-                return;
-
             hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
 
             InternalChild = directionContainer = new Container

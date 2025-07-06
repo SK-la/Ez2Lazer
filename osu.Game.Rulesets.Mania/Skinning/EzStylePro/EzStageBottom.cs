@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -29,20 +30,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load()
         {
             RelativeSizeAxes = Axes.Both;
-            Anchor = Anchor.Centre;
-            Origin = Anchor.Centre;
+            Anchor = Anchor.TopCentre;
+            Origin = Anchor.TopCentre;
 
             hitPositon = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             hitPositon.BindValueChanged(_ => OnConfigChanged());
             columnWidth.BindValueChanged(_ => OnConfigChanged());
+            OnSkinChanged();
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            OnSkinChanged();
-            factory.OnNoteChanged += OnSkinChanged;
+
+            factory.OnStageChanged += OnSkinChanged;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -51,35 +53,32 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (isDisposing)
             {
-                factory.OnNoteChanged -= OnSkinChanged;
+                factory.OnStageChanged -= OnSkinChanged;
             }
         }
 
-        public static string StagePrefix => "Stage/fivekey";
-        protected static string ComponentName => $"{StagePrefix}/Body";
+        // protected override void Update()
+        // {
+        //     base.Update();
+        //     updateSizes();
+        // }
 
         private void loadAnimation()
         {
             ClearInternal();
 
-            var stageBottom = factory.CreateStage(ComponentName);
+            var stageBottom = factory.CreateStage("Body");
             sprite = new Container
             {
                 RelativeSizeAxes = Axes.None,
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
-                // Masking = true,
+
                 Child = stageBottom
             };
             // sprite.Depth = float.MinValue;
             OnConfigChanged();
             AddInternal(sprite);
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-            updateSizes();
         }
 
         private void updateSizes()
@@ -88,11 +87,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
 
             float actualPanelWidth = DrawWidth;
-            double scale = actualPanelWidth / 410.0;
-            sprite.Scale = new Vector2((float)scale);
+            float scale = actualPanelWidth / 410.0f;
+            sprite.Scale = new Vector2(scale);
 
-            Y = 274;
-            Position = new Vector2(0, 660 + 110 - (float)hitPositon.Value);
+            sprite.Y = LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION - (float)hitPositon.Value - DrawHeight * 0.865f;
+            // Position = new Vector2(0, 415 + 110 - (float)hitPositon.Value);
         }
 
         private void OnConfigChanged()

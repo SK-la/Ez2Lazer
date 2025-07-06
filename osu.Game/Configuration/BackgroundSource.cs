@@ -18,7 +18,7 @@ namespace osu.Game.Configuration
         [LocalisableDescription(typeof(UserInterfaceStrings), nameof(UserInterfaceStrings.BeatmapWithStoryboard))]
         BeatmapWithStoryboard,
 
-        [Description("Use 'Resource\\Webm\\*.webm' file from local folders")]
+        [Description("'EzResource/Webm/*.webm' from local folders")]
         WebmSource,
     }
 }

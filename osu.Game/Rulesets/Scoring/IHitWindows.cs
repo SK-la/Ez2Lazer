@@ -24,14 +24,6 @@ namespace osu.Game.Rulesets.Scoring
         // };
     }
 
-    public enum MUGHitMode
-    {
-        Lazer,
-        EZ2AC,
-        IIDX,
-        Melody,
-    }
-
     public static class HitWindowsExtensions
     {
         public static void SetDifficultyRange(this HitWindows windows, double perfect, double great, double good, double ok, double meh, double miss)

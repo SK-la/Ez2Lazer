@@ -164,7 +164,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             hitWindows.SetDifficulty(difficulty.OverallDifficulty);
         }
 
-        public override void ResetHitWindows()
+        public override void ResetSettingsToDefaults()
         {
             hitWindows.ResetHitWindows();
         }

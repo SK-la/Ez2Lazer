@@ -14,7 +14,6 @@ using osu.Game.Skinning;
 using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
-using EffectType = osu.Game.Skinning.Components.EffectType;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
@@ -71,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     combo1.Anchor = Anchor.TopCentre;
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Y = 200;
-                                    combo1.Effect.Value = EffectType.None;
+                                    combo1.Effect.Value = EzComEffectType.None;
                                     combo1.NameDropdown.Value = (EzSelectorNameSet)43;
                                 }
 

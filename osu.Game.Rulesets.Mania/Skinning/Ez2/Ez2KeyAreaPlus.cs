@@ -15,16 +15,15 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
+namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
-    public partial class Ez2KeyAreaPro : CompositeDrawable, IKeyBindingHandler<ManiaAction>
+    public partial class Ez2KeyAreaPlus : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
 
@@ -46,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
 
-        public Ez2KeyAreaPro()
+        public Ez2KeyAreaPlus()
         {
             RelativeSizeAxes = Axes.Both;
         }

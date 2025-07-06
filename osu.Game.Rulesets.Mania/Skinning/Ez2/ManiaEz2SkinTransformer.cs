@@ -9,6 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
+using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
@@ -183,7 +184,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                             // if (Skin is Ez2Skin && resultComponent.Component >= HitResult.Perfect)
                             //     return Drawable.Empty();
 
-                            return new Ez2ColumnBackground();
+                            return new EzColumnBackground();
 
                         case ManiaSkinComponents.KeyArea:
                             return new Ez2KeyArea();
@@ -224,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 bool isSpecialColumn = stage.EzIsSpecialColumn(columnIndex);
 
                 float width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
-                float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
+                // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
 
                 if (stage.Columns == 14 && columnIndex == 13)
                     width = 0f;
@@ -234,8 +235,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
                         return SkinUtils.As<TValue>(new Bindable<float>(width));
 
-                    case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));
+                    // case LegacyManiaSkinConfigurationLookups.HitPosition:
+                    //     return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
 

@@ -25,7 +25,7 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         public EzEditorSidebar()
         {
-            OsuTabControl<SidebarTab> tabControl1;
+            OsuTabControl<SidebarTab> tabControl;
             // 添加tabControl背景，防止内容遮挡tab标签
             var tabBackground = new Box
             {
@@ -36,7 +36,7 @@ namespace osu.Game.Screens.LAsEzExtensions
             AddInternal(tabBackground);
 
             // 只添加tabControl，滚动和内容由基类EditorSidebar负责
-            AddInternal(tabControl1 = new OsuTabControl<SidebarTab>
+            AddInternal(tabControl = new OsuTabControl<SidebarTab>
             {
                 RelativeSizeAxes = Axes.X,
                 Height = 30,
@@ -47,7 +47,7 @@ namespace osu.Game.Screens.LAsEzExtensions
             // 设置内容区整体下移，避免与tab栏重叠
             Content.Margin = new MarginPadding { Top = 30 };
 
-            tabControl1.Current.ValueChanged += e =>
+            tabControl.Current.ValueChanged += e =>
             {
                 currentTab = e.NewValue;
                 Content.Clear();
@@ -80,7 +80,7 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         private void showColorSettings()
         {
-            var colorSettings = new EzColumnColorTab
+            var colorSettings = new EzColumnTab
             {
                 RelativeSizeAxes = Axes.X
             };

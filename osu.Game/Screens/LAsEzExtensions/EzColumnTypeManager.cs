@@ -5,7 +5,7 @@ namespace osu.Game.Screens.LAsEzExtensions
 {
     public static class EzColumnTypeManager
     {
-        public static string GetColumnColorType(int keyMode, int columnIndex)
+        public static string GetColumnType(int keyMode, int columnIndex)
         {
             // 边界检查
             if (columnIndex < 0 || columnIndex >= keyMode)

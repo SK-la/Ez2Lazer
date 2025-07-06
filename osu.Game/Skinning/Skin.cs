@@ -224,25 +224,59 @@ namespace osu.Game.Skinning
 
             try
             {
-                // First attempt to deserialise using the new SkinLayoutInfo format
-                layout = JsonConvert.DeserializeObject<SkinLayoutInfo>(jsonContent);
+                // 检查是否包含版本信息
+                dynamic? tempObject = JsonConvert.DeserializeObject<dynamic>(jsonContent);
+                string? versionString = tempObject?.Version?.ToString();
+
+                // 如果版本是 0.0.0.0 或者没有版本信息，按旧格式处理
+                if (string.IsNullOrEmpty(versionString) || versionString == "0.0.0.0")
+                {
+                    // 尝试按数组格式反序列化（旧格式）
+                    var deserializedContent = JsonConvert.DeserializeObject<IEnumerable<SerialisedDrawableInfo>>(jsonContent);
+
+                    if (deserializedContent != null)
+                    {
+                        layout = new SkinLayoutInfo { Version = 0 };
+                        layout.Update(null, deserializedContent.ToArray());
+                        Logger.Log($"Loaded legacy format skin layout for {target} (version 0.0.0.0)");
+                    }
+                }
+                else
+                {
+                    // 新格式，直接按 SkinLayoutInfo 反序列化
+                    layout = JsonConvert.DeserializeObject<SkinLayoutInfo>(jsonContent);
+                }
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.Log($"Failed to deserialize skin layout using new format for {target}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Debug);
+                layout = null; // 确保 layout 为 null，以便进入后续的fallback逻辑
             }
 
             // If deserialisation using SkinLayoutInfo fails, attempt to deserialise using the old naked list.
             if (layout == null)
             {
-                var deserializedContent = JsonConvert.DeserializeObject<IEnumerable<SerialisedDrawableInfo>>(jsonContent);
-                if (deserializedContent == null)
+                try
+                {
+                    var deserializedContent = JsonConvert.DeserializeObject<IEnumerable<SerialisedDrawableInfo>>(jsonContent);
+
+                    if (deserializedContent != null)
+                    {
+                        layout = new SkinLayoutInfo { Version = 0 };
+                        layout.Update(null, deserializedContent.ToArray());
+
+                        Logger.Log($"Ferrying {deserializedContent.Count()} components in {target} to global section of new {nameof(SkinLayoutInfo)} format");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to deserialize skin layout using legacy format for {target}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
                     return null;
-
-                layout = new SkinLayoutInfo { Version = 0 };
-                layout.Update(null, deserializedContent.ToArray());
-
-                Logger.Log($"Ferrying {deserializedContent.Count()} components in {target} to global section of new {nameof(SkinLayoutInfo)} format");
+                }
             }
+
+            if (layout == null)
+                return null;
 
             for (int i = layout.Version + 1; i <= SkinLayoutInfo.LATEST_VERSION; i++)
                 applyMigration(layout, target, i);

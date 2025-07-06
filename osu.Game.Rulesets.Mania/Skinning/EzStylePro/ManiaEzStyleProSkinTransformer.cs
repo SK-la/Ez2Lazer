@@ -7,16 +7,15 @@ using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osu.Game.Skinning.Components;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -180,7 +179,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                             // if (Skin is Ez2Skin && resultComponent.Component >= HitResult.Perfect)
                             //     return Drawable.Empty();
 
-                            return new Ez2ColumnBackground();
+                            return new EzColumnBackground();
 
                         case ManiaSkinComponents.KeyArea:
                             return new Ez2KeyArea();
@@ -227,7 +226,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
-                bool isSpecialColumn = stage.EzIsSpecialColumn(columnIndex);
+                bool isSpecialColumn = EzColumnTypeManager.GetColumnType(stage.Columns, columnIndex) == "S1";
                 float width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
                 // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
 
@@ -242,9 +241,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     // case LegacyManiaSkinConfigurationLookups.HitPosition:
                     //     return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));
 
-                    case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
-                        var colour = stage.GetColourForLayout(columnIndex);
-                        return SkinUtils.As<TValue>(new Bindable<Color4>(colour));
+                    // case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
+                    //     var colour = stage.GetColourForLayout(columnIndex);
+                    //     return SkinUtils.As<TValue>(new Bindable<Color4>(colour));
 
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:
                         return SkinUtils.As<TValue>(new Bindable<float>(1));

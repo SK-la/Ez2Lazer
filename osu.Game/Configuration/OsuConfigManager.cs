@@ -17,6 +17,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Mods.Input;
+using osu.Game.Overlays.Settings.Sections.Gameplay;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Edit.Compose.Components;
 using osu.Game.Screens.LAsEzExtensions;
@@ -51,7 +52,6 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.SongSelectGroupMode, GroupMode.None);
             SetDefault(OsuSetting.SongSelectSortingMode, SortMode.Title);
-            SetDefault(OsuSetting.SelectEzMode, EzSelectMode.All);
 
             SetDefault(OsuSetting.RandomSelectAlgorithm, RandomSelectAlgorithm.RandomPermutation);
             SetDefault(OsuSetting.ModSelectHotkeyStyle, ModSelectHotkeyStyle.Sequential);
@@ -157,9 +157,18 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.FloatingComments, false);
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
+
+            //新增自定义
+            SetDefault(OsuSetting.SelectEzMode, EzSelectMode.All);
             SetDefault(OsuSetting.HitMode, MUGHitMode.EZ2AC);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
+
+            // SetDefault(OsuSetting.ScrollBaseSpeed, 500, 100, 1000, 1.0);
+            // SetDefault(OsuSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
+            // SetDefault(OsuSetting.ScrollStyle, EzManiaScrollingStyle.ScrollTimeStyleFixed);
+            // SetDefault(OsuSetting.ScrollPerKeyMode, false);
+            // SetDefault(OsuSetting.PerspectiveAngle, 90.0f, 30.0f, 90.0f);
 
             SetDefault(OsuSetting.IncreaseFirstObjectVisibility, true);
             SetDefault(OsuSetting.GameplayDisableWinKey, true);
@@ -174,8 +183,6 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ScreenshotFormat, ScreenshotFormat.Jpg);
             SetDefault(OsuSetting.ScreenshotCaptureMenuCursor, false);
-
-            SetDefault(OsuSetting.SongSelectRightMouseScroll, true);
 
             SetDefault(OsuSetting.Scaling, ScalingMode.Off);
             SetDefault(OsuSetting.ScalingGameMode, ScalingGameMode.Mania);
@@ -413,19 +420,27 @@ namespace osu.Game.Configuration
         Skin,
         ScreenshotFormat,
         ScreenshotCaptureMenuCursor,
-        SongSelectRightMouseScroll,
         BeatmapSkins,
         BeatmapColours,
         BeatmapHitsounds,
         IncreaseFirstObjectVisibility,
         ScoreDisplayMode,
-        SelectEzMode,
-        SelectManiaRulesetSubset,
-        ScalingGameMode,
 
-        HitMode,
+        //自定义
+        SelectEzMode,
+        ScalingGameMode,
         AccuracyCutoffS,
         AccuracyCutoffA,
+        HitMode,
+        // //mania用自定义
+        // SelectManiaRulesetSubset,
+        // ScrollBaseSpeed,
+        // ScrollTimePerSpeed,
+        // ScrollStyle,
+        //
+        // PerspectiveAngle,
+        // ScrollPerKeyMode,
+
         ExternalLinkWarning,
         PreferNoVideo,
         Scaling,

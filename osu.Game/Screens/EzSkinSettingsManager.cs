@@ -2,17 +2,17 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Allocation;
+using System.ComponentModel;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.Screens.LAsEzExtensions;
+using osu.Game.Skinning;
 
 namespace osu.Game.Screens
 {
-    [Cached]
     public class EzSkinSettingsManager : IniConfigManager<EzSkinSetting>, IGameplaySettings
     {
         protected override string Filename => "EzSkinSettings.ini";
@@ -24,10 +24,11 @@ namespace osu.Game.Screens
 
             SetDefault(EzSkinSetting.ColumnWidth, 60, 5, 400.0, 1.0);
             SetDefault(EzSkinSetting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
-            SetDefault(EzSkinSetting.HitPosition, 110.0, 0, 500, 1.0);
+            SetDefault(EzSkinSetting.HitPosition, LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION, 0, 500, 1.0);
             SetDefault(EzSkinSetting.VisualHitPosition, 0.0, -100, 100, 1.0);
 
-            SetDefault(EzSkinSetting.DynamicTracking, false);
+            SetDefault(EzSkinSetting.ColumnWidthStyle, EzColumnWidthStyle.EzStyleProOnly);
+            SetDefault(EzSkinSetting.GlobalHitPosition, false);
             SetDefault(EzSkinSetting.GlobalTextureName, 4);
 
             SetDefault(EzSkinSetting.NoteSetName, "evolve");
@@ -37,10 +38,10 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
-            SetDefault(EzSkinSetting.ColorA, Colour4.FromHex("#F5F5F5"));
-            SetDefault(EzSkinSetting.ColorB, Colour4.FromHex("#648FFF"));
-            SetDefault(EzSkinSetting.ColorS1, Colour4.FromHex("#FF4A4A"));
-            SetDefault(EzSkinSetting.ColorS2, Colour4.FromHex("#72FF72"));
+            SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
+            SetDefault(EzSkinSetting.ColumnTypeB, Colour4.FromHex("#648FFF"));
+            SetDefault(EzSkinSetting.ColumnTypeS1, Colour4.FromHex("#FF4A4A"));
+            SetDefault(EzSkinSetting.ColumnTypeS2, Colour4.FromHex("#72FF72"));
 
             foreach (int keyMode in commonKeyModes)
             {
@@ -74,7 +75,7 @@ namespace osu.Game.Screens
 
             for (int i = 0; i < keyMode; i++)
             {
-                types[i] = EzColumnTypeManager.GetColumnColorType(keyMode, i);
+                types[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
             }
 
             return types;
@@ -98,11 +99,11 @@ namespace osu.Game.Screens
                 if (columnIndex < types.Length && !string.IsNullOrEmpty(types[columnIndex]))
                     return types[columnIndex];
 
-                return EzColumnTypeManager.GetColumnColorType(keyMode, columnIndex);
+                return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
             }
             catch (NotSupportedException)
             {
-                return EzColumnTypeManager.GetColumnColorType(keyMode, columnIndex);
+                return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
             }
         }
 
@@ -135,10 +136,10 @@ namespace osu.Game.Screens
 
             EzSkinSetting setting = colorType switch
             {
-                "S1" => EzSkinSetting.ColorS1,
-                "S2" => EzSkinSetting.ColorS2,
-                "B" => EzSkinSetting.ColorB,
-                _ => EzSkinSetting.ColorA
+                "S1" => EzSkinSetting.ColumnTypeS1,
+                "S2" => EzSkinSetting.ColumnTypeS2,
+                "B" => EzSkinSetting.ColumnTypeB,
+                _ => EzSkinSetting.ColumnTypeA
             };
 
             return Get<Colour4>(setting);
@@ -186,32 +187,49 @@ namespace osu.Game.Screens
         IBindable<float> IGameplaySettings.PositionalHitsoundsLevel => null!;
     }
 
+    public enum EzColumnWidthStyle
+    {
+        [Description("EzStylePro Only")]
+        EzStyleProOnly,
+
+        [Description("Global (全局)")]
+        GlobalWidth,
+
+        [Description("Global Total (全局总宽度)")]
+        GlobalTotalWidth,
+    }
+
     public enum EzSkinSetting
     {
         SelectedKeyMode,
 
-        // 轨道相关
+        // 全局开关
+        ColumnWidthStyle,
+        GlobalHitPosition, //TODO:未来改成下拉栏，补充虚拟判定线
+
+        // 全局设置
         ColumnWidth,
         SpecialFactor,
+
+        // Ez专属皮肤设置
         HitPosition,
         VisualHitPosition,
         NonSquareNoteHeight,
         NoteTrackLine,
         NoteTrackLineHeight,
-
-        // 皮肤设置
-        DynamicTracking,
         GlobalTextureName,
         NoteSetName,
         StageName,
+        // DynamicTracking,
+
+        // 列类型
+        ColumnTypeA,
+        ColumnTypeB,
+        ColumnTypeS1,
+        ColumnTypeS2,
 
         // 着色系统
         ColorSettingsEnabled,
-        ColorA,
-        ColorB,
-        ColorS1,
-        ColorS2,
-
         ColumnColor4K,
         ColumnColor5K,
         ColumnColor6K,
@@ -240,7 +258,7 @@ namespace osu.Game.Screens
 //
 //             for (int i = 0; i < keyMode; i++)
 //             {
-//                 types[i] = EzColumnTypeManager.GetColumnColorType(keyMode, i);
+//                 types[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
 //             }
 //
 //             SetValue(setting, string.Join(",", types));

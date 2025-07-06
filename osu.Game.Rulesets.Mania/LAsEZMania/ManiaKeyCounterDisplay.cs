@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Screens;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
 
@@ -64,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
                 float width = (float)columnWidth.Value;
                 int index = KeyFlow.IndexOf(counter);
 
-                if (StageDefinition.EzIsSpecialColumn(index))
+                if (EzColumnTypeManager.GetColumnType(StageDefinition.Columns, index) == "S1")
                     width *= (float)specialFactor.Value;
 
                 counter.Width = width;

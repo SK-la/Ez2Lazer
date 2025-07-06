@@ -28,10 +28,9 @@ namespace osu.Game.Screens
 {
     public partial class EzSkinSettings : EditorSidebarSection
     {
-        private Bindable<double> hitPosition = new Bindable<double>();
-
-        private readonly Bindable<bool> dynamicTracking = new Bindable<bool>();
+        private readonly Bindable<bool> globalHitPosition = new BindableBool();
         private readonly Bindable<EzSelectorNameSet> globalTextureName = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)4);
+
         private readonly Bindable<string> selectedNoteSet = new Bindable<string>();
         private readonly List<string> availableNoteSets = new List<string>();
 
@@ -58,7 +57,7 @@ namespace osu.Game.Screens
         [BackgroundDependencyLoader]
         private void load()
         {
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            globalHitPosition.Value = ezSkinConfig.Get<bool>(EzSkinSetting.GlobalHitPosition);
 
             globalTextureName.Value = (EzSelectorNameSet)ezSkinConfig.GetBindable<int>(EzSkinSetting.GlobalTextureName).Value;
 
@@ -86,12 +85,12 @@ namespace osu.Game.Screens
                     Spacing = new Vector2(10),
                     Children = new Drawable[]
                     {
-                        new SettingsCheckbox
+                        new SettingsEnumDropdown<EzColumnWidthStyle>
                         {
-                            LabelText = "Dynamic Tracking\n(动态刷新)",
-                            TooltipText = "开启后, 调整滑块时会实时 刷新并保存 皮肤, 可能导致卡顿\n"
-                                          + "Enable this to refresh and save the skin in real-time when adjusting sliders, may cause lag",
-                            Current = ezSkinConfig.GetBindable<bool>(EzSkinSetting.DynamicTracking),
+                            LabelText = "Column Width Style(列宽风格)",
+                            TooltipText = "不完善！全局总列宽=设置值×10\n"
+                                          + "Global Total Column Width = Configured Value × 10",
+                            Current = ezSkinConfig.GetBindable<EzColumnWidthStyle>(EzSkinSetting.ColumnWidthStyle),
                         },
                         new SettingsSlider<double>
                         {
@@ -103,16 +102,22 @@ namespace osu.Game.Screens
                         new SettingsSlider<double>
                         {
                             LabelText = "Special Factor (特殊轨道倍率)",
-                            TooltipText = "设置特殊列的宽度倍率 //未来会联动特殊列颜色定义"
-                                          + "\nSet the width factor for special columns",
+                            TooltipText = "特殊列关联S1类型, 可自定义"
+                                          + "\nSpecial columns are associated with S1 type, customizable",
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor),
                             KeyboardStep = 0.1f,
+                        },
+                        new SettingsCheckbox
+                        {
+                            LabelText = "Global HitPosition",
+                            TooltipText = "全局判定线位置开关",
+                            Current = globalHitPosition,
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "Hit Position (可视判定线位置)",
                             TooltipText = "设置判定线位置",
-                            Current = hitPosition,
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition),
                             KeyboardStep = 1f,
                         },
                         new SettingsSlider<double>
@@ -167,54 +172,18 @@ namespace osu.Game.Screens
                 }
             };
 
-            selectedNoteSet.BindValueChanged(onNoteSetChanged);
-            selectedStageSet.BindValueChanged(onStageSetChanged);
+            selectedNoteSet.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.NoteSetName, e.NewValue));
+            selectedStageSet.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue));
             globalTextureName.BindValueChanged(OnTextureNameChanged);
-            // dynamicTracking.ValueChanged += tracking =>
-            // {
-            //     if (tracking.NewValue)
-            //     {
-            //     }
-            //     else
-            //     {
-            //     }
-            //
-            //     ezSkinConfig.SetValue(EzSkinSetting.DynamicTracking, tracking.NewValue);
-            // };
         }
 
         #region 追踪处理
-
-        // private void onStageChanged(ValueChangedEvent<double> e)
-        // {
-        //     Invalidate();
-        // }
 
         private void OnTextureNameChanged(ValueChangedEvent<EzSelectorNameSet> textureName)
         {
             updateAllSkinComponentsTextureNames(textureName.NewValue);
 
             ezSkinConfig.SetValue(EzSkinSetting.GlobalTextureName, (int)textureName.NewValue);
-        }
-
-        private void onNoteSetChanged(ValueChangedEvent<string> e)
-        {
-            ezSkinConfig.SetValue(EzSkinSetting.NoteSetName, e.NewValue);
-
-            if (dynamicTracking.Value)
-            {
-                ScheduleRefresh();
-            }
-        }
-
-        private void onStageSetChanged(ValueChangedEvent<string> e)
-        {
-            ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue);
-
-            if (dynamicTracking.Value)
-            {
-                ScheduleRefresh();
-            }
         }
 
         private ScheduledDelegate? scheduledRefresh;
@@ -229,6 +198,8 @@ namespace osu.Game.Screens
         {
             isAbsolutePosition = !isAbsolutePosition;
             skinManager.CurrentSkinInfo.TriggerChange();
+            // skinManager.Save(skinManager.CurrentSkin.Value);
+
             // 更新按钮颜色
             updateButtonColor(refreshSkinButton, isAbsolutePosition);
             // 更新按钮文字
@@ -357,8 +328,6 @@ namespace osu.Game.Screens
         }
     }
 
-    public partial class EzGlobalTextureNameSelector : EzSelectorEnumList;
-
     #region 拓展按钮的多行文本显示
 
     public static class SettingsButtonExtensions
@@ -409,6 +378,8 @@ namespace osu.Game.Screens
             return button;
         }
     }
+
+    public partial class EzGlobalTextureNameSelector : EzSelectorEnumList;
 
     #endregion
 }

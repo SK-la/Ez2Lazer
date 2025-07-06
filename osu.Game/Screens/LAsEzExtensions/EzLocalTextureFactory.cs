@@ -52,6 +52,20 @@ namespace osu.Game.Screens.LAsEzExtensions
             }
         }
 
+        private void clearCacheForPrefix(string prefix)
+        {
+            var keysToRemove = new List<string>();
+
+            foreach (string key in ratioCache.Keys)
+            {
+                if (key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    keysToRemove.Add(key);
+            }
+
+            foreach (string key in keysToRemove)
+                ratioCache.Remove(key);
+        }
+
         private void initialize()
         {
             if (initialized) return;
@@ -61,31 +75,40 @@ namespace osu.Game.Screens.LAsEzExtensions
             NoteSetName = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
             NoteSetName.BindValueChanged(e =>
             {
-                foreach (var loader in loaderStoreCache.Values)
-                    loader.Dispose();
-                loaderStoreCache.Clear();
-                textureRatioCache.Clear();
+                // foreach (var loader in loaderStoreCache.Values)
+                //     loader.Dispose();
+                // loaderStoreCache.Clear();
+                // ratioCache.Clear();
+                clearCacheForPrefix("note/");
                 OnNoteChanged?.Invoke();
             }, true);
             StageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
             StageName.BindValueChanged(e =>
             {
+                // foreach (var loader in loaderStoreCache.Values)
+                //     loader.Dispose();
+                // loaderStoreCache.Clear();
+                clearCacheForPrefix("Stage/");
+                OnStageChanged?.Invoke();
+            }, true);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (isDisposing)
+            {
                 foreach (var loader in loaderStoreCache.Values)
                     loader.Dispose();
                 loaderStoreCache.Clear();
-                OnStageChanged?.Invoke();
-            }, true);
+            }
         }
 
         private bool isHitCom(string componentName)
         {
             return componentName.Contains("flare", StringComparison.InvariantCultureIgnoreCase);
         }
-
-        // private bool isStageCom(string componentName)
-        // {
-        //     return componentName.Contains("Stage", StringComparison.InvariantCultureIgnoreCase);
-        // }
 
         public virtual TextureAnimation CreateAnimation(string component)
         {
@@ -103,26 +126,17 @@ namespace osu.Game.Screens.LAsEzExtensions
             if (!isHit)
                 animation.DefaultFrameLength = 1000.0 / 60.0 * 4;
 
-            string path = $"note/{NoteSetName.Value}/{component}";
-
-            for (int i = 0; i < 300; i++)
+            string[] pathsToTry =
             {
-                string frameFile = $"{path}/{i:D3}.png";
-                var texture = textureStore.Get(frameFile);
+                $"note/{NoteSetName.Value}/{component}",
+                $"note/circle/{component}"
+            };
 
-                if (texture == null)
-                    break;
-
-                animation.AddFrame(texture);
-            }
-
-            if (animation.FrameCount == 0)
+            foreach (string basePath in pathsToTry)
             {
-                path = $"note/circle/{component}";
-
-                for (int i = 0; i < 60; i++)
+                for (int i = 0; i < 300; i++)
                 {
-                    string frameFile = $"{path}/{i:D3}.png";
+                    string frameFile = $"{basePath}/{i:D3}.png";
                     var texture = textureStore.Get(frameFile);
 
                     if (texture == null)
@@ -130,136 +144,150 @@ namespace osu.Game.Screens.LAsEzExtensions
 
                     animation.AddFrame(texture);
                 }
+
+                if (animation.FrameCount > 0)
+                    break;
             }
 
             return animation;
         }
 
+        private bool isStageBody(string componentName)
+        {
+            return componentName.Contains("Body", StringComparison.InvariantCultureIgnoreCase);
+        }
+
         public virtual Drawable CreateStage(string component)
         {
-            string path = $"Stage/{StageName.Value}/{component}";
+            bool isBody = isStageBody(component);
+            string basePath = $"Stage/{StageName.Value}/Stage";
 
             var container = new Container
             {
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
-                Y = 0,
-                AutoSizeAxes = Axes.X,
-                Height = 247f,
-                Masking = true,
-                FillMode = FillMode.Fill
+                AutoSizeAxes = Axes.Both,
+                FillMode = FillMode.Fill,
             };
 
-            var bodyTexture = textureStore.Get($"{path}.png");
-
-            if (bodyTexture != null)
+            if (isBody)
             {
-                container.Add(new Sprite
+                container = new Container
                 {
-                    Texture = bodyTexture,
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    RelativeSizeAxes = Axes.None,
-                    Width = bodyTexture.Width,
-                    Height = bodyTexture.Height,
-                    FillMode = FillMode.Fill
-                });
-                // Logger.Log($"Creating stage component: {path}");
-            }
-
-            string grooveLightPath = $"Stage/{StageName.Value}/Stage/GrooveLight";
-            var grooveLight = textureStore.Get($"{grooveLightPath}.png");
-
-            if (grooveLight != null)
-            {
-                var grooveLightSprite = new Sprite
-                {
-                    Texture = grooveLight,
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    RelativeSizeAxes = Axes.None,
-                    Width = grooveLight.Width,
-                    Height = grooveLight.Height,
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
                     FillMode = FillMode.Fill,
-                    Alpha = 0
+                    Y = 0,
+                    AutoSizeAxes = Axes.X,
+                    Height = 247f,
+                    Masking = true,
                 };
 
-                container.Add(grooveLightSprite);
+                addStageComponent(container, $"{basePath}/fivekey/{component}");
+                addStageComponent(container, $"{basePath}/GrooveLight");
+                string overObjectPath = $"{basePath}/Stage/{StageName.Value}_OverObject/{StageName.Value}_OverObject";
 
-                grooveLightSprite.OnLoadComplete += _ =>
-                    grooveLightSprite.Loop(b => b.FadeTo(1f, 300).FadeOut(300));
-
-                Logger.Log($"Creating stage grooveLight {grooveLight}");
-            }
-
-            string overObjectPath = $"Stage/{StageName.Value}/Stage/{StageName.Value}_Overobject/{StageName.Value}_Overobject";
-
-            for (int i = 0; i < 120; i++)
-            {
-                var overObject = textureStore.Get($"{overObjectPath}_{i}.png");
-
-                if (overObject != null)
+                var animation = new TextureAnimation
                 {
-                    // overObject.ScaleAdjust = 0.00125f;
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    RelativeSizeAxes = Axes.None,
+                    FillMode = FillMode.Fill,
+                    Loop = true,
+                    DefaultFrameLength = 1000.0 / 60.0 * 4
+                };
 
-                    container.Add(new Sprite
-                    {
-                        Texture = overObject,
-                        Anchor = Anchor.BottomCentre,
-                        Origin = Anchor.BottomCentre,
-                        RelativeSizeAxes = Axes.None,
-                        Width = overObject.Width,
-                        Height = overObject.Height,
-                        FillMode = FillMode.Fill
-                    });
-                    Logger.Log($"Creating stage overObject {overObjectPath}");
+                for (int i = 0; i < 120; i++)
+                {
+                    var texture = textureStore.Get($"{overObjectPath}_{i}.png");
+                    if (texture == null)
+                        break;
+
+                    animation.AddFrame(texture);
+                }
+
+                container.Add(animation);
+            }
+            else
+            {
+                string baseKeyPath = $"{basePath}/eightkey/{component}";
+                string[] pathsToTry =
+                {
+                    $"{baseKeyPath}/KeyBase",
+                    $"{baseKeyPath}/KeyPress",
+                    $"{baseKeyPath}/KeyBase_0",
+                    $"{baseKeyPath}/KeyPress_0",
+                    $"{baseKeyPath}/2KeyBase_0",
+                    $"{baseKeyPath}/2KeyPress_0",
+                };
+
+                foreach (string paths in pathsToTry)
+                {
+                    addStageComponent(container, $"{paths}");
                 }
             }
 
             return container;
         }
 
-        private readonly Dictionary<string, float> textureRatioCache = new Dictionary<string, float>();
-
-        public float GetRatio(string path)
+        private void addStageComponent(Container container, string basePath, int frameIndex = -1)
         {
+            Texture? texture = loadStageTexture(basePath, frameIndex);
+            if (texture == null) return;
+
+            container.Add(new Sprite
+            {
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
+                RelativeSizeAxes = Axes.None,
+                FillMode = FillMode.Fill,
+                Width = texture.Width,
+                Height = texture.Height,
+                Texture = texture,
+                // Blending = BlendingParameters.Additive,
+            });
+
+            Logger.Log($"Factory load {basePath}");
+        }
+
+        private Texture? loadStageTexture(string basePath, int i = -1)
+        {
+            string texturePath;
+
+            if (i < 0) { texturePath = $"{basePath}.png"; }
+            else
+            {
+                texturePath = i == 0
+                    ? $"{basePath}.png"
+                    : $"{basePath}_{i}.png";
+            }
+
+            return textureStore.Get(texturePath);
+        }
+
+        private readonly Dictionary<string, float> ratioCache = new Dictionary<string, float>();
+
+        public float GetRatio(string component)
+        {
+            string path = $"note/{NoteSetName.Value}/{component}";
+
+            if (ratioCache.TryGetValue(path, out float cachedRatio))
+                return cachedRatio;
+
             Texture texture = textureStore.Get($"{path}/000.png") ?? textureStore.Get($"{path}/001.png");
 
-            float ratio = 1.0f;
-            if (texture != null)
-                ratio = texture.Height / (float)texture.Width;
+            float ratio = texture == null
+                ? 1.0f
+                : texture.Height / (float)texture.Width;
 
-            texture?.Dispose();
-
+            ratioCache[path] = ratio;
             return ratio;
         }
 
         public bool IsSquareNote(string component)
         {
-            if (textureRatioCache.TryGetValue(component, out float ratio))
-                return ratio >= 0.75f;
-
-            if (isHitCom(component))
-                return true;
-
-            string path = $"note/{NoteSetName.Value}/{component}";
-
-            ratio = GetRatio(path);
-            textureRatioCache[component] = ratio;
-
+            float ratio = GetRatio(component);
             return ratio >= 0.75f;
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                foreach (var loader in loaderStoreCache.Values)
-                    loader.Dispose();
-                loaderStoreCache.Clear();
-            }
         }
     }
 

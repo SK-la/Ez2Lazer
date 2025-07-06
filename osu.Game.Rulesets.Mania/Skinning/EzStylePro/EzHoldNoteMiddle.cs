@@ -8,7 +8,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
@@ -34,7 +33,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Container middleScaleContainer = null!;
         private Container middleInnerContainer = null!;
 
-        private EzSkinSettingsManager ezSkinConfig = null!;
+        private IBindable<double> noteHeight = new Bindable<double>();
+        private IBindable<double> hitPosition = new Bindable<double>();
         private Bindable<bool> enabledColor = null!;
         private Drawable? container;
         private Drawable? lightContainer;
@@ -45,6 +45,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
+
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
@@ -60,12 +63,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(EzSkinSettingsManager ezSkinConfig, DrawableHitObject drawableObject)
+        private void load(DrawableHitObject drawableObject)
         {
-            this.ezSkinConfig = ezSkinConfig;
             holdNote = (DrawableHoldNote)drawableObject;
             isHitting.BindTo(holdNote.IsHolding);
 
+            noteHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
+            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
         }
 
@@ -85,6 +89,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
             OnSkinChanged();
+            noteHeight.BindValueChanged(_ => OnSettingsChanged(), true);
             factory.OnNoteChanged += OnSkinChanged;
             ezSkinConfig.OnSettingsChanged += OnSettingsChanged;
             isHitting.BindValueChanged(onIsHittingChanged, true);
@@ -104,6 +109,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnSkinChanged()
         {
+            if (lightContainer != null)
+            {
+                column.TopLevelContainer.Remove(lightContainer, false);
+                lightContainer.Expire();
+                lightContainer = null;
+            }
+
             loadAnimation();
             hittingLayer = new EzHoldNoteHittingLayer
             {
@@ -115,6 +127,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Alpha = 0,
                 Child = hittingLayer
             };
+            hittingLayer.HitPosition.BindTo(hitPosition);
         }
 
         private void onIsHittingChanged(ValueChangedEvent<bool> isHitting)
@@ -157,14 +170,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (enabledColor.Value)
                     return "white";
 
-                if (stageDefinition.EzIsSpecialColumn(column.Index))
+                if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
                     return "green";
 
                 int logicalIndex = 0;
 
                 for (int i = 0; i < column.Index; i++)
                 {
-                    if (!stageDefinition.EzIsSpecialColumn(i))
+                    if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) != "S1")
                         logicalIndex++;
                 }
 
@@ -172,15 +185,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
         }
 
-        protected virtual string ComponentName => $"{ColorPrefix}longnote/middle";
-        protected virtual string ComponentName2 => $"{ColorPrefix}longnote/tail";
-
         private void loadAnimation()
         {
             ClearInternal();
             string backupComponentName = $"{ColorPrefix}note";
-            middleAnimation = factory.CreateAnimation(ComponentName);
-            tailAnimation = factory.CreateAnimation(ComponentName2);
+            middleAnimation = factory.CreateAnimation($"{ColorPrefix}longnote/middle");
+            tailAnimation = factory.CreateAnimation($"{ColorPrefix}longnote/tail");
 
             if (middleAnimation.FrameCount == 0)
             {

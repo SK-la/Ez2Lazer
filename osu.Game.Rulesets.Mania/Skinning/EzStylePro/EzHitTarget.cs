@@ -3,20 +3,15 @@
 
 using System;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens;
 using osu.Game.Screens.Play;
-using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     internal partial class EzHitTarget : EzNote
     {
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private IBindable<double> hitPosition = new Bindable<double>();
+        // private IBindable<double> hitPosition = new Bindable<double>();
 
         protected override bool ShowSeparators => false;
         protected override bool UseColorization => false;
@@ -28,8 +23,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
 
-        [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        // [Resolved]
+        // private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         public EzHitTarget()
         {
@@ -39,16 +34,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo)
+        private void load()
         {
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
-
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            hitPosition.BindValueChanged(_ => updateY(), true);
+            Anchor = Anchor.BottomCentre;
+            Origin = Anchor.BottomCentre;
+            // hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            // hitPosition.BindValueChanged(_ => updateY(), true);
         }
 
-        private float baseYPosition;
+        // private float baseYPosition = 0f;
         private double beatInterval;
 
         protected override void LoadComplete()
@@ -65,18 +59,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             double progress = (gameplayClock.CurrentTime % beatInterval) / beatInterval;
             // 平滑正弦波效果
             double smoothValue = 0.3 * Math.Sin(progress * 2 * Math.PI);
-            Y = baseYPosition + (float)(smoothValue * 6);
+            Y = (float)(smoothValue * 6);
         }
 
-        private void updateY()
-        {
-            baseYPosition = 110f - (float)hitPosition.Value;
-            Position = new Vector2(0, baseYPosition);
-        }
-
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
-        {
-            Anchor = Origin = direction.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
-        }
+        //DrawableManiaRuleset中关联设置后，此处不必设置
+        // private void updateY()
+        // {
+        //     baseYPosition = LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION - (float)hitPosition.Value;
+        //     Position = new Vector2(0, baseYPosition);
+        // }
     }
 }

@@ -29,7 +29,7 @@ namespace osu.Game.Skinning
         [Resolved]
         private TextureStore textures { get; set; } = null!;
 
-        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.SpriteName), nameof(SkinnableComponentStrings.SpriteNameDescription), SettingControlType = typeof(SpriteSelectorControl))]
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.SpriteName), SettingControlType = typeof(SpriteSelectorControl))]
         public Bindable<string> SpriteName { get; } = new Bindable<string>(string.Empty);
 
         [Resolved]
@@ -119,6 +119,9 @@ namespace osu.Game.Skinning
                 // Temporarily used to exclude undesirable ISkin implementations
                 static bool isUserSkin(ISkin skin)
                     => skin.GetType() == typeof(TrianglesSkin)
+                       || skin.GetType() == typeof(Ez2Skin)
+                       || skin.GetType() == typeof(EzStyleProSkin)
+                       || skin.GetType() == typeof(SbISkin)
                        || skin.GetType() == typeof(ArgonProSkin)
                        || skin.GetType() == typeof(ArgonSkin)
                        || skin.GetType() == typeof(DefaultLegacySkin)

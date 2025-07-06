@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
@@ -86,13 +87,19 @@ namespace osu.Game.Rulesets.Mania
 
                 case Ez2Skin:
                     if (GlobalConfigStore.EzConfig == null)
-                        throw new ArgumentNullException(nameof(GlobalConfigStore.Config));
+                    {
+                        Logger.Log("!EGlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
+                        break;
+                    }
 
                     return new ManiaEz2SkinTransformer(skin, beatmap, GlobalConfigStore.EzConfig);
 
                 case EzStyleProSkin:
                     if (GlobalConfigStore.EzConfig == null)
-                        throw new ArgumentNullException(nameof(GlobalConfigStore.Config));
+                    {
+                        Logger.Log("!GlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
+                        break;
+                    }
 
                     return new ManiaEzStyleProSkinTransformer(skin, beatmap, GlobalConfigStore.EzConfig);
 

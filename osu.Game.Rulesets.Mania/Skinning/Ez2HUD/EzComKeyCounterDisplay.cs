@@ -51,7 +51,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            updateWidths();
             triggers.BindTo(controller.Triggers);
             triggers.BindCollectionChanged(triggersChanged, true);
             columnWidth.BindValueChanged(_ => updateWidths(), true);

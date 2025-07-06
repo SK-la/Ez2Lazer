@@ -60,4 +60,12 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
             };
         }
     }
+
+    public enum MUGHitMode
+    {
+        Lazer,
+        EZ2AC,
+        IIDX,
+        Melody,
+    }
 }

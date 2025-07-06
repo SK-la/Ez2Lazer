@@ -7,7 +7,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
@@ -88,14 +87,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (enabledColor.Value)
                     return "white";
 
-                if (stageDefinition.EzIsSpecialColumn(column.Index))
+                if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
                     return "green";
 
                 int logicalIndex = 0;
 
                 for (int i = 0; i < column.Index; i++)
                 {
-                    if (!stageDefinition.EzIsSpecialColumn(i))
+                    if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, i) != "S1")
                         logicalIndex++;
                 }
 

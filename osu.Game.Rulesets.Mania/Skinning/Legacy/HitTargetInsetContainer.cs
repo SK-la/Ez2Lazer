@@ -5,8 +5,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Legacy
@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
     public partial class HitTargetInsetContainer : Container
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-
+        private Bindable<double> hitPositonBindable = new Bindable<double>();
         protected override Container<Drawable> Content => content;
         private readonly Container content;
 
@@ -28,12 +28,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource skin, IScrollingInfo scrollingInfo)
+        private void load(ISkinSource skin, EzSkinSettingsManager ezSkinConfig, IScrollingInfo scrollingInfo)
         {
-            hitPosition = skin.GetManiaSkinConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? Stage.HIT_TARGET_POSITION;
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            hitPositonBindable.BindValueChanged(_ => UpdateHitPosition(), true);
+            hitPosition = skin.GetManiaSkinConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? (float)hitPositonBindable.Value;
 
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
+        }
+
+        protected virtual void UpdateHitPosition()
+        {
+            hitPosition = (float)hitPositonBindable.Value;
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

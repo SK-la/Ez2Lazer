@@ -7,7 +7,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
@@ -21,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Bindable<double> nonSquareNoteHeight = null!;
 
         private TextureAnimation animation = null!;
-        private Container? container;
+        private Container container = null!;
         private EzNoteSideLine? noteSeparatorsL;
         private EzNoteSideLine? noteSeparatorsR;
 
@@ -45,13 +44,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             nonSquareNoteHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
             enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            OnSkinChanged();
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            OnSkinChanged();
-            nonSquareNoteHeight.ValueChanged += _ => updateSizes();
+
+            nonSquareNoteHeight.BindValueChanged(_ => updateSizes(), true);
             ezSkinConfig.OnSettingsChanged += OnConfigChanged;
             factory.OnNoteChanged += OnSkinChanged;
         }
@@ -84,14 +84,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (enabledColor.Value)
                     return "white";
 
-                if (stageDefinition.EzIsSpecialColumn(column.Index))
+                if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
                     return "green";
 
                 int logicalIndex = 0;
 
                 for (int i = 0; i < column.Index; i++)
                 {
-                    if (!stageDefinition.EzIsSpecialColumn(i))
+                    if (EzColumnTypeManager.GetColumnType(stageDefinition.Columns, i) != "S1")
                         logicalIndex++;
                 }
 
@@ -164,7 +164,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 AddInternal(animation);
             }
 
-            Schedule(updateSizes);
+            OnConfigChanged();
         }
 
         private void updateSizes()
@@ -176,11 +176,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             Height = noteHeight;
 
-            if (container != null)
+            if (container.Children.Count > 0 && container.Child is Container c)
             {
                 container.Height = noteHeight / 2;
-                if (container.Child is Container containerA)
-                    containerA.Height = noteHeight;
+                c.Height = noteHeight;
             }
         }
 
@@ -191,7 +190,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 noteColor = NoteColor;
 
             animation.Colour = noteColor;
-
+            container.Colour = noteColor;
             noteSeparatorsL?.UpdateGlowEffect(noteColor);
             noteSeparatorsR?.UpdateGlowEffect(noteColor);
 

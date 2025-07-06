@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         public Bindable<EzSelectorNameSet> NameDropdown { get; } = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)4);
 
         [SettingSource("Effect Type", "Effect Type")]
-        public Bindable<EffectType> Effect { get; } = new Bindable<EffectType>(EffectType.Scale);
+        public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
 
         // [SettingSource("Effect Origin", "Effect Origin", SettingControlType = typeof(AnchorDropdown))]
         // public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.01f,
         };
 
-        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), nameof(SkinnableComponentStrings.ColourDescription))]
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
         public EzComboText Text = null!;
@@ -114,7 +114,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             switch (Effect.Value)
             {
-                case EffectType.Scale:
+                case EzComEffectType.Scale:
                     EzEffectHelper.ApplyScaleAnimation(
                         Text.TextContainer,
                         wasIncrease,
@@ -125,7 +125,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                         EffectEndDuration.Value);
                     break;
 
-                case EffectType.Bounce:
+                case EzComEffectType.Bounce:
                     EzEffectHelper.ApplyBounceAnimation(
                         Text.TextContainer,
                         wasIncrease,

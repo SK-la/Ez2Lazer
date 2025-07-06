@@ -102,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             HitWindows.SetDifficulty(difficulty.OverallDifficulty);
         }
 
-        public override void ResetHitWindows()
+        public override void ResetSettingsToDefaults()
         {
             HitWindows.ResetHitWindows();
         }

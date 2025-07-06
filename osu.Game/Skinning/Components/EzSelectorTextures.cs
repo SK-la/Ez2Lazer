@@ -18,7 +18,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Skinning.Components
 {
-    //TODO 代码不对，无法加载
+    //TODO 代码不对, 无法加载, 用于缩略图选择纹理
     public partial class EzSelectorTextures : SettingsItem<EzSelectorNameSet>
     {
         // private FillFlowContainer previewList = null!;

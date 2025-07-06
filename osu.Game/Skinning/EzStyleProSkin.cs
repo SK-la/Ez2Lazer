@@ -22,6 +22,8 @@ namespace osu.Game.Skinning
 {
     public class EzStyleProSkin : Skin
     {
+        public const int EZ_STYLE_PRO_SKIN_ID = 999;
+
         public static SkinInfo CreateInfo() => new SkinInfo
         {
             ID = Skinning.SkinInfo.EZ_STYLE_PRO_SKIN,

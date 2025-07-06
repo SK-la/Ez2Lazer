@@ -197,7 +197,7 @@ namespace osu.Game.Screens.SelectV2
                                     new OsuSpriteText
                                     {
                                         Text = "Keys",
-                                        Font = OsuFont.GetFont(size: 12),
+                                        Font = OsuFont.GetFont(size: 16),
                                         Margin = new MarginPadding(5),
                                         Anchor = Anchor.BottomRight,
                                         Origin = Anchor.BottomRight,
@@ -206,7 +206,7 @@ namespace osu.Game.Screens.SelectV2
                                     new OsuTabControl<EzSelectMode>
                                     {
                                         RelativeSizeAxes = Axes.X,
-                                        Height = 24,
+                                        Height = 20,
                                         AutoSort = false,
                                         Anchor = Anchor.BottomRight,
                                         Origin = Anchor.BottomRight,
@@ -330,7 +330,7 @@ namespace osu.Game.Screens.SelectV2
                 .FadeOut(SongSelect.ENTER_DURATION / 3, Easing.In);
         }
 
-        private partial class SongSelectSearchTextBox : ShearedFilterTextBox
+        internal partial class SongSelectSearchTextBox : ShearedFilterTextBox
         {
             protected override InnerSearchTextBox CreateInnerTextBox() => new InnerTextBox();
 

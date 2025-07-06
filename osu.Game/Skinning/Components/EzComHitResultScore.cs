@@ -40,7 +40,7 @@ namespace osu.Game.Skinning.Components
         public string TextureBasePath => @"EzResources/enumBase/enumJudgement";
 
         // [SettingSource("Effect Type", "Effect Type")]
-        // public Bindable<EffectType> Effect { get; } = new Bindable<EffectType>(EffectType.Scale);
+        // public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
         //
         // [SettingSource("Effect Origin", "Effect Origin", SettingControlType = typeof(AnchorDropdown))]
         // public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)

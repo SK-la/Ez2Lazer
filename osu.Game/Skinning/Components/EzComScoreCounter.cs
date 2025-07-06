@@ -19,7 +19,7 @@ namespace osu.Game.Skinning.Components
         [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
         public Bindable<EzSelectorNameSet> FontNameDropdown { get; } = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)Enum.ToObject(typeof(EzSelectorNameSet), 43));
 
-        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel), nameof(SkinnableComponentStrings.ShowLabelDescription))]
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
 
         [SettingSource("Alpha", "The alpha value of this box")]
@@ -30,7 +30,7 @@ namespace osu.Game.Skinning.Components
             Precision = 0.01f,
         };
 
-        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour), nameof(SkinnableComponentStrings.ColourDescription))]
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
         public bool UsesFixedAnchor { get; set; }
