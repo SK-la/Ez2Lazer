@@ -2,205 +2,79 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzHoldNoteHead : CompositeDrawable
+    public partial class EzHoldNoteHead : EzNoteBase
     {
-        private Bindable<bool> enabledColor = null!;
-        private Bindable<double> nonSquareNoteHeight = null!;
-
-        private TextureAnimation animation = null!;
-        private Container container = null!;
-        private EzNoteSideLine? noteSeparatorsL;
-        private EzNoteSideLine? noteSeparatorsR;
-
-        [Resolved]
-        private Column column { get; set; } = null!;
-
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
-
-        [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        protected override bool ShowSeparators => true;
 
         [BackgroundDependencyLoader]
         private void load()
         {
             RelativeSizeAxes = Axes.X;
             FillMode = FillMode.Fill;
-
-            nonSquareNoteHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
-            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
-            OnSkinChanged();
         }
 
-        protected override void LoadComplete()
+        protected override void OnDrawableChanged()
         {
-            base.LoadComplete();
+            string newComponentName = $"{ColorPrefix}longnote/head";
 
-            nonSquareNoteHeight.BindValueChanged(_ => updateSizes(), true);
-            ezSkinConfig.OnSettingsChanged += OnConfigChanged;
-            factory.OnNoteChanged += OnSkinChanged;
-        }
+            var animation = Factory.CreateAnimation(newComponentName);
 
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                ezSkinConfig.OnSettingsChanged -= OnConfigChanged;
-                factory.OnNoteChanged -= OnSkinChanged;
-            }
-        }
-
-        protected virtual Color4 NoteColor
-        {
-            get
-            {
-                int keyMode = stageDefinition.Columns;
-                int columnIndex = column.Index;
-                return ezSkinConfig.GetColumnColor(keyMode, columnIndex);
-            }
-        }
-
-        protected virtual string ColorPrefix
-        {
-            get
-            {
-                if (enabledColor.Value)
-                    return "white";
-
-                if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
-                    return "green";
-
-                int logicalIndex = 0;
-
-                for (int i = 0; i < column.Index; i++)
-                {
-                    if (ezSkinConfig.GetColumnType(stageDefinition.Columns, i) != "S1")
-                        logicalIndex++;
-                }
-
-                return logicalIndex % 2 == 0 ? "white" : "blue";
-            }
-        }
-
-        protected virtual string ComponentName => $"{ColorPrefix}longnote/head";
-
-        private void loadAnimation()
-        {
-            ClearInternal();
-            animation = factory.CreateAnimation(ComponentName);
-            container = new Container
-            {
-                RelativeSizeAxes = Axes.X,
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                Masking = true,
-            };
-
-            noteSeparatorsL = new EzNoteSideLine
-            {
-                RelativeSizeAxes = Axes.X,
-                FillMode = FillMode.Fill,
-                Anchor = Anchor.CentreLeft,
-                Origin = Anchor.Centre,
-            };
-            noteSeparatorsR = new EzNoteSideLine
-            {
-                RelativeSizeAxes = Axes.X,
-                FillMode = FillMode.Fill,
-                Anchor = Anchor.CentreRight,
-                Origin = Anchor.Centre,
-                // Rotation = 180,
-            };
-            AddInternal(new Container
-            {
-                RelativeSizeAxes = Axes.X,
-                FillMode = FillMode.Stretch,
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Children = new Drawable[]
-                {
-                    noteSeparatorsL,
-                    noteSeparatorsR
-                }
-            });
-
-            if (animation.FrameCount == 0)
+            if (animation is TextureAnimation textureAnimation && textureAnimation.FrameCount == 0)
             {
                 animation.Dispose();
-                animation = factory.CreateAnimation($"{ColorPrefix}note");
-                var x = new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    Child = animation,
-                };
-                if (x.Child is TextureAnimation)
-                    container.Child = x;
+                animation = Factory.CreateAnimation($"{ColorPrefix}note");
 
-                OnConfigChanged();
-                AddInternal(container);
+                if (animation is TextureAnimation newTexture && newTexture.FrameCount == 0)
+                {
+                    animation.Dispose();
+                    return;
+                }
+
+                if (MainContainer != null)
+                {
+                    MainContainer.Clear();
+                    MainContainer.RelativeSizeAxes = Axes.X;
+                    MainContainer.Anchor = Anchor.BottomCentre;
+                    MainContainer.Origin = Anchor.BottomCentre;
+                    MainContainer.Masking = true;
+                    MainContainer.Child = new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Anchor = Anchor.BottomCentre,
+                        Origin = Anchor.BottomCentre,
+                        Child = animation,
+                    };
+                }
             }
             else
             {
-                OnConfigChanged();
-                AddInternal(animation);
+                if (MainContainer != null)
+                {
+                    MainContainer.Clear();
+                    MainContainer.Child = animation;
+                }
             }
 
-            OnConfigChanged();
+            Schedule(UpdateSize);
         }
 
-        private void updateSizes()
+        protected override void UpdateSize()
         {
-            bool isSquare = factory.IsSquareNote("whitenote");
-            float noteHeight = isSquare
-                ? DrawWidth
-                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
+            base.UpdateSize();
+            float v = NoteSize.Value.Y;
+            Height = v;
 
-            Height = noteHeight;
-
-            if (container.Children.Count > 0 && container.Child is Container c)
+            if (MainContainer?.Children.Count > 0 && MainContainer.Child is Container c)
             {
-                container.Height = noteHeight / 2;
-                c.Height = noteHeight;
+                MainContainer.Height = v / 2;
+                c.Height = v;
             }
         }
-
-        private void OnConfigChanged()
-        {
-            var noteColor = Color4.White;
-            if (enabledColor.Value)
-                noteColor = NoteColor;
-
-            animation.Colour = noteColor;
-            container.Colour = noteColor;
-            noteSeparatorsL?.UpdateGlowEffect(noteColor);
-            noteSeparatorsR?.UpdateGlowEffect(noteColor);
-
-            Schedule(() =>
-            {
-                updateSizes();
-                Invalidate();
-            });
-        }
-
-        private void OnSkinChanged() => loadAnimation();
     }
 }

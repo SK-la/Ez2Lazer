@@ -80,11 +80,11 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         private void showColorSettings()
         {
-            var colorSettings = new EzColumnTab
+            var ezColumnSettings = new EzColumnTab
             {
                 RelativeSizeAxes = Axes.X
             };
-            Content.Add(colorSettings);
+            Content.Add(ezColumnSettings);
         }
 
         /// <summary>

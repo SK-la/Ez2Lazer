@@ -6,38 +6,19 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
-using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
-using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzHoldNoteHittingLayer : CompositeDrawable
+    public partial class EzHoldNoteHittingLayer : EzNoteBase
     {
+        protected override bool BoolUpdateColor => false;
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
         private TextureAnimation? animation;
 
-        private IBindable<double> noteHeightBindable = new Bindable<double>();
-        private IBindable<double> columnWidthBindable = new Bindable<double>();
-        private IBindable<double> specialFactorBindable = new Bindable<double>();
-
         public IBindable<double> HitPosition { get; set; } = new Bindable<double>();
-
-        // private IBindable<double> hitPosition = new Bindable<double>();
-        // private float baseYPosition;
-
-        [Resolved]
-        private Column column { get; set; } = null!;
-
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
@@ -46,31 +27,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.Centre;
-            // AutoSizeAxes = Axes.Both;
+            RelativeSizeAxes = Axes.Both;
             Blending = BlendingParameters.Additive;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            noteHeightBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
-            columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            HitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            noteHeightBindable.BindValueChanged(_ => UpdateLNsLight(), true);
-            columnWidthBindable.BindValueChanged(_ => UpdateLNsLight(), true);
-            specialFactorBindable.BindValueChanged(_ => UpdateLNsLight(), true);
-            // hitPosition.BindValueChanged(_ => updateY(), true);
+            HitPosition = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            HitPosition.BindValueChanged(_ => UpdateSize(), true);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            onSkinChanged();
-            factory.OnNoteChanged += onSkinChanged;
-            HitPosition.BindValueChanged(pos => Y =
-                LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION - (float)pos.NewValue, true);
-
             IsHitting.BindValueChanged(hitting =>
             {
                 ClearTransforms();
@@ -89,62 +59,48 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }, true);
         }
 
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                factory.OnNoteChanged -= onSkinChanged;
-            }
-        }
-
         public void Recycle()
         {
             ClearTransforms();
             Alpha = 0;
         }
 
-        private void loadAnimation()
+        protected override void OnDrawableChanged()
         {
-            ClearInternal();
-            animation = factory.CreateAnimation("longnoteflare");
+            string[] componentsToTry = { "longnoteflare", "noteflaregood", "noteflare" };
 
-            if (animation.FrameCount == 0)
+            foreach (string component in componentsToTry)
             {
-                animation.Dispose();
-                animation = factory.CreateAnimation("noteflaregood");
+                animation = factory.CreateAnimation(component);
 
-                if (animation.FrameCount == 0)
+                if (animation.FrameCount > 0)
                 {
-                    animation.Dispose();
-                    animation = factory.CreateAnimation("noteflare");
+                    animation.Loop = true;
+                    break;
                 }
             }
 
-            animation.Loop = true;
-            AddInternal(animation);
-            UpdateLNsLight();
+            if (animation is TextureAnimation textureAnimation && textureAnimation.FrameCount == 0)
+            {
+                animation.Dispose();
+                UpdateColor();
+                return;
+            }
+
+            if (MainContainer != null)
+            {
+                MainContainer.Clear();
+                if (animation != null) MainContainer.Child = animation;
+            }
+
+            Schedule(UpdateSize);
         }
 
-        public void UpdateLNsLight()
+        protected override void UpdateSize()
         {
-            bool isSpecialColumn = ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S1";
-            double columnWidth = columnWidthBindable.Value * (isSpecialColumn ? specialFactorBindable.Value : 1);
-
-            bool isSquare = factory.IsSquareNote("whitenote");
-            float aspectRatio = factory.GetRatio("whitenote");
-
-            float moveY = isSquare
-                ? (float)columnWidth / 2 * aspectRatio
-                : (float)noteHeightBindable.Value * aspectRatio;
-
-            Position = new Vector2(0, moveY);
-        }
-
-        private void onSkinChanged()
-        {
-            loadAnimation();
+            base.UpdateSize();
+            float v = NoteSize.Value.Y / 2;
+            Position = new Vector2(0, -(float)HitPosition.Value - v);
         }
     }
 }

@@ -102,8 +102,6 @@ namespace osu.Game.Database
         /// </summary>
         private const int schema_version = 49;
 
-        public static int SchemaVersion => schema_version;
-
         /// <summary>
         /// Lock object which is held during <see cref="BlockAllOperations"/> sections, blocking realm retrieval during blocking periods.
         /// </summary>

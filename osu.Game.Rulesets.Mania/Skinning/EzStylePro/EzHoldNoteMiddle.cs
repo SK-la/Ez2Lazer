@@ -5,51 +5,30 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzHoldNoteMiddle : CompositeDrawable, IHoldNoteBody
+    public partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
     {
         private readonly IBindable<bool> isHitting = new Bindable<bool>();
 
-        private DrawableHoldNote holdNote = null!;
+        private Container? topContainer;
+        private Container? bodyContainer;
+        private Container? bodyScaleContainer;
+        private Container? bodyInnerContainer;
 
-        private TextureAnimation? middleAnimation;
-        private TextureAnimation? tailAnimation;
-        private Container topContainer = null!;
-        private Container middleContainer = null!;
-        private Container middleScaleContainer = null!;
-        private Container middleInnerContainer = null!;
-
-        private IBindable<double> noteHeight = new Bindable<double>();
         private IBindable<double> hitPosition = new Bindable<double>();
-        private Bindable<bool> enabledColor = null!;
-        private Drawable? container;
-        private Drawable? lightContainer;
-        private EzHoldNoteHittingLayer hittingLayer = null!;
+        private EzHoldNoteHittingLayer? hittingLayer;
 
         [Resolved]
         private Column column { get; set; } = null!;
-
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
-
-        [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
 
         public EzHoldNoteMiddle()
         {
@@ -64,70 +43,32 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader(true)]
         private void load(DrawableHitObject drawableObject)
         {
-            holdNote = (DrawableHoldNote)drawableObject;
+            var holdNote = (DrawableHoldNote)drawableObject;
             isHitting.BindTo(holdNote.IsHolding);
 
-            noteHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight);
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
-        }
-
-        public void Recycle()
-        {
-            ClearTransforms();
-            hittingLayer.Recycle();
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-            updateSizes();
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-            OnSkinChanged();
-            noteHeight.BindValueChanged(_ => OnSettingsChanged(), true);
-            factory.OnNoteChanged += OnSkinChanged;
-            ezSkinConfig.OnSettingsChanged += OnSettingsChanged;
+            hitPosition = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             isHitting.BindValueChanged(onIsHittingChanged, true);
+            OnSkinChanged();
         }
 
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                factory.OnNoteChanged -= OnSkinChanged;
-                ezSkinConfig.OnSettingsChanged -= OnSettingsChanged;
-                lightContainer?.Expire();
-            }
-        }
+        // protected override void Update()
+        // {
+        //     base.Update();
+        // }
 
         private void OnSkinChanged()
         {
-            if (lightContainer != null)
+            if (hittingLayer != null)
             {
-                column.TopLevelContainer.Remove(lightContainer, false);
-                lightContainer.Expire();
-                lightContainer = null;
+                column.TopLevelContainer.Remove(hittingLayer, false);
+                hittingLayer.Expire();
+                hittingLayer = null;
             }
 
-            loadAnimation();
             hittingLayer = new EzHoldNoteHittingLayer
             {
                 Alpha = 0,
                 IsHitting = { BindTarget = isHitting }
-            };
-            lightContainer = new Container
-            {
-                RelativeSizeAxes = Axes.Both,
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                Alpha = 0,
-                Child = hittingLayer
             };
 
             hittingLayer.HitPosition.BindTo(hitPosition);
@@ -135,77 +76,44 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void onIsHittingChanged(ValueChangedEvent<bool> isHitting)
         {
-            hittingLayer.IsHitting.Value = isHitting.NewValue;
+            if (hittingLayer != null) hittingLayer.IsHitting.Value = isHitting.NewValue;
 
-            if (lightContainer == null)
+            if (hittingLayer == null)
                 return;
 
             if (isHitting.NewValue)
             {
-                lightContainer.ClearTransforms();
+                hittingLayer.ClearTransforms();
 
-                if (lightContainer.Parent == null)
-                    column.TopLevelContainer.Add(lightContainer);
+                if (hittingLayer.Parent == null)
+                    column.TopLevelContainer.Add(hittingLayer);
 
-                lightContainer.FadeIn(80);
+                hittingLayer.FadeIn(80);
             }
             else
             {
-                lightContainer.FadeOut(120)
-                              .OnComplete(d => column.TopLevelContainer.Remove(d, false));
+                hittingLayer.FadeOut(120)
+                            .OnComplete(d => column.TopLevelContainer.Remove(d, false));
             }
         }
 
-        protected virtual Color4 NoteColor
+        public void Recycle()
         {
-            get
-            {
-                int keyMode = stageDefinition.Columns;
-                int columnIndex = column.Index;
-                return ezSkinConfig.GetColumnColor(keyMode, columnIndex);
-            }
+            ClearTransforms();
+            hittingLayer?.Recycle();
         }
 
-        protected virtual string ColorPrefix
+        protected override void OnDrawableChanged()
         {
-            get
-            {
-                if (enabledColor.Value)
-                    return "white";
+            string newComponentName = $"{ColorPrefix}note";
+            var body = Factory.CreateAnimation($"{ColorPrefix}longnote/middle");
+            var tail = Factory.CreateAnimation($"{ColorPrefix}longnote/tail");
 
-                if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
-                    return "green";
+            if (body.FrameCount == 0)
+                body = Factory.CreateAnimation(newComponentName);
 
-                int logicalIndex = 0;
-
-                for (int i = 0; i < column.Index; i++)
-                {
-                    if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) != "S1")
-                        logicalIndex++;
-                }
-
-                return logicalIndex % 2 == 0 ? "white" : "blue";
-            }
-        }
-
-        private void loadAnimation()
-        {
-            ClearInternal();
-            string backupComponentName = $"{ColorPrefix}note";
-            middleAnimation = factory.CreateAnimation($"{ColorPrefix}longnote/middle");
-            tailAnimation = factory.CreateAnimation($"{ColorPrefix}longnote/tail");
-
-            if (middleAnimation.FrameCount == 0)
-            {
-                middleAnimation.Dispose();
-                middleAnimation = factory.CreateAnimation(backupComponentName);
-            }
-
-            if (tailAnimation.FrameCount == 0)
-            {
-                tailAnimation.Dispose();
-                tailAnimation = factory.CreateAnimation(backupComponentName);
-            }
+            if (tail.FrameCount == 0)
+                tail = Factory.CreateAnimation(newComponentName);
 
             topContainer = new Container
             {
@@ -218,67 +126,80 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     RelativeSizeAxes = Axes.X,
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    Child = tailAnimation
+                    Child = tail
                 }
             };
-            middleContainer = new Container
+            bodyContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
                 Masking = true,
-                Child = middleScaleContainer = new Container
+                Child = bodyScaleContainer = new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 1,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Child = middleInnerContainer = new Container
+                    Child = bodyInnerContainer = new Container
                     {
                         RelativeSizeAxes = Axes.X,
-                        Child = middleAnimation
+                        Child = body
                     }
                 }
             };
-            container = new Container
+
+            if (MainContainer != null)
             {
-                RelativeSizeAxes = Axes.Both,
-                Children = new[] { middleContainer, topContainer }
-            };
-
-            OnSettingsChanged();
-            AddInternal(container);
-        }
-
-        private void updateSizes()
-        {
-            bool isSquare = factory.IsSquareNote("whitenote");
-            float noteSize = isSquare
-                ? DrawWidth
-                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
-
-            topContainer.Height = noteSize / 2;
-            if (topContainer.Child is Container topInner)
-                topInner.Height = noteSize;
-
-            float middleHeight = Math.Max(DrawHeight - noteSize / 2, noteSize / 2);
-
-            middleContainer.Y = noteSize / 2;
-            middleContainer.Height = middleHeight + 2;
-            middleScaleContainer.Scale = new Vector2(1, DrawHeight - noteSize / 2);
-            middleInnerContainer.Height = noteSize;
-            middleInnerContainer.Y = -noteSize / 2;
-            Invalidate();
-        }
-
-        private void OnSettingsChanged()
-        {
-            if (enabledColor.Value && container != null)
-            {
-                container.Colour = NoteColor;
+                MainContainer.Clear();
+                MainContainer.Children = [bodyContainer, topContainer];
             }
 
-            Schedule(updateSizes);
+            Schedule(UpdateSize);
+        }
+
+        protected override void UpdateSize()
+        {
+            base.UpdateSize();
+            if (MainContainer?.Children.Count == 0)
+                return;
+
+            float v = NoteSize.Value.Y;
+
+            if (topContainer?.Child is Container topInner)
+            {
+                topContainer.Height = v / 2;
+                topInner.Height = v;
+            }
+
+            float middleHeight = Math.Max(DrawHeight - v / 2, v / 2);
+
+            if (bodyContainer != null)
+            {
+                bodyContainer.Y = v / 2;
+                bodyContainer.Height = middleHeight + 2;
+            }
+
+            if (bodyScaleContainer != null)
+                bodyScaleContainer.Scale = new Vector2(1, DrawHeight - v / 2);
+
+            if (bodyInnerContainer != null)
+            {
+                bodyInnerContainer.Height = v;
+                bodyInnerContainer.Y = -v / 2;
+            }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (isDisposing)
+            {
+                hittingLayer?.Expire();
+                topContainer?.Expire();
+                bodyContainer?.Expire();
+            }
         }
     }
 }

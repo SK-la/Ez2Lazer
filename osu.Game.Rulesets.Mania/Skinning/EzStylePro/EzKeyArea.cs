@@ -49,7 +49,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             OnSkinChanged();
             factory.OnStageChanged += OnSkinChanged;
-            ezSkinConfig.OnSettingsChanged += OnConfigChanged;
+            factory.OnNoteSizeChanged += OnConfigChanged;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (isDisposing)
             {
                 factory.OnStageChanged -= OnSkinChanged;
-                ezSkinConfig.OnSettingsChanged -= OnConfigChanged;
+                factory.OnNoteSizeChanged -= OnConfigChanged;
             }
         }
 
@@ -67,14 +67,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S1")
+                if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S")
                     return "02";
 
                 int logicalIndex = 0;
 
                 for (int i = 0; i < column.Index; i++)
                 {
-                    if (ezSkinConfig.GetColumnType(stageDefinition.Columns, i) == "S1")
+                    if (ezSkinConfig.GetColumnType(stageDefinition.Columns, i) == "S")
                         logicalIndex++;
                 }
 
@@ -107,21 +107,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             AddInternal(container);
         }
 
-        private void updateSizes()
-        {
-            bool isSquare = factory.IsSquareNote("whitenote");
-            Height = isSquare
-                ? DrawWidth
-                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
-        }
-
         private void OnConfigChanged()
         {
-            Schedule(() =>
-            {
-                updateSizes();
-                Invalidate();
-            });
         }
 
         private void OnSkinChanged() => loadAnimation();

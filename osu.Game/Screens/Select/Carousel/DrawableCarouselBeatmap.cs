@@ -125,7 +125,7 @@ namespace osu.Game.Screens.Select.Carousel
 
             if (manager != null)
             {
-                hideRequested = manager.Hide;
+                hideRequested = b => manager.Hide(b);
 
                 if (ruleset.Value.OnlineID == 3)
                 {

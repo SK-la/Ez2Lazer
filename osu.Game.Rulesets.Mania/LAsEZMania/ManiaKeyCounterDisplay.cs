@@ -67,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
                 float width = (float)columnWidth.Value;
                 int index = KeyFlow.IndexOf(counter);
 
-                if (ezSkinConfig.GetColumnType(StageDefinition.Columns, index) == "S1")
+                if (ezSkinConfig.GetColumnType(StageDefinition.Columns, index) == "S")
                     width *= (float)specialFactor.Value;
 
                 counter.Width = width;

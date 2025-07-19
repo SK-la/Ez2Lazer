@@ -35,8 +35,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             hitPositon = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            hitPositon.BindValueChanged(_ => OnConfigChanged());
-            columnWidth.BindValueChanged(_ => OnConfigChanged());
+            hitPositon.BindValueChanged(_ => updateSizes());
+            columnWidth.BindValueChanged(_ => updateSizes());
             OnSkinChanged();
         }
 
@@ -63,7 +63,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         //     updateSizes();
         // }
 
-        private void loadAnimation()
+        private void OnSkinChanged()
         {
             ClearInternal();
 
@@ -77,8 +77,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Child = stageBottom
             };
             // sprite.Depth = float.MinValue;
-            OnConfigChanged();
             AddInternal(sprite);
+            Schedule(updateSizes);
         }
 
         private void updateSizes()
@@ -93,16 +93,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             sprite.Y = LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION - (float)hitPositon.Value - DrawHeight * 0.865f;
             // Position = new Vector2(0, 415 + 110 - (float)hitPositon.Value);
         }
-
-        private void OnConfigChanged()
-        {
-            Schedule(() =>
-            {
-                updateSizes();
-                Invalidate();
-            });
-        }
-
-        private void OnSkinChanged() => loadAnimation();
     }
 }

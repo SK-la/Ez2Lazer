@@ -7,17 +7,17 @@ namespace osu.Game.Screens.LAsEzExtensions
     {
         public static string GetColumnType(int keyMode, int columnIndex)
         {
-            // 边界检查
             if (columnIndex < 0 || columnIndex >= keyMode)
                 return "A";
 
-            // 特殊键 (Special或Effect) - 使用S1颜色
             if (isSpecialColumn(keyMode, columnIndex))
-                return "S1";
+                return "S";
 
-            // 面板键 - 使用S2颜色
+            if (isEffectColumn(keyMode, columnIndex))
+                return "E";
+
             if (isPanelColumn(keyMode, columnIndex))
-                return "S2";
+                return "P";
 
             int normalKeyIndex = 0;
 
@@ -30,6 +30,19 @@ namespace osu.Game.Screens.LAsEzExtensions
             return getNormalColumnType(keyMode, normalKeyIndex, columnIndex);
         }
 
+        private static string getNormalColumnType(int keyMode, int normalKeyIndex, int columnIndex)
+        {
+            if (keyMode % 2 == 0)
+            {
+                int halfKey = keyMode / 2;
+                return columnIndex < halfKey
+                    ? (normalKeyIndex % 2 == 0 ? "A" : "B")
+                    : (normalKeyIndex % 2 == 0 ? "B" : "A");
+            }
+
+            return normalKeyIndex % 2 == 0 ? "A" : "B";
+        }
+
         private static bool isSpecialColumn(int keyMode, int columnIndex)
         {
             return keyMode switch
@@ -37,6 +50,14 @@ namespace osu.Game.Screens.LAsEzExtensions
                 12 when columnIndex is 0 or 11 => true,
                 14 when columnIndex is 0 or 12 => true,
                 16 when columnIndex is 0 or 15 => true,
+                _ => false
+            };
+        }
+
+        private static bool isEffectColumn(int keyMode, int columnIndex)
+        {
+            return keyMode switch
+            {
                 16 when columnIndex is 6 or 7 or 8 or 9 => true,
                 _ => false
             };
@@ -52,19 +73,6 @@ namespace osu.Game.Screens.LAsEzExtensions
                 14 when columnIndex is 6 => true,
                 _ => false
             };
-        }
-
-        private static string getNormalColumnType(int keyMode, int normalKeyIndex, int columnIndex)
-        {
-            if (keyMode % 2 == 0)
-            {
-                int halfKey = keyMode / 2;
-                return columnIndex < halfKey
-                    ? (normalKeyIndex % 2 == 0 ? "A" : "B")
-                    : (normalKeyIndex % 2 == 0 ? "B" : "A");
-            }
-
-            return normalKeyIndex % 2 == 0 ? "A" : "B";
         }
     }
 }

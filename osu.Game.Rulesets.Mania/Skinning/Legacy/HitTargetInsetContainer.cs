@@ -15,6 +15,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private Bindable<double> hitPositonBindable = new Bindable<double>();
+        private Bindable<bool> globalHitPosition = new Bindable<bool>();
+
         protected override Container<Drawable> Content => content;
         private readonly Container content;
 
@@ -30,17 +32,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         [BackgroundDependencyLoader]
         private void load(ISkinSource skin, EzSkinSettingsManager ezSkinConfig, IScrollingInfo scrollingInfo)
         {
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            hitPositonBindable.BindValueChanged(_ => UpdateHitPosition(), true);
-            hitPosition = skin.GetManiaSkinConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? (float)hitPositonBindable.Value;
-
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
+
+            ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition).BindValueChanged(_ => updateHitPosition(skin, ezSkinConfig));
+            ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).BindValueChanged(_ => updateHitPosition(skin, ezSkinConfig));
+
+            updateHitPosition(skin, ezSkinConfig);
         }
 
-        protected virtual void UpdateHitPosition()
+        private void updateHitPosition(ISkinSource skin, EzSkinSettingsManager ezSkinConfig)
         {
-            hitPosition = (float)hitPositonBindable.Value;
+            bool globalHitPositionValue = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition).Value;
+            double hitPositionValue = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
+
+            hitPosition = globalHitPositionValue
+                ? (float)hitPositionValue
+                : skin.GetManiaSkinConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? (float)hitPositionValue;
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)

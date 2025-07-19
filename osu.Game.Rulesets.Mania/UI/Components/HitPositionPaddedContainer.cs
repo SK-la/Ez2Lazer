@@ -24,6 +24,7 @@ namespace osu.Game.Rulesets.Mania.UI.Components
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
+        private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
 
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
@@ -31,6 +32,8 @@ namespace osu.Game.Rulesets.Mania.UI.Components
             Direction.BindTo(scrollingInfo.Direction);
             Direction.BindValueChanged(_ => UpdateHitPosition(), true);
 
+            ezSkinConfig.BindWith(EzSkinSetting.GlobalHitPosition, globalHitPosition);
+            globalHitPosition.BindValueChanged(_ => UpdateHitPosition(), true);
             hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             hitPositonBindable.BindValueChanged(_ => UpdateHitPosition(), true);
             skin.SourceChanged += onSkinChanged;
@@ -40,9 +43,16 @@ namespace osu.Game.Rulesets.Mania.UI.Components
 
         protected virtual void UpdateHitPosition()
         {
-            float hitPosition = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                    new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                                ?? (float)hitPositonBindable.Value;
+            float hitPosition;
+
+            if (globalHitPosition.Value)
+                hitPosition = (float)hitPositonBindable.Value;
+            else
+            {
+                hitPosition = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                                  new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
+                              ?? (float)hitPositonBindable.Value;
+            }
 
             Padding = Direction.Value == ScrollingDirection.Up
                 ? new MarginPadding { Top = hitPosition }

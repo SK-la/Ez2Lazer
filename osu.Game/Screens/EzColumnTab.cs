@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -12,7 +13,6 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Screens.LAsEzExtensions;
-using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
@@ -20,41 +20,86 @@ namespace osu.Game.Screens
 {
     public partial class EzColumnTab : EditorSidebarSection
     {
-        private readonly List<int> availableKeyModes = new List<int> { 0, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
+        private static readonly List<int> available_key_modes = new List<int> { 0, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
+
+        private readonly Dictionary<int, List<EzSelectorColour>> columnSelectorCache = new Dictionary<int, List<EzSelectorColour>>();
+        private readonly Dictionary<EzSkinSetting, BindableColour4> colorBindables = new Dictionary<EzSkinSetting, BindableColour4>();
+
         private FillFlowContainer columnsContainer = null!;
-        private Bindable<int> keyModeSelection = new Bindable<int>();
-        private Bindable<bool> colorSettingsEnabled = new BindableBool(true);
-        private BindableColour4 aColorValue = new BindableColour4();
-        private BindableColour4 bColorValue = new BindableColour4();
-        private BindableColour4 s1ColorValue = new BindableColour4();
-        private BindableColour4 s2ColorValue = new BindableColour4();
+        private FillFlowContainer baseColorsContainer = null!;
+
+        private Bindable<int> keyModeSelection = null!;
+        private Bindable<bool> colorSettingsEnabled = null!;
 
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
-        private SkinManager skinManager { get; set; } = null!;
-
-        [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         public EzColumnTab()
-            : base("EZ Column Settings")
-        {
-        }
+            : base("EZ Column Settings") { }
 
         [BackgroundDependencyLoader]
         private void load()
         {
             keyModeSelection = ezSkinConfig.GetBindable<int>(EzSkinSetting.SelectedKeyMode);
             colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
-            // 设置双向绑定
-            aColorValue = createColorBindable(EzSkinSetting.ColumnTypeA);
-            bColorValue = createColorBindable(EzSkinSetting.ColumnTypeB);
-            s1ColorValue = createColorBindable(EzSkinSetting.ColumnTypeS1);
-            s2ColorValue = createColorBindable(EzSkinSetting.ColumnTypeS2);
 
-            var baseColorsContainer = new FillFlowContainer
+            colorBindables[EzSkinSetting.ColumnTypeA] = createColorBindable(EzSkinSetting.ColumnTypeA);
+            colorBindables[EzSkinSetting.ColumnTypeB] = createColorBindable(EzSkinSetting.ColumnTypeB);
+            colorBindables[EzSkinSetting.ColumnTypeS] = createColorBindable(EzSkinSetting.ColumnTypeS);
+            colorBindables[EzSkinSetting.ColumnTypeE] = createColorBindable(EzSkinSetting.ColumnTypeE);
+            colorBindables[EzSkinSetting.ColumnTypeP] = createColorBindable(EzSkinSetting.ColumnTypeP);
+            createUI();
+            updateKeyModeFromCurrentBeatmap();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            setupEventHandlers();
+            updateColumnsType(keyModeSelection.Value);
+        }
+
+        private void createUI()
+        {
+            baseColorsContainer = createBaseColorsContainer();
+
+            Children = new Drawable[]
+            {
+                new FillFlowContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(2),
+                    Children = new Drawable[]
+                    {
+                        createColorSettingsCheckbox(),
+                        baseColorsContainer,
+                        createKeyModeSection(),
+                        createSaveButton()
+                    }
+                }
+            };
+        }
+
+        private SettingsCheckbox createColorSettingsCheckbox()
+        {
+            return new SettingsCheckbox
+            {
+                LabelText = "Color Enable\n(着色设置)",
+                TooltipText = "仅支持EZ Style Pro皮肤. Only supports EZ Style Pro skin\n" +
+                              "切换tab栏或保存后, 将重置默认颜色为当前设置\n" +
+                              "Switching tabs or saving will reset the colors to the default values",
+                Current = colorSettingsEnabled,
+            };
+        }
+
+        private FillFlowContainer createBaseColorsContainer()
+        {
+            return new FillFlowContainer
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
@@ -67,119 +112,72 @@ namespace osu.Game.Screens
                         Margin = new MarginPadding { Bottom = 5 },
                         Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14)
                     }.WithUnderline(),
-                    SettingsColourExtensions.CreateStyledSettingsColour("A", aColorValue),
-                    SettingsColourExtensions.CreateStyledSettingsColour("B", bColorValue),
-                    SettingsColourExtensions.CreateStyledSettingsColour("S1", s1ColorValue),
-                    SettingsColourExtensions.CreateStyledSettingsColour("S2", s2ColorValue),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_A, colorBindables[EzSkinSetting.ColumnTypeA]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_B, colorBindables[EzSkinSetting.ColumnTypeB]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_S, colorBindables[EzSkinSetting.ColumnTypeS]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_E, colorBindables[EzSkinSetting.ColumnTypeE]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_P, colorBindables[EzSkinSetting.ColumnTypeP]),
                 }
             };
+        }
 
-            Children = new Drawable[]
+        private FillFlowContainer createKeyModeSection()
+        {
+            return new FillFlowContainer
             {
-                new FillFlowContainer
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Margin = new MarginPadding(5f),
+                Children = new Drawable[]
                 {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(2),
-                    Children = new Drawable[]
+                    new OsuSpriteText
                     {
-                        new SettingsCheckbox
-                        {
-                            LabelText = "Color Enable\n(着色设置)",
-                            TooltipText = "仅支持EZ Style Pro皮肤. Only supports EZ Style Pro skin\n"
-                                          + "切换tab栏或保存后, 将重置默认颜色为当前设置\n" +
-                                          "Switching tabs or saving will reset the colors to the default values",
-                            // Scale = new Vector2(0.9f),
-                            Current = colorSettingsEnabled,
-                        },
-                        // 基础颜色选择器
-                        baseColorsContainer,
-                        new FillFlowContainer
-                        {
-                            RelativeSizeAxes = Axes.X,
-                            AutoSizeAxes = Axes.Y,
-                            Direction = FillDirection.Vertical,
-                            Margin = new MarginPadding(5f),
-                            Children = new Drawable[]
-                            {
-                                new OsuSpriteText
-                                {
-                                    Text = "Key Mode (键位数)",
-                                    Margin = new MarginPadding { Bottom = 5 },
-                                    Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14),
-                                }.WithUnderline(),
-                                new SettingsDropdown<int>
-                                {
-                                    Current = keyModeSelection,
-                                    Items = availableKeyModes
-                                },
-                                new Box
-                                {
-                                    RelativeSizeAxes = Axes.X,
-                                    Height = 2,
-                                    Colour = Color4.DarkGray.Opacity(0.5f),
-                                },
-                                // 列颜色设置容器
-                                columnsContainer = new FillFlowContainer
-                                {
-                                    RelativeSizeAxes = Axes.X,
-                                    AutoSizeAxes = Axes.Y,
-                                    Direction = FillDirection.Vertical,
-                                    Spacing = new Vector2(2)
-                                },
-                            }
-                        },
-                        new SettingsButton
-                        {
-                            Action = () =>
-                            {
-                                ezSkinConfig.Save();
-                                skinManager.CurrentSkinInfo.TriggerChange();
-                            },
-                        }.WithTwoLineText("(保存颜色设置)", "Save Color Settings")
-                    }
+                        Text = "Key Mode (键位数)",
+                        Margin = new MarginPadding { Bottom = 5 },
+                        Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14),
+                    }.WithUnderline(),
+                    new SettingsDropdown<int>
+                    {
+                        Current = keyModeSelection,
+                        Items = available_key_modes
+                    },
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = 2,
+                        Colour = Color4.DarkGray.Opacity(0.5f),
+                    },
+                    columnsContainer = new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(2)
+                    },
                 }
             };
-            updateKeyModeFromCurrentBeatmap();
-
-            colorSettingsEnabled.BindValueChanged(e =>
-            {
-                ezSkinConfig.SetValue(EzSkinSetting.ColorSettingsEnabled, e.NewValue);
-                ezSkinConfig.Save();
-                skinManager.Save(skinManager.CurrentSkin.Value);
-                baseColorsContainer.Alpha = e.NewValue ? 1f : 0f;
-            }, true);
         }
 
-        private void updateKeyModeFromCurrentBeatmap()
+        private SettingsButton createSaveButton()
         {
-            if (beatmap.Value?.Beatmap == null)
-                return;
-
-            int currentKeyCount = 0;
-
-            if (beatmap.Value.BeatmapInfo.Ruleset.OnlineID == 3)
+            return new SettingsButton
             {
-                currentKeyCount = (int)beatmap.Value.Beatmap.Difficulty.CircleSize;
-            }
-
-            // 如果无法获取键位数或键位数不在可用列表中，则不更改
-            if (currentKeyCount > 0 && availableKeyModes.Contains(currentKeyCount))
-                keyModeSelection.Value = currentKeyCount;
+                Action = () => ezSkinConfig.Save(),
+            }.WithTwoLineText("(保存颜色设置)", "Save Color Settings");
         }
 
-        protected override void LoadComplete()
+        private void setupEventHandlers()
         {
-            base.LoadComplete();
+            colorSettingsEnabled.BindValueChanged(onColorSettingsEnabledChanged, true);
+            keyModeSelection.BindValueChanged(e => updateColumnsType(e.NewValue));
 
-            aColorValue.ValueChanged += e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeA, "A");
-            bColorValue.ValueChanged += e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeB, "B");
-            s1ColorValue.ValueChanged += e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeS1, "S1");
-            s2ColorValue.ValueChanged += e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeS2, "S2");
-            keyModeSelection.ValueChanged += e => updateColumnsType(e.NewValue);
-
-            updateColumnsType(keyModeSelection.Value);
+            // 设置颜色变化事件
+            colorBindables[EzSkinSetting.ColumnTypeA].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeA, EzConstants.COLUMN_TYPE_A));
+            colorBindables[EzSkinSetting.ColumnTypeB].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeB, EzConstants.COLUMN_TYPE_B));
+            colorBindables[EzSkinSetting.ColumnTypeS].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeS, EzConstants.COLUMN_TYPE_S));
+            colorBindables[EzSkinSetting.ColumnTypeE].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeE, EzConstants.COLUMN_TYPE_E));
+            colorBindables[EzSkinSetting.ColumnTypeP].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeP, EzConstants.COLUMN_TYPE_P));
         }
 
         private BindableColour4 createColorBindable(EzSkinSetting setting)
@@ -193,39 +191,52 @@ namespace osu.Game.Screens
             return result;
         }
 
-        private void updateBaseColour(Colour4 newColor, EzSkinSetting setting, string colorType)
+        private void onColorSettingsEnabledChanged(ValueChangedEvent<bool> e)
         {
+            baseColorsContainer.Alpha = e.NewValue ? 1f : 0f;
+        }
+
+        private void updateBaseColour(Colour4 newColor, EzSkinSetting setting, string type)
+        {
+            if (!colorSettingsEnabled.Value)
+                return;
+
             ezSkinConfig.SetValue(setting, newColor);
-
-            foreach (int keyMode in availableKeyModes)
-            {
-                for (int columnIndex = 0; columnIndex < keyMode; columnIndex++)
-                {
-                    string currentType = ezSkinConfig.GetColumnType(keyMode, columnIndex);
-
-                    if (currentType == colorType)
-                    {
-                        ezSkinConfig.SetColumnType(keyMode, columnIndex, colorType);
-                    }
-                }
-            }
 
             foreach (var selector in columnsContainer.ChildrenOfType<EzSelectorColour>())
             {
-                selector.SetColorMapping(colorType, newColor);
+                selector.SetColorMapping(type, newColor);
             }
-
-            ezSkinConfig.Save();
-            Invalidate();
         }
 
-        #region 创建选择器
+        private void updateKeyModeFromCurrentBeatmap()
+        {
+            if (beatmap.Value?.Beatmap == null)
+                return;
+
+            if (beatmap.Value.BeatmapInfo.Ruleset.OnlineID == 3)
+            {
+                int currentKeyCount = (int)beatmap.Value.Beatmap.Difficulty.CircleSize;
+
+                if (currentKeyCount > 0 && available_key_modes.Contains(currentKeyCount))
+                {
+                    keyModeSelection.Value = currentKeyCount;
+                }
+            }
+        }
 
         private void updateColumnsType(int keyMode)
         {
+            if (columnSelectorCache.TryGetValue(keyMode, out var cachedSelectors))
+            {
+                columnsContainer.Clear();
+                columnsContainer.AddRange(cachedSelectors);
+                return;
+            }
+
             columnsContainer.Clear();
 
-            if (keyMode == 0 || !availableKeyModes.Contains(keyMode))
+            if (keyMode == 0 || !available_key_modes.Contains(keyMode))
             {
                 columnsContainer.Add(new OsuSpriteText
                 {
@@ -236,6 +247,11 @@ namespace osu.Game.Screens
                 return;
             }
 
+            createColumnSelectors(keyMode);
+        }
+
+        private void createColumnSelectors(int keyMode)
+        {
             columnsContainer.Add(new OsuSpriteText
             {
                 Text = $"{keyMode}K ColumnType 列类型",
@@ -243,47 +259,51 @@ namespace osu.Game.Screens
                 Margin = new MarginPadding { Bottom = 5 },
             }.WithUnderline());
 
-            var colorMapping = new Dictionary<string, Color4>
-            {
-                ["A"] = aColorValue.Value,
-                ["B"] = bColorValue.Value,
-                ["S1"] = s1ColorValue.Value,
-                ["S2"] = s2ColorValue.Value
-            };
-
-            string[] currentColumnTypes = new string[keyMode];
+            var newSelectors = new List<EzSelectorColour>();
+            var colorMapping = createColorMapping();
+            string[] columnTypes = Enum.GetNames(typeof(EzColumnType));
 
             for (int i = 0; i < keyMode; i++)
             {
-                currentColumnTypes[i] = ezSkinConfig.GetColumnType(keyMode, i);
-            }
-
-            for (int i = 0; i < keyMode; i++)
-            {
-                int columnIndex = i;
-                string savedType = currentColumnTypes[columnIndex];
-
-                if (string.IsNullOrEmpty(savedType))
-                {
-                    savedType = EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
-                    currentColumnTypes[columnIndex] = savedType;
-                    ezSkinConfig.SetColumnType(keyMode, columnIndex, savedType);
-                }
-
-                var selector = new EzSelectorColour($"Column {columnIndex + 1}", new[] { "A", "B", "S1", "S2" }, colorMapping);
-                selector.Current.Value = savedType;
-
-                selector.Current.ValueChanged += e =>
-                {
-                    ezSkinConfig.SetColumnType(keyMode, columnIndex, e.NewValue);
-                    ezSkinConfig.Save();
-                    // Invalidate();
-                };
-
+                var selector = createColumnSelector(keyMode, i, columnTypes, colorMapping);
                 columnsContainer.Add(selector);
+                newSelectors.Add(selector);
             }
+
+            columnSelectorCache[keyMode] = newSelectors;
         }
 
-        #endregion
+        private Dictionary<string, Color4> createColorMapping()
+        {
+            return new Dictionary<string, Color4>
+            {
+                [EzConstants.COLUMN_TYPE_A] = colorBindables[EzSkinSetting.ColumnTypeA].Value,
+                [EzConstants.COLUMN_TYPE_B] = colorBindables[EzSkinSetting.ColumnTypeB].Value,
+                [EzConstants.COLUMN_TYPE_S] = colorBindables[EzSkinSetting.ColumnTypeS].Value,
+                [EzConstants.COLUMN_TYPE_E] = colorBindables[EzSkinSetting.ColumnTypeE].Value,
+                [EzConstants.COLUMN_TYPE_P] = colorBindables[EzSkinSetting.ColumnTypeP].Value
+            };
+        }
+
+        private EzSelectorColour createColumnSelector(int keyMode, int columnIndex, string[] columnTypes, Dictionary<string, Color4> colorMapping)
+        {
+            string savedType = ezSkinConfig.GetColumnType(keyMode, columnIndex);
+
+            if (string.IsNullOrEmpty(savedType))
+            {
+                savedType = EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
+                ezSkinConfig.SetColumnType(keyMode, columnIndex, savedType);
+            }
+
+            var selector = new EzSelectorColour($"Column {columnIndex + 1}", columnTypes, colorMapping);
+            selector.Current.Value = savedType;
+
+            selector.Current.ValueChanged += e =>
+            {
+                ezSkinConfig.SetColumnType(keyMode, columnIndex, e.NewValue);
+            };
+
+            return selector;
+        }
     }
 }

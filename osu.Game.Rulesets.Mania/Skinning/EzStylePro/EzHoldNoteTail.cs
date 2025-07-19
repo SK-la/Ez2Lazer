@@ -20,14 +20,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteTail : CompositeDrawable
     {
-        private EzHoldNoteHittingLayer hittingLayer = null!;
+        private readonly EzHoldNoteHittingLayer hittingLayer = null!;
         private TextureAnimation? animation;
         private Container container = null!;
 
         private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
-        private float noteSize;
-        private bool isSquare;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -48,9 +46,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             RelativeSizeAxes = Axes.Both;
             Alpha = 0f;
 
-            hittingLayer = new EzHoldNoteHittingLayer { RelativeSizeAxes = Axes.Both };
-            AddInternal(hittingLayer);
-
             if (drawableObject != null)
             {
                 // accentColour.BindTo(drawableObject.AccentColour);
@@ -64,13 +59,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void updateSizes()
         {
-            isSquare = factory.IsSquareNote("whitenote");
-            noteSize = isSquare
-                ? DrawWidth
-                : (float)(ezSkinConfig.GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).Value);
-
-            container.Height = noteSize / 2;
-            if (animation != null) animation.Height = noteSize;
         }
 
         protected override void LoadComplete()
@@ -78,7 +66,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             loadAnimation();
             factory.OnNoteChanged += onSkinChanged;
-            ezSkinConfig.OnSettingsChanged += onSettingsChanged;
+            factory.OnNoteSizeChanged += onNoteSizeChanged;
         }
 
         private void onSkinChanged()
@@ -86,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Schedule(loadAnimation);
         }
 
-        private void onSettingsChanged()
+        private void onNoteSizeChanged()
         {
             if (enabledColor.Value)
                 container.Colour = NoteColor;
@@ -145,7 +133,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             };
 
-            onSettingsChanged();
+            onNoteSizeChanged();
             AddInternal(container);
         }
 

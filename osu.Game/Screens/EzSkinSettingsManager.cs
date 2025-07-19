@@ -2,7 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics;
@@ -18,68 +20,29 @@ namespace osu.Game.Screens
         protected override string Filename => "EzSkinSettings.ini";
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
 
-        protected override void InitialiseDefaults()
+        private static readonly Dictionary<int, EzSkinSetting> key_mode_to_column_color_setting = new Dictionary<int, EzSkinSetting>
         {
-            SetDefault(EzSkinSetting.SelectedKeyMode, 4);
+            { 4, EzSkinSetting.ColumnColor4K },
+            { 5, EzSkinSetting.ColumnColor5K },
+            { 6, EzSkinSetting.ColumnColor6K },
+            { 7, EzSkinSetting.ColumnColor7K },
+            { 8, EzSkinSetting.ColumnColor8K },
+            { 9, EzSkinSetting.ColumnColor9K },
+            { 10, EzSkinSetting.ColumnColor10K },
+            { 12, EzSkinSetting.ColumnColor12K },
+            { 14, EzSkinSetting.ColumnColor14K },
+            { 16, EzSkinSetting.ColumnColor16K },
+            { 18, EzSkinSetting.ColumnColor18K },
+        };
 
-            SetDefault(EzSkinSetting.ColumnWidth, 60, 5, 400.0, 1.0);
-            SetDefault(EzSkinSetting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
-            SetDefault(EzSkinSetting.HitPosition, LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION, 0, 500, 1.0);
-            SetDefault(EzSkinSetting.VisualHitPosition, 0.0, -100, 100, 1.0);
-
-            SetDefault(EzSkinSetting.ColumnWidthStyle, EzColumnWidthStyle.EzStyleProOnly);
-            SetDefault(EzSkinSetting.GlobalHitPosition, false);
-            SetDefault(EzSkinSetting.GlobalTextureName, 4);
-
-            SetDefault(EzSkinSetting.NoteSetName, "evolve");
-            SetDefault(EzSkinSetting.StageName, "JIYU");
-            SetDefault(EzSkinSetting.NonSquareNoteHeight, 28.0, 1.0, 100.0, 1.0);
-            SetDefault(EzSkinSetting.NoteTrackLine, true);
-            SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
-
-            SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
-            SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
-            SetDefault(EzSkinSetting.ColumnTypeB, Colour4.FromHex("#648FFF"));
-            SetDefault(EzSkinSetting.ColumnTypeS1, Colour4.FromHex("#FF4A4A"));
-            SetDefault(EzSkinSetting.ColumnTypeS2, Colour4.FromHex("#72FF72"));
-
-            foreach (int keyMode in commonKeyModes)
-            {
-                EzSkinSetting setting = getColumnColorSetting(keyMode);
-                SetDefault(setting, string.Join(",", getDefaultColumnTypes(keyMode)));
-            }
-        }
-
-        private EzSkinSetting getColumnColorSetting(int keyMode)
+        private static readonly Dictionary<string, EzSkinSetting> column_type_to_setting = new Dictionary<string, EzSkinSetting>
         {
-            return keyMode switch
-            {
-                4 => EzSkinSetting.ColumnColor4K,
-                5 => EzSkinSetting.ColumnColor5K,
-                6 => EzSkinSetting.ColumnColor6K,
-                7 => EzSkinSetting.ColumnColor7K,
-                8 => EzSkinSetting.ColumnColor8K,
-                9 => EzSkinSetting.ColumnColor9K,
-                10 => EzSkinSetting.ColumnColor10K,
-                12 => EzSkinSetting.ColumnColor12K,
-                14 => EzSkinSetting.ColumnColor14K,
-                16 => EzSkinSetting.ColumnColor16K,
-                18 => EzSkinSetting.ColumnColor18K,
-                _ => throw new NotSupportedException($"不支持 {keyMode} 键位模式")
-            };
-        }
-
-        private string[] getDefaultColumnTypes(int keyMode)
-        {
-            string[] types = new string[keyMode];
-
-            for (int i = 0; i < keyMode; i++)
-            {
-                types[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
-            }
-
-            return types;
-        }
+            [nameof(EzColumnType.A)] = EzSkinSetting.ColumnTypeA,
+            [nameof(EzColumnType.B)] = EzSkinSetting.ColumnTypeB,
+            [nameof(EzColumnType.S)] = EzSkinSetting.ColumnTypeS,
+            [nameof(EzColumnType.E)] = EzSkinSetting.ColumnTypeE,
+            [nameof(EzColumnType.P)] = EzSkinSetting.ColumnTypeP,
+        };
 
         public EzSkinSettingsManager(Storage storage)
             : base(storage)
@@ -87,32 +50,90 @@ namespace osu.Game.Screens
             initializeEvents();
         }
 
+        protected override void InitialiseDefaults()
+        {
+            SetDefault(EzSkinSetting.SelectedKeyMode, 4);
+            SetDefault(EzSkinSetting.ColumnWidthStyle, EzColumnWidthStyle.EzStyleProOnly);
+            SetDefault(EzSkinSetting.GlobalHitPosition, false);
+            SetDefault(EzSkinSetting.GlobalTextureName, 4);
+
+            SetDefault(EzSkinSetting.ColumnWidth, 60, 5, 400.0, 1.0);
+            SetDefault(EzSkinSetting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
+            SetDefault(EzSkinSetting.HitPosition, LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION, 0, 500, 1.0);
+            SetDefault(EzSkinSetting.VisualHitPosition, 0.0, -100, 100, 1.0);
+
+            SetDefault(EzSkinSetting.NoteSetName, "evolve");
+            SetDefault(EzSkinSetting.StageName, "JIYU");
+            SetDefault(EzSkinSetting.NoteHeightScaleToWidth, 1, 0.1, 2, 0.1);
+            SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
+
+            SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
+            SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
+            SetDefault(EzSkinSetting.ColumnTypeB, Colour4.FromHex("#648FFF"));
+            SetDefault(EzSkinSetting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
+            SetDefault(EzSkinSetting.ColumnTypeE, Colour4.FromHex("#FF4A4A"));
+            SetDefault(EzSkinSetting.ColumnTypeP, Colour4.FromHex("#72FF72"));
+
+            SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
+            SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
+            SetDefault(EzSkinSetting.ColumnTypeB, Colour4.FromHex("#648FFF"));
+            SetDefault(EzSkinSetting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
+            SetDefault(EzSkinSetting.ColumnTypeE, Colour4.FromHex("#FF4A4A"));
+            SetDefault(EzSkinSetting.ColumnTypeP, Colour4.FromHex("#72FF72"));
+            initializeColumnTypeDefaults();
+        }
+
+        private void initializeColumnTypeDefaults()
+        {
+            foreach (int keyMode in commonKeyModes)
+            {
+                if (key_mode_to_column_color_setting.TryGetValue(keyMode, out var setting))
+                {
+                    string[] defaultTypes = getDefaultColumnTypes(keyMode);
+                    SetDefault(setting, string.Join(",", defaultTypes));
+                }
+            }
+        }
+
+        private static EzSkinSetting getColumnTypeListSetting(int keyMode)
+        {
+            if (key_mode_to_column_color_setting.TryGetValue(keyMode, out var setting))
+                return setting;
+
+            throw new NotSupportedException($"不支持 {keyMode} 键位模式");
+        }
+
+        private static string[] getDefaultColumnTypes(int keyMode)
+        {
+            return Enumerable.Range(0, keyMode)
+                             .Select(i => EzColumnTypeManager.GetColumnType(keyMode, i))
+                             .ToArray();
+        }
+
         public string GetColumnType(int keyMode, int columnIndex)
         {
             try
             {
-                EzSkinSetting setting = getColumnColorSetting(keyMode);
-                string columnColors = Get<string>(setting);
-
-                string[] types = columnColors.Split(',');
+                var setting = getColumnTypeListSetting(keyMode);
+                string? columnColors = Get<string>(setting);
+                string[] types = columnColors?.Split(',') ?? Array.Empty<string>();
 
                 if (columnIndex < types.Length && !string.IsNullOrEmpty(types[columnIndex]))
                     return types[columnIndex];
-
-                return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
             }
             catch (NotSupportedException)
             {
-                return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
             }
+
+            return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
         }
 
         public void SetColumnType(int keyMode, int columnIndex, string colorType)
         {
             try
             {
-                EzSkinSetting setting = getColumnColorSetting(keyMode);
-                string currentConfig = Get<string>(setting);
+                var setting = getColumnTypeListSetting(keyMode);
+                string? currentConfig = Get<string>(setting);
                 string[] types = !string.IsNullOrEmpty(currentConfig)
                     ? currentConfig.Split(',')
                     : new string[keyMode];
@@ -134,53 +155,84 @@ namespace osu.Game.Screens
         {
             string colorType = GetColumnType(keyMode, columnIndex);
 
-            EzSkinSetting setting = colorType switch
-            {
-                "S1" => EzSkinSetting.ColumnTypeS1,
-                "S2" => EzSkinSetting.ColumnTypeS2,
-                "B" => EzSkinSetting.ColumnTypeB,
-                _ => EzSkinSetting.ColumnTypeA
-            };
+            if (column_type_to_setting.TryGetValue(colorType, out var setting))
+                return Get<Colour4>(setting);
 
-            return Get<Colour4>(setting);
+            return Get<Colour4>(EzSkinSetting.ColumnTypeA);
         }
+
+        public IBindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
+        {
+            string colorType = GetColumnType(keyMode, columnIndex);
+
+            if (column_type_to_setting.TryGetValue(colorType, out var setting))
+                return GetBindable<Colour4>(setting);
+
+            return GetBindable<Colour4>(EzSkinSetting.ColumnTypeA);
+        }
+
+        // public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex)
+        // {
+        //     var result = new Bindable<Vector2>();
+        //
+        //     var columnWidthBindable = GetBindable<double>(EzSkinSetting.ColumnWidth);
+        //     var specialFactorBindable = GetBindable<double>(EzSkinSetting.SpecialFactor);
+        //     var heightScaleBindable = GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
+        //
+        //     void updateNoteSize()
+        //     {
+        //         bool isSpecialColumn = GetColumnType(keyMode, columnIndex) == "S";
+        //         double baseWidth = columnWidthBindable.Value;
+        //         double specialFactor = specialFactorBindable.Value;
+        //         double heightScale = heightScaleBindable.Value;
+        //
+        //         float x = (float)(baseWidth * (isSpecialColumn ? specialFactor : 1.0));
+        //         float y = (float)(heightScale);
+        //         result.Value = new Vector2(x, y);
+        //     }
+        //
+        //     columnWidthBindable.BindValueChanged(e =>
+        //     {
+        //         Logger.Log($"ColumnWidth changed: {e.NewValue}");
+        //         updateNoteSize();
+        //     });
+        //     specialFactorBindable.BindValueChanged(_ => updateNoteSize());
+        //     heightScaleBindable.BindValueChanged(_ => updateNoteSize());
+        //
+        //     updateNoteSize();
+        //
+        //     return result;
+        // }
 
         public new Bindable<T> GetBindable<T>(EzSkinSetting setting)
         {
             return base.GetBindable<T>(setting);
         }
 
-        public event Action? OnSettingsChanged;
-        public event Action? OnColumnChanged;
+        // public event Action? OnPositionChanged;
+        public event Action? OnNoteSizeChanged;
 
         private void initializeEvents()
         {
-            GetBindable<double>(EzSkinSetting.ColumnWidth).ValueChanged += e => OnColumnChanged?.Invoke();
-            GetBindable<double>(EzSkinSetting.SpecialFactor).ValueChanged += e => OnColumnChanged?.Invoke();
-
-            GetBindable<double>(EzSkinSetting.HitPosition).ValueChanged += e => OnSettingsChanged?.Invoke();
-            GetBindable<double>(EzSkinSetting.VisualHitPosition).ValueChanged += e => OnSettingsChanged?.Invoke();
-
-            GetBindable<double>(EzSkinSetting.NonSquareNoteHeight).ValueChanged += e => OnSettingsChanged?.Invoke();
-            GetBindable<double>(EzSkinSetting.NoteTrackLineHeight).ValueChanged += e => OnSettingsChanged?.Invoke();
+            // GetBindable<double>(EzSkinSetting.HitPosition).BindValueChanged(_ => OnPositionChanged?.Invoke(), true);
+            GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth).BindValueChanged(_ => updateAllNoteSizes(), true);
+            GetBindable<double>(EzSkinSetting.ColumnWidth).BindValueChanged(_ => updateAllNoteSizes(), true);
+            GetBindable<double>(EzSkinSetting.SpecialFactor).BindValueChanged(_ => updateAllNoteSizes(), true);
         }
 
-        protected void NotifySettingsChanged()
+        private void updateAllNoteSizes()
         {
-            OnSettingsChanged?.Invoke();
-            OnColumnChanged?.Invoke();
+            OnNoteSizeChanged?.Invoke();
         }
 
         public new void SetValue<T>(EzSkinSetting lookup, T value)
         {
             base.SetValue(lookup, value);
-            NotifySettingsChanged();
         }
 
         public new void Save()
         {
             base.Save();
-            NotifySettingsChanged();
         }
 
         IBindable<float> IGameplaySettings.ComboColourNormalisationAmount => null!;
@@ -214,19 +266,11 @@ namespace osu.Game.Screens
         // Ez专属皮肤设置
         HitPosition,
         VisualHitPosition,
-        NonSquareNoteHeight,
-        NoteTrackLine,
+        NoteHeightScaleToWidth,
         NoteTrackLineHeight,
         GlobalTextureName,
         NoteSetName,
         StageName,
-        // DynamicTracking,
-
-        // 列类型
-        ColumnTypeA,
-        ColumnTypeB,
-        ColumnTypeS1,
-        ColumnTypeS2,
 
         // 着色系统
         ColorSettingsEnabled,
@@ -241,27 +285,31 @@ namespace osu.Game.Screens
         ColumnColor14K,
         ColumnColor16K,
         ColumnColor18K,
+
+        // 列类型
+        // ColumnTypeBase = 500,
+        ColumnTypeA,
+        ColumnTypeB,
+        ColumnTypeS,
+        ColumnTypeE,
+        ColumnTypeP,
+    }
+
+    public enum EzColumnType
+    {
+        A,
+        B,
+        S,
+        E,
+        P
+    }
+
+    public static class EzConstants
+    {
+        public const string COLUMN_TYPE_A = nameof(EzColumnType.A);
+        public const string COLUMN_TYPE_B = nameof(EzColumnType.B);
+        public const string COLUMN_TYPE_S = nameof(EzColumnType.S);
+        public const string COLUMN_TYPE_E = nameof(EzColumnType.E);
+        public const string COLUMN_TYPE_P = nameof(EzColumnType.P);
     }
 }
-
-// private void setDefaultColumnColor()
-// {
-//     foreach (int keyMode in commonKeyModes)
-//     {
-//         EzSkinSetting setting = getColumnColorSetting(keyMode);
-//
-//         string existingConfig = Get<string>(setting);
-//
-//         if (string.IsNullOrEmpty(existingConfig))
-//         {
-//             string[] types = new string[keyMode];
-//
-//             for (int i = 0; i < keyMode; i++)
-//             {
-//                 types[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
-//             }
-//
-//             SetValue(setting, string.Join(",", types));
-//         }
-//     }
-// }

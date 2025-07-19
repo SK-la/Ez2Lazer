@@ -202,6 +202,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
                         case ManiaSkinComponents.HitExplosion:
                             return new EzHitExplosion();
+                            // return HitExplosionPool.Rent();
 
                         case ManiaSkinComponents.StageBackground:
                             return new Ez2StageBackground();
@@ -226,7 +227,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
-                bool isSpecialColumn = ezSkinConfig.GetColumnType(stage.Columns, columnIndex) == "S1";
+                bool isSpecialColumn = ezSkinConfig.GetColumnType(stage.Columns, columnIndex) == "S";
                 float width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
                 // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
 

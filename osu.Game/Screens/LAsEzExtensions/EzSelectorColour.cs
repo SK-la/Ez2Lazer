@@ -38,10 +38,11 @@ namespace osu.Game.Screens.LAsEzExtensions
             // 优化：使用懒加载初始化默认颜色
             defaultColors = new Lazy<Dictionary<string, Color4>>(() => new Dictionary<string, Color4>
             {
-                ["A"] = Color4.White,
-                ["B"] = Color4.DodgerBlue,
-                ["S1"] = Color4.LimeGreen,
-                ["S2"] = Color4.Red
+                [EzConstants.COLUMN_TYPE_A] = Color4.White,
+                [EzConstants.COLUMN_TYPE_B] = Color4.DodgerBlue,
+                [EzConstants.COLUMN_TYPE_S] = Color4.IndianRed,
+                [EzConstants.COLUMN_TYPE_E] = Color4.IndianRed,
+                [EzConstants.COLUMN_TYPE_P] = Color4.LimeGreen
             });
 
             if (colorMapping != null)
@@ -95,14 +96,14 @@ namespace osu.Game.Screens.LAsEzExtensions
 
             AddButtons(items);
 
-            Current.ValueChanged += e =>
+            Current.BindValueChanged(e =>
             {
                 if (e.OldValue != null && buttonsByName.TryGetValue(e.OldValue, out var oldButton))
                     oldButton.Selected = false;
 
                 if (e.NewValue != null && buttonsByName.TryGetValue(e.NewValue, out var newButton))
                     newButton.Selected = true;
-            };
+            });
         }
 
         // 添加悬浮事件处理
@@ -166,6 +167,22 @@ namespace osu.Game.Screens.LAsEzExtensions
                 return color;
 
             return defaultColors.Value.TryGetValue(name, out color) ? color : Color4.White;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                foreach (var button in buttonsByName.Values)
+                {
+                    button.Action = null;
+                }
+
+                buttonsByName.Clear();
+                colorMap.Clear();
+            }
+
+            base.Dispose(isDisposing);
         }
     }
 

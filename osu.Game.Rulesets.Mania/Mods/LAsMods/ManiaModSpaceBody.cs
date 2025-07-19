@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override string Acronym => "SB";
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "LaMod: Hold the keys. Adjust the gaps.";
+        public override LocalisableString Description => "LaMod: Full LN 面海, 可调面缝";
 
         public override ModType Type => ModType.CustomMod;
 

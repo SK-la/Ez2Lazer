@@ -163,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
 
                 bool isSpecialColumn =
-                    ezSkinConfig.GetColumnType(stageDefinition.Columns, i) == "S1";
+                    ezSkinConfig.GetColumnType(stageDefinition.Columns, i) == "S";
                 float ezWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
 
                 switch (ezColumnWidthStyle.Value)
