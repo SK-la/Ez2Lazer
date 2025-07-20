@@ -20,8 +20,6 @@ using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
-using osu.Game.Overlays;
-using osu.Game.Overlays.Notifications;
 using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
 
@@ -151,9 +149,6 @@ namespace osu.Game.Screens.Backgrounds
         [Resolved]
         private TextureStore textures { get; set; } = null!;
 
-        [Resolved(CanBeNull = true)]
-        private NotificationOverlay notifications { get; set; }
-
         private Background createBackground()
         {
             switch (source.Value)
@@ -162,29 +157,29 @@ namespace osu.Game.Screens.Backgrounds
                 {
                     const string relative_path = @"EzResources\Webm";
                     string dataFolderPath = storage.GetFullPath(relative_path);
-                    Debug.Assert(!string.IsNullOrEmpty(dataFolderPath));
 
-                    if (!Directory.Exists(dataFolderPath))
+                    if (dataFolderPath != null)
                     {
-                        Directory.CreateDirectory(dataFolderPath);
-                        //TODO： 改为游戏内提示空目录
-                        notifications?.Post(new SimpleErrorNotification
+                        if (!Directory.Exists(dataFolderPath))
                         {
-                            Text = $"已创建视频背景目录：{dataFolderPath}\n请将 .webm 文件放入该目录。"
-                        });
+                            Directory.CreateDirectory(dataFolderPath);
+                            //TODO： 改为游戏内提示空目录
+                            Logger.Log($"已创建视频背景目录：{dataFolderPath}\n"
+                                       + $"请将 .webm 文件放入该目录。", LoggingTarget.Performance, LogLevel.Important);
+                        }
+
+                        string[] videoFiles = Directory.GetFiles(dataFolderPath, "*.webm");
+
+                        if (videoFiles.Length > 0)
+                        {
+                            string videoPath = videoFiles[RNG.Next(videoFiles.Length)];
+                            return new VideoBackgroundScreen(videoPath);
+                        }
                     }
 
-                    string[] videoFiles = Directory.GetFiles(dataFolderPath, "*.webm");
-
-                    if (videoFiles.Length == 0)
-                    {
-                        Stream videoName = textures.GetStream("EzResources/default_video.webm");
-                        return new StreamVideoBackgroundScreen(videoName);
-                        // return new Background(getBackgroundTextureName());
-                    }
-
-                    string videoPath = videoFiles[RNG.Next(videoFiles.Length)];
-                    return new VideoBackgroundScreen(videoPath);
+                    Stream videoName = textures.GetStream("EzResources/default_video.webm");
+                    return new StreamVideoBackgroundScreen(videoName);
+                    // return new Background(getBackgroundTextureName());
                 }
             }
 

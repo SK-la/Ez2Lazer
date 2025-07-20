@@ -43,18 +43,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            factory.OnStageChanged += OnSkinChanged;
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                factory.OnStageChanged -= OnSkinChanged;
-            }
         }
 
         // protected override void Update()

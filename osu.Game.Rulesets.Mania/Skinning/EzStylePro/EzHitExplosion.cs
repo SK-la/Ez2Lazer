@@ -36,6 +36,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
             OnDrawableChanged();
         }
 
@@ -76,15 +81,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 primaryAnimation.Alpha = 1;
                 primaryAnimation.GotoFrame(0);
-                primaryAnimation.Restart();
+                // primaryAnimation.Restart();
             }
 
             if (result.Type >= HitResult.Great && goodAnimation?.FrameCount > 0)
             {
                 goodAnimation.Alpha = 1;
                 goodAnimation.GotoFrame(0);
-                goodAnimation.Restart();
+                // goodAnimation.Restart();
             }
+
+            Schedule(UpdateSize);
         }
     }
 }

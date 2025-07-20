@@ -210,20 +210,20 @@ namespace osu.Game.Screens
         }
 
         // public event Action? OnPositionChanged;
-        public event Action? OnNoteSizeChanged;
+        // public event Action? OnNoteSizeChanged;
 
         private void initializeEvents()
         {
             // GetBindable<double>(EzSkinSetting.HitPosition).BindValueChanged(_ => OnPositionChanged?.Invoke(), true);
-            GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth).BindValueChanged(_ => updateAllNoteSizes(), true);
-            GetBindable<double>(EzSkinSetting.ColumnWidth).BindValueChanged(_ => updateAllNoteSizes(), true);
-            GetBindable<double>(EzSkinSetting.SpecialFactor).BindValueChanged(_ => updateAllNoteSizes(), true);
+            // GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth).BindValueChanged(_ => updateAllNoteSizes(), true);
+            // GetBindable<double>(EzSkinSetting.ColumnWidth).BindValueChanged(_ => updateAllNoteSizes(), true);
+            // GetBindable<double>(EzSkinSetting.SpecialFactor).BindValueChanged(_ => updateAllNoteSizes(), true);
         }
 
-        private void updateAllNoteSizes()
-        {
-            OnNoteSizeChanged?.Invoke();
-        }
+        // private void updateAllNoteSizes()
+        // {
+        //     OnNoteSizeChanged?.Invoke();
+        // }
 
         public new void SetValue<T>(EzSkinSetting lookup, T value)
         {

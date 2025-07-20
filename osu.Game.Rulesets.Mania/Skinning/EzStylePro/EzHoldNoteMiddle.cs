@@ -18,6 +18,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
     {
         private readonly IBindable<bool> isHitting = new Bindable<bool>();
+        private DrawableHoldNote holdNote = null!;
 
         private Container? topContainer;
         private Container? bodyContainer;
@@ -26,9 +27,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private IBindable<double> hitPosition = new Bindable<double>();
         private EzHoldNoteHittingLayer? hittingLayer;
+        private Drawable? lightContainer;
 
         [Resolved]
         private Column column { get; set; } = null!;
+
+        private float halfNoteHeight;
 
         public EzHoldNoteMiddle()
         {
@@ -43,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader(true)]
         private void load(DrawableHitObject drawableObject)
         {
-            var holdNote = (DrawableHoldNote)drawableObject;
+            holdNote = (DrawableHoldNote)drawableObject;
             isHitting.BindTo(holdNote.IsHolding);
 
             hitPosition = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
@@ -51,24 +55,25 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             OnSkinChanged();
         }
 
-        // protected override void Update()
-        // {
-        //     base.Update();
-        // }
-
         private void OnSkinChanged()
         {
-            if (hittingLayer != null)
+            if (lightContainer != null)
             {
-                column.TopLevelContainer.Remove(hittingLayer, false);
-                hittingLayer.Expire();
-                hittingLayer = null;
+                column.TopLevelContainer.Remove(lightContainer, false);
+                lightContainer.Expire();
+                lightContainer = null;
             }
 
             hittingLayer = new EzHoldNoteHittingLayer
             {
                 Alpha = 0,
                 IsHitting = { BindTarget = isHitting }
+            };
+            lightContainer = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Alpha = 0,
+                Child = hittingLayer
             };
 
             hittingLayer.HitPosition.BindTo(hitPosition);
@@ -78,22 +83,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (hittingLayer != null) hittingLayer.IsHitting.Value = isHitting.NewValue;
 
-            if (hittingLayer == null)
+            if (lightContainer == null)
                 return;
 
             if (isHitting.NewValue)
             {
-                hittingLayer.ClearTransforms();
+                lightContainer.ClearTransforms();
 
-                if (hittingLayer.Parent == null)
-                    column.TopLevelContainer.Add(hittingLayer);
+                if (lightContainer.Parent == null)
+                    column.TopLevelContainer.Add(lightContainer);
 
-                hittingLayer.FadeIn(80);
+                lightContainer.FadeIn(80);
             }
             else
             {
-                hittingLayer.FadeOut(120)
-                            .OnComplete(d => column.TopLevelContainer.Remove(d, false));
+                lightContainer.FadeOut(120)
+                              .OnComplete(d => column.TopLevelContainer.Remove(d, false));
             }
         }
 
@@ -115,6 +120,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (tail.FrameCount == 0)
                 tail = Factory.CreateAnimation(newComponentName);
 
+            topContainer?.Expire();
+            bodyContainer?.Expire();
+
             topContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
@@ -132,8 +140,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             bodyContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
                 Masking = true,
                 Child = bodyScaleContainer = new Container
                 {
@@ -161,32 +169,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void UpdateSize()
         {
             base.UpdateSize();
-            if (MainContainer?.Children.Count == 0)
-                return;
-
-            float v = NoteSize.Value.Y;
+            halfNoteHeight = NoteSize.Value.Y * 0.5f;
 
             if (topContainer?.Child is Container topInner)
             {
-                topContainer.Height = v / 2;
-                topInner.Height = v;
+                topContainer.Height = halfNoteHeight;
+                topInner.Height = NoteSize.Value.Y;
             }
-
-            float middleHeight = Math.Max(DrawHeight - v / 2, v / 2);
-
-            if (bodyContainer != null)
-            {
-                bodyContainer.Y = v / 2;
-                bodyContainer.Height = middleHeight + 2;
-            }
-
-            if (bodyScaleContainer != null)
-                bodyScaleContainer.Scale = new Vector2(1, DrawHeight - v / 2);
 
             if (bodyInnerContainer != null)
             {
-                bodyInnerContainer.Height = v;
-                bodyInnerContainer.Y = -v / 2;
+                bodyInnerContainer.Height = halfNoteHeight * 2;
+                bodyInnerContainer.Y = -halfNoteHeight;
+            }
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (MainContainer?.Children.Count > 0 && bodyContainer != null && halfNoteHeight > 0)
+            {
+                float drawHeightMinusHalf = DrawHeight - halfNoteHeight;
+                float middleHeight = Math.Max(drawHeightMinusHalf, halfNoteHeight);
+
+                bodyContainer.Height = middleHeight + 2;
+
+                if (bodyScaleContainer != null)
+                    bodyScaleContainer.Scale = new Vector2(1, drawHeightMinusHalf);
             }
         }
 

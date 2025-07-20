@@ -20,14 +20,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void OnDrawableChanged()
         {
-            string newComponentName = $"{ColorPrefix}note";
-
-            var animation = Factory.CreateAnimation(newComponentName);
+            var animation = Factory.CreateAnimation($"{ColorPrefix}note");
 
             if (animation is TextureAnimation textureAnimation && textureAnimation.FrameCount == 0)
             {
                 animation.Dispose();
-                UpdateColor();
+                Schedule(UpdateColor);
                 return;
             }
 
@@ -43,7 +41,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void UpdateSize()
         {
             base.UpdateSize();
-            Height = NoteSize.Value.Y;
+            float v = NoteSize.Value.Y;
+            Height = v;
         }
     }
 }

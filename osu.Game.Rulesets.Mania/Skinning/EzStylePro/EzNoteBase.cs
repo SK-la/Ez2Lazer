@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected int KeyMode;
         protected int ColumnIndex;
 
-        protected Container? SeparatorsContainer { get; private set; }
+        protected Container? LineContainer { get; private set; }
         protected Container? MainContainer { get; private set; }
 
         [Resolved]
@@ -36,9 +36,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        private IBindable<Colour4> columnColorBindable = null!;
+        // private IBindable<Colour4> columnColorBindable = null!;
         protected Bindable<bool> EnabledColor = null!;
         protected Bindable<Vector2> NoteSize = null!;
+        protected Bindable<string> NoteSetName = null!;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -46,8 +47,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             KeyMode = StageDefinition.Columns;
             ColumnIndex = Column.Index;
             EnabledColor = EZSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
-            columnColorBindable = EZSkinConfig.GetColumnColorBindable(KeyMode, ColumnIndex);
-            NoteSize = Factory.GetNoteSize(KeyMode, ColumnIndex);
+            // columnColorBindable = EZSkinConfig.GetColumnColorBindable(KeyMode, ColumnIndex);
+            NoteSetName = EZSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
 
             createSeparators();
             MainContainer = new Container
@@ -57,6 +58,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Origin = Anchor.Centre,
             };
             AddInternal(MainContainer);
+
+            NoteSize = Factory.GetNoteSize(KeyMode, ColumnIndex);
+            Scheduler.AddOnce(OnDrawableChanged);
         }
 
         private void createSeparators()
@@ -77,7 +81,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Origin = Anchor.Centre,
             };
 
-            SeparatorsContainer = new Container
+            LineContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
                 FillMode = FillMode.Stretch,
@@ -87,19 +91,26 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Children = [noteSeparatorsL, noteSeparatorsR]
             };
 
-            AddInternal(SeparatorsContainer);
+            AddInternal(LineContainer);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
+            NoteSetName.BindValueChanged(OnNoteChanged);
             EnabledColor.BindValueChanged(_ => UpdateColor(), true);
-            columnColorBindable.BindValueChanged(_ => UpdateColor(), true);
+            // columnColorBindable.BindValueChanged(_ => UpdateColor(), true);
             NoteSize.BindValueChanged(_ => UpdateSize(), true);
+        }
 
-            Factory.OnNoteChanged += OnDrawableChanged;
-            // Factory.OnNoteSizeChanged += UpdateSize;
+        private void OnNoteChanged(ValueChangedEvent<string> obj)
+        {
+            if (string.IsNullOrEmpty(obj.NewValue))
+                return;
+
+            MainContainer?.Clear();
+
             Scheduler.AddOnce(OnDrawableChanged);
         }
 
@@ -107,8 +118,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.Dispose(isDisposing);
 
-            Factory.OnNoteChanged -= OnDrawableChanged;
-            // Factory.OnNoteSizeChanged -= UpdateSize;
+            EzLocalTextureFactory.ClearGlobalCache();
         }
 
         protected Colour4 NoteColor
@@ -149,9 +159,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (MainContainer != null)
                     MainContainer.Colour = NoteColor;
 
-                if (SeparatorsContainer?.Children != null)
+                if (LineContainer?.Children != null)
                 {
-                    foreach (var child in SeparatorsContainer.Children)
+                    foreach (var child in LineContainer.Children)
                     {
                         if (child is EzNoteSideLine sideLine)
                             sideLine.UpdateGlowEffect(NoteColor);

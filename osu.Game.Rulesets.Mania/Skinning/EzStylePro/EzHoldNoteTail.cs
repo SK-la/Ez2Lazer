@@ -65,8 +65,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
             loadAnimation();
-            factory.OnNoteChanged += onSkinChanged;
-            factory.OnNoteSizeChanged += onNoteSizeChanged;
         }
 
         private void onSkinChanged()
@@ -88,7 +86,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-            factory.OnNoteChanged -= onSkinChanged;
             if (drawableObject != null)
                 drawableObject.HitObjectApplied -= hitObjectApplied;
         }

@@ -48,19 +48,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
             OnSkinChanged();
-            factory.OnStageChanged += OnSkinChanged;
-            factory.OnNoteSizeChanged += OnConfigChanged;
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                factory.OnStageChanged -= OnSkinChanged;
-                factory.OnNoteSizeChanged -= OnConfigChanged;
-            }
         }
 
         protected virtual string KeyBasicSuffix

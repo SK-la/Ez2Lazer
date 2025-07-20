@@ -35,12 +35,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load()
         {
             HitPosition = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            HitPosition.BindValueChanged(_ => UpdateSize(), true);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            HitPosition.BindValueChanged(_ => UpdateSize(), true);
             IsHitting.BindValueChanged(hitting =>
             {
                 ClearTransforms();
@@ -76,24 +76,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (animation.FrameCount > 0)
                 {
                     animation.Loop = true;
-                    break;
+                    AddInternal(animation);
+                    UpdateSize();
+                }
+                else
+                {
+                    animation.Dispose();
+                    UpdateColor();
+                    return;
                 }
             }
-
-            if (animation is TextureAnimation textureAnimation && textureAnimation.FrameCount == 0)
-            {
-                animation.Dispose();
-                UpdateColor();
-                return;
-            }
-
-            if (MainContainer != null)
-            {
-                MainContainer.Clear();
-                if (animation != null) MainContainer.Child = animation;
-            }
-
-            Schedule(UpdateSize);
         }
 
         protected override void UpdateSize()

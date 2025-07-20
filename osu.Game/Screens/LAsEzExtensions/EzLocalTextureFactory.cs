@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -24,31 +27,51 @@ namespace osu.Game.Screens.LAsEzExtensions
         private const int max_stage_frames = 120;
         private const double default_frame_length = 1000.0 / 60.0 * 4;
         private const float default_stage_body_height = 247f;
+        private const float square_ratio_threshold = 0.75f;
 
-        // 全局缓存，带LRU机制
-        private static readonly Dictionary<string, List<Texture>> global_texture_cache = new Dictionary<string, List<Texture>>();
-        private static readonly Dictionary<string, bool> global_component_cache = new Dictionary<string, bool>();
-        private static readonly Dictionary<string, DateTime> cache_access_times = new Dictionary<string, DateTime>();
-        private static readonly object global_cache_lock = new object();
+        private static readonly ConcurrentDictionary<string, CacheEntry> global_cache = new ConcurrentDictionary<string, CacheEntry>();
+        private static readonly object cleanup_lock = new object();
 
-        // 实例级缓存，统一使用全局锁
-        private readonly Dictionary<string, float> noteRatioCache = new Dictionary<string, float>();
+        // 优化：使用ConcurrentDictionary避免锁
+        private readonly ConcurrentDictionary<string, float> noteRatioCache = new ConcurrentDictionary<string, float>();
+        private readonly ConcurrentDictionary<string, string> pathCache = new ConcurrentDictionary<string, string>();
 
         private readonly TextureStore textureStore;
         private readonly EzSkinSettingsManager ezSkinConfig;
         private readonly Dictionary<string, TextureLoaderStore> loaderStoreCache = new Dictionary<string, TextureLoaderStore>();
+
+        private Bindable<string> noteSetName = null!;
+        private Bindable<string> stageName = null!;
+        private Bindable<double> columnWidth = null!;
+        private Bindable<double> specialFactor = null!;
+        private Bindable<double> noteHeightScaleToWidth = null!;
+
         private bool initialized;
 
-        public Bindable<string> NoteSetName { get; set; } = new Bindable<string>();
-        public Bindable<string> StageName { get; set; } = new Bindable<string>();
+        private readonly struct CacheEntry : IEquatable<CacheEntry>
+        {
+            public readonly List<Texture>? Textures;
+            public readonly bool HasComponent;
+            public readonly DateTime LastAccess;
 
-        public Bindable<double> ColumnWidth = new Bindable<double>();
-        public Bindable<double> SpecialFactor = new Bindable<double>();
-        public Bindable<double> NoteHeightScaleToWidth = new Bindable<double>();
+            public CacheEntry(List<Texture>? textures, bool hasComponent)
+            {
+                Textures = textures;
+                HasComponent = hasComponent;
+                LastAccess = DateTime.UtcNow;
+            }
 
-        public event Action? OnNoteChanged;
-        public event Action? OnNoteSizeChanged;
-        public event Action? OnStageChanged;
+            public CacheEntry UpdateAccess() => new CacheEntry(Textures, HasComponent);
+
+            public bool Equals(CacheEntry other) =>
+                ReferenceEquals(Textures, other.Textures) &&
+                HasComponent == other.HasComponent &&
+                LastAccess.Equals(other.LastAccess);
+
+            public override bool Equals(object? obj) => obj is CacheEntry other && Equals(other);
+
+            public override int GetHashCode() => HashCode.Combine(Textures, HasComponent, LastAccess);
+        }
 
         public EzLocalTextureFactory(
             EzSkinSettingsManager ezSkinConfig,
@@ -57,7 +80,6 @@ namespace osu.Game.Screens.LAsEzExtensions
         {
             this.ezSkinConfig = ezSkinConfig;
             this.textureStore = textureStore;
-            // this.hostStorage = hostStorage;
 
             const string path = "EzResources/";
 
@@ -75,61 +97,159 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         private void initialize()
         {
-            if (initialized) return;
+            if (initialized)
+                return;
 
             initialized = true;
 
-            NoteSetName = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
-            NoteSetName.BindValueChanged(e =>
-            {
-                OnNoteChanged?.Invoke();
-            }, true);
+            noteSetName = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
+            stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
+            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
 
-            StageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
-            StageName.BindValueChanged(e =>
+            noteSetName.BindValueChanged(e =>
             {
-                OnStageChanged?.Invoke();
-            }, true);
+                ForceRefreshCache();
+                clearRelatedCache(e.OldValue, e.NewValue);
+            });
 
-            ColumnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            SpecialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            NoteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
-            // ColumnWidth.BindValueChanged(e =>
-            // {
-            //     OnNoteSizeChanged?.Invoke();
-            // }, true);
-            // SpecialFactor.BindValueChanged(e =>
-            // {
-            //     OnNoteSizeChanged?.Invoke();
-            // }, true);
-            // NoteHeightScaleToWidth.BindValueChanged(e =>
-            // {
-            //     OnNoteSizeChanged?.Invoke();
-            // }, true);
+            stageName.BindValueChanged(e =>
+            {
+                clearStageCache(e.OldValue, e.NewValue);
+            });
+        }
+
+        private void clearRelatedCache(string? oldNoteSet, string newNoteSet)
+        {
+            if (string.IsNullOrEmpty(oldNoteSet)) return;
+
+            var keysToRemove = new List<string>();
+
+            foreach (string key in global_cache.Keys)
+            {
+                if (key.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal))
+                    keysToRemove.Add(key);
+            }
+
+            foreach (string key in keysToRemove)
+            {
+                global_cache.TryRemove(key, out _);
+            }
+
+            var pathKeysToRemove = pathCache.Keys.Where(k => k.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal)).ToList();
+
+            foreach (string key in pathKeysToRemove)
+            {
+                pathCache.TryRemove(key, out _);
+            }
+
+            var ratioKeysToRemove = noteRatioCache.Keys.Where(k =>
+                k.Contains($"note/{oldNoteSet}/", StringComparison.Ordinal) ||
+                k.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal)).ToList();
+
+            foreach (string key in ratioKeysToRemove)
+            {
+                noteRatioCache.TryRemove(key, out _);
+            }
+
+            resetPreloadState();
+
+            var newNoteKeysToRemove = new List<string>();
+
+            foreach (string key in global_cache.Keys)
+            {
+                if (key.StartsWith($"{newNoteSet}_", StringComparison.Ordinal))
+                    newNoteKeysToRemove.Add(key);
+            }
+
+            foreach (string key in newNoteKeysToRemove)
+            {
+                global_cache.TryRemove(key, out _);
+            }
+
+            var newPathKeysToRemove = pathCache.Keys.Where(k => k.StartsWith($"{newNoteSet}_", StringComparison.Ordinal)).ToList();
+
+            foreach (string key in newPathKeysToRemove)
+            {
+                pathCache.TryRemove(key, out _);
+            }
+
+            var newRatioKeysToRemove = noteRatioCache.Keys.Where(k =>
+                k.Contains($"note/{newNoteSet}/", StringComparison.Ordinal) ||
+                k.StartsWith($"{newNoteSet}_", StringComparison.Ordinal)).ToList();
+
+            foreach (string key in newRatioKeysToRemove)
+            {
+                noteRatioCache.TryRemove(key, out _);
+            }
+
+            Schedule(() =>
+            {
+                foreach (string component in preload_components)
+                {
+                    string path = getComponentPath(newNoteSet, component);
+                    noteRatioCache.TryRemove(path, out _);
+                }
+
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await PreloadGameTextures().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"[EzLocalTextureFactory] Background preload failed: {ex.Message}",
+                            LoggingTarget.Runtime, LogLevel.Verbose);
+                    }
+                });
+            });
+
+            Logger.Log($"[EzLocalTextureFactory] Cleared cache for note set change: {oldNoteSet} -> {newNoteSet} " +
+                       $"(Removed {keysToRemove.Count + newNoteKeysToRemove.Count} texture cache, {pathKeysToRemove.Count + newPathKeysToRemove.Count} path cache, {ratioKeysToRemove.Count + newRatioKeysToRemove.Count} ratio cache)",
+                LoggingTarget.Runtime, LogLevel.Debug);
+        }
+
+        private void clearStageCache(string? oldStage, string newStage)
+        {
+            if (string.IsNullOrEmpty(oldStage)) return;
+
+            Logger.Log($"[EzLocalTextureFactory] Cleared stage cache for change: {oldStage} -> {newStage}",
+                LoggingTarget.Runtime, LogLevel.Debug);
+        }
+
+        public void ForceRefreshCache()
+        {
+            noteRatioCache.Clear();
+            pathCache.Clear();
+            ClearGlobalCache();
         }
 
         #region 工具方法
+
+        private string getComponentPath(string noteName, string component)
+        {
+            string key = $"{noteName}_{component}";
+            return pathCache.GetOrAdd(key, _ => $"note/{noteName}/{component}");
+        }
 
         private float calculateRatio(string path)
         {
             try
             {
-                string noteSetName = NoteSetName.Value;
-                string cacheKey = $"{noteSetName}_{System.IO.Path.GetFileName(path)}";
-
-                lock (global_cache_lock)
+                if (global_cache.TryGetValue(path, out var cacheEntry) &&
+                    cacheEntry.Textures is not null && cacheEntry.Textures.Count > 0)
                 {
-                    if (global_texture_cache.TryGetValue(cacheKey, out var cachedFrames) && cachedFrames.Count > 0)
-                    {
-                        var firstFrame = cachedFrames[0];
-                        return (firstFrame.Height / (float)firstFrame.Width);
-                    }
+                    var firstFrame = cacheEntry.Textures[0];
+                    return firstFrame.Height / (float)firstFrame.Width;
                 }
 
-                Texture texture = textureStore.Get($"{path}/000.png") ??
-                                  textureStore.Get($"{path}/001.png");
+                var sb = new StringBuilder(path.Length + 8);
+                Texture? texture = textureStore.Get(sb.Append(path).Append("/000.png").ToString()) ??
+                                   textureStore.Get(sb.Clear().Append(path).Append("/001.png").ToString());
 
-                return (texture?.Height / (float)(texture?.Width!)) ?? 1.0f;
+                return texture?.Height / (texture?.Width ?? 1f) ?? 1.0f;
             }
             catch (Exception ex)
             {
@@ -141,132 +261,145 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         public float GetRatio(string component)
         {
-            string? noteName = NoteSetName.Value;
-            string path = $"note/{noteName}/{component}";
+            string path = getComponentPath(noteSetName.Value, component);
 
-            lock (global_cache_lock)
+            return noteRatioCache.GetOrAdd(path, p =>
             {
-                if (noteRatioCache.TryGetValue(path, out float cachedRatio))
-                    return cachedRatio;
-            }
-
-            float ratio = calculateRatio(path);
-            if (ratio >= 0.75f) ratio = 1.0f;
-
-            lock (global_cache_lock)
-            {
-                noteRatioCache[path] = ratio;
-            }
-
-            return ratio;
+                float ratio = calculateRatio(p);
+                return ratio >= square_ratio_threshold ? 1.0f : ratio;
+            });
         }
 
-        public bool IsSquareNote(string component)
-        {
-            float ratio = GetRatio(component);
-            return ratio >= 0.75f;
-        }
+        public bool IsSquareNote(string component) => GetRatio(component) >= square_ratio_threshold;
 
         public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex)
         {
             var result = new Bindable<Vector2>();
-
             float ratio = GetRatio("whitenote");
+            bool isSpecialColumn = ezSkinConfig.GetColumnType(keyMode, columnIndex) == "S";
 
             void updateNoteSize()
             {
-                bool isSpecialColumn = ezSkinConfig.GetColumnType(keyMode, columnIndex) == "S";
-                float x = (float)(ColumnWidth.Value * (isSpecialColumn ? SpecialFactor.Value : 1.0));
-                float y = (float)(NoteHeightScaleToWidth.Value) * ratio * x;
+                float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
+                float y = (float)noteHeightScaleToWidth.Value * ratio * x;
                 result.Value = new Vector2(x, y);
             }
 
-            ColumnWidth.BindValueChanged(_ => updateNoteSize());
-            SpecialFactor.BindValueChanged(_ => updateNoteSize());
-            NoteHeightScaleToWidth.BindValueChanged(_ => updateNoteSize());
+            columnWidth.BindValueChanged(_ => updateNoteSize());
+            specialFactor.BindValueChanged(_ => updateNoteSize());
+            noteHeightScaleToWidth.BindValueChanged(_ => updateNoteSize());
 
             updateNoteSize();
-
             return result;
         }
 
         #endregion
 
-        #region 缓存处理
+        #region 优化的缓存处理
 
         private static void cleanOldCacheEntries()
         {
-            if (global_texture_cache.Count <= max_cache_size) return;
+            if (global_cache.Count <= max_cache_size) return;
 
-            var oldestEntries = cache_access_times
-                                .OrderBy(kvp => kvp.Value)
-                                .Take(global_texture_cache.Count - max_cache_size + 10)
-                                .Select(kvp => kvp.Key)
-                                .ToList();
-
-            foreach (string key in oldestEntries)
+            lock (cleanup_lock)
             {
-                global_texture_cache.Remove(key);
-                global_component_cache.Remove(key);
-                cache_access_times.Remove(key);
-            }
+                if (global_cache.Count <= max_cache_size) return; // 双重检查
 
-            Logger.Log($"[EzLocalTextureFactory] Cleaned {oldestEntries.Count} old cache entries",
-                LoggingTarget.Performance, LogLevel.Debug);
+                string[] entriesToRemove = global_cache
+                                           .OrderBy(kvp => kvp.Value.LastAccess)
+                                           .Take(global_cache.Count - max_cache_size + 10)
+                                           .Select(kvp => kvp.Key)
+                                           .ToArray(); // 避免延迟执行
+
+                int removedCount = 0;
+
+                foreach (string key in entriesToRemove)
+                {
+                    if (global_cache.TryRemove(key, out _))
+                        removedCount++;
+                }
+
+                if (removedCount > 0)
+                {
+                    Logger.Log($"[EzLocalTextureFactory] Cleaned {removedCount} old cache entries",
+                        LoggingTarget.Performance, LogLevel.Debug);
+                }
+            }
         }
 
         private List<Texture> getCachedTextureFrames(string component, string currentNoteSetName)
         {
             string cacheKey = $"{currentNoteSetName}_{component}";
 
-            lock (global_cache_lock)
+            // 双重检查锁定模式，避免并发时重复创建
+            if (global_cache.TryGetValue(cacheKey, out var cachedEntry))
             {
-                if (global_texture_cache.TryGetValue(cacheKey, out var cachedFrames))
+                if (cachedEntry.Textures != null && cachedEntry.Textures.Count > 0)
                 {
-                    cache_access_times[cacheKey] = DateTime.Now;
-                    return cachedFrames;
+                    global_cache.TryUpdate(cacheKey, cachedEntry.UpdateAccess(), cachedEntry);
+                    return cachedEntry.Textures;
                 }
+
+                global_cache.TryRemove(cacheKey, out _);
             }
 
-            var frames = loadTextureFrames(component, currentNoteSetName);
-
-            lock (global_cache_lock)
+            // 使用锁确保同一组件只加载一次
+            lock (cleanup_lock)
             {
-                cleanOldCacheEntries();
+                // 再次检查，防止在等待锁的过程中其他线程已经加载了
+                if (global_cache.TryGetValue(cacheKey, out cachedEntry))
+                {
+                    if (cachedEntry.Textures != null && cachedEntry.Textures.Count > 0)
+                    {
+                        global_cache.TryUpdate(cacheKey, cachedEntry.UpdateAccess(), cachedEntry);
+                        return cachedEntry.Textures;
+                    }
 
+                    global_cache.TryRemove(cacheKey, out _);
+                }
+
+                // 加载纹理帧
+                var frames = loadTextureFrames(component, currentNoteSetName);
+
+                // 只缓存有效的帧数据，不缓存空结果
                 if (frames.Count > 0)
                 {
-                    global_texture_cache[cacheKey] = frames;
-                    global_component_cache[cacheKey] = true;
-                    cache_access_times[cacheKey] = DateTime.Now;
-                }
-                else
-                {
-                    global_component_cache[cacheKey] = false;
-                }
-            }
+                    var newEntry = new CacheEntry(frames, true);
+                    global_cache.TryAdd(cacheKey, newEntry);
 
-            return frames;
+                    // 统计加载次数，不记录详细日志
+                    lock (stats_lock)
+                    {
+                        totalCacheLoads++;
+                    }
+
+                    // 异步清理缓存，避免阻塞
+                    if (global_cache.Count > max_cache_size)
+                    {
+                        Task.Run(cleanOldCacheEntries);
+                    }
+                }
+
+                return frames;
+            }
         }
 
         public static void ClearGlobalCache()
         {
-            lock (global_cache_lock)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Clearing global cache ({global_texture_cache.Count} entries)",
-                    LoggingTarget.Performance, LogLevel.Important);
+            int count = global_cache.Count;
 
-                global_texture_cache.Clear();
-                global_component_cache.Clear();
-                cache_access_times.Clear();
+            if (count > 0)
+            {
+                Logger.Log($"[EzLocalTextureFactory] Clearing global cache ({count})",
+                    LoggingTarget.Runtime, LogLevel.Debug);
+                global_cache.Clear();
             }
         }
 
         private List<Texture> loadTextureFrames(string component, string noteSetName)
         {
             var frames = new List<Texture>();
-
-            string[] pathsToTry = new[]
+            string[] pathsToTry =
             {
                 $"note/{noteSetName}/{component}",
                 $"note/circle/{component}"
@@ -274,29 +407,40 @@ namespace osu.Game.Screens.LAsEzExtensions
 
             foreach (string basePath in pathsToTry)
             {
-                try
+                frames.Clear(); // 重用List，减少GC
+
+                for (int i = 0; i < max_frames_to_load; i++)
                 {
-                    for (int i = 0; i < max_frames_to_load; i++)
+                    try
                     {
                         string frameFile = $"{basePath}/{i:D3}.png";
                         var texture = textureStore.Get(frameFile);
 
-                        if (texture == null) break;
+                        if (texture == null)
+                            break;
 
                         frames.Add(texture);
                     }
-
-                    if (frames.Count > 0)
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Error loading frame {i} for {basePath}: {ex.Message}",
+                            LoggingTarget.Runtime, LogLevel.Error);
                         break;
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Error loading texture frames for {basePath}: {ex.Message}",
-                        LoggingTarget.Runtime, LogLevel.Error);
-                }
+
+                if (frames.Count > 0) break;
             }
 
-            return frames;
+#if DEBUG
+            if (frames.Count > 0)
+            {
+                Logger.Log($"[EzLocalTextureFactory] Loaded {frames.Count} texture frames for {component} from disk",
+                    LoggingTarget.Runtime, LogLevel.Debug);
+            }
+#endif
+
+            return new List<Texture>(frames);
         }
 
         #endregion
@@ -308,22 +452,9 @@ namespace osu.Game.Screens.LAsEzExtensions
             return componentName.Contains("flare", StringComparison.InvariantCultureIgnoreCase);
         }
 
-        public virtual TextureAnimation CreateAnimation(string component, int? columnIndex = null)
+        public virtual TextureAnimation CreateAnimation(string component)
         {
-            string currentNoteSetName = NoteSetName.Value;
-            // string cacheKey = $"{currentNoteSetName}_{component}";
-            // bool fromCache;
-            //
-            // lock (global_cache_lock)
-            // {
-            //     fromCache = global_texture_cache.ContainsKey(cacheKey);
-            // }
-
-// #if DEBUG
-//             string callerType = new System.Diagnostics.StackTrace().GetFrame(1)?.GetMethod()?.DeclaringType?.Name ?? "Unknown";
-//             Logger.Log($"[EzLocalTextureFactory] Creating texture {currentNoteSetName}/{component} from {callerType} (cached: {fromCache})",
-//                 LoggingTarget.Runtime, LogLevel.Debug);
-// #endif
+            string currentNoteSetName = noteSetName.Value;
 
             bool isHit = isHitCom(component);
             var animation = new TextureAnimation
@@ -338,14 +469,6 @@ namespace osu.Game.Screens.LAsEzExtensions
             if (!isHit) animation.DefaultFrameLength = default_frame_length;
 
             var frames = getCachedTextureFrames(component, currentNoteSetName);
-
-// #if DEBUG
-//             if (frames.Count > 0)
-//             {
-//                 Logger.Log($"[EzLocalTextureFactory] Created animation for {component} with {frames.Count} frames",
-//                     LoggingTarget.Runtime, LogLevel.Debug);
-//             }
-// #endif
 
             foreach (var texture in frames)
             {
@@ -367,7 +490,7 @@ namespace osu.Game.Screens.LAsEzExtensions
         public virtual Drawable CreateStage(string component)
         {
             bool isBody = isStageBody(component);
-            string basePath = $"Stage/{StageName.Value}/Stage";
+            string basePath = $"Stage/{stageName.Value}/Stage";
 
             var container = new Container
             {
@@ -426,7 +549,7 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         private void createStageAnimation(Container container, string basePath)
         {
-            string overObjectPath = $"{basePath}/Stage/{StageName.Value}_OverObject/{StageName.Value}_OverObject";
+            string overObjectPath = $"{basePath}/Stage/{stageName.Value}_OverObject/{stageName.Value}_OverObject";
 
             var animation = new TextureAnimation
             {
@@ -484,6 +607,128 @@ namespace osu.Game.Screens.LAsEzExtensions
                 : (i == 0 ? $"{basePath}.png" : $"{basePath}_{i}.png");
 
             return textureStore.Get(texturePath);
+        }
+
+        #endregion
+
+        #region 预加载系统
+
+        private static readonly string[] preload_components =
+        {
+            "whitenote", "bluenote", "greennote",
+            "noteflare", "noteflaregood", "longnoteflare",
+        };
+
+        private static readonly object preload_lock = new object();
+        private static bool isPreloading;
+        private static bool preloadCompleted;
+
+        private static int totalCacheLoads;
+        private static int totalPreloads;
+        private static readonly object stats_lock = new object();
+
+        public async Task PreloadGameTextures()
+        {
+            if (preloadCompleted || isPreloading) return;
+
+            lock (preload_lock)
+            {
+                if (preloadCompleted || isPreloading) return;
+
+                isPreloading = true;
+            }
+
+            try
+            {
+                string currentNoteSetName = noteSetName.Value;
+                Logger.Log($"[EzLocalTextureFactory] Starting preload for note set: {currentNoteSetName}",
+                    LoggingTarget.Runtime, LogLevel.Debug);
+
+                var preloadTasks = new List<Task>();
+
+                foreach (string component in preload_components)
+                {
+                    preloadTasks.Add(Task.Run(() => preloadComponent(component, currentNoteSetName)));
+                }
+
+                await Task.WhenAll(preloadTasks).ConfigureAwait(false);
+
+                lock (preload_lock)
+                {
+                    preloadCompleted = true;
+                    isPreloading = false;
+                }
+
+                Logger.Log($"[EzLocalTextureFactory] Preload completed for {preload_components.Length} components",
+                    LoggingTarget.Runtime, LogLevel.Debug);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[EzLocalTextureFactory] Preload failed: {ex.Message}",
+                    LoggingTarget.Runtime, LogLevel.Error);
+
+                lock (preload_lock)
+                {
+                    isPreloading = false;
+                }
+            }
+        }
+
+        private void preloadComponent(string component, string noteSetName)
+        {
+            try
+            {
+                string cacheKey = $"{noteSetName}_{component}";
+
+                if (global_cache.ContainsKey(cacheKey)) return;
+
+                var frames = loadTextureFrames(component, noteSetName);
+
+                if (frames.Count > 0)
+                {
+                    var newEntry = new CacheEntry(frames, true);
+                    global_cache.TryAdd(cacheKey, newEntry);
+
+                    lock (stats_lock)
+                    {
+                        totalPreloads++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[EzLocalTextureFactory] Failed to preload {component}: {ex.Message}",
+                    LoggingTarget.Runtime, LogLevel.Error);
+            }
+        }
+
+        public void PreloadSpecificComponent(string component)
+        {
+            Task.Run(() => preloadComponent(component, noteSetName.Value));
+        }
+
+        public bool IsComponentPreloaded(string component)
+        {
+            string cacheKey = $"{noteSetName.Value}_{component}";
+            return global_cache.ContainsKey(cacheKey);
+        }
+
+        private void resetPreloadState()
+        {
+            lock (preload_lock)
+            {
+                preloadCompleted = false;
+                isPreloading = false;
+            }
+        }
+
+        public static void LogCacheStatistics()
+        {
+            lock (stats_lock)
+            {
+                Logger.Log($"[EzLocalTextureFactory] Cache Statistics - Total loads: {totalCacheLoads}, Total preloads: {totalPreloads}, Cached components: {global_cache.Count}",
+                    LoggingTarget.Runtime, LogLevel.Important);
+            }
         }
 
         #endregion

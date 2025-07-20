@@ -13,7 +13,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
-using osu.Framework.Threading;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
@@ -51,28 +50,26 @@ namespace osu.Game.Screens
             [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), "强制刷新, 并切换至 相对位置", "Refresh, Switch to Relative")
         };
 
-        private readonly Bindable<bool> globalHitPosition = new BindableBool();
-        private readonly Bindable<EzSelectorNameSet> globalTextureName = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)4);
         private readonly Bindable<string> selectedNoteSet = new Bindable<string>();
         private readonly Bindable<string> selectedStageSet = new Bindable<string>();
-
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
 
+        private readonly Bindable<EzSelectorNameSet> globalTextureName = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)4);
+
         private SettingsButton refreshSkinButton = null!;
-        private ScheduledDelegate? scheduledRefresh;
         private bool isAbsolutePosition = true;
 
-        public Bindable<double> HitPosition => ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-        public Bindable<double> ColumnWidth => ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-        public Bindable<double> SpecialFactor => ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-        public Bindable<double> NoteHeightScaleToWidth => ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
+        // public Bindable<double> HitPosition => ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+        // public Bindable<double> ColumnWidth => ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+        // public Bindable<double> SpecialFactor => ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+        // public Bindable<double> NoteHeightScaleToWidth => ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            globalHitPosition.Value = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition).Value;
             globalTextureName.Value = (EzSelectorNameSet)ezSkinConfig.GetBindable<int>(EzSkinSetting.GlobalTextureName).Value;
+
             loadFolderSets("note");
             loadFolderSets("Stage");
 
@@ -86,7 +83,7 @@ namespace osu.Game.Screens
         {
             base.LoadComplete();
 
-            globalTextureName.BindValueChanged(OnNameSetChanged);
+            globalTextureName.BindValueChanged(e => updateAllEzTextureNames(e.NewValue));
             selectedNoteSet.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.NoteSetName, e.NewValue));
             selectedStageSet.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue));
         }
@@ -131,7 +128,7 @@ namespace osu.Game.Screens
                     Spacing = new Vector2(10),
                     Children = new Drawable[]
                     {
-                        new EzGlobalTextureNameSelector
+                        new SettingsEnumDropdown<EzSelectorNameSet>
                         {
                             LabelText = "Global Texture Name",
                             TooltipText = "(全局纹理名称)统一修改当前皮肤中所有组件的纹理名称\n"
@@ -165,7 +162,7 @@ namespace osu.Game.Screens
                         {
                             LabelText = "Column Width (轨道宽度)",
                             TooltipText = "设置每列的宽度",
-                            Current = ColumnWidth,
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth),
                             KeyboardStep = 1.0f,
                         },
                         new SettingsSlider<double>
@@ -173,14 +170,14 @@ namespace osu.Game.Screens
                             LabelText = "Special Factor (特殊轨道倍率)",
                             TooltipText = "特殊列关联S1类型, 可自定义"
                                           + "\nSpecial columns are associated with S1 type, customizable",
-                            Current = SpecialFactor,
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsCheckbox
                         {
                             LabelText = "Global HitPosition",
                             TooltipText = "全局判定线位置开关",
-                            Current = globalHitPosition,
+                            Current = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition),
                         },
                         new SettingsSlider<double>
                         {
@@ -194,8 +191,8 @@ namespace osu.Game.Screens
                             LabelText = "Note Height Scale (note 高度比例)",
                             TooltipText = "统一修改note的高度的比例\n"
                                           + "Fixed Height for square notes",
-                            Current = NoteHeightScaleToWidth,
-                            KeyboardStep = 1.0f,
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth),
+                            KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
@@ -207,37 +204,22 @@ namespace osu.Game.Screens
                         refreshSkinButton = new SettingsButton
                         {
                             Action = RefreshSkin,
-                            TooltipText = "1、强制刷新、保存皮肤,\n"
-                                          + "2、切换判定线标高为 绝对/相对位置,\n"
-                                          + "3、切换EzCom组件资源为 默认/设定 \n"
-                                          + "1. Refresh & Save Skin, \n"
-                                          + "2. Switch HitPosition to Absolute/Relative Position,\n"
-                                          + "3. Switch EzCom's Sprite to Default/Configured",
-                        }.WithTwoLineText("强制刷新, 并切换 绝对/相对位置", "Switch Absolute/Relative", 16)
+                            TooltipText = "强制刷新、保存皮肤,\n"
+                                          + "Refresh & Save Skin"
+                        }.WithTwoLineText("强制刷新, 保存皮肤", "Refresh & Save Skin", 16)
                     }
                 }
             };
         }
 
-        #region 追踪处理
-
-        private void OnNameSetChanged(ValueChangedEvent<EzSelectorNameSet> textureName)
-        {
-            updateAllEzTextureNames(textureName.NewValue);
-        }
-
-        public void ScheduleRefresh()
-        {
-            scheduledRefresh?.Cancel();
-            scheduledRefresh = Scheduler.AddDelayed(RefreshSkin, 50);
-        }
+        #region Save按钮处理
 
         public void RefreshSkin()
         {
             isAbsolutePosition = !isAbsolutePosition;
             skinManager.CurrentSkinInfo.TriggerChange();
             // skinManager.Save(skinManager.CurrentSkin.Value);
-            updateButtonAppearance();
+            // updateButtonAppearance();
         }
 
         private void updateButtonAppearance()
@@ -373,8 +355,6 @@ namespace osu.Game.Screens
             return button;
         }
     }
-
-    public partial class EzGlobalTextureNameSelector : EzSelectorEnumList;
 
     #endregion
 }
