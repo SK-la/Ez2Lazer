@@ -4,7 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -25,6 +27,8 @@ using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.LAsEzExtensions;
+using osu.Game.Screens.SelectV2.Components;
 using osuTK;
 
 namespace osu.Game.Screens.SelectV2
@@ -46,8 +50,10 @@ namespace osu.Game.Screens.SelectV2
         private CancellationTokenSource? starDifficultyCancellationSource;
 
         private Box backgroundAccentGradient = null!;
-
         private TrianglesV2 triangles = null!;
+
+        private KpsDisplay kpsDisplay = null!;
+        private ColumnNotesDisplay columnNotesDisplay = null!;
 
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
@@ -66,6 +72,17 @@ namespace osu.Game.Screens.SelectV2
 
         [Resolved]
         private ISongSelect? songSelect { get; set; }
+
+        [Resolved]
+        private BeatmapManager beatmapManager { get; set; } = null!;
+
+        private IBeatmap? iBeatmap;
+
+        private readonly Dictionary<string, (double averageKps, double maxKps, List<double> kpsList)> kpsCache = new Dictionary<string, (double, double, List<double>)>();
+        // private LineGraph kpsGraph = null!;
+
+        // 添加异步计算相关字段
+        private CancellationTokenSource? kpsCalculationCancellationSource;
 
         public PanelBeatmap()
         {
@@ -155,7 +172,15 @@ namespace osu.Game.Screens.SelectV2
                                         Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
                                         Anchor = Anchor.BottomLeft,
                                         Origin = Anchor.BottomLeft
-                                    }
+                                    },
+                                    kpsDisplay = new KpsDisplay(),
+                                    // kpsGraph = new LineGraph
+                                    // {
+                                    //     Size = new Vector2(300, 20),
+                                    //     Colour = OsuColour.Gray(0.25f),
+                                    //     Anchor = Anchor.BottomLeft,
+                                    //     Origin = Anchor.BottomLeft,
+                                    // },
                                 }
                             },
                             new FillFlowContainer
@@ -176,7 +201,16 @@ namespace osu.Game.Screens.SelectV2
                                         Anchor = Anchor.CentreLeft,
                                         Origin = Anchor.CentreLeft,
                                         Scale = new Vector2(0.4f)
-                                    }
+                                    },
+                                    new OsuSpriteText
+                                    {
+                                        Text = "[Notes] ",
+                                        Font = OsuFont.GetFont(size: 14),
+                                        Colour = Colour4.GhostWhite,
+                                        Anchor = Anchor.BottomLeft,
+                                        Origin = Anchor.BottomLeft
+                                    },
+                                    columnNotesDisplay = new ColumnNotesDisplay(),
                                 },
                             }
                         }
@@ -215,8 +249,81 @@ namespace osu.Game.Screens.SelectV2
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
+            updateCalculationsAsync(beatmap);
             computeStarRating();
             updateKeyCount();
+        }
+
+        private void updateCalculationsAsync(BeatmapInfo beatmapInfo)
+        {
+            if (ruleset.Value.OnlineID != 3)
+                return;
+
+            kpsCalculationCancellationSource?.Cancel();
+            kpsCalculationCancellationSource = new CancellationTokenSource();
+            var cancellationToken = kpsCalculationCancellationSource.Token;
+
+            string cacheKey = $"{beatmapInfo.Hash}_{string.Join(",", mods.Value?.Select(m => m.Acronym) ?? Array.Empty<string>())}";
+
+            if (kpsCache.TryGetValue(cacheKey, out var cachedResult))
+            {
+                updateUI(cachedResult, null);
+                return;
+            }
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                    var playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.Value, mods.Value, cancellationToken);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    // 使用优化后的计算器一次性获取所有数据
+                    var (averageKps, maxKps, kpsList, columnCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
+                    var kpsResult = (averageKps, maxKps, kpsList);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    kpsCache[cacheKey] = kpsResult;
+
+                    Schedule(() =>
+                    {
+                        if (!cancellationToken.IsCancellationRequested)
+                        {
+                            iBeatmap = playableBeatmap;
+                            updateUI(kpsResult, columnCounts);
+                            updateKeyCount();
+                        }
+                    });
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception)
+                {
+                    Schedule(() =>
+                    {
+                        if (!cancellationToken.IsCancellationRequested)
+                        {
+                            updateUI((0, 0, new List<double>()), null);
+                        }
+                    });
+                }
+            }, cancellationToken);
+        }
+
+        private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts)
+        {
+            var (averageKps, maxKps, _) = result;
+
+            kpsDisplay.SetKps(averageKps, maxKps);
+
+            if (columnCounts != null && columnCounts.Any())
+            {
+                columnNotesDisplay.UpdateColumnCounts(columnCounts);
+            }
         }
 
         protected override void FreeAfterUse()
@@ -227,6 +334,7 @@ namespace osu.Game.Screens.SelectV2
             starDifficultyBindable = null;
 
             starDifficultyCancellationSource?.Cancel();
+            kpsCalculationCancellationSource?.Cancel();
         }
 
         private void computeStarRating()
@@ -290,8 +398,17 @@ namespace osu.Game.Screens.SelectV2
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
 
+                if (iBeatmap != null)
+                {
+                    string keyCountTextValue = EzBeatmapCalculator.GetScratch(iBeatmap, keyCount);
+                    keyCountText.Text = keyCountTextValue;
+                }
+                else
+                {
+                    keyCountText.Text = $"[{keyCount}K] ";
+                }
+
                 keyCountText.Alpha = 1;
-                keyCountText.Text = $"[{keyCount}K] ";
             }
             else
                 keyCountText.Alpha = 0;

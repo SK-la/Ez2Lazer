@@ -24,6 +24,22 @@ namespace osu.Game.Rulesets.Mania
         {
             int keyCount = ManiaBeatmapConverter.GetColumnCount(LegacyBeatmapConversionDifficultyInfo.FromBeatmapInfo(beatmapInfo), criteria.Mods);
 
+            // 首先检查多选键数过滤（通过 ManiaRulesetSubset 传递）
+            if (criteria.ManiaRulesetSubset?.Any() == true)
+            {
+                var targetKeyCounts = criteria.ManiaRulesetSubset
+                                              .Select(keyCountStr => int.TryParse(keyCountStr, out int count) ? (int?)count : null)
+                                              .Where(count => count.HasValue)
+                                              .Select(count => count!.Value)
+                                              .ToHashSet();
+
+                if (targetKeyCounts.Count > 0)
+                {
+                    return targetKeyCounts.Contains(keyCount);
+                }
+            }
+
+            // 如果没有多选过滤，使用默认的 includedKeyCounts 逻辑
             return includedKeyCounts.Contains(keyCount);
         }
 

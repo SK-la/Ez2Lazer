@@ -14,9 +14,7 @@ using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
@@ -25,6 +23,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
+using osu.Game.Screens.SelectV2.Components;
 using osuTK;
 using osuTK.Input;
 
@@ -43,8 +42,7 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<SortMode> sortDropdown = null!;
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
-
-        private Bindable<EzSelectMode> ezMode = null!;
+        private KeyModeFilterTabControl keyModeFilter = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -70,7 +68,6 @@ namespace osu.Game.Screens.SelectV2
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
-            ezMode = config.GetBindable<EzSelectMode>(OsuSetting.SelectEzMode);
 
             Shear = OsuGame.SHEAR;
             Margin = new MarginPadding { Top = -corner_radius, Right = -40 };
@@ -178,43 +175,16 @@ namespace osu.Game.Screens.SelectV2
                                 }
                             }
                         },
-                        new GridContainer
+                        new Container
                         {
                             RelativeSizeAxes = Axes.X,
                             AutoSizeAxes = Axes.Y,
                             Shear = -OsuGame.SHEAR,
-                            RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
-                            ColumnDimensions = new[]
+                            Alpha = ruleset.Value.OnlineID == 3 ? 1 : 0, // Only filter for osu!mania
+                            Child = keyModeFilter = new KeyModeFilterTabControl
                             {
-                                new Dimension(GridSizeMode.AutoSize),
-                                new Dimension(GridSizeMode.Absolute),
-                                new Dimension(),
+                                RelativeSizeAxes = Axes.X,
                             },
-                            Content = new[]
-                            {
-                                new[]
-                                {
-                                    new OsuSpriteText
-                                    {
-                                        Text = "Keys",
-                                        Font = OsuFont.GetFont(size: 16),
-                                        Margin = new MarginPadding(5),
-                                        Anchor = Anchor.BottomRight,
-                                        Origin = Anchor.BottomRight,
-                                    },
-                                    Empty(),
-                                    new OsuTabControl<EzSelectMode>
-                                    {
-                                        RelativeSizeAxes = Axes.X,
-                                        Height = 20,
-                                        AutoSort = false,
-                                        Anchor = Anchor.BottomRight,
-                                        Origin = Anchor.BottomRight,
-                                        AccentColour = Colour4.LightBlue,
-                                        Current = { BindTarget = ezMode }
-                                    },
-                                }
-                            }
                         }
                     },
                 }
@@ -247,7 +217,6 @@ namespace osu.Game.Screens.SelectV2
                 if (rulesetCriteria?.FilterMayChangeFromMods(m) == true)
                     updateCriteria();
             });
-            ezMode.ValueChanged += _ => updateCriteria();
             searchTextBox.Current.BindValueChanged(_ => updateCriteria());
             difficultyRangeSlider.LowerBound.BindValueChanged(_ => updateCriteria());
             difficultyRangeSlider.UpperBound.BindValueChanged(_ => updateCriteria());
@@ -255,6 +224,11 @@ namespace osu.Game.Screens.SelectV2
             sortDropdown.Current.BindValueChanged(_ => updateCriteria());
             groupDropdown.Current.BindValueChanged(_ => updateCriteria());
             collectionDropdown.Current.BindValueChanged(_ => updateCriteria());
+            keyModeFilter.Current.BindValueChanged(_ => updateCriteria());
+
+            // 添加对多选状态变化的监听
+            keyModeFilter.MultiSelect.SelectionChanged += updateCriteria;
+
             updateCriteria();
         }
 
@@ -272,15 +246,23 @@ namespace osu.Game.Screens.SelectV2
                 AllowConvertedBeatmaps = showConvertedBeatmapsButton.Active.Value,
                 Ruleset = ruleset.Value,
                 Mods = mods.Value,
-                CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet()
+                CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet(),
             };
 
-            if (ezMode.Value != EzSelectMode.All)
-            {
-                float keyCount;
+            // 处理多选键数过滤
+            var selectedModes = keyModeFilter.MultiSelect.SelectedModes;
+            var selectedKeyCounts = EzModeHelper.GetKeyCountsFromSelectedModes(selectedModes);
 
-                if (float.TryParse(EzModeHelper.GetKeyCountFromEzMode(ezMode.Value).ToString(CultureInfo.InvariantCulture), out keyCount))
+            if (selectedKeyCounts.Count > 0)
+            {
+                // 如果有多个选中的键数，我们需要创建一个自定义的过滤逻辑
+                // 这里我们将使用 ManiaRulesetSubset 来传递多选信息，或者扩展 FilterCriteria
+                criteria.ManiaRulesetSubset = selectedKeyCounts.Select(k => k.ToString(CultureInfo.InvariantCulture));
+
+                // 为了向后兼容，如果只选择了一个模式，还是使用原来的 CircleSize 过滤
+                if (selectedKeyCounts.Count == 1)
                 {
+                    float keyCount = selectedKeyCounts[0];
                     criteria.CircleSize = new FilterCriteria.OptionalRange<float>
                     {
                         Min = keyCount,

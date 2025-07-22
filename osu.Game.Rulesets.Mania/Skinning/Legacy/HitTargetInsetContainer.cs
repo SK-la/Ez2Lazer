@@ -35,14 +35,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
-            ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition).BindValueChanged(_ => updateHitPosition(skin, ezSkinConfig));
-            ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).BindValueChanged(_ => updateHitPosition(skin, ezSkinConfig));
-
-            updateHitPosition(skin, ezSkinConfig);
-        }
-
-        private void updateHitPosition(ISkinSource skin, EzSkinSettingsManager ezSkinConfig)
-        {
             bool globalHitPositionValue = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition).Value;
             double hitPositionValue = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
 

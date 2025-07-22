@@ -6,8 +6,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
-using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -18,34 +16,31 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
         private TextureAnimation? animation;
 
-        public IBindable<double> HitPosition { get; set; } = new Bindable<double>();
-
-        [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
+        public IBindable<double> HitPosition { get; } = new Bindable<double>();
 
         public EzHoldNoteHittingLayer()
         {
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.Centre;
-            RelativeSizeAxes = Axes.Both;
+            RelativeSizeAxes = Axes.None;
             Blending = BlendingParameters.Additive;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            HitPosition = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            if (animation == null)
+                OnDrawableChanged();
+
             HitPosition.BindValueChanged(_ => UpdateSize(), true);
             IsHitting.BindValueChanged(hitting =>
             {
                 ClearTransforms();
-                // Logger.Log($"IsHitting changed to: {hitting.NewValue}", LoggingTarget.Runtime, LogLevel.Debug);
-                // animation.IsPlaying = hitting.NewValue;
 
                 if (hitting.NewValue && animation.IsNotNull() && animation.FrameCount > 0)
                 {
@@ -67,32 +62,38 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void OnDrawableChanged()
         {
+            ClearInternal();
             string[] componentsToTry = { "longnoteflare", "noteflaregood", "noteflare" };
 
             foreach (string component in componentsToTry)
             {
-                animation = factory.CreateAnimation(component);
+                animation = Factory.CreateAnimation(component);
 
-                if (animation.FrameCount > 0)
+                if (animation != null)
                 {
-                    animation.Loop = true;
-                    AddInternal(animation);
-                    UpdateSize();
-                }
-                else
-                {
+                    if (animation.FrameCount > 0)
+                    {
+                        animation.Loop = true;
+                        AddInternal(animation);
+                        UpdateSize();
+                        break;
+                    }
+
                     animation.Dispose();
-                    UpdateColor();
-                    return;
                 }
+            }
+
+            if (animation == null || animation.FrameCount == 0)
+            {
+                UpdateColor();
             }
         }
 
         protected override void UpdateSize()
         {
             base.UpdateSize();
-            float v = NoteSize.Value.Y / 2;
-            Position = new Vector2(0, -(float)HitPosition.Value - v);
+            float v = -(float)HitPosition.Value - NoteSize.Value.Y / 2;
+            Position = new Vector2(0, v);
         }
     }
 }

@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Screens;
@@ -51,11 +52,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             isHitting.BindTo(holdNote.IsHolding);
 
             hitPosition = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            isHitting.BindValueChanged(onIsHittingChanged, true);
-            OnSkinChanged();
         }
 
-        private void OnSkinChanged()
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            isHitting.BindValueChanged(onIsHittingChanged, true);
+
+            // 确保光效层被正确初始化
+            if (lightContainer == null)
+                OnLightChanged();
+        }
+
+        private void OnLightChanged()
         {
             if (lightContainer != null)
             {
@@ -69,7 +78,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Alpha = 0,
                 IsHitting = { BindTarget = isHitting }
             };
-            lightContainer = new Container
+
+            lightContainer = new HitTargetInsetContainer
             {
                 RelativeSizeAxes = Axes.Both,
                 Alpha = 0,
@@ -110,6 +120,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void OnDrawableChanged()
         {
+            // 清理之前的光效层和容器
+            if (lightContainer != null)
+            {
+                if (lightContainer.Parent != null)
+                    column.TopLevelContainer.Remove(lightContainer, false);
+                lightContainer.Expire();
+                lightContainer = null;
+            }
+
+            if (hittingLayer != null)
+            {
+                hittingLayer.Expire();
+                hittingLayer = null;
+            }
+
             string newComponentName = $"{ColorPrefix}note";
             var body = Factory.CreateAnimation($"{ColorPrefix}longnote/middle");
             var tail = Factory.CreateAnimation($"{ColorPrefix}longnote/tail");
@@ -162,6 +187,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 MainContainer.Clear();
                 MainContainer.Children = [bodyContainer, topContainer];
             }
+
+            // 重新初始化光效层
+            OnLightChanged();
 
             Schedule(UpdateSize);
         }
