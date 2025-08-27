@@ -124,14 +124,14 @@ namespace osu.Game.Skinning
 
         private void updateLayout()
         {
-            // const float font_height_ratio = 0.625f;
-            // const float vertical_offset = 9;
+            const float font_height_ratio = 0.625f;
+            const float vertical_offset = 9;
 
-            // displayedCountSpriteText.OriginPosition = new Vector2(displayedCountSpriteText.Width / 2, displayedCountSpriteText.Height / 2);
-            // displayedCountSpriteText.Position = new Vector2(0, 0);
+            displayedCountSpriteText.OriginPosition = new Vector2(0, font_height_ratio * displayedCountSpriteText.Height + vertical_offset);
+            displayedCountSpriteText.Position = new Vector2(0, -(1 - font_height_ratio) * displayedCountSpriteText.Height + vertical_offset);
 
-            popOutCount.Position = new Vector2(0, 8);
-            // popOutCount.Position = new Vector2(0, 0);
+            popOutCount.OriginPosition = new Vector2(3, font_height_ratio * popOutCount.Height + vertical_offset); // In stable, the bigger pop out scales a bit to the left
+            popOutCount.Position = new Vector2(0, -(1 - font_height_ratio) * popOutCount.Height + vertical_offset);
 
             counterContainer.Size = displayedCountSpriteText.Size;
         }

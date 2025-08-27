@@ -5,12 +5,12 @@ namespace osu.Game.Rulesets.Mods
 {
     public enum ModType
     {
-        CustomMod,
         DifficultyReduction,
         DifficultyIncrease,
         Conversion,
         Automation,
         Fun,
-        System
+        System,
+        CustomMod
     }
 }

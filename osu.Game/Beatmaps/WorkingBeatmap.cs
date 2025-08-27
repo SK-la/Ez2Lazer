@@ -29,8 +29,6 @@ namespace osu.Game.Beatmaps
         public readonly BeatmapInfo BeatmapInfo;
         public readonly BeatmapSetInfo BeatmapSetInfo;
 
-        public IBeatmap BeatmapAfterConverted { get; set; }
-
         // TODO: remove once the fallback lookup is not required (and access via `working.BeatmapInfo.Metadata` directly).
         public BeatmapMetadata Metadata => BeatmapInfo.Metadata;
 
@@ -126,11 +124,11 @@ namespace osu.Game.Beatmaps
             Track.Looping = looping;
             Track.RestartPoint = Metadata.PreviewTime;
 
-                if (!Track.IsLoaded)
-                {
-                    // force length to be populated (https://github.com/ppy/osu-framework/issues/4202)
-                    Track.Seek(Track.CurrentTime);
-                }
+            if (!Track.IsLoaded)
+            {
+                // force length to be populated (https://github.com/ppy/osu-framework/issues/4202)
+                Track.Seek(Track.CurrentTime);
+            }
 
             if (Track.RestartPoint < 0 || Track.RestartPoint > Track.Length)
                 Track.RestartPoint = 0.4f * Track.Length;
@@ -347,7 +345,6 @@ namespace osu.Game.Beatmaps
                 mod.ApplyToBeatmap(converted);
             }
 
-            BeatmapAfterConverted = converted;
             return converted;
         }
 

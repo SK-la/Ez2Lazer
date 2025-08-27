@@ -2,7 +2,6 @@
   "solution": {
     "path": "osu.sln",
     "projects": [
-      "..\\osu-framework\\osu.Framework.NativeLibs\\osu.Framework.NativeLibs.csproj",
       "..\\osu-framework\\osu.Framework\\osu.Framework.csproj",
       "..\\osu-resources\\osu.Game.Resources\\osu.Game.Resources.csproj",
       "osu.Desktop\\osu.Desktop.csproj",

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
@@ -20,10 +21,11 @@ using osu.Game.Overlays.Mods.Input;
 using osu.Game.Overlays.Settings.Sections.Gameplay;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Edit.Compose.Components;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.OnlinePlay.Lounge.Components;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
+using osu.Game.Screens.Select.Leaderboards;
+using osu.Game.Screens.SelectV2;
 using osu.Game.Skinning;
 using osu.Game.Users;
 
@@ -44,6 +46,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.Skin, SkinInfo.ARGON_SKIN.ToString());
 
             SetDefault(OsuSetting.BeatmapDetailTab, BeatmapDetailTab.Local);
+            SetDefault(OsuSetting.BeatmapLeaderboardSortMode, LeaderboardSortMode.Score);
             SetDefault(OsuSetting.BeatmapDetailModsFilter, false);
 
             SetDefault(OsuSetting.ShowConvertedBeatmaps, false);
@@ -109,6 +112,8 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.AudioOffset, 0, -500.0, 500.0, 1);
 
+            SetDefault(OsuSetting.AutomaticallyAdjustBeatmapOffset, false);
+
             // Input
             SetDefault(OsuSetting.MenuCursorSize, 1.0f, 0.5f, 2f, 0.01f);
             SetDefault(OsuSetting.GameplayCursorSize, 1.0f, 0.1f, 2f, 0.01f);
@@ -159,7 +164,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
 
             //新增自定义
-            SetDefault(OsuSetting.SelectEzMode, EzSelectMode.All);
+            SetDefault(OsuSetting.SelectEzMode, EzKeyModes.ALL.First().Id);
             SetDefault(OsuSetting.HitMode, MUGHitMode.EZ2AC);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
@@ -243,6 +248,9 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.EditorSubmissionLoadInBrowserAfterSubmission, true);
 
             SetDefault(OsuSetting.WasSupporter, false);
+
+            // intentionally uses `DateTime?` and not `DateTimeOffset?` because the latter fails due to `DateTimeOffset` not implementing `IConvertible`
+            SetDefault(OsuSetting.LastOnlineTagsPopulation, (DateTime?)null);
         }
 
         protected override bool CheckLookupContainsPrivateInformation(OsuSetting lookup)
@@ -398,6 +406,7 @@ namespace osu.Game.Configuration
         MenuParallax,
         Prefer24HourTime,
         BeatmapDetailTab,
+        BeatmapLeaderboardSortMode,
         BeatmapDetailModsFilter,
         Username,
         ReleaseStream,
@@ -505,6 +514,10 @@ namespace osu.Game.Configuration
         /// Cached state of whether local user is a supporter.
         /// Used to allow early checks (ie for startup samples) to be in the correct state, even if the API authentication process has not completed.
         /// </summary>
-        WasSupporter
+        WasSupporter,
+
+        LastOnlineTagsPopulation,
+
+        AutomaticallyAdjustBeatmapOffset,
     }
 }

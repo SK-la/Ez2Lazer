@@ -1,0 +1,142 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.IO;
+using osu.Framework.Allocation;
+using osu.Framework.Audio;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
+using osu.Framework.Logging;
+using osu.Framework.Platform;
+using LogLevel = osu.Framework.Logging.LogLevel;
+using osu.Game.Skinning.Components;
+using osuTK;
+
+namespace osu.Game.Screens
+{
+    public partial class EzNoteFactory : CompositeDrawable, IPreviewable
+    {
+        public Bindable<string> TextureNameBindable { get; } = new Bindable<string>("evolve");
+        public string TextureBasePath { get; } = @"EzResources\note";
+        
+        private readonly TextureStore textureStore;
+        private readonly EzSkinSettingsManager ezSkinConfig;
+        
+        private string? notesPath = string.Empty;
+        
+        private const float fps = 60;
+        
+        /// <summary>
+        /// 简化后的构造函数，直接使用TextureStore
+        /// </summary>
+        /// <param name="textureStore">用于加载纹理的TextureStore</param>
+        /// <param name="ezSkinConfig">皮肤设置管理器</param>
+        /// <param name="customTexturePath">自定义纹理路径（可选）</param>
+        public EzNoteFactory(TextureStore textureStore, EzSkinSettingsManager ezSkinConfig, string? customTexturePath = null)
+        {
+            this.textureStore = textureStore;
+            this.ezSkinConfig = ezSkinConfig;
+            
+            if (!string.IsNullOrEmpty(customTexturePath))
+                TextureBasePath = customTexturePath;
+                
+            RelativeSizeAxes = Axes.Both;
+            Anchor = Anchor.Centre;
+            Origin = Anchor.Centre;
+            Blending = new BlendingParameters
+            {
+                Source = BlendingType.SrcAlpha,
+                Destination = BlendingType.One,
+            };
+            
+            Initialize();
+        }
+          private void Initialize()
+        {
+            // 我们不再需要获取完整路径和创建目录，因为我们将直接使用TextureStore
+            // 直接从配置中获取纹理名称
+            TextureNameBindable.Value = ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName);
+
+            ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName).BindValueChanged(e =>
+                TextureNameBindable.Value = e.NewValue, true);
+
+            var gif = new DrawableAnimation
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Scale = new Vector2(1.2f),
+                DefaultFrameLength = 1000 / fps,
+                Loop = true,
+            };
+
+            AddInternal(gif);
+        }
+
+        // 保留BackgroundDependencyLoader方法来维持兼容性，但它不再必需
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            // 所有初始化逻辑都已移动到Initialize()方法中
+        }
+        
+        public virtual Drawable CreateAnimation(string component)
+        {
+            // 规范化
+            string noteSetName = TextureNameBindable.Value;
+            string normalizedComponent = component.Replace('/', Path.DirectorySeparatorChar);
+            
+            var animation = new TextureAnimation
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Scale = new Vector2(1.2f),
+                DefaultFrameLength = 1000 / fps,
+                Loop = false
+            };
+
+            // 为了适配TextureStore的方式，我们尝试加载序列帧（001.png, 002.png等）
+            for (int i = 1; i <= 60; i++) // 假设最多60帧
+            {
+                string framePath = $"{TextureBasePath}/{noteSetName}/{normalizedComponent}/{i:D3}";
+                var texture = textureStore.Get(framePath);
+                
+                if (texture == null)
+                {
+                    // 如果找不到更多帧，退出循环
+                    if (i == 1)
+                        Logger.Log($"EzNoteFactory: No frames found for {framePath}", LoggingTarget.Runtime, LogLevel.Warning);
+                    else
+                        Logger.Log($"EzNoteFactory: Found {i-1} frames for {component}", LoggingTarget.Runtime, LogLevel.Debug);
+                    break;
+                }
+                
+                animation.AddFrame(texture);
+            }
+
+            // 如果没有找到任何帧，尝试加载单张图片
+            if (animation.FrameCount == 0)
+            {
+                string singleImagePath = $"{TextureBasePath}/{noteSetName}/{normalizedComponent}";
+                var texture = textureStore.Get(singleImagePath);
+                
+                if (texture != null)
+                {
+                    Logger.Log($"EzNoteFactory: Loaded single image for {component}", LoggingTarget.Runtime, LogLevel.Debug);
+                    animation.AddFrame(texture);
+                }
+                else
+                {
+                    Logger.Log($"EzNoteFactory: Failed to load any textures for {component}", LoggingTarget.Runtime, LogLevel.Warning);
+                }
+            }
+
+            return animation;
+        }
+    }
+}

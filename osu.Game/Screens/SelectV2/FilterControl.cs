@@ -13,17 +13,19 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Collections;
 using osu.Game.Configuration;
+using osu.Game.Database;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
+using osu.Game.Online.API;
+using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
-using osu.Game.Screens.SelectV2.Components;
 using osuTK;
 using osuTK.Input;
 
@@ -42,7 +44,7 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<SortMode> sortDropdown = null!;
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
-        private KeyModeFilterTabControl keyModeFilter = null!;
+        private CircleSizeSelectorTab csSelector = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -52,6 +54,11 @@ namespace osu.Game.Screens.SelectV2
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
+
+        private IBindable<APIUser> localUser = null!;
 
         public LocalisableString StatusText
         {
@@ -63,8 +70,10 @@ namespace osu.Game.Screens.SelectV2
 
         private FilterCriteria currentCriteria = null!;
 
+        private IDisposable? collectionsSubscription;
+
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IAPIProvider api)
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -155,14 +164,13 @@ namespace osu.Game.Screens.SelectV2
                             {
                                 new[]
                                 {
-                                    sortDropdown = new ShearedDropdown<SortMode>("Sort")
+                                    sortDropdown = new ShearedDropdown<SortMode>(SongSelectStrings.Sort)
                                     {
                                         RelativeSizeAxes = Axes.X,
                                         Items = Enum.GetValues<SortMode>(),
                                     },
                                     Empty(),
-                                    // todo: pending localisation
-                                    groupDropdown = new ShearedDropdown<GroupMode>("Group")
+                                    groupDropdown = new ShearedDropdown<GroupMode>(SongSelectStrings.Group)
                                     {
                                         RelativeSizeAxes = Axes.X,
                                         Items = Enum.GetValues<GroupMode>(),
@@ -175,20 +183,15 @@ namespace osu.Game.Screens.SelectV2
                                 }
                             }
                         },
-                        new Container
+                        csSelector = new CircleSizeSelectorTab
                         {
                             RelativeSizeAxes = Axes.X,
-                            AutoSizeAxes = Axes.Y,
-                            Shear = -OsuGame.SHEAR,
-                            Alpha = ruleset.Value.OnlineID == 3 ? 1 : 0, // Only filter for osu!mania
-                            Child = keyModeFilter = new KeyModeFilterTabControl
-                            {
-                                RelativeSizeAxes = Axes.X,
-                            },
-                        }
+                        },
                     },
                 }
             };
+
+            localUser = api.LocalUser.GetBoundCopy();
         }
 
         protected override void LoadComplete()
@@ -217,19 +220,40 @@ namespace osu.Game.Screens.SelectV2
                 if (rulesetCriteria?.FilterMayChangeFromMods(m) == true)
                     updateCriteria();
             });
+
             searchTextBox.Current.BindValueChanged(_ => updateCriteria());
             difficultyRangeSlider.LowerBound.BindValueChanged(_ => updateCriteria());
             difficultyRangeSlider.UpperBound.BindValueChanged(_ => updateCriteria());
             showConvertedBeatmapsButton.Active.BindValueChanged(_ => updateCriteria());
             sortDropdown.Current.BindValueChanged(_ => updateCriteria());
             groupDropdown.Current.BindValueChanged(_ => updateCriteria());
-            collectionDropdown.Current.BindValueChanged(_ => updateCriteria());
-            keyModeFilter.Current.BindValueChanged(_ => updateCriteria());
+            collectionDropdown.Current.BindValueChanged(v =>
+            {
+                // The hope would be that this never arrives here, but due to bindings receiving changes before
+                // local ValueChanged events, that's not the case (see https://github.com/ppy/osu-framework/pull/1545).
+                if (v.NewValue is ManageCollectionsFilterMenuItem || v.OldValue is ManageCollectionsFilterMenuItem)
+                    return;
 
-            // 添加对多选状态变化的监听
-            keyModeFilter.MultiSelect.SelectionChanged += updateCriteria;
+                updateCriteria();
+            });
+            collectionsSubscription = realm.RegisterForNotifications(r => r.All<BeatmapCollection>(), (collections, changeSet) =>
+            {
+                if (changeSet != null && groupDropdown.Current.Value == GroupMode.Collections)
+                    updateCriteria();
+            });
+
+            localUser.BindValueChanged(_ => updateCriteria());
+
+            csSelector.Current.BindValueChanged(_ => updateCriteria());
+            csSelector.MultiSelect.SelectionChanged += updateCriteria;
 
             updateCriteria();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+            collectionsSubscription?.Dispose();
         }
 
         /// <summary>
@@ -238,6 +262,7 @@ namespace osu.Game.Screens.SelectV2
         public FilterCriteria CreateCriteria()
         {
             string query = searchTextBox.Current.Value;
+            bool isValidUser = localUser.Value.Id > 1;
 
             var criteria = new FilterCriteria
             {
@@ -247,31 +272,9 @@ namespace osu.Game.Screens.SelectV2
                 Ruleset = ruleset.Value,
                 Mods = mods.Value,
                 CollectionBeatmapMD5Hashes = collectionDropdown.Current.Value?.Collection?.PerformRead(c => c.BeatmapMD5Hashes).ToImmutableHashSet(),
+                LocalUserId = isValidUser ? localUser.Value.Id : null,
+                LocalUserUsername = isValidUser ? localUser.Value.Username : null,
             };
-
-            // 处理多选键数过滤
-            var selectedModes = keyModeFilter.MultiSelect.SelectedModes;
-            var selectedKeyCounts = EzModeHelper.GetKeyCountsFromSelectedModes(selectedModes);
-
-            if (selectedKeyCounts.Count > 0)
-            {
-                // 如果有多个选中的键数，我们需要创建一个自定义的过滤逻辑
-                // 这里我们将使用 ManiaRulesetSubset 来传递多选信息，或者扩展 FilterCriteria
-                criteria.ManiaRulesetSubset = selectedKeyCounts.Select(k => k.ToString(CultureInfo.InvariantCulture));
-
-                // 为了向后兼容，如果只选择了一个模式，还是使用原来的 CircleSize 过滤
-                if (selectedKeyCounts.Count == 1)
-                {
-                    float keyCount = selectedKeyCounts[0];
-                    criteria.CircleSize = new FilterCriteria.OptionalRange<float>
-                    {
-                        Min = keyCount,
-                        Max = keyCount,
-                        IsLowerInclusive = true,
-                        IsUpperInclusive = true
-                    };
-                }
-            }
 
             if (!difficultyRangeSlider.LowerBound.IsDefault)
                 criteria.UserStarDifficulty.Min = difficultyRangeSlider.LowerBound.Value;
@@ -279,10 +282,82 @@ namespace osu.Game.Screens.SelectV2
             if (!difficultyRangeSlider.UpperBound.IsDefault)
                 criteria.UserStarDifficulty.Max = difficultyRangeSlider.UpperBound.Value;
 
+            applyCircleSizeFilter(criteria);
+
             criteria.RulesetCriteria = ruleset.Value.CreateInstance().CreateRulesetFilterCriteria();
 
             FilterQueryParser.ApplyQueries(criteria, query);
             return criteria;
+        }
+
+        private void applyCircleSizeFilter(FilterCriteria criteria)
+        {
+            var selectedModeIds = csSelector.MultiSelect.SelectedModeIds;
+
+            if (selectedModeIds.Count == 1 && selectedModeIds.Contains("All"))
+                return;
+
+            var selectedKeyCounts = EzKeyModes.ALL
+                                              .Where(m => selectedModeIds.Contains(m.Id) && m.KeyCount.HasValue)
+                                              .Select(m => m.KeyCount!.Value)
+                                              .ToList();
+
+            if (selectedKeyCounts.Count == 0) return;
+
+            bool isManiaMode = ruleset.Value.OnlineID == 3;
+
+            if (isManiaMode)
+            {
+                applyManiaKeyFilter(criteria, selectedKeyCounts);
+            }
+            else
+            {
+                applyCircleSizeRangeFilter(criteria, selectedKeyCounts);
+            }
+        }
+
+        private void applyManiaKeyFilter(FilterCriteria criteria, List<float> selectedKeyCounts)
+        {
+            criteria.ManiaRulesetSubset = selectedKeyCounts.Select(k => ((int)k).ToString(CultureInfo.InvariantCulture));
+
+            if (selectedKeyCounts.Count == 1)
+            {
+                float keyCount = selectedKeyCounts[0];
+                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                {
+                    Min = keyCount,
+                    Max = keyCount,
+                    IsLowerInclusive = true,
+                    IsUpperInclusive = true
+                };
+            }
+        }
+
+        private void applyCircleSizeRangeFilter(FilterCriteria criteria, List<float> selectedKeyCounts)
+        {
+            if (selectedKeyCounts.Count == 1)
+            {
+                float keyCount = selectedKeyCounts[0];
+                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                {
+                    Min = keyCount - 0.5f,
+                    Max = keyCount + 0.5f,
+                    IsLowerInclusive = false,
+                    IsUpperInclusive = false
+                };
+            }
+            else if (selectedKeyCounts.Count > 1)
+            {
+                float minKey = selectedKeyCounts.Min();
+                float maxKey = selectedKeyCounts.Max();
+                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                {
+                    Min = minKey - 0.5f,
+                    Max = maxKey + 0.5f,
+                    IsLowerInclusive = false,
+                    IsUpperInclusive = false
+                };
+            }
         }
 
         private void updateCriteria()

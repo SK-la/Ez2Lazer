@@ -176,7 +176,7 @@ namespace osu.Game.Screens.Select.Carousel
                             {
                                 difficultyIcon = new DifficultyIcon(beatmapInfo)
                                 {
-                                    TooltipType = DifficultyIconTooltipType.StarRating,
+                                    TooltipType = DifficultyIconTooltipType.None,
                                     Scale = new Vector2(1.8f),
                                 },
                                 new Box

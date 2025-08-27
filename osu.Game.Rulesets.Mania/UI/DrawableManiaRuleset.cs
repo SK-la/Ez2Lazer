@@ -72,6 +72,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         // private readonly Bindable<MUGHitMode> hitMode = new Bindable<MUGHitMode>();
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
+        private readonly Bindable<bool> touchOverlay = new Bindable<bool>();
 
         public double TargetTimeRange { get; protected set; }
 
@@ -131,12 +132,21 @@ namespace osu.Game.Rulesets.Mania.UI
             Config.BindWith(ManiaRulesetSetting.ScrollBaseSpeed, configBaseMs);
             Config.BindWith(ManiaRulesetSetting.ScrollTimePerSpeed, configTimePerSpeed);
             Config.BindWith(ManiaRulesetSetting.ScrollSpeed, configScrollSpeed);
-            configScrollSpeed.BindValueChanged(speed => TargetTimeRange = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value));
+            configScrollSpeed.BindValueChanged(speed =>
+            {
+                if (!AllowScrollSpeedAdjustment)
+                    return;
+
+                TargetTimeRange = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value);
+            });
 
             TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
             mobileLayout.BindValueChanged(_ => updateMobileLayout(), true);
+
+            Config.BindWith(ManiaRulesetSetting.TouchOverlay, touchOverlay);
+            touchOverlay.BindValueChanged(_ => updateMobileLayout(), true);
 
             hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
@@ -175,18 +185,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void updateMobileLayout()
         {
-            switch (mobileLayout.Value)
-            {
-                case ManiaMobileLayout.LandscapeWithOverlay:
+            if (touchOverlay.Value)
                     KeyBindingInputManager.Add(touchInputArea = new ManiaTouchInputArea(this));
-                    break;
-
-                default:
+            else
+            {
                     if (touchInputArea != null)
                         KeyBindingInputManager.Remove(touchInputArea, true);
 
                     touchInputArea = null;
-                    break;
             }
         }
 
