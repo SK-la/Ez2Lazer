@@ -39,7 +39,7 @@ namespace osu.Game.Screens.SelectV2
 
         public IBindable<string> Current => tabControl.Current;
 
-        public MultiSelectEzKeyMode MultiSelect { get; } = new MultiSelectEzKeyMode();
+        public MultiEzSelectMode MultiEzSelect { get; } = new MultiEzSelectMode();
 
         public CircleSizeSelectorTab()
         {
@@ -87,12 +87,12 @@ namespace osu.Game.Screens.SelectV2
                 }
             };
 
-            keyModeId.BindTo(config.GetBindable<string>(OsuSetting.SelectEzMode));
+            keyModeId.BindTo(config.GetBindable<string>(OsuSetting.EzSelectMode));
             tabControl.Current.BindTarget = keyModeId;
 
             multiSelectButton.Active.BindTo(isMultiSelectMode);
             isMultiSelectMode.BindValueChanged(_ => syncSelection(), true);
-            MultiSelect.SelectionChanged += syncSelection;
+            MultiEzSelect.SelectionChanged += syncSelection;
             keyModeId.BindValueChanged(_ => syncSelection(), true);
             ruleset.BindValueChanged(_ => syncSelection(), true);
 
@@ -109,7 +109,7 @@ namespace osu.Game.Screens.SelectV2
         {
             base.Dispose(isDisposing);
 
-            MultiSelect.SelectionChanged -= syncSelection;
+            MultiEzSelect.SelectionChanged -= syncSelection;
         }
 
         private void syncSelection()
@@ -121,9 +121,9 @@ namespace osu.Game.Screens.SelectV2
 
             if (isMultiSelectMode.Value)
             {
-                if (!MultiSelect.SelectedModeIds.SetEquals(modeSelections[modeId]))
+                if (!MultiEzSelect.SelectedModeIds.SetEquals(modeSelections[modeId]))
                 {
-                    MultiSelect.SetSelection(modeSelections[modeId]);
+                    MultiEzSelect.SetSelection(modeSelections[modeId]);
                     keyModeId.Value = string.Join(",", modeSelections[modeId].OrderBy(x => x));
                 }
             }
@@ -135,8 +135,8 @@ namespace osu.Game.Screens.SelectV2
 
             tabControl.UpdateItemsForRuleset(modeId, modeSelections[modeId]);
 
-            if (!MultiSelect.SelectedModeIds.SetEquals(modeSelections[modeId]))
-                MultiSelect.SetSelection(modeSelections[modeId]);
+            if (!MultiEzSelect.SelectedModeIds.SetEquals(modeSelections[modeId]))
+                MultiEzSelect.SetSelection(modeSelections[modeId]);
         }
 
         public partial class ShearedKeyModeTabControl : OsuTabControl<string>
@@ -213,10 +213,10 @@ namespace osu.Game.Screens.SelectV2
                 };
 
                 const int mode_id = 3;
-                var keyModes = EzKeyModes.GetModesForRuleset(mode_id)
-                                         .OrderBy(m => m.Id == "All" ? -1 : m.KeyCount ?? 0)
-                                         .Select(m => m.Id)
-                                         .ToList();
+                var keyModes = EzSelectModes.GetModesForRuleset(mode_id)
+                                            .OrderBy(m => m.Id == "All" ? -1 : m.KeyCount ?? 0)
+                                            .Select(m => m.Id)
+                                            .ToList();
 
                 GetCurrentModeId.Value = mode_id;
                 Items = keyModes;
@@ -226,10 +226,10 @@ namespace osu.Game.Screens.SelectV2
             {
                 if (!IsLoaded) return;
 
-                var keyModes = EzKeyModes.GetModesForRuleset(modeId)
-                                         .OrderBy(m => m.Id == "All" ? -1 : m.KeyCount ?? 0)
-                                         .Select(m => m.Id)
-                                         .ToList();
+                var keyModes = EzSelectModes.GetModesForRuleset(modeId)
+                                            .OrderBy(m => m.Id == "All" ? -1 : m.KeyCount ?? 0)
+                                            .Select(m => m.Id)
+                                            .ToList();
 
                 if (GetCurrentModeId.Value != modeId)
                 {
@@ -387,7 +387,7 @@ namespace osu.Game.Screens.SelectV2
                         RelativeSizeAxes = Axes.Both,
                     };
 
-                    var modeInfo = EzKeyModes.GetById(value);
+                    var modeInfo = EzSelectModes.GetById(value);
                     text = new OsuSpriteText
                     {
                         Text = modeInfo?.DisplayName ?? value,
