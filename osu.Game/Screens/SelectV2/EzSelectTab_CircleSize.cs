@@ -162,6 +162,9 @@ namespace osu.Game.Screens.SelectV2
             [Resolved]
             private OverlayColourProvider colourProvider { get; set; } = null!;
 
+            [Resolved]
+            private IBindable<RulesetInfo> ruleset { get; set; } = null!;
+
             public ShearedKeyModeTabControl()
             {
                 RelativeSizeAxes = Axes.X;
@@ -212,13 +215,13 @@ namespace osu.Game.Screens.SelectV2
                     Left = LabelContainer.DrawWidth + 8,
                 };
 
-                const int mode_id = 3;
-                var keyModes = EzSelectModes.GetModesForRuleset(mode_id)
+                int modeID = ruleset.Value.OnlineID;
+                var keyModes = EzSelectModes.GetModesForRuleset(modeID)
                                             .OrderBy(m => m.Id == "All" ? -1 : m.KeyCount ?? 0)
                                             .Select(m => m.Id)
                                             .ToList();
 
-                GetCurrentModeId.Value = mode_id;
+                GetCurrentModeId.Value = modeID;
                 Items = keyModes;
             }
 
