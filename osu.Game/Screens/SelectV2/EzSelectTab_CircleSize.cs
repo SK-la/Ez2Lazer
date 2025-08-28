@@ -14,7 +14,6 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osuTK;
-using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Game.Graphics;
@@ -97,7 +96,7 @@ namespace osu.Game.Screens.SelectV2
             keyModeId.BindValueChanged(_ => syncSelection(), true);
             ruleset.BindValueChanged(_ => syncSelection(), true);
 
-            tabControl.GetCurrentModeId = () => ruleset.Value.OnlineID;
+            tabControl.GetCurrentModeId.Value = ruleset.Value.OnlineID;
             tabControl.GetCurrentSelections = () => modeSelections[ruleset.Value.OnlineID];
             tabControl.SetCurrentSelections = s => modeSelections[ruleset.Value.OnlineID] = new HashSet<string>(s);
             tabControl.GetIsMultiSelect = () => isMultiSelectMode.Value;
@@ -146,19 +145,22 @@ namespace osu.Game.Screens.SelectV2
 
             private readonly Box labelBox;
 
+            private readonly OsuSpriteText labelText;
+
             // private readonly LayoutValue drawSizeLayout = new LayoutValue(Invalidation.DrawSize);
             public float TabHeight { get; set; } = 30f;
             public float TabSpacing { get; set; } = 5f;
 
             // public Action<EzSelectMode>? OnTabItemClicked;
 
-            public Func<int>? GetCurrentModeId;
+            public Bindable<int> GetCurrentModeId = new Bindable<int>(-1);
             public Func<HashSet<string>>? GetCurrentSelections;
             public Action<HashSet<string>>? SetCurrentSelections;
             public Func<bool>? GetIsMultiSelect;
             public Action<string>? SetKeyMode;
 
-            private int currentRulesetId = -1;
+            [Resolved]
+            private OverlayColourProvider colourProvider { get; set; } = null!;
 
             public ShearedKeyModeTabControl()
             {
@@ -167,13 +169,6 @@ namespace osu.Game.Screens.SelectV2
                 Shear = OsuGame.SHEAR;
                 CornerRadius = ShearedButton.CORNER_RADIUS;
                 Masking = true;
-                EdgeEffect = new EdgeEffectParameters
-                {
-                    Type = EdgeEffectType.Shadow,
-                    Colour = Colour4.Black.Opacity(0.15f),
-                    Radius = 8,
-                    Offset = new Vector2(0, 2),
-                };
                 // AddLayout(drawSizeLayout);
                 LabelContainer = new Container
                 {
@@ -187,7 +182,7 @@ namespace osu.Game.Screens.SelectV2
                         {
                             RelativeSizeAxes = Axes.Both,
                         },
-                        new OsuSpriteText
+                        labelText = new OsuSpriteText
                         {
                             Text = "Keys",
                             Margin = new MarginPadding
@@ -201,7 +196,7 @@ namespace osu.Game.Screens.SelectV2
             }
 
             [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colourProvider)
+            private void load()
             {
                 labelBox.Colour = colourProvider.Background3;
 
@@ -223,7 +218,7 @@ namespace osu.Game.Screens.SelectV2
                                          .Select(m => m.Id)
                                          .ToList();
 
-                currentRulesetId = mode_id;
+                GetCurrentModeId.Value = mode_id;
                 Items = keyModes;
             }
 
@@ -236,14 +231,15 @@ namespace osu.Game.Screens.SelectV2
                                          .Select(m => m.Id)
                                          .ToList();
 
-                if (currentRulesetId != modeId)
+                if (GetCurrentModeId.Value != modeId)
                 {
-                    currentRulesetId = modeId;
+                    GetCurrentModeId.Value = modeId;
                     TabContainer.Clear();
                     Items = keyModes;
                     Logger.Log($"[UpdateItemsForRuleset] Rebuilding buttons for ruleset {modeId}, keyModes=[{string.Join(",", keyModes)}]");
                 }
 
+                labelText.Text = modeId == 3 ? "Keys" : "CS";
                 RefreshTabItems(selectedModes, keyModes);
             }
 
@@ -383,8 +379,8 @@ namespace osu.Game.Screens.SelectV2
                     CornerRadius = ShearedButton.CORNER_RADIUS;
                     Masking = true;
                     AutoSizeAxes = Axes.Both;
-
-                    Margin = value == "All" ? new MarginPadding { Left = 4 } : new MarginPadding(0);
+                    Margin = new MarginPadding { Left = 4 };
+                    // Margin = value == "All" ? new MarginPadding { Left = 4 } : new MarginPadding { Left = 4 };
 
                     background = new Box
                     {
@@ -412,7 +408,7 @@ namespace osu.Game.Screens.SelectV2
                 private void load(OverlayColourProvider colourProvider)
                 {
                     this.colourProvider = colourProvider;
-                    background.Colour = colourProvider.Background6;
+                    background.Colour = colourProvider.Background5;
                 }
 
                 public void UpdateMultiSelectState(bool isSelected)
@@ -440,7 +436,7 @@ namespace osu.Game.Screens.SelectV2
                         }
                         else
                         {
-                            background.FadeColour(colourProvider.Background6, 150, Easing.OutQuint);
+                            background.FadeColour(colourProvider.Background5, 150, Easing.OutQuint);
                             text.FadeColour(Colour4.White, 150, Easing.OutQuint);
                         }
                     }
