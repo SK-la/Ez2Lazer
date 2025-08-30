@@ -26,24 +26,13 @@ namespace osu.Game.Rulesets.Mania
         {
             int keyCount = ManiaBeatmapConverter.GetColumnCount(LegacyBeatmapConversionDifficultyInfo.FromBeatmapInfo(beatmapInfo), criteria.Mods);
 
-            if (criteria.ManiaRulesetSubset?.Any() == true)
-            {
-                var targetKeyCounts = criteria.ManiaRulesetSubset
-                                              .Select(keyCountStr => int.TryParse(keyCountStr, out int count) ? (int?)count : null)
-                                              .Where(count => count.HasValue)
-                                              .Select(count => count!.Value)
-                                              .ToHashSet();
-
-                if (targetKeyCounts.Count > 0)
-                {
-                    // Framework.Logging.Logger.Log($"[ManiaFilter] [{targetKeyCounts}], keyCount={keyCount}");
-
-                    return targetKeyCounts.Contains(keyCount);
-                }
-            }
-
             bool keyCountMatch = includedKeyCounts.Contains(keyCount);
             bool longNotePercentageMatch = !longNotePercentage.HasFilter || (!isConvertedBeatmap(beatmapInfo) && longNotePercentage.IsInRange(calculateLongNotePercentage(beatmapInfo)));
+
+            if (criteria.DiscreteCircleSizeValues?.Any() == true)
+            {
+                keyCountMatch = criteria.DiscreteCircleSizeValues.Contains(keyCount);
+            }
 
             return keyCountMatch && longNotePercentageMatch;
         }

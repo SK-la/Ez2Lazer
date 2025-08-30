@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -44,7 +43,7 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<SortMode> sortDropdown = null!;
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
-        private CircleSizeSelectorTab csSelector = null!;
+        private CircleSizeSelector csSelector = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -183,7 +182,7 @@ namespace osu.Game.Screens.SelectV2
                                 }
                             }
                         },
-                        csSelector = new CircleSizeSelectorTab
+                        csSelector = new CircleSizeSelector
                         {
                             RelativeSizeAxes = Axes.X,
                         },
@@ -245,7 +244,7 @@ namespace osu.Game.Screens.SelectV2
             localUser.BindValueChanged(_ => updateCriteria());
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
-            csSelector.MultiEzSelect.SelectionChanged += updateCriteria;
+            csSelector.CircleSizeFilter.SelectionChanged += updateCriteria;
 
             updateCriteria();
         }
@@ -292,68 +291,28 @@ namespace osu.Game.Screens.SelectV2
 
         private void applyCircleSizeFilter(FilterCriteria criteria)
         {
-            var selectedModeIds = csSelector.MultiEzSelect.SelectedModeIds;
+            var selectedModeIds = csSelector.CircleSizeFilter.SelectedModeIds;
 
-            if (selectedModeIds.Count == 1 && selectedModeIds.Contains("All"))
+            if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
                 return;
 
-            var selectedKeyCounts = EzSelectModes.ALL
-                                                 .Where(m => selectedModeIds.Contains(m.Id) && m.KeyCount.HasValue)
-                                                 .Select(m => m.KeyCount!.Value)
-                                                 .ToList();
+            var selectedModes = CsItemIds.ALL
+                                         .Where(m => selectedModeIds.Contains(m.Id) && m.CsValue.HasValue)
+                                         .Select(m => m.CsValue!.Value)
+                                         .ToList();
 
-            if (selectedKeyCounts.Count == 0) return;
+            if (selectedModes.Count == 0)
+                return;
 
-            bool isManiaMode = ruleset.Value.OnlineID == 3;
+            criteria.DiscreteCircleSizeValues = new List<float>(selectedModes);
 
-            if (isManiaMode)
+            if (ruleset.Value.OnlineID != 3)
             {
-                applyManiaKeyFilter(criteria, selectedKeyCounts);
-            }
-            else
-            {
-                applyCircleSizeRangeFilter(criteria, selectedKeyCounts);
-            }
-        }
-
-        private void applyManiaKeyFilter(FilterCriteria criteria, List<float> selectedKeyCounts)
-        {
-            criteria.ManiaRulesetSubset = selectedKeyCounts.Select(k => ((int)k).ToString(CultureInfo.InvariantCulture));
-
-            if (selectedKeyCounts.Count == 1)
-            {
-                float keyCount = selectedKeyCounts[0];
+                // For no mania rulesets, ±0.5 is an intuitive range.
                 criteria.CircleSize = new FilterCriteria.OptionalRange<float>
                 {
-                    Min = keyCount,
-                    Max = keyCount,
-                    IsLowerInclusive = true,
-                    IsUpperInclusive = true
-                };
-            }
-        }
-
-        private void applyCircleSizeRangeFilter(FilterCriteria criteria, List<float> selectedKeyCounts)
-        {
-            if (selectedKeyCounts.Count == 1)
-            {
-                float keyCount = selectedKeyCounts[0];
-                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
-                {
-                    Min = keyCount - 0.5f,
-                    Max = keyCount + 0.5f,
-                    IsLowerInclusive = false,
-                    IsUpperInclusive = false
-                };
-            }
-            else if (selectedKeyCounts.Count > 1)
-            {
-                float minKey = selectedKeyCounts.Min();
-                float maxKey = selectedKeyCounts.Max();
-                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
-                {
-                    Min = minKey - 0.5f,
-                    Max = maxKey + 0.5f,
+                    Min = selectedModes.Min() - 0.5f,
+                    Max = selectedModes.Max() + 0.5f,
                     IsLowerInclusive = false,
                     IsUpperInclusive = false
                 };

@@ -164,7 +164,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
 
             //新增自定义
-            SetDefault(OsuSetting.EzSelectMode, EzSelectModes.ALL.First().Id);
+            SetDefault(OsuSetting.EzSelectMode, CsItemIds.ALL.First().Id);
             SetDefault(OsuSetting.HitMode, MUGHitMode.EZ2AC);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
