@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 MainContainer.Child = animation;
             }
 
-            Schedule(UpdateSize);
+            UpdateSize();
         }
 
         protected override void UpdateSize()

@@ -46,8 +46,8 @@ namespace osu.Game.Screens
 
         private static readonly Dictionary<bool, (Color4 Color, string TopText, string BottomText)> position_mode_config = new Dictionary<bool, (Color4 Color, string TopText, string BottomText)>
         {
-            [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), "强制刷新, 并切换至 绝对位置", "Refresh, Switch to Absolute"),
-            [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), "强制刷新, 并切换至 相对位置", "Refresh, Switch to Relative")
+            [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), "SwitchToAbsolute".Localize(), "SwitchToAbsolute".Localize()),
+            [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), "SwitchToRelative".Localize(), "SwitchToRelative".Localize())
         };
 
         private readonly Bindable<string> selectedNoteSet = new Bindable<string>();
@@ -60,11 +60,6 @@ namespace osu.Game.Screens
         private SettingsButton refreshSkinButton = null!;
         private bool isAbsolutePosition = true;
 
-        // public Bindable<double> HitPosition => ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-        // public Bindable<double> ColumnWidth => ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-        // public Bindable<double> SpecialFactor => ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-        // public Bindable<double> NoteHeightScaleToWidth => ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
-
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -73,7 +68,6 @@ namespace osu.Game.Screens
             loadFolderSets("note");
             loadFolderSets("Stage");
 
-            // 设置默认值
             setDefaultSelection(selectedNoteSet, availableNoteSets, ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName));
             setDefaultSelection(selectedStageSet, availableStageSets, ezSkinConfig.Get<string>(EzSkinSetting.StageName));
             createUI();
@@ -87,22 +81,6 @@ namespace osu.Game.Screens
             selectedNoteSet.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.NoteSetName, e.NewValue));
             selectedStageSet.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue));
         }
-
-        // public Bindable<float> GetNoteSize(int keyMode, int columnIndex, int x = 0)
-        // {
-        //     bool isSpecialColumn = ezSkinConfig.GetColumnType(keyMode, columnIndex) == "S";
-        //     double baseWidth = ColumnWidth.Value;
-        //     double specialFactor = SpecialFactor.Value;
-        //     double columnWidth = (baseWidth * (isSpecialColumn ? specialFactor : 1.0));
-        //     NoteSize.Value = (float)columnWidth;
-        //
-        //     if (x != 0)
-        //         return NoteSize;
-        //
-        //     double heightScale = NoteHeightScaleToWidth.Value;
-        //     NoteSize.Value = (float)(columnWidth * heightScale);
-        //     return new Bindable<float>((float)(columnWidth * heightScale));
-        // }
 
         private void setDefaultSelection(Bindable<string> bindable, List<string> availableItems, string configuredValue)
         {
@@ -130,83 +108,90 @@ namespace osu.Game.Screens
                     {
                         new SettingsEnumDropdown<EzSelectorNameSet>
                         {
-                            LabelText = "Global Texture Name",
-                            TooltipText = "(全局纹理名称)统一修改当前皮肤中所有组件的纹理名称\n"
-                                          + "Set a global texture name for all components in the current skin",
+                            LabelText = "GlobalTextureName".Localize(),
+                            TooltipText = "GlobalTextureNameTooltip".Localize(),
                             Current = globalTextureName,
                         },
                         new SettingsDropdown<string>
                         {
-                            LabelText = "(面板套图)Stage Set",
-                            TooltipText = "统一指定Stage Bottom, 关联实时BPM\n"
-                                          + "Set a stage set for Stage Bottom, related to real-time BPM",
+                            LabelText = "StageSet".Localize(),
+                            TooltipText = "StageSetTooltip".Localize(),
                             Current = selectedStageSet,
                             Items = availableStageSets,
                         },
                         new SettingsDropdown<string>
                         {
-                            LabelText = "(Note套图)Note Set",
-                            TooltipText = "统一指定note套图, 含note和打击光效\n"
-                                          + "Set a note set for all notes and hit effects",
+                            LabelText = "NoteSet".Localize(),
+                            TooltipText = "NoteSetTooltip".Localize(),
                             Current = selectedNoteSet,
                             Items = availableNoteSets,
                         },
                         new SettingsEnumDropdown<EzColumnWidthStyle>
                         {
-                            LabelText = "Column Width Style(列宽风格)",
-                            TooltipText = "不完善！全局总列宽=设置值×10\n"
-                                          + "Global Total Column Width = Configured Value × 10",
+                            LabelText = "ColumnWidthStyle".Localize(),
+                            TooltipText = "ColumnWidthStyleTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<EzColumnWidthStyle>(EzSkinSetting.ColumnWidthStyle),
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "Column Width (轨道宽度)",
-                            TooltipText = "设置每列的宽度",
+                            LabelText = "ColumnWidth".Localize(),
+                            TooltipText = "ColumnWidthTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth),
                             KeyboardStep = 1.0f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "Special Factor (特殊轨道倍率)",
-                            TooltipText = "特殊列关联S1类型, 可自定义"
-                                          + "\nSpecial columns are associated with S1 type, customizable",
+                            LabelText = "SpecialFactor".Localize(),
+                            TooltipText = "SpecialFactorTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsCheckbox
                         {
-                            LabelText = "Global HitPosition",
-                            TooltipText = "全局判定线位置开关",
+                            LabelText = "GlobalHitPosition".Localize(),
+                            TooltipText = "GlobalHitPositionTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition),
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "Hit Position (可视判定线位置)",
-                            TooltipText = "设置判定线位置",
+                            LabelText = "HitPosition".Localize(),
+                            TooltipText = "HitPositionTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition),
                             KeyboardStep = 1f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "Note Height Scale (note 高度比例)",
-                            TooltipText = "统一修改note的高度的比例\n"
-                                          + "Fixed Height for square notes",
+                            LabelText = "HitTargetFloatFixed".Localize(),
+                            TooltipText = "HitTargetFloatFixedTooltip".Localize(),
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetFloatFixed),
+                            KeyboardStep = 0.1f,
+                        },
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "HitTargetAlpha".Localize(),
+                            TooltipText = "HitTargetAlphaTooltip".Localize(),
+                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetAlpha),
+                            KeyboardStep = 0.1f,
+                        },
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "NoteHeightScale".Localize(),
+                            TooltipText = "NoteHeightScaleTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "Note Track Line",
-                            TooltipText = "note两侧辅助轨道线的高度\n"
-                                          + "note side auxiliary track line height",
+                            LabelText = "NoteTrackLine".Localize(),
+                            TooltipText = "NoteTrackLineTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteTrackLineHeight),
                         },
                         refreshSkinButton = new SettingsButton
                         {
                             Action = RefreshSkin,
-                            TooltipText = "强制刷新、保存皮肤,\n"
-                                          + "Refresh & Save Skin"
-                        }.WithTwoLineText("强制刷新, 保存皮肤", "Refresh & Save Skin", 16)
+                            Text = "RefreshSaveSkin".Localize(),
+                            TooltipText = "RefreshSaveSkin".Localize()
+                        }
                     }
                 }
             };
@@ -219,7 +204,7 @@ namespace osu.Game.Screens
             isAbsolutePosition = !isAbsolutePosition;
             skinManager.CurrentSkinInfo.TriggerChange();
             // skinManager.Save(skinManager.CurrentSkin.Value);
-            // updateButtonAppearance();
+            updateButtonAppearance();
         }
 
         private void updateButtonAppearance()

@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.UI.Components
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
-        private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
+        private Bindable<bool> globalHitPosition = new Bindable<bool>();
 
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.UI.Components
             Direction.BindTo(scrollingInfo.Direction);
             Direction.BindValueChanged(_ => UpdateHitPosition(), true);
 
-            globalHitPosition.BindTo(ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition));
+            globalHitPosition = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition);
             hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             skin.SourceChanged += onSkinChanged;
         }

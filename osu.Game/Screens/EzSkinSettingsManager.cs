@@ -61,6 +61,8 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
             SetDefault(EzSkinSetting.HitPosition, LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION, 0, 500, 1.0);
             SetDefault(EzSkinSetting.VisualHitPosition, 0.0, -100, 100, 1.0);
+            SetDefault(EzSkinSetting.HitTargetFloatFixed, 6, 0, 10, 0.1);
+            SetDefault(EzSkinSetting.HitTargetAlpha, 0.3, 0, 1, 0.1);
 
             SetDefault(EzSkinSetting.NoteSetName, "evolve");
             SetDefault(EzSkinSetting.StageName, "JIYU");
@@ -265,6 +267,8 @@ namespace osu.Game.Screens
 
         // Ez专属皮肤设置
         HitPosition,
+        HitTargetFloatFixed,
+        HitTargetAlpha,
         VisualHitPosition,
         NoteHeightScaleToWidth,
         NoteTrackLineHeight,

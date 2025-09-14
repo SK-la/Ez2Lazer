@@ -49,7 +49,7 @@ namespace osu.Game.Screens.SelectV2
         public static CsItemInfo? GetById(string id) => ALL.FirstOrDefault(m => m.Id == id);
     }
 
-    public class CircleSizeFilter
+    public class KeyModeFilter
     {
         public HashSet<string> SelectedModeIds { get; } = new HashSet<string> { "All" };
 

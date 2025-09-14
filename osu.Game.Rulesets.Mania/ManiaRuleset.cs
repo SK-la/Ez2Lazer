@@ -109,6 +109,7 @@ namespace osu.Game.Rulesets.Mania
                     return new ManiaSbISkinTransformer(skin, beatmap);
 
                 case DefaultLegacySkin:
+                case RetroSkin:
                     return new ManiaClassicSkinTransformer(skin, beatmap);
 
                 case LegacySkin:

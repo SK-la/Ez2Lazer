@@ -43,7 +43,7 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<SortMode> sortDropdown = null!;
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
-        private CircleSizeSelector csSelector = null!;
+        private EzKeyModeSelector csSelector = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -182,7 +182,7 @@ namespace osu.Game.Screens.SelectV2
                                 }
                             }
                         },
-                        csSelector = new CircleSizeSelector
+                        csSelector = new EzKeyModeSelector
                         {
                             RelativeSizeAxes = Axes.X,
                         },
@@ -244,7 +244,7 @@ namespace osu.Game.Screens.SelectV2
             localUser.BindValueChanged(_ => updateCriteria());
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
-            csSelector.CircleSizeFilter.SelectionChanged += updateCriteria;
+            csSelector.KeyModeFilter.SelectionChanged += updateCriteria;
 
             updateCriteria();
         }
@@ -291,7 +291,7 @@ namespace osu.Game.Screens.SelectV2
 
         private void applyCircleSizeFilter(FilterCriteria criteria)
         {
-            var selectedModeIds = csSelector.CircleSizeFilter.SelectedModeIds;
+            var selectedModeIds = csSelector.KeyModeFilter.SelectedModeIds;
 
             if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
                 return;

@@ -3,8 +3,10 @@
 
 using System;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
+using osu.Game.Screens;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -17,6 +19,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override string ColorPrefix => "white";
 
+        private Bindable<double> hitTargetFloatFixed = new Bindable<double>();
+        private Bindable<double> hitTargetAlpha = new Bindable<double>(0.3);
+
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
 
@@ -27,7 +32,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             RelativeSizeAxes = Axes.X;
             FillMode = FillMode.Fill;
-            Alpha = 0.3f;
         }
 
         [BackgroundDependencyLoader]
@@ -35,25 +39,50 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
+
+            Alpha = (float)hitTargetAlpha.Value;
+            hitTargetAlpha = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetAlpha);
+            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
+
+            hitTargetFloatFixed = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetFloatFixed);
+            hitTargetFloatFixed.BindValueChanged(_ => updatePosition());
         }
 
         private double beatInterval;
+        private bool requiresUpdate = true;
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            double bpm = beatmap.BeatmapInfo.BPM * gameplayClock.GetTrueGameplayRate();
-            beatInterval = 60000 / bpm;
+            calculateBeatInterval();
+            requiresUpdate = true;
         }
 
         protected override void Update()
         {
             base.Update();
 
-            double progress = (gameplayClock.CurrentTime % beatInterval) / beatInterval;
+            if (requiresUpdate)
+            {
+                updatePosition();
+            }
+        }
+
+        private void calculateBeatInterval()
+        {
+            double bpm = beatmap.BeatmapInfo.BPM * gameplayClock.GetTrueGameplayRate();
+            beatInterval = 60000 / bpm;
+        }
+
+        private void updatePosition()
+        {
             // 平滑正弦波效果
-            double smoothValue = 0.3 * Math.Sin(progress * 2 * Math.PI);
-            Y = (float)(smoothValue * 6);
+            if (beatInterval > 0)
+            {
+                double progress = (gameplayClock.CurrentTime % beatInterval) / beatInterval;
+                double smoothValue = 0.3 * Math.Sin(progress * 2 * Math.PI);
+                Y = (float)(smoothValue * hitTargetFloatFixed.Value);
+            }
         }
     }
 }

@@ -21,7 +21,7 @@ using osu.Game.Graphics.Sprites;
 
 namespace osu.Game.Screens.SelectV2
 {
-    public partial class CircleSizeSelector : CompositeDrawable
+    public partial class EzKeyModeSelector : CompositeDrawable
     {
         private readonly Bindable<string> keyModeId = new Bindable<string>("All");
         private readonly BindableBool isMultiSelectMode = new BindableBool();
@@ -38,9 +38,9 @@ namespace osu.Game.Screens.SelectV2
 
         public IBindable<string> Current => tabControl.Current;
 
-        public CircleSizeFilter CircleSizeFilter { get; } = new CircleSizeFilter();
+        public KeyModeFilter KeyModeFilter { get; } = new KeyModeFilter();
 
-        public CircleSizeSelector()
+        public EzKeyModeSelector()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -88,12 +88,12 @@ namespace osu.Game.Screens.SelectV2
 
             multiSelectButton.Active.BindTo(isMultiSelectMode);
 
-            keyModeId.BindTo(config.GetBindable<string>(OsuSetting.EzSelectMode));
+            keyModeId.BindTo(config.GetBindable<string>(OsuSetting.EzSelectCsMode));
             keyModeId.BindValueChanged(onSelectorChanged, true);
 
             isMultiSelectMode.BindValueChanged(_ => updateValue(), true);
             ruleset.BindValueChanged(onRulesetChanged, true);
-            CircleSizeFilter.SelectionChanged += updateValue;
+            KeyModeFilter.SelectionChanged += updateValue;
 
             tabControl.Current.BindTarget = keyModeId;
         }
@@ -102,7 +102,7 @@ namespace osu.Game.Screens.SelectV2
         {
             base.Dispose(isDisposing);
 
-            CircleSizeFilter.SelectionChanged -= updateValue;
+            KeyModeFilter.SelectionChanged -= updateValue;
         }
 
         private void onRulesetChanged(ValueChangedEvent<RulesetInfo> e)
@@ -114,7 +114,7 @@ namespace osu.Game.Screens.SelectV2
         private void onSelectorChanged(ValueChangedEvent<string> e)
         {
             var modes = parseModeIds(e.NewValue);
-            CircleSizeFilter.SetSelection(modes);
+            KeyModeFilter.SetSelection(modes);
             tabControl.UpdateTabItemUI(modes);
         }
 
@@ -129,12 +129,12 @@ namespace osu.Game.Screens.SelectV2
 
             if (isMultiSelectMode.Value)
             {
-                selectedModes = CircleSizeFilter.SelectedModeIds;
+                selectedModes = KeyModeFilter.SelectedModeIds;
                 keyModeId.Value = string.Join(",", selectedModes.OrderBy(x => x));
             }
             else
             {
-                selectedModes = CircleSizeFilter.SelectedModeIds;
+                selectedModes = KeyModeFilter.SelectedModeIds;
                 keyModeId.Value = selectedModes.Count > 0 ? selectedModes.First() : "All";
             }
 
@@ -161,8 +161,6 @@ namespace osu.Game.Screens.SelectV2
 
             public Container LabelContainer;
             public bool IsMultiSelectMode { get; set; }
-            public float TabHeight { get; set; } = 30f;
-            public float TabSpacing { get; set; } = 5f;
 
             public Action<HashSet<string>>? SetCurrentSelections;
 
@@ -181,7 +179,8 @@ namespace osu.Game.Screens.SelectV2
                     Depth = float.MaxValue,
                     CornerRadius = ShearedButton.CORNER_RADIUS,
                     Masking = true,
-                    AutoSizeAxes = Axes.Both,
+                    AutoSizeAxes = Axes.Y,
+                    Width = 50,
                     Children = new Drawable[]
                     {
                         labelBox = new Box
@@ -195,6 +194,8 @@ namespace osu.Game.Screens.SelectV2
                                 { Horizontal = 8f, Vertical = 7f },
                             Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
                             Shear = -OsuGame.SHEAR,
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
                         },
                     }
                 };
@@ -210,7 +211,7 @@ namespace osu.Game.Screens.SelectV2
                 TabContainer.Origin = Anchor.CentreLeft;
                 TabContainer.Shear = -OsuGame.SHEAR;
                 TabContainer.RelativeSizeAxes = Axes.X;
-                TabContainer.Height = TabHeight;
+                TabContainer.AutoSizeAxes = Axes.Y;
                 TabContainer.Spacing = new Vector2(0f);
                 TabContainer.Margin = new MarginPadding
                 {

@@ -60,9 +60,13 @@ namespace osu.Game.Skinning
 
         private readonly IResourceStore<byte[]> userFiles;
 
+        private Skin ezProSkin { get; }
+
         private Skin argonSkin { get; }
 
         private Skin trianglesSkin { get; }
+
+        private Skin retroSkin { get; }
 
         public override bool PauseImports
         {
@@ -91,12 +95,13 @@ namespace osu.Game.Skinning
 
             var defaultSkins = new[]
             {
+                retroSkin = new RetroSkin(this),
                 DefaultClassicSkin = new DefaultLegacySkin(this),
                 trianglesSkin = new TrianglesSkin(this),
                 argonSkin = new ArgonSkin(this),
                 new ArgonProSkin(this),
                 new Ez2Skin(this),
-                new EzStyleProSkin(this),
+                ezProSkin = new EzStyleProSkin(this),
                 new SbISkin(this),
             };
 
@@ -370,8 +375,15 @@ namespace osu.Game.Skinning
 
             if (skinInfo == null)
             {
+                if (guid == SkinInfo.EZ_STYLE_PRO_SKIN)
+                    skinInfo = ezProSkin.SkinInfo;
+
                 if (guid == SkinInfo.CLASSIC_SKIN)
                     skinInfo = DefaultClassicSkin.SkinInfo;
+
+                if (guid == SkinInfo.RETRO_SKIN)
+                    skinInfo = retroSkin.SkinInfo;
+
             }
 
             CurrentSkinInfo.Value = skinInfo ?? trianglesSkin.SkinInfo;
