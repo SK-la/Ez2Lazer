@@ -156,6 +156,8 @@ namespace osu.Game.Screens.SelectV2
 
         private Bindable<bool> configBackgroundBlur = null!;
 
+        private EnhancedPreviewTrackManager enhancedPreviewManager = null!;
+
         [BackgroundDependencyLoader]
         private void load(AudioManager audio, OsuConfigManager config)
         {
@@ -290,6 +292,7 @@ namespace osu.Game.Screens.SelectV2
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
                 },
+                enhancedPreviewManager = new EnhancedPreviewTrackManager(),
                 modSpeedHotkeyHandler = new ModSpeedHotkeyHandler(),
                 modSelectOverlay,
             });
@@ -500,13 +503,21 @@ namespace osu.Game.Screens.SelectV2
             if (!isHandlingLooping)
                 return;
 
+            enhancedPreviewManager.StopPreview();
             music.CurrentTrack.Looping = isHandlingLooping = false;
 
             music.TrackChanged -= ensureTrackLooping;
         }
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
-            => beatmap.PrepareTrackForPreview(true);
+        {
+            enhancedPreviewManager?.StopPreview();
+
+            if (enhancedPreviewManager != null)
+                enhancedPreviewManager.StartPreview(beatmap);
+            else
+                beatmap.PrepareTrackForPreview(true);
+        }
 
         #endregion
 
