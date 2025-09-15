@@ -23,7 +23,7 @@ namespace osu.Game.Screens.SelectV2
 {
     public partial class EzKeyModeSelector : CompositeDrawable
     {
-        private readonly Bindable<string> keyModeId = new Bindable<string>("All");
+        private Bindable<string> keyModeId = new Bindable<string>("All");
         private readonly BindableBool isMultiSelectMode = new BindableBool();
         private readonly Dictionary<int, HashSet<string>> modeSelections = new Dictionary<int, HashSet<string>>();
 
@@ -38,7 +38,7 @@ namespace osu.Game.Screens.SelectV2
 
         public IBindable<string> Current => tabControl.Current;
 
-        public KeyModeFilter KeyModeFilter { get; } = new KeyModeFilter();
+        public EzKeyModeFilter EzKeyModeFilter { get; } = new EzKeyModeFilter();
 
         public EzKeyModeSelector()
         {
@@ -88,12 +88,12 @@ namespace osu.Game.Screens.SelectV2
 
             multiSelectButton.Active.BindTo(isMultiSelectMode);
 
-            keyModeId.BindTo(config.GetBindable<string>(OsuSetting.EzSelectCsMode));
+            keyModeId = config.GetBindable<string>(OsuSetting.EzSelectCsMode);
             keyModeId.BindValueChanged(onSelectorChanged, true);
 
             isMultiSelectMode.BindValueChanged(_ => updateValue(), true);
             ruleset.BindValueChanged(onRulesetChanged, true);
-            KeyModeFilter.SelectionChanged += updateValue;
+            EzKeyModeFilter.SelectionChanged += updateValue;
 
             tabControl.Current.BindTarget = keyModeId;
         }
@@ -102,7 +102,7 @@ namespace osu.Game.Screens.SelectV2
         {
             base.Dispose(isDisposing);
 
-            KeyModeFilter.SelectionChanged -= updateValue;
+            EzKeyModeFilter.SelectionChanged -= updateValue;
         }
 
         private void onRulesetChanged(ValueChangedEvent<RulesetInfo> e)
@@ -114,7 +114,7 @@ namespace osu.Game.Screens.SelectV2
         private void onSelectorChanged(ValueChangedEvent<string> e)
         {
             var modes = parseModeIds(e.NewValue);
-            KeyModeFilter.SetSelection(modes);
+            EzKeyModeFilter.SetSelection(modes);
             tabControl.UpdateTabItemUI(modes);
         }
 
@@ -129,12 +129,12 @@ namespace osu.Game.Screens.SelectV2
 
             if (isMultiSelectMode.Value)
             {
-                selectedModes = KeyModeFilter.SelectedModeIds;
+                selectedModes = EzKeyModeFilter.SelectedModeIds;
                 keyModeId.Value = string.Join(",", selectedModes.OrderBy(x => x));
             }
             else
             {
-                selectedModes = KeyModeFilter.SelectedModeIds;
+                selectedModes = EzKeyModeFilter.SelectedModeIds;
                 keyModeId.Value = selectedModes.Count > 0 ? selectedModes.First() : "All";
             }
 

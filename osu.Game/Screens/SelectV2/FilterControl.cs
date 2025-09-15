@@ -244,7 +244,7 @@ namespace osu.Game.Screens.SelectV2
             localUser.BindValueChanged(_ => updateCriteria());
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
-            csSelector.KeyModeFilter.SelectionChanged += updateCriteria;
+            csSelector.EzKeyModeFilter.SelectionChanged += updateCriteria;
 
             updateCriteria();
         }
@@ -291,7 +291,7 @@ namespace osu.Game.Screens.SelectV2
 
         private void applyCircleSizeFilter(FilterCriteria criteria)
         {
-            var selectedModeIds = csSelector.KeyModeFilter.SelectedModeIds;
+            var selectedModeIds = csSelector.EzKeyModeFilter.SelectedModeIds;
 
             if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
                 return;
