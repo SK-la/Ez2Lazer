@@ -461,7 +461,7 @@ namespace osu.Game.Screens.SelectV2
                         channel.Volume.Value = (float)Math.Clamp(vol, 0, 1);
                         channel.Play();
                         playedAny = true;
-                        Logger.Log($"EnhancedPreviewTrackManager: Played hitsound {info.Name} ({string.Join(',', info.LookupNames)})", LoggingTarget.Runtime);
+                        // Logger.Log($"EnhancedPreviewTrackManager: Played hitsound {info.Name} ({string.Join(',', info.LookupNames)})", LoggingTarget.Runtime);
                         break; // 只需播放命中链中的首个可用样本
                     }
 
@@ -514,7 +514,7 @@ namespace osu.Game.Screens.SelectV2
                 double vol = sampleInfo.Volume <= 0 ? 1.0 : sampleInfo.Volume / 100.0;
                 channel.Volume.Value = (float)Math.Clamp(vol, 0, 1);
                 channel.Play();
-                Logger.Log($"EnhancedPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}", LoggingTarget.Runtime);
+                // Logger.Log($"EnhancedPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}", LoggingTarget.Runtime);
             }
             catch (Exception ex)
             {
