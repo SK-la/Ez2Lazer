@@ -29,22 +29,16 @@ namespace osu.Game.Screens.SelectV2
         private const int hitsound_threshold = 10;
         private const double preview_window_length = 10000; // 10s
         private const double scheduler_interval = 16; // ~60fps
-        private const double trigger_tolerance = 90; // ms 容差
-        private const double bgm_duck_volume = 0.9; // 轻微压低主轨来突出打击音 (可后续做成设置)
+        private const double trigger_tolerance = 40; // ms 容差
         private const double max_dynamic_preview_length = 10000; // 动态扩展最长 10s
         private readonly List<ScheduledHitSound> scheduledHitSounds = new List<ScheduledHitSound>();
 
         private readonly List<ScheduledStoryboardSample> scheduledStoryboardSamples = new List<ScheduledStoryboardSample>();
 
-        // storyboard 样本缓存，预加载时写入，触发时优先命中
         private readonly Dictionary<string, ISample?> storyboardSampleCache = new Dictionary<string, ISample?>();
 
-        // 运行时索引，避免每帧全表扫描
         private int nextHitSoundIndex;
         private int nextStoryboardSampleIndex;
-
-        // 预加载统计
-        // private int uniqueHitsoundCount; // 已移除：不再需要统计输出
 
         private Track? currentTrack;
 
@@ -168,7 +162,7 @@ namespace osu.Game.Screens.SelectV2
                 return false;
             }
 
-            void collect(HitObject ho, HashSet<HitSampleInfo> s)
+            static void collect(HitObject ho, HashSet<HitSampleInfo> s)
             {
                 foreach (var sm in ho.Samples) s.Add(sm);
                 foreach (var n in ho.NestedHitObjects) collect(n, s);
@@ -273,7 +267,6 @@ namespace osu.Game.Screens.SelectV2
                 {
                     currentTrack.Looping = true;
                     currentTrack.RestartPoint = previewStartTime;
-                    currentTrack.Volume.Value = bgm_duck_volume; // 轻微压低
                 }
 
                 currentTrack?.Start();

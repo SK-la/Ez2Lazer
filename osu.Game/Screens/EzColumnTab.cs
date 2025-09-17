@@ -30,6 +30,8 @@ namespace osu.Game.Screens
 
         private Bindable<int> keyModeSelection = null!;
         private Bindable<bool> colorSettingsEnabled = null!;
+        private Bindable<double> columnBlur = new Bindable<double>();
+        private Bindable<double> columnDim = new Bindable<double>();
 
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
@@ -45,6 +47,8 @@ namespace osu.Game.Screens
         {
             keyModeSelection = ezSkinConfig.GetBindable<int>(EzSkinSetting.SelectedKeyMode);
             colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
+            columnDim = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnDim);
 
             colorBindables[EzSkinSetting.ColumnTypeA] = createColorBindable(EzSkinSetting.ColumnTypeA);
             colorBindables[EzSkinSetting.ColumnTypeB] = createColorBindable(EzSkinSetting.ColumnTypeB);
@@ -76,6 +80,22 @@ namespace osu.Game.Screens
                     Spacing = new Vector2(2),
                     Children = new Drawable[]
                     {
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "Column Dim",
+                            TooltipText = "修改面板背景暗化",
+                            Current = columnDim,
+                            KeyboardStep = 0.01f,
+                            DisplayAsPercentage = true
+                        },
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "Column Blur",
+                            TooltipText = "修改面板背景虚化",
+                            Current = columnBlur,
+                            KeyboardStep = 0.01f,
+                            DisplayAsPercentage = true
+                        },
                         createColorSettingsCheckbox(),
                         baseColorsContainer,
                         createKeyModeSection(),

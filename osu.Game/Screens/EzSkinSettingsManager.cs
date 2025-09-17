@@ -70,6 +70,8 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
+            SetDefault(EzSkinSetting.ColumnBlur,  0.7, 0.01, 1, 0.01);
+            SetDefault(EzSkinSetting.ColumnDim,  0.4, 0.01, 1, 0.01);
             SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
             SetDefault(EzSkinSetting.ColumnTypeB, Colour4.FromHex("#648FFF"));
             SetDefault(EzSkinSetting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
@@ -297,6 +299,8 @@ namespace osu.Game.Screens
         ColumnTypeS,
         ColumnTypeE,
         ColumnTypeP,
+        ColumnBlur,
+        ColumnDim
     }
 
     public enum EzColumnType
