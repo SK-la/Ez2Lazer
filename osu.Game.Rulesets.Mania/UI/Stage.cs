@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -20,6 +21,7 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -45,6 +47,10 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private readonly Drawable barLineContainer;
 
+        private readonly BufferedContainer? blurredBackgroundContainer;
+
+        private Bindable<double> columnBlur = new BindableDouble();
+
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
         {
             foreach (var c in Columns)
@@ -59,6 +65,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly int firstColumnIndex;
 
         private ISkinSource currentSkin = null!;
+
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
@@ -85,14 +94,24 @@ namespace osu.Game.Rulesets.Mania.UI
                     AutoSizeAxes = Axes.X,
                     Children = new Drawable[]
                     {
-                        new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageBackground), _ => new DefaultStageBackground())
+                        // 将背景包装在 BufferedContainer 中以支持虚化
+                        blurredBackgroundContainer = new BufferedContainer(cachedFrameBuffer: true)
                         {
-                            RelativeSizeAxes = Axes.Both
-                        },
-                        columnBackgrounds = new Container
-                        {
-                            Name = "Column backgrounds",
+                            Name = "Blurred Background Container",
                             RelativeSizeAxes = Axes.Both,
+                            RedrawOnScale = false,
+                            Children = new Drawable[]
+                            {
+                                new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageBackground), _ => new DefaultStageBackground())
+                                {
+                                    RelativeSizeAxes = Axes.Both
+                                },
+                                columnBackgrounds = new Container
+                                {
+                                    Name = "Column backgrounds",
+                                    RelativeSizeAxes = Axes.Both,
+                                },
+                            }
                         },
                         new Container
                         {
@@ -169,6 +188,11 @@ namespace osu.Game.Rulesets.Mania.UI
 
             skin.SourceChanged += onSkinChanged;
             onSkinChanged();
+
+            columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
+            columnBlur.ValueChanged += _ => updateBackgroundEffects();
+
+            updateBackgroundEffects();
         }
 
         private void onSkinChanged()
@@ -224,6 +248,38 @@ namespace osu.Game.Rulesets.Mania.UI
             // Due to masking differences, it is not possible to get the width of the columns container automatically
             // While masking on effectively only the Y-axis, so we need to set the width of the bar line container manually
             barLineContainer.Width = columnFlow.Width;
+        }
+
+        /// <summary>
+        /// 应用背景虚化效果
+        /// </summary>
+        /// <param name="blurAmount">虚化强度</param>
+        /// <param name="duration">动画时长</param>
+        public void ApplyBackgroundBlur(float blurAmount, double duration = 200)
+        {
+            if (blurredBackgroundContainer == null)
+                return;
+
+            var blurVector = new Vector2(blurAmount);
+
+            if (duration <= 0)
+            {
+                blurredBackgroundContainer.BlurSigma = blurVector;
+            }
+            else
+            {
+                blurredBackgroundContainer.TransformTo(nameof(BufferedContainer.BlurSigma), blurVector, duration, Easing.OutQuint);
+            }
+
+            // 性能优化：根据模糊强度调整渲染缩放
+            float scale = blurAmount <= 0 ? 1f : MathF.Max(0.25f, 1f / (1f + blurAmount * 0.1f));
+            blurredBackgroundContainer.FrameBufferScale = new Vector2(scale);
+        }
+
+        private void updateBackgroundEffects()
+        {
+            float blurAmount = (float)columnBlur.Value * 30f;
+            ApplyBackgroundBlur(blurAmount);
         }
     }
 }
