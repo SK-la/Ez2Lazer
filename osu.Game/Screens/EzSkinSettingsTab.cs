@@ -171,7 +171,7 @@ namespace osu.Game.Screens
                             LabelText = "HitTargetAlpha".Localize(),
                             TooltipText = "HitTargetAlphaTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetAlpha),
-                            KeyboardStep = 0.1f,
+                            KeyboardStep = 0.01f,
                         },
                         new SettingsSlider<double>
                         {

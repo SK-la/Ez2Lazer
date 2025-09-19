@@ -182,7 +182,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                             return new EzColumnBackground();
 
                         case ManiaSkinComponents.KeyArea:
-                            return new Ez2KeyArea();
+                            return columnWidth == 0 ? Drawable.Empty() : new EzKeyArea();
 
                         case ManiaSkinComponents.Note:
                             return new EzNote();
@@ -221,6 +221,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         #region GetConfig
 
+        private float columnWidth;
+
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {
             if (lookup is ManiaSkinConfigurationLookup maniaLookup)
@@ -228,16 +230,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
                 bool isSpecialColumn = ezSkinConfig.GetColumnType(stage.Columns, columnIndex) == "S";
-                float width = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
+                columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
                 // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
 
                 if (stage.Columns == 14 && columnIndex == 13)
-                    width = 0f;
+                    columnWidth = 0f;
 
                 switch (maniaLookup.Lookup)
                 {
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-                        return SkinUtils.As<TValue>(new Bindable<float>(width));
+                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
 
                     // case LegacyManiaSkinConfigurationLookups.HitPosition:
                     //     return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));

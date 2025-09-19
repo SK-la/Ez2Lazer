@@ -1,29 +1,23 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-// #pragma warning disable
-
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.Audio;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.ControlPoints;
-using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Storyboards;
-using osu.Game.Screens.Play;
+using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModEz2Settings : Mod, IApplicableToDifficulty, IApplicableToBeatmap, IApplicableToPlayer
+    public class ManiaModEz2Settings : Mod, IApplicableToDifficulty, IApplicableToBeatmap, IApplicableToDrawableHitObject
     {
         public override string Name => "Ez2 Settings";
         public override string Acronym => "ES";
@@ -51,25 +45,22 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        private IBeatmap beatmap = null!;
-        private readonly List<(double time, List<HitSampleInfo> samples)> removedNoteSamples = new List<(double, List<HitSampleInfo>)>();
+        private readonly List<HitObject> objectsToMakeAuto = new List<HitObject>();
 
         public ManiaModEz2Settings()
         {
-            NoScratch.ValueChanged += OnSettingChanged;
-            HealthScratch.ValueChanged += OnHealthScratchChanged;
+            NoScratch.ValueChanged += onSettingChanged;
+            HealthScratch.ValueChanged += onHealthScratchChanged;
         }
 
-        private void OnSettingChanged(ValueChangedEvent<bool> e)
+        private void onSettingChanged(ValueChangedEvent<bool> e)
         {
-            if (e.NewValue)
-                HealthScratch.Value = false;
+            if (e.NewValue) HealthScratch.Value = false;
         }
 
-        private void OnHealthScratchChanged(ValueChangedEvent<bool> e)
+        private void onHealthScratchChanged(ValueChangedEvent<bool> e)
         {
-            if (e.NewValue)
-                NoScratch.Value = false;
+            if (e.NewValue) NoScratch.Value = false;
         }
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
@@ -93,20 +84,18 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            this.beatmap = beatmap;
+            objectsToMakeAuto.Clear();
             var maniaBeatmap = (ManiaBeatmap)beatmap;
             int keys = (int)maniaBeatmap.Difficulty.CircleSize;
 
-            if (HealthScratch.Value)
-                NoScratch.Value = false;
+            if (HealthScratch.Value) NoScratch.Value = false;
 
             if (HealthScratch.Value && HealthTemplate.TryGetValue(keys, out var moveTargets))
             {
                 var notesToMove = maniaBeatmap.HitObjects
-                                              .Where(h => h is ManiaHitObject maniaHitObject && moveTargets.Contains(maniaHitObject.Column))
+                                              .Where(h => moveTargets.Contains(h.Column))
                                               .OrderBy(h => h.StartTime)
                                               .ToList();
-
                 ManiaHitObject? previousNote = null;
 
                 foreach (var note in notesToMove)
@@ -115,42 +104,38 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     {
                         bool moved = false;
 
-                        if (MoveTemplate.TryGetValue(keys, out var targetColumns))
+                        foreach (int targetColumn in MoveTemplate[keys])
                         {
-                            foreach (int targetColumn in targetColumns)
+                            int newColumn = targetColumn;
+                            note.Column = newColumn % keys;
+                            var targetColumnNotes = maniaBeatmap.HitObjects
+                                                                .Where(h => h.Column == newColumn)
+                                                                .OrderBy(h => h.StartTime)
+                                                                .ToList();
+                            bool isValid = true;
+
+                            for (int i = 0; i < targetColumnNotes.Count - 1; i++)
                             {
-                                int newColumn = targetColumn % keys;
-                                note.Column = newColumn;
+                                var currentNote = targetColumnNotes[i];
+                                var nextNote = targetColumnNotes[i + 1];
 
-                                var targetColumnNotes = maniaBeatmap.HitObjects
-                                                                    .Where(h => h is ManiaHitObject maniaHitObject && maniaHitObject.Column == newColumn)
-                                                                    .OrderBy(h => h.StartTime)
-                                                                    .ToList();
-                                bool isValid = true;
-
-                                for (int i = 0; i < targetColumnNotes.Count - 1; i++)
+                                if (nextNote.StartTime - currentNote.StartTime <= beatmap.ControlPointInfo.TimingPointAt(nextNote.StartTime).BeatLength / 4)
                                 {
-                                    var currentNote = targetColumnNotes[i];
-                                    var nextNote = targetColumnNotes[i + 1];
-
-                                    if (nextNote.StartTime - currentNote.StartTime <= beatmap.ControlPointInfo.TimingPointAt(nextNote.StartTime).BeatLength / 4)
-                                    {
-                                        isValid = false;
-                                        break;
-                                    }
-
-                                    if (currentNote is HoldNote holdNote && nextNote.StartTime <= holdNote.EndTime)
-                                    {
-                                        isValid = false;
-                                        break;
-                                    }
-                                }
-
-                                if (isValid)
-                                {
-                                    moved = true;
+                                    isValid = false;
                                     break;
                                 }
+
+                                if (currentNote is HoldNote holdNote && nextNote.StartTime <= holdNote.EndTime)
+                                {
+                                    isValid = false;
+                                    break;
+                                }
+                            }
+
+                            if (isValid)
+                            {
+                                moved = true;
+                                break;
                             }
                         }
 
@@ -164,92 +149,23 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             if (NoScratch.Value && NoScratchTemplate.TryGetValue(keys, out var scratchToRemove))
             {
-                var scratchNotesToRemove = maniaBeatmap.HitObjects
-                                                       .Where(h => h is ManiaHitObject maniaHitObject && scratchToRemove.Contains(maniaHitObject.Column))
-                                                       .OrderBy(h => h.StartTime)
-                                                       .ToList();
-
-                foreach (var note in scratchNotesToRemove)
-                {
-                    // 在移除前收集样本信息
-                    captureRemovedSamples(note);
-                    maniaBeatmap.HitObjects.Remove(note);
-                    applySamples(note);
-                }
+                objectsToMakeAuto.AddRange(maniaBeatmap.HitObjects.Where(h => h is ManiaHitObject maniaHitObject && scratchToRemove.Contains(maniaHitObject.Column)));
             }
 
             if (NoPanel.Value && NoPanelTemplate.TryGetValue(keys, out var panelToRemove))
             {
-                var panelNotesToRemove = maniaBeatmap.HitObjects
-                                                     .Where(h => h is ManiaHitObject maniaHitObject && panelToRemove.Contains(maniaHitObject.Column))
-                                                     .OrderBy(h => h.StartTime)
-                                                     .ToList();
-
-                foreach (var note in panelNotesToRemove)
-                {
-                    // 在移除前收集样本信息
-                    captureRemovedSamples(note);
-                    maniaBeatmap.HitObjects.Remove(note);
-                    applySamples(note);
-                }
+                objectsToMakeAuto.AddRange(maniaBeatmap.HitObjects.Where(h => h is ManiaHitObject maniaHitObject && panelToRemove.Contains(maniaHitObject.Column)));
             }
         }
 
-        public void ApplyToPlayer(Player player)
+        public void ApplyToDrawableHitObject(DrawableHitObject drawableHitObject)
         {
-            // 在游戏开始时添加自动激活的样本
-            addStoryboardSamplesForRemovedNotes(player);
-        }
-
-        private void captureRemovedSamples(HitObject hitObject)
-        {
-            if (hitObject.Samples == null || hitObject.Samples.Count == 0)
-                return;
-
-            var hitSamples = new List<HitSampleInfo>();
-
-            foreach (var sample in hitObject.Samples)
+            if (objectsToMakeAuto.Contains(drawableHitObject.HitObject))
             {
-                if (sample is HitSampleInfo hitSample)
-                    hitSamples.Add(hitSample);
+                // 隐藏note但保留音效（参考ModCinema的实现）
+                drawableHitObject.AlwaysPresent = true;
+                drawableHitObject.Hide();
             }
-
-            if (hitSamples.Count > 0)
-                removedNoteSamples.Add((hitObject.StartTime, hitSamples));
-        }
-
-        private void addStoryboardSamplesForRemovedNotes(Player player)
-        {
-            if (removedNoteSamples.Count == 0)
-                return;
-
-            // 获取storyboard并添加自动播放的样本
-            var storyboard = player.GameplayState.Storyboard;
-            var backgroundLayer = storyboard.GetLayer("Background");
-
-            foreach (var (time, samples) in removedNoteSamples)
-            {
-                foreach (var sample in samples)
-                {
-                    string? samplePath = sample.LookupNames.FirstOrDefault();
-
-                    if (!string.IsNullOrEmpty(samplePath))
-                    {
-                        var storyboardSample = new StoryboardSampleInfo(samplePath, time, sample.Volume);
-                        backgroundLayer.Add(storyboardSample);
-                    }
-                }
-            }
-
-            // 清空列表以避免重复添加
-            removedNoteSamples.Clear();
-        }
-
-        private void applySamples(HitObject hitObject)
-        {
-            SampleControlPoint sampleControlPoint = (beatmap.ControlPointInfo as LegacyControlPointInfo)?.SamplePointAt(hitObject.GetEndTime() + 5)
-                                                    ?? SampleControlPoint.DEFAULT;
-            hitObject.Samples = hitObject.Samples.Select(o => sampleControlPoint.ApplyTo(o)).ToList();
         }
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty) { }
@@ -264,7 +180,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             { 9, new List<int> { 0 } },
             { 8, new List<int> { 0 } },
             { 7, new List<int> { 0 } },
-            { 6, new List<int> { 0 } },
+            { 6, new List<int> { 0 } }
         };
 
         public Dictionary<int, List<int>> NoPanelTemplate { get; set; } = new Dictionary<int, List<int>>
@@ -272,7 +188,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             { 18, new List<int> { 6, 11 } },
             { 14, new List<int> { 6 } },
             { 9, new List<int> { 8 } },
-            { 7, new List<int> { 6 } },
+            { 7, new List<int> { 6 } }
         };
 
         public Dictionary<int, List<int>> HealthTemplate { get; set; } = new Dictionary<int, List<int>>
@@ -283,7 +199,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             { 9, new List<int> { 0, 8 } },
             { 8, new List<int> { 0, 8 } },
             { 7, new List<int> { 0 } },
-            { 6, new List<int> { 0 } },
+            { 6, new List<int> { 0 } }
         };
 
         public Dictionary<int, List<int>> MoveTemplate { get; set; } = new Dictionary<int, List<int>>
@@ -294,43 +210,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             { 9, new List<int> { 8, 0, 4, 2, 3, 1, 5, 7, 6 } },
             { 8, new List<int> { 7, 0, 6, 4, 2, 5, 3, 1 } },
             { 7, new List<int> { 6, 4, 2, 5, 3, 1 } },
-            { 6, new List<int> { 4, 2, 5, 3, 1 } },
+            { 6, new List<int> { 4, 2, 5, 3, 1 } }
         };
     }
 }
-// #pragma warning restore
-// public void SetTrackBackgroundColor(List<int> trackIndices, Color4 color, List<Ez2ColumnBackground> columnBackgrounds)
-// {
-//     foreach (int trackIndex in trackIndices)
-//     {
-//         if (trackIndex >= 0 && trackIndex < columnBackgrounds.Count)
-//         {
-//             var columnBackground = columnBackgrounds[trackIndex];
-//             columnBackground.background.Colour = color;
-//         }
-//     }
-// }
-// public void ReadFromDifficulty(IBeatmapDifficultyInfo difficulty)
-// {
-// }
-// string lines = note;
-// beatmap.UnhandledEventLines.Add(lines);
-// string path = note.Samples.GetHashCode().ToString();
-// double time = note.StartTime;
-// storyboard.GetLayer("Background").Add(new StoryboardSampleInfo(path, time, 100));
-// storyboard.GetLayer("Background").Add();
-// applySamples(note);
-
-// private Storyboard storyboard = null!;
-
-// public void ApplyToSample(IAdjustableAudioComponent sample)
-// {
-//     foreach (var noteSample in removedSamples)
-//     {
-//         string path = noteSample.Sample.ToString() ?? string.Empty;
-//         double time = noteSample.StartTime;
-//         storyboard.GetLayer("Background").Add(new StoryboardSampleInfo(path, time, 100));
-//     }
-// }
-// processedTracks.AddRange(panelToRemove);
-// setTrackBackgroundColor(panelToRemove, new Color4(0, 0, 0, 0));

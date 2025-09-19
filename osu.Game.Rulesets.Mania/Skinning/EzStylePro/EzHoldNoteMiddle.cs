@@ -38,11 +38,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         public EzHoldNoteMiddle()
         {
             RelativeSizeAxes = Axes.Both;
-            // FillMode = FillMode.Stretch;
-
-            // Anchor = Anchor.BottomCentre;
-            // Origin = Anchor.BottomCentre;
-            // Masking = true;
         }
 
         [BackgroundDependencyLoader(true)]
@@ -59,7 +54,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             isHitting.BindValueChanged(onIsHittingChanged, true);
 
-            // 确保光效层被正确初始化
             if (lightContainer == null)
                 OnLightChanged();
         }
@@ -120,7 +114,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void OnDrawableChanged()
         {
-            // 清理之前的光效层和容器
             if (lightContainer != null)
             {
                 if (lightContainer.Parent != null)
