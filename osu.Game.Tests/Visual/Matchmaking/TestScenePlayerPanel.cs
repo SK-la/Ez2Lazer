@@ -1,13 +1,16 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using NUnit.Framework;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Online.Matchmaking.Events;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Multiplayer.MatchTypes.Matchmaking;
-using osu.Game.Screens.OnlinePlay.Matchmaking.Screens.Idle;
+using osu.Game.Online.Rooms;
+using osu.Game.Screens.OnlinePlay.Matchmaking.Match;
 using osu.Game.Tests.Visual.Multiplayer;
 using osu.Game.Users;
 
@@ -21,7 +24,7 @@ namespace osu.Game.Tests.Visual.Matchmaking
         {
             base.SetUpSteps();
 
-            AddStep("join room", () => JoinRoom(CreateDefaultRoom()));
+            AddStep("join room", () => JoinRoom(CreateDefaultRoom(MatchType.Matchmaking)));
             WaitForJoined();
 
             AddStep("add panel", () => Child = panel = new PlayerPanel(new MultiplayerRoomUser(1)
@@ -64,7 +67,10 @@ namespace osu.Game.Tests.Visual.Matchmaking
                 }
             }).WaitSafely());
 
-            AddToggleStep("toggle horizontal", h => panel.Horizontal = h);
+            foreach (var layout in Enum.GetValues<PlayerPanelDisplayMode>())
+            {
+                AddStep($"set layout to {layout}", () => panel.DisplayMode = layout);
+            }
         }
 
         [Test]
@@ -89,6 +95,12 @@ namespace osu.Game.Tests.Visual.Matchmaking
                     }
                 }
             }).WaitSafely());
+        }
+
+        [Test]
+        public void TestJump()
+        {
+            AddStep("jump", () => MultiplayerClient.SendUserMatchRequest(1, new MatchmakingAvatarActionRequest { Action = MatchmakingAvatarAction.Jump }).WaitSafely());
         }
     }
 }

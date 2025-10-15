@@ -44,6 +44,7 @@ namespace osu.Game.Rulesets.Mania.Edit
 
         protected override void Update()
         {
+            // 使用ez2lazer特色调速系统
             TargetTimeRange = TimelineTimeRange == null || ShowSpeedChanges.Value ? ComputeScrollTime(Config.Get<double>(ManiaRulesetSetting.ScrollSpeed), Config.Get<double>(ManiaRulesetSetting.ScrollBaseSpeed), Config.Get<double>(ManiaRulesetSetting.ScrollTimePerSpeed)) : TimelineTimeRange.Value;
             base.Update();
         }

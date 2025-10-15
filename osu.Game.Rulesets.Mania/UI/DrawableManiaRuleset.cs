@@ -10,6 +10,7 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -38,7 +39,7 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
-    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>
+    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>, IPlayfieldDimensionProvider
     {
         /// <summary>
         /// The minimum time range. This occurs at a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 40.
@@ -63,16 +64,17 @@ namespace osu.Game.Rulesets.Mania.UI
         protected new ManiaRulesetConfigManager Config => (ManiaRulesetConfigManager)base.Config;
 
         private readonly Bindable<ManiaScrollingDirection> configDirection = new Bindable<ManiaScrollingDirection>();
+        private readonly BindableDouble configScrollSpeed = new BindableDouble();
+        private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
+        private readonly Bindable<bool> touchOverlay = new Bindable<bool>();
+
+        //自定义判定系统
         private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
-        private readonly BindableDouble configScrollSpeed = new BindableDouble();
 
         // private readonly ManiaHitModeConvertor hitModeConvertor;
-
         // private readonly Bindable<MUGHitMode> hitMode = new Bindable<MUGHitMode>();
-        private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
-        private readonly Bindable<bool> touchOverlay = new Bindable<bool>();
 
         public double TargetTimeRange { get; protected set; }
 
@@ -91,6 +93,15 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
+
+        // 背景虚化管理器
+        private readonly ManiaBackgroundBlurManager blurManager = null!;
+
+        public void SetGameplayBackgroundSource(IGameplayBackgroundSource source)
+        {
+            // 可能在Load前或后调用，blurManager在load()里创建，因此先判断null
+            blurManager.SetSource(source);
+        }
 
         public DrawableManiaRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)
@@ -158,7 +169,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
 
-            // 启动独立的异步任务
+            // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>
             {
                 _ = Task.Run(async () =>
@@ -186,13 +197,13 @@ namespace osu.Game.Rulesets.Mania.UI
         private void updateMobileLayout()
         {
             if (touchOverlay.Value)
-                    KeyBindingInputManager.Add(touchInputArea = new ManiaTouchInputArea(this));
+                KeyBindingInputManager.Add(touchInputArea = new ManiaTouchInputArea(this));
             else
             {
-                    if (touchInputArea != null)
-                        KeyBindingInputManager.Remove(touchInputArea, true);
+                if (touchInputArea != null)
+                    KeyBindingInputManager.Remove(touchInputArea, true);
 
-                    touchInputArea = null;
+                touchInputArea = null;
             }
         }
 
@@ -290,6 +301,20 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (currentSkin.IsNotNull())
                 currentSkin.SourceChanged -= onSkinChange;
+        }
+
+        public bool SupportsBackgroundBlurMasking => true;
+
+        public RectangleF? GetPlayfieldBounds()
+        {
+            try
+            {
+                return Playfield.ScreenSpaceDrawQuad.AABBFloat;
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

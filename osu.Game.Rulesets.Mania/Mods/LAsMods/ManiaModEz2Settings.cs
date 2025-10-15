@@ -149,12 +149,16 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             if (NoScratch.Value && NoScratchTemplate.TryGetValue(keys, out var scratchToRemove))
             {
-                objectsToMakeAuto.AddRange(maniaBeatmap.HitObjects.Where(h => h is ManiaHitObject maniaHitObject && scratchToRemove.Contains(maniaHitObject.Column)));
+                objectsToMakeAuto.AddRange(maniaBeatmap.HitObjects
+                                                       .Where(h => h is ManiaHitObject maniaHitObject &&
+                                                                   scratchToRemove.Contains(maniaHitObject.Column)));
             }
 
             if (NoPanel.Value && NoPanelTemplate.TryGetValue(keys, out var panelToRemove))
             {
-                objectsToMakeAuto.AddRange(maniaBeatmap.HitObjects.Where(h => h is ManiaHitObject maniaHitObject && panelToRemove.Contains(maniaHitObject.Column)));
+                objectsToMakeAuto.AddRange(maniaBeatmap.HitObjects
+                                                       .Where(h => h is ManiaHitObject maniaHitObject &&
+                                                                   panelToRemove.Contains(maniaHitObject.Column)));
             }
         }
 

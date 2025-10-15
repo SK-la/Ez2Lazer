@@ -91,6 +91,7 @@ namespace osu.Game.Rulesets.Mania
 
         private partial class ManiaScrollSlider : RoundedSliderBar<double>
         {
+            // 自定义提示
             private ManiaRulesetConfigManager config = null!;
 
             [BackgroundDependencyLoader]

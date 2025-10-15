@@ -64,22 +64,7 @@ namespace osu.Game.Screens.Edit.Compose
             if (ruleset == null || composer == null)
                 return new ScreenWhiteBox.UnderConstructionMessage(ruleset == null ? "This beatmap" : $"{ruleset.Description}'s composer");
 
-            // Create a container to hold both the composer content and the vertical timeline
-            var mainContent = new Container
-            {
-                RelativeSizeAxes = Axes.Both,
-                Children = new[]
-                {
-                    wrapSkinnableContent(composer),
-                    new EzVerticalTimeline
-                    {
-                        Anchor = Anchor.TopRight,
-                        Origin = Anchor.TopRight,
-                    }
-                }
-            };
-
-            return mainContent;
+            return wrapSkinnableContent(composer);
         }
 
         protected override Drawable CreateTimelineContent()

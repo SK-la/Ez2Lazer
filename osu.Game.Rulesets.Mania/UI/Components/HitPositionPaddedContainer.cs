@@ -48,16 +48,11 @@ namespace osu.Game.Rulesets.Mania.UI.Components
 
         protected virtual void UpdateHitPosition()
         {
-            float hitPosition;
-
-            if (globalHitPosition.Value)
-                hitPosition = (float)hitPositonBindable.Value;
-            else
-            {
-                hitPosition = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                  new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                              ?? (float)hitPositonBindable.Value;
-            }
+            float hitPosition = globalHitPosition.Value
+                ? (float)hitPositonBindable.Value
+                : skin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                      new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
+                  ?? (float)hitPositonBindable.Value;
 
             Padding = Direction.Value == ScrollingDirection.Up
                 ? new MarginPadding { Top = hitPosition }

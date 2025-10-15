@@ -116,6 +116,7 @@ namespace osu.Game.Screens.Select
         /// </summary>
         public IEnumerable<string>? CollectionBeatmapMD5Hashes { get; set; }
 
+        // 多条件过滤按钮的实现
         public List<float>? DiscreteCircleSizeValues { get; set; }
 
         public IRulesetFilterCriteria? RulesetCriteria { get; set; }
@@ -207,7 +208,7 @@ namespace osu.Game.Screens.Select
 
                 // search term is guaranteed to be non-empty, so if the string we're comparing is empty, it's not matching
                 if (string.IsNullOrEmpty(value))
-                    return false;
+                    return ExcludeTerm;
 
                 bool result;
 
