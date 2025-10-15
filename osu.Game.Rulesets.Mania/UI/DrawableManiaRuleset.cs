@@ -39,7 +39,7 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
-    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>, IPlayfieldDimensionProvider
+    public partial class DrawableManiaRuleset : DrawableScrollingRuleset<ManiaHitObject>
     {
         /// <summary>
         /// The minimum time range. This occurs at a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 40.
@@ -93,15 +93,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
-
-        // 背景虚化管理器
-        private readonly ManiaBackgroundBlurManager blurManager = null!;
-
-        public void SetGameplayBackgroundSource(IGameplayBackgroundSource source)
-        {
-            // 可能在Load前或后调用，blurManager在load()里创建，因此先判断null
-            blurManager.SetSource(source);
-        }
 
         public DrawableManiaRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)

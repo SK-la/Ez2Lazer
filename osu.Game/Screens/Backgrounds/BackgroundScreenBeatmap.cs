@@ -117,9 +117,6 @@ namespace osu.Game.Screens.Backgrounds
             dimmable.Background = Background = b;
         }
 
-        // 接口，提供给 PlayerLoader 使用
-        public Drawable CreateBackdropProxy() => dimmable?.CreateProxy();
-
         public override bool Equals(BackgroundScreen other)
         {
             if (!(other is BackgroundScreenBeatmap otherBeatmapBackground)) return false;
