@@ -20,6 +20,7 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Skinning;
 using osuTK;
 

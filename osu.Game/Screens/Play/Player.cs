@@ -1116,6 +1116,8 @@ namespace osu.Game.Screens.Play
 
                 b.StoryboardReplacesBackground.BindTo(storyboardReplacesBackground);
 
+                b.ShowManiaOverlay.Value = true;
+
                 failAnimationContainer.Background = b;
             });
 
@@ -1280,6 +1282,8 @@ namespace osu.Game.Screens.Play
                         b.IsBreakTime.UnbindFrom(breakTracker.IsBreakTime);
                         b.IsBreakTime.Value = false;
                     }
+
+                    b.ShowManiaOverlay.Value = false;
                 });
 
                 storyboardReplacesBackground.Value = false;

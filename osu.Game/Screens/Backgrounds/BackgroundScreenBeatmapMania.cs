@@ -11,15 +11,14 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
-using osu.Game.Storyboards.Drawables;
 using osuTK;
 
 namespace osu.Game.Screens.Backgrounds
 {
     /// <summary>
-    /// Mania模式的背景屏幕，具有模糊叠加层，遮罩到游戏面板宽度。
+    /// Mania模式的背景组件，具有模糊叠加层，遮罩到游戏面板宽度。
     /// </summary>
-    public partial class BackgroundScreenBeatmapMania : BackgroundScreenBeatmap
+    public partial class BackgroundScreenBeatmapMania : CompositeDrawable
     {
         private Container blurContainer;
         private Container maskingContainer;
@@ -31,7 +30,10 @@ namespace osu.Game.Screens.Backgrounds
         private Bindable<double> columnWidth;
         private Bindable<double> specialFactor;
         private IBindable<double> columnBlur;
-        private WorkingBeatmap beatmap => Beatmap;
+        private Bindable<ScalingMode> scalingMode;
+        private Bindable<bool> showStoryboard;
+        private Bindable<float> uiScale;
+        private readonly WorkingBeatmap beatmap;
 
         [Resolved]
         private EzSkinSettingsManager ezSkinSettings { get; set; } = null!;
@@ -40,63 +42,56 @@ namespace osu.Game.Screens.Backgrounds
         private OsuConfigManager config { get; set; } = null!;
 
         public BackgroundScreenBeatmapMania(WorkingBeatmap beatmap)
-            : base(beatmap)
         {
+            this.beatmap = beatmap;
             RelativeSizeAxes = Axes.Both;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
+            columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
+            columnWidth = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactor = ezSkinSettings.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            scalingMode = config.GetBindable<ScalingMode>(OsuSetting.Scaling);
+            showStoryboard = config.GetBindable<bool>(OsuSetting.ShowStoryboard);
+            uiScale = config.GetBindable<float>(OsuSetting.UIScale);
+
             maskingContainer = new Container
             {
                 Masking = true,
                 RelativeSizeAxes = Axes.Y,
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
-                Alpha = 0.9f
-            };
-
-            blurContainer = new Container
-            {
-                RelativeSizeAxes = Axes.Both,
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre
-            };
-
-            replicatedBackground = new BeatmapBackground(Beatmap)
-            {
-                RelativeSizeAxes = Axes.Both
-            };
-
-            blurContainer.Add(replicatedBackground);
-            replicatedBackground.BlurTo(new Vector2(BlurAmount.Value), 0);
-
-            // 添加暗化Box，与标准模式一致
-            dimBox = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-                Colour = Colour4.Black,
-                Alpha = 0
-            };
-            blurContainer.Add(dimBox);
-
-            // 如果beatmap有Storyboard，添加Storyboard overlay
-            if (Beatmap.Storyboard.HasDrawable)
-            {
-                var drawableStoryboard = new DrawableStoryboard(Beatmap.Storyboard)
+                Alpha = 0.98f,
+                Child = blurContainer = new Container
                 {
-                    RelativeSizeAxes = Axes.Both
-                };
-                blurContainer.Add(drawableStoryboard);
-            }
+                    RelativeSizeAxes = Axes.Both,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Children = new Drawable[]
+                    {
+                        // Dim box to darken the background behind the playfield.
+                        dimBox = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = Colour4.Black,
+                            Alpha = 0
+                        },
+                        replicatedBackground = showStoryboard.Value
+                            ? new BeatmapBackgroundWithStoryboard(beatmap)
+                            : new BeatmapBackground(beatmap)
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Scale = new Vector2(1.8f),
+                            },
+                    }
+                }
+            };
 
-            maskingContainer.Add(blurContainer);
             AddInternal(maskingContainer);
-
-            columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
-            columnWidth = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactor = ezSkinSettings.GetBindable<double>(EzSkinSetting.SpecialFactor);
         }
 
         protected override void LoadComplete()
@@ -107,18 +102,15 @@ namespace osu.Game.Screens.Backgrounds
             var dimLevel = config.GetBindable<double>(OsuSetting.DimLevel);
             dimLevel.BindValueChanged(v => dimBox.Alpha = (float)v.NewValue, true);
 
-            // 让复刻背景完全复制原背景的显示效果
-            replicatedBackground.RelativeSizeAxes = Axes.None;
-            replicatedBackground.Size = new Vector2(DrawWidth, DrawHeight);
-
             columnBlur.BindValueChanged(e =>
             {
-                replicatedBackground?.BlurTo(new Vector2((float)e.NewValue * 30f), 0);
+                replicatedBackground?.BlurTo(new Vector2((float)e.NewValue * 80f), 0);
             }, true);
 
-            // BlurAmount.BindValueChanged(v => replicatedBackground?.BlurTo(new Vector2(v.NewValue), 0), true);
             columnWidth.BindValueChanged(e => updateWidth(), true);
             specialFactor.BindValueChanged(e => updateWidth(), true);
+            scalingMode.BindValueChanged(e => updateWidth(), true);
+            uiScale.BindValueChanged(e => updateWidth(), true);
             updateWidth();
         }
 
@@ -130,9 +122,11 @@ namespace osu.Game.Screens.Backgrounds
             int keyMode = (int)totalColumns;
             totalWidth = 0;
 
-            for (int i = 0; i < keyMode; i++) totalWidth += getColumnWidth(keyMode, i);
+            for (int i = 0; i < keyMode; i++)
+                totalWidth += getColumnWidth(keyMode, i);
 
-            maskingContainer.Width = totalWidth * 0.94f;
+            float totalScale = uiScale.Value / 0.938f;
+            maskingContainer.Width = totalWidth / totalScale;
         }
 
         private float getColumnWidth(int keyMode, int columnIndex)
@@ -142,6 +136,5 @@ namespace osu.Game.Screens.Backgrounds
             float factor = (float)specialFactor.Value;
             return baseWidth * (isSpecialColumn ? factor : 1.0f);
         }
-        // TODO: 如果需要，实现动态模糊（例如，绑定到音频响应）
     }
 }

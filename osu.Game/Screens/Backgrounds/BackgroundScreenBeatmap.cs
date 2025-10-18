@@ -27,6 +27,7 @@ namespace osu.Game.Screens.Backgrounds
         protected Background Background;
 
         private WorkingBeatmap beatmap;
+        private BackgroundScreenBeatmapMania maniaBackground;
 
         /// <summary>
         /// Whether or not user-configured settings relating to brightness of elements should be ignored.
@@ -40,6 +41,11 @@ namespace osu.Game.Screens.Backgrounds
         /// Whether or not the storyboard loaded should completely hide the background behind it.
         /// </summary>
         public readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
+
+        /// <summary>
+        /// Whether to show the mania overlay background.
+        /// </summary>
+        public readonly Bindable<bool> ShowManiaOverlay = new Bindable<bool>();
 
         /// <summary>
         /// The amount of blur to be applied in addition to user-specified blur.
@@ -76,6 +82,15 @@ namespace osu.Game.Screens.Backgrounds
             var background = new BeatmapBackground(beatmap);
             LoadComponent(background);
             switchBackground(background);
+
+            if (ShowManiaOverlay.Value && beatmap?.BeatmapInfo.Ruleset.OnlineID == 3)
+            {
+                maniaBackground = new BackgroundScreenBeatmapMania(beatmap);
+                LoadComponent(maniaBackground);
+                dimmable.Add(maniaBackground);
+            }
+
+            ShowManiaOverlay.BindValueChanged(_ => updateManiaBackground());
         }
 
         private CancellationTokenSource cancellationSource;
@@ -97,6 +112,21 @@ namespace osu.Game.Screens.Backgrounds
 
                     cancellationSource?.Cancel();
                     LoadComponentAsync(new BeatmapBackground(beatmap), switchBackground, (cancellationSource = new CancellationTokenSource()).Token);
+
+                    // // Manage mania background
+                    // if (maniaBackground != null)
+                    // {
+                    //     maniaBackground.FadeOut(250);
+                    //     maniaBackground.Expire();
+                    //     maniaBackground = null;
+                    // }
+
+                    if (ShowManiaOverlay.Value && beatmap?.BeatmapInfo.Ruleset.OnlineID == 3)
+                    {
+                        maniaBackground = new BackgroundScreenBeatmapMania(beatmap);
+                        LoadComponent(maniaBackground);
+                        dimmable.Add(maniaBackground);
+                    }
                 });
             }
         }
@@ -115,6 +145,23 @@ namespace osu.Game.Screens.Backgrounds
             b.Depth = newDepth;
             b.FadeInFromZero(500, Easing.OutQuint);
             dimmable.Background = Background = b;
+        }
+
+        private void updateManiaBackground()
+        {
+            if (maniaBackground != null)
+            {
+                maniaBackground.FadeOut(250);
+                maniaBackground.Expire();
+                maniaBackground = null;
+            }
+
+            if (ShowManiaOverlay.Value && beatmap?.BeatmapInfo.Ruleset.OnlineID == 3)
+            {
+                maniaBackground = new BackgroundScreenBeatmapMania(beatmap);
+                LoadComponent(maniaBackground);
+                dimmable.Add(maniaBackground);
+            }
         }
 
         public override bool Equals(BackgroundScreen other)
