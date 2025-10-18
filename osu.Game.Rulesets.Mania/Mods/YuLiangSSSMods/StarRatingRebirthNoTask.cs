@@ -62,11 +62,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             public static EasyObject[] FromManiaObjects(List<ManiaHitObject> objects)
             {
-                EasyObject[] easyObjects = new EasyObject[objects.Count];
-                for (int i = 0; i < objects.Count; i++)
-                {
-                    easyObjects[i] = new EasyObject(objects[i].StartTime, objects[i].GetEndTime(), objects[i].Column);
-                }
+                var easyObjects = new EasyObject[objects.Count];
+                for (int i = 0; i < objects.Count; i++) easyObjects[i] = new EasyObject(objects[i].StartTime, objects[i].GetEndTime(), objects[i].Column);
                 return easyObjects;
             }
 
@@ -77,6 +74,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     objects[i].StartTime = objects[i].StartTime * (1 / rate);
                     objects[i].EndTime = objects[i].EndTime * (1 / rate);
                 }
+
                 return objects;
             }
         }
@@ -101,39 +99,30 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             //}
 
             var hit = EasyObject.FromManiaObjects(objects);
-            if (rate != 1)
-            {
-                hit = EasyObject.FromRate(hit, rate);
-            }
+            if (rate != 1) hit = EasyObject.FromRate(hit, rate);
 
             var note_seq = hit.OrderBy(t => t.StartTime).ThenBy(t => t.Column).ToArray();
 
             // Preprocessing (Completed)
             var note_seq_by_column = note_seq.GroupBy(n => n.Column).OrderBy(g => g.Key).Select(g => g.ToArray()).ToArray();
             var LN_seq = note_seq
-                .Where(t => t.EndTime != t.StartTime)
-                .ToArray();
+                         .Where(t => t.EndTime != t.StartTime)
+                         .ToArray();
             var tail_seq = LN_seq
-                .OrderBy(t => t.EndTime)
-                .ToArray();
+                           .OrderBy(t => t.EndTime)
+                           .ToArray();
 
-            List<List<EasyObject>> LN_list = new List<List<EasyObject>>(keys);
-            for (int i = 0; i < keys; i++)
-            {
-                LN_list.Add(new List<EasyObject>(1500));
-            }
+            var LN_list = new List<List<EasyObject>>(keys);
+            for (int i = 0; i < keys; i++) LN_list.Add(new List<EasyObject>(1500));
 
-            foreach (var ln in LN_seq)
-            {
-                LN_list[ln.Column].Add(ln);
-            }
+            foreach (var ln in LN_seq) LN_list[ln.Column].Add(ln);
 
             var LN_seq_by_column = LN_list.ToList();
 
             LN_seq_by_column = LN_seq_by_column
-                .Where(list => list != null && list.Count > 0)
-                //.OrderBy(t => t.First().Column)
-                .ToList();
+                               .Where(list => list != null && list.Count > 0)
+                               //.OrderBy(t => t.First().Column)
+                               .ToList();
 
             int K = keys;
             int T = (int)(note_seq.Max(t => Math.Max(t.StartTime, t.EndTime)) + 1);
@@ -147,15 +136,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 for (int s = 0; s < T; s++)
                 {
                     lstbar[s] = 0.001 * window_sum;
-                    if (s + 500 < T)
-                    {
-                        window_sum += list[s + 500];
-                    }
-                    if (s - 500 >= 0)
-                    {
-                        window_sum -= list[s - 500];
-                    }
+                    if (s + 500 < T) window_sum += list[s + 500];
+
+                    if (s - 500 >= 0) window_sum -= list[s - 500];
                 }
+
                 return lstbar;
             }
 
@@ -168,25 +153,25 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 for (int s = 0; s < T; s++)
                 {
                     lstbar[s] = window_sum / window_len;
+
                     if (s + 500 < T)
                     {
                         window_sum += list[s + 500];
                         window_len += 1;
                     }
+
                     if (s - 500 >= 0)
                     {
                         window_sum -= list[s - 500];
                         window_len -= 1;
                     }
                 }
+
                 return lstbar;
             }
 
             // Section 2.3 (Completed)
-            double jackNerfer(double delta)
-            {
-                return 1 - (7 * 1e-5 * Math.Pow(0.15 + Math.Abs(delta - 0.08), -4));
-            }
+            double jackNerfer(double delta) => 1 - 7 * 1e-5 * Math.Pow(0.15 + Math.Abs(delta - 0.08), -4);
 
             double[][] J_ks = new double[K][];
             double[][] delta_ks = new double[K][];
@@ -216,36 +201,36 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
 
             double[][] Jbar_ks = new double[K][];
-            for (int k = 0; k < K; k++)
-            {
-                Jbar_ks[k] = smooth(J_ks[k]);
-            }
+            for (int k = 0; k < K; k++) Jbar_ks[k] = smooth(J_ks[k]);
 
             double[] Jbar = new double[T];
+
             for (int s = 0; s < T; s++)
             {
                 double sum1 = 0.0;
                 double sum2 = 0.0;
+
                 for (int i = 0; i < K; i++)
                 {
                     double weight = 1 / delta_ks[i][s];
                     sum2 += weight;
                     sum1 += Math.Pow(Math.Max(Jbar_ks[i][s], 0), lambda_n) * weight;
                 }
+
                 double weighted_avg = Math.Pow(sum1 / Math.Max(1e-9, sum2), 1.0 / lambda_n);
                 Jbar[s] = weighted_avg;
             }
 
-
             // Section 2.4 (Completed)
             double[][] X_ks = new double[K + 1][];
+
             for (int k = 0; k <= K; k++)
             {
                 X_ks[k] = new double[T];
                 var notes_in_pair = k == 0 ? note_seq_by_column[0] :
-                                    k == K ? note_seq_by_column[K - 1] :
-                                    note_seq_by_column[k - 1].Concat(note_seq_by_column[k])
-                                        .OrderBy(n => n.StartTime).ToArray();
+                    k == K ? note_seq_by_column[K - 1] :
+                    note_seq_by_column[k - 1].Concat(note_seq_by_column[k])
+                                             .OrderBy(n => n.StartTime).ToArray();
                 int pairLength = notes_in_pair.Length;
                 double previousStartTime = pairLength > 0 ? notes_in_pair[0].StartTime : 0;
 
@@ -253,17 +238,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     double currentStartTime = notes_in_pair[i].StartTime;
                     double delta = 0.001 * (currentStartTime - previousStartTime);
-                    if (delta <= 0)
-                    {
-                        continue;
-                    }
+                    if (delta <= 0) continue;
                     double val = 0.16 * Math.Pow(Math.Max(x, delta), -2.0);
                     int starts = (int)previousStartTime;
                     int ends = (int)currentStartTime;
-                    for (int s = starts; s < ends; s++)
-                    {
-                        X_ks[k][s] = val;
-                    }
+                    for (int s = starts; s < ends; s++) X_ks[k][s] = val;
                     previousStartTime = currentStartTime;
                 }
             }
@@ -285,57 +264,46 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             double[] X = new double[T];
             int[] K_rangePlus1 = Enumerable.Range(0, K + 1).ToArray();
-            for (int s = 0; s < T; s++)
-            {
-                X[s] = K_rangePlus1.Sum(k => X_ks[k][s] * cross_matrix[K][k]);
-            }
+            for (int s = 0; s < T; s++) X[s] = K_rangePlus1.Sum(k => X_ks[k][s] * cross_matrix[K][k]);
 
             double[] Xbar = smooth(X);
-
 
             // Section 2.5 (Completed)
             double[] P = new double[T];
             double[] LN_bodies = new double[T];
+
             foreach (var tuple in LN_seq)
             {
                 int t2 = (int)Math.Min(tuple.StartTime + 80, tuple.EndTime);
-                for (int temp = (int)tuple.StartTime; temp < t2; temp++)
-                {
-                    LN_bodies[temp] += 0.5;
-                }
-                for (int temp = t2; temp < tuple.EndTime; temp++)
-                {
-                    LN_bodies[temp] += 1;
-                }
+                for (int temp = (int)tuple.StartTime; temp < t2; temp++) LN_bodies[temp] += 0.5;
+
+                for (int temp = t2; temp < tuple.EndTime; temp++) LN_bodies[temp] += 1;
             }
 
             double b(double delta)
             {
                 double val = 7.5 / delta;
-                if (160 < val && val < 360)
-                {
-                    return 1 + (1.4 * Math.Pow(10, -7) * (val - 160) * Math.Pow(val - 360, 2));
-                }
+                if (160 < val && val < 360) return 1 + 1.4 * Math.Pow(10, -7) * (val - 160) * Math.Pow(val - 360, 2);
                 return 1;
             }
 
             for (int i = 0; i < note_seq.Length - 1; i++)
             {
                 double delta = 0.001 * (note_seq[i + 1].StartTime - note_seq[i].StartTime);
+
                 if (delta < 1e-9)
-                {
-                    P[(int)note_seq[i].StartTime] += 1000 * Math.Pow(0.02 * ((4.0 / x) - lambda_3), 1.0 / 4.0);
-                }
+                    P[(int)note_seq[i].StartTime] += 1000 * Math.Pow(0.02 * (4.0 / x - lambda_3), 1.0 / 4.0);
                 else
                 {
                     double h_l = note_seq[i].StartTime;
                     double h_r = note_seq[i + 1].StartTime;
-                    double v = 1 + (lambda_2 * 0.001 * LN_bodies.Skip((int)h_l).Take((int)(h_r - h_l)).Sum());
+                    double v = 1 + lambda_2 * 0.001 * LN_bodies.Skip((int)h_l).Take((int)(h_r - h_l)).Sum();
+
                     if (delta < 2 * x / 3)
                     {
                         double baseVal = Math.Pow(0.08 * Math.Pow(x, -1) *
-                        (1 - (lambda_3 * Math.Pow(x, -1) * Math.Pow(delta - (x / 2), 2))), 1.0 / 4) *
-                        b(delta) * v / delta;
+                                                  (1 - lambda_3 * Math.Pow(x, -1) * Math.Pow(delta - x / 2, 2)), 1.0 / 4) *
+                            b(delta) * v / delta;
 
                         for (int s = (int)h_l; s < (int)h_r; s++)
                             P[s] += baseVal;
@@ -343,8 +311,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     else
                     {
                         double baseVal = Math.Pow(0.08 * Math.Pow(x, -1) *
-                        (1 - (lambda_3 * Math.Pow(x, -1) * Math.Pow(x / 6, 2))), 1.0 / 4) *
-                        b(delta) * v / delta;
+                                                  (1 - lambda_3 * Math.Pow(x, -1) * Math.Pow(x / 6, 2)), 1.0 / 4) *
+                            b(delta) * v / delta;
 
                         for (int s = (int)h_l; s < (int)h_r; s++)
                             P[s] += baseVal;
@@ -354,23 +322,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             double[] Pbar = smooth(P);
 
-
             // Section 2.6 (Completed)
             bool[][] KU_ks = new bool[K][];
-            for (int k = 0; k < K; k++)
-            {
-                KU_ks[k] = new bool[T];
-            }
+            for (int k = 0; k < K; k++) KU_ks[k] = new bool[T];
 
             foreach (var note in note_seq)
             {
                 double startTime = Math.Max(0, note.StartTime - 500);
                 double endTime = Math.Min(note.EndTime == note.StartTime ? note.StartTime + 500 : note.EndTime + 500, T - 1);
 
-                for (int s = (int)startTime; s < (int)endTime; s++)
-                {
-                    KU_ks[note.Column][s] = true;
-                }
+                for (int s = (int)startTime; s < (int)endTime; s++) KU_ks[note.Column][s] = true;
             }
 
             int[] K_s = new int[T];
@@ -378,21 +339,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             double[] A = new double[T];
             Array.Fill(A, 1);
 
-            for (int k = 0; k < K - 1; k++)
-            {
-                dks[k] = new double[T];
-            }
+            for (int k = 0; k < K - 1; k++) dks[k] = new double[T];
 
             for (int s = 0; s < T; s++)
             {
                 var cols = new List<int>(K);
+
                 for (int k = 0; k < K; k++)
                 {
                     if (KU_ks[k][s])
-                    {
                         cols.Add(k);
-                    }
                 }
+
                 K_s[s] = Math.Max(cols.Count, 1);
 
                 for (int i = 0; i < cols.Count - 1; i++)
@@ -400,22 +358,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     if (cols[i + 1] > K - 1) continue;
 
                     double currentDks = Math.Abs(delta_ks[cols[i]][s] - delta_ks[cols[i + 1]][s])
-                                     + Math.Max(0, Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s]) - 0.3);
+                                        + Math.Max(0, Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s]) - 0.3);
                     dks[cols[i]][s] = currentDks;
 
                     if (currentDks < 0.02)
-                    {
-                        A[s] *= Math.Min(0.75 + (0.5 * Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s])), 1);
-                    }
-                    else if (currentDks < 0.07)
-                    {
-                        A[s] *= Math.Min(0.65 + (5 * currentDks) + (0.5 * Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s])), 1);
-                    }
+                        A[s] *= Math.Min(0.75 + 0.5 * Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s]), 1);
+                    else if (currentDks < 0.07) A[s] *= Math.Min(0.65 + 5 * currentDks + 0.5 * Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s]), 1);
                 }
             }
 
             double[] Abar = smooth2(A);
-
 
             // Section 2.7 (Completed)
             (int, double, double) find_next_note_in_column(EasyObject note, EasyObject[][] note_seq_by_column)
@@ -424,24 +376,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 double h = note.StartTime;
 
                 double[] second_values = new double[note_seq_by_column[k].Length];
-                for (int i = 0; i < second_values.Length; i++)
-                {
-                    second_values[i] = note_seq_by_column[k][i].StartTime;
-                }
+                for (int i = 0; i < second_values.Length; i++) second_values[i] = note_seq_by_column[k][i].StartTime;
 
                 int index = Array.BinarySearch(second_values, h);
-                if (index < 0)
-                {
-                    index = ~index;
-                }
+                if (index < 0) index = ~index;
 
-                return index + 1 < second_values.Length ?
-                    (note_seq_by_column[k][index + 1].Column, note_seq_by_column[k][index + 1].StartTime, note_seq_by_column[k][index + 1].EndTime) :
-                    (0, 1e9, 1e9);
+                return index + 1 < second_values.Length
+                    ? (note_seq_by_column[k][index + 1].Column, note_seq_by_column[k][index + 1].StartTime, note_seq_by_column[k][index + 1].EndTime)
+                    : (0, 1e9, 1e9);
             }
 
-
             double[] I = new double[LN_seq.Length];
+
             for (int i = 0; i < tail_seq.Length; i++)
             {
                 (int Column, double StartTime, double endTime) next = find_next_note_in_column(tail_seq[i], note_seq_by_column);
@@ -452,36 +398,33 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             double[] Is = new double[T];
             double[] R = new double[T];
+
             if (tail_seq.Length > 0)
             {
                 for (int i = 0; i < tail_seq.Length - 1; i++)
                 {
                     double delta_r = 0.001 * (tail_seq[i + 1].EndTime - tail_seq[i].EndTime);
+
                     for (int s = (int)tail_seq[i].EndTime; s < (int)tail_seq[i + 1].EndTime; s++)
                     {
                         Is[s] = 1 + I[i];
-                        R[s] = 0.08 * Math.Pow(delta_r, -1.0 / 2.0) * Math.Pow(x, -1) * (1 + (lambda_4 * (I[i] + I[i + 1])));
+                        R[s] = 0.08 * Math.Pow(delta_r, -1.0 / 2.0) * Math.Pow(x, -1) * (1 + lambda_4 * (I[i] + I[i + 1]));
                     }
                 }
             }
 
             double[] Rbar = smooth(R);
 
-
             // Section 3 (Completed)
             double[] C = new double[T];
             int start = 0;
             int end = 0;
+
             for (int t = 0; t < T; t++)
             {
-                while (start < note_seq.Length && note_seq[start].StartTime < t - 500)
-                {
-                    start += 1;
-                }
-                while (end < note_seq.Length && note_seq[end].StartTime < t + 500)
-                {
-                    end += 1;
-                }
+                while (start < note_seq.Length && note_seq[start].StartTime < t - 500) start += 1;
+
+                while (end < note_seq.Length && note_seq[end].StartTime < t + 500) end += 1;
                 C[t] = end - start;
             }
 
@@ -500,29 +443,23 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
                 double term1 = w_0 * Math.Pow(Math.Pow(Abar[t], 3.0 / K_s[t]) * Jbar[t], 1.5);
                 double term2 = (1 - w_0) * Math.Pow(Math.Pow(Abar[t], 2.0 / 3) *
-                    ((0.8 * Pbar[t]) + Rbar[t]), 1.5);
+                                                    (0.8 * Pbar[t] + Rbar[t]), 1.5);
                 S[t] = Math.Pow(term1 + term2, 2.0 / 3);
 
                 double T_t = Math.Pow(Abar[t], 3.0 / K_s[t]) * Xbar[t] / (Xbar[t] + S[t] + 1);
-                D[t] = (w_1 * Math.Pow(S[t], 1.0 / 2) * Math.Pow(T_t, p_1)) + (S[t] * w_2);
+                D[t] = w_1 * Math.Pow(S[t], 1.0 / 2) * Math.Pow(T_t, p_1) + S[t] * w_2;
             }
 
             double weightedSum = 0.0;
             double weightSum = C.Sum();
 
-            for (int t = 0; t < T; t++)
-            {
-                weightedSum += Math.Pow(D[t], lambda_n) * C[t];
-            }
+            for (int t = 0; t < T; t++) weightedSum += Math.Pow(D[t], lambda_n) * C[t];
 
             double SR = Math.Pow(weightedSum / weightSum, 1.0 / lambda_n);
             SR = Math.Pow(SR, p_0) / Math.Pow(8.0, p_0) * 8;
-            SR *= (note_seq.Length + (0.5 * LN_seq.Length)) / (note_seq.Length + (0.5 * LN_seq.Length) + 60);
-            if (SR <= 2.0)
-            {
-                SR = Math.Sqrt(SR * 2);
-            }
-            SR *= 0.96 + (0.01 * K);
+            SR *= (note_seq.Length + 0.5 * LN_seq.Length) / (note_seq.Length + 0.5 * LN_seq.Length + 60);
+            if (SR <= 2.0) SR = Math.Sqrt(SR * 2);
+            SR *= 0.96 + 0.01 * K;
             // SR *= 0.88+0.03*K
 
             return SR;
@@ -537,7 +474,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         /// <returns></returns>
         public static List<ManiaHitObject>? NTM(List<ManiaHitObject> objects, int keys, int cs)
         {
-            Random Rng = new Random();
+            var Rng = new Random();
 
             var newObjects = new List<ManiaHitObject>();
 
@@ -546,52 +483,47 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var fixedColumnObjects = new List<ManiaHitObject>();
 
             var locations = objects.OfType<Note>().Select(n =>
-            (
-                startTime: n.StartTime,
-                samples: n.Samples,
-                column: n.Column,
-                endTime: n.StartTime,
-                duration: n.StartTime - n.StartTime
-            ))
-            .Concat(objects.OfType<HoldNote>().Select(h =>
-            (
-                startTime: h.StartTime,
-                samples: h.Samples,
-                column: h.Column,
-                endTime: h.EndTime,
-                duration: h.EndTime - h.StartTime
-            ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
-
+                                   (
+                                       startTime: n.StartTime,
+                                       samples: n.Samples,
+                                       column: n.Column,
+                                       endTime: n.StartTime,
+                                       duration: n.StartTime - n.StartTime
+                                   ))
+                                   .Concat(objects.OfType<HoldNote>().Select(h =>
+                                   (
+                                       startTime: h.StartTime,
+                                       samples: h.Samples,
+                                       column: h.Column,
+                                       endTime: h.EndTime,
+                                       duration: h.EndTime - h.StartTime
+                                   ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
 
             int keyvalue = keys + 1;
             bool firstKeyFlag = true;
 
             int nullColumn = Rng.Next(-1, 1 + keyvalue - 2);
+
             while (keyvalue <= keys)
             {
                 var confirmnull = new List<bool>();
-                for (int i = 0; i <= keys; i++)
-                {
-                    confirmnull.Add(false);
-                }
+                for (int i = 0; i <= keys; i++) confirmnull.Add(false);
                 var nullcolumnlist = new List<int>();
+
                 if (firstKeyFlag)
                 {
                     foreach (var column in objects.GroupBy(h => h.Column))
                     {
                         int count = column.Count();
-                        if (!confirmnull[column.Key] && count != 0)
-                        {
-                            confirmnull[column.Key] = true;
-                        }
+                        if (!confirmnull[column.Key] && count != 0) confirmnull[column.Key] = true;
                     }
+
                     for (int i = 0; i < keys; i++)
                     {
                         if (!confirmnull[i])
-                        {
                             nullcolumnlist.Add(i);
-                        }
                     }
+
                     firstKeyFlag = false;
                 }
 
@@ -610,13 +542,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     var hold = new HoldNote();
                     int columnnum = locations[i].column;
                     int minuscolumn = 0;
+
                     foreach (int nul in nullcolumnlist)
                     {
                         if (columnnum > nul)
-                        {
                             minuscolumn++;
-                        }
                     }
+
                     columnnum -= minuscolumn;
                     int testcolumn = columnnum;
                     atLeast--;
@@ -637,21 +569,21 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     bool error = changetime != locations[i].startTime;
 
                     if (keys < 4)
-                    {
                         columnnum = Rng.Next(keyvalue);
-                    }
                     else
                     {
-                        if (error && Rng.Next(100) < 70/*Probability.Value*/ && atLeast < 0)
+                        if (error && Rng.Next(100) < 70 /*Probability.Value*/ && atLeast < 0)
                         {
                             changetime = locations[i].startTime;
                             atLeast = keys - 2;
                             next = true;
                         }
+
                         if (next && plus)
                         {
                             next = false;
                             nullColumn++;
+
                             if (nullColumn > keyvalue - 2)
                             {
                                 plus = !plus;
@@ -663,6 +595,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         {
                             next = false;
                             nullColumn--;
+
                             if (nullColumn < -1)
                             {
                                 plus = !plus;
@@ -671,27 +604,21 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
 
-                        if (columnnum > nullColumn)
-                        {
-                            columnnum++;
-                        }
+                        if (columnnum > nullColumn) columnnum++;
                     }
 
                     bool overlap = FindOverlap(newColumnObjects, columnnum, locations[i].startTime, locations[i].endTime);
+
                     if (overlap)
                     {
                         for (int k = 0; k < keyvalue; k++)
                         {
                             if (!FindOverlap(newColumnObjects, columnnum - k, locations[i].startTime, locations[i].endTime) && columnnum - k >= 0)
-                            {
                                 columnnum -= k;
-                            }
-                            else if (!FindOverlap(newColumnObjects, columnnum + k, locations[i].startTime, locations[i].endTime) && columnnum + k <= keyvalue - 1)
-                            {
-                                columnnum += k;
-                            }
+                            else if (!FindOverlap(newColumnObjects, columnnum + k, locations[i].startTime, locations[i].endTime) && columnnum + k <= keyvalue - 1) columnnum += k;
                         }
                     }
+
                     if (isLN)
                     {
                         newColumnObjects.Add(new HoldNote
@@ -716,46 +643,40 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 for (int i = 0; i < newColumnObjects.Count; i++)
                 {
                     bool overlap = false, outindex = false;
+
                     if (newColumnObjects[i].Column < 0 || newColumnObjects[i].Column > keys - 1)
                     {
                         outindex = true;
                         newColumnObjects[i].Column = Rng.Next(keys - 1);
                     }
+
                     for (int j = i + 1; j < newColumnObjects.Count; j++)
                     {
-                        if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2 && newColumnObjects[i].StartTime <= newColumnObjects[j].StartTime + 2)
-                        {
-                            overlap = true;
-                        }
+                        if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
+                                                                                     && newColumnObjects[i].StartTime <= newColumnObjects[j].StartTime + 2) overlap = true;
+
                         if (newColumnObjects[j].StartTime != newColumnObjects[j].GetEndTime())
                         {
-                            if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2 && newColumnObjects[i].StartTime <= newColumnObjects[j].GetEndTime() + 2)
-                            {
+                            if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
+                                                                                         && newColumnObjects[i].StartTime <= newColumnObjects[j].GetEndTime() + 2)
                                 overlap = true;
-                            }
                         }
                     }
-                    if (outindex)
-                    {
-                        overlap = true;
-                    }
+
+                    if (outindex) overlap = true;
+
                     if (!overlap)
-                    {
                         fixedColumnObjects.Add(newColumnObjects[i]);
-                    }
                     else
                     {
                         for (int k = 0; k < keyvalue; k++)
                         {
                             if (!FindOverlap(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column - k).ToList()) && newColumnObjects[i].Column - k >= 0)
-                            {
                                 newColumnObjects[i].Column -= k;
-                            }
-                            else if (!FindOverlap(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column + k).ToList()) && newColumnObjects[i].Column + k <= keyvalue - 1)
-                            {
-                                newColumnObjects[i].Column += k;
-                            }
+                            else if (!FindOverlap(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column + k).ToList())
+                                     && newColumnObjects[i].Column + k <= keyvalue - 1) newColumnObjects[i].Column += k;
                         }
+
                         fixedColumnObjects.Add(newColumnObjects[i]);
                     }
                 }
@@ -766,30 +687,30 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     keyvalue = keys + 1;
 
                     locations = fixedColumnObjects.OfType<Note>().Select(n =>
-                    (
-                        startTime: n.StartTime,
-                        samples: n.Samples,
-                        column: n.Column,
-                        endTime: n.StartTime,
-                        duration: n.StartTime - n.StartTime
-                    ))
-                    .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h =>
-                    (
-                        startTime: h.StartTime,
-                        samples: h.Samples,
-                        column: h.Column,
-                        endTime: h.EndTime,
-                        duration: h.EndTime - h.StartTime
-                    ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList(); ;
+                                                  (
+                                                      startTime: n.StartTime,
+                                                      samples: n.Samples,
+                                                      column: n.Column,
+                                                      endTime: n.StartTime,
+                                                      duration: n.StartTime - n.StartTime
+                                                  ))
+                                                  .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h =>
+                                                  (
+                                                      startTime: h.StartTime,
+                                                      samples: h.Samples,
+                                                      column: h.Column,
+                                                      endTime: h.EndTime,
+                                                      duration: h.EndTime - h.StartTime
+                                                  ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+                    ;
                     nullColumn = -1;
                     fixedColumnObjects.Clear();
                     newColumnObjects.Clear();
                 }
                 else
-                {
                     break;
-                }
             }
+
             newObjects.AddRange(fixedColumnObjects);
 
             return newObjects;
@@ -798,17 +719,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public (int Left, int Right) FindConsecutive(List<int> othercolumn, int number, int keys)
         {
             int left = -1, right = keys - 1;
+
             foreach (int consecutive in othercolumn)
             {
                 if (consecutive > number) // right
-                {
                     right = Math.Min(right, consecutive);
-                }
+
                 if (consecutive < number) // left
-                {
                     left = Math.Max(left, consecutive);
-                }
             }
+
             return (left, right);
         }
 
@@ -816,10 +736,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             foreach (var obj in hitobj)
             {
-                if (obj.Column == column && starttime <= obj.StartTime && starttime >= obj.StartTime)
-                {
-                    return true;
-                }
+                if (obj.Column == column && starttime <= obj.StartTime && starttime >= obj.StartTime) return true;
+
                 if (obj.StartTime != obj.GetEndTime())
                 {
                     if (obj.Column == column && starttime >= obj.StartTime && starttime <= obj.GetEndTime())
@@ -827,14 +745,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         if (endtime != starttime)
                         {
                             if (endtime >= obj.StartTime && endtime <= obj.GetEndTime())
-                            {
                                 return true;
-                            }
                         }
+
                         return true;
                     }
                 }
             }
+
             return false;
         }
 
@@ -855,10 +773,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             {
                 for (int j = i + 1; j < hitobj.Count; j++)
                 {
-                    if (hitobj[i].Column == hitobj[j].Column && hitobj[i].StartTime == hitobj[j].StartTime)
-                    {
-                        return true;
-                    }
+                    if (hitobj[i].Column == hitobj[j].Column && hitobj[i].StartTime == hitobj[j].StartTime) return true;
+
                     if (hitobj[j].StartTime != hitobj[j].GetEndTime())
                     {
                         if (hitobj[i].Column == hitobj[j].Column && hitobj[i].StartTime >= hitobj[j].StartTime - 2 && hitobj[i].StartTime <= hitobj[j].GetEndTime() + 2)
@@ -866,18 +782,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             if (hitobj[i].GetEndTime() != hitobj[j].StartTime)
                             {
                                 if (hitobj[i].GetEndTime() >= hitobj[j].StartTime - 2 && hitobj[i].GetEndTime() <= hitobj[j].GetEndTime() + 2)
-                                {
                                     return true;
-                                }
                             }
+
                             return true;
                         }
                     }
                 }
             }
+
             return false;
         }
-
 
         public static List<ManiaHitObject> DP(List<ManiaHitObject> objects, int style)
         {
@@ -886,56 +801,55 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var newColumnObjects = new List<ManiaHitObject>();
 
             var locations = objects.OfType<Note>().Select(n =>
-            (
-                startTime: n.StartTime,
-                samples: n.Samples,
-                column: n.Column,
-                endTime: n.StartTime
-            ))
-            .Concat(objects.OfType<HoldNote>().Select(h =>
-            (
-                startTime: h.StartTime,
-                samples: h.Samples,
-                column: h.Column,
-                endTime: h.EndTime
-            ))).OrderBy(h => h.startTime).ToList();
+                                   (
+                                       startTime: n.StartTime,
+                                       samples: n.Samples,
+                                       column: n.Column,
+                                       endTime: n.StartTime
+                                   ))
+                                   .Concat(objects.OfType<HoldNote>().Select(h =>
+                                   (
+                                       startTime: h.StartTime,
+                                       samples: h.Samples,
+                                       column: h.Column,
+                                       endTime: h.EndTime
+                                   ))).OrderBy(h => h.startTime).ToList();
 
             for (int i = 0; i < locations.Count; i++)
             {
                 var note = new Note();
                 var hold = new HoldNote();
                 int columnnum = locations[i].column;
+
                 switch (columnnum)
                 {
                     case 1:
                     {
                         columnnum = 0;
                     }
-                    break;
+                        break;
+
                     case 3:
                     {
                         columnnum = 1;
                     }
-                    break;
+                        break;
+
                     case 5:
                     {
                         columnnum = 2;
-                        if (style >= 5 && style <= 8)
-                        {
-                            columnnum = 4;
-                        }
+                        if (style >= 5 && style <= 8) columnnum = 4;
                     }
-                    break;
+                        break;
+
                     case 7:
                     {
                         columnnum = 3;
-                        if (style >= 5 && style <= 8)
-                        {
-                            columnnum = 5;
-                        }
+                        if (style >= 5 && style <= 8) columnnum = 5;
                     }
-                    break;
+                        break;
                 }
+
                 if (locations[i].startTime == locations[i].endTime)
                 {
                     note.StartTime = locations[i].startTime;
@@ -955,71 +869,69 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         newColumnObjects.AddNote(locations[i].samples, columnnum, locations[i].startTime, locations[i].endTime);
                         newColumnObjects.AddNote(locations[i].samples, 4 + columnnum, locations[i].startTime, locations[i].endTime);
                     }
-                    break;
+                        break;
+
                     case 2:
                     {
                         newColumnObjects.AddNote(locations[i].samples, 3 - columnnum, locations[i].startTime, locations[i].endTime);
                         newColumnObjects.AddNote(locations[i].samples, 7 - columnnum, locations[i].startTime, locations[i].endTime);
                     }
-                    break;
+                        break;
+
                     case 3:
                     {
                         newColumnObjects.AddNote(locations[i].samples, columnnum, locations[i].startTime, locations[i].endTime);
                         newColumnObjects.AddNote(locations[i].samples, 7 - columnnum, locations[i].startTime, locations[i].endTime);
                     }
-                    break;
+                        break;
+
                     case 4:
                     {
                         newColumnObjects.AddNote(locations[i].samples, 3 - columnnum, locations[i].startTime, locations[i].endTime);
                         newColumnObjects.AddNote(locations[i].samples, 4 + columnnum, locations[i].startTime, locations[i].endTime);
                     }
-                    break;
+                        break;
+
                     case 5:
                     {
                         newColumnObjects.AddNote(locations[i].samples, columnnum, locations[i].startTime, locations[i].endTime);
                         newColumnObjects.AddNote(locations[i].samples, 2 + columnnum, locations[i].startTime, locations[i].endTime);
                     }
-                    break;
+                        break;
+
                     case 6:
                     {
-                        if (columnnum <= 1)
-                        {
-                            columnnum = 3 - columnnum;
-                        }
-                        if (columnnum >= 4)
-                        {
-                            columnnum = 7 - columnnum + 4;
-                        }
+                        if (columnnum <= 1) columnnum = 3 - columnnum;
+
+                        if (columnnum >= 4) columnnum = 7 - columnnum + 4;
                         newColumnObjects.AddNote(locations[i].samples, columnnum, locations[i].startTime, locations[i].endTime);
                         newColumnObjects.AddNote(locations[i].samples, columnnum - 2, locations[i].startTime, locations[i].endTime);
                     }
-                    break;
+                        break;
+
                     case 7:
                     case 8:
                     {
                         if (style == 8)
                         {
                             if (columnnum == 0 || columnnum == 4)
-                            {
                                 columnnum++;
-                            }
-                            else if (columnnum == 1 || columnnum == 5)
-                            {
-                                columnnum--;
-                            }
+                            else if (columnnum == 1 || columnnum == 5) columnnum--;
                         }
+
                         if (columnnum < 4)
                         {
                             newColumnObjects.AddNote(locations[i].samples, columnnum, locations[i].startTime, locations[i].endTime);
                             newColumnObjects.AddNote(locations[i].samples, 3 - columnnum, locations[i].startTime, locations[i].endTime);
                         }
+
                         if (columnnum > 3)
                         {
                             newColumnObjects.AddNote(locations[i].samples, columnnum, locations[i].startTime, locations[i].endTime);
                             newColumnObjects.AddNote(locations[i].samples, 7 - (columnnum - 4), locations[i].startTime, locations[i].endTime);
                         }
                     }
-                    break;
+                        break;
                 }
             }
 
@@ -1029,84 +941,70 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public static List<ManiaHitObject> NTMA(IBeatmap beatmap, int blank, int toKey, int gapValue, int cleanDivide)
         {
-            Random Rng = new Random();
+            var Rng = new Random();
             const double error = 1.5;
             const double interval = 50;
             const double ln_interval = 10;
 
-            ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
+            var maniaBeatmap = (ManiaBeatmap)beatmap;
 
             int keys = (int)maniaBeatmap.Difficulty.CircleSize;
 
-            if (blank > toKey - keys)
-            {
-                blank = toKey - keys;
-            }
+            if (blank > toKey - keys) blank = toKey - keys;
 
-            if (keys > 9 || toKey <= keys)
-            {
-                return new List<ManiaHitObject>();
-            }
+            if (keys > 9 || toKey <= keys) return new List<ManiaHitObject>();
 
             var newObjects = new List<ManiaHitObject>();
 
             var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n =>
-            (
-                column: n.Column,
-                startTime: n.StartTime,
-                endTime: n.StartTime,
-                samples: n.Samples
-            ))
-            .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
-            (
-                column: h.Column,
-                startTime: h.StartTime,
-                endTime: h.EndTime,
-                samples: h.Samples
-            ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+                                        (
+                                            column: n.Column,
+                                            startTime: n.StartTime,
+                                            endTime: n.StartTime,
+                                            samples: n.Samples
+                                        ))
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
+                                        (
+                                            column: h.Column,
+                                            startTime: h.StartTime,
+                                            endTime: h.EndTime,
+                                            samples: h.Samples
+                                        ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
 
             var confirmNull = new List<bool>();
             var nullColumnList = new List<int>();
 
-            for (int i = 0; i <= toKey; i++)
-            {
-                confirmNull.Add(false);
-            }
+            for (int i = 0; i <= toKey; i++) confirmNull.Add(false);
 
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
                 int count = column.Count();
-                if (!confirmNull[column.Key] && count != 0)
-                {
-                    confirmNull[column.Key] = true;
-                }
+                if (!confirmNull[column.Key] && count != 0) confirmNull[column.Key] = true;
             }
 
             for (int i = 0; i < toKey; i++)
             {
                 if (!confirmNull[i])
-                {
                     nullColumnList.Add(i);
-                }
             }
 
             for (int i = 0; i < locations.Count; i++)
             {
                 int minusColumn = 0;
+
                 foreach (int nul in nullColumnList)
                 {
                     if (locations[i].column > nul)
-                    {
                         minusColumn++;
-                    }
                 }
+
                 var thisLocations = locations[i];
                 thisLocations.column -= minusColumn;
                 locations[i] = thisLocations;
             }
 
-            List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> area = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
-            List<ManiaHitObject> checkList = new List<ManiaHitObject>();
+            var area = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
+            var checkList = new List<ManiaHitObject>();
 
             var tempObjects = locations.OrderBy(h => h.startTime).ToList();
 
@@ -1115,14 +1013,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             foreach (var timingPoint in tempObjects.GroupBy(h => h.startTime))
             {
-                var newLocations = timingPoint.OfType<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>().Select(n => (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
+                var newLocations = timingPoint.OfType<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>()
+                                              .Select(n => (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
 
-                List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
+                var line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
 
-                foreach (var note in newLocations)
-                {
-                    line.Add((note.Column, note.StartTime, note.EndTime, note.Samples));
-                }
+                foreach (var note in newLocations) line.Add((note.Column, note.StartTime, note.EndTime, note.Samples));
 
                 //manyLine.Add(line);
                 int blankColumn = blank;
@@ -1132,12 +1028,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
                 area.AddRange(line);
 
-                double gap = (29998.8584 * Math.Pow(Math.E, -0.3176 * gapValue)) + 347.7248;
+                double gap = 29998.8584 * Math.Pow(Math.E, -0.3176 * gapValue) + 347.7248;
 
-                if (gapValue == 0)
-                {
-                    gap = double.MaxValue;
-                }
+                if (gapValue == 0) gap = double.MaxValue;
 
                 if (sumTime >= gap)
                 {
@@ -1165,11 +1058,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 var newColumnObjects = new List<ManiaHitObject>();
 
                 var cleanLocations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                          (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                  }))
-                                  .OrderBy(h => h.startTime).ToList();
+                                           .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
+                                           {
+                                               (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
+                                           }))
+                                           .OrderBy(h => h.startTime).ToList();
 
                 double lastStartTime = cleanLocations[0].startTime;
                 double lastEndTime = cleanLocations[0].endTime;
@@ -1182,6 +1075,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         lastEndTime = cleanLocations[0].endTime;
                         continue;
                     }
+
                     if (cleanLocations[i].startTime >= lastStartTime && cleanLocations[i].startTime <= lastEndTime)
                     {
                         cleanLocations.RemoveAt(i);
@@ -1226,27 +1120,34 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             Samples = cleanLocations[i].samples
                         });
                     }
+
                     lastStartTime = cleanLocations[i].startTime;
                     lastEndTime = cleanLocations[i].endTime;
                 }
 
                 cleanObjects.AddRange(newColumnObjects);
             }
+
             return cleanObjects.OrderBy(h => h.StartTime).ToList();
         }
 
-        public static (List<ManiaHitObject> result, List<ManiaHitObject> checkList) ProcessArea(ManiaBeatmap beatmap, Random Rng, List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> hitObjects, int fromKeys, int toKeys, int blankNum = 0, int clean = 0, double error = 0, List<ManiaHitObject>? checkList = null)
+        public static (List<ManiaHitObject> result, List<ManiaHitObject> checkList) ProcessArea(ManiaBeatmap beatmap, Random Rng,
+                                                                                                List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> hitObjects,
+                                                                                                int fromKeys, int toKeys, int blankNum = 0, int clean = 0, double error = 0,
+                                                                                                List<ManiaHitObject>? checkList = null)
         {
-            List<ManiaHitObject> newObjects = new List<ManiaHitObject>();
+            var newObjects = new List<ManiaHitObject>();
             List<(int column, bool isBlank)> copyColumn = [];
             List<int> insertColumn = [];
             List<ManiaHitObject> checkColumn = [];
             bool isFirst = true;
 
             int num = toKeys - fromKeys - blankNum;
+
             while (num > 0)
             {
                 int copy = Rng.Next(fromKeys);
+
                 if (!copyColumn.Contains((copy, false)))
                 {
                     copyColumn.Add((copy, false));
@@ -1255,6 +1156,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
 
             num = blankNum;
+
             while (num > 0)
             {
                 int copy = -1;
@@ -1263,15 +1165,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
 
             num = toKeys - fromKeys;
+
             while (num > 0)
             {
                 int insert = Rng.Next(toKeys);
+
                 if (!insertColumn.Contains(insert))
                 {
                     insertColumn.Add(insert);
                     num--;
                 }
             }
+
             insertColumn = insertColumn.OrderBy(c => c).ToList();
 
             foreach (var timingPoint in hitObjects.GroupBy(h => h.startTime))
@@ -1283,18 +1188,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 for (int i = 0; i < locations.Count; i++)
                 {
                     int column = locations[i].column;
+
                     for (int j = 0; j < length; j++)
                     {
-                        if (column == copyColumn[j].column && !copyColumn[j].isBlank)
-                        {
-                            tempObjects.AddNote(locations[i].samples, insertColumn[j], locations[i].startTime, locations[i].endTime);
-                        }
+                        if (column == copyColumn[j].column && !copyColumn[j].isBlank) tempObjects.AddNote(locations[i].samples, insertColumn[j], locations[i].startTime, locations[i].endTime);
 
-                        if (locations[i].column >= insertColumn[j])
-                        {
-                            locations[i] = (locations[i].column + 1, locations[i].startTime, locations[i].endTime, locations[i].samples);
-                        }
+                        if (locations[i].column >= insertColumn[j]) locations[i] = (locations[i].column + 1, locations[i].startTime, locations[i].endTime, locations[i].samples);
                     }
+
                     tempObjects.AddNote(locations[i].samples, locations[i].column, locations[i].startTime, locations[i].endTime);
                 }
 
@@ -1302,6 +1203,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     var checkC = checkList.Select(h => h.Column).ToList();
                     var checkS = checkList.Select(h => h.StartTime).ToList();
+
                     for (int i = 0; i < tempObjects.Count; i++)
                     {
                         if (checkC.Contains(tempObjects[i].Column))
@@ -1325,6 +1227,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
+
                     isFirst = false;
                 }
 

@@ -36,6 +36,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Probability", $"{Probability.Value}");
+                yield return ("Line", $"{Line.Value}");
+                yield return ("Alignment", Align.Value ? "First Line" : "Last Line");
+                yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+            }
+        }
+
         [SettingSource("To Stream", "As Jumpjack as possible(Recommand to use a medium(50~80) probability).")]
         public BindableBool Stream { get; set; } = new BindableBool(true);
 
@@ -44,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             Precision = 1,
             MinValue = 0,
-            MaxValue = 100,
+            MaxValue = 100
         };
 
         [SettingSource("Line", "Line for Jack.")]
@@ -52,7 +63,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             Precision = 1,
             MinValue = 2,
-            MaxValue = 16,
+            MaxValue = 16
         };
 
         [SettingSource("Alignment", "Last line(false) or first line(true), true will get some bullet, false will get many long jack.")]
@@ -77,6 +88,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             {
                 var thisLine = new List<ManiaHitObject>();
                 thisLine.AddRange(timingPoint);
+
                 if (!Stream.Value)
                 {
                     if (line > 0)
@@ -102,16 +114,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     int count = notDuplicate.Count;
                     thisLine = thisLine.ShuffleIndex(Rng).ToList();
                     int selectError = 0;
+
                     for (int i = 0; i < thisLine.Count; i++)
                     {
-                        if (count == 0)
-                        {
-                            break;
-                        }
+                        if (count == 0) break;
+
                         if (duplicateColumn.Contains(thisLine[i].Column) && Rng.Next(100) < Probability.Value)
                         {
                             bool jumpLoop = false;
                             int randColumn = notDuplicate.SelectRandomOne(Rng);
+
                             while (thisLine.Any(c => c.Column == randColumn))
                             {
                                 if (selectError > MAX_KEY)
@@ -120,20 +132,21 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                     selectError = 0;
                                     break;
                                 }
+
                                 randColumn = notDuplicate.SelectRandomOne(Rng);
                                 selectError++;
                             }
-                            if (jumpLoop)
-                            {
-                                continue;
-                            }
+
+                            if (jumpLoop) continue;
                             duplicateColumn.Remove(thisLine[i].Column);
                             thisLine[i].Column = randColumn;
                             count--;
                         }
                     }
+
                     newObjects.AddRange(thisLine);
                 }
+
                 lastLine = thisLine.ToList();
             }
 
@@ -150,11 +163,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 var newColumnObjects = new List<ManiaHitObject>();
 
                 var cleanLocations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                          (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                  }))
-                                  .OrderBy(h => h.startTime).ToList();
+                                           .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
+                                           {
+                                               (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
+                                           }))
+                                           .OrderBy(h => h.startTime).ToList();
 
                 double lastStartTime = cleanLocations[0].startTime;
                 double lastEndTime = cleanLocations[0].endTime;
@@ -198,9 +211,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var lastLine = new List<ManiaHitObject>();
             bool init = true;
             int jackCount = 0;
+
             foreach (var group in area.GroupBy(h => h.StartTime))
             {
                 var thisLine = group.ToList();
+
                 if (init)
                 {
                     jackLine = thisLine;
@@ -236,11 +251,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 //count = select.result.Count;
                 var select = thisLine;
                 var jackColumn = jackLine.Select(c => c.Column).ShuffleIndex(Rng).ToList();
-                if (!align)
-                {
-                    jackColumn = lastLine.Select(c => c.Column).ShuffleIndex(Rng).ToList();
-                }
+                if (!align) jackColumn = lastLine.Select(c => c.Column).ShuffleIndex(Rng).ToList();
                 thisLine = thisLine.ShuffleIndex(Rng).ToList();
+
                 for (int i = 0; i < thisLine.Count; i++)
                 {
                     if (!jackColumn.Contains(thisLine[i].Column) && jackColumn.Count > 0 && thisLine[i].GetEndTime() == thisLine[i].StartTime)
@@ -248,11 +261,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         int randColumn = jackColumn.SelectRandomOne(Rng);
                         int opportunity = 0;
                         int max = 20;
+
                         while (opportunity < max)
                         {
                             if (randColumn == thisLine[i].Column || thisLine.Except(Enumerable.Repeat(thisLine[i], 1)).Any(c => c.Column == randColumn))
                             {
                                 randColumn = jackColumn.SelectRandomOne(Rng);
+
                                 if (randColumn != thisLine[i].Column && thisLine.Except(Enumerable.Repeat(thisLine[i], 1)).All(c => c.Column != randColumn))
                                 {
                                     thisLine[i].Column = randColumn;
@@ -260,14 +275,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                     break;
                                 }
                             }
+
                             opportunity++;
                         }
                     }
                 }
+
                 resultObjects.AddRange(thisLine);
 
                 lastLine = thisLine;
             }
+
             return resultObjects.OrderBy(s => s.StartTime).ToList();
         }
 
@@ -278,8 +296,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 var nullList = new List<ManiaHitObject>();
                 return (nullList, nullList);
             }
+
             var remainList = obj.ToList();
             var resultList = new List<ManiaHitObject>();
+
             for (int i = 0; i < num; i++)
             {
                 if (Rng.Next(100) < probability)
@@ -289,6 +309,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     remainList.RemoveAt(index);
                 }
             }
+
             return (remainList, resultList);
         }
     }

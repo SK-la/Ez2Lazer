@@ -18,6 +18,15 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private double speedMultiplier = 1;
 
+        private static bool updateSpecialWindows;
+
+        public static DifficultyRange PerfectRange;
+        public static DifficultyRange GreatRange;
+        public static DifficultyRange GoodRange;
+        public static DifficultyRange OkRange;
+        public static DifficultyRange MehRange;
+        public static DifficultyRange MissRange;
+
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
         /// The goal of this multiplier is to keep hit windows independent of track speed.
@@ -126,8 +135,55 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
+        public void SetSpecialDifficultyRange(double perfect, double great, double good, double ok, double meh, double miss)
+        {
+            updateSpecialWindows = true;
+            PerfectRange = new DifficultyRange(perfect, perfect, perfect);
+            GreatRange = new DifficultyRange(great, great, great);
+            GoodRange = new DifficultyRange(good, good, good);
+            OkRange = new DifficultyRange(ok, ok, ok);
+            MehRange = new DifficultyRange(meh, meh, meh);
+            MissRange = new DifficultyRange(miss, miss, miss);
+            updateWindows();
+        }
+
+        public void SetSpecialDifficultyRange(DifficultyRange[] difficultyRangeArray)
+        {
+            updateSpecialWindows = true;
+            PerfectRange = difficultyRangeArray[0];
+            GreatRange = difficultyRangeArray[1];
+            GoodRange = difficultyRangeArray[2];
+            OkRange = difficultyRangeArray[3];
+            MehRange = difficultyRangeArray[4];
+            MissRange = difficultyRangeArray[5];
+            updateWindows();
+        }
+
+        public void ResetRange()
+        {
+            updateSpecialWindows = false;
+            updateWindows();
+        }
+
         private void updateWindows()
         {
+            if (updateSpecialWindows)
+            {
+                //perfect = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, PerfectRange) * totalMultiplier);
+                //great = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, GreatRange) * totalMultiplier);
+                //good = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, GoodRange) * totalMultiplier);
+                //ok = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, OkRange) * totalMultiplier);
+                //meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MehRange) * totalMultiplier);
+                //miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MissRange) * totalMultiplier);
+                perfect = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, PerfectRange) * totalMultiplier;
+                great = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, GreatRange) * totalMultiplier;
+                good = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, GoodRange) * totalMultiplier;
+                ok = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, OkRange) * totalMultiplier;
+                meh = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MehRange) * totalMultiplier;
+                miss = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MissRange) * totalMultiplier;
+                return;
+            }
+
             if (ClassicModActive && !ScoreV2Active)
             {
                 if (IsConvert)

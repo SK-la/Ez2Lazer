@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override Type[] IncompatibleMods => new[] { typeof(ModTimeRamp) };
+        public override Type[] IncompatibleMods => new Type[] { typeof(ModTimeRamp) };
 
         private readonly BindableDouble accuracy = new BindableDouble();
 
@@ -75,6 +75,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
             rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
+
+
         }
 
         public void Update(Playfield playfield)

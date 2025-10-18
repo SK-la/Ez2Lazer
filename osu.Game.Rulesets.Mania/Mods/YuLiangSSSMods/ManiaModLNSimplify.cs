@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "Remove 1/8 1/12 etc.";
+        public override LocalisableString Description => "Simplifies rhythms by converting.";
 
         public override IconUsage? Icon => FontAwesome.Solid.YinYang;
 
@@ -33,6 +33,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override bool Ranked => false;
 
         public readonly double ERROR = 1.5;
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Limit Divide", $"{LimitDivide.Value}");
+                yield return ("Easier Divide", $"{EasierDivide.Value}");
+                yield return ("Longest LN", $"{Gap.Value}");
+                yield return ("Shortest LN", $"{Len.Value}");
+            }
+        }
 
         [SettingSource("Limit Divide", "Select limit.")]
         public BindableInt LimitDivide { get; set; } = new BindableInt(4)

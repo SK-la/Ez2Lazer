@@ -34,6 +34,8 @@ namespace osu.Game.Beatmaps
 
         public Storyboard Storyboard => storyboard.Value;
 
+        public IBeatmap BeatmapAfterConverted;
+
         public ISkin Skin => skin.Value;
 
         private AudioManager audioManager { get; }

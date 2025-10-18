@@ -34,33 +34,30 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             get
             {
-                var settings = new List<(LocalisableString setting, LocalisableString value)>();
-
                 if (CustomHitRange.Value)
                 {
-                    settings.Add((new LocalisableString("Custom Hit Range"), new LocalisableString("True")));
-                    settings.Add((new LocalisableString("Perfect Hit"), new LocalisableString(PerfectHit.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Great Hit"), new LocalisableString(GreatHit.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Good Hit"), new LocalisableString(GoodHit.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Ok Hit"), new LocalisableString(OkHit.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Meh Hit"), new LocalisableString(MehHit.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Miss Hit"), new LocalisableString(MissHit.Value.ToString("0.#"))));
+                    yield return ("Custom Hit Range", "On");
+                    yield return ("Perfect Range", $"{PerfectHit.Value:0.#}");
+                    yield return ("Great Range", $"{GreatHit.Value:0.#}");
+                    yield return ("Good Range", $"{GoodHit.Value:0.#}");
+                    yield return ("Ok Range", $"{OkHit.Value:0.#}");
+                    yield return ("Meh Range", $"{MehHit.Value:0.#}");
+                    yield return ("Miss Range", $"{MissHit.Value:0.#}");
                 }
 
                 if (CustomProportionScore.Value)
                 {
-                    settings.Add((new LocalisableString("Custom Proportion Score"), new LocalisableString("True")));
-                    settings.Add((new LocalisableString("Perfect"), new LocalisableString(Perfect.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Great"), new LocalisableString(Great.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Good"), new LocalisableString(Good.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Ok"), new LocalisableString(Ok.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Meh"), new LocalisableString(Meh.Value.ToString("0.#"))));
-                    settings.Add((new LocalisableString("Miss"), new LocalisableString(Miss.Value.ToString("0.#"))));
+                    yield return ("Custom Proportion Score", "On");
+                    yield return ("Perfect Score", $"{Perfect.Value:0.#}");
+                    yield return ("Great Score", $"{Great.Value:0.#}");
+                    yield return ("Good Score", $"{Good.Value:0.#}");
+                    yield return ("Ok Score", $"{Ok.Value:0.#}");
+                    yield return ("Meh Score", $"{Meh.Value:0.#}");
+                    yield return ("Miss Score", $"{Miss.Value:0.#}");
                 }
-
-                return settings;
             }
         }
+
 
         [SettingSource("Custom Hit Range", "Adjust the hit range of notes.")]
         public BindableBool CustomHitRange { get; set; } = new BindableBool(true);
@@ -164,7 +161,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 500
         };
 
-        public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
+        public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
         public ScoreRank AdjustRank(ScoreRank rank, double accuracy)
         {
@@ -186,7 +183,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             if (CustomHitRange.Value)
             {
-                HitWindows.SetDifficultyRange(PerfectHit.Value, GreatHit.Value, GoodHit.Value, OkHit.Value, MehHit.Value, MissHit.Value);
+                HitWindows.SetSpecialDifficultyRange(PerfectHit.Value, GreatHit.Value, GoodHit.Value, OkHit.Value, MehHit.Value, MissHit.Value);
                 difficulty.OverallDifficulty = 0;
                 HitWindows.SetDifficulty(difficulty.OverallDifficulty);
             }

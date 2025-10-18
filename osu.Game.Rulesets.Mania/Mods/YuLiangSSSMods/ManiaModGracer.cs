@@ -38,6 +38,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override ModType Type => ModType.CustomMod;
 
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Bias", $"{Bias.Value}");
+                yield return ("Interval", $"{Interval.Value}ms");
+                yield return ("Probability", $"{Probability.Value}%");
+                yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+            }
+        }
+
         [SettingSource("Bias", "The bias of original timing.")]
         public BindableNumber<int> Bias { get; set; } = new BindableInt(16)
         {

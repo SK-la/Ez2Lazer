@@ -34,6 +34,7 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
 using osu.Game.Users;
@@ -87,6 +88,8 @@ namespace osu.Game.Screens.Play
 
         // We are managing our own adjustments (see OnEntering/OnExiting).
         public override bool? ApplyModTrackAdjustments => false;
+
+        protected override BackgroundScreen CreateBackground() => Ruleset.Value.OnlineID == 3 ? new BackgroundScreenBeatmapMania(Beatmap.Value) : new BackgroundScreenBeatmap(Beatmap.Value);
 
         private readonly IBindable<bool> gameActive = new Bindable<bool>(true);
 

@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Audio;
@@ -17,19 +16,33 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public partial class StarRatingRebirth : Mod, IApplicableAfterBeatmapConversion
+    public class StarRatingRebirth : Mod, IApplicableAfterBeatmapConversion
     {
         public override string Name => "Star Rating Rebirth";
 
         public override string Acronym => "SR";
 
-        public override LocalisableString Description => "New algorithm.";
+        public override LocalisableString Description => "New algorithm by sunnyxxy.";
 
         public override double ScoreMultiplier => 1;
 
         public override bool Ranked => false;
 
         public override ModType Type => ModType.CustomMod;
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                if (Original.Value) yield return ("Original OD", "On");
+
+                if (!Original.Value && Custom.Value)
+                {
+                    yield return ("Custom OD", "On");
+                    yield return ("OD", $"{OD.Value}");
+                }
+            }
+        }
 
         [SettingSource("Use original OD", "High Priority")]
         public BindableBool Original { get; set; } = new BindableBool(false);
@@ -46,26 +59,28 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         };
 
         public void ApplyToBeatmap(IBeatmap beatmap)
-        {
-        }
+        { }
 
         public class EasyObject
         {
-            public double StartTime;
-            public double EndTime;
-            public int Column;
+            public int Head;
+            public int Tail;
+            public int Key;
+
+            public bool IsLong => Head != Tail;
 
             public EasyObject(double startTime, double endTime, int column)
             {
-                StartTime = startTime;
-                EndTime = endTime;
-                Column = column;
+                Head = (int)startTime;
+                Tail = (int)endTime;
+                Key = column;
             }
 
             public static EasyObject[] FromManiaObjects(List<ManiaHitObject> objects)
             {
                 var easyObjects = new EasyObject[objects.Count];
                 for (int i = 0; i < objects.Count; i++) easyObjects[i] = new EasyObject(objects[i].StartTime, objects[i].GetEndTime(), objects[i].Column);
+
                 return easyObjects;
             }
 
@@ -73,315 +88,403 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             {
                 for (int i = 0; i < objects.Length; i++)
                 {
-                    objects[i].StartTime = objects[i].StartTime * (1 / rate);
-                    objects[i].EndTime = objects[i].EndTime * (1 / rate);
+                    objects[i].Head = (int)(objects[i].Head / rate);
+                    objects[i].Tail = (int)(objects[i].Tail / rate);
                 }
 
                 return objects;
             }
         }
 
-        private static double lambda_n = 5;
-        private static double lambda_1 = 0.11;
-        private static double lambda_2 = 7;
-        private static double lambda_3 = 24;
-        private static double lambda_4 = 0.1;
-        private static double w_0 = 0.4;
-        private static double w_1 = 2.7;
-        private static double w_2 = 0.27;
-        private static double p_0 = 1.0;
-        private static double p_1 = 1.5;
-
         public static double CalculateStarRating(List<ManiaHitObject> objects, double od, int keys, double rate)
         {
-            double x = 0.3 * Math.Pow((64.5 - Math.Ceiling(od * 3)) / 500.0, 0.5);
-            //for (int i = 0; i < objects.Count; i++)
-            //{
-            //    objects[i].StartTime = (int)objects[i].StartTime;
-            //}
+            // return StarRatingRebirthCalculateForLazer.CalculateStarRatingForLazer(objects, od, keys, rate);
 
             var hit = EasyObject.FromManiaObjects(objects);
             if (rate != 1) hit = EasyObject.FromRate(hit, rate);
 
-            var note_seq = hit.OrderBy(t => t.StartTime).ThenBy(t => t.Column).ToArray();
+            PreProcess(hit, keys, od, out double x, out int K, out int T,
+                out var noteSeq, out var noteSeqByCol,
+                out var lnSeq, out var tailSeq, out var lnSeqByColumn);
 
-            // Preprocessing (Completed)
-            var note_seq_by_column = note_seq.GroupBy(n => n.Column).OrderBy(g => g.Key).Select(g => g.ToArray()).ToArray();
-            var LN_seq = note_seq
-                         .Where(t => t.EndTime != t.StartTime)
-                         .ToArray();
-            var tail_seq = LN_seq
-                           .OrderBy(t => t.EndTime)
-                           .ToArray();
+            GetCorners(noteSeq, T, out int[] baseCorners, out int[] aCorners, out int[] allCorners);
 
-            var LN_list = new List<List<EasyObject>>(keys);
-            for (int i = 0; i < keys; i++) LN_list.Add(new List<EasyObject>(1500));
+            // 对于每一列，存储其使用情况（在150ms内是否非空）。例如：keyUsage[k, i]
+            bool[,] keyUsage = GetKeyUsage(noteSeq, K, T, baseCorners);
 
-            foreach (var ln in LN_seq) LN_list[ln.Column].Add(ln);
+            // 在base_corners的每个时间点，构建活跃列的列表
+            int[][] activeColumns = Enumerable.Range(0, baseCorners.Length)
+                                              .Select(i => Enumerable.Range(0, K)
+                                                                     .Where(k => keyUsage[k, i])
+                                                                     .ToArray())
+                                              .ToArray();
 
-            var LN_seq_by_column = LN_list.ToList();
+            double[,] keyUsage400 = GetKeyUsage400(noteSeq, K, T, baseCorners);
 
-            LN_seq_by_column = LN_seq_by_column
-                               .Where(list => list != null && list.Count > 0)
-                               //.OrderBy(t => t.First().Column)
-                               .ToList();
+            double[] anchor = ComputeAnchor(K, keyUsage400, baseCorners);
 
-            int K = keys;
-            int T = (int)(note_seq.Max(t => Math.Max(t.StartTime, t.EndTime)) + 1);
+            ComputeJbar(K, T, x, noteSeqByCol, baseCorners, out double[,] deltaKs, out double[] jBar);
+            double[] jBarInterp = Utils.InterpValues(allCorners, baseCorners, jBar);
 
-            double[][] delta_ks = new double[K][];
-            double[] Jbar = new double[T];
-            double[] Xbar = new double[T];
-            double[] Pbar = new double[T];
-            int[] K_s = new int[T];
-            double[] Abar = new double[T];
-            double[] Rbar = new double[T];
+            double[] xBar = ComputeXbar(K, T, x, noteSeqByCol, activeColumns, baseCorners);
+            double[] xBarInterp = Utils.InterpValues(allCorners, baseCorners, xBar);
 
-            var task23 = Task.Run(() => Section23(x, note_seq_by_column, K, T, out delta_ks, out Jbar));
+            // 构建LN主体的稀疏表示
+            LNBodiesCountSparseRepresentation(lnSeq, T, out int[] points, out double[] cumsum, out double[] values);
 
-            var task24 = Task.Run(() => Section24(x, note_seq_by_column, K, T, out Xbar));
+            double[] pBar = ComputePbar(K, T, x, noteSeq, points, cumsum, values, anchor, baseCorners);
+            double[] pBarInterp = Utils.InterpValues(allCorners, baseCorners, pBar);
 
-            var task25 = Task.Run(() => Section25(x, note_seq, LN_seq, T, out Pbar));
+            double[] aBar = ComputeAbar(K, T, x, noteSeqByCol, activeColumns, deltaKs, aCorners, baseCorners);
+            double[] aBarInterp = Utils.InterpValues(allCorners, aCorners, aBar);
 
-            Task.WaitAll(task23, task24, task25);
+            double[] rBar = ComputeRbar(K, T, x, noteSeqByCol, tailSeq, baseCorners);
+            double[] rBarInterp = Utils.InterpValues(allCorners, baseCorners, rBar);
 
-            var task26 = Task.Run(() => Section26(note_seq, K, T, delta_ks, out K_s, out Abar));
+            ComputeCAndKs(K, T, noteSeq, keyUsage, baseCorners, out double[] cStep, out double[] ksStep);
+            double[] cArr = Utils.StepInterp(allCorners, baseCorners, cStep);
+            double[] ksArr = Utils.StepInterp(allCorners, baseCorners, ksStep);
 
-            var task27 = Task.Run(() => Section27(x, note_seq_by_column, LN_seq, tail_seq, T, out Rbar));
+            // === 最终计算 ===
+            // 在all_corners上计算难度D
+            double[] sAll = new double[allCorners.Length];
+            double[] tAll = new double[allCorners.Length];
+            double[] dAll = new double[allCorners.Length];
 
-            Task.WaitAll(task26, task27);
+            for (int i = 0; i < allCorners.Length; i++)
+            {
+                double term1 = Math.Pow(aBarInterp[i], 3 / ksArr[i]) * Math.Min(jBarInterp[i], 8 + 0.85 * jBarInterp[i]);
+                double term2 = Math.Pow(aBarInterp[i], 2.0 / 3.0) * (0.8 * pBarInterp[i] + rBarInterp[i] * 35 / (cArr[i] + 8));
 
-            double SR = Section3(note_seq, LN_seq, K, T, Jbar, Xbar, Pbar, K_s, Abar, Rbar);
-            return SR;
+                sAll[i] = Math.Pow(0.4 * Math.Pow(term1, 1.5) + (1 - 0.4) * Math.Pow(term2, 1.5), 2.0 / 3.0);
+                tAll[i] = Math.Pow(aBarInterp[i], 3 / ksArr[i]) * xBarInterp[i] / (xBarInterp[i] + sAll[i] + 1);
+                dAll[i] = 2.7 * Math.Pow(sAll[i], 0.5) * Math.Pow(tAll[i], 1.5) + sAll[i] * 0.27;
+            }
+
+            // 计算连续时间之间的间隔
+            double[] gaps = new double[allCorners.Length];
+            gaps[0] = (allCorners[1] - allCorners[0]) / 2.0;
+            gaps[^1] = (allCorners[^1] - allCorners[^2]) / 2.0;
+            for (int i = 1; i < allCorners.Length - 1; i++) gaps[i] = (allCorners[i + 1] - allCorners[i - 1]) / 2.0;
+
+            // 每个拐角的有效权重是其密度和间隔的乘积
+            double[] effectiveWeights = new double[allCorners.Length];
+            for (int i = 0; i < allCorners.Length; i++) effectiveWeights[i] = cArr[i] * gaps[i];
+
+            // 按难度D排序
+            int[] sortedIndices = Enumerable.Range(0, allCorners.Length)
+                                            .OrderBy(i => dAll[i])
+                                            .ToArray();
+
+            double[] dSorted = sortedIndices.Select(i => dAll[i]).ToArray();
+            double[] wSorted = sortedIndices.Select(i => effectiveWeights[i]).ToArray();
+
+            // 计算有效权重的累积和
+            double[] cumWeights = new double[wSorted.Length];
+            cumWeights[0] = wSorted[0];
+            for (int i = 1; i < wSorted.Length; i++) cumWeights[i] = cumWeights[i - 1] + wSorted[i];
+            double totalWeight = cumWeights[^1];
+
+            double[] normCumWeights = cumWeights.Select(w => w / totalWeight).ToArray();
+
+            // 计算目标百分位
+            double[] targetPercentiles = { 0.945, 0.935, 0.925, 0.915, 0.845, 0.835, 0.825, 0.815 };
+            int[] indices = new int[targetPercentiles.Length];
+
+            for (int i = 0; i < targetPercentiles.Length; i++)
+            {
+                indices[i] = Array.FindIndex(normCumWeights, w => w >= targetPercentiles[i]);
+                if (indices[i] < 0) indices[i] = normCumWeights.Length - 1;
+            }
+
+            double percentile93 = (dSorted[indices[0]] + dSorted[indices[1]] + dSorted[indices[2]] + dSorted[indices[3]]) / 4.0;
+            double percentile83 = (dSorted[indices[4]] + dSorted[indices[5]] + dSorted[indices[6]] + dSorted[indices[7]]) / 4.0;
+
+            // 计算加权平均值
+            double weightedSum = 0;
+            double weightSum = 0;
+
+            for (int i = 0; i < dSorted.Length; i++)
+            {
+                weightedSum += Math.Pow(dSorted[i], 5) * wSorted[i];
+                weightSum += wSorted[i];
+            }
+
+            double weightedMean = Math.Pow(weightedSum / weightSum, 1.0 / 5.0);
+
+            // 最终SR计算
+            double sr = 0.88 * percentile93 * 0.25 + 0.94 * percentile83 * 0.2 + weightedMean * 0.55;
+            sr = Math.Pow(sr, 1.0) / Math.Pow(8, 1.0) * 8;
+
+            double totalNotes = noteSeq.Length + 0.5 * lnSeq.Sum(ln => Math.Min(ln.Tail - ln.Head, 1000) / 200.0);
+            sr *= totalNotes / (totalNotes + 60);
+
+            sr = Utils.RescaleHigh(sr);
+            sr *= 0.975;
+
+            return sr;
         }
 
-        public static double Section3(EasyObject[] note_seq, EasyObject[] LN_seq, int K, int T, double[] Jbar, double[] Xbar, double[] Pbar, int[] K_s, double[] Abar, double[] Rbar)
+        internal static void ComputeCAndKs(int K, int T, EasyObject[] noteSeq, bool[,] keyUsage, int[] baseCorners,
+                                           out double[] cStep, out double[] ksStep)
         {
-            double[] C = new double[T];
-            int start = 0;
-            int end = 0;
+            int cornersLength = baseCorners.Length;
 
-            for (int t = 0; t < T; t++)
+            // 提取所有音符的命中时间并排序
+            int[] noteHitTimes = noteSeq.Select(n => n.Head).OrderBy(t => t).ToArray();
+
+            // 初始化 C_step 数组
+            cStep = new double[cornersLength];
+
+            // 计算每个基准点的 C(s)：500ms 内的音符数量
+            for (int i = 0; i < cornersLength; i++)
             {
-                while (start < note_seq.Length && note_seq[start].StartTime < t - 500) start += 1;
+                int s = baseCorners[i];
+                int low = s - 500;
+                int high = s + 500;
 
-                while (end < note_seq.Length && note_seq[end].StartTime < t + 500) end += 1;
-                C[t] = end - start;
+                // 使用二分查找计算区间内的音符数量
+                int highIdx = Utils.SearchSortedLeft(noteHitTimes, high);
+                int lowIdx = Utils.SearchSortedLeft(noteHitTimes, low);
+
+                cStep[i] = highIdx - lowIdx;
             }
 
-            double[] S = new double[T];
-            double[] D = new double[T];
+            // 计算 Ks：本地按键使用计数（最小为1）
+            ksStep = new double[cornersLength];
 
-            for (int t = 0; t < T; t++)
+            for (int i = 0; i < cornersLength; i++)
             {
-                Jbar[t] = Math.Max(0, Jbar[t]);
-                Xbar[t] = Math.Max(0, Xbar[t]);
-                Pbar[t] = Math.Max(0, Pbar[t]);
-                Abar[t] = Math.Max(0, Abar[t]);
-                Rbar[t] = Math.Max(0, Rbar[t]);
-                C[t] = Math.Max(0, C[t]);
-                K_s[t] = Math.Max(0, K_s[t]);
+                int count = 0;
 
-                double term1 = w_0 * Math.Pow(Math.Pow(Abar[t], 3.0 / K_s[t]) * Jbar[t], 1.5);
-                double term2 = (1 - w_0) * Math.Pow(Math.Pow(Abar[t], 2.0 / 3) *
-                                                    (0.8 * Pbar[t] + Rbar[t]), 1.5);
-                S[t] = Math.Pow(term1 + term2, 2.0 / 3);
-
-                double T_t = Math.Pow(Abar[t], 3.0 / K_s[t]) * Xbar[t] / (Xbar[t] + S[t] + 1);
-                D[t] = w_1 * Math.Pow(S[t], 1.0 / 2) * Math.Pow(T_t, p_1) + S[t] * w_2;
-            }
-
-            double weightedSum = 0.0;
-            double weightSum = C.Sum();
-
-            for (int t = 0; t < T; t++) weightedSum += Math.Pow(D[t], lambda_n) * C[t];
-
-            double SR = Math.Pow(weightedSum / weightSum, 1.0 / lambda_n);
-            SR = Math.Pow(SR, p_0) / Math.Pow(8.0, p_0) * 8;
-            SR *= (note_seq.Length + 0.5 * LN_seq.Length) / (note_seq.Length + 0.5 * LN_seq.Length + 60);
-            if (SR <= 2.0) SR = Math.Sqrt(SR * 2);
-            SR *= 0.96 + 0.01 * K;
-            // SR *= 0.88+0.03*K
-            return SR;
-        }
-
-        public static void Section27(double x, EasyObject[][]? note_seq_by_column, EasyObject[]? LN_seq, EasyObject[]? tail_seq, int T, out double[] Rbar)
-        {
-            static (int, double, double) find_next_note_in_column(EasyObject note, EasyObject[][] note_seq_by_column)
-            {
-                int k = note.Column;
-                double h = note.StartTime;
-
-                double[] second_values = new double[note_seq_by_column[k].Length];
-                for (int i = 0; i < second_values.Length; i++) second_values[i] = note_seq_by_column[k][i].StartTime;
-
-                int index = Array.BinarySearch(second_values, h);
-                if (index < 0) index = ~index;
-
-                return index + 1 < second_values.Length
-                    ? (note_seq_by_column[k][index + 1].Column, note_seq_by_column[k][index + 1].StartTime, note_seq_by_column[k][index + 1].EndTime)
-                    : (0, 1e9, 1e9);
-            }
-
-            double[] I = new double[LN_seq!.Length];
-
-            for (int i = 0; i < tail_seq!.Length; i++)
-            {
-                (int Column, double StartTime, double endTime) next = find_next_note_in_column(tail_seq[i], note_seq_by_column!);
-                double l_h = 0.001 * Math.Abs(tail_seq[i].EndTime - tail_seq[i].StartTime - 80) / x;
-                double l_t = 0.001 * Math.Abs(next.StartTime - tail_seq[i].EndTime - 80) / x;
-                I[i] = 2.0 / (2.0 + Math.Exp(-5.0 * (l_h - 0.75)) + Math.Exp(-5.0 * (l_t - 0.75)));
-            }
-
-            double[] Is = new double[T];
-            double[] R = new double[T];
-
-            if (tail_seq.Length > 0)
-            {
-                for (int i = 0; i < tail_seq.Length - 1; i++)
-                {
-                    double delta_r = 0.001 * (tail_seq[i + 1].EndTime - tail_seq[i].EndTime);
-
-                    for (int s = (int)tail_seq[i].EndTime; s < (int)tail_seq[i + 1].EndTime; s++)
-                    {
-                        Is[s] = 1 + I[i];
-                        R[s] = 0.08 * Math.Pow(delta_r, -1.0 / 2.0) * Math.Pow(x, -1) * (1 + lambda_4 * (I[i] + I[i + 1]));
-                    }
-                }
-            }
-
-            Rbar = Smooth(R, T);
-        }
-
-        public static void Section26(EasyObject[] note_seq, int K, int T, double[][] delta_ks, out int[] K_s, out double[] Abar)
-        {
-            bool[][] KU_ks = new bool[K][];
-            for (int k = 0; k < K; k++) KU_ks[k] = new bool[T];
-
-            foreach (var note in note_seq)
-            {
-                double startTime = Math.Max(0, note.StartTime - 500);
-                double endTime = Math.Min(note.EndTime == note.StartTime ? note.StartTime + 500 : note.EndTime + 500, T - 1);
-
-                for (int s = (int)startTime; s < (int)endTime; s++) KU_ks[note.Column][s] = true;
-            }
-
-            K_s = new int[T];
-            double[][] dks = new double[K - 1][];
-            double[] A = new double[T];
-            Array.Fill(A, 1);
-
-            for (int k = 0; k < K - 1; k++) dks[k] = new double[T];
-
-            for (int s = 0; s < T; s++)
-            {
-                var cols = new List<int>(K);
                 for (int k = 0; k < K; k++)
-                    if (KU_ks[k][s])
-                        cols.Add(k);
-                K_s[s] = Math.Max(cols.Count, 1);
-
-                for (int i = 0; i < cols.Count - 1; i++)
                 {
-                    if (cols[i + 1] > K - 1) continue;
-
-                    double currentDks = Math.Abs(delta_ks[cols[i]][s] - delta_ks[cols[i + 1]][s])
-                                        + Math.Max(0, Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s]) - 0.3);
-                    dks[cols[i]][s] = currentDks;
-
-                    if (currentDks < 0.02)
-                        A[s] *= Math.Min(0.75 + 0.5 * Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s]), 1);
-                    else if (currentDks < 0.07) A[s] *= Math.Min(0.65 + 5 * currentDks + 0.5 * Math.Max(delta_ks[cols[i + 1]][s], delta_ks[cols[i]][s]), 1);
+                    if (keyUsage[k, i])
+                        count++;
                 }
-            }
 
-            Abar = Smooth2(A, T);
+                ksStep[i] = Math.Max(count, 1);
+            }
         }
 
-        public static void Section25(double x, EasyObject[] note_seq, EasyObject[] LN_seq, int T, out double[] Pbar)
+        internal static double[] ComputePbar(int K, int T, double x, EasyObject[] noteSeq, int[] points, double[] cumsum, double[] values, double[] anchor, int[] baseCorners)
         {
-            double[] P = new double[T];
-            double[] LN_bodies = new double[T];
+            int cornersLength = baseCorners.Length;
+            double[] pStep = new double[cornersLength];
 
-            foreach (var tuple in LN_seq)
+            // stream_booster 函数的C#实现
+            static double streamBooster(double delta)
             {
-                int t2 = (int)Math.Min(tuple.StartTime + 80, tuple.EndTime);
-                for (int temp = (int)tuple.StartTime; temp < t2; temp++) LN_bodies[temp] += 0.5;
-
-                for (int temp = t2; temp < tuple.EndTime; temp++) LN_bodies[temp] += 1;
+                double ratio = 7.5 / delta;
+                return 160 < ratio && ratio < 360 ? 1 + 1.7e-7 * (ratio - 160) * Math.Pow(ratio - 360, 2) : 1;
             }
 
-            static double b(double delta)
+            for (int i = 0; i < noteSeq.Length - 1; i++)
             {
-                double val = 7.5 / delta;
-                if (160 < val && val < 360) return 1 + 1.4 * Math.Pow(10, -7) * (val - 160) * Math.Pow(val - 360, 2);
-                return 1;
-            }
+                int hL = noteSeq[i].Head;
+                int hR = noteSeq[i + 1].Head;
+                int deltaTime = hR - hL;
 
-            for (int i = 0; i < note_seq.Length - 1; i++)
-            {
-                double delta = 0.001 * (note_seq[i + 1].StartTime - note_seq[i].StartTime);
+                if (deltaTime < 1e-9)
+                {
+                    // 狄拉克增量情况：当音符同时出现时
+                    // 在基准网格中的音符头部精确位置添加尖峰
+                    double spike = 1000 * Math.Pow(0.02 * (4 / x - 24), 1.0 / 4);
+                    int leftIdx = Utils.SearchSortedLeft(baseCorners, hL);
+                    int rightIdx = Utils.SearchSortedRight(baseCorners, hL);
 
-                if (delta < 1e-9)
-                    P[(int)note_seq[i].StartTime] += 1000 * Math.Pow(0.02 * (4.0 / x - lambda_3), 1.0 / 4.0);
+                    for (int idx = leftIdx; idx < rightIdx; idx++) pStep[idx] += spike;
+                }
                 else
                 {
-                    double h_l = note_seq[i].StartTime;
-                    double h_r = note_seq[i + 1].StartTime;
-                    double v = 1 + lambda_2 * 0.001 * LN_bodies.Skip((int)h_l).Take((int)(h_r - h_l)).Sum();
+                    // 对于delta_time > 0的常规情况，找出[h_l, h_r)范围内的基准网格索引
+                    int leftIdx = Utils.SearchSortedLeft(baseCorners, hL);
+                    int rightIdx = Utils.SearchSortedLeft(baseCorners, hR);
 
+                    if (leftIdx >= rightIdx) continue;
+
+                    double delta = 0.001 * deltaTime;
+                    double v = 1 + 6 * 0.001 * LNSum(hL, hR, points, cumsum, values);
+                    double bVal = streamBooster(delta);
+
+                    double inc;
                     if (delta < 2 * x / 3)
-                    {
-                        double baseVal = Math.Pow(0.08 * Math.Pow(x, -1) *
-                                                  (1 - lambda_3 * Math.Pow(x, -1) * Math.Pow(delta - x / 2, 2)), 1.0 / 4) *
-                            b(delta) * v / delta;
-
-                        for (int s = (int)h_l; s < (int)h_r; s++)
-                            P[s] += baseVal;
-                    }
+                        inc = 1 / delta * Math.Pow(0.08 / x * (1 - 24 / x * Math.Pow(delta - x / 2, 2)), 1.0 / 4) * Math.Max(bVal, v);
                     else
-                    {
-                        double baseVal = Math.Pow(0.08 * Math.Pow(x, -1) *
-                                                  (1 - lambda_3 * Math.Pow(x, -1) * Math.Pow(x / 6, 2)), 1.0 / 4) *
-                            b(delta) * v / delta;
+                        inc = 1 / delta * Math.Pow(0.08 / x * (1 - 24 / x * Math.Pow(x / 6, 2)), 1.0 / 4) * Math.Max(bVal, v);
 
-                        for (int s = (int)h_l; s < (int)h_r; s++)
-                            P[s] += baseVal;
-                    }
+                    for (int idx = leftIdx; idx < rightIdx; idx++) pStep[idx] += Math.Min(inc * anchor[idx], Math.Max(inc, inc * 2 - 10));
                 }
             }
 
-            Pbar = Smooth(P, T);
+            double[] pBar = Utils.SmoothOnCorners(baseCorners, pStep, 500, 0.001, "sum");
+            return pBar;
         }
 
-        public static void Section24(double x, EasyObject[][] note_seq_by_column, int K, int T, out double[] Xbar)
+        internal static double[] ComputeAbar(int K, int T, double x, EasyObject[][] noteSeqByColumn, int[][] activeColumns, double[,] deltaKs, int[] aCorners, int[] baseCorners)
         {
-            double[][] X_ks = new double[K + 1][];
+            int cornersLength = baseCorners.Length;
 
-            for (int k = 0; k <= K; k++)
+            // 初始化dks数据结构，对应Python中的字典
+            double[,] dks = new double[K - 1, cornersLength];
+
+            // 填充dks数组
+            for (int i = 0; i < cornersLength; i++)
             {
-                X_ks[k] = new double[T];
-                var notes_in_pair = k == 0 ? note_seq_by_column[0] :
-                    k == K ? note_seq_by_column[K - 1] :
-                    note_seq_by_column[k - 1].Concat(note_seq_by_column[k])
-                                             .OrderBy(n => n.StartTime).ToArray();
-                int pairLength = notes_in_pair.Length;
-                double previousStartTime = pairLength > 0 ? notes_in_pair[0].StartTime : 0;
+                int[] cols = activeColumns[i];
 
-                for (int i = 1; i < pairLength; i++)
+                for (int j = 0; j < cols.Length - 1; j++)
                 {
-                    double currentStartTime = notes_in_pair[i].StartTime;
-                    double delta = 0.001 * (currentStartTime - previousStartTime);
-                    if (delta <= 0) continue;
-                    double val = 0.16 * Math.Pow(Math.Max(x, delta), -2.0);
-                    int starts = (int)previousStartTime;
-                    int ends = (int)currentStartTime;
-                    for (int s = starts; s < ends; s++) X_ks[k][s] = val;
-                    previousStartTime = currentStartTime;
+                    int k0 = cols[j];
+                    int k1 = cols[j + 1];
+
+                    // 使用之前在base_corners上计算的delta_ks
+                    dks[k0, i] = Math.Abs(deltaKs[k0, i] - deltaKs[k1, i]) + 0.4 * Math.Max(0, Math.Max(deltaKs[k0, i], deltaKs[k1, i]) - 0.11);
                 }
             }
 
-            double[][] cross_matrix =
+            // 初始化A_step数组，全部填充为1
+            double[] aStep = new double[aCorners.Length];
+            for (int i = 0; i < aCorners.Length; i++) aStep[i] = 1.0;
+
+            // 修改A_step
+            for (int i = 0; i < aCorners.Length; i++)
+            {
+                int s = aCorners[i];
+                int idx = Utils.SearchSortedLeft(baseCorners, s);
+
+                // 确保idx在有效范围内
+                if (idx >= baseCorners.Length) idx = baseCorners.Length - 1;
+
+                int[] cols = activeColumns[idx];
+
+                for (int j = 0; j < cols.Length - 1; j++)
+                {
+                    int k0 = cols[j];
+                    int k1 = cols[j + 1];
+                    double dVal = dks[k0, idx];
+
+                    if (dVal < 0.02)
+                        aStep[i] *= Math.Min(0.75 + 0.5 * Math.Max(deltaKs[k0, idx], deltaKs[k1, idx]), 1);
+                    else if (dVal < 0.07) aStep[i] *= Math.Min(0.65 + 5 * dVal + 0.5 * Math.Max(deltaKs[k0, idx], deltaKs[k1, idx]), 1);
+                    // 否则保持A_step[i]不变
+                }
+            }
+
+            // 对A_step应用平滑操作得到Abar
+            double[] aBar = Utils.SmoothOnCorners(aCorners, aStep, 250, mode: "avg");
+            return aBar;
+        }
+
+        internal static double[] ComputeRbar(int K, int T, double x, EasyObject[][] noteSeqByColumn, EasyObject[] tailSeq, int[] baseCorners)
+        {
+            int cornersLength = baseCorners.Length;
+            double[] iArr = new double[cornersLength];
+            double[] rStep = new double[cornersLength];
+
+            int[][] timesByColumn = new int[noteSeqByColumn.Length][];
+            for (int i = 0; i < noteSeqByColumn.Length; i++) timesByColumn[i] = noteSeqByColumn[i].Select(note => note.Head).ToArray();
+
+            // 计算释放指数(Release Index)
+            var iList = new List<double>();
+
+            for (int i = 0; i < tailSeq.Length; i++)
+            {
+                int k = tailSeq[i].Key;
+                int hI = tailSeq[i].Head;
+                int tI = tailSeq[i].Tail;
+
+                // 找到同一列中的下一个音符
+                var nextNote = Utils.FindNextNoteInColumn(tailSeq[i], timesByColumn[k], noteSeqByColumn);
+                int hJ = nextNote.Head;
+
+                double iH = 0.001 * Math.Abs(tI - hI - 80) / x;
+                double iT = 0.001 * Math.Abs(hJ - tI - 80) / x;
+
+                iList.Add(2 / (2 + Math.Exp(-5 * (iH - 0.75)) + Math.Exp(-5 * (iT - 0.75))));
+            }
+
+            // 对相邻尾音时间之间的每个区间，分配 I 和 R
+            for (int i = 0; i < tailSeq.Length - 1; i++)
+            {
+                int tStart = tailSeq[i].Tail;
+                int tEnd = tailSeq[i + 1].Tail;
+
+                int leftIdx = Utils.SearchSortedLeft(baseCorners, tStart);
+                int rightIdx = Utils.SearchSortedLeft(baseCorners, tEnd);
+
+                if (leftIdx >= rightIdx) continue;
+
+                // 设置这个区间内所有索引的值
+                for (int idx = leftIdx; idx < rightIdx; idx++)
+                {
+                    iArr[idx] = 1 + iList[i];
+                    double deltaR = 0.001 * (tailSeq[i + 1].Tail - tailSeq[i].Tail);
+                    rStep[idx] = 0.08 * Math.Pow(deltaR, -0.5) * (1 / x) * (1 + 0.8 * (iList[i] + iList[i + 1]));
+                }
+            }
+
+            // 应用平滑操作得到Rbar
+            double[] rBar = Utils.SmoothOnCorners(baseCorners, rStep, 500, 0.001, "sum");
+            return rBar;
+        }
+
+        internal static void LNBodiesCountSparseRepresentation(EasyObject[] lnSeq, int T,
+                                                               out int[] points, out double[] cumsum, out double[] values)
+        {
+            // 字典：索引 -> 长音符体变化量（转换前）
+            var diff = new Dictionary<int, double>();
+
+            foreach (var ln in lnSeq)
+            {
+                int t0 = Math.Min(ln.Head + 60, ln.Tail);
+                int t1 = Math.Min(ln.Head + 120, ln.Tail);
+
+                diff[t0] = diff.GetValueOrDefault(t0, 0) + 1.3;
+                diff[t1] = diff.GetValueOrDefault(t1, 0) + (-1.3 + 1); // t1处的净变化：从第一部分的-1.3，然后+1
+                diff[ln.Tail] = diff.GetValueOrDefault(ln.Tail, 0) - 1;
+            }
+
+            // 断点是变化发生的时间点
+            points = new[] { 0, T }.Concat(diff.Keys).Distinct().OrderBy(p => p).ToArray();
+
+            // 构建分段常量值（转换后）和累积和
+            values = new double[points.Length - 1];
+            cumsum = new double[points.Length];
+            cumsum[0] = 0; // 断点处的累积和
+            double curr = 0.0;
+
+            for (int i = 0; i < points.Length - 1; i++)
+            {
+                int t = points[i];
+                // 如果在t处有变化，更新运行值
+                if (diff.ContainsKey(t)) curr += diff[t];
+
+                double v = Math.Min(curr, 2.5 + 0.5 * curr);
+                values[i] = v;
+                // 计算区间[points[i], points[i+1])上的累积和
+                int segLength = points[i + 1] - points[i];
+                cumsum[i + 1] = cumsum[i] + segLength * v;
+            }
+        }
+
+        private static bool contains(int[] array, int value)
+        {
+            if (array == null) return false;
+
+            foreach (int item in array)
+            {
+                if (item == value)
+                    return true;
+            }
+
+            return false;
+        }
+
+        internal static double[] ComputeXbar(int K, int T, double x, EasyObject[][] noteSeqByColumn, int[][] activeColumns, int[] baseCorners)
+        {
+            // 创建交叉矩阵
+            double[][] crossMatrix =
             [
                 [-1],
                 [0.075, 0.075],
@@ -396,106 +499,374 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 [0.325, 0.55, 0.45, 0.35, 0.25, 0.05, 0.25, 0.35, 0.45, 0.55, 0.325]
             ];
 
-            double[] X = new double[T];
-            int[] K_rangePlus1 = Enumerable.Range(0, K + 1).ToArray();
-            for (int s = 0; s < T; s++) X[s] = K_rangePlus1.Sum(k => X_ks[k][s] * cross_matrix[K][k]);
+            int cornersLength = baseCorners.Length;
 
-            Xbar = Smooth(X, T);
-        }
+            // 初始化 X_ks 和 fast_cross
+            double[,] xKs = new double[K + 1, cornersLength];
+            double[,] fastCross = new double[K + 1, cornersLength];
 
-        // Helper Functions (Completed)
-        public static double[] Smooth(double[] list, int T)
-        {
-            double[] lstbar = new double[T];
-            double window_sum = list.Take(Math.Min(500, T)).Sum();
+            // 获取交叉系数
+            double[] crossCoeff = crossMatrix[K];
 
-            for (int s = 0; s < T; s++)
+            // 计算每列的 X_ks 和 fast_cross 值
+            for (int k = 0; k <= K; k++)
             {
-                lstbar[s] = 0.001 * window_sum;
-                if (s + 500 < T) window_sum += list[s + 500];
+                // 根据不同情况选择要处理的音符
+                EasyObject[] notesInPair;
 
-                if (s - 500 >= 0) window_sum -= list[s - 500];
-            }
-
-            return lstbar;
-        }
-
-        public static double[] Smooth2(double[] list, int T)
-        {
-            double[] lstbar = new double[T];
-            int window_len = Math.Min(500, T);
-            double window_sum = list.Take(window_len).Sum();
-
-            for (int s = 0; s < T; s++)
-            {
-                lstbar[s] = window_sum / window_len;
-
-                if (s + 500 < T)
+                if (k == 0)
+                    notesInPair = noteSeqByColumn[0];
+                else if (k == K)
+                    notesInPair = noteSeqByColumn[K - 1];
+                else
                 {
-                    window_sum += list[s + 500];
-                    window_len += 1;
+                    // 合并两列的音符并按时间排序
+                    var mergedNotes = new List<EasyObject>();
+                    mergedNotes.AddRange(noteSeqByColumn[k - 1]);
+                    mergedNotes.AddRange(noteSeqByColumn[k]);
+                    notesInPair = mergedNotes.OrderBy(n => n.Head).ToArray();
                 }
 
-                if (s - 500 >= 0)
+                // 处理相邻音符对
+                for (int i = 1; i < notesInPair.Length; i++)
                 {
-                    window_sum -= list[s - 500];
-                    window_len -= 1;
+                    int start = notesInPair[i - 1].Head;
+                    int end = notesInPair[i].Head;
+
+                    int idxStart = Utils.SearchSortedLeft(baseCorners, start);
+                    int idxEnd = Utils.SearchSortedLeft(baseCorners, end);
+
+                    if (idxStart >= idxEnd) continue;
+
+                    double delta = 0.001 * (end - start);
+                    double val = 0.16 * Math.Pow(Math.Max(x, delta), -2);
+
+                    // 检查活跃列条件
+                    bool condition1 = !contains(activeColumns[idxStart], k - 1) && !contains(activeColumns[idxEnd], k - 1);
+                    bool condition2 = !contains(activeColumns[idxStart], k) && !contains(activeColumns[idxEnd], k);
+
+                    if (condition1 || condition2) val *= 1 - crossCoeff[k];
+
+                    // 设置值
+                    for (int idx = idxStart; idx < idxEnd; idx++)
+                    {
+                        xKs[k, idx] = val;
+                        fastCross[k, idx] = Math.Max(0, 0.4 * Math.Pow(Math.Max(delta, Math.Max(0.06, 0.75 * x)), -2) - 80);
+                    }
                 }
             }
 
-            return lstbar;
+            // 计算 X_base
+            double[] xBase = new double[cornersLength];
+
+            for (int i = 0; i < cornersLength; i++)
+            {
+                // 第一部分：xKs 的加权和
+                double sum1 = 0;
+                for (int k = 0; k <= K; k++) sum1 += xKs[k, i] * crossCoeff[k];
+
+                // 第二部分：fastCross 的平方根乘积和
+                double sum2 = 0;
+                for (int k = 0; k < K; k++) sum2 += Math.Sqrt(fastCross[k, i] * crossCoeff[k] * fastCross[k + 1, i] * crossCoeff[k + 1]);
+
+                xBase[i] = sum1 + sum2;
+            }
+
+            // 应用平滑操作得到 Xbar
+            double[] xBar = Utils.SmoothOnCorners(baseCorners, xBase, 500, 0.001, "sum");
+            return xBar;
         }
 
-        public static void Section23(double x, EasyObject[][]? note_seq_by_column, int K, int T, out double[][] delta_ks, out double[] Jbar)
+        internal static void ComputeJbar(int K, int T, double x, EasyObject[][] noteSeqByColumn, int[] baseCorners,
+                                         out double[,] deltaKs, out double[] jBar)
         {
-            static double jackNerfer(double delta) => 1 - 7 * 1e-5 * Math.Pow(0.15 + Math.Abs(delta - 0.08), -4);
+            int cornersLength = baseCorners.Length;
 
-            double[][] J_ks = new double[K][];
-            delta_ks = new double[K][];
-            double t1 = lambda_1 * Math.Pow(x, 1.0 / 4.0);
+            double[,] jKs = new double[K, cornersLength];
+            deltaKs = new double[K, cornersLength];
 
             for (int k = 0; k < K; k++)
             {
-                J_ks[k] = new double[T];
-                delta_ks[k] = new double[T];
-                var noteColumn = note_seq_by_column![k];
-                Array.Fill(delta_ks[k], 1e9);
-
-                for (int i = 0; i < noteColumn.Length - 1; i++)
-                {
-                    double startTimeI = noteColumn[i].StartTime;
-                    double startTimeIPlus1 = noteColumn[i + 1].StartTime;
-                    double delta = 0.001 * (startTimeIPlus1 - startTimeI);
-                    double val = Math.Pow(delta, -1.0) * Math.Pow(delta + t1, -1.0) * jackNerfer(delta);
-                    double timeLength = startTimeIPlus1 - startTimeI;
-                    var deltaSpan = new Span<double>(delta_ks[k], (int)startTimeI, (int)timeLength);
-                    var JksSpan = new Span<double>(J_ks[k], (int)startTimeI, (int)timeLength);
-
-                    deltaSpan.Fill(delta);
-                    JksSpan.Fill(val);
-                }
+                for (int i = 0; i < cornersLength; i++) deltaKs[k, i] = 1e9;
             }
 
-            double[][] Jbar_ks = new double[K][];
-            for (int k = 0; k < K; k++) Jbar_ks[k] = Smooth(J_ks[k], T);
+            static double jackNerfer(double delta) => 1 - 7e-5 * Math.Pow(0.15 + Math.Abs(delta - 0.08), -4);
 
-            Jbar = new double[T];
-
-            for (int s = 0; s < T; s++)
+            for (int k = 0; k < K; k++)
             {
-                double sum1 = 0.0;
-                double sum2 = 0.0;
+                var notes = noteSeqByColumn[k];
 
-                for (int i = 0; i < K; i++)
+                for (int i = 0; i < notes.Length - 1; i++)
                 {
-                    double weight = 1 / delta_ks[i][s];
-                    sum2 += weight;
-                    sum1 += Math.Pow(Math.Max(Jbar_ks[i][s], 0), lambda_n) * weight;
+                    int start = notes[i].Head;
+                    int end = notes[i + 1].Head;
+
+                    int leftIdx = Utils.SearchSortedLeft(baseCorners, start);
+                    int rightIdx = Utils.SearchSortedLeft(baseCorners, end);
+
+                    if (leftIdx >= rightIdx) continue;
+
+                    double delta = 0.001 * (end - start);
+                    double val = 1 / delta * (1 / (delta + 0.11 * Math.Pow(x, 1.0 / 4)));
+                    double jVal = val * jackNerfer(delta);
+
+                    for (int idx = leftIdx; idx < rightIdx; idx++)
+                    {
+                        jKs[k, idx] = jVal;
+                        deltaKs[k, idx] = delta;
+                    }
+                }
+            }
+
+            // 对每列的J_ks进行平滑处理
+            double[,] jBarKs = new double[K, cornersLength];
+
+            for (int k = 0; k < K; k++)
+            {
+                double[] rowData = new double[cornersLength];
+                for (int i = 0; i < cornersLength; i++) rowData[i] = jKs[k, i];
+
+                double[] smoothed = Utils.SmoothOnCorners(baseCorners, rowData, 500, 0.001, "sum");
+
+                for (int i = 0; i < cornersLength; i++) jBarKs[k, i] = smoothed[i];
+            }
+
+            // 使用加权平均聚合各列
+            jBar = new double[cornersLength];
+
+            for (int i = 0; i < cornersLength; i++)
+            {
+                double num = 0.0;
+                double den = 0.0;
+
+                for (int k = 0; k < K; k++)
+                {
+                    double v = jBarKs[k, i];
+                    double w = 1 / deltaKs[k, i];
+
+                    num += Math.Pow(Math.Max(v, 0), 5) * w;
+                    den += w;
                 }
 
-                double weighted_avg = Math.Pow(sum1 / Math.Max(1e-9, sum2), 1.0 / lambda_n);
-                Jbar[s] = weighted_avg;
+                jBar[i] = num / Math.Max(1e-9, den);
+                jBar[i] = Math.Pow(jBar[i], 1.0 / 5);
             }
+        }
+
+        internal static double[] ComputeAnchor(int K, double[,] keyUsage400, int[] baseCorners)
+        {
+            double[] anchor = new double[baseCorners.Length];
+
+            for (int idx = 0; idx < baseCorners.Length; idx++)
+            {
+                var nonzeroCounts = Enumerable.Range(0, K)
+                                              .Select(k => keyUsage400[k, idx])
+                                              .OrderByDescending(c => c)
+                                              .Where(c => c != 0)
+                                              .ToList();
+
+                if (nonzeroCounts.Count > 1)
+                {
+                    double walk = 0;
+                    double maxWalk = 0;
+
+                    for (int i = 0; i < nonzeroCounts.Count - 1; i++)
+                    {
+                        double ratio = nonzeroCounts[i + 1] / nonzeroCounts[i];
+                        walk += nonzeroCounts[i] * (1 - 4 * Math.Pow(0.5 - ratio, 2));
+                        maxWalk += nonzeroCounts[i];
+                    }
+
+                    anchor[idx] = walk / maxWalk;
+                }
+                else
+                    anchor[idx] = 0;
+            }
+
+            for (int i = 0; i < anchor.Length; i++) anchor[i] = 1 + Math.Min(anchor[i] - 0.18, 5 * Math.Pow(anchor[i] - 0.22, 3));
+            return anchor;
+        }
+
+        internal static double[,] GetKeyUsage400(EasyObject[] noteSeq, int K, int T, int[] baseCorners)
+        {
+            double[,] keyUsage400 = new double[K, baseCorners.Length];
+
+            foreach (var note in noteSeq)
+            {
+                int startTime = Math.Max(note.Head, 0);
+                int endTime = !note.IsLong ? note.Head : Math.Min(note.Tail, T - 1);
+                int left400Idx = Utils.SearchSortedLeft(baseCorners, startTime - 400);
+                int leftIdx = Utils.SearchSortedLeft(baseCorners, startTime);
+                int rightIdx = Utils.SearchSortedLeft(baseCorners, endTime);
+                int right400Idx = Utils.SearchSortedLeft(baseCorners, endTime + 400);
+                for (int i = leftIdx; i < rightIdx; i++) keyUsage400[note.Key, i] += 3.75 + Math.Min(endTime - startTime, 1500) / 150.0;
+
+                for (int i = left400Idx; i < leftIdx; i++)
+                {
+                    double diff = baseCorners[i] - startTime;
+                    keyUsage400[note.Key, i] += 3.75 - 3.75 / (400.0 * 400.0) * diff * diff;
+                }
+
+                for (int i = rightIdx; i < right400Idx; i++)
+                {
+                    double diff = baseCorners[i] - endTime;
+                    keyUsage400[note.Key, i] += 3.75 - 3.75 / (400.0 * 400.0) * diff * diff;
+                }
+            }
+
+            return keyUsage400;
+        }
+
+        internal static double LNSum(int a, int b, int[] points, double[] cumsum, double[] values)
+        {
+            // 定位包含 a 和 b 的分段
+            int i = Utils.SearchSortedRight(points, a) - 1;
+            int j = Utils.SearchSortedRight(points, b) - 1;
+
+            double total = 0.0;
+
+            if (i == j)
+            {
+                // a 和 b 在同一分段内
+                total = (b - a) * values[i];
+            }
+            else
+            {
+                // 第一个分段：从 a 到第 i 个分段的末尾
+                total += (points[i + 1] - a) * values[i];
+                // i+1 到 j-1 之间的完整分段
+                total += cumsum[j] - cumsum[i + 1];
+                // 最后一个分段：从第 j 个分段的开始到 b
+                total += (b - points[j]) * values[j];
+            }
+
+            return total;
+        }
+
+        internal static bool[,] GetKeyUsage(EasyObject[] noteSeq, int K, int T, int[] baseCorners)
+        {
+            bool[,] keyUsage = new bool[K, baseCorners.Length];
+
+            foreach (var note in noteSeq)
+            {
+                int startTime = Math.Max(note.Head - 150, 0);
+                int endTime = !note.IsLong ? note.Head + 150 : Math.Min(note.Tail + 150, T - 1);
+                int leftIdx = Utils.SearchSortedLeft(baseCorners, startTime);
+                int rightIdx = Utils.SearchSortedLeft(baseCorners, endTime);
+                for (int i = leftIdx; i < rightIdx; i++) keyUsage[note.Key, i] = true;
+            }
+
+            return keyUsage;
+        }
+
+        internal static void GetCorners(EasyObject[] noteSeq, int T, out int[] baseCorners, out int[] aCorners, out int[] allCorners)
+        {
+            var baseSet = new HashSet<int>();
+
+            foreach (var note in noteSeq)
+            {
+                baseSet.Add(note.Head);
+                if (note.IsLong) baseSet.Add(note.Tail);
+            }
+
+            foreach (int s in baseSet.ToArray())
+            {
+                baseSet.Add(s + 501);
+                baseSet.Add(s - 499);
+                baseSet.Add(s + 1); // 在音符确切位置解决狄拉克增量问题
+            }
+
+            baseSet.Add(0);
+            baseSet.Add(T);
+            baseCorners = baseSet
+                          .Where(s => 0 <= s && s <= T)
+                          .OrderBy(s => s)
+                          .ToArray();
+
+            var aSet = new HashSet<int>();
+
+            foreach (var note in noteSeq)
+            {
+                aSet.Add(note.Head);
+                if (note.IsLong) aSet.Add(note.Tail);
+            }
+
+            foreach (int s in aSet.ToArray())
+            {
+                aSet.Add(s + 1000);
+                aSet.Add(s - 1000);
+            }
+
+            aSet.Add(0);
+            aSet.Add(T);
+            aCorners = aSet
+                       .Where(s => 0 <= s && s <= T)
+                       .OrderBy(s => s)
+                       .ToArray();
+
+            allCorners = baseCorners.Union(aCorners)
+                                    .OrderBy(s => s)
+                                    .ToArray();
+        }
+
+        internal static void PreProcess(EasyObject[] objects, int keys, double od, out double x, out int K, out int T,
+                                        out EasyObject[] noteSeq, out EasyObject[][] noteSeqByCol, out EasyObject[] lnSeq, out EasyObject[] tailSeq, out EasyObject[][] lnSeqByCol)
+        {
+            K = keys;
+            x = 0.3 * Math.Pow((64.5 - Math.Ceiling(od * 3)) / 500, 0.5);
+            x = Math.Min(x, 0.6 * (x - 0.09) + 0.09);
+
+            // 排序一次，后续复用这个排序结果
+            noteSeq = objects.OrderBy(n => n.Head).ThenBy(n => n.Key).ToArray();
+
+            // 创建包含 K 个空列表的数组
+            var noteColumns = new List<EasyObject>[K];
+            var lnColumns = new List<EasyObject>[K];
+            var lnNotes = new List<EasyObject>();
+
+            // 初始化所有列表
+            for (int k = 0; k < K; k++)
+            {
+                noteColumns[k] = new List<EasyObject>();
+                lnColumns[k] = new List<EasyObject>();
+            }
+
+            // 单次遍历，同时填充 noteColumns 和 lnColumns
+            foreach (var note in noteSeq)
+            {
+                int key = note.Key;
+
+                if (key >= 0 && key < K) // 确保 key 在有效范围内
+                {
+                    noteColumns[key].Add(note);
+
+                    if (note.IsLong)
+                    {
+                        lnNotes.Add(note);
+                        lnColumns[key].Add(note);
+                    }
+                }
+            }
+
+            // 将列表转换为数组
+            noteSeqByCol = new EasyObject[K][];
+            lnSeqByCol = new EasyObject[K][];
+
+            for (int k = 0; k < K; k++)
+            {
+                noteSeqByCol[k] = noteColumns[k].ToArray();
+                lnSeqByCol[k] = lnColumns[k].ToArray();
+            }
+
+            // 获取长音符数组和按尾部时间排序的长音符数组
+            lnSeq = lnNotes.ToArray();
+            tailSeq = lnSeq.OrderBy(n => n.Tail).ToArray();
+
+            // 计算总时长 T
+            if (tailSeq.Length > 0)
+                T = Math.Max(noteSeq[^1].Head, tailSeq[^1].Tail) + 1;
+            else
+                T = noteSeq[^1].Head + 1;
         }
 
         /// <summary>
@@ -552,8 +923,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     }
 
                     for (int i = 0; i < keys; i++)
+                    {
                         if (!confirmnull[i])
                             nullcolumnlist.Add(i);
+                    }
+
                     firstKeyFlag = false;
                 }
 
@@ -572,9 +946,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     var hold = new HoldNote();
                     int columnnum = locations[i].column;
                     int minuscolumn = 0;
+
                     foreach (int nul in nullcolumnlist)
+                    {
                         if (columnnum > nul)
                             minuscolumn++;
+                    }
+
                     columnnum -= minuscolumn;
                     int testcolumn = columnnum;
                     atLeast--;
@@ -682,9 +1060,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                                                                      && newColumnObjects[i].StartTime <= newColumnObjects[j].StartTime + 2) overlap = true;
 
                         if (newColumnObjects[j].StartTime != newColumnObjects[j].GetEndTime())
+                        {
                             if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
                                                                                          && newColumnObjects[i].StartTime <= newColumnObjects[j].GetEndTime() + 2)
                                 overlap = true;
+                        }
                     }
 
                     if (outindex) overlap = true;
@@ -767,8 +1147,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     if (obj.Column == column && starttime >= obj.StartTime && starttime <= obj.GetEndTime())
                     {
                         if (endtime != starttime)
+                        {
                             if (endtime >= obj.StartTime && endtime <= obj.GetEndTime())
                                 return true;
+                        }
+
                         return true;
                     }
                 }
@@ -801,8 +1184,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         if (hitobj[i].Column == hitobj[j].Column && hitobj[i].StartTime >= hitobj[j].StartTime - 2 && hitobj[i].StartTime <= hitobj[j].GetEndTime() + 2)
                         {
                             if (hitobj[i].GetEndTime() != hitobj[j].StartTime)
+                            {
                                 if (hitobj[i].GetEndTime() >= hitobj[j].StartTime - 2 && hitobj[i].GetEndTime() <= hitobj[j].GetEndTime() + 2)
                                     return true;
+                            }
+
                             return true;
                         }
                     }
@@ -1001,15 +1387,21 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
 
             for (int i = 0; i < toKey; i++)
+            {
                 if (!confirmNull[i])
                     nullColumnList.Add(i);
+            }
 
             for (int i = 0; i < locations.Count; i++)
             {
                 int minusColumn = 0;
+
                 foreach (int nul in nullColumnList)
+                {
                     if (locations[i].column > nul)
                         minusColumn++;
+                }
+
                 var thisLocations = locations[i];
                 thisLocations.column -= minusColumn;
                 locations[i] = thisLocations;

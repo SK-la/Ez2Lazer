@@ -32,6 +32,8 @@ namespace osu.Game.Screens.SelectV2
     {
         private const float corner_radius = 10;
 
+        public static WorkingBeatmap SelectedWorkingBeatmap = null!;
+
         [Resolved]
         private IBindable<WorkingBeatmap> working { get; set; } = null!;
 
@@ -182,7 +184,11 @@ namespace osu.Game.Screens.SelectV2
         {
             base.LoadComplete();
 
-            working.BindValueChanged(_ => updateDisplay());
+            working.BindValueChanged(value =>
+            {
+                SelectedWorkingBeatmap = value.NewValue;
+                updateDisplay();
+            });
             ruleset.BindValueChanged(_ => updateDisplay());
             onlineLookupResult.BindValueChanged(_ => updateDisplay());
 

@@ -16,6 +16,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
@@ -23,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
     {
         public override string Name => "Nk to Mk Converter";
 
-        public override string Acronym => "NTM";  //Nk to Mk Letter
+        public override string Acronym => "NTM"; //Nk to Mk Letter
 
         public override double ScoreMultiplier => 1;
 
@@ -34,6 +35,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override ModType Type => ModType.CustomMod;
 
         public override bool Ranked => false;
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Probability", $"{Probability.Value}%");
+                yield return ("Key", $"{Key.Value}");
+                yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+            }
+        }
 
         [SettingSource("Probability", "Needed convert column movement probability")]
         public BindableNumber<int> Probability { get; set; } = new BindableInt(70)
@@ -60,10 +71,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             float keys = mbc.TotalColumns;
 
-            if (keys > 9 || Key.Value <= keys)
-            {
-                return;
-            }
+            if (keys > 9 || Key.Value <= keys) return;
 
             mbc.TargetColumns = Key.Value;
         }
@@ -78,10 +86,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             int keys = (int)maniaBeatmap.Difficulty.CircleSize;
 
-            if (keys > 9 || Key.Value <= keys)
-            {
-                return;
-            }
+            if (keys > 9 || Key.Value <= keys) return;
 
             var newObjects = new List<ManiaHitObject>();
 
@@ -90,21 +95,21 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var fixedColumnObjects = new List<ManiaHitObject>();
 
             var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n =>
-            (
-                startTime: n.StartTime,
-                samples: n.Samples,
-                column: n.Column,
-                endTime: n.StartTime,
-                duration: n.StartTime - n.StartTime
-            ))
-            .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
-            (
-                startTime: h.StartTime,
-                samples: h.Samples,
-                column: h.Column,
-                endTime: h.EndTime,
-                duration: h.EndTime - h.StartTime
-            ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+                                        (
+                                            startTime: n.StartTime,
+                                            samples: n.Samples,
+                                            column: n.Column,
+                                            endTime: n.StartTime,
+                                            duration: n.StartTime - n.StartTime
+                                        ))
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
+                                        (
+                                            startTime: h.StartTime,
+                                            samples: h.Samples,
+                                            column: h.Column,
+                                            endTime: h.EndTime,
+                                            duration: h.EndTime - h.StartTime
+                                        ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
 
             #region Null column
 
@@ -112,33 +117,27 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             bool firstKeyFlag = true;
 
             int emptyColumn = Rng.Next(-1, 1 + keyValue - 2);
+
             while (keyValue <= Key.Value)
             {
                 var confirmNull = new List<bool>();
-                for (int i = 0; i <= Key.Value; i++)
-                {
-                    confirmNull.Add(false);
-                }
+                for (int i = 0; i <= Key.Value; i++) confirmNull.Add(false);
                 var nullColumnList = new List<int>();
+
                 if (firstKeyFlag)
                 {
                     foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
                     {
                         int count = column.Count();
-                        if (!confirmNull[column.Key] && count != 0)
-                        {
-                            confirmNull[column.Key] = true;
-                        }
+                        if (!confirmNull[column.Key] && count != 0) confirmNull[column.Key] = true;
                     }
+
                     for (int i = 0; i < Key.Value; i++)
-                    {
                         if (!confirmNull[i])
-                        {
                             nullColumnList.Add(i);
-                        }
-                    }
                     firstKeyFlag = false;
                 }
+
                 int atLeast = 5;
                 double changeTime = 0;
 
@@ -154,12 +153,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     int columnNum = locations[i].column;
                     int minusColumn = 0;
                     foreach (int nul in nullColumnList)
-                    {
                         if (columnNum > nul)
-                        {
                             minusColumn++;
-                        }
-                    }
                     columnNum -= minusColumn;
 
                     #endregion
@@ -182,9 +177,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     bool error = changeTime != locations[i].startTime;
 
                     if (keys < 4) // why you are converting 1k 2k 3k into upper keys?
-                    {
                         columnNum = Rng.Next(keyValue);
-                    }
                     else
                     {
                         if (error && Rng.Next(100) < Probability.Value && atLeast < 0)
@@ -193,10 +186,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             atLeast = keys - 2;
                             next = true;
                         }
+
                         if (next && plus)
                         {
                             next = false;
                             emptyColumn++;
+
                             if (emptyColumn > keyValue - 2)
                             {
                                 plus = !plus;
@@ -208,6 +203,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         {
                             next = false;
                             emptyColumn--;
+
                             if (emptyColumn < -1)
                             {
                                 plus = !plus;
@@ -216,27 +212,21 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
 
-                        if (columnNum > emptyColumn)
-                        {
-                            columnNum++;
-                        }
+                        if (columnNum > emptyColumn) columnNum++;
                     }
 
                     bool overlap = ManiaModHelper.FindOverlapInList(newColumnObjects, columnNum, locations[i].startTime, locations[i].endTime);
+
                     if (overlap)
                     {
                         for (int k = 0; k < keyValue; k++)
                         {
                             if (!ManiaModHelper.FindOverlapInList(newColumnObjects, columnNum - k, locations[i].startTime, locations[i].endTime) && columnNum - k >= 0)
-                            {
                                 columnNum -= k;
-                            }
-                            else if (!ManiaModHelper.FindOverlapInList(newColumnObjects, columnNum + k, locations[i].startTime, locations[i].endTime) && columnNum + k <= keyValue - 1)
-                            {
-                                columnNum += k;
-                            }
+                            else if (!ManiaModHelper.FindOverlapInList(newColumnObjects, columnNum + k, locations[i].startTime, locations[i].endTime) && columnNum + k <= keyValue - 1) columnNum += k;
                         }
                     }
+
                     if (isLN)
                     {
                         newColumnObjects.Add(new HoldNote
@@ -261,46 +251,39 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 for (int i = 0; i < newColumnObjects.Count; i++)
                 {
                     bool overlap = false, outIndex = false;
+
                     if (newColumnObjects[i].Column < 0 || newColumnObjects[i].Column > Key.Value - 1)
                     {
                         outIndex = true;
                         newColumnObjects[i].Column = Rng.Next(Key.Value - 1);
                     }
+
                     for (int j = i + 1; j < newColumnObjects.Count; j++)
                     {
-                        if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2 && newColumnObjects[i].StartTime <= newColumnObjects[j].StartTime + 2)
-                        {
-                            overlap = true;
-                        }
+                        if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
+                                                                                     && newColumnObjects[i].StartTime <= newColumnObjects[j].StartTime + 2) overlap = true;
+
                         if (newColumnObjects[j].StartTime != newColumnObjects[j].GetEndTime())
-                        {
-                            if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2 && newColumnObjects[i].StartTime <= newColumnObjects[j].GetEndTime() + 2)
-                            {
+                            if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
+                                                                                         && newColumnObjects[i].StartTime <= newColumnObjects[j].GetEndTime() + 2)
                                 overlap = true;
-                            }
-                        }
                     }
-                    if (outIndex)
-                    {
-                        overlap = true;
-                    }
+
+                    if (outIndex) overlap = true;
+
                     if (!overlap)
-                    {
                         fixedColumnObjects.Add(newColumnObjects[i]);
-                    }
                     else
                     {
                         for (int k = 0; k < keyValue; k++)
                         {
-                            if (!ManiaModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column - k).ToList()) && newColumnObjects[i].Column - k >= 0)
-                            {
+                            if (!ManiaModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column - k).ToList())
+                                && newColumnObjects[i].Column - k >= 0)
                                 newColumnObjects[i].Column -= k;
-                            }
-                            else if (!ManiaModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column + k).ToList()) && newColumnObjects[i].Column + k <= keyValue - 1)
-                            {
-                                newColumnObjects[i].Column += k;
-                            }
+                            else if (!ManiaModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column + k).ToList())
+                                     && newColumnObjects[i].Column + k <= keyValue - 1) newColumnObjects[i].Column += k;
                         }
+
                         fixedColumnObjects.Add(newColumnObjects[i]);
                     }
                 }
@@ -311,29 +294,28 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     keyValue = keys + 1;
 
                     locations = fixedColumnObjects.OfType<Note>().Select(n =>
-                    (
-                        startTime: n.StartTime,
-                        samples: n.Samples,
-                        column: n.Column,
-                        endTime: n.StartTime,
-                        duration: n.StartTime - n.StartTime
-                    ))
-                    .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h =>
-                    (
-                        startTime: h.StartTime,
-                        samples: h.Samples,
-                        column: h.Column,
-                        endTime: h.EndTime,
-                        duration: h.EndTime - h.StartTime
-                    ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList(); ;
+                                                  (
+                                                      startTime: n.StartTime,
+                                                      samples: n.Samples,
+                                                      column: n.Column,
+                                                      endTime: n.StartTime,
+                                                      duration: n.StartTime - n.StartTime
+                                                  ))
+                                                  .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h =>
+                                                  (
+                                                      startTime: h.StartTime,
+                                                      samples: h.Samples,
+                                                      column: h.Column,
+                                                      endTime: h.EndTime,
+                                                      duration: h.EndTime - h.StartTime
+                                                  ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+                    ;
                     emptyColumn = -1;
                     fixedColumnObjects.Clear();
                     newColumnObjects.Clear();
                 }
                 else
-                {
                     break;
-                }
             }
 
             newObjects.AddRange(fixedColumnObjects);

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
@@ -19,33 +20,28 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModLNTransformer : Mod, IApplicableAfterBeatmapConversion, IHasSeed
+    public class ManiaModLNTransformer : ManiaModLN, IApplicableAfterBeatmapConversion
     {
         public override string Name => "LN Transformer";
 
         public override string Acronym => "LT";
 
-        public override double ScoreMultiplier => 1;
-
         public override LocalisableString Description => "From YuLiangSSS' Tool";// "From YuLiangSSS' LN Transformer.";
-
-        public override IconUsage? Icon => FontAwesome.Solid.YinYang;
-
-        public override ModType Type => ModType.CustomMod;
-
-        public override bool Ranked => false;
 
         public readonly double ERROR = 2;
 
-        [SettingSource("Divide", "Use 1/?")]
-        public BindableNumber<int> Divide { get; set; } = new BindableInt(4)
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
-            MinValue = 1,
-            MaxValue = 16,
-            Precision = 1,
-        };
+            get
+            {
+                yield return ("Level", $"{Level.Value}");
 
-        [SettingSource("Level", "LN Transform Level  (-3: Hold Off   -2: Real RandomLN(Random ms)   -1: RandomLN(Random TimingPoint)   0: RegularLN   3: LightLN   5: MediumLN   8: HeavyLN   10: FullLN)")]
+                foreach (var (setting, value) in base.SettingDescription)
+                    yield return (setting, value);
+            }
+        }
+
+        [SettingSource("Level", "LN Transform Level  (-3: Hold Off   -2: Real RandomLN(Random ms)   -1: RandomLN(Random TimingPoint)   0: RegularLN   3: LightLN   5: MediumLN   8: HeavyLN   10: FullLN)", 0)]
         public BindableNumber<int> Level { get; set; } = new BindableInt(3)
         {
             MinValue = -3,
@@ -53,72 +49,60 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1,
         };
 
-        [SettingSource("Percentage", "LN Content")]
-        public BindableNumber<int> Percentage { get; set; } = new BindableInt(100)
-        {
-            MinValue = 0,
-            MaxValue = 100,
-            Precision = 5,
-        };
-
-        [SettingSource("Original LN", "Original LN won't be converted.")]
-        public BindableBool OriginalLN { get; set; } = new BindableBool(false);
-
-        [SettingSource("Column Num", "Select the number of column to transform(Transform all columns if set to equal or greater than keys).")]
-        public BindableInt SelectColumn { get; set; } = new BindableInt(20)
-        {
-            MinValue = 0,
-            MaxValue = 20,
-            Precision = 1,
-        };
-
-        [SettingSource("Gap", "For changing random columns after transforming the gap's number of notes(set to 0 then the selected columns for transforming will not move).")]
-        public BindableInt Gap { get; set; } = new BindableInt(12)
-        {
-            MinValue = 0,
-            MaxValue = 20,
-            Precision = 1,
-        };
-
-        [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
-        public Bindable<int?> Seed { get; } = new Bindable<int?>();
-
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            if (SelectColumn.Value == 0)
-            {
-                return;
-            }
             var maniaBeatmap = (ManiaBeatmap)beatmap;
-            var newObjects = new List<ManiaHitObject>();
             int keys = maniaBeatmap.TotalColumns;
-            var oldObjects = maniaBeatmap.HitObjects.ToList();
-            var originalLNObjects = new List<ManiaHitObject>();
 
             Random? Rng;
             Seed.Value ??= RNG.Next();
             Rng = new Random((int)Seed.Value);
 
+            var newObjects = new List<ManiaHitObject>();
+            var oldObjects = maniaBeatmap.HitObjects.ToList();
+            var originalLNObjects = new List<ManiaHitObject>();
+
             if (Level.Value == -3)
             {
-                foreach (var hold in beatmap.HitObjects.OfType<HoldNote>())
+                int transformColumnNum = SelectColumn.Value;
+
+                if (transformColumnNum > keys)
                 {
-                    newObjects.Add(new Note
+                    transformColumnNum = keys;
+                }
+                var randomColumnSet = ManiaModHelper.SelectRandom(Enumerable.Range(0, keys), Rng, transformColumnNum == 0 ? keys : transformColumnNum).ToHashSet();
+                int gap = Gap.Value;
+
+                foreach (var timeGroup in oldObjects.GroupBy(x => x.StartTime))
+                {
+                    foreach (var note in timeGroup)
                     {
-                        Column = hold.Column,
-                        StartTime = hold.StartTime,
-                        Samples = hold.GetNodeSamples(0)
-                    });
+                        if (randomColumnSet.Contains(note.Column) && Rng.Next(100) < Percentage.Value)
+                        {
+                            newObjects.Add(new Note
+                            {
+                                Column = note.Column,
+                                StartTime = note.StartTime,
+                                Samples = note.Samples
+                            });
+                        }
+                        else
+                        {
+                            newObjects.Add(note);
+                        }
+                    }
+
+                    gap--;
+                    if (gap <= 0)
+                    {
+                        randomColumnSet = ManiaModHelper.SelectRandom(Enumerable.Range(0, keys), Rng, transformColumnNum).ToHashSet();
+                        gap = Gap.Value;
+                    }
                 }
 
-                maniaBeatmap.HitObjects = maniaBeatmap.HitObjects.OfType<Note>().Concat(newObjects).OrderBy(h => h.StartTime).ToList();
+                maniaBeatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ToList();
                 return;
             }
-
-            //if (SelectColumn.Value < keys)
-            //{
-            //    ManiaModHelper.SelectNumber(Rng, notTransformColumn, SelectColumn.Value, keys - SelectColumn.Value, false);
-            //}  // Do not transform these columns.
 
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
@@ -203,7 +187,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
             }
 
-            ManiaModHelper.AfterTransform(newObjects, originalLNObjects, beatmap, Rng, OriginalLN.Value, Gap.Value, SelectColumn.Value);
+            ManiaModHelper.AfterTransform(newObjects, originalLNObjects, beatmap, Rng, OriginalLN.Value, Gap.Value, SelectColumn.Value, DurationLimit.Value, LineSpacing.Value, InvertLineSpacing.Value);
+            maniaBeatmap.Breaks.Clear();
         }
 
         public List<ManiaHitObject> Invert(IBeatmap beatmap, List<ManiaHitObject> newObjects, Random Rng, IGrouping<int, ManiaHitObject> column)
@@ -226,7 +211,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 // Beat length at the end of the hold note.
                 double beatLength = beatmap.ControlPointInfo.TimingPointAt(locations[i + 1].startTime).BeatLength;
                 bool flag = true;
-                double duration = fullDuration - beatLength / Divide.Value;
+                double duration = fullDuration - (beatLength / Divide.Value);
 
                 if (duration < beatLength / Divide.Value)
                 {
@@ -334,7 +319,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             bool flag = true;
 
-            double duration = fullDuration - beatLength / Divide.Value;
+            double duration = fullDuration - (beatLength / Divide.Value);
 
             if (duration < beatLength / Divide.Value)
             {

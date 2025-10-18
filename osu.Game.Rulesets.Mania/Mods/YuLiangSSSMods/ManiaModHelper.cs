@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MongoDB.Bson.Serialization.Serializers;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -22,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
                                   .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
                                   {
-                                          (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
+                                      (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
                                       //(startTime: h.EndTime, samples: h.GetNodeSamples(1))
                                   }))
                                   .OrderBy(h => h.startTime).ToList();
@@ -36,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         Column = column.Key,
                         StartTime = locations[i].startTime,
                         EndTime = locations[i].endTime,
-                        NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()],
+                        NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                     });
                 }
                 else
@@ -54,14 +55,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         }
 
         [Obsolete]
-        public static void Transform(Random Rng, double mu, double sigmaDivisor, int divide, int percentage, double error, bool originalLN, IBeatmap beatmap, List<ManiaHitObject> newObjects, List<ManiaHitObject> oldObjects, int gap = -1, int forTransformColumnNum = 0, int divide2 = -1, double mu2 = -2, double mu1Dmu2 = -1)
+        public static void Transform(Random Rng, double mu, double sigmaDivisor, int divide, int percentage, double error, bool originalLN, IBeatmap beatmap, List<ManiaHitObject> newObjects,
+                                     List<ManiaHitObject> oldObjects, int gap = -1, int forTransformColumnNum = 0, int divide2 = -1, double mu2 = -2, double mu1Dmu2 = -1)
         {
             var locations = oldObjects.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                                  .Concat(oldObjects.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
+                                      .Concat(oldObjects.OfType<HoldNote>().SelectMany(h => new[]
+                                      {
                                           (column: h.Column, startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
-                                  }))
-                                  .OrderBy(h => h.startTime).ToList();
+                                      }))
+                                      .OrderBy(h => h.startTime).ToList();
             var maniaBeatmap = (ManiaBeatmap)beatmap;
             int keys = maniaBeatmap.TotalColumns;
             int maxGap = gap;
@@ -83,30 +85,29 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         }
                         else
                         {
-                            noteList[note.column] = (noteList[note.column].thisStartTime, noteList[note.column].thisEndTime, noteList[note.column].thisLN, note.startTime, note.endTime, note.startTime != note.endTime);
+                            noteList[note.column] = (noteList[note.column].thisStartTime, noteList[note.column].thisEndTime, noteList[note.column].thisLN, note.startTime, note.endTime,
+                                note.startTime != note.endTime);
                             sampleList[note.column] = (sampleList[note.column].thisSample, note.samples);
 
                             double fullDuration = noteList[note.column].thisStartTime - noteList[note.column].lastStartTime;
 
                             double duration = GetDurationByDistribution(Rng, beatmap, noteList[note.column].lastStartTime, fullDuration, mu, sigmaDivisor, divide, error, divide2, mu2, mu1Dmu2);
 
-                            JudgementToNote(Rng, newObjects, noteList[note.column].lastStartTime, note.column, noteList[note.column].lastEndTime, sampleList[note.column].lastSample, originalLN, noteList[note.column].lastLN, percentage, duration);
+                            JudgementToNote(Rng, newObjects, noteList[note.column].lastStartTime, note.column, noteList[note.column].lastEndTime, sampleList[note.column].lastSample, originalLN,
+                                noteList[note.column].lastLN, percentage, duration);
                         }
                     }
                     else
                     {
                         if (note.startTime != note.endTime && originalLN)
-                        {
                             newObjects.AddNote(note.samples, note.column, note.startTime, note.endTime);
-                        }
                         else
-                        {
                             newObjects.AddNote(note.samples, note.column, note.startTime);
-                        }
                     }
                 }
 
                 gap--;
+
                 if (gap == 0)
                 {
                     randomColumnList = SelectRandom(Enumerable.Range(0, keys), Rng, forTransformColumnNum).ToList();
@@ -124,34 +125,26 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
                     JudgementToNote(Rng, newObjects, noteList[i].lastStartTime, i, noteList[i].lastEndTime, sampleList[i].lastSample, originalLN, noteList[i].lastLN, percentage, duration);
                 }
+
                 if (!double.IsNaN(noteList[i].thisStartTime))
                 {
                     if (Rng.Next(100) >= percentage || Math.Abs(noteList[i].thisEndTime - noteList[i].thisStartTime) <= error)
-                    {
                         newObjects.AddNote(sampleList[i].thisSample, i, noteList[i].thisStartTime);
-                    }
                     else
-                    {
                         newObjects.AddNote(sampleList[i].thisSample, i, noteList[i].thisStartTime, noteList[i].thisEndTime);
-                    }
                 }
             }
         }
 
-        public static void JudgementToNote(Random Rng, List<ManiaHitObject> newObjects, double startTime, int column, double endTime, IList<HitSampleInfo> samples, bool originalLN, bool isLN, int percentage, double duration)
+        public static void JudgementToNote(Random Rng, List<ManiaHitObject> newObjects, double startTime, int column, double endTime, IList<HitSampleInfo> samples, bool originalLN, bool isLN,
+                                           int percentage, double duration)
         {
             if (originalLN && isLN)
-            {
                 newObjects.AddNote(samples, column, startTime, endTime);
-            }
             else if (Rng.Next(100) < percentage && !double.IsNaN(duration))
-            {
                 newObjects.AddLNByDuration(samples, column, startTime, duration);
-            }
             else
-            {
                 newObjects.AddNote(samples, column, startTime);
-            }
         }
 
         /// <summary>
@@ -171,17 +164,19 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         /// <param name="mu2"></param>
         /// <param name="mu1Dmu2"></param>
         /// <returns></returns>
-        public static List<ManiaHitObject> Transform(Random Rng, double mu, double sigmaDivisor, int divide, int percentage, double error, bool originalLN, IBeatmap beatmap, List<ManiaHitObject> newObjects,
-            IGrouping<int, ManiaHitObject> column, int divide2 = -1, double mu2 = -2, double mu1Dmu2 = -1)
+        public static List<ManiaHitObject> Transform(Random Rng, double mu, double sigmaDivisor, int divide, int percentage, double error, bool originalLN, IBeatmap beatmap,
+                                                     List<ManiaHitObject> newObjects,
+                                                     IGrouping<int, ManiaHitObject> column, int divide2 = -1, double mu2 = -2, double mu1Dmu2 = -1)
         {
             var originalLNObjects = new List<ManiaHitObject>();
             var newColumnObjects = new List<ManiaHitObject>();
             var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
                                   .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
                                   {
-                                          (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
+                                      (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
                                   }))
                                   .OrderBy(h => h.startTime).ToList();
+
             for (int i = 0; i < locations.Count - 1; i++)
             {
                 double offset = locations[0].startTime;
@@ -198,16 +193,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     originalLNObjects.AddNote(locations[i].samples, column.Key, locations[i].startTime, locations[i].endTime);
                 }
                 else if (Rng.Next(100) < percentage && !double.IsNaN(duration))
-                {
                     newColumnObjects.AddLNByDuration(locations[i].samples, column.Key, locations[i].startTime, duration);
-                }
                 else
-                {
                     newColumnObjects.AddNote(locations[i].samples, column.Key, locations[i].startTime);
-                }
             }
 
-            // Dispose last note on every column
+            // Dispose last note on the column
 
             if (Math.Abs(locations[locations.Count - 1].startTime - locations[locations.Count - 1].endTime) <= error || Rng.Next(100) >= percentage)
             {
@@ -234,7 +225,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return originalLNObjects;
         }
 
-        public static double GetDurationByDistribution(Random Rng, IBeatmap beatmap, double startTime, double limitDuration, double mu, double sigmaDivisor, int divide, double error, int divide2 = -1, double mu2 = -2, double mu1Dmu2 = -1)
+        public static double GetDurationByDistribution(Random Rng, IBeatmap beatmap, double startTime, double limitDuration, double mu, double sigmaDivisor, int divide, double error, int divide2 = -1,
+                                                       double mu2 = -2, double mu1Dmu2 = -1)
         {
             // Beat length at the end of the hold note.
             double beatLength = beatmap.ControlPointInfo.TimingPointAt(startTime).BeatLength;
@@ -260,9 +252,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             if (mu == -1)
             {
                 if (timenum < 1)
-                {
                     duration = timeDivide;
-                }
                 else
                 {
                     rdtime = Rng.Next(1, timenum);
@@ -277,55 +267,84 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 duration = TimeRound(timeDivide, duration);
             }
 
-            if (duration <= timeDivide)
-            {
-                duration = timeDivide;
-            }
+            if (duration <= timeDivide) duration = timeDivide;
 
             if (duration >= limitDuration - error) // Additional processing.
-            {
                 flag = false;
-            }
 
             return flag ? duration : double.NaN;
         }
 
-        public static void AfterTransform(List<ManiaHitObject> afterObjects, List<ManiaHitObject> originalLNObjects, IBeatmap beatmap, Random Rng, bool originalLN, int gap = -1, int transformColumnNum = 0)
+        public static void AfterTransform(List<ManiaHitObject> afterObjects, List<ManiaHitObject> originalLNObjects, IBeatmap beatmap, Random Rng, bool originalLN, int gap = -1,
+                                          int transformColumnNum = 0, double limitDuration = 0, int lineSpacing = 0, bool invertSpacing = false)
         {
             var maniaBeatmap = (ManiaBeatmap)beatmap;
             var resultObjects = new List<ManiaHitObject>();
             var originalLNSet = new HashSet<ManiaHitObject>(originalLNObjects);
             int keys = maniaBeatmap.TotalColumns;
-            int maxGap = gap;
-            if (transformColumnNum > keys)
-            {
-                transformColumnNum = keys;
-            }
+            if (transformColumnNum > keys) transformColumnNum = keys;
             var randomColumnSet = SelectRandom(Enumerable.Range(0, keys), Rng, transformColumnNum == 0 ? keys : transformColumnNum).ToHashSet();
+
+            int maxGap = gap;
 
             foreach (var timeGroup in afterObjects.GroupBy(h => h.StartTime))
             {
                 foreach (var note in timeGroup)
                 {
                     if (originalLNSet.Contains(note) && originalLN)
-                    {
                         resultObjects.Add(note);
-                    }
-                    else if (randomColumnSet.Contains(note.Column) && note.StartTime != note.GetEndTime())
-                    {
+                    else if (randomColumnSet.Contains(note.Column) && note.StartTime != note.GetEndTime()
+                                                                   && ((limitDuration > 0 && note.GetEndTime() - note.StartTime <= limitDuration * 1000) || limitDuration == 0))
                         resultObjects.Add(note);
-                    }
                     else
-                    {
                         resultObjects.AddNote(note.Samples, note.Column, note.StartTime);
-                    }
                 }
 
                 gap--;
+
                 if (gap == 0)
                 {
                     randomColumnSet = SelectRandom(Enumerable.Range(0, keys), Rng, transformColumnNum).ToHashSet();
                     gap = maxGap;
+                }
+            }
+
+            int maxSpacing = lineSpacing;
+
+            if (maxSpacing > 0)
+            {
+                afterObjects = resultObjects.OrderBy(h => h.StartTime).ToList();
+                resultObjects = new List<ManiaHitObject>();
+
+                foreach (var timeGroup in afterObjects.GroupBy(h => h.StartTime))
+                {
+                    foreach (var note in timeGroup)
+                    {
+                        if (originalLNSet.Contains(note) && originalLN)
+                        {
+                            resultObjects.Add(note);
+                            continue;
+                        }
+
+                        if (invertSpacing)
+                        {
+                            if (lineSpacing > 0)
+                                resultObjects.Add(note);
+                            else
+                                resultObjects.AddNote(note.Samples, note.Column, note.StartTime);
+                        }
+                        else
+                        {
+                            if (lineSpacing > 0)
+                                resultObjects.AddNote(note.Samples, note.Column, note.StartTime);
+                            else
+                                resultObjects.Add(note);
+                        }
+                    }
+
+                    lineSpacing--;
+
+                    if (lineSpacing < 0) lineSpacing = maxSpacing;
                 }
             }
 
@@ -336,16 +355,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public static double RandDistribution(Random Rng, double u, double d)
         {
             double u1, u2, z, x;
-            if (d <= 0)
-            {
-                return u;
-            }
+            if (d <= 0) return u;
             u1 = Rng.NextDouble();
             u2 = Rng.NextDouble();
             z = Math.Sqrt(-2 * Math.Log(u1)) * Math.Sin(2 * Math.PI * u2);
             x = u + d * z;
             return x;
         }
+
         public static double TimeRound(double timedivide, double num)
         {
             double remainder = num % timedivide;
@@ -373,6 +390,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 else
                     time = tem;
             }
+
             return time;
             //try
             //{
@@ -391,21 +409,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public static bool SelectRandomNumberForThis(this List<int> list, Random Rng, int minValue, int maxValue, int times, bool duplicate = false)
         {
             if (duplicate)
-            {
                 for (int i = 0; i < times; i++)
-                {
                     list.Add(Rng.Next(minValue, maxValue));
-                }
-            }
             else
             {
-                if (maxValue - minValue < times)
-                {
-                    return false;
-                }
+                if (maxValue - minValue < times) return false;
+
                 while (times > 0)
                 {
                     int num = Rng.Next(minValue, maxValue);
+
                     if (!list.Contains(num))
                     {
                         list.Add(num);
@@ -413,6 +426,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     }
                 }
             }
+
             return true;
         }
 
@@ -423,10 +437,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public static IEnumerable<T> SelectRandom<T>(this IEnumerable<T> enumerable, Random Rng, int times = 1, bool duplicate = false)
         {
-            if (times <= 0)
-            {
-                return Enumerable.Empty<T>();
-            }
+            if (times <= 0) return Enumerable.Empty<T>();
 
             var result = new List<T>();
             var list = enumerable.ToList();
@@ -450,6 +461,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     times--;
                 }
             }
+
             return result.AsEnumerable();
         }
 
@@ -462,7 +474,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             if (endTime is null || endTime == startTime)
             {
-                obj.Add(new Note()
+                obj.Add(new Note
                 {
                     Column = column,
                     StartTime = startTime,
@@ -470,9 +482,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 });
             }
             else
-            {
                 obj.AddLNByDuration(samples, column, startTime, (double)endTime - startTime);
-            }
         }
 
         public static void RemoveNote(this List<ManiaHitObject> obj, int column, double startTime)
@@ -489,7 +499,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public static void AddLNByDuration(this List<ManiaHitObject> obj, IList<HitSampleInfo> samples, int column, double startTime, double duration)
         {
-            obj.Add(new HoldNote()
+            obj.Add(new HoldNote
             {
                 Column = column,
                 StartTime = startTime,
@@ -502,25 +512,20 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             foreach (var obj in hitobj)
             {
-                if (obj.Column == column && starttime <= obj.StartTime && starttime >= obj.StartTime)
-                {
-                    return true;
-                }
+                if (obj.Column == column && starttime <= obj.StartTime && starttime >= obj.StartTime) return true;
+
                 if (obj.StartTime != obj.GetEndTime())
                 {
                     if (obj.Column == column && starttime >= obj.StartTime && starttime <= obj.GetEndTime())
                     {
                         if (endtime != starttime)
-                        {
                             if (endtime >= obj.StartTime && endtime <= obj.GetEndTime())
-                            {
                                 return true;
-                            }
-                        }
                         return true;
                     }
                 }
             }
+
             return false;
         }
 
@@ -541,39 +546,36 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             {
                 for (int j = i + 1; j < hitobj.Count; j++)
                 {
-                    if (hitobj[i].Column == hitobj[j].Column && hitobj[i].StartTime == hitobj[j].StartTime)
-                    {
-                        return true;
-                    }
+                    if (hitobj[i].Column == hitobj[j].Column && hitobj[i].StartTime == hitobj[j].StartTime) return true;
+
                     if (hitobj[j].StartTime != hitobj[j].GetEndTime())
                     {
                         if (hitobj[i].Column == hitobj[j].Column && hitobj[i].StartTime >= hitobj[j].StartTime - 2 && hitobj[i].StartTime <= hitobj[j].GetEndTime() + 2)
                         {
                             if (hitobj[i].GetEndTime() != hitobj[j].StartTime)
-                            {
                                 if (hitobj[i].GetEndTime() >= hitobj[j].StartTime - 2 && hitobj[i].GetEndTime() <= hitobj[j].GetEndTime() + 2)
-                                {
                                     return true;
-                                }
-                            }
                             return true;
                         }
                     }
                 }
             }
+
             return false;
         }
 
         public static IEnumerable<T> ShuffleIndex<T>(this IEnumerable<T> list, Random rng)
         {
-            List<T> result = list.ToList();
+            var result = list.ToList();
+
             for (int i = 0; i < result.Count; i++)
             {
                 int toIndex = rng.Next(result.Count);
-                T temp = result[i];
+                var temp = result[i];
                 result[i] = result[toIndex];
                 result[toIndex] = temp;
             }
+
             return result.AsEnumerable();
         }
     }

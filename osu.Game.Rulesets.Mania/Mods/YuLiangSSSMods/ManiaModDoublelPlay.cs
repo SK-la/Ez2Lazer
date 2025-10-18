@@ -32,6 +32,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Style", $"Style {Style.Value}");
+            }
+        }
+
         [SettingSource("Style", "1: NM+NM   2: MR+MR   3: NM+MR   4: MR+NM   5: Bracket NM+NM   6: Bracket MR   7: Wide Bracket   8: Wide Bracket MR")]
         public BindableNumber<int> Style { get; } = new BindableInt(1)
         {

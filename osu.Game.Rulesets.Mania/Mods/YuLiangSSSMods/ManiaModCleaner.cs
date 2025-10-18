@@ -32,6 +32,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Style", $"{Style.Value}");
+                yield return ("Interval", $"{Interval.Value}ms");
+                yield return ("LN Interval", $"{LNInterval.Value}ms");
+            }
+        }
+
         [SettingSource("Style", "Choose your style.")]
         public BindableNumber<int> Style { get; set; } = new BindableInt(2)
         {

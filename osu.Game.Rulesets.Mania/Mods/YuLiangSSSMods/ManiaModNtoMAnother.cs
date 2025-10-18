@@ -40,7 +40,31 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        [SettingSource("Key", "To Keys")]
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Key", $"{Key.Value}");
+                yield return ("Blank Column", $"{BlankColumn.Value}");
+                yield return ("Gap", $"{Gap.Value}");
+                if (Clean.Value)
+                {
+                    yield return ("Clean", Clean.Value ? "On" : "Off");
+                    yield return ("Clean Divide", $"1/{CleanDivide.Value}");
+                }
+                if (Adjust4Jack.Value)
+                {
+                    yield return ("1/4 Jack", Adjust4Jack.Value ? "On" : "Off");
+                }
+                if (Adjust4Speed.Value)
+                {
+                    yield return ("1/4 Speed", Adjust4Speed.Value ? "On" : "Off");
+                }
+                yield return ("Seed", $"Seed {(Seed.Value is null ? "Null" : Seed.Value)}");
+            }
+        }
+
+        [SettingSource("Key", "To Keys(Can only convert lower keys to higher keys.)")]
         public BindableNumber<int> Key { get; set; } = new BindableInt(8)
         {
             MinValue = 2,
@@ -74,6 +98,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 16,
             Precision = 1
         };
+
+        [SettingSource("1/4 Jack", "(Like 100+ BPM 1/4 Jack)Clean Divide * 1/2, for 1/4 Jack, avoiding cleaning 1/4 Jack.")]
+        public BindableBool Adjust4Jack { get; set; } = new BindableBool(false);
+
+        [SettingSource("1/4 Speed", "(Like 300+ BPM 1/4 Speed)Clean Divide * 2, for 1/4 Speed, avoiding additional 1/2 Jack.")]
+        public BindableBool Adjust4Speed { get; set; } = new BindableBool(false);
 
         [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
@@ -208,7 +238,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     sumTime = 0;
                     // Process area
-                    var processed = ProcessArea(maniaBeatmap, Rng, area, keys, Key.Value, blank, CleanDivide.Value, ERROR, checkList);
+                    int cleanDivide = CleanDivide.Value;
+                    if (Adjust4Jack.Value)
+                    {
+                        cleanDivide *= 2;
+                    }
+                    if (Adjust4Speed.Value)
+                    {
+                        cleanDivide /= 2;
+                    }
+                    var processed = ProcessArea(maniaBeatmap, Rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
                     newObjects.AddRange(processed.result);
                     checkList = processed.checkList.ToList();
                     area.Clear();
@@ -217,7 +256,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             if (area.Count > 0)
             {
-                var processed = ProcessArea(maniaBeatmap, Rng, area, keys, Key.Value, blank, CleanDivide.Value, ERROR, checkList);
+                int cleanDivide = CleanDivide.Value;
+                if (Adjust4Jack.Value)
+                {
+                    cleanDivide *= 2;
+                }
+                if (Adjust4Speed.Value)
+                {
+                    cleanDivide /= 2;
+                }
+                var processed = ProcessArea(maniaBeatmap, Rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
                 newObjects.AddRange(processed.result);
             }
 

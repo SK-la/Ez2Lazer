@@ -77,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.Mods
 
             protected override void CheckForResult(bool userTriggered, double timeOffset)
             {
-                if (Math.Abs(timeOffset) <= ReleaseOffset)
+                if (HoldNote.IsHolding.Value && Math.Abs(timeOffset) <= ReleaseOffset)
                     ApplyResult(GetCappedResult(HitResult.Perfect));
                 else
                     base.CheckForResult(userTriggered, timeOffset);
