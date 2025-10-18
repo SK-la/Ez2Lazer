@@ -18,10 +18,6 @@ namespace osu.Game.Screens.Select
     {
         public readonly BeatmapLeaderboard Leaderboard;
 
-        public static WorkingBeatmap SelectedBeatmap;
-
-        public static BeatmapInfo SelectedBeatmapInfo;
-
         public override WorkingBeatmap Beatmap
         {
             get => base.Beatmap;
@@ -30,9 +26,6 @@ namespace osu.Game.Screens.Select
                 base.Beatmap = value;
 
                 Leaderboard.BeatmapInfo = value is DummyWorkingBeatmap ? null : value?.BeatmapInfo;
-
-                SelectedBeatmap = value;
-                SelectedBeatmapInfo = value?.BeatmapInfo;
             }
         }
 

@@ -89,8 +89,6 @@ namespace osu.Game.Screens.Play
         // We are managing our own adjustments (see OnEntering/OnExiting).
         public override bool? ApplyModTrackAdjustments => false;
 
-        protected override BackgroundScreen CreateBackground() => Ruleset.Value.OnlineID == 3 ? new BackgroundScreenBeatmapMania(Beatmap.Value) : new BackgroundScreenBeatmap(Beatmap.Value);
-
         private readonly IBindable<bool> gameActive = new Bindable<bool>(true);
 
         private readonly Bindable<bool> samplePlaybackDisabled = new Bindable<bool>();
@@ -442,6 +440,7 @@ namespace osu.Game.Screens.Play
                     {
                         RelativeSizeAxes = Axes.Both
                     },
+                    new Container(),
                     letterboxOverlay = new LetterboxOverlay
                     {
                         BreakTracker = breakTracker,
