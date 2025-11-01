@@ -203,8 +203,8 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
             LegacySortHelper<HitObject>.Sort(sortedObjects, Comparer<HitObject>.Create((a, b) => (int)Math.Round(a.StartTime) - (int)Math.Round(b.StartTime)));
 
-            var objects = new List<DifficultyHitObject>();
-            var perColumnObjects = new List<DifficultyHitObject>[totalColumns];
+            List<DifficultyHitObject> objects = new List<DifficultyHitObject>();
+            List<DifficultyHitObject>[] perColumnObjects = new List<DifficultyHitObject>[totalColumns];
 
             for (int column = 0; column < totalColumns; column++)
                 perColumnObjects[column] = new List<DifficultyHitObject>();
@@ -220,18 +220,12 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         }
 
         // Sorting is done in CreateDifficultyHitObjects, since the full list of hitobjects is required.
-        protected override IEnumerable<DifficultyHitObject> SortObjects(IEnumerable<DifficultyHitObject> input)
-        {
-            return input;
-        }
+        protected override IEnumerable<DifficultyHitObject> SortObjects(IEnumerable<DifficultyHitObject> input) => input;
 
-        protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods, double clockRate)
-        {
-            return new Skill[]
+        protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods, double clockRate) => new Skill[]
             {
                 new Strain(mods, ((ManiaBeatmap)Beatmap).TotalColumns)
             };
-        }
 
         protected override Mod[] DifficultyAdjustmentMods
         {
@@ -242,7 +236,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
                     new ManiaModDoubleTime(),
                     new ManiaModHalfTime(),
                     new ManiaModEasy(),
-                    new ManiaModHardRock()
+                    new ManiaModHardRock(),
                 };
 
                 if (isForCurrentRuleset)
@@ -264,7 +258,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
                     new ManiaModKey8(),
                     new MultiMod(new ManiaModKey8(), new ManiaModDualStages()),
                     new ManiaModKey9(),
-                    new MultiMod(new ManiaModKey9(), new ManiaModDualStages())
+                    new MultiMod(new ManiaModKey9(), new ManiaModDualStages()),
                 }).ToArray();
             }
         }

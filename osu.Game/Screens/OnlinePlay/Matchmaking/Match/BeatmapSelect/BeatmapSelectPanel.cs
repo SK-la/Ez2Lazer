@@ -45,8 +45,6 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
 
         private BeatmapCardMatchmaking? card;
 
-        public override bool PropagatePositionalInputSubTree => AllowSelection;
-
         public BeatmapSelectPanel(MultiplayerPlaylistItem item)
         {
             Item = item;
@@ -113,13 +111,27 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
             {
                 Debug.Assert(card == null);
 
-                var beatmap = b.GetResultSafely()!;
+                APIBeatmap beatmap = b.GetResultSafely() ?? new APIBeatmap
+                {
+                    BeatmapSet = new APIBeatmapSet
+                    {
+                        Title = "unknown beatmap",
+                        TitleUnicode = "unknown beatmap",
+                        Artist = "unknown artist",
+                        ArtistUnicode = "unknown artist",
+                    }
+                };
+
                 beatmap.StarRating = Item.StarRating;
 
                 mainContent.Add(card = new BeatmapCardMatchmaking(beatmap)
                 {
                     Depth = float.MaxValue,
-                    Action = () => Action?.Invoke(Item),
+                    Action = () =>
+                    {
+                        if (AllowSelection)
+                            Action?.Invoke(Item);
+                    },
                 });
 
                 foreach (var user in users)
@@ -141,11 +153,15 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
 
         protected override bool OnHover(HoverEvent e)
         {
-            lighting.FadeTo(0.2f, 50)
-                    .Then()
-                    .FadeTo(0.1f, 300);
+            if (AllowSelection)
+            {
+                lighting.FadeTo(0.2f, 50)
+                        .Then()
+                        .FadeTo(0.1f, 300);
+                return true;
+            }
 
-            return true;
+            return base.OnHover(e);
         }
 
         protected override void OnHoverLost(HoverLostEvent e)
@@ -157,11 +173,8 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
-            if (e.Button == MouseButton.Left)
-            {
+            if (AllowSelection && e.Button == MouseButton.Left)
                 scaleContainer.ScaleTo(0.95f, 400, Easing.OutExpo);
-                return true;
-            }
 
             return base.OnMouseDown(e);
         }
@@ -171,16 +184,17 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
             base.OnMouseUp(e);
 
             if (e.Button == MouseButton.Left)
-            {
                 scaleContainer.ScaleTo(1f, 500, Easing.OutElasticHalf);
-            }
         }
 
         protected override bool OnClick(ClickEvent e)
         {
-            lighting.FadeTo(0.5f, 50)
-                    .Then()
-                    .FadeTo(0.1f, 400);
+            if (AllowSelection)
+            {
+                lighting.FadeTo(0.5f, 50)
+                        .Then()
+                        .FadeTo(0.1f, 400);
+            }
 
             // pass through to let the beatmap card handle actual click.
             return false;

@@ -12,6 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osuTK;
+using System.Reflection;
 
 namespace osu.Game.Screens.Backgrounds
 {
@@ -105,6 +106,14 @@ namespace osu.Game.Screens.Backgrounds
             columnBlur.BindValueChanged(e =>
             {
                 replicatedBackground?.BlurTo(new Vector2((float)e.NewValue * 80f), 0);
+
+                // Also apply blur to storyboard if present
+                if (replicatedBackground is BeatmapBackgroundWithStoryboard bws)
+                {
+                    var storyboardContainerField = typeof(BeatmapBackgroundWithStoryboard).GetField("storyboardContainer", BindingFlags.NonPublic | BindingFlags.Instance);
+                    // if (storyboardContainerField?.GetValue(bws) is Container storyboardContainer)
+                    //     storyboardContainer.BlurSigma = new Vector2((float)e.NewValue * 80f);
+                }
             }, true);
 
             columnWidth.BindValueChanged(e => updateWidth(), true);
@@ -125,7 +134,7 @@ namespace osu.Game.Screens.Backgrounds
             for (int i = 0; i < keyMode; i++)
                 totalWidth += getColumnWidth(keyMode, i);
 
-            float totalScale = uiScale.Value / 0.938f;
+            float totalScale = uiScale.Value / 0.936f;
             maskingContainer.Width = totalWidth / totalScale;
         }
 

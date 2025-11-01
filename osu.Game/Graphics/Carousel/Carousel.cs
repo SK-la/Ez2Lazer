@@ -160,7 +160,18 @@ namespace osu.Game.Graphics.Carousel
         /// <summary>
         /// Scroll carousel to the selected item if available.
         /// </summary>
-        public void ScrollToSelection() => scrollToSelection.Invalidate();
+        /// <param name="immediate">
+        /// Whether the scroll position should immediately be shifted to the target, delegating animation to visible panels.
+        /// This should be true for operations like filtering - where panels are changing visibility state - to avoid large jumps in animation.
+        /// </param>
+        public void ScrollToSelection(bool immediate = false)
+        {
+            // if an immediate scroll is already requested, don't override it with a slower scroll
+            if (scrollToSelection == PendingScrollOperation.Immediate)
+                return;
+
+            scrollToSelection = immediate ? PendingScrollOperation.Immediate : PendingScrollOperation.Standard;
+        }
 
         /// <summary>
         /// Returns the vertical spacing between two given carousel items. Negative value can be used to create an overlapping effect.
@@ -400,7 +411,7 @@ namespace osu.Game.Graphics.Carousel
 
                 refreshAfterSelection();
                 if (!Scroll.UserScrolling)
-                    ScrollToSelection();
+                    ScrollToSelection(immediate: true);
 
                 NewItemsPresented?.Invoke(carouselItems);
             });
@@ -681,6 +692,23 @@ namespace osu.Game.Graphics.Carousel
 
         #endregion
 
+        #region Scrolling
+
+        /// <summary>
+        /// Scrolling to selection relies on <see cref="currentKeyboardSelection"/> being fully populated.
+        /// This flag ensures it runs after <see cref="refreshAfterSelection"/> validates this.
+        /// </summary>
+        private PendingScrollOperation scrollToSelection = PendingScrollOperation.None;
+
+        private enum PendingScrollOperation
+        {
+            None,
+            Standard,
+            Immediate,
+        }
+
+        #endregion
+
         #region Audio
 
         private Sample? sampleKeyboardTraversal;
@@ -761,13 +789,26 @@ namespace osu.Game.Graphics.Carousel
             {
                 var item = carouselItems[i];
 
+                bool isKeyboardSelection = CheckModelEquality(item.Model, currentKeyboardSelection.Model!);
+                bool isSelection = CheckModelEquality(item.Model, currentSelection.Model!);
+
+                // while we don't know the Y position of the item yet, as it's about to be updated,
+                // consumers (specifically `BeatmapCarousel.GetSpacingBetweenPanels()`) benefit from `CurrentSelectionItem` already pointing
+                // at the correct item to avoid redundant local equality checks.
+                // the Y positions will be filled in after they're computed.
+                if (isKeyboardSelection)
+                    currentKeyboardSelection = new Selection(currentKeyboardSelection.Model, item, null, i);
+
+                if (isSelection)
+                    currentSelection = new Selection(currentSelection.Model, item, null, i);
+
                 updateItemYPosition(item, ref lastVisible, ref yPos);
 
-                if (CheckModelEquality(item.Model, currentKeyboardSelection.Model!))
-                    currentKeyboardSelection = new Selection(currentKeyboardSelection.Model, item, item.CarouselYPosition + item.DrawHeight / 2, i);
+                if (isKeyboardSelection)
+                    currentKeyboardSelection = currentKeyboardSelection with { YPosition = item.CarouselYPosition + item.DrawHeight / 2 };
 
-                if (CheckModelEquality(item.Model, currentSelection.Model!))
-                    currentSelection = new Selection(currentSelection.Model, item, item.CarouselYPosition + item.DrawHeight / 2, i);
+                if (isSelection)
+                    currentSelection = currentSelection with { YPosition = item.CarouselYPosition + item.DrawHeight / 2 };
             }
 
             // Update the total height of all items (to make the scroll container scrollable through the full height even though
@@ -807,12 +848,6 @@ namespace osu.Game.Graphics.Carousel
         /// Whether existing panels can be re-used in the next filter.
         /// </summary>
         private readonly Cached filterReusesPanels = new Cached();
-
-        /// <summary>
-        /// Scrolling to selection relies on <see cref="currentKeyboardSelection"/> being fully populated.
-        /// This flag ensures it runs after <see cref="refreshAfterSelection"/> validates this.
-        /// </summary>
-        private readonly Cached scrollToSelection = new Cached();
 
         protected override void Update()
         {
@@ -874,12 +909,12 @@ namespace osu.Game.Graphics.Carousel
         {
             base.UpdateAfterChildren();
 
-            if (!scrollToSelection.IsValid)
+            if (scrollToSelection != PendingScrollOperation.None)
             {
                 if (GetScrollTarget() is double scrollTarget)
-                    Scroll.ScrollTo(scrollTarget - visibleHalfHeight + BleedTop);
+                    Scroll.ScrollTo(scrollTarget - visibleHalfHeight + BleedTop, animated: scrollToSelection == PendingScrollOperation.Standard);
 
-                scrollToSelection.Validate();
+                scrollToSelection = PendingScrollOperation.None;
             }
         }
 

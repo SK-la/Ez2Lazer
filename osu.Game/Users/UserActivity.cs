@@ -274,8 +274,16 @@ namespace osu.Game.Users
 
             public InLobby(MultiplayerRoom room)
             {
+                if (room.Settings.MatchType == MatchType.Matchmaking)
+                {
+                    RoomID = -1;
+                    RoomName = "Quick Play";
+                }
+                else
+                {
                 RoomID = room.RoomID;
                 RoomName = room.Settings.Name;
+            }
             }
 
             [SerializationConstructor]
