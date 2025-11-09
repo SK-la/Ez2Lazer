@@ -2,8 +2,6 @@
   "solution": {
     "path": "osu.sln",
     "projects": [
-      "..\\osu.Game.Rulesets.LazerMania\\osu.Game.Rulesets.LazerMania\\osu.Game.Rulesets.LazerMania.csproj",
-      "..\\osu.Game.Rulesets.LazerMania\\osu.Game.Rulesets.LazerMania.Tests\\osu.Game.Rulesets.LazerMania.Tests.csproj",
       "..\\osu-framework\\osu.Framework\\osu.Framework.csproj",
       "..\\osu-resources\\osu.Game.Resources\\osu.Game.Resources.csproj",
       "osu.Desktop\\osu.Desktop.csproj",
