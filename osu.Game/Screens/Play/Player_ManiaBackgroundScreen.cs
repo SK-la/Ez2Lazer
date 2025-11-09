@@ -55,7 +55,6 @@ namespace osu.Game.Screens.Play
 
                 // 创建遮罩背景容器
                 // 关键：不使用嵌套结构，直接让 DimmableBackground 作为遮罩容器的子元素
-                // 并设置 RelativeSizeAxes 为 Both，让它自动填充但受 Masking 裁剪
                 maniaBackgroundMask = new Container
                 {
                     RelativeSizeAxes = Axes.Y,
@@ -64,7 +63,7 @@ namespace osu.Game.Screens.Play
                     Masking = true,
                     Child = maniaMaskedDimmable = new DimmableBackground
                     {
-                        RelativeSizeAxes = Axes.None, // 不使用相对尺寸
+                        RelativeSizeAxes = Axes.None, // 不使用相对尺寸，如果用Both会导致主副背景缩放不一致
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                     }
