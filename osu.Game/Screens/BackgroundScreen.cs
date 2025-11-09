@@ -21,6 +21,12 @@ namespace osu.Game.Screens
 
         public bool AnimateEntry { get; set; } = true;
 
+        /// <summary>
+        /// Whether parallax effect should be disabled for this background screen.
+        /// When disabled, the background will remain static and not respond to mouse movement.
+        /// </summary>
+        public bool DisableParallax { get; set; }
+
         protected BackgroundScreen()
         {
             Anchor = Anchor.Centre;
@@ -47,7 +53,9 @@ namespace osu.Game.Screens
         protected override void Update()
         {
             base.Update();
-            Scale = new Vector2(1 + x_movement_amount / DrawSize.X * 2);
+
+            if (!DisableParallax)
+                Scale = new Vector2(1 + x_movement_amount / DrawSize.X * 2);
         }
 
         public override void OnEntering(ScreenTransitionEvent e)
@@ -56,8 +64,12 @@ namespace osu.Game.Screens
             {
                 this.FadeOut();
                 this.FadeIn(TRANSITION_LENGTH, Easing.InOutQuart);
-                this.MoveToX(x_movement_amount);
-                this.MoveToX(0, TRANSITION_LENGTH, Easing.InOutQuart);
+
+                if (!DisableParallax)
+                {
+                    this.MoveToX(x_movement_amount);
+                    this.MoveToX(0, TRANSITION_LENGTH, Easing.InOutQuart);
+                }
             }
 
             base.OnEntering(e);
@@ -65,7 +77,8 @@ namespace osu.Game.Screens
 
         public override void OnSuspending(ScreenTransitionEvent e)
         {
-            this.MoveToX(-x_movement_amount, TRANSITION_LENGTH, Easing.InOutQuart);
+            if (!DisableParallax)
+                this.MoveToX(-x_movement_amount, TRANSITION_LENGTH, Easing.InOutQuart);
             base.OnSuspending(e);
         }
 
@@ -74,7 +87,8 @@ namespace osu.Game.Screens
             if (IsLoaded)
             {
                 this.FadeOut(TRANSITION_LENGTH, Easing.OutExpo);
-                this.MoveToX(x_movement_amount, TRANSITION_LENGTH, Easing.OutExpo);
+                if (!DisableParallax)
+                    this.MoveToX(x_movement_amount, TRANSITION_LENGTH, Easing.OutExpo);
             }
 
             return base.OnExiting(e);
@@ -82,7 +96,7 @@ namespace osu.Game.Screens
 
         public override void OnResuming(ScreenTransitionEvent e)
         {
-            if (IsLoaded)
+            if (IsLoaded && !DisableParallax)
                 this.MoveToX(0, TRANSITION_LENGTH, Easing.OutExpo);
             base.OnResuming(e);
         }

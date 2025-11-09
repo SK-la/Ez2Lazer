@@ -276,7 +276,7 @@ namespace osu.Game.Screens.LAsEzExtensions
         {
             var result = new Bindable<Vector2>();
             float ratio = GetRatio("whitenote");
-            bool isSpecialColumn = ezSkinConfig.GetColumnType(keyMode, columnIndex) == "S";
+            bool isSpecialColumn = ezSkinConfig.IsSpecialColumn(keyMode, columnIndex);
 
             void updateNoteSize()
             {

@@ -37,6 +37,8 @@ namespace osu.Game.Screens.SelectV2
 
         private readonly Dictionary<string, ISample?> storyboardSampleCache = new Dictionary<string, ISample?>();
 
+        private readonly List<SampleChannel> activeChannels = new List<SampleChannel>();
+
         private int nextHitSoundIndex;
         private int nextStoryboardSampleIndex;
 
@@ -477,6 +479,7 @@ namespace osu.Game.Screens.SelectV2
                         }
 
                         channelInner.Play();
+                        activeChannels.Add(channelInner);
                         playedAny = true;
                         break; // 只需播放命中链中的首个可用样本
                     }
@@ -536,6 +539,7 @@ namespace osu.Game.Screens.SelectV2
                 }
 
                 channel.Play();
+                activeChannels.Add(channel);
                 // Logger.Log($"EzPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}", LoggingTarget.Runtime);
             }
             catch (Exception)
@@ -609,6 +613,11 @@ namespace osu.Game.Screens.SelectV2
 
         private void clearEnhancedElements()
         {
+            // Stop all active sample channels
+            foreach (var channel in activeChannels)
+                channel.Stop();
+            activeChannels.Clear();
+
             scheduledHitSounds.Clear();
             scheduledStoryboardSamples.Clear();
             storyboardSampleCache.Clear();

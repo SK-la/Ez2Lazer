@@ -4,6 +4,7 @@
 #nullable disable
 
 using System;
+using System.Collections;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -15,6 +16,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Input;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Framework.Threading;
@@ -70,12 +72,12 @@ namespace osu.Game.Screens.Play
         // 为 Mania 创建自定义背景（带遮罩）
         protected override BackgroundScreen CreateBackground() =>
             Ruleset.Value.OnlineID == 3
-                ? new ManiaPlayerBackgroundScreen(Beatmap.Value, this)
+                ? new PlayerManiaBackgroundScreen(Beatmap.Value, this)
                 : new BackgroundScreenBeatmap(Beatmap.Value);
 
         protected override UserActivity InitialActivity => new UserActivity.InSoloGame(Beatmap.Value.BeatmapInfo, Ruleset.Value);
 
-        public override float BackgroundParallaxAmount => 0.1f;
+        public override float BackgroundParallaxAmount => ruleset?.RulesetInfo.OnlineID == 3 ? 0 : 0.1f;
 
         public override bool HideOverlaysOnEnter => true;
 
@@ -112,15 +114,6 @@ namespace osu.Game.Screens.Play
         private bool skipExitTransition;
 
         private readonly Bindable<bool> storyboardReplacesBackground = new Bindable<bool>();
-
-        // Mania 专用配置（供自定义背景使用）
-        private Bindable<double> maniaColumnBlur = new Bindable<double>();
-        private Bindable<double> maniaColumnWidth = new Bindable<double>();
-        private Bindable<double> maniaSpecialFactor = new Bindable<double>();
-        private Bindable<float> uiScale = new Bindable<float>(1f);
-
-        [Resolved]
-        private EzSkinSettingsManager ezSkinSettings { get; set; }
 
         public IBindable<bool> LocalUserPlaying => localUserPlaying;
 
@@ -244,8 +237,6 @@ namespace osu.Game.Screens.Play
         [BackgroundDependencyLoader(true)]
         private void load(OsuConfigManager config, OsuGameBase game, CancellationToken cancellationToken)
         {
-            uiScale = config.GetBindable<float>(OsuSetting.UIScale);
-
             var gameplayMods = Mods.Value.Select(m => m.DeepClone()).ToArray();
 
             if (gameplayMods.Any(m => m is UnknownMod))
@@ -468,24 +459,7 @@ namespace osu.Game.Screens.Play
                 },
             };
 
-            // 为 Mania 初始化相关配置（用于背景屏幕）
-            if (Ruleset.Value.OnlineID == 3)
-            {
-                maniaColumnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
-                maniaColumnWidth = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnWidth);
-                maniaSpecialFactor = ezSkinSettings.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            }
-
             return container;
-        }
-
-        // Mania 列宽度计算（内部类也需要访问）
-        private float getManiaColumnWidth(int keyMode, int columnIndex)
-        {
-            bool isSpecialColumn = ezSkinSettings.GetColumnType(keyMode, columnIndex) == "S";
-            float baseWidth = (float)maniaColumnWidth.Value;
-            float factor = (float)maniaSpecialFactor.Value;
-            return baseWidth * (isSpecialColumn ? factor : 1.0f);
         }
 
         private Drawable createGameplayComponents(IWorkingBeatmap working) => new ScalingContainer(ScalingMode.Gameplay)
@@ -1337,102 +1311,5 @@ namespace osu.Game.Screens.Play
         IBindable<bool> ISamplePlaybackDisabler.SamplePlaybackDisabled => samplePlaybackDisabled;
 
         public IBindable<LocalUserPlayingState> PlayingState => playingState;
-
-        /// <summary>
-        /// 为 Mania 模式创建的自定义背景屏幕，包含遮罩副本背景
-        /// </summary>
-        private partial class ManiaPlayerBackgroundScreen : BackgroundScreenBeatmap
-        {
-            private readonly Player player;
-            private Container maniaBackgroundMask;
-            private DimmableBackground maniaMaskedDimmable;
-
-            public ManiaPlayerBackgroundScreen(WorkingBeatmap beatmap, Player player)
-                : base(beatmap)
-            {
-                this.player = player;
-            }
-
-            [BackgroundDependencyLoader]
-            private void load()
-            {
-                // 创建遮罩背景容器
-                // 关键：不使用嵌套结构，直接让 DimmableBackground 作为遮罩容器的子元素
-                // 并设置 RelativeSizeAxes 为 Both，让它自动填充但受 Masking 裁剪
-                maniaBackgroundMask = new Container
-                {
-                    RelativeSizeAxes = Axes.Y,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Masking = true,
-                    Child = maniaMaskedDimmable = new DimmableBackground
-                    {
-                        RelativeSizeAxes = Axes.None, // 不使用相对尺寸
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                    }
-                };
-
-                AddInternal(maniaBackgroundMask);
-
-                // 绑定设置
-                maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(player.storyboardReplacesBackground);
-                maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
-                maniaMaskedDimmable.IsBreakTime.BindTo(player.IsBreakTime);
-
-                // 绑定模糊效果
-                player.maniaColumnBlur.BindValueChanged(v => maniaMaskedDimmable.BlurAmount.Value = (float)v.NewValue * 25, true);
-
-                // 绑定宽度更新
-                player.maniaColumnWidth.BindValueChanged(_ => updateMaskWidth(), true);
-                player.maniaSpecialFactor.BindValueChanged(_ => updateMaskWidth(), true);
-
-                // 设置副本背景
-                Schedule(() =>
-                {
-                    if (player.LoadedBeatmapSuccessfully)
-                    {
-                        var maskedBackground = new BeatmapBackground(player.Beatmap.Value);
-                        maskedBackground.FadeInFromZero(500, Easing.OutQuint);
-                        maniaMaskedDimmable.Background = maskedBackground;
-                    }
-                });
-            }
-
-            protected override void Update()
-            {
-                base.Update();
-
-                // 每帧更新以确保副本背景与原背景完全同步
-                if (maniaMaskedDimmable != null)
-                {
-                    // 让副本背景的尺寸与整个背景屏幕一致
-                    maniaMaskedDimmable.Size = DrawSize;
-                }
-
-                // 更新遮罩宽度
-                if (player.LoadedBeatmapSuccessfully)
-                    updateMaskWidth();
-            }
-
-            private void updateMaskWidth()
-            {
-                if (maniaBackgroundMask == null || !player.LoadedBeatmapSuccessfully) return;
-                if (player.DrawableRuleset?.Playfield == null) return;
-
-                int keyMode = (int)player.Beatmap.Value.Beatmap.BeatmapInfo.Difficulty.CircleSize;
-                float totalWidth = 0;
-
-                for (int i = 0; i < keyMode; i++)
-                    totalWidth += player.getManiaColumnWidth(keyMode, i);
-
-                float maskWidth = totalWidth;
-
-                // BackgroundScreen 会应用缩放（Scale），这会影响子元素的实际显示宽度
-                // 我们需要除以这个缩放来补偿，确保遮罩的实际显示宽度与 Playfield 一致
-                float backgroundScale = Scale.X;
-                maniaBackgroundMask.Width = maskWidth / backgroundScale;
-            }
-        }
     }
 }

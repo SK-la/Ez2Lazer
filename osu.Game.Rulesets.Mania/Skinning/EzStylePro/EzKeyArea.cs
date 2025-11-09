@@ -54,14 +54,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (ezSkinConfig.GetColumnType(stageDefinition.Columns, column.Index) == "S")
+                if (ezSkinConfig.IsSpecialColumn(stageDefinition.Columns, column.Index))
                     return "02";
 
                 int logicalIndex = 0;
 
                 for (int i = 0; i < column.Index; i++)
                 {
-                    if (ezSkinConfig.GetColumnType(stageDefinition.Columns, i) == "S")
+                    if (ezSkinConfig.IsSpecialColumn(stageDefinition.Columns, i))
                         logicalIndex++;
                 }
 
