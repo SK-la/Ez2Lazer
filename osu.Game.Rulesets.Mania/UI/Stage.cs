@@ -99,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both, //使用Both即可实现局部遮罩，因为此处父容器就是局部面板
                     Masking = true,
-                    BlurStrength = 0,
+                    BlurStrength = 30f,
                     Depth = 1, // 在背景层
                 },
                 dimBox = new Box //通过叠加覆盖实现暗化效果

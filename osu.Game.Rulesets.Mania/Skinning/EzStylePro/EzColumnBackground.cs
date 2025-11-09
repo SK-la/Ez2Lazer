@@ -26,12 +26,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     /// </summary>
     public partial class EzColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private Bindable<double> columnDim = new BindableDouble();
         private Bindable<double> hitPosition = new Bindable<double>();
         private Color4 brightColour;
         private Color4 dimColour;
 
-        private AcrylicContainer dimOverlay = null!;
         private Box hitOverlay = null!;
         private Box separator = null!;
 
@@ -46,9 +44,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
-        [Resolved(canBeNull: true)]
-        private IFrameBuffer? gameBackgroundBuffer { get; set; }
-
         public EzColumnBackground()
         {
             Anchor = Anchor.BottomLeft;
@@ -59,31 +54,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader]
         private void load()
         {
-            // 添加一个实际的背景，用于被模糊
-            var backgroundLayer = new Box
-            {
-                Name = "Background Layer",
-                RelativeSizeAxes = Axes.Both,
-                Colour = ColourInfo.GradientVertical(
-                    Color4.White.Opacity(0.05f),
-                    Color4.Black.Opacity(0.1f)
-                )
-            };
-
-            dimOverlay = new AcrylicContainer
-            {
-                Name = "Dim Overlay",
-                RelativeSizeAxes = Axes.Both,
-                // 设置外部游戏背景buffer（如果可用）
-                BackgroundBuffer = gameBackgroundBuffer,
-                // 初始 tint 颜色 - 黑色用于变暗效果
-                TintColour = new Color4(0, 0, 0, 0.5f),
-                // 初始模糊强度
-                BlurStrength = 50f,
-                BlurSigma = new Vector2(50f),
-                // 添加背景层作为子元素，会叠加在模糊的游戏背景上
-                Child = backgroundLayer
-            };
             hitOverlay = new Box
             {
                 Name = "Hit Overlay",
@@ -125,24 +95,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (Column.TopLevelContainer.Children.OfType<Box>().All(b => b.Name != "Separator"))
                 Column.TopLevelContainer.Add(separator);
 
-            if (!Column.BackgroundContainer.Children.Contains(dimOverlay))
-                Column.BackgroundContainer.Add(dimOverlay);
-
             if (!Column.BackgroundContainer.Children.Contains(hitOverlay))
                 Column.BackgroundContainer.Add(hitOverlay);
 
             hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             hitPosition.BindValueChanged(_ => updateSeparator(), true);
-
-            columnDim = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnDim);
-            columnDim.BindValueChanged(_ => applyDim(), true);
-        }
-
-        private float dimTarget => (float)columnDim.Value;
-
-        private void applyDim()
-        {
-            dimOverlay.TintColour = Colour4.Black.Opacity(dimTarget);
         }
 
         private void updateSeparator()
