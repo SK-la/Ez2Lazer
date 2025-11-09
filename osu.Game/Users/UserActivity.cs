@@ -281,9 +281,9 @@ namespace osu.Game.Users
                 }
                 else
                 {
-                RoomID = room.RoomID;
-                RoomName = room.Settings.Name;
-            }
+                    RoomID = room.RoomID;
+                    RoomName = room.Settings.Name;
+                }
             }
 
             [SerializationConstructor]

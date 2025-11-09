@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="UserContentModel">
-    <attachedFolders />
-    <explicitIncludes />
-    <explicitExcludes />
+    <attachedFolders>
+      <Path>Templates</Path>
+    </attachedFolders>
+    <explicitIncludes>
+      <Path>osu.Game/Skinning/Ez2HUD</Path>
+      <Path>osu.Game/Skinning/EzComponents</Path>
+    </explicitIncludes>
+    <explicitExcludes>
+      <Path>Templates</Path>
+    </explicitExcludes>
   </component>
 </project>

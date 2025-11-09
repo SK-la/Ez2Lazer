@@ -8,6 +8,9 @@ using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
@@ -27,7 +30,9 @@ namespace osu.Game.Screens.Backgrounds
         protected Background Background;
 
         private WorkingBeatmap beatmap;
-        private BackgroundScreenBeatmapMania maniaBackground;
+
+        // 双重绘制：底层完整背景，上层遮罩背景
+        private readonly Container maskedContainer;
 
         /// <summary>
         /// Whether or not user-configured settings relating to brightness of elements should be ignored.
@@ -43,11 +48,6 @@ namespace osu.Game.Screens.Backgrounds
         public readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
 
         /// <summary>
-        /// Whether to show the mania overlay background.
-        /// </summary>
-        public readonly Bindable<bool> ShowManiaOverlay = new Bindable<bool>();
-
-        /// <summary>
         /// The amount of blur to be applied in addition to user-specified blur.
         /// </summary>
         public readonly Bindable<float> BlurAmount = new BindableFloat();
@@ -60,20 +60,73 @@ namespace osu.Game.Screens.Backgrounds
         internal readonly Bindable<bool> IsBreakTime = new Bindable<bool>();
 
         private readonly DimmableBackground dimmable;
+        private readonly DimmableBackground maskedDimmable; // 上层独立的 dimmable
+        private readonly Container backgroundHolder; // 用于突破父容器尺寸限制
+
+        private Bindable<double> columnDim;
+        private Bindable<double> columnBlur;
+        private Bindable<double> columnWidth;
+        private Bindable<double> specialFactor;
 
         protected virtual DimmableBackground CreateFadeContainer() => new DimmableBackground { RelativeSizeAxes = Axes.Both };
+
+        [Resolved]
+        private EzSkinSettingsManager ezSkinSettings { get; set; } = null!;
 
         public BackgroundScreenBeatmap(WorkingBeatmap beatmap = null)
         {
             Beatmap = beatmap;
 
-            InternalChild = dimmable = CreateFadeContainer();
+            InternalChildren = new Drawable[]
+            {
+                // 底层：完整背景（使用外部控制的 dimmable）
+                new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Child = dimmable = CreateFadeContainer()
+                },
+                // 上层：遮罩背景（使用独立的 maskedDimmable）
+                maskedContainer = new Container
+                {
+                    RelativeSizeAxes = Axes.Y,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Masking = true,
+                    Children = new Drawable[]
+                    {
+                        // 调试用色块（半透明红色）
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = Colour4.Red.Opacity(0.3f),
+                        },
+                        // 背景容器：保持全屏尺寸，不受父容器宽度限制
+                        backgroundHolder = new Container
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            Child = maskedDimmable = CreateFadeContainer()
+                        }
+                    }
+                }
+            };
 
             dimmable.StoryboardReplacesBackground.BindTo(StoryboardReplacesBackground);
             dimmable.IgnoreUserSettings.BindTo(IgnoreUserSettings);
             dimmable.IsBreakTime.BindTo(IsBreakTime);
             dimmable.BlurAmount.BindTo(BlurAmount);
             dimmable.DimWhenUserSettingsIgnored.BindTo(DimWhenUserSettingsIgnored);
+
+            // 上层也绑定必要的设置（但虚化暗化会被 EzSkin 覆盖）
+            maskedDimmable.StoryboardReplacesBackground.BindTo(StoryboardReplacesBackground);
+            maskedDimmable.IgnoreUserSettings.BindTo(IgnoreUserSettings);
+            maskedDimmable.IsBreakTime.BindTo(IsBreakTime);
+
+            // 设置 backgroundHolder 的尺寸为屏幕尺寸，不受父容器限制
+            Schedule(() =>
+            {
+                backgroundHolder.Size = Parent.DrawSize;
+            });
         }
 
         [BackgroundDependencyLoader]
@@ -83,14 +136,43 @@ namespace osu.Game.Screens.Backgrounds
             LoadComponent(background);
             switchBackground(background);
 
-            if (ShowManiaOverlay.Value && beatmap?.BeatmapInfo.Ruleset.OnlineID == 3)
+            // 如果是 Mania，绑定 EzSkin 设置到上层背景
+            if (beatmap.BeatmapInfo.Ruleset.OnlineID != 3)
             {
-                maniaBackground = new BackgroundScreenBeatmapMania(beatmap);
-                LoadComponent(maniaBackground);
-                dimmable.Add(maniaBackground);
+                maskedDimmable.Alpha = 0;
+                return;
             }
 
-            ShowManiaOverlay.BindValueChanged(_ => updateManiaBackground());
+            columnDim = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnDim);
+            columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
+            columnWidth = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactor = ezSkinSettings.GetBindable<double>(EzSkinSetting.SpecialFactor);
+
+            columnWidth.BindValueChanged(_ => updateWidth(), true);
+            specialFactor.BindValueChanged(_ => updateWidth());
+
+            // 应用 EzSkin 的虚化暗化设置到上层（maskedDimmable）
+            columnDim.BindValueChanged(v => maskedDimmable.DimWhenUserSettingsIgnored.Value = (float)v.NewValue, true);
+            columnBlur.BindValueChanged(v => maskedDimmable.BlurAmount.Value = (float)v.NewValue * USER_BLUR_FACTOR, true);
+        }
+
+        private void updateWidth()
+        {
+            int keyMode = (int)Beatmap.BeatmapInfo.Difficulty.CircleSize;
+            float totalWidth = 0;
+
+            for (int i = 0; i < keyMode; i++)
+                totalWidth += getColumnWidth(keyMode, i);
+
+            maskedContainer.Width = totalWidth;
+        }
+
+        private float getColumnWidth(int keyMode, int columnIndex)
+        {
+            bool isSpecialColumn = ezSkinSettings.GetColumnType(keyMode, columnIndex) == "S";
+            float baseWidth = (float)columnWidth.Value;
+            float factor = (float)specialFactor.Value;
+            return baseWidth * (isSpecialColumn ? factor : 1.0f);
         }
 
         private CancellationTokenSource cancellationSource;
@@ -112,21 +194,6 @@ namespace osu.Game.Screens.Backgrounds
 
                     cancellationSource?.Cancel();
                     LoadComponentAsync(new BeatmapBackground(beatmap), switchBackground, (cancellationSource = new CancellationTokenSource()).Token);
-
-                    // // Manage mania background
-                    // if (maniaBackground != null)
-                    // {
-                    //     maniaBackground.FadeOut(250);
-                    //     maniaBackground.Expire();
-                    //     maniaBackground = null;
-                    // }
-
-                    if (ShowManiaOverlay.Value && beatmap?.BeatmapInfo.Ruleset.OnlineID == 3)
-                    {
-                        maniaBackground = new BackgroundScreenBeatmapMania(beatmap);
-                        LoadComponent(maniaBackground);
-                        dimmable.Add(maniaBackground);
-                    }
                 });
             }
         }
@@ -145,23 +212,11 @@ namespace osu.Game.Screens.Backgrounds
             b.Depth = newDepth;
             b.FadeInFromZero(500, Easing.OutQuint);
             dimmable.Background = Background = b;
-        }
 
-        private void updateManiaBackground()
-        {
-            if (maniaBackground != null)
-            {
-                maniaBackground.FadeOut(250);
-                maniaBackground.Expire();
-                maniaBackground = null;
-            }
-
-            if (ShowManiaOverlay.Value && beatmap?.BeatmapInfo.Ruleset.OnlineID == 3)
-            {
-                maniaBackground = new BackgroundScreenBeatmapMania(beatmap);
-                LoadComponent(maniaBackground);
-                dimmable.Add(maniaBackground);
-            }
+            // 上层：独立的背景（克隆一个新实例）
+            // var maskedBackground = new BeatmapBackground(beatmap) { Depth = newDepth };
+            // maskedBackground.FadeInFromZero(500, Easing.OutQuint);
+            // maskedDimmable.Background = maskedBackground;
         }
 
         public override bool Equals(BackgroundScreen other)

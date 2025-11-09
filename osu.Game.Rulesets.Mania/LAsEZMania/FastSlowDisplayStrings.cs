@@ -3,11 +3,11 @@
 
 using osu.Framework.Localisation;
 
-namespace osu.Game.Rulesets.Mania.Localisation.HUD
+namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
     public static class FastSlowDisplayStrings
     {
-        private const string prefix = @"osu.Game.Rulesets.Mania.Localisation.HUD.FastSlowDisplay";
+        private const string prefix = @"osu.Game.Rulesets.Mania.LAsEZMania.FastSlowDisplay";
 
         /// <summary>
         /// "Perfect"

@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.UI
     /// <summary>
     /// A graph which displays the distribution of hit timing for each column in a series of <see cref="HitEvent"/>s.
     /// </summary>
-    public partial class HitEventTimingDistributionGraphByColumn : CompositeDrawable
+    public partial class EzHitTimingGraphByColumn : CompositeDrawable
     {
         /// <summary>
         /// The currently displayed hit events.
@@ -32,11 +32,11 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly int columnCount;
 
         /// <summary>
-        /// Creates a new <see cref="HitEventTimingDistributionGraphByColumn"/>.
+        /// Creates a new <see cref="EzHitTimingGraphByColumn"/>.
         /// </summary>
         /// <param name="hitEvents">The <see cref="HitEvent"/>s to display the timing distribution of.</param>
         /// <param name="columnCount">The number of columns in the beatmap.</param>
-        public HitEventTimingDistributionGraphByColumn(IReadOnlyList<HitEvent> hitEvents, int columnCount)
+        public EzHitTimingGraphByColumn(IReadOnlyList<HitEvent> hitEvents, int columnCount)
         {
             this.hitEvents = hitEvents;
             this.columnCount = columnCount;
@@ -133,27 +133,27 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 columnContainer.Add(new SimpleStatisticTable(3, new[]
                 {
-                    new JudgementsItem(total.ToString(), "Total", totalColor),
-                    new JudgementsItem(totalLate.ToString(), "Total (Late)", ColourInfo.GradientVertical(Colour4.White, totalColor)),
-                    new JudgementsItem(totalEarly.ToString(), "Total (Early)", ColourInfo.GradientVertical(totalColor, Colour4.White)),
-                    new JudgementsItem(perfect.ToString(), "Perfect", perfectColor),
-                    new JudgementsItem(perfectLate.ToString(), "Perfect (Late)", ColourInfo.GradientVertical(Colour4.White, perfectColor)),
-                    new JudgementsItem(perfectEarly.ToString(), "Perfect (Early)", ColourInfo.GradientVertical(perfectColor, Colour4.White)),
-                    new JudgementsItem(great.ToString(), "Great", greatColor),
-                    new JudgementsItem(greatLate.ToString(), "Great (Late)", ColourInfo.GradientVertical(Colour4.White, greatColor)),
-                    new JudgementsItem(greatEarly.ToString(), "Great (Early)", ColourInfo.GradientVertical(greatColor, Colour4.White)),
-                    new JudgementsItem(good.ToString(), "Good", goodColor),
-                    new JudgementsItem(goodLate.ToString(), "Good (Late)", ColourInfo.GradientVertical(Colour4.White, goodColor)),
-                    new JudgementsItem(goodEarly.ToString(), "Good (Early)", ColourInfo.GradientVertical(goodColor, Colour4.White)),
-                    new JudgementsItem(ok.ToString(), "Ok", okColor),
-                    new JudgementsItem(okLate.ToString(), "Ok (Late)", ColourInfo.GradientVertical(Colour4.White, okColor)),
-                    new JudgementsItem(okEarly.ToString(), "Ok (Early)", ColourInfo.GradientVertical(okColor, Colour4.White)),
-                    new JudgementsItem(meh.ToString(), "Meh", mehColor),
-                    new JudgementsItem(mehLate.ToString(), "Meh (Late)", ColourInfo.GradientVertical(Colour4.White, mehColor)),
-                    new JudgementsItem(mehEarly.ToString(), "Meh (Early)", ColourInfo.GradientVertical(mehColor, Colour4.White)),
-                    new JudgementsItem(miss.ToString(), "Miss", missColor),
-                    new JudgementsItem(missLate.ToString(), "Miss (Late)", ColourInfo.GradientVertical(Colour4.White, missColor)),
-                    new JudgementsItem(missEarly.ToString(), "Miss (Early)", ColourInfo.GradientVertical(missColor, Colour4.White))
+                    new EzJudgementsItem(total.ToString(), "Total", totalColor),
+                    new EzJudgementsItem(totalLate.ToString(), "Total (Late)", ColourInfo.GradientVertical(Colour4.White, totalColor)),
+                    new EzJudgementsItem(totalEarly.ToString(), "Total (Early)", ColourInfo.GradientVertical(totalColor, Colour4.White)),
+                    new EzJudgementsItem(perfect.ToString(), "Perfect", perfectColor),
+                    new EzJudgementsItem(perfectLate.ToString(), "Perfect (Late)", ColourInfo.GradientVertical(Colour4.White, perfectColor)),
+                    new EzJudgementsItem(perfectEarly.ToString(), "Perfect (Early)", ColourInfo.GradientVertical(perfectColor, Colour4.White)),
+                    new EzJudgementsItem(great.ToString(), "Great", greatColor),
+                    new EzJudgementsItem(greatLate.ToString(), "Great (Late)", ColourInfo.GradientVertical(Colour4.White, greatColor)),
+                    new EzJudgementsItem(greatEarly.ToString(), "Great (Early)", ColourInfo.GradientVertical(greatColor, Colour4.White)),
+                    new EzJudgementsItem(good.ToString(), "Good", goodColor),
+                    new EzJudgementsItem(goodLate.ToString(), "Good (Late)", ColourInfo.GradientVertical(Colour4.White, goodColor)),
+                    new EzJudgementsItem(goodEarly.ToString(), "Good (Early)", ColourInfo.GradientVertical(goodColor, Colour4.White)),
+                    new EzJudgementsItem(ok.ToString(), "Ok", okColor),
+                    new EzJudgementsItem(okLate.ToString(), "Ok (Late)", ColourInfo.GradientVertical(Colour4.White, okColor)),
+                    new EzJudgementsItem(okEarly.ToString(), "Ok (Early)", ColourInfo.GradientVertical(okColor, Colour4.White)),
+                    new EzJudgementsItem(meh.ToString(), "Meh", mehColor),
+                    new EzJudgementsItem(mehLate.ToString(), "Meh (Late)", ColourInfo.GradientVertical(Colour4.White, mehColor)),
+                    new EzJudgementsItem(mehEarly.ToString(), "Meh (Early)", ColourInfo.GradientVertical(mehColor, Colour4.White)),
+                    new EzJudgementsItem(miss.ToString(), "Miss", missColor),
+                    new EzJudgementsItem(missLate.ToString(), "Miss (Late)", ColourInfo.GradientVertical(Colour4.White, missColor)),
+                    new EzJudgementsItem(missEarly.ToString(), "Miss (Early)", ColourInfo.GradientVertical(missColor, Colour4.White))
                 })
                 {
                     Anchor = Anchor.TopCentre,

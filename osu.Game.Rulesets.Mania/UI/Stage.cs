@@ -5,9 +5,12 @@ using System;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
+using osu.Framework.Logging;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
@@ -20,6 +23,8 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -60,6 +65,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private ISkinSource currentSkin = null!;
 
+        [Resolved]
+        private EzSkinSettingsManager ezSkinSettings { get; set; }
+
+        private Bindable<double> columnDim;
+        private Bindable<double> columnBlur;
+        private readonly Box dimBox;
+        private AcrylicContainer acrylicEffect;
+
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
             this.firstColumnIndex = firstColumnIndex;
@@ -77,6 +90,23 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
+                // TODO: 需要修改framework着色器-容器实现真正效果。动态根据实际的游戏中BackgroundScreen背景或故事版绘制局部虚化效果
+                // 注意，如果是真正的毛玻璃效果，此处就不应该在此处试图获取外部的背景内容，因为存在循环依赖问题。
+                acrylicEffect = new AcrylicContainer
+                {
+                    Name = "Acrylic backdrop effect",
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.Both, //使用Both即可实现局部遮罩，因为此处父容器就是局部面板
+                    Masking = true,
+                    BlurStrength = 0,
+                    Depth = 1, // 在背景层
+                },
+                dimBox = new Box //通过叠加覆盖实现暗化效果
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Colour4.Black,
+                },
                 new Container
                 {
                     Anchor = Anchor.TopCentre,
@@ -169,6 +199,21 @@ namespace osu.Game.Rulesets.Mania.UI
 
             skin.SourceChanged += onSkinChanged;
             onSkinChanged();
+
+            columnDim = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnDim);
+            columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
+
+            // 应用暗化效果
+            columnDim.BindValueChanged(v =>
+            {
+                dimBox.Alpha = (float)v.NewValue;
+            }, true);
+
+            // 应用虚化效果
+            columnBlur.BindValueChanged(v =>
+            {
+                acrylicEffect.BlurStrength = (float)v.NewValue;
+            }, true);
         }
 
         private void onSkinChanged()

@@ -257,27 +257,15 @@ namespace osu.Game.Skinning
             // If deserialisation using SkinLayoutInfo fails, attempt to deserialise using the old naked list.
             if (layout == null)
             {
-                try
-                {
                     var deserializedContent = JsonConvert.DeserializeObject<IEnumerable<SerialisedDrawableInfo>>(jsonContent);
+                if (deserializedContent == null)
+                    return null;
 
-                    if (deserializedContent != null)
-                    {
                         layout = new SkinLayoutInfo { Version = 0 };
                         layout.Update(null, deserializedContent.ToArray());
 
                         Logger.Log($"Ferrying {deserializedContent.Count()} components in {target} to global section of new {nameof(SkinLayoutInfo)} format");
                     }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Failed to deserialize skin layout using legacy format for {target}: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-                    return null;
-                }
-            }
-
-            if (layout == null)
-                return null;
 
             for (int i = layout.Version + 1; i <= SkinLayoutInfo.LATEST_VERSION; i++)
                 applyMigration(layout, target, i);

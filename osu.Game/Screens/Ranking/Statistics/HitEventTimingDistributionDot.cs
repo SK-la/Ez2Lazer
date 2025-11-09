@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
@@ -123,6 +124,21 @@ namespace osu.Game.Screens.Ranking.Statistics
                 X = 25,
                 Y = (float)(boundary),
             });
+        }
+    }
+
+    public partial class EzJudgementsItem : SimpleStatisticItem<string>
+    {
+        public EzJudgementsItem(string display, string name = "Count", ColourInfo? colour = null)
+            : base(name)
+        {
+            Value = display;
+            Colour = colour ?? Colour4.White;
+        }
+
+        protected override string DisplayValue(string? value)
+        {
+            return value ?? "N/A";
         }
     }
 }
