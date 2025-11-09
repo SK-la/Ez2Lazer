@@ -110,36 +110,6 @@ namespace osu.Game.Screens.Play
 
                 float totalWidth = 0;
 
-                // 尝试通过反射获取ManiaPlayfield的实际下落面板宽度, 反射有延迟且不稳定，先注释掉，不要删除
-                // if (player.DrawableRuleset?.Playfield is ScrollingPlayfield scrollingPlayfield)
-                // {
-                //     try
-                //     {
-                //         // 通过反射访问ManiaPlayfield的私有stages字段
-                //         var stagesField = scrollingPlayfield.GetType().GetField("stages", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                //
-                //         if (stagesField != null)
-                //         {
-                //             if (stagesField.GetValue(scrollingPlayfield) is IList stages && stages.Count > 0)
-                //             {
-                //                 // 获取第一个Stage的DrawWidth（Mania通常只有一个Stage）
-                //                 object? firstStage = stages[0];
-                //                 var drawWidthProperty = firstStage?.GetType().GetProperty("DrawWidth");
-                //
-                //                 if (drawWidthProperty != null)
-                //                 {
-                //                     totalWidth = (float)drawWidthProperty.GetValue(firstStage)!;
-                //                 }
-                //             }
-                //         }
-                //     }
-                //     catch
-                //     {
-                //         // 如果反射失败，回退到计算列宽总和
-                //         totalWidth = 0;
-                //     }
-                // }
-
                 if (totalWidth == 0)
                 {
                     for (int i = 0; i < keyMode; i++)
@@ -161,3 +131,33 @@ namespace osu.Game.Screens.Play
         }
     }
 }
+
+// 尝试通过反射获取ManiaPlayfield的实际下落面板宽度, 反射有延迟且不稳定，先注释掉，不要删除
+// if (player.DrawableRuleset?.Playfield is ScrollingPlayfield scrollingPlayfield)
+// {
+//     try
+//     {
+//         // 通过反射访问ManiaPlayfield的私有stages字段
+//         var stagesField = scrollingPlayfield.GetType().GetField("stages", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+//
+//         if (stagesField != null)
+//         {
+//             if (stagesField.GetValue(scrollingPlayfield) is IList stages && stages.Count > 0)
+//             {
+//                 // 获取第一个Stage的DrawWidth（Mania通常只有一个Stage）
+//                 object? firstStage = stages[0];
+//                 var drawWidthProperty = firstStage?.GetType().GetProperty("DrawWidth");
+//
+//                 if (drawWidthProperty != null)
+//                 {
+//                     totalWidth = (float)drawWidthProperty.GetValue(firstStage)!;
+//                 }
+//             }
+//         }
+//     }
+//     catch
+//     {
+//         // 如果反射失败，回退到计算列宽总和
+//         totalWidth = 0;
+//     }
+// }
