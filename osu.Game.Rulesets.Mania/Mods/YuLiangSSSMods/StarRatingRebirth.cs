@@ -458,7 +458,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             {
                 int t = points[i];
                 // 如果在t处有变化，更新运行值
-                if (diff.ContainsKey(t)) curr += diff[t];
+                if (diff.TryGetValue(t, out double value)) curr += value;
 
                 double v = Math.Min(curr, 2.5 + 0.5 * curr);
                 values[i] = v;

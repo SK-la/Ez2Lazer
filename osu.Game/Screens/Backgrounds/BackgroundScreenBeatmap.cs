@@ -31,9 +31,6 @@ namespace osu.Game.Screens.Backgrounds
 
         private WorkingBeatmap beatmap;
 
-        // 双重绘制：底层完整背景，上层遮罩背景
-        private readonly Container maskedContainer;
-
         /// <summary>
         /// Whether or not user-configured settings relating to brightness of elements should be ignored.
         /// </summary>
@@ -60,15 +57,17 @@ namespace osu.Game.Screens.Backgrounds
         internal readonly Bindable<bool> IsBreakTime = new Bindable<bool>();
 
         private readonly DimmableBackground dimmable;
-        private readonly DimmableBackground maskedDimmable; // 上层独立的 dimmable
-        private readonly Container backgroundHolder; // 用于突破父容器尺寸限制
 
-        private Bindable<double> columnDim;
+        protected virtual DimmableBackground CreateFadeContainer() => new DimmableBackground { RelativeSizeAxes = Axes.Both };
+
+        // 双重绘制：底层完整背景，上层遮罩背景
+        private readonly Container maskedContainer;
+        private readonly DimmableBackground maskedDimmable; // 上层独立的 dimmable
+
         private Bindable<double> columnBlur;
         private Bindable<double> columnWidth;
         private Bindable<double> specialFactor;
-
-        protected virtual DimmableBackground CreateFadeContainer() => new DimmableBackground { RelativeSizeAxes = Axes.Both };
+        private int keyMode;
 
         [Resolved]
         private EzSkinSettingsManager ezSkinSettings { get; set; } = null!;
@@ -77,29 +76,29 @@ namespace osu.Game.Screens.Backgrounds
         {
             Beatmap = beatmap;
 
-            InternalChildren = new Drawable[]
+            InternalChild = dimmable = CreateFadeContainer();
+
+            dimmable.StoryboardReplacesBackground.BindTo(StoryboardReplacesBackground);
+            dimmable.IgnoreUserSettings.BindTo(IgnoreUserSettings);
+            dimmable.IsBreakTime.BindTo(IsBreakTime);
+            dimmable.BlurAmount.BindTo(BlurAmount);
+            dimmable.DimWhenUserSettingsIgnored.BindTo(DimWhenUserSettingsIgnored);
+
+            Container backgroundHolder;
+
+            if (Beatmap.BeatmapInfo.Ruleset.OnlineID == 3)
             {
-                // 底层：完整背景（使用外部控制的 dimmable）
-                new Container
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Child = dimmable = CreateFadeContainer()
-                },
-                // 上层：遮罩背景（使用独立的 maskedDimmable）
+                // 上层：遮罩背景副本
                 maskedContainer = new Container
                 {
                     RelativeSizeAxes = Axes.Y,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     Masking = true,
+                    Alpha = 0,
                     Children = new Drawable[]
                     {
-                        // 调试用色块（半透明红色）
-                        new Box
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Colour = Colour4.Red.Opacity(0.3f),
-                        },
+                        // 暗化效果在Stage中实现，这里只负责创建背景副本虚化
                         // 背景容器：保持全屏尺寸，不受父容器宽度限制
                         backgroundHolder = new Container
                         {
@@ -108,25 +107,19 @@ namespace osu.Game.Screens.Backgrounds
                             Child = maskedDimmable = CreateFadeContainer()
                         }
                     }
-                }
-            };
+                };
+                AddInternal(maskedContainer);
 
-            dimmable.StoryboardReplacesBackground.BindTo(StoryboardReplacesBackground);
-            dimmable.IgnoreUserSettings.BindTo(IgnoreUserSettings);
-            dimmable.IsBreakTime.BindTo(IsBreakTime);
-            dimmable.BlurAmount.BindTo(BlurAmount);
-            dimmable.DimWhenUserSettingsIgnored.BindTo(DimWhenUserSettingsIgnored);
+                maskedDimmable.StoryboardReplacesBackground.BindTo(StoryboardReplacesBackground);
+                maskedDimmable.IgnoreUserSettings.BindTo(IgnoreUserSettings);
+                maskedDimmable.IsBreakTime.BindTo(IsBreakTime);
 
-            // 上层也绑定必要的设置（但虚化暗化会被 EzSkin 覆盖）
-            maskedDimmable.StoryboardReplacesBackground.BindTo(StoryboardReplacesBackground);
-            maskedDimmable.IgnoreUserSettings.BindTo(IgnoreUserSettings);
-            maskedDimmable.IsBreakTime.BindTo(IsBreakTime);
-
-            // 设置 backgroundHolder 的尺寸为屏幕尺寸，不受父容器限制
-            Schedule(() =>
-            {
-                backgroundHolder.Size = Parent.DrawSize;
-            });
+                // 设置 backgroundHolder 的尺寸为屏幕尺寸，不受父容器限制
+                Schedule(() =>
+                {
+                    backgroundHolder.Size = DrawSize;
+                });
+            }
         }
 
         [BackgroundDependencyLoader]
@@ -137,28 +130,24 @@ namespace osu.Game.Screens.Backgrounds
             switchBackground(background);
 
             // 如果是 Mania，绑定 EzSkin 设置到上层背景
-            if (beatmap.BeatmapInfo.Ruleset.OnlineID != 3)
+            if (beatmap.BeatmapInfo.Ruleset.OnlineID == 3)
             {
-                maskedDimmable.Alpha = 0;
-                return;
+                maskedContainer.Alpha = 1;
+
+                keyMode = (int)Beatmap.BeatmapInfo.Difficulty.CircleSize;
+
+                columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
+                columnWidth = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnWidth);
+                specialFactor = ezSkinSettings.GetBindable<double>(EzSkinSetting.SpecialFactor);
+
+                columnWidth.BindValueChanged(_ => updateWidth(), true);
+                specialFactor.BindValueChanged(_ => updateWidth(), true);
+                columnBlur.BindValueChanged(v => maskedDimmable.BlurAmount.Value = (float)v.NewValue * USER_BLUR_FACTOR, true);
             }
-
-            columnDim = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnDim);
-            columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
-            columnWidth = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactor = ezSkinSettings.GetBindable<double>(EzSkinSetting.SpecialFactor);
-
-            columnWidth.BindValueChanged(_ => updateWidth(), true);
-            specialFactor.BindValueChanged(_ => updateWidth());
-
-            // 应用 EzSkin 的虚化暗化设置到上层（maskedDimmable）
-            columnDim.BindValueChanged(v => maskedDimmable.DimWhenUserSettingsIgnored.Value = (float)v.NewValue, true);
-            columnBlur.BindValueChanged(v => maskedDimmable.BlurAmount.Value = (float)v.NewValue * USER_BLUR_FACTOR, true);
         }
 
         private void updateWidth()
         {
-            int keyMode = (int)Beatmap.BeatmapInfo.Difficulty.CircleSize;
             float totalWidth = 0;
 
             for (int i = 0; i < keyMode; i++)
@@ -214,9 +203,9 @@ namespace osu.Game.Screens.Backgrounds
             dimmable.Background = Background = b;
 
             // 上层：独立的背景（克隆一个新实例）
-            // var maskedBackground = new BeatmapBackground(beatmap) { Depth = newDepth };
-            // maskedBackground.FadeInFromZero(500, Easing.OutQuint);
-            // maskedDimmable.Background = maskedBackground;
+            var maskedBackground = new BeatmapBackground(beatmap) { Depth = newDepth };
+            maskedBackground.Sprite.Texture = b.Sprite.Texture; // 直接使用底层背景的纹理，确保缩放一致
+            maskedDimmable.Background = maskedBackground;
         }
 
         public override bool Equals(BackgroundScreen other)
