@@ -67,10 +67,15 @@ namespace osu.Game.Screens.Backgrounds
         private Bindable<double> columnBlur;
         private Bindable<double> columnWidth;
         private Bindable<double> specialFactor;
+        private Bindable<float> uiScale;
+
         private int keyMode;
 
         [Resolved]
         private EzSkinSettingsManager ezSkinSettings { get; set; } = null!;
+
+        [Resolved]
+        private OsuConfigManager config { get; set; } = null!;
 
         public BackgroundScreenBeatmap(WorkingBeatmap beatmap = null)
         {
@@ -133,17 +138,19 @@ namespace osu.Game.Screens.Backgrounds
             if (beatmap.BeatmapInfo.Ruleset.OnlineID == 3)
             {
                 maskedContainer.Alpha = 1;
-
-                keyMode = (int)Beatmap.BeatmapInfo.Difficulty.CircleSize;
-
-                columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
-                columnWidth = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnWidth);
-                specialFactor = ezSkinSettings.GetBindable<double>(EzSkinSetting.SpecialFactor);
-
-                columnWidth.BindValueChanged(_ => updateWidth(), true);
-                specialFactor.BindValueChanged(_ => updateWidth(), true);
-                columnBlur.BindValueChanged(v => maskedDimmable.BlurAmount.Value = (float)v.NewValue * USER_BLUR_FACTOR, true);
             }
+
+            keyMode = (int)Beatmap.BeatmapInfo.Difficulty.CircleSize;
+
+            columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
+            columnWidth = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            specialFactor = ezSkinSettings.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            uiScale = config.GetBindable<float>(OsuSetting.UIScale);
+
+            columnWidth.BindValueChanged(_ => updateWidth(), true);
+            specialFactor.BindValueChanged(_ => updateWidth(), true);
+            uiScale.BindValueChanged(_ => updateWidth(), true);
+            columnBlur.BindValueChanged(v => maskedDimmable.BlurAmount.Value = (float)v.NewValue * USER_BLUR_FACTOR, true);
         }
 
         private void updateWidth()
@@ -153,7 +160,7 @@ namespace osu.Game.Screens.Backgrounds
             for (int i = 0; i < keyMode; i++)
                 totalWidth += getColumnWidth(keyMode, i);
 
-            maskedContainer.Width = totalWidth;
+            maskedContainer.Width = totalWidth / uiScale.Value;
         }
 
         private float getColumnWidth(int keyMode, int columnIndex)
