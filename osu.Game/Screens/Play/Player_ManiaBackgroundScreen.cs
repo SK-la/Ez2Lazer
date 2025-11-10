@@ -110,11 +110,8 @@ namespace osu.Game.Screens.Play
 
                 float totalWidth = 0;
 
-                if (totalWidth == 0)
-                {
-                    for (int i = 0; i < keyMode; i++)
-                        totalWidth += getManiaColumnWidth(i);
-                }
+                for (int i = 0; i < keyMode; i++)
+                    totalWidth += getManiaColumnWidth(i);
 
                 float uiScaleCompensation = 1f / uiScale.Value;
 

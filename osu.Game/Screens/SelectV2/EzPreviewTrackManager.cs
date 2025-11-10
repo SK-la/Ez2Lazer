@@ -30,7 +30,7 @@ namespace osu.Game.Screens.SelectV2
         private const double preview_window_length = 10000; // 10s
         private const double scheduler_interval = 16; // ~60fps
         private const double trigger_tolerance = 40; // ms 容差
-        private const double max_dynamic_preview_length = 10000; // 动态扩展最长 10s
+        private const double max_dynamic_preview_length = 30000; // 动态扩展最长 s
         private readonly List<ScheduledHitSound> scheduledHitSounds = new List<ScheduledHitSound>();
 
         private readonly List<ScheduledStoryboardSample> scheduledStoryboardSamples = new List<ScheduledStoryboardSample>();
@@ -395,6 +395,9 @@ namespace osu.Game.Screens.SelectV2
             double logicalTime = physicalTime + logicalOffset;
             bool withinWindow = logicalTime <= previewEndTime + trigger_tolerance;
 
+            // 优化：使用二分查找跳过已错过的事件，减少循环次数
+            nextHitSoundIndex = FindNextValidIndex(scheduledHitSounds, nextHitSoundIndex, logicalTime - trigger_tolerance);
+
             while (withinWindow && nextHitSoundIndex < scheduledHitSounds.Count)
             {
                 var hs = scheduledHitSounds[nextHitSoundIndex];
@@ -423,6 +426,9 @@ namespace osu.Game.Screens.SelectV2
                 }
                 else break;
             }
+
+            // 同样优化 storyboard samples
+            nextStoryboardSampleIndex = FindNextValidIndex(scheduledStoryboardSamples, nextStoryboardSampleIndex, logicalTime - trigger_tolerance);
 
             while (withinWindow && nextStoryboardSampleIndex < scheduledStoryboardSamples.Count)
             {
@@ -453,6 +459,8 @@ namespace osu.Game.Screens.SelectV2
             }
 
             lastTrackTime = physicalTime;
+            // 清理已停止的音频通道，减少内存占用
+            activeChannels.RemoveAll(c => !c.Playing);
         }
 
         private void triggerHitSound(HitSampleInfo[] samples)
@@ -641,6 +649,43 @@ namespace osu.Game.Screens.SelectV2
             public double Time;
             public StoryboardSampleInfo Sample;
             public bool HasTriggered;
+        }
+
+        // 二分查找辅助方法：找到第一个 Time >= minTime 的索引
+        private static int FindNextValidIndex(List<ScheduledHitSound> list, int startIndex, double minTime)
+        {
+            int low = startIndex, high = list.Count - 1;
+
+            while (low <= high)
+            {
+                int mid = (low + high) / 2;
+                double time = list[mid].Time;
+
+                if (time < minTime)
+                    low = mid + 1;
+                else
+                    high = mid - 1;
+            }
+
+            return low;
+        }
+
+        private static int FindNextValidIndex(List<ScheduledStoryboardSample> list, int startIndex, double minTime)
+        {
+            int low = startIndex, high = list.Count - 1;
+
+            while (low <= high)
+            {
+                int mid = (low + high) / 2;
+                double time = list[mid].Time;
+
+                if (time < minTime)
+                    low = mid + 1;
+                else
+                    high = mid - 1;
+            }
+
+            return low;
         }
     }
 }

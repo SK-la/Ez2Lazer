@@ -443,13 +443,13 @@ namespace osu.Game.Rulesets.Mania
             };
         }
 
-        public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) //单轨道判定分布
+        public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap)
         {
             var hitEventsByColumn = score.HitEvents
-                                         .Where(e => e.HitObject is ManiaHitObject)
-                                         .GroupBy(e => ((ManiaHitObject)e.HitObject).Column)
-                                         .OrderBy(g => g.Key)
-                                         .ToList();
+                .Where(e => e.HitObject is ManiaHitObject)
+                .GroupBy(e => ((ManiaHitObject)e.HitObject).Column)
+                .OrderBy(g => g.Key)
+                .ToList();
 
             var statistics = new List<StatisticItem>
             {
@@ -461,12 +461,12 @@ namespace osu.Game.Rulesets.Mania
                 new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score.HitEvents, new DefaultHitWindows()) //TODO:改成可实时变更
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 300
+                    Height = 180
                 }, true),
                 new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 300
+                    Height = 180
                 }, true),
                 new StatisticItem("Column Timing Distributions", () => new CreateRotatedColumnGraphs(hitEventsByColumn)
                 {
@@ -479,16 +479,6 @@ namespace osu.Game.Rulesets.Mania
                     new UnstableRate(score.HitEvents)
                 }), true)
             };
-
-            //横向组件，纵向堆积
-            // foreach (var column in hitEventsByColumn)
-            // {
-            //     statistics.Add(new StatisticItem($"Timing Distribution - Column {column.Key + 1}", () => new HitEventTimingDistributionGraph(column.ToList())
-            //     {
-            //         RelativeSizeAxes = Axes.X,
-            //         Height = 50,
-            //     }, true));
-            // }
 
             return statistics.ToArray();
         }
