@@ -38,8 +38,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             hitPositon = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
-            hitPositon.BindValueChanged(_ => updateSizes());
-            columnWidth.BindValueChanged(_ => updateSizes());
             OnSkinChanged();
         }
 
@@ -47,6 +45,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
             stageName.BindValueChanged(_ => OnSkinChanged());
+            hitPositon.BindValueChanged(_ => updateSizes());
+            columnWidth.BindValueChanged(_ => updateSizes());
         }
 
         protected override void Update()
@@ -63,13 +63,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             sprite = new Container
             {
                 RelativeSizeAxes = Axes.None,
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
                 Child = stageBottom
             };
-            // sprite.Depth = float.MinValue;
-            AddInternal(sprite); // 注释掉以隐藏stage
+            sprite.Depth = -1;
+            // AddInternal(sprite); // 注释掉以隐藏stage
             Schedule(updateSizes);
         }
 
@@ -82,7 +81,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             float scale = actualPanelWidth / 410.0f;
             sprite.Scale = new Vector2(scale);
 
-            sprite.Y = LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION - (float)hitPositon.Value - DrawHeight * 0.865f;
+            sprite.Y = (ezSkinConfig.DefaultHitPosition - (float)hitPositon.Value) + (247f * scale);
             // Position = new Vector2(0, 415 + 110 - (float)hitPositon.Value);
         }
     }

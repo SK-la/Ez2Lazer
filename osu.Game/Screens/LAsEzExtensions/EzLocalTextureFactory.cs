@@ -530,16 +530,12 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         public virtual Drawable CreateStage(string component)
         {
-            // if (!isStageBody(component))
-            //     throw new ArgumentException("CreateStage only handles Body components. Use CreateStageKeys for key components.", nameof(component));
-
             string basePath = $"Stage/{stageName.Value}/Stage";
 
             var container = new Container
             {
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
-                FillMode = FillMode.Fill,
                 Y = 0,
                 AutoSizeAxes = Axes.X,
                 Height = default_stage_body_height,

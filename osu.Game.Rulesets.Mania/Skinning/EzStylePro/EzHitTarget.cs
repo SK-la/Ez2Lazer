@@ -32,6 +32,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             RelativeSizeAxes = Axes.X;
             FillMode = FillMode.Fill;
+            Depth = 1;
         }
 
         [BackgroundDependencyLoader]

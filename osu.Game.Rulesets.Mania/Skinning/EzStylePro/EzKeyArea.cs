@@ -87,10 +87,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             container = new Container
             {
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
                 RelativeSizeAxes = Axes.Both,
-                Y = (float)hitPositonBindable.Value + 4,
                 Children = new[]
                 {
                     upSprite,
@@ -104,7 +103,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
-            container.Y = (float)hitPositonBindable.Value + 4;
+            container.Y = ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
         }
 
         private void OnSkinChanged() => loadAnimation();
