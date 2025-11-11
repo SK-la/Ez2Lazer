@@ -173,6 +173,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     return Drawable.Empty();
 
                 case ManiaSkinComponentLookup maniaComponent:
+                    if (columnWidth == 0) Drawable.Empty();
+
                     switch (maniaComponent.Component)
                     {
                         case ManiaSkinComponents.ColumnBackground:
@@ -182,7 +184,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                             return new EzColumnBackground();
 
                         case ManiaSkinComponents.KeyArea:
-                            return columnWidth == 0 ? Drawable.Empty() : new EzKeyArea();
+                            return new EzKeyArea();
 
                         case ManiaSkinComponents.Note:
                             return new EzNote();

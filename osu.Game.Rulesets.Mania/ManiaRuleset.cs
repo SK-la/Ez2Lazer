@@ -466,12 +466,12 @@ namespace osu.Game.Rulesets.Mania
                 new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 180
+                    Height = 120
                 }, true),
                 new StatisticItem("Column Timing Distributions", () => new CreateRotatedColumnGraphs(hitEventsByColumn)
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 300,
+                    Height = 250,
                 }, true),
                 new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
                 {

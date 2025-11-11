@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = null!;
         private readonly Box dimBox;
-        private readonly AcrylicContainer acrylicEffect;
+        private readonly FrostedGlassContainer acrylicEffect;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
@@ -92,13 +92,13 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 // TODO: 需要修改framework着色器-容器实现真正效果。动态根据实际的游戏中BackgroundScreen背景或故事版绘制局部虚化效果
                 // 注意，如果是真正的毛玻璃效果，此处就不应该在此处试图获取外部的背景内容，因为存在循环依赖问题。
-                acrylicEffect = new AcrylicContainer
+                acrylicEffect = new FrostedGlassContainer
                 {
                     Name = "Acrylic backdrop effect",
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both, //使用Both即可实现局部遮罩，因为此处父容器就是局部面板
-                    BlurStrength = 30f,
+                    BlurRotation = 50f,
                     Depth = 1, // 在背景层
                     Child = new Box
                     {
@@ -217,7 +217,7 @@ namespace osu.Game.Rulesets.Mania.UI
             // 应用虚化效果
             columnBlur.BindValueChanged(v =>
             {
-                acrylicEffect.BlurStrength = (float)v.NewValue;
+                acrylicEffect.BlurRotation = (float)v.NewValue;
             }, true);
         }
 
