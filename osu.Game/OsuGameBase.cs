@@ -288,7 +288,7 @@ namespace osu.Game
             dependencies.Cache(
                 NoteFactory = new EzLocalTextureFactory(
                     EzSkinSettingsManager,
-                    new TextureStore(Host.Renderer),
+                    Host.Renderer,
                     Storage));
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
@@ -452,7 +452,7 @@ namespace osu.Game
             LocalConfig.LookupKeyBindings = l => KeyBindingStore.GetBindingsStringFor(l);
 
             // 添加自动背景捕获组件，启用亚克力效果
-            base.Content.Add(new osu.Framework.Graphics.Containers.AutoBackgroundCapture());
+            // base.Content.Add(new AutoBackgroundCapture());
         }
 
         private void updateLanguage() => CurrentLanguage.Value = LanguageExtensions.GetLanguageFor(frameworkLocale.Value, localisationParameters.Value);

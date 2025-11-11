@@ -26,6 +26,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
+        private Bindable<string> stageName = null!;
+
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -35,6 +37,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             hitPositon = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
             hitPositon.BindValueChanged(_ => updateSizes());
             columnWidth.BindValueChanged(_ => updateSizes());
             OnSkinChanged();
@@ -43,13 +46,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            stageName.BindValueChanged(_ => OnSkinChanged());
         }
 
-        // protected override void Update()
-        // {
-        //     base.Update();
-        //     updateSizes();
-        // }
+        protected override void Update()
+        {
+            base.Update();
+            updateSizes();
+        }
 
         private void OnSkinChanged()
         {
@@ -65,7 +69,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Child = stageBottom
             };
             // sprite.Depth = float.MinValue;
-            AddInternal(sprite);
+            AddInternal(sprite); // 注释掉以隐藏stage
             Schedule(updateSizes);
         }
 

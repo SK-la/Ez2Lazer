@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
@@ -34,6 +35,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
+        private Bindable<string> stageName = null!;
+        private Bindable<double> hitPositonBindable = null!;
+
         public EzKeyArea()
         {
             RelativeSizeAxes = Axes.Both;
@@ -42,11 +46,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader]
         private void load()
         {
+            stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            stageName.BindValueChanged(_ => OnSkinChanged());
+            hitPositonBindable.BindValueChanged(_ => OnConfigChanged());
             OnSkinChanged();
         }
 
@@ -73,16 +81,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             ClearInternal();
 
-            upSprite = factory.CreateStage("keybase");
-            downSprite = factory.CreateStage("keypress");
+            upSprite = factory.CreateStageKeys("keybase");
+            downSprite = factory.CreateStageKeys("keypress");
             downSprite.Alpha = 0;
 
             container = new Container
             {
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
+                RelativeSizeAxes = Axes.Both,
+                Y = (float)hitPositonBindable.Value + 4,
                 Children = new[]
                 {
                     upSprite,
@@ -96,6 +104,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
+            container.Y = (float)hitPositonBindable.Value + 4;
         }
 
         private void OnSkinChanged() => loadAnimation();
