@@ -15,7 +15,7 @@ using osu.Game.Screens.LAsEzExtensions;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzKeyArea : LegacyManiaColumnElement, IKeyBindingHandler<ManiaAction>
+    public partial class EzKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private Drawable container = null!;
         private Drawable upSprite = null!;
@@ -25,6 +25,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         [Resolved]
         private Column column { get; set; } = null!;
+
+        [Resolved]
+        private StageDefinition stage { get; set; } = null!;
 
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
@@ -41,6 +44,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         public EzKeyArea()
         {
             RelativeSizeAxes = Axes.Both;
+            Anchor = Anchor.TopCentre;
+            Origin = Anchor.TopCentre;
         }
 
         [BackgroundDependencyLoader]
@@ -79,6 +84,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void loadAnimation()
         {
+            if (stage.Columns == 14 && column.Index == 13) return;
+
             ClearInternal();
 
             upSprite = factory.CreateStageKeys("keybase");
@@ -103,7 +110,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
-            container.Y = ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
+            container.Y =  768f - (float)hitPositonBindable.Value + 45f;
         }
 
         private void OnSkinChanged() => loadAnimation();
