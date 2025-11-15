@@ -109,8 +109,11 @@ namespace osu.Game.Screens.Play
                 if (!player.LoadedBeatmapSuccessfully) return;
 
                 float totalWidth = 0;
+                float forMode = keyMode == 14
+                    ? keyMode - 1
+                    : keyMode;
 
-                for (int i = 0; i < keyMode; i++)
+                for (int i = 0; i < forMode; i++)
                     totalWidth += getManiaColumnWidth(i);
 
                 float uiScaleCompensation = 1f / uiScale.Value;

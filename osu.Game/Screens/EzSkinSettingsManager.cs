@@ -19,6 +19,7 @@ namespace osu.Game.Screens
     {
         protected override string Filename => "EzSkinSettings.ini";
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
+        public float DefaultHitPosition = 180f;
 
         private Dictionary<int, EzColumnType[]> columnTypeCache = new Dictionary<int, EzColumnType[]>();
 
@@ -72,8 +73,8 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
-            SetDefault(EzSkinSetting.ColumnBlur,  0.7, 0.01, 1, 0.01);
-            SetDefault(EzSkinSetting.ColumnDim,  0.7, 0.01, 1, 0.01);
+            SetDefault(EzSkinSetting.ColumnBlur, 0.7, 0.01, 1, 0.01);
+            SetDefault(EzSkinSetting.ColumnDim, 0.7, 0.01, 1, 0.01);
             SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
             SetDefault(EzSkinSetting.ColumnTypeB, Colour4.FromHex("#648FFF"));
             SetDefault(EzSkinSetting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
@@ -88,8 +89,6 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.ColumnTypeP, Colour4.FromHex("#72FF72"));
             initializeColumnTypeDefaults();
         }
-
-        public float DefaultHitPosition = 180f;
 
         private void initializeColumnTypeDefaults()
         {

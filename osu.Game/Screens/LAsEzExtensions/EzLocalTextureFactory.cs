@@ -29,6 +29,9 @@ namespace osu.Game.Screens.LAsEzExtensions
         public static EzLocalTextureFactory? GetInstance() => instance;
 
         private const int max_cache_size = 100;
+        private const int max_single_texture_cache_size = 200;
+        private const int max_note_ratio_cache_size = 50;
+        private const int max_path_cache_size = 50;
         private const int max_frames_to_load = 240;
         private const int max_stage_frames = 120;
         private const double default_frame_length = 1000.0 / 60.0 * 4;
@@ -47,13 +50,11 @@ namespace osu.Game.Screens.LAsEzExtensions
         private readonly EzSkinSettingsManager ezSkinConfig;
         private readonly Dictionary<string, TextureLoaderStore> loaderStoreCache = new Dictionary<string, TextureLoaderStore>();
 
-        private Bindable<string> noteSetName = null!;
-        private Bindable<string> stageName = null!;
-        private Bindable<double> columnWidth = null!;
-        private Bindable<double> specialFactor = null!;
-        private Bindable<double> noteHeightScaleToWidth = null!;
-
-        private bool initialized;
+        private readonly Bindable<string> noteSetName;
+        private readonly Bindable<string> stageName;
+        private readonly Bindable<double> columnWidth;
+        private readonly Bindable<double> specialFactor;
+        private readonly Bindable<double> noteHeightScaleToWidth;
 
         private readonly struct CacheEntry : IEquatable<CacheEntry>
         {
@@ -99,27 +100,26 @@ namespace osu.Game.Screens.LAsEzExtensions
             textureStore = new TextureStore(renderer);
             largeTextureStore = new LargeTextureStore(renderer);
 
-            const string path = "EzResources/";
+            const string base_path = "EzResources/";
+            const string stage_path = "EzResources/Stage/";
 
-            if (!loaderStoreCache.TryGetValue(path, out var textureLoaderStore))
+            if (!loaderStoreCache.TryGetValue(base_path, out var baseTextureLoaderStore))
             {
-                var storage = hostStorage.GetStorageForDirectory(path);
-                var fileStore = new StorageBackedResourceStore(storage);
-                textureLoaderStore = new TextureLoaderStore(fileStore);
-                loaderStoreCache[path] = textureLoaderStore;
-                textureStore.AddTextureSource(textureLoaderStore);
-                largeTextureStore.AddTextureSource(textureLoaderStore);
+                var baseStorage = hostStorage.GetStorageForDirectory(base_path);
+                var baseFileStore = new StorageBackedResourceStore(baseStorage);
+                baseTextureLoaderStore = new TextureLoaderStore(baseFileStore);
+                loaderStoreCache[base_path] = baseTextureLoaderStore;
+                textureStore.AddTextureSource(baseTextureLoaderStore);
             }
 
-            initialize();
-        }
-
-        private void initialize()
-        {
-            if (initialized)
-                return;
-
-            initialized = true;
+            if (!loaderStoreCache.TryGetValue(stage_path, out var stageTextureLoaderStore))
+            {
+                var stageStorage = hostStorage.GetStorageForDirectory(stage_path);
+                var stageFileStore = new StorageBackedResourceStore(stageStorage);
+                stageTextureLoaderStore = new TextureLoaderStore(stageFileStore);
+                loaderStoreCache[stage_path] = stageTextureLoaderStore;
+                largeTextureStore.AddTextureSource(stageTextureLoaderStore);
+            }
 
             noteSetName = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
             stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
@@ -134,83 +134,43 @@ namespace osu.Game.Screens.LAsEzExtensions
             });
 
             stageName.BindValueChanged(e =>
+
             {
-                clearStageCache(e.OldValue, e.NewValue);
             });
+        }
+
+        private void clearCache<T>(ConcurrentDictionary<string, T> cache, Func<string, bool> predicate, string cacheName)
+        {
+            var keysToRemove = cache.Keys.Where(predicate).ToList();
+            int removedCount = 0;
+
+            foreach (string key in keysToRemove)
+            {
+                if (cache.TryRemove(key, out _))
+                    removedCount++;
+            }
+
+            if (removedCount > 0)
+            {
+                Logger.Log($"[EzLocalTextureFactory] Cleared {removedCount} entries from {cacheName}",
+                    LoggingTarget.Runtime, LogLevel.Debug);
+            }
         }
 
         private void clearRelatedCache(string? oldNoteSet, string newNoteSet)
         {
             if (string.IsNullOrEmpty(oldNoteSet)) return;
 
-            var keysToRemove = new List<string>();
-
-            foreach (string key in global_cache.Keys)
-            {
-                if (key.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal))
-                    keysToRemove.Add(key);
-            }
-
-            foreach (string key in keysToRemove)
-            {
-                global_cache.TryRemove(key, out _);
-            }
-
-            var pathKeysToRemove = pathCache.Keys.Where(k => k.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal)).ToList();
-
-            foreach (string key in pathKeysToRemove)
-            {
-                pathCache.TryRemove(key, out _);
-            }
-
-            var ratioKeysToRemove = noteRatioCache.Keys.Where(k =>
-                k.Contains($"note/{oldNoteSet}/", StringComparison.Ordinal) ||
-                k.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal)).ToList();
-
-            foreach (string key in ratioKeysToRemove)
-            {
-                noteRatioCache.TryRemove(key, out _);
-            }
-
-            var singleTextureKeysToRemove = singleTextureCache.Keys.Where(k =>
-                k.Contains($"note/{oldNoteSet}/", StringComparison.Ordinal) ||
-                k.Contains($"/{oldNoteSet}/", StringComparison.Ordinal)).ToList();
-
-            foreach (string key in singleTextureKeysToRemove)
-            {
-                singleTextureCache.TryRemove(key, out _);
-            }
+            clearCache(global_cache, k => k.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal), "global_cache");
+            clearCache(pathCache, k => k.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal), "pathCache");
+            clearCache(noteRatioCache, k => k.Contains($"note/{oldNoteSet}/", StringComparison.Ordinal) || k.StartsWith($"{oldNoteSet}_", StringComparison.Ordinal), "noteRatioCache");
+            clearCache(singleTextureCache, k => k.Contains($"note/{oldNoteSet}/", StringComparison.Ordinal) || k.Contains($"/{oldNoteSet}/", StringComparison.Ordinal), "singleTextureCache");
 
             resetPreloadState();
 
-            var newNoteKeysToRemove = new List<string>();
-
-            foreach (string key in global_cache.Keys)
-            {
-                if (key.StartsWith($"{newNoteSet}_", StringComparison.Ordinal))
-                    newNoteKeysToRemove.Add(key);
-            }
-
-            foreach (string key in newNoteKeysToRemove)
-            {
-                global_cache.TryRemove(key, out _);
-            }
-
-            var newPathKeysToRemove = pathCache.Keys.Where(k => k.StartsWith($"{newNoteSet}_", StringComparison.Ordinal)).ToList();
-
-            foreach (string key in newPathKeysToRemove)
-            {
-                pathCache.TryRemove(key, out _);
-            }
-
-            var newRatioKeysToRemove = noteRatioCache.Keys.Where(k =>
-                k.Contains($"note/{newNoteSet}/", StringComparison.Ordinal) ||
-                k.StartsWith($"{newNoteSet}_", StringComparison.Ordinal)).ToList();
-
-            foreach (string key in newRatioKeysToRemove)
-            {
-                noteRatioCache.TryRemove(key, out _);
-            }
+            clearCache(global_cache, k => k.StartsWith($"{newNoteSet}_", StringComparison.Ordinal), "global_cache");
+            clearCache(pathCache, k => k.StartsWith($"{newNoteSet}_", StringComparison.Ordinal), "pathCache");
+            clearCache(noteRatioCache, k => k.Contains($"note/{newNoteSet}/", StringComparison.Ordinal) || k.StartsWith($"{newNoteSet}_", StringComparison.Ordinal), "noteRatioCache");
 
             Schedule(() =>
             {
@@ -233,27 +193,6 @@ namespace osu.Game.Screens.LAsEzExtensions
                     }
                 });
             });
-
-            // Logger.Log($"[EzLocalTextureFactory] Cleared cache for note set change: {oldNoteSet} -> {newNoteSet} " +
-            //            $"(Removed {keysToRemove.Count + newNoteKeysToRemove.Count} texture cache, {pathKeysToRemove.Count + newPathKeysToRemove.Count} path cache, {ratioKeysToRemove.Count + newRatioKeysToRemove.Count} ratio cache)",
-            //     LoggingTarget.Runtime, LogLevel.Debug);
-        }
-
-        private void clearStageCache(string? oldStage, string newStage)
-        {
-            if (string.IsNullOrEmpty(oldStage)) return;
-
-            var stageTextureKeysToRemove = singleTextureCache.Keys.Where(k =>
-                k.Contains($"/{oldStage}/", StringComparison.Ordinal) ||
-                k.Contains($"{oldStage}_", StringComparison.Ordinal)).ToList();
-
-            foreach (string key in stageTextureKeysToRemove)
-            {
-                singleTextureCache.TryRemove(key, out _);
-            }
-
-            Logger.Log($"[EzLocalTextureFactory] Cleared stage cache for change: {oldStage} -> {newStage}",
-                LoggingTarget.Runtime, LogLevel.Debug);
         }
 
         public void ForceRefreshCache()
@@ -266,7 +205,7 @@ namespace osu.Game.Screens.LAsEzExtensions
 
             noteRatioCache.Clear();
             pathCache.Clear();
-            clearSingleTextureCache();
+            singleTextureCache.Clear();
             ClearGlobalCache();
         }
 
@@ -275,7 +214,14 @@ namespace osu.Game.Screens.LAsEzExtensions
         private string getComponentPath(string noteName, string component)
         {
             string key = $"{noteName}_{component}";
-            return pathCache.GetOrAdd(key, _ => $"note/{noteName}/{component}");
+            string path = pathCache.GetOrAdd(key, _ => $"note/{noteName}/{component}");
+
+            if (pathCache.Count > max_path_cache_size)
+            {
+                Task.Run(cleanPathCache);
+            }
+
+            return path;
         }
 
         private float calculateRatio(string path)
@@ -307,11 +253,18 @@ namespace osu.Game.Screens.LAsEzExtensions
         {
             string path = getComponentPath(noteSetName.Value, component);
 
-            return noteRatioCache.GetOrAdd(path, p =>
+            float ratio = noteRatioCache.GetOrAdd(path, p =>
             {
-                float ratio = calculateRatio(p);
-                return ratio >= square_ratio_threshold ? 1.0f : ratio;
+                float calculatedRatio = calculateRatio(p);
+                return calculatedRatio >= square_ratio_threshold ? 1.0f : calculatedRatio;
             });
+
+            if (noteRatioCache.Count > max_note_ratio_cache_size)
+            {
+                Task.Run(cleanNoteRatioCache);
+            }
+
+            return ratio;
         }
 
         public bool IsSquareNote(string component) => GetRatio(component) >= square_ratio_threshold;
@@ -371,8 +324,9 @@ namespace osu.Game.Screens.LAsEzExtensions
             }
         }
 
-        private List<Texture> getCachedTextureFrames(string component, string currentNoteSetName)
+        private List<Texture> getCachedTextureFrames(string component)
         {
+            string currentNoteSetName = noteSetName.Value;
             string cacheKey = $"{currentNoteSetName}_{component}";
 
             // 双重检查锁定模式，避免并发时重复创建
@@ -403,7 +357,7 @@ namespace osu.Game.Screens.LAsEzExtensions
                 }
 
                 // 加载纹理帧
-                var frames = loadTextureFrames(component, currentNoteSetName);
+                var frames = loadNotesFrames(component, currentNoteSetName);
 
                 // 只缓存有效的帧数据，不缓存空结果
                 if (frames.Count > 0)
@@ -433,19 +387,87 @@ namespace osu.Game.Screens.LAsEzExtensions
             }
         }
 
-        private void clearSingleTextureCache()
+        private void cleanSingleTextureCache()
         {
-            int count = singleTextureCache.Count;
+            if (singleTextureCache.Count <= max_single_texture_cache_size) return;
 
-            if (count > 0)
+            lock (cleanup_lock)
             {
-                Logger.Log($"[EzLocalTextureFactory] Clearing single texture cache ({count})",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-                singleTextureCache.Clear();
+                if (singleTextureCache.Count <= max_single_texture_cache_size) return;
+
+                // Simple cleanup: remove oldest entries (assuming insertion order, but ConcurrentDictionary doesn't guarantee order)
+                // For simplicity, remove a fixed number
+                var keysToRemove = singleTextureCache.Keys.Take(singleTextureCache.Count - max_single_texture_cache_size + 10).ToList();
+
+                int removedCount = 0;
+
+                foreach (string key in keysToRemove)
+                {
+                    if (singleTextureCache.TryRemove(key, out _))
+                        removedCount++;
+                }
+
+                if (removedCount > 0)
+                {
+                    Logger.Log($"[EzLocalTextureFactory] Cleaned {removedCount} old single texture cache entries",
+                        LoggingTarget.Performance, LogLevel.Debug);
+                }
             }
         }
 
-        private List<Texture> loadTextureFrames(string component, string noteSetName)
+        private void cleanNoteRatioCache()
+        {
+            if (noteRatioCache.Count <= max_note_ratio_cache_size) return;
+
+            lock (cleanup_lock)
+            {
+                if (noteRatioCache.Count <= max_note_ratio_cache_size) return;
+
+                var keysToRemove = noteRatioCache.Keys.Take(noteRatioCache.Count - max_note_ratio_cache_size + 5).ToList();
+
+                int removedCount = 0;
+
+                foreach (string key in keysToRemove)
+                {
+                    if (noteRatioCache.TryRemove(key, out _))
+                        removedCount++;
+                }
+
+                if (removedCount > 0)
+                {
+                    Logger.Log($"[EzLocalTextureFactory] Cleaned {removedCount} old note ratio cache entries",
+                        LoggingTarget.Performance, LogLevel.Debug);
+                }
+            }
+        }
+
+        private void cleanPathCache()
+        {
+            if (pathCache.Count <= max_path_cache_size) return;
+
+            lock (cleanup_lock)
+            {
+                if (pathCache.Count <= max_path_cache_size) return;
+
+                var keysToRemove = pathCache.Keys.Take(pathCache.Count - max_path_cache_size + 5).ToList();
+
+                int removedCount = 0;
+
+                foreach (string key in keysToRemove)
+                {
+                    if (pathCache.TryRemove(key, out _))
+                        removedCount++;
+                }
+
+                if (removedCount > 0)
+                {
+                    Logger.Log($"[EzLocalTextureFactory] Cleaned {removedCount} old path cache entries",
+                        LoggingTarget.Performance, LogLevel.Debug);
+                }
+            }
+        }
+
+        private List<Texture> loadNotesFrames(string component, string noteSetName)
         {
             var frames = new List<Texture>();
             string[] pathsToTry =
@@ -495,8 +517,6 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         public virtual TextureAnimation CreateAnimation(string component)
         {
-            string currentNoteSetName = noteSetName.Value;
-
             bool isHit = isHitCom(component);
             var animation = new TextureAnimation
             {
@@ -509,7 +529,7 @@ namespace osu.Game.Screens.LAsEzExtensions
 
             if (!isHit) animation.DefaultFrameLength = default_frame_length;
 
-            var frames = getCachedTextureFrames(component, currentNoteSetName);
+            var frames = getCachedTextureFrames(component);
 
             foreach (var texture in frames)
             {
@@ -530,38 +550,109 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         public virtual Drawable CreateStage(string component)
         {
-            string basePath = $"Stage/{stageName.Value}/Stage";
-
-            var container = new Container
-            {
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                Y = 0,
-                AutoSizeAxes = Axes.X,
-                Height = default_stage_body_height,
-                Masking = true,
-            };
-
-            addStageComponent(container, $"{basePath}/fivekey/{component}");
-            addStageComponent(container, $"{basePath}/GrooveLight");
-            createStageAnimation(container, basePath);
-
-            return container;
-        }
-
-        public virtual Container CreateStageKeys(string component)
-        {
-            string basePath = $"Stage/{stageName.Value}/Stage";
+            string basePath = $"{stageName.Value}/Stage";
 
             var container = new Container
             {
                 Anchor = Anchor.BottomCentre,
                 Origin = Anchor.BottomCentre,
+                Y = 0,
+                // AutoSizeAxes = Axes.X,
+                // Height = default_stage_body_height,
+                // Masking = true,
+            };
+
+            addStageComponent(container, $"{basePath}/fivekey/{component}", false);
+            addStageComponent(container, $"{basePath}/GrooveLight", false);
+            addStageComponent(container, $"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject", true);
+
+            return container;
+        }
+
+        private void addStageComponent(Container container, string basePath, bool isAnimation)
+        {
+            if (isAnimation)
+            {
+                var animation = new TextureAnimation
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    RelativeSizeAxes = Axes.None,
+                    FillMode = FillMode.Fill,
+                    Loop = true,
+                    DefaultFrameLength = default_frame_length
+                };
+
+                try
+                {
+                    for (int i = 0; i < max_stage_frames; i++)
+                    {
+                        string framePath = $"{basePath}_{i}.png";
+                        var texture = largeTextureStore.Get(framePath);
+
+                        if (texture == null) break;
+
+                        animation.AddFrame(texture);
+                    }
+
+                    if (animation.FrameCount > 0)
+                    {
+                        container.Add(animation);
+                        Logger.Log($"[EzLocalTextureFactory] Added stage animation with {animation.FrameCount} frames",
+                            LoggingTarget.Runtime, LogLevel.Debug);
+                    }
+                    else
+                    {
+                        Logger.Log($"[EzLocalTextureFactory] No frames loaded for stage animation: {basePath}",
+                            LoggingTarget.Runtime, LogLevel.Debug);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Error loading stage animation: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+                }
+            }
+            else
+            {
+                string texturePath = $"{basePath}.png";
+                Texture? texture = largeTextureStore.Get(texturePath);
+
+                if (texture == null)
+                {
+                    Logger.Log($"[EzLocalTextureFactory] Failed to load stage texture: {texturePath}",
+                        LoggingTarget.Runtime, LogLevel.Error);
+                    return;
+                }
+
+                Logger.Log($"[EzLocalTextureFactory] Loaded stage texture: {texturePath} ({texture.Width}x{texture.Height})",
+                    LoggingTarget.Runtime, LogLevel.Debug);
+
+                var sprite = new Sprite
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    RelativeSizeAxes = Axes.None,
+                    FillMode = FillMode.Fill,
+                    Width = texture.Width,
+                    Height = texture.Height,
+                    Texture = texture,
+                };
+
+                container.Add(sprite);
+            }
+        }
+
+        public virtual Container CreateStageKeys(string component)
+        {
+            var container = new Container
+            {
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
                 AutoSizeAxes = Axes.Both,
                 FillMode = FillMode.Fill,
             };
 
-            string baseKeyPath = $"{basePath}/eightkey/{component}";
+            string baseKeyPath = $"{stageName.Value}/Stage/eightkey/{component}";
             string[] pathsToTry =
             {
                 $"{baseKeyPath}/KeyBase",
@@ -574,92 +665,24 @@ namespace osu.Game.Screens.LAsEzExtensions
 
             foreach (string path in pathsToTry)
             {
-                addStageComponent(container, path);
+                Texture? texture = getCachedTexture($"{path}.png");
+                if (texture == null) break;
+
+                var sprite = new Sprite
+                {
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
+                    RelativeSizeAxes = Axes.None,
+                    FillMode = FillMode.Fill,
+                    Width = texture.Width,
+                    Height = texture.Height,
+                    Texture = texture,
+                };
+
+                container.Add(sprite);
             }
 
             return container;
-        }
-
-        private void addStageComponent(Container container, string basePath, int frameIndex = -1)
-        {
-            Texture? texture = loadStageTexture(basePath, frameIndex);
-            if (texture == null) return;
-
-            const int medium_texture_threshold = 384;
-
-            bool isLargeTexture = Math.Max(texture.Width, texture.Height) > medium_texture_threshold;
-
-            if (isLargeTexture)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Large texture detected: {basePath} ({texture.Width}x{texture.Height}) - bypassing atlas",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-                // For large textures, try to load from large texture store to bypass atlas
-                string texturePath = frameIndex < 0
-                    ? $"{basePath}.png"
-                    : (frameIndex == 0 ? $"{basePath}.png" : $"{basePath}_{frameIndex}.png");
-
-                var largeTexture = largeTextureStore.Get(texturePath);
-                if (largeTexture != null)
-                {
-                    texture = largeTexture;
-                }
-            }
-
-            var sprite = new Sprite
-            {
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                RelativeSizeAxes = Axes.None,
-                FillMode = FillMode.Fill,
-                Width = texture.Width,
-                Height = texture.Height,
-                Texture = texture,
-            };
-
-            container.Add(sprite);
-        }
-
-        private void createStageAnimation(Container container, string basePath)
-        {
-            string overObjectPath = $"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject";
-
-            var animation = new TextureAnimation
-            {
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                RelativeSizeAxes = Axes.None,
-                FillMode = FillMode.Fill,
-                Loop = true,
-                DefaultFrameLength = default_frame_length
-            };
-
-            try
-            {
-                for (int i = 0; i < max_stage_frames; i++)
-                {
-                    var texture = getCachedTexture($"{overObjectPath}_{i}.png");
-                    if (texture == null)
-                        break;
-
-                    animation.AddFrame(texture);
-                }
-
-                if (animation.FrameCount > 0)
-                    container.Add(animation);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Error loading stage animation: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-            }
-        }
-
-        private Texture? loadStageTexture(string basePath, int i = -1)
-        {
-            string texturePath = i < 0
-                ? $"{basePath}.png"
-                : (i == 0 ? $"{basePath}.png" : $"{basePath}_{i}.png");
-
-            return getCachedTexture(texturePath);
         }
 
         private Texture? getCachedTexture(string texturePath)
@@ -682,155 +705,13 @@ namespace osu.Game.Screens.LAsEzExtensions
                 Logger.Log($"[EzLocalTextureFactory] Loaded texture from disk: {texturePath} ({texture.Width}x{texture.Height}) - Cache add: {added}",
                     LoggingTarget.Runtime, LogLevel.Debug);
 #endif
-            }
-            else
-            {
-#if DEBUG
-                Logger.Log($"[EzLocalTextureFactory] Failed to load texture: {texturePath}",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-#endif
+                if (added && singleTextureCache.Count > max_single_texture_cache_size)
+                {
+                    Task.Run(cleanSingleTextureCache);
+                }
             }
 
             return texture;
-        }
-
-        #endregion
-
-        #region 预加载系统
-
-        private static readonly string[] preload_components =
-        {
-            "whitenote", "bluenote", "greennote",
-            "noteflare", "noteflaregood", "longnoteflare",
-        };
-
-        private static readonly object preload_lock = new object();
-        private static bool isPreloading;
-        private static bool preloadCompleted;
-
-        public async Task PreloadGameTextures()
-        {
-            if (preloadCompleted || isPreloading) return;
-
-            lock (preload_lock)
-            {
-                if (preloadCompleted || isPreloading) return;
-
-                isPreloading = true;
-            }
-
-            try
-            {
-                string currentNoteSetName = noteSetName.Value;
-                Logger.Log($"[EzLocalTextureFactory] Starting preload for note set: {currentNoteSetName}",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-
-                var preloadTasks = new List<Task>();
-
-                foreach (string component in preload_components)
-                {
-                    preloadTasks.Add(Task.Run(() => preloadComponent(component, currentNoteSetName)));
-                }
-
-                preloadTasks.Add(Task.Run(preloadStageTextures));
-
-                await Task.WhenAll(preloadTasks).ConfigureAwait(false);
-
-                lock (preload_lock)
-                {
-                    preloadCompleted = true;
-                    isPreloading = false;
-                }
-
-                Logger.Log($"[EzLocalTextureFactory] Preload completed for {preload_components.Length} components",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-
-                Logger.Log($"[EzLocalTextureFactory] Cache stats after preload: {singleTextureCache.Count} single textures, {global_cache.Count} frame sets",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Preload failed: {ex.Message}",
-                    LoggingTarget.Runtime, LogLevel.Error);
-
-                lock (preload_lock)
-                {
-                    isPreloading = false;
-                }
-            }
-        }
-
-        private void preloadComponent(string component, string noteSetName)
-        {
-            try
-            {
-                string cacheKey = $"{noteSetName}_{component}";
-
-                if (global_cache.ContainsKey(cacheKey)) return;
-
-                var frames = loadTextureFrames(component, noteSetName);
-
-                if (frames.Count > 0)
-                {
-                    var newEntry = new CacheEntry(frames, true);
-                    global_cache.TryAdd(cacheKey, newEntry);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Failed to preload {component}: {ex.Message}",
-                    LoggingTarget.Runtime, LogLevel.Error);
-            }
-        }
-
-        private async Task preloadStageTextures()
-        {
-            try
-            {
-                string currentStageName = stageName.Value;
-                Logger.Log($"[EzLocalTextureFactory] Preloading stage textures for: {currentStageName}",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-
-                var stagePaths = new List<string>
-                {
-                    $"Stage/{currentStageName}/Stage/fivekey/Body",
-                    $"Stage/{currentStageName}/Stage/GrooveLight",
-                    $"Stage/{currentStageName}/Stage/eightkey/keybase/KeyBase",
-                    $"Stage/{currentStageName}/Stage/eightkey/keypress/KeyBase",
-                    $"Stage/{currentStageName}/Stage/eightkey/keypress/KeyPress",
-                };
-
-                int loadedCount = 0;
-
-                foreach (string path in stagePaths)
-                {
-                    var texture = getCachedTexture($"{path}.png");
-                    if (texture != null)
-                        loadedCount++;
-
-                    Logger.Log($"[EzLocalTextureFactory] preload stage texture {path}",
-                        LoggingTarget.Runtime, LogLevel.Debug);
-
-                    if (loadedCount % 2 == 0)
-                    {
-                        await Task.Delay(10).ConfigureAwait(false);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Stage texture preload failed: {ex.Message}",
-                    LoggingTarget.Runtime, LogLevel.Error);
-            }
-        }
-
-        private void resetPreloadState()
-        {
-            lock (preload_lock)
-            {
-                preloadCompleted = false;
-                isPreloading = false;
-            }
         }
 
         #endregion
@@ -852,6 +733,11 @@ namespace osu.Game.Screens.LAsEzExtensions
                 foreach (var loader in loaderStoreCache.Values)
                     loader.Dispose();
                 loaderStoreCache.Clear();
+
+                // Clear instance caches
+                noteRatioCache.Clear();
+                pathCache.Clear();
+                singleTextureCache.Clear();
             }
 
             base.Dispose(isDisposing);

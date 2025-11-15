@@ -16,6 +16,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private Bindable<double> hitPositon = null!;
         private Bindable<double> columnWidth = null!;
+        private Bindable<string> stageName = null!;
         private Drawable? sprite;
 
         protected virtual bool OpenEffect => true;
@@ -25,8 +26,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
-
-        private Bindable<string> stageName = null!;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -38,15 +37,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             hitPositon = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
-            OnSkinChanged();
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            stageName.BindValueChanged(_ => OnSkinChanged());
-            hitPositon.BindValueChanged(_ => updateSizes());
-            columnWidth.BindValueChanged(_ => updateSizes());
+            stageName.BindValueChanged(_ => OnSkinChanged(), true);
+            hitPositon.BindValueChanged(_ => updateSizes(), true);
+            columnWidth.BindValueChanged(_ => updateSizes(), true);
         }
 
         protected override void Update()
@@ -63,13 +61,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             sprite = new Container
             {
                 RelativeSizeAxes = Axes.None,
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
                 Child = stageBottom
             };
             sprite.Depth = -1;
-            // AddInternal(sprite); // 注释掉以隐藏stage
-            Schedule(updateSizes);
+            AddInternal(sprite); // 注释掉以隐藏stage
+            updateSizes();
         }
 
         private void updateSizes()
@@ -81,7 +79,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             float scale = actualPanelWidth / 410.0f;
             sprite.Scale = new Vector2(scale);
 
-            sprite.Y = (ezSkinConfig.DefaultHitPosition - (float)hitPositon.Value) + (247f * scale);
+            sprite.Y = (ezSkinConfig.DefaultHitPosition - (float)hitPositon.Value) * scale;
             // Position = new Vector2(0, 415 + 110 - (float)hitPositon.Value);
         }
     }
