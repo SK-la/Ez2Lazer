@@ -5,6 +5,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
@@ -17,9 +19,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Bindable<double> hitPositon = null!;
         private Bindable<double> columnWidth = null!;
         private Bindable<string> stageName = null!;
-        private Drawable? sprite;
+        private Container? sprite;
 
         protected virtual bool OpenEffect => true;
+
+        [Resolved]
+        private StageDefinition stageDefinition { get; set; } = null!;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
@@ -31,8 +36,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load()
         {
             RelativeSizeAxes = Axes.Both;
-            Anchor = Anchor.TopCentre;
-            Origin = Anchor.TopCentre;
+            Anchor = Anchor.Centre;
+            Origin = Anchor.Centre;
 
             hitPositon = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
@@ -50,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void Update()
         {
             base.Update();
-            updateSizes();
+            // updateSizes();
         }
 
         private void OnSkinChanged()
@@ -61,8 +66,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             sprite = new Container
             {
                 RelativeSizeAxes = Axes.None,
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
                 Child = stageBottom
             };
             sprite.Depth = -1;
@@ -75,12 +80,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (sprite == null)
                 return;
 
-            float actualPanelWidth = DrawWidth;
+            float actualPanelWidth = ezSkinConfig.GetTotalWidth(stageDefinition.Columns);
             float scale = actualPanelWidth / 410.0f;
             sprite.Scale = new Vector2(scale);
 
-            sprite.Y = (ezSkinConfig.DefaultHitPosition - (float)hitPositon.Value) * scale;
-            // Position = new Vector2(0, 415 + 110 - (float)hitPositon.Value);
+            sprite.Y = 768f / 2 - 247f * scale;
+
+            // 计算纹理高度和位置
+            // float textureHeight = sprite.Child.Height * scale;
+            // float textureTopY = DrawHeight + sprite.Y - textureHeight / 2;
+
+            // 当纹理顶部低于屏幕顶部时隐藏
+            // sprite.Alpha = textureTopY != 0
+            //     ? 1
+            //     : 0;
         }
     }
 }

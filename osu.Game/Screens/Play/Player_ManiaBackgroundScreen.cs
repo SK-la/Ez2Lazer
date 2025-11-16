@@ -32,7 +32,6 @@ namespace osu.Game.Screens.Play
             private Bindable<float> uiScale = new Bindable<float>(1f);
 
             private int keyMode;
-            private bool[]? cachedIsSpecialColumns;
 
             [Resolved]
             private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
@@ -48,10 +47,6 @@ namespace osu.Game.Screens.Play
             private void load(OsuConfigManager config)
             {
                 keyMode = (int)player.Beatmap.Value.Beatmap.BeatmapInfo.Difficulty.CircleSize;
-                // 初始化缓存
-                cachedIsSpecialColumns = new bool[keyMode];
-                for (int i = 0; i < keyMode; i++)
-                    cachedIsSpecialColumns[i] = ezSkinConfig.IsSpecialColumn(keyMode, i);
 
                 // 创建遮罩背景容器
                 // 关键：不使用嵌套结构，直接让 DimmableBackground 作为遮罩容器的子元素
@@ -108,25 +103,11 @@ namespace osu.Game.Screens.Play
             {
                 if (!player.LoadedBeatmapSuccessfully) return;
 
-                float totalWidth = 0;
-                float forMode = keyMode == 14
-                    ? keyMode - 1
-                    : keyMode;
-
-                for (int i = 0; i < forMode; i++)
-                    totalWidth += getManiaColumnWidth(i);
+                float totalWidth = ezSkinConfig.GetTotalWidth(keyMode);
 
                 float uiScaleCompensation = 1f / uiScale.Value;
 
                 maniaBackgroundMask.Width = totalWidth * uiScaleCompensation;
-            }
-
-            private float getManiaColumnWidth(int columnIndex)
-            {
-                bool isSpecialColumn = cachedIsSpecialColumns![columnIndex];
-                float baseWidth = (float)maniaColumnWidth.Value;
-                float factor = (float)maniaSpecialFactor.Value;
-                return baseWidth * (isSpecialColumn ? factor : 1.0f);
             }
         }
     }

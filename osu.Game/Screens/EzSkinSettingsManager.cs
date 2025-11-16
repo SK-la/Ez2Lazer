@@ -21,7 +21,7 @@ namespace osu.Game.Screens
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;
 
-        private Dictionary<int, EzColumnType[]> columnTypeCache = new Dictionary<int, EzColumnType[]>();
+        private readonly Dictionary<int, EzColumnType[]> columnTypeCache = new Dictionary<int, EzColumnType[]>();
 
         private static readonly Dictionary<int, EzSkinSetting> key_mode_to_column_color_setting = new Dictionary<int, EzSkinSetting>
         {
@@ -38,13 +38,13 @@ namespace osu.Game.Screens
             { 18, EzSkinSetting.ColumnColor18K },
         };
 
-        private static readonly Dictionary<string, EzSkinSetting> column_type_to_setting = new Dictionary<string, EzSkinSetting>
+        private static readonly Dictionary<EzColumnType, EzSkinSetting> column_type_to_setting = new Dictionary<EzColumnType, EzSkinSetting>
         {
-            [nameof(EzColumnType.A)] = EzSkinSetting.ColumnTypeA,
-            [nameof(EzColumnType.B)] = EzSkinSetting.ColumnTypeB,
-            [nameof(EzColumnType.S)] = EzSkinSetting.ColumnTypeS,
-            [nameof(EzColumnType.E)] = EzSkinSetting.ColumnTypeE,
-            [nameof(EzColumnType.P)] = EzSkinSetting.ColumnTypeP,
+            [EzColumnType.A] = EzSkinSetting.ColumnTypeA,
+            [EzColumnType.B] = EzSkinSetting.ColumnTypeB,
+            [EzColumnType.S] = EzSkinSetting.ColumnTypeS,
+            [EzColumnType.E] = EzSkinSetting.ColumnTypeE,
+            [EzColumnType.P] = EzSkinSetting.ColumnTypeP,
         };
 
         public EzSkinSettingsManager(Storage storage)
@@ -96,7 +96,7 @@ namespace osu.Game.Screens
             {
                 if (key_mode_to_column_color_setting.TryGetValue(keyMode, out var setting))
                 {
-                    string[] defaultTypes = getDefaultColumnTypes(keyMode);
+                    EzColumnType[] defaultTypes = getDefaultColumnTypes(keyMode);
                     SetDefault(setting, string.Join(",", defaultTypes));
                 }
             }
@@ -110,7 +110,7 @@ namespace osu.Game.Screens
             throw new NotSupportedException($"不支持 {keyMode} 键位模式");
         }
 
-        private static string[] getDefaultColumnTypes(int keyMode)
+        private static EzColumnType[] getDefaultColumnTypes(int keyMode)
         {
             return Enumerable.Range(0, keyMode)
                 .Select(i => EzColumnTypeManager.GetColumnType(keyMode, i))
@@ -119,7 +119,7 @@ namespace osu.Game.Screens
 
         private EzColumnType[] getColumnTypes(int keyMode)
         {
-            if (columnTypeCache.TryGetValue(keyMode, out EzColumnType[] types))
+            if (columnTypeCache.TryGetValue(keyMode, out EzColumnType[]? types) && types != null)
                 return types;
 
             string[] stringTypes;
@@ -146,7 +146,7 @@ namespace osu.Game.Screens
             return types;
         }
 
-        public string GetColumnType(int keyMode, int columnIndex)
+        public EzColumnType GetColumnType(int keyMode, int columnIndex)
         {
             try
             {
@@ -155,7 +155,10 @@ namespace osu.Game.Screens
                 string[] types = columnColors?.Split(',') ?? Array.Empty<string>();
 
                 if (columnIndex < types.Length && !string.IsNullOrEmpty(types[columnIndex]))
-                    return types[columnIndex];
+                {
+                    if (Enum.TryParse<EzColumnType>(types[columnIndex], out var t))
+                        return t;
+                }
             }
             catch (NotSupportedException)
             {
@@ -171,6 +174,11 @@ namespace osu.Game.Screens
                 return types[columnIndex] == EzColumnType.S;
 
             return EzColumnTypeManager.IsSpecialColumn(keyMode, columnIndex);
+        }
+
+        public void SetColumnType(int keyMode, int columnIndex, EzColumnType colorType)
+        {
+            SetColumnType(keyMode, columnIndex, colorType.ToString());
         }
 
         public void SetColumnType(int keyMode, int columnIndex, string colorType)
@@ -199,7 +207,7 @@ namespace osu.Game.Screens
 
         public Colour4 GetColumnColor(int keyMode, int columnIndex)
         {
-            string colorType = GetColumnType(keyMode, columnIndex);
+            EzColumnType colorType = GetColumnType(keyMode, columnIndex);
 
             if (column_type_to_setting.TryGetValue(colorType, out var setting))
                 return Get<Colour4>(setting);
@@ -209,7 +217,7 @@ namespace osu.Game.Screens
 
         public IBindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
         {
-            string colorType = GetColumnType(keyMode, columnIndex);
+            EzColumnType colorType = GetColumnType(keyMode, columnIndex);
 
             if (column_type_to_setting.TryGetValue(colorType, out var setting))
                 return GetBindable<Colour4>(setting);
@@ -249,6 +257,38 @@ namespace osu.Game.Screens
         //
         //     return result;
         // }
+
+        public bool[] GetIsSpecialColumns(int keyMode)
+        {
+            EzColumnType[] types = getColumnTypes(keyMode);
+            bool[] result = new bool[keyMode];
+
+            for (int i = 0; i < keyMode; i++)
+            {
+                if (i < types.Length)
+                    result[i] = types[i] == EzColumnType.S;
+                else
+                    result[i] = EzColumnTypeManager.IsSpecialColumn(keyMode, i);
+            }
+
+            return result;
+        }
+
+        public float GetTotalWidth(int keyMode)
+        {
+            double baseWidth = Get<double>(EzSkinSetting.ColumnWidth);
+            double specialFactor = Get<double>(EzSkinSetting.SpecialFactor);
+            float totalWidth = 0;
+            int forMode = keyMode == 14 ? keyMode - 1 : keyMode;
+
+            for (int i = 0; i < forMode; i++)
+            {
+                bool isSpecial = IsSpecialColumn(keyMode, i);
+                totalWidth += (float)(baseWidth * (isSpecial ? specialFactor : 1.0));
+            }
+
+            return totalWidth;
+        }
 
         public new Bindable<T> GetBindable<T>(EzSkinSetting setting)
         {

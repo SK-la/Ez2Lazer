@@ -27,9 +27,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Column column { get; set; } = null!;
 
         [Resolved]
-        private StageDefinition stage { get; set; } = null!;
-
-        [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
         [Resolved]
@@ -84,7 +81,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void loadAnimation()
         {
-            if (stage.Columns == 14 && column.Index == 13) return;
+            if (stageDefinition.Columns == 14 && column.Index == 13) return;
 
             ClearInternal();
 

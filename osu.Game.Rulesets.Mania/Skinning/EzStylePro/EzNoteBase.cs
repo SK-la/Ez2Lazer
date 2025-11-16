@@ -138,15 +138,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 if (EnabledColor.Value) return "white";
 
-                string keyType = EZSkinConfig.GetColumnType(KeyMode, ColumnIndex);
+                EzColumnType keyType = EZSkinConfig.GetColumnType(KeyMode, ColumnIndex);
 
                 return keyType switch
                 {
-                    "A" => "white",
-                    "B" => "blue",
-                    "S" => "green",
-                    "E" => "white",
-                    "P" => "green",
+                    EzColumnType.A => "white",
+                    EzColumnType.B => "blue",
+                    EzColumnType.S => "green",
+                    EzColumnType.E => "white",
+                    EzColumnType.P => "green",
                     _ => "white"
                 };
             }

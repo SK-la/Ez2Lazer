@@ -307,20 +307,15 @@ namespace osu.Game.Screens
 
         private EzSelectorColour createColumnSelector(int keyMode, int columnIndex, string[] columnTypes, Dictionary<string, Color4> colorMapping)
         {
-            string savedType = ezSkinConfig.GetColumnType(keyMode, columnIndex);
-
-            if (string.IsNullOrEmpty(savedType))
-            {
-                savedType = EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
-                ezSkinConfig.SetColumnType(keyMode, columnIndex, savedType);
-            }
+            EzColumnType savedType = ezSkinConfig.GetColumnType(keyMode, columnIndex);
 
             var selector = new EzSelectorColour($"Column {columnIndex + 1}", columnTypes, colorMapping);
-            selector.Current.Value = savedType;
+            selector.Current.Value = savedType.ToString();
 
             selector.Current.ValueChanged += e =>
             {
-                ezSkinConfig.SetColumnType(keyMode, columnIndex, e.NewValue);
+                if (Enum.TryParse<EzColumnType>(e.NewValue, out var type))
+                    ezSkinConfig.SetColumnType(keyMode, columnIndex, type);
             };
 
             return selector;

@@ -25,34 +25,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Rulesets.Taiko.Tes
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Rulesets.Osu.Tests", "osu.Game.Rulesets.Osu.Tests\osu.Game.Rulesets.Osu.Tests.csproj", "{6A2D5D58-0261-4A75-BE84-2BE8B076B7C2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Tournament", "osu.Game.Tournament\osu.Game.Tournament.csproj", "{5672CA4D-1B37-425B-A118-A8DA26E78938}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Tournament.Tests", "osu.Game.Tournament.Tests\osu.Game.Tournament.Tests.csproj", "{5789E78D-38F9-4072-AB7B-978F34B2C17F}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.iOS", "osu.iOS\osu.iOS.csproj", "{3F082D0B-A964-43D7-BDF7-C256D76A50D0}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Tests.iOS", "osu.Game.Tests.iOS\osu.Game.Tests.iOS.csproj", "{65FF8E19-6934-469B-B690-23C6D6E56A17}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Taiko.Tests.iOS", "osu.Game.Rulesets.Taiko.Tests.iOS\osu.Game.Rulesets.Taiko.Tests.iOS.csproj", "{7E408809-66AC-49D1-AF4D-98834F9B979A}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Osu.Tests.iOS", "osu.Game.Rulesets.Osu.Tests.iOS\osu.Game.Rulesets.Osu.Tests.iOS.csproj", "{6653CA6F-DB06-4604-A3FD-762E25C2AF96}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Mania.Tests.iOS", "osu.Game.Rulesets.Mania.Tests.iOS\osu.Game.Rulesets.Mania.Tests.iOS.csproj", "{39FD990E-B6CE-4B2A-999F-BC008CF2C64C}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Catch.Tests.iOS", "osu.Game.Rulesets.Catch.Tests.iOS\osu.Game.Rulesets.Catch.Tests.iOS.csproj", "{4004C7B7-1A62-43F1-9DF2-52450FA67E70}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Android", "osu.Android\osu.Android.csproj", "{D1D5F9A8-B40B-40E6-B02F-482D03346D3D}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Catch.Tests.Android", "osu.Game.Rulesets.Catch.Tests.Android\osu.Game.Rulesets.Catch.Tests.Android.csproj", "{C5379ECB-3A94-4D2F-AC3B-2615AC23EB0D}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Mania.Tests.Android", "osu.Game.Rulesets.Mania.Tests.Android\osu.Game.Rulesets.Mania.Tests.Android.csproj", "{531F1092-DB27-445D-AA33-2A77C7187C99}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Osu.Tests.Android", "osu.Game.Rulesets.Osu.Tests.Android\osu.Game.Rulesets.Osu.Tests.Android.csproj", "{90CAB706-39CB-4B93-9629-3218A6FF8E9B}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Taiko.Tests.Android", "osu.Game.Rulesets.Taiko.Tests.Android\osu.Game.Rulesets.Taiko.Tests.Android.csproj", "{3701A0A1-8476-42C6-B5C4-D24129B4A484}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Tests.Android", "osu.Game.Tests.Android\osu.Game.Tests.Android.csproj", "{5CC222DC-5716-4499-B897-DCBDDA4A5CF9}"
-EndProject
+
+
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{10DF8F12-50FD-45D8-8A38-17BA764BF54D}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
@@ -63,36 +37,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		osu.TestProject.props = osu.TestProject.props
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Benchmarks", "osu.Game.Benchmarks\osu.Game.Benchmarks.csproj", "{93632F2D-2BB4-46C1-A7B8-F8CF2FB27118}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Templates", "Templates", "{70CFC05F-CF79-4A7F-81EC-B32F1E564480}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Rulesets", "Rulesets", "{CA1DD4A8-FA22-48E0-860F-D57A7ED7D426}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ruleset-empty", "ruleset-empty", "{6E22BB20-901E-49B3-90A1-B0E6377FE568}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ruleset-example", "ruleset-example", "{7DBBBA73-6D84-4EBA-8711-EBC2939B04B5}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ruleset-scrolling-empty", "ruleset-scrolling-empty", "{5CB72FDE-BA77-47D1-A556-FEB15AAD4523}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ruleset-scrolling-example", "ruleset-scrolling-example", "{0E0EDD4C-1E45-4E03-BC08-0102C98D34B3}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.EmptyFreeform", "Templates\Rulesets\ruleset-empty\osu.Game.Rulesets.EmptyFreeform\osu.Game.Rulesets.EmptyFreeform.csproj", "{9014CA66-5217-49F6-8C1E-3430FD08EF61}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.EmptyFreeform.Tests", "Templates\Rulesets\ruleset-empty\osu.Game.Rulesets.EmptyFreeform.Tests\osu.Game.Rulesets.EmptyFreeform.Tests.csproj", "{561DFD5E-5896-40D1-9708-4D692F5BAE66}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Pippidon", "Templates\Rulesets\ruleset-example\osu.Game.Rulesets.Pippidon\osu.Game.Rulesets.Pippidon.csproj", "{B325271C-85E7-4DB3-8BBB-B70F242954F8}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Pippidon.Tests", "Templates\Rulesets\ruleset-example\osu.Game.Rulesets.Pippidon.Tests\osu.Game.Rulesets.Pippidon.Tests.csproj", "{4C834F7F-07CA-46C7-8C7B-F10A1B3BC738}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.EmptyScrolling", "Templates\Rulesets\ruleset-scrolling-empty\osu.Game.Rulesets.EmptyScrolling\osu.Game.Rulesets.EmptyScrolling.csproj", "{AD923016-F318-49B7-B08B-89DED6DC2422}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.EmptyScrolling.Tests", "Templates\Rulesets\ruleset-scrolling-empty\osu.Game.Rulesets.EmptyScrolling.Tests\osu.Game.Rulesets.EmptyScrolling.Tests.csproj", "{B9B92246-02EB-4118-9C6F-85A0D726AA70}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Pippidon", "Templates\Rulesets\ruleset-scrolling-example\osu.Game.Rulesets.Pippidon\osu.Game.Rulesets.Pippidon.csproj", "{B9022390-8184-4548-9DB1-50EB8878D20A}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.Pippidon.Tests", "Templates\Rulesets\ruleset-scrolling-example\osu.Game.Rulesets.Pippidon.Tests\osu.Game.Rulesets.Pippidon.Tests.csproj", "{1743BF7C-E6AE-4A06-BAD9-166D62894303}"
-EndProject
+
+
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CodeAnalysis", "CodeAnalysis", "{FB156649-D457-4D1A-969C-D3A23FD31513}"
 	ProjectSection(SolutionItems) = preProject
 		CodeAnalysis\BannedSymbols.txt = CodeAnalysis\BannedSymbols.txt
@@ -153,84 +99,9 @@ Global
 		{6A2D5D58-0261-4A75-BE84-2BE8B076B7C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6A2D5D58-0261-4A75-BE84-2BE8B076B7C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6A2D5D58-0261-4A75-BE84-2BE8B076B7C2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5672CA4D-1B37-425B-A118-A8DA26E78938}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5672CA4D-1B37-425B-A118-A8DA26E78938}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5672CA4D-1B37-425B-A118-A8DA26E78938}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5672CA4D-1B37-425B-A118-A8DA26E78938}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5789E78D-38F9-4072-AB7B-978F34B2C17F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5789E78D-38F9-4072-AB7B-978F34B2C17F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5789E78D-38F9-4072-AB7B-978F34B2C17F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5789E78D-38F9-4072-AB7B-978F34B2C17F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3F082D0B-A964-43D7-BDF7-C256D76A50D0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3F082D0B-A964-43D7-BDF7-C256D76A50D0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3F082D0B-A964-43D7-BDF7-C256D76A50D0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3F082D0B-A964-43D7-BDF7-C256D76A50D0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{65FF8E19-6934-469B-B690-23C6D6E56A17}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{65FF8E19-6934-469B-B690-23C6D6E56A17}.Release|Any CPU.Build.0 = Release|Any CPU
-		{65FF8E19-6934-469B-B690-23C6D6E56A17}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{65FF8E19-6934-469B-B690-23C6D6E56A17}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7E408809-66AC-49D1-AF4D-98834F9B979A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7E408809-66AC-49D1-AF4D-98834F9B979A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7E408809-66AC-49D1-AF4D-98834F9B979A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7E408809-66AC-49D1-AF4D-98834F9B979A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6653CA6F-DB06-4604-A3FD-762E25C2AF96}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6653CA6F-DB06-4604-A3FD-762E25C2AF96}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6653CA6F-DB06-4604-A3FD-762E25C2AF96}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6653CA6F-DB06-4604-A3FD-762E25C2AF96}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{39FD990E-B6CE-4B2A-999F-BC008CF2C64C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{39FD990E-B6CE-4B2A-999F-BC008CF2C64C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{39FD990E-B6CE-4B2A-999F-BC008CF2C64C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{39FD990E-B6CE-4B2A-999F-BC008CF2C64C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{4004C7B7-1A62-43F1-9DF2-52450FA67E70}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4004C7B7-1A62-43F1-9DF2-52450FA67E70}.Release|Any CPU.Build.0 = Release|Any CPU
-		{4004C7B7-1A62-43F1-9DF2-52450FA67E70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4004C7B7-1A62-43F1-9DF2-52450FA67E70}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D1D5F9A8-B40B-40E6-B02F-482D03346D3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D1D5F9A8-B40B-40E6-B02F-482D03346D3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D1D5F9A8-B40B-40E6-B02F-482D03346D3D}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{D1D5F9A8-B40B-40E6-B02F-482D03346D3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D1D5F9A8-B40B-40E6-B02F-482D03346D3D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D1D5F9A8-B40B-40E6-B02F-482D03346D3D}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{C5379ECB-3A94-4D2F-AC3B-2615AC23EB0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C5379ECB-3A94-4D2F-AC3B-2615AC23EB0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C5379ECB-3A94-4D2F-AC3B-2615AC23EB0D}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{C5379ECB-3A94-4D2F-AC3B-2615AC23EB0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C5379ECB-3A94-4D2F-AC3B-2615AC23EB0D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C5379ECB-3A94-4D2F-AC3B-2615AC23EB0D}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{531F1092-DB27-445D-AA33-2A77C7187C99}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{531F1092-DB27-445D-AA33-2A77C7187C99}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{531F1092-DB27-445D-AA33-2A77C7187C99}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{531F1092-DB27-445D-AA33-2A77C7187C99}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{531F1092-DB27-445D-AA33-2A77C7187C99}.Release|Any CPU.Build.0 = Release|Any CPU
-		{531F1092-DB27-445D-AA33-2A77C7187C99}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{90CAB706-39CB-4B93-9629-3218A6FF8E9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{90CAB706-39CB-4B93-9629-3218A6FF8E9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{90CAB706-39CB-4B93-9629-3218A6FF8E9B}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{90CAB706-39CB-4B93-9629-3218A6FF8E9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{90CAB706-39CB-4B93-9629-3218A6FF8E9B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{90CAB706-39CB-4B93-9629-3218A6FF8E9B}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{3701A0A1-8476-42C6-B5C4-D24129B4A484}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3701A0A1-8476-42C6-B5C4-D24129B4A484}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3701A0A1-8476-42C6-B5C4-D24129B4A484}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{3701A0A1-8476-42C6-B5C4-D24129B4A484}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3701A0A1-8476-42C6-B5C4-D24129B4A484}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3701A0A1-8476-42C6-B5C4-D24129B4A484}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{5CC222DC-5716-4499-B897-DCBDDA4A5CF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5CC222DC-5716-4499-B897-DCBDDA4A5CF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5CC222DC-5716-4499-B897-DCBDDA4A5CF9}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{5CC222DC-5716-4499-B897-DCBDDA4A5CF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5CC222DC-5716-4499-B897-DCBDDA4A5CF9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5CC222DC-5716-4499-B897-DCBDDA4A5CF9}.Release|Any CPU.Deploy.0 = Release|Any CPU
+
 		{93632F2D-2BB4-46C1-A7B8-F8CF2FB27118}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{93632F2D-2BB4-46C1-A7B8-F8CF2FB27118}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9014CA66-5217-49F6-8C1E-3430FD08EF61}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{561DFD5E-5896-40D1-9708-4D692F5BAE66}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B325271C-85E7-4DB3-8BBB-B70F242954F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4C834F7F-07CA-46C7-8C7B-F10A1B3BC738}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AD923016-F318-49B7-B08B-89DED6DC2422}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B9B92246-02EB-4118-9C6F-85A0D726AA70}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B9022390-8184-4548-9DB1-50EB8878D20A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1743BF7C-E6AE-4A06-BAD9-166D62894303}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{18ED4ABC-6064-46F1-9A05-4E0BE88A635A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{18ED4ABC-6064-46F1-9A05-4E0BE88A635A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{18ED4ABC-6064-46F1-9A05-4E0BE88A635A}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -280,18 +151,18 @@ Global
 		$2.scope = text/x-csharp
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{CA1DD4A8-FA22-48E0-860F-D57A7ED7D426} = {70CFC05F-CF79-4A7F-81EC-B32F1E564480}
-		{6E22BB20-901E-49B3-90A1-B0E6377FE568} = {CA1DD4A8-FA22-48E0-860F-D57A7ED7D426}
-		{9014CA66-5217-49F6-8C1E-3430FD08EF61} = {6E22BB20-901E-49B3-90A1-B0E6377FE568}
-		{561DFD5E-5896-40D1-9708-4D692F5BAE66} = {6E22BB20-901E-49B3-90A1-B0E6377FE568}
-		{7DBBBA73-6D84-4EBA-8711-EBC2939B04B5} = {CA1DD4A8-FA22-48E0-860F-D57A7ED7D426}
-		{B325271C-85E7-4DB3-8BBB-B70F242954F8} = {7DBBBA73-6D84-4EBA-8711-EBC2939B04B5}
-		{4C834F7F-07CA-46C7-8C7B-F10A1B3BC738} = {7DBBBA73-6D84-4EBA-8711-EBC2939B04B5}
-		{5CB72FDE-BA77-47D1-A556-FEB15AAD4523} = {CA1DD4A8-FA22-48E0-860F-D57A7ED7D426}
-		{0E0EDD4C-1E45-4E03-BC08-0102C98D34B3} = {CA1DD4A8-FA22-48E0-860F-D57A7ED7D426}
-		{AD923016-F318-49B7-B08B-89DED6DC2422} = {5CB72FDE-BA77-47D1-A556-FEB15AAD4523}
-		{B9B92246-02EB-4118-9C6F-85A0D726AA70} = {5CB72FDE-BA77-47D1-A556-FEB15AAD4523}
-		{B9022390-8184-4548-9DB1-50EB8878D20A} = {0E0EDD4C-1E45-4E03-BC08-0102C98D34B3}
-		{1743BF7C-E6AE-4A06-BAD9-166D62894303} = {0E0EDD4C-1E45-4E03-BC08-0102C98D34B3}
+
+
+
+
+
+
+
+
+
+
+
+
+
 	EndGlobalSection
 EndGlobal

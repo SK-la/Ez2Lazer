@@ -5,19 +5,19 @@ namespace osu.Game.Screens.LAsEzExtensions
 {
     public static class EzColumnTypeManager
     {
-        public static string GetColumnType(int keyMode, int columnIndex)
+        public static EzColumnType GetColumnType(int keyMode, int columnIndex)
         {
             if (columnIndex < 0 || columnIndex >= keyMode)
-                return "A";
+                return EzColumnType.A;
 
             if (isSpecialColumn(keyMode, columnIndex))
-                return "S";
+                return EzColumnType.S;
 
             if (isEffectColumn(keyMode, columnIndex))
-                return "E";
+                return EzColumnType.E;
 
             if (isPanelColumn(keyMode, columnIndex))
-                return "P";
+                return EzColumnType.P;
 
             int normalKeyIndex = 0;
 
@@ -30,17 +30,17 @@ namespace osu.Game.Screens.LAsEzExtensions
             return getNormalColumnType(keyMode, normalKeyIndex, columnIndex);
         }
 
-        private static string getNormalColumnType(int keyMode, int normalKeyIndex, int columnIndex)
+        private static EzColumnType getNormalColumnType(int keyMode, int normalKeyIndex, int columnIndex)
         {
             if (keyMode % 2 == 0)
             {
                 int halfKey = keyMode / 2;
                 return columnIndex < halfKey
-                    ? (normalKeyIndex % 2 == 0 ? "A" : "B")
-                    : (normalKeyIndex % 2 == 0 ? "B" : "A");
+                    ? (normalKeyIndex % 2 == 0 ? EzColumnType.A : EzColumnType.B)
+                    : (normalKeyIndex % 2 == 0 ? EzColumnType.B : EzColumnType.A);
             }
 
-            return normalKeyIndex % 2 == 0 ? "A" : "B";
+            return normalKeyIndex % 2 == 0 ? EzColumnType.A : EzColumnType.B;
         }
 
         private static bool isSpecialColumn(int keyMode, int columnIndex)
