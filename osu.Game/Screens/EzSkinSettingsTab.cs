@@ -188,7 +188,7 @@ namespace osu.Game.Screens
                         },
                         refreshSkinButton = new SettingsButton
                         {
-                            Action = RefreshSkin,
+                            Action = refreshSkin,
                             Text = "RefreshSaveSkin".Localize(),
                             TooltipText = "RefreshSaveSkin".Localize()
                         }
@@ -199,7 +199,7 @@ namespace osu.Game.Screens
 
         #region Save按钮处理
 
-        public void RefreshSkin()
+        private void refreshSkin()
         {
             isAbsolutePosition = !isAbsolutePosition;
             skinManager.CurrentSkinInfo.TriggerChange();

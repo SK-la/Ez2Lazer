@@ -10,7 +10,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
@@ -23,11 +22,6 @@ namespace osu.Game.Screens.LAsEzExtensions
     [Cached]
     public partial class EzLocalTextureFactory : CompositeDrawable
     {
-        private static EzLocalTextureFactory? instance;
-        private static readonly object instance_lock = new object();
-
-        public static EzLocalTextureFactory? GetInstance() => instance;
-
         private const int max_cache_size = 100;
         private const int max_single_texture_cache_size = 200;
         private const int max_note_ratio_cache_size = 50;
@@ -54,6 +48,7 @@ namespace osu.Game.Screens.LAsEzExtensions
         private readonly Bindable<string> stageName;
         private readonly Bindable<double> columnWidth;
         private readonly Bindable<double> specialFactor;
+        private readonly Bindable<double> hitPositonBindable;
         private readonly Bindable<double> noteHeightScaleToWidth;
 
         private readonly struct CacheEntry : IEquatable<CacheEntry>
@@ -85,20 +80,9 @@ namespace osu.Game.Screens.LAsEzExtensions
             IRenderer renderer,
             Storage hostStorage)
         {
-            lock (instance_lock)
-            {
-                if (instance != null)
-                {
-                    Logger.Log("[EzLocalTextureFactory] WARNING: Multiple instances detected!",
-                        LoggingTarget.Runtime, LogLevel.Important);
-                }
-
-                instance = this;
-            }
-
             this.ezSkinConfig = ezSkinConfig;
             textureStore = new TextureStore(renderer);
-            largeTextureStore = new LargeTextureStore(renderer);
+            largeTextureStore = new LargeTextureStore(renderer); //stage相关纹理专用
 
             const string base_path = "EzResources/";
             const string stage_path = "EzResources/Stage/";
@@ -125,6 +109,7 @@ namespace osu.Game.Screens.LAsEzExtensions
             stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
 
             noteSetName.BindValueChanged(e =>
@@ -543,103 +528,66 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         #region Stage Creation
 
-        // private bool isStageBody(string componentName)
-        // {
-        //     return componentName.Contains("Body", StringComparison.InvariantCultureIgnoreCase);
-        // }
-
         public virtual Drawable CreateStage(string component)
         {
             string basePath = $"{stageName.Value}/Stage";
 
             var container = new Container
             {
-                Anchor = Anchor.BottomCentre,
-                Origin = Anchor.BottomCentre,
-                Y = 0,
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
+
                 // AutoSizeAxes = Axes.X,
                 // Height = default_stage_body_height,
                 // Masking = true,
             };
+            // hitPositonBindable.BindValueChanged(_ =>
+            // {
+            //     container.Y = ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
+            // }, true);
 
-            addStageComponent(container, $"{basePath}/fivekey/{component}", false);
-            addStageComponent(container, $"{basePath}/GrooveLight", false);
-            addStageComponent(container, $"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject", true);
+            addStageComponent(container, $"{basePath}/fivekey/{component}");
+            addStageComponent(container, $"{basePath}/GrooveLight");
+            addStageComponent(container, $"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject");
 
             return container;
         }
 
-        private void addStageComponent(Container container, string basePath, bool isAnimation)
+        private void addStageComponent(Container container, string basePath)
         {
-            if (isAnimation)
+            var animation = new TextureAnimation
             {
-                var animation = new TextureAnimation
-                {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    RelativeSizeAxes = Axes.None,
-                    FillMode = FillMode.Fill,
-                    Loop = true,
-                    DefaultFrameLength = default_frame_length
-                };
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
+                Y = 384f + 247f,
+                // RelativeSizeAxes = Axes.None,
+                // FillMode = FillMode.Fill,
+                DefaultFrameLength = default_frame_length
+            };
 
-                try
-                {
-                    for (int i = 0; i < max_stage_frames; i++)
-                    {
-                        string framePath = $"{basePath}_{i}.png";
-                        var texture = largeTextureStore.Get(framePath);
-
-                        if (texture == null) break;
-
-                        animation.AddFrame(texture);
-                    }
-
-                    if (animation.FrameCount > 0)
-                    {
-                        container.Add(animation);
-                        Logger.Log($"[EzLocalTextureFactory] Added stage animation with {animation.FrameCount} frames",
-                            LoggingTarget.Runtime, LogLevel.Debug);
-                    }
-                    else
-                    {
-                        Logger.Log($"[EzLocalTextureFactory] No frames loaded for stage animation: {basePath}",
-                            LoggingTarget.Runtime, LogLevel.Debug);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"Error loading stage animation: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
-                }
-            }
-            else
+            for (int i = 0; i < max_stage_frames; i++)
             {
-                string texturePath = $"{basePath}.png";
-                Texture? texture = largeTextureStore.Get(texturePath);
+                string framePath = $"{basePath}_{i}.png";
+                var texture = largeTextureStore.Get(framePath);
 
-                if (texture == null)
-                {
-                    Logger.Log($"[EzLocalTextureFactory] Failed to load stage texture: {texturePath}",
-                        LoggingTarget.Runtime, LogLevel.Error);
-                    return;
-                }
+                if (texture == null) break;
 
-                Logger.Log($"[EzLocalTextureFactory] Loaded stage texture: {texturePath} ({texture.Width}x{texture.Height})",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-
-                var sprite = new Sprite
-                {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    RelativeSizeAxes = Axes.None,
-                    FillMode = FillMode.Fill,
-                    Width = texture.Width,
-                    Height = texture.Height,
-                    Texture = texture,
-                };
-
-                container.Add(sprite);
+                animation.AddFrame(texture);
             }
+
+            if (animation.FrameCount == 0)
+            {
+                Texture? singleTexture = largeTextureStore.Get($"{basePath}.png");
+
+                animation.AddFrame(singleTexture);
+            }
+
+            // 如果只有1帧，设置为非循环（静态）；否则循环
+            animation.Loop = animation.FrameCount > 1;
+
+            container.Add(animation);
+            Logger.Log($"[EzLocalTextureFactory] Added stage component with {animation.FrameCount} frames ({(animation.Loop ? "animated" : "static")})",
+                LoggingTarget.Runtime, LogLevel.Debug);
         }
 
         public virtual Container CreateStageKeys(string component)
@@ -665,26 +613,53 @@ namespace osu.Game.Screens.LAsEzExtensions
 
             foreach (string path in pathsToTry)
             {
-                Texture? texture = getCachedTexture($"{path}.png");
-                if (texture == null) break;
-
-                var sprite = new Sprite
+                var animation = new TextureAnimation
                 {
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    RelativeSizeAxes = Axes.None,
+                    // RelativeSizeAxes = Axes.None,
                     FillMode = FillMode.Fill,
-                    Width = texture.Width,
-                    Height = texture.Height,
-                    Texture = texture,
+                    DefaultFrameLength = default_frame_length
                 };
 
-                container.Add(sprite);
+                // 加载帧序列
+                for (int i = 0; i < max_stage_frames; i++)
+                {
+                    string framePath = $"{path}_{i}.png";
+                    var texture = largeTextureStore.Get(framePath);
+
+                    if (texture == null) break;
+
+                    animation.AddFrame(texture);
+                }
+
+                // 如果没有帧，加载单个纹理作为单帧
+                if (animation.FrameCount == 0)
+                {
+                    Texture? singleTexture = largeTextureStore.Get($"{path}.png");
+
+                    if (singleTexture == null) break;
+
+                    animation.AddFrame(singleTexture);
+                }
+
+                // 设置循环模式：多帧循环，单帧不循环
+                animation.Loop = animation.FrameCount > 1;
+
+                container.Add(animation);
+
+                Logger.Log($"[EzLocalTextureFactory] Added stage key animation with {animation.FrameCount} frames for {path} (Loop: {animation.Loop})",
+                    LoggingTarget.Runtime, LogLevel.Debug);
             }
 
             return container;
         }
 
+        /// <summary>
+        /// 小纹理使用，不建议用于stage相关纹理。
+        /// </summary>
+        /// <param name="texturePath"></param>
+        /// <returns></returns>
         private Texture? getCachedTexture(string texturePath)
         {
             if (singleTextureCache.TryGetValue(texturePath, out var cachedTexture))
@@ -719,11 +694,11 @@ namespace osu.Game.Screens.LAsEzExtensions
         private bool isStageTexturePath(string texturePath)
         {
             return texturePath.Contains("Stage/") ||
-                   texturePath.Contains("/Body") ||
-                   texturePath.Contains("/GrooveLight") ||
-                   texturePath.Contains("keybase") ||
-                   texturePath.Contains("keypress") ||
-                   texturePath.Contains("_OverObject");
+                texturePath.Contains("/Body") ||
+                texturePath.Contains("/GrooveLight") ||
+                texturePath.Contains("keybase") ||
+                texturePath.Contains("keypress") ||
+                texturePath.Contains("_OverObject");
         }
 
         protected override void Dispose(bool isDisposing)

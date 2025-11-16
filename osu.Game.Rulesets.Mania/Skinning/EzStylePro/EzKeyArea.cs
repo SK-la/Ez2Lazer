@@ -55,9 +55,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            stageName.BindValueChanged(_ => OnSkinChanged());
-            hitPositonBindable.BindValueChanged(_ => OnConfigChanged());
-            OnSkinChanged();
+            stageName.BindValueChanged(_ => loadAnimation(), true);
+            hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
         }
 
         protected virtual string KeyBasicSuffix
@@ -107,10 +106,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
-            container.Y =  768f - (float)hitPositonBindable.Value + 45f;
+            Y =  768f - (float)hitPositonBindable.Value + 45f;
         }
-
-        private void OnSkinChanged() => loadAnimation();
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {

@@ -84,8 +84,6 @@ namespace osu.Game.Screens.Play
 
                 uiScale = config.GetBindable<float>(OsuSetting.UIScale);
                 uiScale.BindValueChanged(_ => updateMaskWidth(), true);
-
-                updateMaskWidth();
             }
 
             protected override void Update()

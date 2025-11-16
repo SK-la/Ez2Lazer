@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
@@ -16,10 +17,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzStageBottom : CompositeDrawable
     {
-        private Bindable<double> hitPositon = null!;
+        private Bindable<double> hitPositonBindable = null!;
         private Bindable<double> columnWidth = null!;
         private Bindable<string> stageName = null!;
         private Container? sprite;
+        private int cs;
 
         protected virtual bool OpenEffect => true;
 
@@ -39,7 +41,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            hitPositon = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            cs = stageDefinition.Columns;
+
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
             stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
         }
@@ -48,7 +52,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
             stageName.BindValueChanged(_ => OnSkinChanged(), true);
-            hitPositon.BindValueChanged(_ => updateSizes(), true);
+            hitPositonBindable.BindValueChanged(_ => updateSizes(), true);
             columnWidth.BindValueChanged(_ => updateSizes(), true);
         }
 
@@ -77,14 +81,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void updateSizes()
         {
-            if (sprite == null)
-                return;
-
-            float actualPanelWidth = ezSkinConfig.GetTotalWidth(stageDefinition.Columns);
+            float actualPanelWidth = ezSkinConfig.GetTotalWidth(cs);
             float scale = actualPanelWidth / 410.0f;
-            sprite.Scale = new Vector2(scale);
 
-            sprite.Y = 768f / 2 - 247f * scale;
+            if (sprite != null)
+            {
+                sprite.Scale = new Vector2(scale);
+                sprite.Y = 250f  - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
+            }
 
             // 计算纹理高度和位置
             // float textureHeight = sprite.Child.Height * scale;

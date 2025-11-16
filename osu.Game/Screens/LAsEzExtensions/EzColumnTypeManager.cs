@@ -54,11 +54,6 @@ namespace osu.Game.Screens.LAsEzExtensions
             };
         }
 
-        public static bool IsSpecialColumn(int keyMode, int columnIndex)
-        {
-            return isSpecialColumn(keyMode, columnIndex);
-        }
-
         private static bool isEffectColumn(int keyMode, int columnIndex)
         {
             return keyMode switch
