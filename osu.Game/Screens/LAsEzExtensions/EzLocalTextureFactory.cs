@@ -23,8 +23,8 @@ namespace osu.Game.Screens.LAsEzExtensions
     [Cached]
     public partial class EzLocalTextureFactory : CompositeDrawable
     {
+        // private const int max_stage_frames = 120;
         private const int max_frames_to_load = 240;
-        private const int max_stage_frames = 120;
         private const double default_frame_length = 1000.0 / 60.0 * 4;
         private const float default_stage_body_height = 247f;
         private const float square_ratio_threshold = 0.75f;
@@ -340,42 +340,77 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         private void addStageComponent(Container container, string basePath)
         {
+            var frames = loadStageComponentFrames(basePath);
             var animation = new TextureAnimation
             {
                 Anchor = Anchor.BottomCentre,
                 Origin = Anchor.BottomCentre,
                 Y = 384f + 247f,
-                RelativeSizeAxes = Axes.None,
-                FillMode = FillMode.Fill,
+                // RelativeSizeAxes = Axes.None,
+                // FillMode = FillMode.Fill,
             };
 
-            for (int i = 0; i < max_stage_frames; i++)
-            {
-                var texture = stageTextureStore.Get($"{basePath}_{i}.png");
-
-                if (texture == null) break;
-
-                animation.AddFrame(texture);
-            }
-
-            if (animation.FrameCount == 0)
-            {
-                Texture? singleTexture = stageTextureStore.Get($"{basePath}.png");
-
-                animation.AddFrame(singleTexture);
-            }
-
-            // 如果只有1帧，设置为非循环（静态）；否则循环
-            animation.Loop = animation.FrameCount > 1;
+            animation.Loop = frames.Count > 1;
+            animation.Scale = frames.Count > 1
+                ? new Vector2(2f)
+                : Vector2.One;
+            animation.AddFrames(frames);
 
             container.Add(animation);
             Logger.Log($"[EzLocalTextureFactory] Added stage component with {animation.FrameCount} frames ({(animation.Loop ? "animated" : "static")})",
                 LoggingTarget.Runtime, LogLevel.Debug);
         }
 
+        private List<Texture> loadStageComponentFrames(string basePath)
+        {
+            var frames = new List<Texture>();
+
+            for (int i = 0;; i++)
+            {
+                Texture? texture = textureStore.Get($"{basePath}_{i}.png");
+
+                if (texture == null) break;
+
+                frames.Add(texture);
+            }
+
+            if (frames.Count == 0)
+            {
+                Texture? singleTexture = stageTextureStore.Get($"{basePath}.png");
+
+                if (singleTexture != null)
+                    frames.Add(singleTexture);
+            }
+
+            return frames;
+        }
+
         public virtual TextureAnimation CreateStageKeys(string component)
         {
-            string baseKeyPath = $"Stage/{stageName.Value}/Stage/eightkey/{component}";
+            var frames = getCachedStageKeysFrames(component);
+            var animation = new TextureAnimation
+            {
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
+                RelativeSizeAxes = Axes.None,
+                FillMode = FillMode.Fill,
+                Loop = frames.Count > 1
+            };
+            animation.AddFrames(frames);
+            return animation;
+        }
+
+        private List<Texture> getCachedStageKeysFrames(string component)
+        {
+            string currentStageName = stageName.Value;
+            string cacheKey = $"stagekeys_{currentStageName}_{component}";
+            return getOrAddCachedFrames(cacheKey, () => loadStageKeysFrames(component, currentStageName));
+        }
+
+        private List<Texture> loadStageKeysFrames(string component, string stageName)
+        {
+            var frames = new List<Texture>();
+            string baseKeyPath = $"Stage/{stageName}/Stage/eightkey/{component}";
             string[] pathsToTry =
             {
                 $"{baseKeyPath}/KeyBase",
@@ -384,45 +419,41 @@ namespace osu.Game.Screens.LAsEzExtensions
                 $"{baseKeyPath}/2KeyPress",
             };
 
-            var animation = new TextureAnimation
-            {
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                RelativeSizeAxes = Axes.None,
-                FillMode = FillMode.Fill,
-                DefaultFrameLength = default_frame_length / 4,
-            };
-
             foreach (string path in pathsToTry)
             {
+                frames.Clear();
+
                 // 加载帧序列
-                for (int i = 0; i < max_stage_frames; i++)
+                for (int i = 0;; i++)
                 {
                     Texture? texture = textureStore.Get($"{path}_{i}.png");
 
                     if (texture == null) break;
 
-                    animation.AddFrame(texture);
+                    frames.Add(texture);
                 }
 
                 // 如果没有帧，加载单个纹理作为单帧
-                if (animation.FrameCount == 0)
+                if (frames.Count == 0)
                 {
                     Texture? singleTexture = textureStore.Get($"{path}.png");
 
-                    if (singleTexture == null) break;
+                    if (singleTexture == null) continue;
 
-                    animation.AddFrame(singleTexture);
+                    frames.Add(singleTexture);
                 }
 
                 // 设置循环模式：多帧循环，单帧不循环
-                animation.Loop = animation.FrameCount > 1;
+                bool isLoop = frames.Count > 1;
 
-                Logger.Log($"[EzLocalTextureFactory] Added stage key animation with {animation.FrameCount} frames for {path} (Loop: {animation.Loop})",
+                Logger.Log($"[EzLocalTextureFactory] Loaded stage key frames with {frames.Count} frames for {path} (Loop: {isLoop})",
                     LoggingTarget.Runtime, LogLevel.Debug);
+
+                // 如果找到了帧，返回
+                if (frames.Count > 0) return frames;
             }
 
-            return animation;
+            return frames; // 返回空列表如果没有找到
         }
 
         #endregion

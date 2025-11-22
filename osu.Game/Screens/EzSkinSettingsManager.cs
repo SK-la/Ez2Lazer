@@ -26,17 +26,17 @@ namespace osu.Game.Screens
 
         private static readonly Dictionary<int, EzSkinSetting> key_mode_to_column_color_setting = new Dictionary<int, EzSkinSetting>
         {
-            { 4, EzSkinSetting.ColumnColor4K },
-            { 5, EzSkinSetting.ColumnColor5K },
-            { 6, EzSkinSetting.ColumnColor6K },
-            { 7, EzSkinSetting.ColumnColor7K },
-            { 8, EzSkinSetting.ColumnColor8K },
-            { 9, EzSkinSetting.ColumnColor9K },
-            { 10, EzSkinSetting.ColumnColor10K },
-            { 12, EzSkinSetting.ColumnColor12K },
-            { 14, EzSkinSetting.ColumnColor14K },
-            { 16, EzSkinSetting.ColumnColor16K },
-            { 18, EzSkinSetting.ColumnColor18K },
+            { 4, EzSkinSetting.ColumnTypeOf4K },
+            { 5, EzSkinSetting.ColumnTypeOf5K },
+            { 6, EzSkinSetting.ColumnTypeOf6K },
+            { 7, EzSkinSetting.ColumnTypeOf7K },
+            { 8, EzSkinSetting.ColumnTypeOf8K },
+            { 9, EzSkinSetting.ColumnTypeOf9K },
+            { 10, EzSkinSetting.ColumnTypeOf10K },
+            { 12, EzSkinSetting.ColumnTypeOf12K },
+            { 14, EzSkinSetting.ColumnTypeOf14K },
+            { 16, EzSkinSetting.ColumnTypeOf16K },
+            { 18, EzSkinSetting.ColumnTypeOf18K },
         };
 
         private static readonly Dictionary<EzColumnType, EzSkinSetting> column_type_to_setting = new Dictionary<EzColumnType, EzSkinSetting>
@@ -388,17 +388,17 @@ namespace osu.Game.Screens
 
         // 着色系统
         ColorSettingsEnabled,
-        ColumnColor4K,
-        ColumnColor5K,
-        ColumnColor6K,
-        ColumnColor7K,
-        ColumnColor8K,
-        ColumnColor9K,
-        ColumnColor10K,
-        ColumnColor12K,
-        ColumnColor14K,
-        ColumnColor16K,
-        ColumnColor18K,
+        ColumnTypeOf4K,
+        ColumnTypeOf5K,
+        ColumnTypeOf6K,
+        ColumnTypeOf7K,
+        ColumnTypeOf8K,
+        ColumnTypeOf9K,
+        ColumnTypeOf10K,
+        ColumnTypeOf12K,
+        ColumnTypeOf14K,
+        ColumnTypeOf16K,
+        ColumnTypeOf18K,
 
         // 列类型
         // ColumnTypeBase = 500,

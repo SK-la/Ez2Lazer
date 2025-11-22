@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Bindable<double> hitPositonBindable = null!;
         private Bindable<double> columnWidth = null!;
         private Bindable<string> stageName = null!;
-        private Drawable? sprite;
+        private Container? sprite;
         private int cs;
 
         protected virtual bool OpenEffect => true;
@@ -40,6 +40,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             RelativeSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
+
+            InternalChild =
+                sprite = new Container
+                {
+                    RelativeSizeAxes = Axes.None,
+                    FillMode = FillMode.Fill,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                };
 
             cs = stageDefinition.Columns;
 
@@ -65,18 +74,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnSkinChanged()
         {
-            ClearInternal();
+            sprite?.Clear();
 
             var stageBottom = factory.CreateStage("Body");
-            sprite = new Container
-            {
-                RelativeSizeAxes = Axes.None,
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Child = stageBottom
-            };
-            sprite.Depth = -1;
-            AddInternal(sprite); // 注释掉以隐藏stage
+            sprite?.Add(stageBottom);
+
             updateSizes();
         }
 
@@ -88,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (sprite != null)
             {
                 sprite.Scale = new Vector2(scale);
-                sprite.Y = 220f  - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
+                sprite.Y = 210f  - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
             }
 
             // 计算纹理高度和位置

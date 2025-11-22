@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
@@ -15,32 +16,21 @@ using osu.Game.Screens.LAsEzExtensions;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
+    public partial class EzKeyArea : EzNoteBase, IKeyBindingHandler<ManiaAction>
     {
-        private Drawable container = null!;
-        private Drawable upSprite = null!;
-        private Drawable downSprite = null!;
+        private Container? container;
+        private TextureAnimation? upSprite;
+        private TextureAnimation? downSprite;
         protected virtual bool IsKeyPress => true;
-        protected virtual bool UseColorization => true;
-
-        [Resolved]
-        private Column column { get; set; } = null!;
-
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
-
-        [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        protected override bool UseColorization => true;
 
         private Bindable<string> stageName = null!;
         private Bindable<double> hitPositonBindable = null!;
 
         public EzKeyArea()
         {
-            RelativeSizeAxes = Axes.Both;
+            RelativeSizeAxes = Axes.X;
+            FillMode = FillMode.Fill;
             Anchor = Anchor.TopCentre;
             Origin = Anchor.TopCentre;
         }
@@ -48,8 +38,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader]
         private void load()
         {
-            stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            container = new Container
+            {
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
+                RelativeSizeAxes = Axes.X,
+                FillMode = FillMode.Fill,
+            };
+
+            Column.TopLevelContainer.Add(container);
+
+            stageName = EZSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
+            hitPositonBindable = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+
+            loadAnimation();
         }
 
         protected override void LoadComplete()
@@ -63,14 +65,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (ezSkinConfig.IsSpecialColumn(stageDefinition.Columns, column.Index))
+                if (EZSkinConfig.IsSpecialColumn(StageDefinition.Columns, Column.Index))
                     return "02";
 
                 int logicalIndex = 0;
 
-                for (int i = 0; i < column.Index; i++)
+                for (int i = 0; i < Column.Index; i++)
                 {
-                    if (ezSkinConfig.IsSpecialColumn(stageDefinition.Columns, i))
+                    if (EZSkinConfig.IsSpecialColumn(StageDefinition.Columns, i))
                         logicalIndex++;
                 }
 
@@ -80,39 +82,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void loadAnimation()
         {
-            if (stageDefinition.Columns == 14 && column.Index == 13) return;
+            if (StageDefinition.Columns == 14 && Column.Index == 13) return;
 
             ClearInternal();
 
-            upSprite = factory.CreateStageKeys("keybase");
-            downSprite = factory.CreateStageKeys("keypress");
+            upSprite = Factory.CreateStageKeys("keybase");
+            downSprite = Factory.CreateStageKeys("keypress");
             downSprite.Alpha = 0;
 
-            container = new Container
+            if (container != null)
             {
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                RelativeSizeAxes = Axes.Both,
-                FillMode = FillMode.Fill,
-                Children = new[]
+                container.Children = new[]
                 {
                     upSprite,
                     downSprite,
-                }
-            };
-
-            OnConfigChanged();
-            AddInternal(container);
+                };
+                OnConfigChanged();
+            }
         }
 
         private void OnConfigChanged()
         {
-            Y =  768f - (float)hitPositonBindable.Value + 45f;
+            if (container != null)
+                container.Y = 768f - (float)hitPositonBindable.Value + 4f;
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
-            if (e.Action == column.Action.Value)
+            if (e.Action == Column.Action.Value)
             {
                 upSprite.FadeTo(0);
                 downSprite.FadeTo(1);
@@ -123,10 +120,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
-            if (e.Action == column.Action.Value)
+            if (e.Action == Column.Action.Value)
             {
-                upSprite.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(1);
-                downSprite.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
+                upSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(1);
+                downSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
             }
         }
     }
