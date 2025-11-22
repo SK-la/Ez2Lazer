@@ -76,7 +76,7 @@ namespace osu.Game.Screens
 
             setDefaultSelection(nameOfNote, availableNoteSets, ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName));
             setDefaultSelection(nameOfStage, availableStageSets, ezSkinConfig.Get<string>(EzSkinSetting.StageName));
-            setDefaultSelection(nameOfGameTheme, availableGameThemes, ezSkinConfig.Get<string>(EzSkinSetting.GameThemeName) ?? "AZURE_EXPRESSION");
+            setDefaultSelection(nameOfGameTheme, availableGameThemes, ezSkinConfig.Get<string>(EzSkinSetting.GameThemeName));
             createUI();
         }
 
@@ -267,7 +267,20 @@ namespace osu.Game.Screens
 
         private void loadFolderSets(string type)
         {
-            List<string> targetList = type.Equals("note", StringComparison.OrdinalIgnoreCase) ? availableNoteSets : availableStageSets;
+            List<string> targetList;
+
+            if (type.Equals("note", StringComparison.OrdinalIgnoreCase))
+                targetList = availableNoteSets;
+            else if (type.Equals("Stage", StringComparison.OrdinalIgnoreCase))
+                targetList = availableStageSets;
+            else if (type.Equals("GameTheme", StringComparison.OrdinalIgnoreCase))
+                targetList = availableGameThemes;
+            else
+            {
+                Logger.Log($"Unknown resource type: {type}", LoggingTarget.Runtime, LogLevel.Error);
+                return;
+            }
+
             targetList.Clear();
 
             if (!resource_paths.TryGetValue(type, out string? relativePath))
