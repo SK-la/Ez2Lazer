@@ -69,6 +69,11 @@ namespace osu.Game.Screens
             loadFolderSets("Stage");
             loadFolderSets("GameTheme");
 
+            // 设置动态枚举
+            DynamicEnums.SetNoteSets(availableNoteSets);
+            DynamicEnums.SetStageSets(availableStageSets);
+            DynamicEnums.SetGameThemes(availableGameThemes);
+
             setDefaultSelection(nameOfNote, availableNoteSets, ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName));
             setDefaultSelection(nameOfStage, availableStageSets, ezSkinConfig.Get<string>(EzSkinSetting.StageName));
             setDefaultSelection(nameOfGameTheme, availableGameThemes, ezSkinConfig.Get<string>(EzSkinSetting.GameThemeName) ?? "AZURE_EXPRESSION");
@@ -79,10 +84,10 @@ namespace osu.Game.Screens
         {
             base.LoadComplete();
 
-            nameOfGameTheme.BindValueChanged(e => updateAllEzTextureNames(e.NewValue));
             nameOfNote.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.NoteSetName, e.NewValue));
             nameOfStage.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue));
             nameOfGameTheme.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.GameThemeName, e.NewValue));
+            nameOfGameTheme.BindValueChanged(e => updateAllEzTextureNames(e.NewValue));
         }
 
         private void setDefaultSelection(Bindable<string> bindable, List<string> availableItems, string configuredValue)
@@ -114,21 +119,21 @@ namespace osu.Game.Screens
                             LabelText = "GlobalTextureName".Localize(),
                             TooltipText = "GlobalTextureNameTooltip".Localize(),
                             Current = nameOfGameTheme,
-                            Items = availableGameThemes,
+                            Items = DynamicEnums.GameThemes,
                         },
                         new SettingsDropdown<string>
                         {
                             LabelText = "StageSet".Localize(),
                             TooltipText = "StageSetTooltip".Localize(),
                             Current = nameOfStage,
-                            Items = availableStageSets,
+                            Items = DynamicEnums.StageSets,
                         },
                         new SettingsDropdown<string>
                         {
                             LabelText = "NoteSet".Localize(),
                             TooltipText = "NoteSetTooltip".Localize(),
                             Current = nameOfNote,
-                            Items = availableNoteSets,
+                            Items = DynamicEnums.NoteSets,
                         },
                         new SettingsEnumDropdown<EzColumnWidthStyle>
                         {

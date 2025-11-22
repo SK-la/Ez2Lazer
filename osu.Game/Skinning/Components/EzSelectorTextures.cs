@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -11,6 +12,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
@@ -19,13 +22,24 @@ using osuTK.Graphics;
 namespace osu.Game.Skinning.Components
 {
     //TODO 代码不对, 无法加载, 用于缩略图选择纹理
-    public partial class EzSelectorTextures : SettingsItem<EzSelectorGameThemeSet>
+    public partial class EzSelectorTextures : SettingsItem<string>
     {
-        // private FillFlowContainer previewList = null!;
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
+        private List<string> availableThemes = new List<string>();
 
         public EzSelectorTextures()
         {
-            Current = new Bindable<EzSelectorGameThemeSet>((EzSelectorGameThemeSet)49);
+            Current = new Bindable<string>();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            availableThemes = loadAvailableThemes();
+            if (availableThemes.Count > 0)
+                Current.Value = availableThemes[0];
         }
 
         protected override Drawable CreateControl()
@@ -46,7 +60,7 @@ namespace osu.Game.Skinning.Components
 
         private IEnumerable<Drawable> createPreviewItems()
         {
-            foreach (EzSelectorGameThemeSet value in Enum.GetValues(typeof(EzSelectorGameThemeSet)))
+            foreach (string value in availableThemes)
             {
                 yield return new PreviewContainer
                 {
@@ -57,9 +71,31 @@ namespace osu.Game.Skinning.Components
             }
         }
 
+        private List<string> loadAvailableThemes()
+        {
+            var themes = new List<string>();
+
+            try
+            {
+                string gameThemePath = storage.GetFullPath("EzResources/GameTheme");
+
+                if (Directory.Exists(gameThemePath))
+                {
+                    string[] directories = Directory.GetDirectories(gameThemePath);
+                    themes.AddRange(directories.Select(Path.GetFileName).Where(name => !string.IsNullOrEmpty(name))!);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to load GameTheme folders: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+            }
+
+            return themes;
+        }
+
         private partial class PreviewContainer : Container
         {
-            public EzSelectorGameThemeSet Value { get; set; }
+            public string Value { get; set; } = string.Empty;
             public Action? Action { get; set; }
 
             private Box? background;
