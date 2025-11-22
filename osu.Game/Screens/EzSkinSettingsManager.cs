@@ -68,8 +68,9 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(EzSkinSetting.HitTargetAlpha, 0.6, 0, 1, 0.01);
 
-            SetDefault(EzSkinSetting.NoteSetName, "evolve");
-            SetDefault(EzSkinSetting.StageName, "JIYU");
+            SetDefault(EzSkinSetting.NoteSetName, "lucenteclat");
+            SetDefault(EzSkinSetting.StageName, "Celeste_Lumiere");
+            SetDefault(EzSkinSetting.GameThemeName, "Celeste_Lumiere");
             SetDefault(EzSkinSetting.NoteHeightScaleToWidth, 1, 0.1, 2, 0.1);
             SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
