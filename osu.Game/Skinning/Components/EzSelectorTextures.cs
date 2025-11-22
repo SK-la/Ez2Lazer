@@ -19,13 +19,13 @@ using osuTK.Graphics;
 namespace osu.Game.Skinning.Components
 {
     //TODO 代码不对, 无法加载, 用于缩略图选择纹理
-    public partial class EzSelectorTextures : SettingsItem<EzSelectorNameSet>
+    public partial class EzSelectorTextures : SettingsItem<EzSelectorGameThemeSet>
     {
         // private FillFlowContainer previewList = null!;
 
         public EzSelectorTextures()
         {
-            Current = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)49);
+            Current = new Bindable<EzSelectorGameThemeSet>((EzSelectorGameThemeSet)49);
         }
 
         protected override Drawable CreateControl()
@@ -46,7 +46,7 @@ namespace osu.Game.Skinning.Components
 
         private IEnumerable<Drawable> createPreviewItems()
         {
-            foreach (EzSelectorNameSet value in Enum.GetValues(typeof(EzSelectorNameSet)))
+            foreach (EzSelectorGameThemeSet value in Enum.GetValues(typeof(EzSelectorGameThemeSet)))
             {
                 yield return new PreviewContainer
                 {
@@ -59,7 +59,7 @@ namespace osu.Game.Skinning.Components
 
         private partial class PreviewContainer : Container
         {
-            public EzSelectorNameSet Value { get; set; }
+            public EzSelectorGameThemeSet Value { get; set; }
             public Action? Action { get; set; }
 
             private Box? background;

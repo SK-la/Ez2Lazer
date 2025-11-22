@@ -85,7 +85,7 @@ namespace osu.Game.Screens.LAsEzExtensions
             largeTextureStore = new LargeTextureStore(renderer); //stage相关纹理专用
 
             const string base_path = "EzResources/";
-            const string stage_path = "EzResources/Stage/";
+            const string stage_path = "EzResources/";
 
             if (!loaderStoreCache.TryGetValue(base_path, out var baseTextureLoaderStore))
             {
@@ -94,14 +94,10 @@ namespace osu.Game.Screens.LAsEzExtensions
                 baseTextureLoaderStore = new TextureLoaderStore(baseFileStore);
                 loaderStoreCache[base_path] = baseTextureLoaderStore;
                 textureStore.AddTextureSource(baseTextureLoaderStore);
-            }
 
-            if (!loaderStoreCache.TryGetValue(stage_path, out var stageTextureLoaderStore))
-            {
                 var stageStorage = hostStorage.GetStorageForDirectory(stage_path);
                 var stageFileStore = new StorageBackedResourceStore(stageStorage);
-                stageTextureLoaderStore = new TextureLoaderStore(stageFileStore);
-                loaderStoreCache[stage_path] = stageTextureLoaderStore;
+                var stageTextureLoaderStore = new TextureLoaderStore(stageFileStore);
                 largeTextureStore.AddTextureSource(stageTextureLoaderStore);
             }
 
@@ -119,7 +115,6 @@ namespace osu.Game.Screens.LAsEzExtensions
             });
 
             stageName.BindValueChanged(e =>
-
             {
             });
         }
@@ -530,12 +525,12 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         public virtual Drawable CreateStage(string component)
         {
-            string basePath = $"{stageName.Value}/Stage";
+            string basePath = $"Stage/{stageName.Value}/Stage";
 
             var container = new Container
             {
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
 
                 // AutoSizeAxes = Axes.X,
                 // Height = default_stage_body_height,
@@ -547,7 +542,7 @@ namespace osu.Game.Screens.LAsEzExtensions
             // }, true);
 
             addStageComponent(container, $"{basePath}/fivekey/{component}");
-            addStageComponent(container, $"{basePath}/GrooveLight");
+            // addStageComponent(container, $"{basePath}/GrooveLight"); //此纹理需要修改正片叠底
             addStageComponent(container, $"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject");
 
             return container;
@@ -560,15 +555,15 @@ namespace osu.Game.Screens.LAsEzExtensions
                 Anchor = Anchor.BottomCentre,
                 Origin = Anchor.BottomCentre,
                 Y = 384f + 247f,
-                // RelativeSizeAxes = Axes.None,
-                // FillMode = FillMode.Fill,
+                RelativeSizeAxes = Axes.None,
+                FillMode = FillMode.Fill,
                 DefaultFrameLength = default_frame_length
             };
 
             for (int i = 0; i < max_stage_frames; i++)
             {
                 string framePath = $"{basePath}_{i}.png";
-                var texture = largeTextureStore.Get(framePath);
+                var texture = textureStore.Get(framePath);
 
                 if (texture == null) break;
 
@@ -600,15 +595,13 @@ namespace osu.Game.Screens.LAsEzExtensions
                 FillMode = FillMode.Fill,
             };
 
-            string baseKeyPath = $"{stageName.Value}/Stage/eightkey/{component}";
+            string baseKeyPath = $"Stage/{stageName.Value}/Stage/eightkey/{component}";
             string[] pathsToTry =
             {
                 $"{baseKeyPath}/KeyBase",
                 $"{baseKeyPath}/KeyPress",
-                $"{baseKeyPath}/KeyBase_0",
-                $"{baseKeyPath}/KeyPress_0",
-                $"{baseKeyPath}/2KeyBase_0",
-                $"{baseKeyPath}/2KeyPress_0",
+                $"{baseKeyPath}/2KeyBase",
+                $"{baseKeyPath}/2KeyPress",
             };
 
             foreach (string path in pathsToTry)
@@ -617,16 +610,16 @@ namespace osu.Game.Screens.LAsEzExtensions
                 {
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    // RelativeSizeAxes = Axes.None,
+                    RelativeSizeAxes = Axes.None,
                     FillMode = FillMode.Fill,
-                    DefaultFrameLength = default_frame_length
+                    DefaultFrameLength = default_frame_length / 4,
                 };
 
                 // 加载帧序列
                 for (int i = 0; i < max_stage_frames; i++)
                 {
                     string framePath = $"{path}_{i}.png";
-                    var texture = largeTextureStore.Get(framePath);
+                    Texture? texture = textureStore.Get(framePath);
 
                     if (texture == null) break;
 
@@ -636,7 +629,7 @@ namespace osu.Game.Screens.LAsEzExtensions
                 // 如果没有帧，加载单个纹理作为单帧
                 if (animation.FrameCount == 0)
                 {
-                    Texture? singleTexture = largeTextureStore.Get($"{path}.png");
+                    Texture? singleTexture = textureStore.Get($"{path}.png");
 
                     if (singleTexture == null) break;
 

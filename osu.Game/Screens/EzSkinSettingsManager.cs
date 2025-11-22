@@ -366,6 +366,7 @@ namespace osu.Game.Screens
         GlobalTextureName,
         NoteSetName,
         StageName,
+        GameThemeName,
 
         // 着色系统
         ColorSettingsEnabled,

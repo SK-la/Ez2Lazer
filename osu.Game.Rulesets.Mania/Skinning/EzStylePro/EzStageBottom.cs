@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Bindable<double> hitPositonBindable = null!;
         private Bindable<double> columnWidth = null!;
         private Bindable<string> stageName = null!;
-        private Container? sprite;
+        private Drawable? sprite;
         private int cs;
 
         protected virtual bool OpenEffect => true;
@@ -54,12 +54,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             stageName.BindValueChanged(_ => OnSkinChanged(), true);
             hitPositonBindable.BindValueChanged(_ => updateSizes(), true);
             columnWidth.BindValueChanged(_ => updateSizes(), true);
+            OnSkinChanged();
         }
 
         protected override void Update()
         {
             base.Update();
-            // updateSizes();
+            updateSizes();
         }
 
         private void OnSkinChanged()
@@ -81,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void updateSizes()
         {
-            float actualPanelWidth = ezSkinConfig.GetTotalWidth(cs);
+            float actualPanelWidth = DrawWidth; //ezSkinConfig.GetTotalWidth(cs);
             float scale = actualPanelWidth / 410.0f;
 
             if (sprite != null)

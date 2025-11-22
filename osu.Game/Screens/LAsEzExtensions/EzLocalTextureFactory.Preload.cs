@@ -45,7 +45,7 @@ namespace osu.Game.Screens.LAsEzExtensions
                     preloadTasks.Add(Task.Run(() => preloadComponent(component, currentNoteSetName)));
                 }
 
-                preloadTasks.Add(Task.Run(preloadStageTextures));
+                // preloadTasks.Add(Task.Run(preloadStageTextures));
 
                 await Task.WhenAll(preloadTasks).ConfigureAwait(false);
 
@@ -96,47 +96,43 @@ namespace osu.Game.Screens.LAsEzExtensions
             }
         }
 
-        private async Task preloadStageTextures()
-        {
-            try
-            {
-                string currentStageName = stageName.Value;
-                Logger.Log($"[EzLocalTextureFactory] Preloading stage textures for: {currentStageName}",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-
-                var stagePaths = new List<string>
-                {
-                    $"Stage/{currentStageName}/Stage/fivekey/Body",
-                    $"Stage/{currentStageName}/Stage/GrooveLight",
-                    $"Stage/{currentStageName}/Stage/eightkey/keybase/KeyBase",
-                    $"Stage/{currentStageName}/Stage/eightkey/keypress/KeyBase",
-                    $"Stage/{currentStageName}/Stage/eightkey/keypress/KeyPress",
-                };
-
-                int loadedCount = 0;
-
-                foreach (string path in stagePaths)
-                {
-                    // For stage textures, use largeTextureStore directly without caching
-                    var texture = largeTextureStore.Get($"{path}.png");
-                    if (texture != null)
-                        loadedCount++;
-
-                    Logger.Log($"[EzLocalTextureFactory] preload stage texture {path}",
-                        LoggingTarget.Runtime, LogLevel.Debug);
-
-                    if (loadedCount % 2 == 0)
-                    {
-                        await Task.Delay(10).ConfigureAwait(false);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Stage texture preload failed: {ex.Message}",
-                    LoggingTarget.Runtime, LogLevel.Error);
-            }
-        }
+        // private async Task preloadStageTextures()
+        // {
+        //     try
+        //     {
+        //         string currentStageName = stageName.Value;
+        //         Logger.Log($"[EzLocalTextureFactory] Preloading stage textures for: {currentStageName}",
+        //             LoggingTarget.Runtime, LogLevel.Debug);
+        //
+        //         var stagePaths = new List<string>
+        //         {
+        //             $"Stage/{currentStageName}/Stage/fivekey/Body",
+        //             $"Stage/{currentStageName}/Stage/GrooveLight",
+        //             $"Stage/{currentStageName}/Stage/eightkey/keybase/KeyBase",
+        //             $"Stage/{currentStageName}/Stage/eightkey/keypress/KeyBase",
+        //             $"Stage/{currentStageName}/Stage/eightkey/keypress/KeyPress",
+        //         };
+        //
+        //         foreach (string path in stagePaths)
+        //         {
+        //             // For stage textures, skip preloading to avoid conflicts with runtime loading
+        //             // var texture = largeTextureStore.Get($"{path}.png");
+        //             // if (texture != null)
+        //             //     loadedCount++;
+        //
+        //             Logger.Log($"[EzLocalTextureFactory] Skipping preload for stage texture {path}",
+        //                 LoggingTarget.Runtime, LogLevel.Debug);
+        //
+        //             // Simulate loading delay if needed
+        //             // await Task.Delay(10).ConfigureAwait(false);
+        //         }
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         Logger.Log($"[EzLocalTextureFactory] Stage texture preload failed: {ex.Message}",
+        //             LoggingTarget.Runtime, LogLevel.Error);
+        //     }
+        // }
 
         private void resetPreloadState()
         {

@@ -93,6 +93,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
                 RelativeSizeAxes = Axes.Both,
+                FillMode = FillMode.Fill,
                 Children = new[]
                 {
                     upSprite,

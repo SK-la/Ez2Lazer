@@ -31,7 +31,7 @@ namespace osu.Game.Skinning.Components
         };
 
         [SettingSource("HitResult Text Font", "HitResult Text Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzSelectorNameSet> NameDropdown { get; } = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)49);
+        public Bindable<string> NameDropdown { get; } = new Bindable<string>("TANOc2");
 
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
@@ -119,7 +119,7 @@ namespace osu.Game.Skinning.Components
 
         // private void showPreview() => previewOverlay.Show();
 
-        // public Drawable CreatePreviewDrawable(EzSelectorNameSet name)
+        // public Drawable CreatePreviewDrawable(EzSelectorGameThemeSet name)
         // {
         //     var container = new Container
         //     {
@@ -144,7 +144,7 @@ namespace osu.Game.Skinning.Components
         //     return container;
         // }
         //
-        // private Sprite createPreviewSprite(EzSelectorNameSet name, HitResult result)
+        // private Sprite createPreviewSprite(EzSelectorGameThemeSet name, HitResult result)
         // {
         //     string basePath = $@"EzResources/enumBase/enumJudgement/{name}";
         //     var texture = textures.Get($"{basePath}.png");
@@ -286,7 +286,7 @@ namespace osu.Game.Skinning.Components
 
         private string getGifPath(HitResult hitResult)
         {
-            string textureNameReplace = NameDropdown.Value.ToString();
+            string textureNameReplace = NameDropdown.Value;
             string basePath = $@"EzResources/GameTheme/{textureNameReplace}/judgement";
             string resultName = hitResult switch
             {

@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Y = 200;
                                     combo1.Effect.Value = EzComEffectType.None;
-                                    combo1.NameDropdown.Value = (EzSelectorNameSet)43;
+                                    combo1.NameDropdown.Value = "Celeste_Lumiere";
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -137,7 +137,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         case ManiaSkinComponents.KeyArea:
                             return new SbIKeyArea();
 
-                        // case ManiaSkinComponents.HitExplosion:
+                            // case ManiaSkinComponents.HitExplosion:
                             // return new SbIHitExplosion();
                     }
 

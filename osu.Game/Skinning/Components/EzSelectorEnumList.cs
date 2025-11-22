@@ -3,18 +3,49 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.Skinning.Components
 {
-    public partial class EzSelectorEnumList : SettingsDropdown<EzSelectorNameSet>
+    public partial class EzSelectorEnumList : SettingsDropdown<string>
     {
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            Items = Enum.GetValues(typeof(EzSelectorNameSet)).Cast<EzSelectorNameSet>().ToList();
+            // 动态加载GameTheme文件夹
+            var availableThemes = loadAvailableThemes();
+            Items = availableThemes;
+        }
+
+        private List<string> loadAvailableThemes()
+        {
+            var themes = new List<string>();
+
+            try
+            {
+                string gameThemePath = storage.GetFullPath("EzResources/GameTheme");
+
+                if (Directory.Exists(gameThemePath))
+                {
+                    string[] directories = Directory.GetDirectories(gameThemePath);
+                    themes.AddRange(directories.Select(Path.GetFileName).Where(name => !string.IsNullOrEmpty(name))!);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to load GameTheme folders: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+            }
+
+            return themes;
         }
     }
 
@@ -40,7 +71,9 @@ namespace osu.Game.Skinning.Components
         None
     }
 
-    public enum EzSelectorNameSet
+    //TODO: 枚举维护不方便，修改后要清理重构，考虑改为读取配置文件，或自动搜索子文件夹生成列表
+    //这里使用枚举，加载的是Resource.dll中的资源
+    public enum EzSelectorGameThemeSet
     {
         // ReSharper disable InconsistentNaming
         EZ2DJ_1st,
@@ -52,6 +85,7 @@ namespace osu.Game.Skinning.Components
         EZ2DJ_7th,
         AIR,
         AZURE_EXPRESSION,
+        Celeste_Lumiere,
         CV_CRAFT,
         D2D_Station,
         Dark_Concert,

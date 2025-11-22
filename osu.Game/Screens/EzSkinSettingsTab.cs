@@ -41,7 +41,8 @@ namespace osu.Game.Screens
         private static readonly Dictionary<string, string> resource_paths = new Dictionary<string, string>
         {
             ["note"] = @"EzResources\note",
-            ["Stage"] = @"EzResources\Stage"
+            ["Stage"] = @"EzResources\Stage",
+            ["GameTheme"] = @"EzResources\GameTheme"
         };
 
         private static readonly Dictionary<bool, (Color4 Color, string TopText, string BottomText)> position_mode_config = new Dictionary<bool, (Color4 Color, string TopText, string BottomText)>
@@ -50,12 +51,13 @@ namespace osu.Game.Screens
             [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), "SwitchToRelative".Localize(), "SwitchToRelative".Localize())
         };
 
-        private readonly Bindable<string> selectedNoteSet = new Bindable<string>();
-        private readonly Bindable<string> selectedStageSet = new Bindable<string>();
+        private readonly Bindable<string> nameOfNote = new Bindable<string>();
+        private readonly Bindable<string> nameOfStage = new Bindable<string>();
+        private readonly Bindable<string> nameOfGameTheme = new Bindable<string>();
+
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
-
-        private readonly Bindable<EzSelectorNameSet> globalTextureName = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)4);
+        private readonly List<string> availableGameThemes = new List<string>();
 
         private SettingsButton refreshSkinButton = null!;
         private bool isAbsolutePosition = true;
@@ -63,13 +65,13 @@ namespace osu.Game.Screens
         [BackgroundDependencyLoader]
         private void load()
         {
-            globalTextureName.Value = (EzSelectorNameSet)ezSkinConfig.GetBindable<int>(EzSkinSetting.GlobalTextureName).Value;
-
             loadFolderSets("note");
             loadFolderSets("Stage");
+            loadFolderSets("GameTheme");
 
-            setDefaultSelection(selectedNoteSet, availableNoteSets, ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName));
-            setDefaultSelection(selectedStageSet, availableStageSets, ezSkinConfig.Get<string>(EzSkinSetting.StageName));
+            setDefaultSelection(nameOfNote, availableNoteSets, ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName));
+            setDefaultSelection(nameOfStage, availableStageSets, ezSkinConfig.Get<string>(EzSkinSetting.StageName));
+            setDefaultSelection(nameOfGameTheme, availableGameThemes, ezSkinConfig.Get<string>(EzSkinSetting.GameThemeName) ?? "AZURE_EXPRESSION");
             createUI();
         }
 
@@ -77,9 +79,10 @@ namespace osu.Game.Screens
         {
             base.LoadComplete();
 
-            globalTextureName.BindValueChanged(e => updateAllEzTextureNames(e.NewValue));
-            selectedNoteSet.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.NoteSetName, e.NewValue));
-            selectedStageSet.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue));
+            nameOfGameTheme.BindValueChanged(e => updateAllEzTextureNames(e.NewValue));
+            nameOfNote.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.NoteSetName, e.NewValue));
+            nameOfStage.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue));
+            nameOfGameTheme.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.GameThemeName, e.NewValue));
         }
 
         private void setDefaultSelection(Bindable<string> bindable, List<string> availableItems, string configuredValue)
@@ -106,24 +109,25 @@ namespace osu.Game.Screens
                     Spacing = new Vector2(10),
                     Children = new Drawable[]
                     {
-                        new SettingsEnumDropdown<EzSelectorNameSet>
+                        new SettingsDropdown<string>
                         {
                             LabelText = "GlobalTextureName".Localize(),
                             TooltipText = "GlobalTextureNameTooltip".Localize(),
-                            Current = globalTextureName,
+                            Current = nameOfGameTheme,
+                            Items = availableGameThemes,
                         },
                         new SettingsDropdown<string>
                         {
                             LabelText = "StageSet".Localize(),
                             TooltipText = "StageSetTooltip".Localize(),
-                            Current = selectedStageSet,
+                            Current = nameOfStage,
                             Items = availableStageSets,
                         },
                         new SettingsDropdown<string>
                         {
                             LabelText = "NoteSet".Localize(),
                             TooltipText = "NoteSetTooltip".Localize(),
-                            Current = selectedNoteSet,
+                            Current = nameOfNote,
                             Items = availableNoteSets,
                         },
                         new SettingsEnumDropdown<EzColumnWidthStyle>
@@ -228,7 +232,7 @@ namespace osu.Game.Screens
 
         #region 刷新所有EzComponent的纹理名称
 
-        private void updateAllEzTextureNames(EzSelectorNameSet textureName)
+        private void updateAllEzTextureNames(string textureGameTheme)
         {
             var root = findRootDrawable();
 
@@ -237,13 +241,13 @@ namespace osu.Game.Screens
             var hitResultScores = root.ChildrenOfType<EzComHitResultScore>();
 
             foreach (var scoreText in scoreTexts)
-                scoreText.FontName.Value = textureName;
+                scoreText.FontName.Value = textureGameTheme;
 
             foreach (var comboText in comboTexts)
-                comboText.FontName.Value = textureName;
+                comboText.FontName.Value = textureGameTheme;
 
             foreach (var hitResultScore in hitResultScores)
-                hitResultScore.NameDropdown.Value = textureName;
+                hitResultScore.NameDropdown.Value = textureGameTheme;
         }
 
         private Drawable findRootDrawable()

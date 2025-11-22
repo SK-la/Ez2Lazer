@@ -17,7 +17,7 @@ namespace osu.Game.Skinning.Components
         protected override double RollingDuration => 250;
 
         [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzSelectorNameSet> FontNameDropdown { get; } = new Bindable<EzSelectorNameSet>((EzSelectorNameSet)Enum.ToObject(typeof(EzSelectorNameSet), 43));
+        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("QTZ_01");
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
