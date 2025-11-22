@@ -88,7 +88,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (sprite != null)
             {
                 sprite.Scale = new Vector2(scale);
-                sprite.Y = 250f  - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
+                sprite.Y = 220f  - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
             }
 
             // 计算纹理高度和位置

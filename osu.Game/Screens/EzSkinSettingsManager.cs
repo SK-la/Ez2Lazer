@@ -21,8 +21,8 @@ namespace osu.Game.Screens
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;
 
-        private readonly Dictionary<int, EzColumnType[]> columnTypeCache = new Dictionary<int, EzColumnType[]>();
-        private readonly Dictionary<int, bool[]> isSpecialCache = new Dictionary<int, bool[]>();
+        public static readonly Dictionary<int, EzColumnType[]> COLUMN_TYPE_CACHE = new Dictionary<int, EzColumnType[]>();
+        public static readonly Dictionary<int, bool[]> IS_SPECIAL_CACHE = new Dictionary<int, bool[]>();
 
         private static readonly Dictionary<int, EzSkinSetting> key_mode_to_column_color_setting = new Dictionary<int, EzSkinSetting>
         {
@@ -89,8 +89,18 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
             SetDefault(EzSkinSetting.ColumnTypeE, Colour4.FromHex("#FF4A4A"));
             SetDefault(EzSkinSetting.ColumnTypeP, Colour4.FromHex("#72FF72"));
+
             initializeColumnTypeDefaults();
+
+            // Pre-populate caches for all common key modes to avoid lazy loading delays
+            foreach (int keyMode in commonKeyModes)
+            {
+                getColumnTypes(keyMode);
+                GetIsSpecialColumns(keyMode);
+            }
         }
+
+        #region 列类型管理
 
         private void initializeColumnTypeDefaults()
         {
@@ -107,13 +117,127 @@ namespace osu.Game.Screens
         private static EzColumnType[] getDefaultColumnTypes(int keyMode)
         {
             return Enumerable.Range(0, keyMode)
-                .Select(i => EzColumnTypeManager.GetColumnType(keyMode, i))
-                .ToArray();
+                             .Select(i => EzColumnTypeManager.GetColumnType(keyMode, i))
+                             .ToArray();
         }
+
+        public void SetColumnType(int keyMode, int columnIndex, EzColumnType colorType)
+        {
+            SetColumnType(keyMode, columnIndex, colorType.ToString());
+        }
+
+        public void SetColumnType(int keyMode, int columnIndex, string colorType)
+        {
+            try
+            {
+                var setting = getColumnTypeListSetting(keyMode);
+                string? currentConfig = Get<string>(setting);
+                string[] types = !string.IsNullOrEmpty(currentConfig)
+                    ? currentConfig.Split(',')
+                    : new string[keyMode];
+
+                if (types.Length <= columnIndex)
+                {
+                    Array.Resize(ref types, Math.Max(keyMode, columnIndex + 1));
+                }
+
+                types[columnIndex] = colorType.Trim();
+                SetValue(setting, string.Join(",", types));
+
+                COLUMN_TYPE_CACHE.Remove(keyMode);
+                IS_SPECIAL_CACHE.Remove(keyMode);
+            }
+            catch (NotSupportedException)
+            {
+            }
+        }
+
+        private static EzSkinSetting getColumnTypeListSetting(int keyMode)
+        {
+            if (key_mode_to_column_color_setting.TryGetValue(keyMode, out var setting))
+                return setting;
+
+            throw new NotSupportedException($"不支持 {keyMode} 键位模式");
+        }
+
+        #endregion
+
+        #region 公共方法
+
+        public Colour4 GetColumnColor(int keyMode, int columnIndex)
+        {
+            EzColumnType colorType = GetColumnType(keyMode, columnIndex);
+
+            if (column_type_to_setting.TryGetValue(colorType, out var setting))
+                return Get<Colour4>(setting);
+
+            return Get<Colour4>(EzSkinSetting.ColumnTypeA);
+        }
+
+        public IBindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
+        {
+            EzColumnType colorType = GetColumnType(keyMode, columnIndex);
+
+            if (column_type_to_setting.TryGetValue(colorType, out var setting))
+                return GetBindable<Colour4>(setting);
+
+            return GetBindable<Colour4>(EzSkinSetting.ColumnTypeA);
+        }
+
+        public EzColumnType GetColumnType(int keyMode, int columnIndex)
+        {
+            EzColumnType[] types = getColumnTypes(keyMode);
+            if (columnIndex < types.Length)
+                return types[columnIndex];
+
+            return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
+        }
+
+        public float GetTotalWidth(int keyMode)
+        {
+            double baseWidth = GetBindable<double>(EzSkinSetting.ColumnWidth).Value;
+            double specialFactor = GetBindable<double>(EzSkinSetting.SpecialFactor).Value;
+            float totalWidth = 0;
+            int forMode = keyMode == 14 ? keyMode - 1 : keyMode;
+            bool[] isSpecials = GetIsSpecialColumns(keyMode);
+
+            for (int i = 0; i < forMode; i++)
+            {
+                bool isSpecial = isSpecials[i];
+                totalWidth += (float)(baseWidth * (isSpecial ? specialFactor : 1.0));
+            }
+
+            return totalWidth;
+        }
+
+        public bool IsSpecialColumn(int keyMode, int columnIndex)
+        {
+            bool[] specials = GetIsSpecialColumns(keyMode);
+            return specials[columnIndex];
+        }
+
+        public bool[] GetIsSpecialColumns(int keyMode)
+        {
+            if (IS_SPECIAL_CACHE.TryGetValue(keyMode, out bool[]? specials))
+                return specials;
+
+            EzColumnType[] types = getColumnTypes(keyMode);
+            bool[] result = new bool[keyMode];
+
+            for (int i = 0; i < keyMode; i++)
+            {
+                result[i] = types[i] == EzColumnType.S;
+            }
+
+            IS_SPECIAL_CACHE[keyMode] = result;
+            return result;
+        }
+
+        #endregion
 
         private EzColumnType[] getColumnTypes(int keyMode)
         {
-            if (columnTypeCache.TryGetValue(keyMode, out EzColumnType[]? types))
+            if (COLUMN_TYPE_CACHE.TryGetValue(keyMode, out EzColumnType[]? types))
                 return types;
 
             types = new EzColumnType[keyMode];
@@ -158,75 +282,8 @@ namespace osu.Game.Screens
                     types[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
             }
 
-            columnTypeCache[keyMode] = types;
+            COLUMN_TYPE_CACHE[keyMode] = types;
             return types;
-        }
-
-        private static EzSkinSetting getColumnTypeListSetting(int keyMode)
-        {
-            if (key_mode_to_column_color_setting.TryGetValue(keyMode, out var setting))
-                return setting;
-
-            throw new NotSupportedException($"不支持 {keyMode} 键位模式");
-        }
-
-        public EzColumnType GetColumnType(int keyMode, int columnIndex)
-        {
-            EzColumnType[] types = getColumnTypes(keyMode);
-            if (columnIndex < types.Length)
-                return types[columnIndex];
-
-            return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
-        }
-
-        public void SetColumnType(int keyMode, int columnIndex, EzColumnType colorType)
-        {
-            SetColumnType(keyMode, columnIndex, colorType.ToString());
-        }
-
-        public void SetColumnType(int keyMode, int columnIndex, string colorType)
-        {
-            try
-            {
-                var setting = getColumnTypeListSetting(keyMode);
-                string? currentConfig = Get<string>(setting);
-                string[] types = !string.IsNullOrEmpty(currentConfig)
-                    ? currentConfig.Split(',')
-                    : new string[keyMode];
-
-                if (types.Length <= columnIndex)
-                {
-                    Array.Resize(ref types, Math.Max(keyMode, columnIndex + 1));
-                }
-
-                types[columnIndex] = colorType.Trim();
-                SetValue(setting, string.Join(",", types));
-                columnTypeCache.Remove(keyMode);
-                isSpecialCache.Remove(keyMode);
-            }
-            catch (NotSupportedException)
-            {
-            }
-        }
-
-        public Colour4 GetColumnColor(int keyMode, int columnIndex)
-        {
-            EzColumnType colorType = GetColumnType(keyMode, columnIndex);
-
-            if (column_type_to_setting.TryGetValue(colorType, out var setting))
-                return Get<Colour4>(setting);
-
-            return Get<Colour4>(EzSkinSetting.ColumnTypeA);
-        }
-
-        public IBindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
-        {
-            EzColumnType colorType = GetColumnType(keyMode, columnIndex);
-
-            if (column_type_to_setting.TryGetValue(colorType, out var setting))
-                return GetBindable<Colour4>(setting);
-
-            return GetBindable<Colour4>(EzSkinSetting.ColumnTypeA);
         }
 
         // public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex)
@@ -262,51 +319,6 @@ namespace osu.Game.Screens
         //     return result;
         // }
 
-        public bool IsSpecialColumn(int keyMode, int columnIndex)
-        {
-            EzColumnType[] types = getColumnTypes(keyMode);
-            return types[columnIndex] == EzColumnType.S;
-        }
-
-        public bool[] GetIsSpecialColumns(int keyMode)
-        {
-            if (isSpecialCache.TryGetValue(keyMode, out bool[]? specials))
-                return specials;
-
-            EzColumnType[] types = getColumnTypes(keyMode);
-            bool[] result = new bool[keyMode];
-
-            for (int i = 0; i < keyMode; i++)
-            {
-                result[i] = types[i] == EzColumnType.S;
-            }
-
-            isSpecialCache[keyMode] = result;
-            return result;
-        }
-
-        public float GetTotalWidth(int keyMode)
-        {
-            double baseWidth = GetBindable<double>(EzSkinSetting.ColumnWidth).Value;
-            double specialFactor = GetBindable<double>(EzSkinSetting.SpecialFactor).Value;
-            float totalWidth = 0;
-            int forMode = keyMode == 14 ? keyMode - 1 : keyMode;
-            bool[] isSpecials = GetIsSpecialColumns(keyMode);
-
-            for (int i = 0; i < forMode; i++)
-            {
-                bool isSpecial = isSpecials[i];
-                totalWidth += (float)(baseWidth * (isSpecial ? specialFactor : 1.0));
-            }
-
-            return totalWidth;
-        }
-
-        public new Bindable<T> GetBindable<T>(EzSkinSetting setting)
-        {
-            return base.GetBindable<T>(setting);
-        }
-
         // public event Action? OnPositionChanged;
         // public event Action? OnNoteSizeChanged;
 
@@ -318,6 +330,11 @@ namespace osu.Game.Screens
         // {
         //     OnNoteSizeChanged?.Invoke();
         // }
+
+        public new Bindable<T> GetBindable<T>(EzSkinSetting setting)
+        {
+            return base.GetBindable<T>(setting);
+        }
 
         public new void SetValue<T>(EzSkinSetting lookup, T value)
         {

@@ -18,31 +18,20 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzHoldNoteTail : CompositeDrawable
+    public partial class EzHoldNoteTail : EzNoteBase
     {
         private readonly EzHoldNoteHittingLayer hittingLayer = null!;
         private TextureAnimation? animation;
         private Container container = null!;
 
-        private EzSkinSettingsManager ezSkinConfig = null!;
         private Bindable<bool> enabledColor = null!;
-
-        [Resolved]
-        private Column column { get; set; } = null!;
-
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
 
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }
 
         [BackgroundDependencyLoader(true)]
-        private void load(EzSkinSettingsManager ezSkinConfig, DrawableHitObject? drawableObject)
+        private void load(DrawableHitObject? drawableObject)
         {
-            this.ezSkinConfig = ezSkinConfig;
             RelativeSizeAxes = Axes.Both;
             Alpha = 0f;
 
@@ -54,33 +43,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
 
-            enabledColor = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
-        }
-
-        private void updateSizes()
-        {
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-            loadAnimation();
-        }
-
-        private void onSkinChanged()
-        {
-            Schedule(loadAnimation);
-        }
-
-        private void onNoteSizeChanged()
-        {
-            if (enabledColor.Value)
-                container.Colour = NoteColor;
-            Schedule(() =>
-            {
-                updateSizes();
-                Invalidate();
-            });
+            enabledColor = EZSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -90,29 +53,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 drawableObject.HitObjectApplied -= hitObjectApplied;
         }
 
-        protected virtual Color4 NoteColor
-        {
-            get
-            {
-                int keyMode = stageDefinition.Columns;
-                int columnIndex = column.Index;
-                return ezSkinConfig.GetColumnColor(keyMode, columnIndex);
-            }
-        }
-
-        protected virtual string ColorPrefix => "blue";
         protected virtual string ComponentSuffix => "longnote/tail";
         protected virtual string ComponentName => $"{ColorPrefix}{ComponentSuffix}";
 
-        private void loadAnimation()
+        protected override void OnDrawableChanged()
         {
             ClearInternal();
-            animation = factory.CreateAnimation(ComponentName);
+            animation = Factory.CreateAnimation(ComponentName);
 
             if (animation.FrameCount == 0)
             {
                 animation.Dispose();
-                animation = factory.CreateAnimation($"{ColorPrefix}note");
+                animation = Factory.CreateAnimation($"{ColorPrefix}note");
             }
 
             container = new Container
@@ -130,7 +82,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             };
 
-            onNoteSizeChanged();
+            if (enabledColor.Value)
+                container.Colour = NoteColor;
+            Schedule(() =>
+            {
+                Invalidate();
+            });
+
             AddInternal(container);
         }
 

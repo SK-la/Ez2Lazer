@@ -13,7 +13,7 @@ namespace osu.Game.Skinning.Components
     public partial class EzComboText : CompositeDrawable, IHasText
     {
         public readonly EzGetComboTexture TextPart;
-        public Bindable<string> FontName { get; } = new Bindable<string>("AZURE_EXPRESSION");
+        public Bindable<string> FontName { get; } = new Bindable<string>("Celeste_Lumiere");
 
         public FillFlowContainer TextContainer { get; private set; }
 

@@ -17,7 +17,7 @@ namespace osu.Game.Skinning.Components
         protected override double RollingDuration => 250;
 
         [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("QTZ_01");
+        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("Celeste_Lumiere");
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
@@ -59,7 +59,7 @@ namespace osu.Game.Skinning.Components
 
         protected override IHasText CreateText()
         {
-            Text = new EzScoreText(FontNameDropdown);
+            Text = new EzScoreText();
             return Text;
         }
     }

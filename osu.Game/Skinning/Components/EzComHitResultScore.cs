@@ -27,16 +27,18 @@ namespace osu.Game.Skinning.Components
         {
             MinValue = 1,
             MaxValue = 240,
-            Precision = 1f,
+            Precision = 1f
         };
 
         [SettingSource("HitResult Text Font", "HitResult Text Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<string> NameDropdown { get; } = new Bindable<string>("TANOc2");
+        public Bindable<string> NameDropdown { get; } = new Bindable<string>("Celeste_Lumiere");
 
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
 
-        public Bindable<string> TextureNameBindable { get; } = new Bindable<string>();
+        public Bindable<string> TextureNameBindable { get; } = new Bindable<string>("Celeste_Lumiere");
+
+        // 预览纹理基础路径
         public string TextureBasePath => @"EzResources/enumBase/enumJudgement";
 
         // [SettingSource("Effect Type", "Effect Type")]
@@ -107,7 +109,7 @@ namespace osu.Game.Skinning.Components
                         Origin = Anchor.Centre,
                         Scale = new Vector2(1.5f),
                         Alpha = 0, // 初始隐藏
-                        Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2.png"),
+                        Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2.png")
                     }
                 };
 
@@ -225,7 +227,7 @@ namespace osu.Game.Skinning.Components
 
                         // 2. 加法混合（发光效果）
                         Source = BlendingType.SrcAlpha,
-                        Destination = BlendingType.One,
+                        Destination = BlendingType.One
 
                         // 3. 减法混合（暗色透明）
                         // Source = BlendingType.Zero,
@@ -343,10 +345,7 @@ namespace osu.Game.Skinning.Components
                 drawable.FadeColour(colors[0], 0);
                 var sequence = drawable.FadeColour(colors[0], flashSpeed, Easing.OutQuint);
 
-                for (int i = 1; i < colors.Length; i++)
-                {
-                    sequence = sequence.Then().FadeColour(colors[i], flashSpeed, Easing.OutQuint);
-                }
+                for (int i = 1; i < colors.Length; i++) sequence = sequence.Then().FadeColour(colors[i], flashSpeed, Easing.OutQuint);
             }
             else
             {
@@ -361,10 +360,7 @@ namespace osu.Game.Skinning.Components
                 drawable.FadeTo(weakerAlphas[0], 0);
                 var sequence = drawable.FadeTo(weakerAlphas[0], flashSpeed, Easing.OutQuint);
 
-                for (int i = 1; i < weakerAlphas.Length; i++)
-                {
-                    sequence = sequence.Then().FadeTo(weakerAlphas[i], flashSpeed, Easing.OutQuint);
-                }
+                for (int i = 1; i < weakerAlphas.Length; i++) sequence = sequence.Then().FadeTo(weakerAlphas[i], flashSpeed, Easing.OutQuint);
             }
         }
 
@@ -428,8 +424,8 @@ namespace osu.Game.Skinning.Components
 
             // 计算第二步的中间缩放值（完成70%的变形）
             var midScale = new Vector2(
-                1.0f + (finalScale.X - 1.0f) * 0.7f,
-                1.0f - (1.0f - finalScale.Y) * 0.7f
+                1.0f + ((finalScale.X - 1.0f) * 0.7f),
+                1.0f - ((1.0f - finalScale.Y) * 0.7f)
             );
 
             // 重置状态

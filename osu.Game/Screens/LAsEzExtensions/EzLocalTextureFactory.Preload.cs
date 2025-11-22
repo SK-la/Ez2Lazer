@@ -17,21 +17,14 @@ namespace osu.Game.Screens.LAsEzExtensions
             "noteflare", "noteflaregood", "longnoteflare",
         };
 
-        private static readonly object preload_lock = new object();
-        private static bool isPreloading;
-        private static bool preloadCompleted;
+        private static volatile bool isPreloading;
+        private static volatile bool preloadCompleted;
 
         public async Task PreloadGameTextures()
         {
             if (preloadCompleted || isPreloading) return;
 
-            lock (preload_lock)
-            {
-                if (preloadCompleted || isPreloading) return;
-
-                isPreloading = true;
-            }
-
+            isPreloading = true;
             try
             {
                 string currentNoteSetName = noteSetName.Value;
@@ -49,27 +42,21 @@ namespace osu.Game.Screens.LAsEzExtensions
 
                 await Task.WhenAll(preloadTasks).ConfigureAwait(false);
 
-                lock (preload_lock)
-                {
-                    preloadCompleted = true;
-                    isPreloading = false;
-                }
-
+                preloadCompleted = true;
                 Logger.Log($"[EzLocalTextureFactory] Preload completed for {preload_components.Length} components",
                     LoggingTarget.Runtime, LogLevel.Debug);
 
-                Logger.Log($"[EzLocalTextureFactory] Cache stats after preload: {singleTextureCache.Count} single textures, {global_cache.Count} frame sets",
+                Logger.Log($"[EzLocalTextureFactory] Cache stats after preload: {global_cache.Count} frame sets",
                     LoggingTarget.Runtime, LogLevel.Debug);
             }
             catch (Exception ex)
             {
                 Logger.Log($"[EzLocalTextureFactory] Preload failed: {ex.Message}",
                     LoggingTarget.Runtime, LogLevel.Error);
-
-                lock (preload_lock)
-                {
-                    isPreloading = false;
-                }
+            }
+            finally
+            {
+                isPreloading = false;
             }
         }
 
@@ -136,11 +123,8 @@ namespace osu.Game.Screens.LAsEzExtensions
 
         private void resetPreloadState()
         {
-            lock (preload_lock)
-            {
-                preloadCompleted = false;
-                isPreloading = false;
-            }
+            preloadCompleted = false;
+            isPreloading = false;
         }
 
         #endregion

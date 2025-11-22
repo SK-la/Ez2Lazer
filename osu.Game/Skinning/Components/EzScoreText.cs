@@ -1,19 +1,24 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.Screens;
 using osuTK;
 
 namespace osu.Game.Skinning.Components
 {
     public partial class EzScoreText : CompositeDrawable, IHasText
     {
+        [Resolved]
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+
         public readonly EzGetScoreTexture TextPart;
-        public Bindable<string> FontName { get; } = new Bindable<string>();
+        public Bindable<string> FontName { get; } = new Bindable<string>("Celeste_Lumiere");
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -27,19 +32,13 @@ namespace osu.Game.Skinning.Components
 
         // public object Spacing { get; set; }
 
-        public EzScoreText(Bindable<string>? externalFontName = null)
+        public EzScoreText()
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            if (externalFontName is not null)
-                FontName.BindTo(externalFontName);
-
-            var fontNameString = new Bindable<string>();
-            FontName.BindValueChanged(e => fontNameString.Value = e.NewValue.ToString(), true);
-
-            TextPart = new EzGetScoreTexture(textLookup, fontNameString);
+            TextPart = new EzGetScoreTexture(textLookup, FontName);
 
             InternalChildren = new Drawable[]
             {
@@ -74,6 +73,7 @@ namespace osu.Game.Skinning.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            FontName.BindTo(ezSkinConfig.GetBindable<string>(EzSkinSetting.GameThemeName));
 
             float scale = calculateScale(TextPart.Height);
             TextPart.Scale = new Vector2(scale);

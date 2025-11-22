@@ -18,12 +18,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         // public override bool RemoveWhenNotAlive => true;
 
-        [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
-
         private TextureAnimation? primaryAnimation;
         private TextureAnimation? goodAnimation;
-        private bool animationsCreated;
 
         public EzHitExplosion()
         {
@@ -38,31 +34,24 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Origin = Anchor.BottomCentre;
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-            OnDrawableChanged();
-        }
-
         protected override void OnDrawableChanged()
         {
-            ClearInternal();
-            primaryAnimation = null;
-            goodAnimation = null;
+            base.OnDrawableChanged();
 
-            primaryAnimation = factory.CreateAnimation("noteflare");
-            goodAnimation = factory.CreateAnimation("noteflaregood");
+            // 清理旧动画
+            MainContainer?.Clear();
 
-            if (primaryAnimation?.FrameCount > 0)
-                AddInternal(primaryAnimation);
+            primaryAnimation = Factory.CreateAnimation("noteflare", true);
+            goodAnimation = Factory.CreateAnimation("noteflaregood", true);
 
-            if (goodAnimation?.FrameCount > 0)
+            if (primaryAnimation != null)
+                MainContainer?.Add(primaryAnimation);
+
+            if (goodAnimation != null)
             {
                 goodAnimation.Alpha = 0;
-                AddInternal(goodAnimation);
+                MainContainer?.Add(goodAnimation);
             }
-
-            animationsCreated = true;
         }
 
         protected override void UpdateSize()
@@ -75,11 +64,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         public void Animate(JudgementResult result)
         {
-            if (!animationsCreated) OnDrawableChanged();
-
             if (primaryAnimation?.FrameCount > 0)
             {
-                primaryAnimation.Alpha = 1;
                 primaryAnimation.GotoFrame(0);
                 // primaryAnimation.Restart();
             }

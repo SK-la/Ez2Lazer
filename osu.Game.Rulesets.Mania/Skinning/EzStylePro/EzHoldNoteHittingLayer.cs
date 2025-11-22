@@ -67,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             foreach (string component in componentsToTry)
             {
-                animation = Factory.CreateAnimation(component);
+                animation = Factory.CreateAnimation(component, true);
 
                 if (animation != null)
                 {

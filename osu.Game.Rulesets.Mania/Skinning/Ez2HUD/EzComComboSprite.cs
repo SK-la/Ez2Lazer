@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
     public partial class EzComComboSprite : HitErrorMeter
     {
         [SettingSource("Combo Text Font", "Combo Text Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<string> NameDropdown { get; } = new Bindable<string>("AZURE_EXPRESSION");
+        public Bindable<string> NameDropdown { get; } = new Bindable<string>("Celeste_Lumiere");
 
         [SettingSource("Effect Type", "Effect Type")]
         public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);

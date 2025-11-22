@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
@@ -57,9 +58,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
             };
-            AddInternal(MainContainer);
+            AddInternal(MainContainer); //允许多个子元素
 
-            NoteSize = Factory.GetNoteSize(KeyMode, ColumnIndex);
+            UpdateSize();
             Scheduler.AddOnce(OnDrawableChanged);
         }
 
@@ -99,9 +100,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
 
             NoteSetName.BindValueChanged(OnNoteChanged);
+            NoteSize.BindValueChanged(_ => UpdateSize(), true);
             EnabledColor.BindValueChanged(_ => UpdateColor(), true);
             // columnColorBindable.BindValueChanged(_ => UpdateColor(), true);
-            NoteSize.BindValueChanged(_ => UpdateSize(), true);
         }
 
         private void OnNoteChanged(ValueChangedEvent<string> obj)
@@ -114,23 +115,33 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Scheduler.AddOnce(OnDrawableChanged);
         }
 
-        protected override void Dispose(bool isDisposing)
+        protected virtual void UpdateSize()
         {
-            base.Dispose(isDisposing);
-
-            EzLocalTextureFactory.ClearGlobalCache();
+            NoteSize = Factory.GetNoteSize(KeyMode, ColumnIndex);
+            UpdateColor();
         }
 
-        protected Colour4 NoteColor
+        protected void UpdateColor()
         {
-            get
+            if (BoolUpdateColor)
             {
-                if (EnabledColor.Value && UseColorization)
-                    return EZSkinConfig.GetColumnColor(KeyMode, ColumnIndex);
+                if (MainContainer != null)
+                    MainContainer.Colour = NoteColor;
 
-                return Colour4.White;
+                if (LineContainer?.Children != null)
+                {
+                    foreach (var child in LineContainer.Children)
+                    {
+                        if (child is EzNoteSideLine sideLine)
+                            sideLine.UpdateGlowEffect(NoteColor);
+                    }
+                }
             }
         }
+
+        protected virtual Colour4 NoteColor => (EnabledColor.Value && UseColorization)
+            ? EZSkinConfig.GetColumnColor(KeyMode, ColumnIndex)
+            : Colour4.White;
 
         protected virtual string ColorPrefix
         {
@@ -152,30 +163,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
         }
 
-        protected void UpdateColor()
-        {
-            if (BoolUpdateColor)
-            {
-                if (MainContainer != null)
-                    MainContainer.Colour = NoteColor;
-
-                if (LineContainer?.Children != null)
-                {
-                    foreach (var child in LineContainer.Children)
-                    {
-                        if (child is EzNoteSideLine sideLine)
-                            sideLine.UpdateGlowEffect(NoteColor);
-                    }
-                }
-            }
-        }
-
-        protected virtual void UpdateSize()
-        {
-            NoteSize = Factory.GetNoteSize(KeyMode, ColumnIndex);
-            UpdateColor();
-        }
-
         protected virtual void OnDrawableChanged() { }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            EzLocalTextureFactory.ClearGlobalCache();
+        }
     }
 }

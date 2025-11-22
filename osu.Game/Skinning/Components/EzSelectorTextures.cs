@@ -145,7 +145,7 @@ namespace osu.Game.Skinning.Components
                                 {
                                     new OsuSpriteText
                                     {
-                                        Text = Value.ToString(),
+                                        Text = Value,
                                         Font = OsuFont.GetFont(size: 16, weight: FontWeight.Bold)
                                     }
                                 },

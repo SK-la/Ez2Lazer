@@ -12,7 +12,7 @@ namespace osu.Game.Skinning.Components
 {
     public partial class EzTextureFactory : CompositeDrawable
     {
-        public Bindable<string> TextureNameBindable { get; } = new Bindable<string>("evolve");
+        public Bindable<string> TextureNameBindable { get; } = new Bindable<string>("Celeste_Lumiere");
         public string TextureBasePath = @"EzResources/note";
         private readonly EzAnimationType animationType;
 

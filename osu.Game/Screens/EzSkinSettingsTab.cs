@@ -51,9 +51,9 @@ namespace osu.Game.Screens
             [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), "SwitchToRelative".Localize(), "SwitchToRelative".Localize())
         };
 
-        private readonly Bindable<string> nameOfNote = new Bindable<string>();
-        private readonly Bindable<string> nameOfStage = new Bindable<string>();
-        private readonly Bindable<string> nameOfGameTheme = new Bindable<string>();
+        private Bindable<string> nameOfNote = new Bindable<string>();
+        private Bindable<string> nameOfStage = new Bindable<string>();
+        private Bindable<string> nameOfGameTheme = new Bindable<string>();
 
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
@@ -74,9 +74,12 @@ namespace osu.Game.Screens
             DynamicEnums.SetStageSets(availableStageSets);
             DynamicEnums.SetGameThemes(availableGameThemes);
 
-            setDefaultSelection(nameOfNote, availableNoteSets, ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName));
-            setDefaultSelection(nameOfStage, availableStageSets, ezSkinConfig.Get<string>(EzSkinSetting.StageName));
-            setDefaultSelection(nameOfGameTheme, availableGameThemes, ezSkinConfig.Get<string>(EzSkinSetting.GameThemeName));
+            nameOfNote = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
+            nameOfStage = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
+            nameOfGameTheme = ezSkinConfig.GetBindable<string>(EzSkinSetting.GameThemeName);
+            // setDefaultSelection(nameOfNote, availableNoteSets);
+            // setDefaultSelection(nameOfStage, availableStageSets);
+            // setDefaultSelection(nameOfGameTheme, availableGameThemes);
             createUI();
         }
 
@@ -90,13 +93,9 @@ namespace osu.Game.Screens
             nameOfGameTheme.BindValueChanged(e => updateAllEzTextureNames(e.NewValue));
         }
 
-        private void setDefaultSelection(Bindable<string> bindable, List<string> availableItems, string configuredValue)
+        private void setDefaultSelection(Bindable<string> bindable, List<string> availableItems)
         {
-            if (!string.IsNullOrEmpty(configuredValue) && availableItems.Contains(configuredValue))
-            {
-                bindable.Value = configuredValue;
-            }
-            else if (availableItems.Count > 1)
+            if (availableItems.Count > 1 || !availableItems.Contains(bindable.Value))
             {
                 bindable.Value = availableItems[1];
             }
@@ -119,21 +118,21 @@ namespace osu.Game.Screens
                             LabelText = "GlobalTextureName".Localize(),
                             TooltipText = "GlobalTextureNameTooltip".Localize(),
                             Current = nameOfGameTheme,
-                            Items = DynamicEnums.GameThemes,
+                            Items = availableGameThemes,
                         },
                         new SettingsDropdown<string>
                         {
                             LabelText = "StageSet".Localize(),
                             TooltipText = "StageSetTooltip".Localize(),
                             Current = nameOfStage,
-                            Items = DynamicEnums.StageSets,
+                            Items = availableStageSets,
                         },
                         new SettingsDropdown<string>
                         {
                             LabelText = "NoteSet".Localize(),
                             TooltipText = "NoteSetTooltip".Localize(),
                             Current = nameOfNote,
-                            Items = DynamicEnums.NoteSets,
+                            Items = availableNoteSets,
                         },
                         new SettingsEnumDropdown<EzColumnWidthStyle>
                         {
