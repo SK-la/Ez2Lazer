@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
 
-            enabledColor = EZSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            enabledColor = EzSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
         }
 
         protected override void Dispose(bool isDisposing)

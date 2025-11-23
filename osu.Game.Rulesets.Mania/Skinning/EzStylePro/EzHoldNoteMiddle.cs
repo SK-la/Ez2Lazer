@@ -46,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             holdNote = (DrawableHoldNote)drawableObject;
             isHitting.BindTo(holdNote.IsHolding);
 
-            hitPosition = EZSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            hitPosition = EzSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
         }
 
         protected override void LoadComplete()

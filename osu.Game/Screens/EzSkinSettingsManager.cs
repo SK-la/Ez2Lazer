@@ -95,8 +95,8 @@ namespace osu.Game.Screens
             // Pre-populate caches for all common key modes to avoid lazy loading delays
             foreach (int keyMode in commonKeyModes)
             {
-                getColumnTypes(keyMode);
-                GetIsSpecialColumns(keyMode);
+                GetColumnTypes(keyMode);
+                GetSpecialColumnsBools(keyMode);
             }
         }
 
@@ -164,6 +164,23 @@ namespace osu.Game.Screens
 
         #region 公共方法
 
+        public float GetTotalWidth(int keyMode)
+        {
+            double baseWidth = GetBindable<double>(EzSkinSetting.ColumnWidth).Value;
+            double specialFactor = GetBindable<double>(EzSkinSetting.SpecialFactor).Value;
+            float totalWidth = 0;
+            int forMode = keyMode == 14 ? keyMode - 1 : keyMode;
+            bool[] isSpecials = GetSpecialColumnsBools(keyMode);
+
+            for (int i = 0; i < forMode; i++)
+            {
+                bool isSpecial = isSpecials[i];
+                totalWidth += (float)(baseWidth * (isSpecial ? specialFactor : 1.0));
+            }
+
+            return totalWidth;
+        }
+
         public Colour4 GetColumnColor(int keyMode, int columnIndex)
         {
             EzColumnType colorType = GetColumnType(keyMode, columnIndex);
@@ -184,44 +201,17 @@ namespace osu.Game.Screens
             return GetBindable<Colour4>(EzSkinSetting.ColumnTypeA);
         }
 
-        public EzColumnType GetColumnType(int keyMode, int columnIndex)
-        {
-            EzColumnType[] types = getColumnTypes(keyMode);
-            if (columnIndex < types.Length)
-                return types[columnIndex];
-
-            return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
-        }
-
-        public float GetTotalWidth(int keyMode)
-        {
-            double baseWidth = GetBindable<double>(EzSkinSetting.ColumnWidth).Value;
-            double specialFactor = GetBindable<double>(EzSkinSetting.SpecialFactor).Value;
-            float totalWidth = 0;
-            int forMode = keyMode == 14 ? keyMode - 1 : keyMode;
-            bool[] isSpecials = GetIsSpecialColumns(keyMode);
-
-            for (int i = 0; i < forMode; i++)
-            {
-                bool isSpecial = isSpecials[i];
-                totalWidth += (float)(baseWidth * (isSpecial ? specialFactor : 1.0));
-            }
-
-            return totalWidth;
-        }
-
         public bool IsSpecialColumn(int keyMode, int columnIndex)
         {
-            bool[] specials = GetIsSpecialColumns(keyMode);
-            return specials[columnIndex];
+            return GetColumnType(keyMode, columnIndex) == EzColumnType.S;
         }
 
-        public bool[] GetIsSpecialColumns(int keyMode)
+        public bool[] GetSpecialColumnsBools(int keyMode)
         {
             if (IS_SPECIAL_CACHE.TryGetValue(keyMode, out bool[]? specials))
                 return specials;
 
-            EzColumnType[] types = getColumnTypes(keyMode);
+            EzColumnType[] types = GetColumnTypes(keyMode);
             bool[] result = new bool[keyMode];
 
             for (int i = 0; i < keyMode; i++)
@@ -233,9 +223,16 @@ namespace osu.Game.Screens
             return result;
         }
 
-        #endregion
+        public EzColumnType GetColumnType(int keyMode, int columnIndex)
+        {
+            EzColumnType[] types = GetColumnTypes(keyMode);
+            if (columnIndex < types.Length)
+                return types[columnIndex];
 
-        private EzColumnType[] getColumnTypes(int keyMode)
+            return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
+        }
+
+        public EzColumnType[] GetColumnTypes(int keyMode)
         {
             if (COLUMN_TYPE_CACHE.TryGetValue(keyMode, out EzColumnType[]? types))
                 return types;
@@ -286,6 +283,8 @@ namespace osu.Game.Screens
             return types;
         }
 
+        #endregion
+
         // public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex)
         // {
         //     var result = new Bindable<Vector2>();
@@ -319,17 +318,23 @@ namespace osu.Game.Screens
         //     return result;
         // }
 
+        #region 事件发布
+
         // public event Action? OnPositionChanged;
-        // public event Action? OnNoteSizeChanged;
+        public event Action? OnColumnSizeChanged;
 
         private void initializeEvents()
         {
+            var columnWidthBindable = GetBindable<double>(EzSkinSetting.ColumnWidth);
+            var specialFactorBindable = GetBindable<double>(EzSkinSetting.SpecialFactor);
+            var columnWidthStyleBindable = GetBindable<EzColumnWidthStyle>(EzSkinSetting.ColumnWidthStyle);
+
+            columnWidthBindable.BindValueChanged(_ => OnColumnSizeChanged?.Invoke());
+            specialFactorBindable.BindValueChanged(_ => OnColumnSizeChanged?.Invoke());
+            columnWidthStyleBindable.BindValueChanged(_ => OnColumnSizeChanged?.Invoke());
         }
 
-        // private void updateAllNoteSizes()
-        // {
-        //     OnNoteSizeChanged?.Invoke();
-        // }
+        #endregion
 
         public new Bindable<T> GetBindable<T>(EzSkinSetting setting)
         {

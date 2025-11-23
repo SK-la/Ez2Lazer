@@ -171,6 +171,7 @@ namespace osu.Game.Rulesets.Mania.UI
             for (int i = 0; i < definition.Columns; i++)
             {
                 bool isSpecial = definition.IsSpecialColumn(i);
+                // bool isSpecial = ezSkinSettings.IsSpecialColumn(definition.Columns, i);
 
                 var action = columnStartAction;
                 columnStartAction++;

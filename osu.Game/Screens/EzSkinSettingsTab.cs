@@ -51,6 +51,7 @@ namespace osu.Game.Screens
             [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), "SwitchToRelative".Localize(), "SwitchToRelative".Localize())
         };
 
+        // TODO: 优化为动态枚举, 不能用Bindable<string>，这不是列表/枚举，会导致控件下拉栏无选项
         private Bindable<string> nameOfNote = new Bindable<string>();
         private Bindable<string> nameOfStage = new Bindable<string>();
         private Bindable<string> nameOfGameTheme = new Bindable<string>();

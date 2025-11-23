@@ -4,26 +4,21 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Logging;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
-using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzStageBottom : CompositeDrawable
+    public partial class EzJudgementLine : CompositeDrawable
     {
-        private Bindable<double> hitPositonBindable = null!;
-        private Bindable<double> columnWidth = null!;
-        private Bindable<string> stageName = null!;
         private Container sprite = null!;
-        private int cs;
-
-        protected virtual bool OpenEffect => true;
 
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
@@ -34,33 +29,37 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
+        private Bindable<double> hitPositonBindable = null!;
+        private Bindable<double> columnWidth = null!;
+        private Bindable<string> noteSetName = null!;
+
         [BackgroundDependencyLoader]
         private void load()
         {
             RelativeSizeAxes = Axes.Both;
-            Anchor = Anchor.Centre;
-            Origin = Anchor.Centre;
+            Anchor = Anchor.BottomCentre;
+            Origin = Anchor.BottomCentre;
 
             InternalChild =
                 sprite = new Container
                 {
-                    RelativeSizeAxes = Axes.None,
+                    RelativeSizeAxes = Axes.X,
                     FillMode = FillMode.Fill,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Y = -ezSkinConfig.DefaultHitPosition,
                 };
 
-            cs = stageDefinition.Columns;
-
+            noteSetName = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
             hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            stageName.BindValueChanged(_ => OnSkinChanged(), true);
+            noteSetName.BindValueChanged(_ => OnDrawableChanged(), true);
+
             // hitPositonBindable.BindValueChanged(_ => updateSizes(), true);
             // columnWidth.BindValueChanged(_ => updateSizes(), true);
         }
@@ -71,11 +70,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             updateSizes();
         }
 
-        private void OnSkinChanged()
+        protected void OnDrawableChanged()
         {
             sprite.Clear();
 
-            var container = factory.CreateStage("Body");
+            var container = factory.CreateAnimation("JudgementLine");
             sprite.Add(container);
 
             // updateSizes();
@@ -87,16 +86,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             float scale = actualPanelWidth / 410.0f;
 
             sprite.Scale = new Vector2(scale);
-            sprite.Y = 205f  - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
-
-            // 计算纹理高度和位置
-            // float textureHeight = sprite.Child.Height * scale;
-            // float textureTopY = DrawHeight + sprite.Y - textureHeight / 2;
-
-            // 当纹理顶部低于屏幕顶部时隐藏
-            // sprite.Alpha = textureTopY != 0
-            //     ? 1
-            //     : 0;
+            sprite.Y = ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
         }
     }
 }

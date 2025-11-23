@@ -10,6 +10,8 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -30,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Color4 brightColour;
         private Color4 dimColour;
 
-        private Box hitOverlay = null!;
+        private Sprite hitOverlay = null!;
         private Box separator = null!;
 
         private Bindable<Color4> accentColour = null!;
@@ -40,6 +42,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
+
+        [Resolved]
+        private TextureStore textures { get; set; } = null!;
 
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
@@ -54,15 +59,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader]
         private void load()
         {
-            hitOverlay = new Box
+            var texture = textures.Get("EzResources/note/ColumnLight.png");
+
+            hitOverlay = new Sprite
             {
                 Name = "Hit Overlay",
-                RelativeSizeAxes = Axes.Both,
+                RelativeSizeAxes = Axes.X,
                 Anchor = Anchor.BottomLeft,
                 Origin = Anchor.BottomLeft,
-                Height = 0.5f,
-                Blending = BlendingParameters.Additive,
-                Alpha = 0
+                // Blending = BlendingParameters.Additive,
+                Alpha = 0,
+                Texture = texture,
             };
 
             separator = new Box
@@ -92,8 +99,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
 
-            if (Column.TopLevelContainer.Children.OfType<Box>().All(b => b.Name != "Separator"))
-                Column.TopLevelContainer.Add(separator);
+            if (Column.BackgroundContainer.Children.OfType<Box>().All(b => b.Name != "Separator"))
+                Column.BackgroundContainer.Add(separator);
 
             if (!Column.BackgroundContainer.Children.Contains(hitOverlay))
                 Column.BackgroundContainer.Add(hitOverlay);
@@ -104,7 +111,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void updateSeparator()
         {
-            separator.Height = DrawHeight - (float)hitPosition.Value;
+            float h = DrawHeight - (float)hitPosition.Value;
+            hitOverlay.Y = -(float)hitPosition.Value;
+            hitOverlay.Height = h;
+            separator.Height = h;
             separator.Alpha = drawSeparator(Column.Index, stageDefinition) ? 0.25f : 0;
         }
 

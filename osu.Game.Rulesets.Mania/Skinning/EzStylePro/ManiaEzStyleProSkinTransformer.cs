@@ -207,10 +207,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                             // return HitExplosionPool.Rent();
 
                         case ManiaSkinComponents.StageBackground:
-                            return new Ez2StageBackground();
+                            return new EzStageBottom();
 
                         case ManiaSkinComponents.StageForeground:
-                            return new EzStageBottom();
+                            return new EzJudgementLine();
                     }
 
                     break;

@@ -19,8 +19,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected virtual bool BoolUpdateColor => true;
         protected virtual bool UseColorization => true;
         protected virtual bool ShowSeparators => false;
-        protected int KeyMode;
-        protected int ColumnIndex;
 
         protected Container? LineContainer { get; private set; }
         protected Container? MainContainer { get; private set; }
@@ -32,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected StageDefinition StageDefinition { get; private set; } = null!;
 
         [Resolved]
-        protected EzSkinSettingsManager EZSkinConfig { get; private set; } = null!;
+        protected EzSkinSettingsManager EzSkinConfig { get; private set; } = null!;
 
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
@@ -41,15 +39,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected Bindable<bool> EnabledColor = null!;
         protected Bindable<Vector2> NoteSize = null!;
         protected Bindable<string> NoteSetName = null!;
+        protected int KeyMode;
+        protected int ColumnIndex;
 
         [BackgroundDependencyLoader]
         private void load()
         {
             KeyMode = StageDefinition.Columns;
             ColumnIndex = Column.Index;
-            EnabledColor = EZSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
-            // columnColorBindable = EZSkinConfig.GetColumnColorBindable(KeyMode, ColumnIndex);
-            NoteSetName = EZSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
+            EnabledColor = EzSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            // columnColorBindable = EzSkinConfig.GetColumnColorBindable(KeyMode, ColumnIndex);
+            NoteSetName = EzSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
 
             createSeparators();
             MainContainer = new Container
@@ -140,7 +140,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         protected virtual Colour4 NoteColor => (EnabledColor.Value && UseColorization)
-            ? EZSkinConfig.GetColumnColor(KeyMode, ColumnIndex)
+            ? EzSkinConfig.GetColumnColor(KeyMode, ColumnIndex)
             : Colour4.White;
 
         protected virtual string ColorPrefix
@@ -149,7 +149,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 if (EnabledColor.Value) return "white";
 
-                EzColumnType keyType = EZSkinConfig.GetColumnType(KeyMode, ColumnIndex);
+                EzColumnType keyType = EzSkinConfig.GetColumnType(KeyMode, ColumnIndex);
 
                 return keyType switch
                 {

@@ -27,19 +27,15 @@ namespace osu.Game.Skinning.Components
 
         // public object Spacing { get; set; }
 
-        public EzComboText(Bindable<string>? externalFontName = null)
+        public EzComboText(Bindable<string> externalFontName)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            if (externalFontName is not null)
-                FontName.BindTo(externalFontName);
+            FontName.BindTo(externalFontName);
 
-            var fontNameString = new Bindable<string>();
-            FontName.BindValueChanged(e => fontNameString.Value = e.NewValue.ToString(), true);
-
-            TextPart = new EzGetComboTexture(textLookup, fontNameString);
+            TextPart = new EzGetComboTexture(textLookup, FontName);
 
             InternalChildren = new Drawable[]
             {
