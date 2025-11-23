@@ -1,3 +1,6 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Sample;
@@ -206,8 +209,21 @@ namespace osu.Game.Skinning.Components
 
         protected Drawable CreateJudgementTexture(HitResult result)
         {
-            string basePath = getGifPath(result);
-            var singleTexture = textures.Get($"{basePath}.png");
+            string resultName = getHitResultPath(result);
+            string baseDir = $@"EzResources/GameTheme/{NameDropdown.Value}/judgement";
+
+            // 尝试多种大小写变体以处理文件名大小写不确定性
+            // 由于 TextureStore 的 Get 方法区分大小写，我们尝试常见变体：小写（默认）和大写
+            string[] possibleResultNames = { resultName, resultName.ToUpperInvariant() };
+            Texture? singleTexture = null;
+
+            foreach (string rn in possibleResultNames)
+            {
+                string path = $"{baseDir}/{rn}";
+                singleTexture = textures.Get($"{path}.png");
+                if (singleTexture != null)
+                    break;
+            }
 
             if (singleTexture != null)
             {
@@ -261,13 +277,24 @@ namespace osu.Game.Skinning.Components
                 Loop = false
             };
 
-            for (int i = 0;; i++)
+            // 对于动画帧，也尝试多种大小写变体
+            foreach (string rn in possibleResultNames)
             {
-                var texture = textures.Get($@"{basePath}/frame_{i}");
-                if (texture == null)
-                    break;
+                string path = $"{baseDir}/{rn}";
+                bool foundFrames = false;
 
-                animation.AddFrame(texture);
+                for (int i = 0;; i++)
+                {
+                    var texture = textures.Get($@"{path}/frame_{i}");
+                    if (texture == null)
+                        break;
+
+                    animation.AddFrame(texture);
+                    foundFrames = true;
+                }
+
+                if (foundFrames)
+                    break; // 如果找到帧，使用这个路径
             }
 
             PlaybackFps.BindValueChanged(fps =>
@@ -286,10 +313,8 @@ namespace osu.Game.Skinning.Components
             return animation;
         }
 
-        private string getGifPath(HitResult hitResult)
+        private string getHitResultPath(HitResult hitResult)
         {
-            string textureNameReplace = NameDropdown.Value;
-            string basePath = $@"EzResources/GameTheme/{textureNameReplace}/judgement";
             string resultName = hitResult switch
             {
                 HitResult.Miss => "Miss",
@@ -301,7 +326,7 @@ namespace osu.Game.Skinning.Components
                 _ => string.Empty
             };
 
-            return $"{basePath}/{resultName}";
+            return resultName;
         }
 
         private void checkFullCombo()

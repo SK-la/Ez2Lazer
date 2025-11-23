@@ -20,7 +20,7 @@ namespace osu.Game.Skinning.Components
         private readonly Func<char, string> getLookup;
         private GlyphStore glyphStore = null!;
 
-        protected override char FixedWidthReferenceCharacter => '6';
+        protected override char FixedWidthReferenceCharacter => '5';
 
         public EzGetScoreTexture(Func<char, string> getLookup, Bindable<string> fontName)
         {
