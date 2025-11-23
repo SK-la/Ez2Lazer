@@ -7,6 +7,7 @@ using System.Linq;
 using System.IO;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -52,13 +53,11 @@ namespace osu.Game.Screens
         };
 
         // TODO: 优化为动态枚举, 不能用Bindable<string>，这不是列表/枚举，会导致控件下拉栏无选项
-        private Bindable<string> nameOfNote = new Bindable<string>();
-        private Bindable<string> nameOfStage = new Bindable<string>();
-        private Bindable<string> nameOfGameTheme = new Bindable<string>();
-
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
-        private readonly List<string> availableGameThemes = new List<string>();
+        private Bindable<string> nameOfNote = new Bindable<string>();
+        private Bindable<string> nameOfStage = new Bindable<string>();
+        private Bindable<EzEnumGameThemeName> nameOfGameTheme = new Bindable<EzEnumGameThemeName>();
 
         private SettingsButton refreshSkinButton = null!;
         private bool isAbsolutePosition = true;
@@ -68,18 +67,11 @@ namespace osu.Game.Screens
         {
             loadFolderSets("note");
             loadFolderSets("Stage");
-            loadFolderSets("GameTheme");
-
-            // 设置动态枚举
-            DynamicEnums.SetNoteSets(availableNoteSets);
-            DynamicEnums.SetStageSets(availableStageSets);
-            DynamicEnums.SetGameThemes(availableGameThemes);
+            // loadFolderSets("GameTheme");
 
             nameOfNote = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
             nameOfStage = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
-            nameOfGameTheme = ezSkinConfig.GetBindable<string>(EzSkinSetting.GameThemeName);
-            // setDefaultSelection(nameOfNote, availableNoteSets);
-            // setDefaultSelection(nameOfStage, availableStageSets);
+            nameOfGameTheme = ezSkinConfig.GetBindable<EzEnumGameThemeName>(EzSkinSetting.GameThemeName);
             // setDefaultSelection(nameOfGameTheme, availableGameThemes);
             createUI();
         }
@@ -114,12 +106,11 @@ namespace osu.Game.Screens
                     Spacing = new Vector2(10),
                     Children = new Drawable[]
                     {
-                        new SettingsDropdown<string>
+                        new SettingsEnumDropdown<EzEnumGameThemeName>
                         {
                             LabelText = "GlobalTextureName".Localize(),
                             TooltipText = "GlobalTextureNameTooltip".Localize(),
                             Current = nameOfGameTheme,
-                            Items = availableGameThemes,
                         },
                         new SettingsDropdown<string>
                         {
@@ -237,7 +228,7 @@ namespace osu.Game.Screens
 
         #region 刷新所有EzComponent的纹理名称
 
-        private void updateAllEzTextureNames(string textureGameTheme)
+        private void updateAllEzTextureNames(EzEnumGameThemeName textureGameTheme)
         {
             var root = findRootDrawable();
 
@@ -273,8 +264,8 @@ namespace osu.Game.Screens
                 targetList = availableNoteSets;
             else if (type.Equals("Stage", StringComparison.OrdinalIgnoreCase))
                 targetList = availableStageSets;
-            else if (type.Equals("GameTheme", StringComparison.OrdinalIgnoreCase))
-                targetList = availableGameThemes;
+            // else if (type.Equals("GameTheme", StringComparison.OrdinalIgnoreCase))
+            //     targetList = availableGameThemes;
             else
             {
                 Logger.Log($"Unknown resource type: {type}", LoggingTarget.Runtime, LogLevel.Error);

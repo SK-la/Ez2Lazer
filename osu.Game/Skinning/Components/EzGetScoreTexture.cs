@@ -15,14 +15,14 @@ namespace osu.Game.Skinning.Components
 {
     public partial class EzGetScoreTexture : OsuSpriteText
     {
-        public Bindable<string> FontName { get; }
+        public Bindable<EzEnumGameThemeName> FontName { get; }
 
         private readonly Func<char, string> getLookup;
         private GlyphStore glyphStore = null!;
 
         protected override char FixedWidthReferenceCharacter => '5';
 
-        public EzGetScoreTexture(Func<char, string> getLookup, Bindable<string> fontName)
+        public EzGetScoreTexture(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> fontName)
         {
             this.getLookup = getLookup;
             FontName = fontName;
@@ -37,13 +37,13 @@ namespace osu.Game.Skinning.Components
             // Spacing = new Vector2(-2f, 0f);
             FontName.BindValueChanged(e =>
             {
-                Font = new FontUsage(FontName.Value, 1);
+                Font = new FontUsage(FontName.Value.ToString(), 1);
                 glyphStore = new GlyphStore(textures, getLookup);
 
                 foreach (char c in new[] { '.', '%' })
-                    glyphStore.Get(FontName.Value, c);
+                    glyphStore.Get(FontName.Value.ToString(), c);
                 for (int i = 0; i < 10; i++)
-                    glyphStore.Get(FontName.Value, (char)('0' + i));
+                    glyphStore.Get(FontName.Value.ToString(), (char)('0' + i));
             }, true);
         }
 

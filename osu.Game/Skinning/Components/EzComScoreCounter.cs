@@ -17,7 +17,7 @@ namespace osu.Game.Skinning.Components
         protected override double RollingDuration => 250;
 
         [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<string> FontNameDropdown { get; } = new Bindable<string>("Celeste_Lumiere");
+        public Bindable<EzEnumGameThemeName> FontNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();

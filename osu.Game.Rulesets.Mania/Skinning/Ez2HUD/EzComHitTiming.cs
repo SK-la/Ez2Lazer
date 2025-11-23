@@ -17,10 +17,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
     public partial class EzComHitTiming : HitErrorMeter
     {
         [SettingSource("Offset Number Font", "Offset Number Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<string> NumberNameDropdown { get; } = new Bindable<string>("Celeste_Lumiere");
+        public Bindable<EzEnumGameThemeName> NumberNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource("Offset Text Font", "Offset Text Font", SettingControlType = typeof(OffsetTextNameSelector))]
-        public Bindable<string> TextNameDropdown { get; } = new Bindable<string>("Celeste_Lumiere");
+        public Bindable<EzEnumGameThemeName> TextNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource("AloneShow", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);

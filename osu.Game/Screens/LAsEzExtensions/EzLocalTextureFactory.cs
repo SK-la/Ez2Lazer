@@ -218,7 +218,11 @@ namespace osu.Game.Screens.LAsEzExtensions
                 Loop = !isHit
             };
 
-            if (!isHit) animation.DefaultFrameLength = default_frame_length;
+            if (!isHit)
+            {
+                animation.DefaultFrameLength = default_frame_length;
+                animation.Blending = BlendingParameters.Additive;
+            }
 
             var frames = getCachedTextureFrames(component);
             animation.AddFrames(frames);

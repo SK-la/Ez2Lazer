@@ -12,6 +12,7 @@ using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
+using osu.Game.Skinning.Components;
 
 namespace osu.Game.Screens
 {
@@ -70,7 +71,7 @@ namespace osu.Game.Screens
 
             SetDefault(EzSkinSetting.NoteSetName, "lucenteclat");
             SetDefault(EzSkinSetting.StageName, "Celeste_Lumiere");
-            SetDefault(EzSkinSetting.GameThemeName, "Celeste_Lumiere");
+            SetDefault(EzSkinSetting.GameThemeName, EzEnumGameThemeName.Celeste_Lumiere);
             SetDefault(EzSkinSetting.NoteHeightScaleToWidth, 1, 0.1, 2, 0.1);
             SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 

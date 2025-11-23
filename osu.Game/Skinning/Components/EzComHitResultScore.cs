@@ -21,7 +21,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Skinning.Components
 {
-    public partial class EzComHitResultScore : CompositeDrawable, ISerialisableDrawable, IPreviewable //, IAnimatableJudgement
+    public partial class EzComHitResultScore : CompositeDrawable, ISerialisableDrawable //, IPreviewable //, IAnimatableJudgement
     {
         public bool UsesFixedAnchor { get; set; }
 
@@ -34,12 +34,10 @@ namespace osu.Game.Skinning.Components
         };
 
         [SettingSource("HitResult Text Font", "HitResult Text Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<string> NameDropdown { get; } = new Bindable<string>("Celeste_Lumiere");
+        public Bindable<EzEnumGameThemeName> NameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
-
-        public Bindable<string> TextureNameBindable { get; } = new Bindable<string>("Celeste_Lumiere");
 
         // 预览纹理基础路径
         public string TextureBasePath => @"EzResources/enumBase/enumJudgement";

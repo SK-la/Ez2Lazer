@@ -13,7 +13,7 @@ namespace osu.Game.Skinning.Components
     public partial class EzComboText : CompositeDrawable, IHasText
     {
         public readonly EzGetComboTexture TextPart;
-        public Bindable<string> FontName { get; } = new Bindable<string>("Celeste_Lumiere");
+        public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -27,13 +27,14 @@ namespace osu.Game.Skinning.Components
 
         // public object Spacing { get; set; }
 
-        public EzComboText(Bindable<string> externalFontName)
+        public EzComboText(Bindable<EzEnumGameThemeName>? externalFontName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            FontName.BindTo(externalFontName);
+            if (externalFontName is not null)
+                FontName.BindTo(externalFontName);
 
             TextPart = new EzGetComboTexture(textLookup, FontName);
 

@@ -18,7 +18,7 @@ namespace osu.Game.Skinning.Components
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         public readonly EzGetScoreTexture TextPart;
-        public Bindable<string> FontName { get; } = new Bindable<string>("Celeste_Lumiere");
+        public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -73,14 +73,14 @@ namespace osu.Game.Skinning.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            FontName.BindTo(ezSkinConfig.GetBindable<string>(EzSkinSetting.GameThemeName));
+            FontName.BindTo(ezSkinConfig.GetBindable<EzEnumGameThemeName>(EzSkinSetting.GameThemeName));
 
             float scale = calculateScale(TextPart.Height);
             TextPart.Scale = new Vector2(scale);
 
             FontName.BindValueChanged(e =>
             {
-                TextPart.FontName.Value = e.NewValue.ToString();
+                TextPart.FontName.Value = e.NewValue;
                 // textPart.LoadAsync(); // **强制重新加载字体**
                 scale = calculateScale(TextPart.Height);
                 TextPart.Scale = new Vector2(scale);
