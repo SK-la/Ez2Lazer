@@ -38,6 +38,7 @@ namespace osu.Game.Skinning.Components
         private static readonly List<string> notsets = new List<string>();
         private static readonly List<string> stagesets = new List<string>();
         private static readonly List<string> gamethemes = new List<string>();
+        private static readonly Dictionary<string, List<string>> dynamiclists = new Dictionary<string, List<string>>();
 
         public static IEnumerable<string> NoteSets => notsets;
         public static IEnumerable<string> StageSets => stagesets;
@@ -52,11 +53,16 @@ namespace osu.Game.Skinning.Components
         public static void SetStageSets(IEnumerable<string> sets) => stagesets.AddRange(sets);
         public static void SetGameThemes(IEnumerable<string> sets) => gamethemes.AddRange(sets);
 
+        public static void SetList(string key, IEnumerable<string> sets) => dynamiclists[key] = new List<string>(sets);
+
+        public static IEnumerable<string> GetList(string key) => dynamiclists.TryGetValue(key, out var list) ? list : Enumerable.Empty<string>();
+
         public static void ClearAll()
         {
             notsets.Clear();
             stagesets.Clear();
             gamethemes.Clear();
+            dynamiclists.Clear();
         }
     }
 
@@ -65,7 +71,8 @@ namespace osu.Game.Skinning.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            Items = DynamicEnums.GameThemes;
+            var list = DynamicEnums.GetList(TooltipText.ToString());
+            Items = list.Any() ? list : DynamicEnums.GameThemes;
         }
     }
 
