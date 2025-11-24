@@ -36,14 +36,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader]
         private void load()
         {
-            RelativeSizeAxes = Axes.Both;
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
 
             InternalChild =
                 sprite = new Container
                 {
-                    RelativeSizeAxes = Axes.X,
+                    RelativeSizeAxes = Axes.None,
                     FillMode = FillMode.Fill,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
@@ -83,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void updateSizes()
         {
             float actualPanelWidth = DrawWidth; //ezSkinConfig.GetTotalWidth(cs);
-            float scale = actualPanelWidth / 410.0f;
+            float scale = actualPanelWidth / 412.0f;
 
             sprite.Scale = new Vector2(scale);
             sprite.Y = ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;

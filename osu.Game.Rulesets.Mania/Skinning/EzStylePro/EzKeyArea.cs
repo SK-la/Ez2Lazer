@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -69,8 +70,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 RelativeSizeAxes = Axes.X,
                 FillMode = FillMode.Stretch,
             };
-            AddInternal(sprite);
-            // Column.TopLevelContainer.Add(sprite);
 
             keyMode = stageDefinition.Columns;
             columnIndex = column.Index;
@@ -80,6 +79,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm * 64;
+
+            bool isFreeSize = free_size_stages.Contains(stageName.Value);
+
+            if (isFreeSize)
+            {
+                sprite.RelativeSizeAxes = Axes.None;
+                sprite.AutoSizeAxes = Axes.Both;
+                sprite.Scale = new Vector2(2f);
+                AddInternal(sprite);
+            }
+            else
+            {
+                column.TopLevelContainer.Add(sprite);
+            }
 
             loadAnimation();
         }
@@ -147,6 +160,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             float scale = actualPanelWidth / baseWidth;
 
             sprite.Scale = new Vector2(2f, 2 * scale);
+
             sprite.Y = 768f - (float)hitPositonBindable.Value + 2f;
         }
 
@@ -168,6 +182,35 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 upSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(1);
                 downSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
             }
+        }
+
+        private static readonly HashSet<string> free_size_stages = new HashSet<string>
+        {
+            "AZURE_EXPRESSION",
+            "Celeste_Lumiere",
+            "EC_Wheel",
+            "EVOLVE",
+            "Fortress3_Gear",
+            "Fortress3_Modern",
+            "GC",
+            "NIGHT_FALL",
+            "TANOc2",
+            "TECHNIKA",
+        };
+
+        public enum EzEnumGameThemeNameForFreeSize
+        {
+            // ReSharper disable InconsistentNaming
+            AZURE_EXPRESSION,
+            Celeste_Lumiere,
+            EC_Wheel,
+            EVOLVE,
+            Fortress3_Gear,
+            Fortress3_Modern,
+            GC,
+            NIGHT_FALL,
+            TANOc2,
+            TECHNIKA,
         }
     }
 }

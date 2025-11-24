@@ -78,13 +78,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             var container = factory.CreateStage("Body");
             sprite.Add(container);
 
+            var judgeLine = new EzJudgementLine();
+            sprite.Add(judgeLine);
             // updateSizes();
         }
 
         private void updateSizes()
         {
             float actualPanelWidth = DrawWidth; //ezSkinConfig.GetTotalWidth(cs);
-            float scale = actualPanelWidth / 410.0f;
+            float scale = actualPanelWidth / 412.0f;
 
             sprite.Scale = new Vector2(scale);
             sprite.Y = 205f  - 384f * scale + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
