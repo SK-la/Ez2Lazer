@@ -21,6 +21,7 @@ using osu.Game.Overlays.Mods.Input;
 using osu.Game.Overlays.Settings.Sections.Gameplay;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Edit.Compose.Components;
+using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.OnlinePlay.Lounge.Components;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
@@ -165,7 +166,7 @@ namespace osu.Game.Configuration
 
             //新增自定义
             SetDefault(OsuSetting.EzSelectCsMode, CsItemIds.ALL.First().Id);
-            SetDefault(OsuSetting.HitMode, MUGHitMode.EZ2AC);
+            SetDefault(OsuSetting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 

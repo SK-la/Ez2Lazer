@@ -36,6 +36,9 @@ using osu.Game.Screens;
 using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
+using osu.Game.Overlays.Settings.Sections.Gameplay;
+using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
@@ -74,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
 
         // private readonly ManiaHitModeConvertor hitModeConvertor;
-        // private readonly Bindable<MUGHitMode> hitMode = new Bindable<MUGHitMode>();
+        // private readonly Bindable<EzMUGHitMode> hitMode = new Bindable<EzMUGHitMode>();
 
         public double TargetTimeRange { get; protected set; }
 
@@ -159,6 +162,15 @@ namespace osu.Game.Rulesets.Mania.UI
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            // Configure pools based on hit mode
+            foreach (var stage in Playfield.Stages)
+            {
+                foreach (var column in stage.Columns)
+                {
+                    configurePools(column, ManiaBeatmapConverter.CurrentHitMode);
+                }
+            }
 
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>
@@ -305,6 +317,30 @@ namespace osu.Game.Rulesets.Mania.UI
             catch
             {
                 return null;
+            }
+        }
+
+        private void configurePools(Column column, EzMUGHitMode hitMode)
+        {
+            switch (hitMode)
+            {
+                case EzMUGHitMode.EZ2AC:
+                    column.RegisterPool<NoJudgmentNote, DrawableNote>(10, 50);
+                    column.RegisterPool<CustomLNHead, DrawableHoldNoteHead>(10, 50);
+                    column.RegisterPool<NoMissLNBody, Ez2AcDrawableHoldNoteBody>(10, 50);
+                    column.RegisterPool<Ez2AcHoldNoteTail, Ez2AcDrawableHoldNoteTail>(10, 50);
+                    break;
+
+                case EzMUGHitMode.Melody:
+                    column.RegisterPool<NoJudgmentNote, DrawableNote>(10, 50);
+                    // Add other pools for Melody if needed
+                    break;
+
+                case EzMUGHitMode.O2Jam:
+                    column.RegisterPool<O2Note, O2DrawableNote>(10, 50);
+                    column.RegisterPool<O2HeadNote, O2DrawableHoldNoteHead>(10, 50);
+                    column.RegisterPool<O2TailNote, O2DrawableHoldNoteTail>(10, 50);
+                    break;
             }
         }
     }

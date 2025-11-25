@@ -125,6 +125,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (BoolUpdateColor)
             {
+                // TODO： 命中HMT面条时，考虑是否跳过面头着色，只更新面身。
+                // 或者单独做一个着色拓展设置，比如“仅着色面身”“着色面头和面身”“不着色”等等。
+                // 或者，不着色时，使用新的开关拓展，在Middle中进一步单独管理着色
                 if (MainContainer != null)
                     MainContainer.Colour = NoteColor;
 

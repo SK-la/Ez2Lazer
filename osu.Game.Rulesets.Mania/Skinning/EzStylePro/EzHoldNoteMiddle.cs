@@ -30,9 +30,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private EzHoldNoteHittingLayer? hittingLayer;
         private Drawable? lightContainer;
 
-        [Resolved]
-        private Column column { get; set; } = null!;
-
         private float halfNoteHeight;
 
         public EzHoldNoteMiddle()
@@ -63,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (lightContainer != null)
             {
-                column.TopLevelContainer.Remove(lightContainer, false);
+                Column.TopLevelContainer.Remove(lightContainer, false);
                 lightContainer.Expire();
                 lightContainer = null;
             }
@@ -96,14 +93,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 lightContainer.ClearTransforms();
 
                 if (lightContainer.Parent == null)
-                    column.TopLevelContainer.Add(lightContainer);
+                    Column.TopLevelContainer.Add(lightContainer);
 
                 lightContainer.FadeIn(80);
             }
             else
             {
                 lightContainer.FadeOut(120)
-                              .OnComplete(d => column.TopLevelContainer.Remove(d, false));
+                              .OnComplete(d => Column.TopLevelContainer.Remove(d, false));
             }
         }
 
@@ -119,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (lightContainer != null)
             {
                 if (lightContainer.Parent != null)
-                    column.TopLevelContainer.Remove(lightContainer, false);
+                    Column.TopLevelContainer.Remove(lightContainer, false);
                 lightContainer.Expire();
                 lightContainer = null;
             }
@@ -130,10 +127,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 hittingLayer = null;
             }
 
-            string newComponentName = $"{ColorPrefix}note";
             var body = Factory.CreateAnimation($"{ColorPrefix}longnote/middle");
             var tail = Factory.CreateAnimation($"{ColorPrefix}longnote/tail");
 
+            string newComponentName = $"{ColorPrefix}note";
             if (body.FrameCount == 0)
                 body = Factory.CreateAnimation(newComponentName);
 

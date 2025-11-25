@@ -17,6 +17,8 @@ using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Utils;
 using osuTK;
+using osu.Game.Screens.LAsEzExtensions;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania.Beatmaps
 {
@@ -25,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         /// <summary>
         /// Maximum number of previous notes to consider for density calculation.
         /// </summary>
-        private const int max_notes_for_density = 7;
+        private const int max_notes_for_density = 24;
 
         /// <summary>
         /// The total number of columns.
@@ -46,6 +48,11 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         /// Whether the beatmap instantiated with is for the mania ruleset.
         /// </summary>
         public readonly bool IsForCurrentRuleset;
+
+        /// <summary>
+        /// The current hit mode for mania judgement system.
+        /// </summary>
+        public static EzMUGHitMode CurrentHitMode { get; set; } = EzMUGHitMode.Lazer;
 
         // Internal for testing purposes
         internal readonly LegacyRandom Random;
@@ -132,7 +139,20 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             {
                 case ManiaHitObject maniaObj:
                 {
-                    yield return maniaObj;
+                    if (maniaObj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
+                    {
+                        yield return CurrentHitMode switch
+                        {
+                            EzMUGHitMode.EZ2AC => new Ez2AcHoldNote(hold),
+                            EzMUGHitMode.Melody => new NoJudgmentHoldNote(hold),
+                            EzMUGHitMode.O2Jam => new O2HoldNote(hold),
+                            _ => hold
+                        };
+                    }
+                    else
+                    {
+                        yield return maniaObj;
+                    }
 
                     yield break;
                 }
@@ -227,7 +247,22 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                     lastPattern = newPattern;
 
                 foreach (var obj in newPattern.HitObjects)
-                    yield return obj;
+                {
+                    if (obj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
+                    {
+                        yield return CurrentHitMode switch
+                        {
+                            EzMUGHitMode.EZ2AC => new Ez2AcHoldNote(hold),
+                            EzMUGHitMode.Melody => new NoJudgmentHoldNote(hold),
+                            EzMUGHitMode.O2Jam => new O2HoldNote(hold),
+                            _ => hold
+                        };
+                    }
+                    else
+                    {
+                        yield return obj;
+                    }
+                }
             }
         }
 

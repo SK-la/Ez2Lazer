@@ -26,6 +26,8 @@ using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
 using osu.Game.Screens.Backgrounds;
 using osu.Game.Skinning;
+using osu.Game.Screens;
+using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.UI

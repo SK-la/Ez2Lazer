@@ -224,6 +224,9 @@ namespace osu.Game.Screens.LAsEzExtensions
                 // animation.Blending = BlendingParameters.Inherit;
             }
 
+            if (component == "JudgementLine")
+                FillMode = FillMode.Fill;
+
             var frames = getCachedTextureFrames(component);
             animation.AddFrames(frames);
 
@@ -251,12 +254,16 @@ namespace osu.Game.Screens.LAsEzExtensions
 
                     if (texture == null) break;
 
+                    if (texture.Width > 500) texture.ScaleAdjust = 0.5f; // 大纹理缩小加载，防止内存暴涨
+
                     frames.Add(texture);
                 }
             }
             else
             {
                 string frameFile = $"{basePath}.png";
+                Logger.Log($"[EzLocalTextureFactory] Loading JudgementLine Frame: {frameFile}",
+                    LoggingTarget.Runtime, LogLevel.Debug);
                 var texture = textureStore.Get(frameFile);
 
                 if (texture != null)

@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 if (e.NewValue)
                 {
-                    ApplyTemplate(HitWindowTemplates.EASY);
+                    ApplyTemplate(HitWindowTemplateDictionary.EASY);
                     UseHardTemplate.Value = false;
                     AdaptiveJudgement.Value = false;
                 }
@@ -98,7 +98,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 if (e.NewValue)
                 {
-                    ApplyTemplate(HitWindowTemplates.HARD);
+                    ApplyTemplate(HitWindowTemplateDictionary.HARD);
                     Ez2AcTemplate.Value = false;
                     AdaptiveJudgement.Value = false;
                 }
@@ -168,28 +168,5 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             hitWindows.ResetHitWindows();
         }
-    }
-
-    public static class HitWindowTemplates
-    {
-        public static readonly HitWindowTemplate EASY = new HitWindowTemplate
-        {
-            TemplatePerfect = 50,
-            TemplateGreat = 100,
-            TemplateGood = 150,
-            TemplateOk = 200,
-            TemplateMeh = 250,
-            TemplateMiss = 300
-        };
-
-        public static readonly HitWindowTemplate HARD = new HitWindowTemplate
-        {
-            TemplatePerfect = 20,
-            TemplateGreat = 40,
-            TemplateGood = 60,
-            TemplateOk = 80,
-            TemplateMeh = 100,
-            TemplateMiss = 120
-        };
     }
 }

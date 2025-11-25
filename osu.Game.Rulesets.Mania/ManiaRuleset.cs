@@ -49,6 +49,8 @@ using osu.Game.Screens.Edit.Setup;
 using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
+using osu.Game.Overlays.Settings.Sections.Gameplay;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania
 {
@@ -65,7 +67,35 @@ namespace osu.Game.Rulesets.Mania
 
         public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new ManiaHealthProcessor(drainStartTime);
 
-        public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap) => new ManiaBeatmapConverter(beatmap, this);
+        public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap)
+        {
+            var hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
+            ManiaBeatmapConverter.CurrentHitMode = hitMode;
+
+            if (hitMode == EzMUGHitMode.O2Jam)
+            {
+                double bpm = beatmap.BeatmapInfo.BPM;
+                if (bpm == 0) bpm = 200;
+                O2HitObject.NowBeatmapBPM = bpm;
+                double coolRange = 7500.0 / bpm;
+                double goodRange = 22500.0 / bpm;
+                double badRange = 31250.0 / bpm;
+                var hw = new ManiaHitWindows();
+                hw.SetSpecialDifficultyRange(coolRange, coolRange, goodRange, goodRange, badRange, badRange);
+
+                // Set O2JAM pill
+                O2HitObject.PillActivated = true;
+                O2HitObject.Pill = 0;
+                O2HitObject.CoolCombo = 0;
+            }
+            else
+            {
+                var hw = new ManiaHitWindows();
+                hw.ResetRange();
+            }
+
+            return new ManiaBeatmapConverter(beatmap, this);
+        }
 
         public override PerformanceCalculator CreatePerformanceCalculator() => new ManiaPerformanceCalculator();
 
@@ -322,7 +352,6 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
-                        new EzManiaHitModeConvertor(),
                         // new ManiaModJudgmentStyle(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
@@ -446,10 +475,10 @@ namespace osu.Game.Rulesets.Mania
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap)
         {
             var hitEventsByColumn = score.HitEvents
-                .Where(e => e.HitObject is ManiaHitObject)
-                .GroupBy(e => ((ManiaHitObject)e.HitObject).Column)
-                .OrderBy(g => g.Key)
-                .ToList();
+                                         .Where(e => e.HitObject is ManiaHitObject)
+                                         .GroupBy(e => ((ManiaHitObject)e.HitObject).Column)
+                                         .OrderBy(g => g.Key)
+                                         .ToList();
 
             var statistics = new List<StatisticItem>
             {

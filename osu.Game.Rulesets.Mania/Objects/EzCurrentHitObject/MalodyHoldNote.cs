@@ -6,7 +6,7 @@ using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.Mania.Objects
+namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     public partial class MalodyDrawableHoldNoteBody : DrawableHoldNoteBody
     {

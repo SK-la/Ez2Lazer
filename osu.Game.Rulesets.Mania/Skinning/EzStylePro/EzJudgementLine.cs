@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
@@ -36,18 +37,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader]
         private void load()
         {
-            Anchor = Anchor.BottomCentre;
-            Origin = Anchor.BottomCentre;
+            RelativeSizeAxes = Axes.Both;
+            Anchor = Anchor.Centre;
+            Origin = Anchor.Centre;
 
-            InternalChild =
+            InternalChildren = new Drawable[]
+            {
                 sprite = new Container
                 {
                     RelativeSizeAxes = Axes.None,
                     FillMode = FillMode.Fill,
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
                     Y = -ezSkinConfig.DefaultHitPosition,
-                };
+                }
+            };
 
             noteSetName = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
             hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
@@ -59,8 +63,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             noteSetName.BindValueChanged(_ => OnDrawableChanged(), true);
 
-            // hitPositonBindable.BindValueChanged(_ => updateSizes(), true);
-            // columnWidth.BindValueChanged(_ => updateSizes(), true);
+            hitPositonBindable.BindValueChanged(_ => updateSizes(), true);
+            columnWidth.BindValueChanged(_ => updateSizes(), true);
         }
 
         protected override void Update()
@@ -85,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             float scale = actualPanelWidth / 412.0f;
 
             sprite.Scale = new Vector2(scale);
-            sprite.Y = ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
+            sprite.Y = 384f + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
         }
     }
 }

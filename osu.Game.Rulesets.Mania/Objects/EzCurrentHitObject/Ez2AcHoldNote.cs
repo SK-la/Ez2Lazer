@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Threading;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Judgements;
@@ -9,7 +8,7 @@ using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.Mania.Objects
+namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     public class Ez2AcHoldNote : HoldNote
     {
@@ -59,12 +58,12 @@ namespace osu.Game.Rulesets.Mania.Objects
     public class Ez2AcHoldNoteTail : TailNote
     {
         public override Judgement CreateJudgement() => new Ez2AcTailJudgement();
-        protected override HitWindows CreateHitWindows() => HitWindows.Empty;
+        protected override HitWindows CreateHitWindows() => new ManiaHitWindows();
 
         private class Ez2AcTailJudgement : ManiaJudgement
         {
-            public override HitResult MaxResult => HitResult.IgnoreHit;
-            public override HitResult MinResult => HitResult.IgnoreMiss;
+            public override HitResult MaxResult => HitResult.Perfect;
+            public override HitResult MinResult => HitResult.Miss;
         }
     }
 
@@ -91,25 +90,17 @@ namespace osu.Game.Rulesets.Mania.Objects
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (HoldNote.IsHolding.Value && timeOffset >= 0)
+            // At the tail time, if still holding, give Perfect
+            if (timeOffset >= 0)
             {
-                ApplyResult(GetCappedResult(HitResult.Perfect));
-                return;
-            }
-
-            if (!HoldNote.IsHolding.Value && timeOffset < 0)
-            {
-                ApplyResult(GetCappedResult(HitResult.ComboBreak));
-                return;
-            }
-
-            if (HoldNote.Head.IsHit && Math.Abs(timeOffset) < Math.Abs(HitWindows.WindowFor(HitResult.Meh) * TailNote.RELEASE_WINDOW_LENIENCE))
-            {
-                ApplyMaxResult();
-            }
-            else
-            {
-                ApplyMinResult();
+                if (HoldNote.IsHolding.Value)
+                {
+                    ApplyResult(HitResult.Perfect);
+                }
+                else
+                {
+                    ApplyResult(HitResult.Miss);
+                }
             }
         }
     }

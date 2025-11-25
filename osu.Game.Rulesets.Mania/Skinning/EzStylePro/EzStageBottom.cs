@@ -78,8 +78,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             var container = factory.CreateStage("Body");
             sprite.Add(container);
 
-            var judgeLine = new EzJudgementLine();
-            sprite.Add(judgeLine);
+            // var judgeLine = new EzJudgementLine();
+            // sprite.Add(judgeLine);
             // updateSizes();
         }
 
