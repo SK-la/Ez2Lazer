@@ -82,11 +82,6 @@ namespace osu.Game.Rulesets.Mania
                 double badRange = 31250.0 / bpm;
                 var hw = new ManiaHitWindows();
                 hw.SetSpecialDifficultyRange(coolRange, coolRange, goodRange, goodRange, badRange, badRange);
-
-                // Set O2JAM pill
-                O2HitObject.PillActivated = true;
-                O2HitObject.Pill = 0;
-                O2HitObject.CoolCombo = 0;
             }
             else
             {

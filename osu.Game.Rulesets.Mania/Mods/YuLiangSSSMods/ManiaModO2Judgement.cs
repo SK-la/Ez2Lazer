@@ -24,21 +24,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModO2Judgement : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
-        public const double COOL = 7500.0;
-        public const double GOOD = 22500.0;
-        public const double BAD = 31250.0;
-
-        public static double CoolRange => COOL / NowBeatmapBPM;
-        public static double GoodRange => GOOD / NowBeatmapBPM;
-        public static double BadRange => BAD / NowBeatmapBPM;
-
-        // MISS
-
-        public const double DEFAULT_BPM = 200;
-
-        public static int Pill;
-        public static bool PillActivated;
-        public static int CoolCombo;
         public static ManiaHitWindows Windows = new ManiaHitWindows();
 
         public override string Name => "O2JAM Judgement";
@@ -63,17 +48,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         [SettingSource("Pill Switch", "Use O2JAM pill function.")]
         public BindableBool PillMode { get; set; } = new BindableBool(true);
-
-        public static double NowBeatmapBPM
-        {
-            get
-            {
-                if (BeatmapTitleWedge.SelectedWorkingBeatmap is not null)
-                    return BeatmapTitleWedge.SelectedWorkingBeatmap.BeatmapInfo.BPM;
-                else
-                    return DEFAULT_BPM;
-            }
-        }
 
         public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
         {
@@ -110,9 +84,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            HitWindows.SetSpecialDifficultyRange(CoolRange, CoolRange, GoodRange, GoodRange, BadRange, BadRange);
-            Pill = 0;
-            PillActivated = PillMode.Value;
+            HitWindows.SetSpecialDifficultyRange(O2HitObject.CoolRange, O2HitObject.CoolRange, O2HitObject.GoodRange, O2HitObject.GoodRange, O2HitObject.BadRange, O2HitObject.BadRange);
+            O2HitObject.Pill = 0;
+            O2HitObject.PillActivated = PillMode.Value;
             Windows = HitWindows;
         }
 

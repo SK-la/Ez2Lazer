@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading;
+using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 
@@ -10,7 +11,13 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     public static class O2HitObject
     {
-        public static bool PillActivated;
+        public const double COOL = 7500.0;
+        public const double GOOD = 22500.0;
+        public const double BAD = 31250.0;
+        public const double DEFAULT_BPM = 200;
+
+        // TODO: 💊缺少UI显示，以及合适的开关
+        public static bool PillActivated; // = ManiaModO2Judgement.PillMode.Value;
         public static int Pill;
         public static int CoolCombo;
         public static double CoolRange => 7500.0 / NowBeatmapBPM;
