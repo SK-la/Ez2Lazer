@@ -325,10 +325,10 @@ namespace osu.Game.Rulesets.Mania.UI
             switch (hitMode)
             {
                 case EzMUGHitMode.EZ2AC:
-                    column.RegisterPool<NoJudgmentNote, DrawableNote>(10, 50);
-                    column.RegisterPool<CustomLNHead, DrawableHoldNoteHead>(10, 50);
+                    column.RegisterPool<Note, DrawableNote>(10, 50);
+                    column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<NoMissLNBody, Ez2AcDrawableHoldNoteBody>(10, 50);
-                    column.RegisterPool<Ez2AcHoldNoteTail, Ez2AcDrawableHoldNoteTail>(10, 50);
+                    column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableHoldNoteTail>(10, 50);
                     break;
 
                 case EzMUGHitMode.Melody:

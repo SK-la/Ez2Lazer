@@ -1,7 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Threading;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -23,10 +25,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         }
     }
 
-    public class CustomLNHead : HeadNote
-    {
-    }
-
     public class NoComboBreakLNTail : TailNote
     {
         public override Judgement CreateJudgement() => new NoComboBreakTailJudgement();
@@ -36,18 +34,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         {
             public override HitResult MaxResult => HitResult.IgnoreHit;
             public override HitResult MinResult => HitResult.ComboBreak;
-        }
-    }
-
-    public class NoMissLNBody : HoldNoteBody
-    {
-        public override Judgement CreateJudgement() => new NoMissBodyJudgement();
-        protected override HitWindows CreateHitWindows() => HitWindows.Empty;
-
-        public class NoMissBodyJudgement : ManiaJudgement
-        {
-            public override HitResult MaxResult => HitResult.IgnoreHit;
-            public override HitResult MinResult => HitResult.IgnoreMiss;
         }
     }
 
@@ -63,7 +49,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
-            AddNested(Head = new CustomLNHead
+            AddNested(Head = new Ez2AcLNHead
             {
                 StartTime = StartTime,
                 Column = Column,

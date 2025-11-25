@@ -22,14 +22,14 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
-            AddNested(Head = new CustomLNHead
+            AddNested(Head = new Ez2AcLNHead
             {
                 StartTime = StartTime,
                 Column = Column,
                 Samples = GetNodeSamples(0),
             });
 
-            AddNested(Tail = new Ez2AcHoldNoteTail
+            AddNested(Tail = new Ez2AcLNTail
             {
                 StartTime = EndTime,
                 Column = Column,
@@ -55,7 +55,19 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         }
     }
 
-    public class Ez2AcHoldNoteTail : TailNote
+    public class Ez2AcLNHead : HeadNote
+    {
+        public override Judgement CreateJudgement() => new Ez2AcHeadJudgement();
+        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
+
+        private class Ez2AcHeadJudgement : ManiaJudgement
+        {
+            public override HitResult MaxResult => HitResult.Perfect;
+            public override HitResult MinResult => HitResult.IgnoreMiss;
+        }
+    }
+
+    public class Ez2AcLNTail : TailNote
     {
         public override Judgement CreateJudgement() => new Ez2AcTailJudgement();
         protected override HitWindows CreateHitWindows() => new ManiaHitWindows();
@@ -63,7 +75,19 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         private class Ez2AcTailJudgement : ManiaJudgement
         {
             public override HitResult MaxResult => HitResult.Perfect;
-            public override HitResult MinResult => HitResult.Miss;
+            public override HitResult MinResult => HitResult.ComboBreak;
+        }
+    }
+
+    public class NoMissLNBody : HoldNoteBody
+    {
+        public override Judgement CreateJudgement() => new NoMissBodyJudgement();
+        protected override HitWindows CreateHitWindows() => HitWindows.Empty;
+
+        public class NoMissBodyJudgement : ManiaJudgement
+        {
+            public override HitResult MaxResult => HitResult.IgnoreHit;
+            public override HitResult MinResult => HitResult.IgnoreMiss;
         }
     }
 
