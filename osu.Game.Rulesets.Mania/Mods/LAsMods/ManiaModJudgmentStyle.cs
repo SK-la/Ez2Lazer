@@ -14,9 +14,9 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModJudgmentStyle : Mod, IApplicableToDifficulty
+    public class ManiaModJudgementStyle : Mod, IApplicableToDifficulty
     {
-        public override string Name => "Other MUG-Game Judgment Style";
+        public override string Name => "Other MUG-Game Judgement Style";
         public override string Acronym => "CH";
         public override double ScoreMultiplier => 1;
         public override bool Ranked => false;
@@ -83,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        public ManiaModJudgmentStyle()
+        public ManiaModJudgementStyle()
         {
             Ez2AcTemplate.BindValueChanged(e =>
             {

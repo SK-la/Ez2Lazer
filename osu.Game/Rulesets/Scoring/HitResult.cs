@@ -128,6 +128,13 @@ namespace osu.Game.Rulesets.Scoring
         IgnoreHit,
 
         /// <summary>
+        /// Indicates a pool judgement in Mania mode.
+        /// </summary>
+        [EnumMember(Value = "pool")]
+        [Order(17)]
+        Pool,
+
+        /// <summary>
         /// Indicates that a combo break should occur, but does not otherwise affect score.
         /// </summary>
         /// <remarks>
@@ -217,6 +224,10 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.ComboBreak:
                     return false;
 
+                // Pool is a special type that does not affect accuracy.
+                case HitResult.Pool:
+                    return false;
+
                 default:
                     return IsScorable(result) && !IsBonus(result);
             }
@@ -235,6 +246,10 @@ namespace osu.Game.Rulesets.Scoring
 
                 // ComboBreak is a special type that only affects combo. It cannot be considered as basic, tick, bonus, or accuracy-affecting.
                 case HitResult.ComboBreak:
+                    return false;
+
+                // Pool is a special type that is not basic.
+                case HitResult.Pool:
                     return false;
 
                 default:
@@ -403,7 +418,7 @@ namespace osu.Game.Rulesets.Scoring
             if (maxResult == HitResult.SmallTickHit && minResult != HitResult.SmallTickMiss)
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.SmallTickMiss} is the only valid minimum result for a {maxResult} judgement.");
 
-            if (maxResult.IsBasic() && minResult != HitResult.Miss)
+            if (maxResult.IsBasic() && minResult != HitResult.Miss && minResult != HitResult.ComboBreak)
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.Miss} is the only valid minimum result for a {maxResult} judgement.");
         }
     }

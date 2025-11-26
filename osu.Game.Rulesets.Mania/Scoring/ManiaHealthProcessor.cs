@@ -62,6 +62,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Perfect:
                     increase = 0.0055 - Beatmap.Difficulty.DrainRate * 0.0005;
                     break;
+
+                case HitResult.Pool:
+                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.01; // Strict health deduction for pool
             }
 
             return HpMultiplierNormal * increase;
