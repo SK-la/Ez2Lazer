@@ -47,6 +47,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private DrawablePool<PoolableHitExplosion> hitExplosionPool = null!;
         private readonly OrderedHitPolicy hitPolicy;
+
+        private DrawableManiaRuleset drawableManiaRuleset = null!;
+
         public Container UnderlayElements => HitObjectArea.UnderlayElements;
 
         private GameplaySampleTriggerSource sampleTriggerSource = null!;
@@ -143,6 +146,16 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
             NewResult += OnNewResult;
+
+            // Find the DrawableManiaRuleset by traversing up the hierarchy
+            Drawable? drawable = Parent;
+
+            while (drawable != null && !(drawable is DrawableManiaRuleset))
+            {
+                drawable = drawable.Parent;
+            }
+
+            drawableManiaRuleset = (DrawableManiaRuleset)drawable!;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -190,11 +203,20 @@ namespace osu.Game.Rulesets.Mania.UI
                 return false;
 
             sampleTriggerSource.Play();
+
+            // Check for pool judgement
+            checkPool();
+
             return true;
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
+        }
+
+        private void checkPool()
+        {
+            drawableManiaRuleset.CheckPool(this);
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)

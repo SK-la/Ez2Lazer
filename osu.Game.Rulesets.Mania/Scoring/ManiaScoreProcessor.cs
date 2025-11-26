@@ -7,6 +7,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
@@ -23,6 +24,19 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public void AddHitTiming(double hitTime, HitResult result)
         {
             HitTimings.Add(new EzManiaHitTimingInfo(hitTime, result));
+        }
+
+        public int PoolCount { get; private set; }
+
+        public void ApplyPoolResult(double time, int column)
+        {
+            PoolCount++;
+            // Create a dummy JudgementResult for IgnoreHit
+            var dummyHitObject = new PoolHitObject(time, column);
+            var judgement = new ManiaJudgement();
+            var result = new JudgementResult(dummyHitObject, judgement);
+            result.Type = HitResult.Pool;
+            ApplyResult(result);
         }
 
         public double CalculateScoreWithParameters(double comboProgress, double accuracyProgress, double bonusPortion, Dictionary<HitResult, int> customHitProportionScore)
@@ -93,6 +107,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                 case HitResult.Miss:
                     return HitProportionScore.Miss;
+
+                case HitResult.Pool:
+                    return 0;
             }
 
             return base.GetBaseScoreForResult(result);
@@ -122,6 +139,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 results.GetValueOrDefault(HitResult.Good) > 0
                 || results.GetValueOrDefault(HitResult.Ok) > 0
                 || results.GetValueOrDefault(HitResult.Meh) > 0
+                || results.GetValueOrDefault(HitResult.Pool) > 0
                 || results.GetValueOrDefault(HitResult.Miss) > 0;
 
             return anyImperfect ? rank : ScoreRank.X;

@@ -39,6 +39,8 @@ using osu.Game.Skinning;
 using osu.Game.Overlays.Settings.Sections.Gameplay;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.Mania.Scoring;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
@@ -48,6 +50,9 @@ namespace osu.Game.Rulesets.Mania.UI
         /// The minimum time range. This occurs at a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 40.
         /// </summary>
         public const double MIN_TIME_RANGE = 290;
+
+        [Resolved]
+        private ScoreProcessor scoreProcessor { get; set; } = null!;
 
         /// <summary>
         /// The maximum time range. This occurs with a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 1.
@@ -325,22 +330,51 @@ namespace osu.Game.Rulesets.Mania.UI
             switch (hitMode)
             {
                 case EzMUGHitMode.EZ2AC:
-                    column.RegisterPool<Note, DrawableNote>(10, 50);
+                    column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
                     column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<NoMissLNBody, Ez2AcDrawableHoldNoteBody>(10, 50);
-                    column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableHoldNoteTail>(10, 50);
+                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
                     break;
 
                 case EzMUGHitMode.Melody:
-                    column.RegisterPool<NoJudgmentNote, DrawableNote>(10, 50);
-                    // Add other pools for Melody if needed
+                    column.RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
+                    column.RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
+                    column.RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
+                    break;
+
+                case EzMUGHitMode.IIDX:
+                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
                     break;
 
                 case EzMUGHitMode.O2Jam:
                     column.RegisterPool<O2Note, O2DrawableNote>(10, 50);
-                    column.RegisterPool<O2HeadNote, O2DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<O2TailNote, O2DrawableHoldNoteTail>(10, 50);
+                    column.RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
+                    column.RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
                     break;
+            }
+        }
+
+        public void CheckPool(Column column)
+        {
+            // Only apply pool judgement in EZ2AC and IIDX modes
+            if (ManiaBeatmapConverter.CurrentHitMode != EzMUGHitMode.EZ2AC && ManiaBeatmapConverter.CurrentHitMode != EzMUGHitMode.IIDX)
+                return;
+
+            double currentTime = Clock.CurrentTime;
+            double missWindow = IBeatmapDifficultyInfo.DifficultyRange(Beatmap.Difficulty.OverallDifficulty, ManiaHitWindows.MissRange);
+
+            // Check if there is any hit object in miss window globally
+            bool hasAnyHitObjectInWindow = Playfield.Stages.SelectMany(s => s.Columns).Any(c => c.HitObjectArea.Children.Any(child =>
+                child is DrawableManiaHitObject d && Math.Abs(d.HitObject.StartTime - currentTime) <= missWindow));
+
+            // Check if this column has hit object in miss window
+            bool hasThisColumnHitObjectInWindow = column.HitObjectArea.Children.Any(child =>
+                child is DrawableManiaHitObject d && Math.Abs(d.HitObject.StartTime - currentTime) <= missWindow);
+
+            if (hasAnyHitObjectInWindow && !hasThisColumnHitObjectInWindow)
+            {
+                ((ManiaScoreProcessor)scoreProcessor).ApplyPoolResult(currentTime, column.Index);
             }
         }
     }

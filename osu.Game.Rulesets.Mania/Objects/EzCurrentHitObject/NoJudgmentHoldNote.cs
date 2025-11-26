@@ -11,32 +11,6 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
-    public class NoJudgmentNote : Note
-    {
-        public NoJudgmentNote(Note note)
-        {
-            StartTime = note.StartTime;
-            Column = note.Column;
-            Samples = note.Samples;
-        }
-
-        protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
-        {
-        }
-    }
-
-    public class NoComboBreakLNTail : TailNote
-    {
-        public override Judgement CreateJudgement() => new NoComboBreakTailJudgement();
-        protected override HitWindows CreateHitWindows() => HitWindows.Empty;
-
-        public class NoComboBreakTailJudgement : ManiaJudgement
-        {
-            public override HitResult MaxResult => HitResult.IgnoreHit;
-            public override HitResult MinResult => HitResult.ComboBreak;
-        }
-    }
-
     public class NoJudgmentHoldNote : HoldNote
     {
         public NoJudgmentHoldNote(HoldNote hold)
@@ -49,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
-            AddNested(Head = new Ez2AcLNHead
+            AddNested(Head = new HeadNote
             {
                 StartTime = StartTime,
                 Column = Column,
@@ -68,18 +42,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 StartTime = StartTime,
                 Column = Column,
             });
-        }
-    }
-
-    public partial class NoTailDrawableHoldNoteTail : DrawableHoldNoteTail
-    {
-        protected override void CheckForResult(bool userTriggered, double timeOffset)
-        {
-            // apply perfect once the tail is reached
-            if (HoldNote.Head.IsHit && timeOffset >= 0)
-                ApplyResult(GetCappedResult(HitResult.Perfect));
-            else
-                base.CheckForResult(userTriggered, timeOffset);
         }
     }
 }

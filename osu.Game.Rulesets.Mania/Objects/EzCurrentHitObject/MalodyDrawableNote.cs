@@ -8,11 +8,11 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
-    public partial class MalodyDrawableHoldNoteBody : DrawableHoldNoteBody
+    public partial class MalodyDrawableLNBody : DrawableHoldNoteBody
     {
         public new bool HasHoldBreak => false;
 
-        internal new void TriggerResult(bool hit)
+        internal override void TriggerResult(bool hit)
         {
             if (AllJudged) return;
 
@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         }
     }
 
-    public partial class MalodyDrawableHoldNoteTail : DrawableHoldNoteTail
+    public partial class MalodyDrawableLNTail : DrawableHoldNoteTail
     {
         public static HitWindows HitWindows = new ManiaHitWindows();
 

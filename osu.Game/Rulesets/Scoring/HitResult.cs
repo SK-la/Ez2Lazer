@@ -418,6 +418,9 @@ namespace osu.Game.Rulesets.Scoring
             if (maxResult == HitResult.SmallTickHit && minResult != HitResult.SmallTickMiss)
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.SmallTickMiss} is the only valid minimum result for a {maxResult} judgement.");
 
+            if (maxResult == HitResult.Pool && minResult != HitResult.Pool)
+                throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.Pool} is the only valid minimum result for a {HitResult.Pool} judgement.");
+
             if (maxResult.IsBasic() && minResult != HitResult.Miss && minResult != HitResult.ComboBreak)
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.Miss} is the only valid minimum result for a {maxResult} judgement.");
         }

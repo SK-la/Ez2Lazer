@@ -12,6 +12,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     public class Ez2AcHoldNote : HoldNote
     {
+        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
+
         public Ez2AcHoldNote(HoldNote hold)
         {
             StartTime = hold.StartTime;
@@ -62,70 +64,23 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         private class Ez2AcHeadJudgement : ManiaJudgement
         {
-            public override HitResult MaxResult => HitResult.Perfect;
-            public override HitResult MinResult => HitResult.IgnoreMiss;
+            public override HitResult MinResult => HitResult.Pool;
         }
     }
 
     public class Ez2AcLNTail : TailNote
     {
-        public override Judgement CreateJudgement() => new Ez2AcTailJudgement();
-        protected override HitWindows CreateHitWindows() => new ManiaHitWindows();
-
-        private class Ez2AcTailJudgement : ManiaJudgement
-        {
-            public override HitResult MaxResult => HitResult.Perfect;
-            public override HitResult MinResult => HitResult.ComboBreak;
-        }
+        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
     }
 
-    public class NoMissLNBody : HoldNoteBody
+    public class Ez2AcNote : Note
     {
-        public override Judgement CreateJudgement() => new NoMissBodyJudgement();
-        protected override HitWindows CreateHitWindows() => HitWindows.Empty;
+        public override Judgement CreateJudgement() => new Ez2AcNoteJudgement();
+        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
 
-        public class NoMissBodyJudgement : ManiaJudgement
+        private class Ez2AcNoteJudgement : ManiaJudgement
         {
-            public override HitResult MaxResult => HitResult.IgnoreHit;
-            public override HitResult MinResult => HitResult.IgnoreMiss;
-        }
-    }
-
-    public partial class Ez2AcDrawableHoldNoteBody : DrawableHoldNoteBody
-    {
-        internal new void TriggerResult(bool hit)
-        {
-            if (AllJudged) return;
-
-            ApplyMaxResult();
-            // ApplyResult(HitResult.Perfect);
-        }
-    }
-
-    public partial class Ez2AcDrawableHoldNoteTail : DrawableHoldNoteTail
-    {
-        public static HitWindows HitWindows = new ManiaHitWindows();
-
-        // public override bool DisplayResult => false;
-        // public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
-        // {
-        //     return UpdateResult(true);
-        // }
-
-        protected override void CheckForResult(bool userTriggered, double timeOffset)
-        {
-            // At the tail time, if still holding, give Perfect
-            if (timeOffset >= 0)
-            {
-                if (HoldNote.IsHolding.Value)
-                {
-                    ApplyResult(HitResult.Perfect);
-                }
-                else
-                {
-                    ApplyResult(HitResult.Miss);
-                }
-            }
+            public override HitResult MinResult => HitResult.Pool;
         }
     }
 }

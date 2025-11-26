@@ -193,11 +193,11 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         }
     }
 
-    public class O2HeadNote : HeadNote
+    public class O2LNHead : HeadNote
     {
     }
 
-    public class O2TailNote : TailNote
+    public class O2LNTail : TailNote
     {
         public override double MaximumJudgementOffset => base.MaximumJudgementOffset / RELEASE_WINDOW_LENIENCE;
     }
@@ -214,14 +214,14 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
-            AddNested(Head = new O2HeadNote
+            AddNested(Head = new O2LNHead
             {
                 StartTime = StartTime,
                 Column = Column,
                 Samples = GetNodeSamples(0)
             });
 
-            AddNested(Tail = new O2TailNote
+            AddNested(Tail = new O2LNTail
             {
                 StartTime = EndTime,
                 Column = Column,
