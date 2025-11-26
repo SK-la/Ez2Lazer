@@ -186,23 +186,24 @@ namespace osu.Game.Screens.Play
         /// <returns>Whether gameplay should be immediately exited as a result. Returning false allows the gameplay session to continue. Defaults to true.</returns>
         protected virtual bool ShouldExitOnTokenRetrievalFailure(Exception exception) => true;
 
-        public override bool AllowCriticalSettingsAdjustment
-        {
-            get
-            {
-                // General limitations to ensure players don't do anything too weird.
-                // These match stable for now.
-
-                // TODO: the blocking conditions should probably display a message.
-                if (!IsBreakTime.Value && GameplayClockContainer.CurrentTime - GameplayClockContainer.GameplayStartTime > 10000)
-                    return false;
-
-                if (GameplayClockContainer.IsPaused.Value)
-                    return false;
-
-                return base.AllowCriticalSettingsAdjustment;
-            }
-        }
+        // 重写允许在游戏过程中调整关键设置（如速度修改器）大于10秒后、非休息时间且未暂停时不允许调整
+        // public override bool AllowCriticalSettingsAdjustment
+        // {
+        //     get
+        //     {
+        //         // General limitations to ensure players don't do anything too weird.
+        //         // These match stable for now.
+        //
+        //         // TODO: the blocking conditions should probably display a message.
+        //         if (!IsBreakTime.Value && GameplayClockContainer.CurrentTime - GameplayClockContainer.GameplayStartTime > 10000)
+        //             return false;
+        //
+        //         if (GameplayClockContainer.IsPaused.Value)
+        //             return false;
+        //
+        //         return base.AllowCriticalSettingsAdjustment;
+        //     }
+        // }
 
         protected override async Task PrepareScoreForResultsAsync(Score score)
         {
