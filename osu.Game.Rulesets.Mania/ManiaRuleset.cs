@@ -459,7 +459,6 @@ namespace osu.Game.Rulesets.Mania
                 HitResult.Good,
                 HitResult.Ok,
                 HitResult.Meh,
-                HitResult.Pool,
 
                 // HitResult.SmallBonus is used for awarding perfect bonus score but is not included here as
                 // it would be a bit redundant to show this to the user.

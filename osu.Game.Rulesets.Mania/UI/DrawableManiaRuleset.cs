@@ -357,22 +357,13 @@ namespace osu.Game.Rulesets.Mania.UI
 
         public void CheckPool(Column column)
         {
-            // Only apply pool judgement in EZ2AC and IIDX modes
-            if (ManiaBeatmapConverter.CurrentHitMode != EzMUGHitMode.EZ2AC && ManiaBeatmapConverter.CurrentHitMode != EzMUGHitMode.IIDX)
-                return;
-
             double currentTime = Clock.CurrentTime;
             double missWindow = IBeatmapDifficultyInfo.DifficultyRange(Beatmap.Difficulty.OverallDifficulty, ManiaHitWindows.MissRange);
 
-            // Check if there is any hit object in miss window globally
-            bool hasAnyHitObjectInWindow = Playfield.Stages.SelectMany(s => s.Columns).Any(c => c.HitObjectArea.Children.Any(child =>
-                child is DrawableManiaHitObject d && Math.Abs(d.HitObject.StartTime - currentTime) <= missWindow));
-
             // Check if this column has hit object in miss window
-            bool hasThisColumnHitObjectInWindow = column.HitObjectArea.Children.Any(child =>
-                child is DrawableManiaHitObject d && Math.Abs(d.HitObject.StartTime - currentTime) <= missWindow);
+            bool hasThisColumnHitObjectInWindow = Beatmap.HitObjects.OfType<ManiaHitObject>().Any(h => h.Column == column.Index && Math.Abs(h.StartTime - currentTime) <= missWindow);
 
-            if (hasAnyHitObjectInWindow && !hasThisColumnHitObjectInWindow)
+            if (!hasThisColumnHitObjectInWindow)
             {
                 ((ManiaScoreProcessor)scoreProcessor).ApplyPoolResult(currentTime, column.Index);
             }

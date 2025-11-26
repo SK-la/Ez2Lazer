@@ -397,10 +397,10 @@ namespace osu.Game.Rulesets.Scoring
             if (maxResult == HitResult.None || !IsHit(maxResult))
                 throw new ArgumentOutOfRangeException(nameof(maxResult), $"{maxResult} is not a valid maximum judgement result.");
 
-            if (minResult == HitResult.None || IsHit(minResult))
+            if (minResult == HitResult.None || (IsHit(minResult) && minResult != HitResult.Pool && minResult != HitResult.IgnoreHit))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum judgement result.");
 
-            if (maxResult == HitResult.IgnoreHit && minResult is not (HitResult.IgnoreMiss or HitResult.ComboBreak))
+            if (maxResult == HitResult.IgnoreHit && minResult is not (HitResult.IgnoreMiss or HitResult.ComboBreak or HitResult.IgnoreHit))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum result for a {maxResult} judgement.");
 
             if (maxResult.IsBonus() && minResult != HitResult.IgnoreMiss)

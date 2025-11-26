@@ -315,6 +315,7 @@ namespace osu.Game.Skinning.Components
         {
             string resultName = hitResult switch
             {
+                HitResult.Pool => "Miss",
                 HitResult.Miss => "Miss",
                 HitResult.Meh => "Fail",
                 HitResult.Ok => "Fail",
@@ -354,6 +355,7 @@ namespace osu.Game.Skinning.Components
 
             var colors = hitResult switch
             {
+                HitResult.Pool => new[] { Color4.Purple, Color4.MediumPurple },
                 HitResult.Miss => new[] { Color4.Red, Color4.IndianRed },
                 HitResult.Meh => new[] { Color4.Purple, Color4.MediumPurple },
                 HitResult.Ok => new[] { Color4.ForestGreen, Color4.SeaGreen },
@@ -415,6 +417,7 @@ namespace osu.Game.Skinning.Components
                     applyEzStyleEffect(drawable, new Vector2(1f));
                     break;
 
+                case HitResult.Pool:
                 case HitResult.Miss:
                     // 中心小状态，放大后快速消失
                     applyEzStyleEffect(drawable, new Vector2(1f));

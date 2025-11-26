@@ -36,6 +36,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
             var judgement = new ManiaJudgement();
             var result = new JudgementResult(dummyHitObject, judgement);
             result.Type = HitResult.Pool;
+            // Set RawTime and GameplayRate using reflection since they are internal
+            typeof(JudgementResult).GetProperty("RawTime")?.SetValue(result, time);
+            typeof(JudgementResult).GetProperty("GameplayRate")?.SetValue(result, Clock.Rate);
             ApplyResult(result);
         }
 

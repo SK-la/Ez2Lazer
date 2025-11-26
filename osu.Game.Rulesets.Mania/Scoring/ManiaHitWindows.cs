@@ -121,7 +121,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Ok:
                 case HitResult.Meh:
                 case HitResult.Miss:
-                case HitResult.Pool:
                     return true;
             }
 
