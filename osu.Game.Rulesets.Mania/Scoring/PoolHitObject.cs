@@ -16,9 +16,15 @@ namespace osu.Game.Rulesets.Mania.Scoring
             Column = column;
         }
 
-        public override Judgement CreateJudgement() => new ManiaJudgement();
+        public override Judgement CreateJudgement() => new PoolJudgement();
 
         protected override HitWindows CreateHitWindows() => new PoolHitWindows();
+    }
+
+    public class PoolJudgement : ManiaJudgement
+    {
+        public override HitResult MaxResult => HitResult.Pool;
+        public override HitResult MinResult => HitResult.Pool;
     }
 
     public class PoolHitWindows : HitWindows

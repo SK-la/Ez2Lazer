@@ -17,6 +17,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         public static DifficultyRange OkRange = new DifficultyRange(127, 112, 97);
         public static DifficultyRange MehRange = new DifficultyRange(151, 136, 121);
         public static DifficultyRange MissRange = new DifficultyRange(188, 173, 158);
+        public static DifficultyRange PoolRange = new DifficultyRange(200, 300, 500);
 
         public double SpeedMultiplier
         {
@@ -57,6 +58,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         private double ok;
         private double meh;
         private double miss;
+        private double pool;
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -68,8 +70,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 case HitResult.Ok:
                 case HitResult.Meh:
                 case HitResult.Miss:
-                case HitResult.IgnoreHit:
-                case HitResult.IgnoreMiss:
+                case HitResult.Pool:
                     return true;
             }
 
@@ -82,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             updateWindows();
         }
 
-        public void SetSpecialDifficultyRange(double perfect, double great, double good, double ok, double meh, double miss)
+        public void SetSpecialDifficultyRange(double perfect, double great, double good, double ok, double meh, double miss, double? pool = 0)
         {
             PerfectRange = new DifficultyRange(perfect, perfect, perfect);
             GreatRange = new DifficultyRange(great, great, great);
@@ -90,6 +91,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             OkRange = new DifficultyRange(ok, ok, ok);
             MehRange = new DifficultyRange(meh, meh, meh);
             MissRange = new DifficultyRange(miss, miss, miss);
+            PoolRange = new DifficultyRange(pool ?? 0, pool ?? 0, pool ?? 0);
             updateWindows();
         }
 
@@ -101,6 +103,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             OkRange = difficultyRangeArray[3];
             MehRange = difficultyRangeArray[4];
             MissRange = difficultyRangeArray[5];
+            PoolRange = difficultyRangeArray[6];
             updateWindows();
         }
 
@@ -112,6 +115,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             ok = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, OkRange) * totalMultiplier) + 0.5;
             meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MehRange) * totalMultiplier) + 0.5;
             miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MissRange) * totalMultiplier) + 0.5;
+            pool = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, PoolRange) * totalMultiplier) + 0.5;
         }
 
         public override double WindowFor(HitResult result)
@@ -135,6 +139,9 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
                 case HitResult.Miss:
                     return miss;
+
+                case HitResult.Pool:
+                    return pool;
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(result), result, null);

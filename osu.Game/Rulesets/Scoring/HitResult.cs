@@ -409,6 +409,10 @@ namespace osu.Game.Rulesets.Scoring
             if (minResult == HitResult.IgnoreMiss)
                 return;
 
+            // Pool is a special result that can be both max and min
+            if (minResult == HitResult.Pool)
+                return;
+
             if (maxResult == HitResult.SliderTailHit && minResult != HitResult.LargeTickMiss)
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.LargeTickMiss} is the only valid minimum result for a {maxResult} judgement.");
 

@@ -4,16 +4,12 @@
 using System.Threading;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Judgements;
-using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     public class Ez2AcHoldNote : HoldNote
     {
-        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
-
         public Ez2AcHoldNote(HoldNote hold)
         {
             StartTime = hold.StartTime;
@@ -21,6 +17,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             Column = hold.Column;
             NodeSamples = hold.NodeSamples;
         }
+
+        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
