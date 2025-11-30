@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             NodeSamples = hold.NodeSamples;
         }
 
-        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
+        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     public class Ez2AcLNHead : HeadNote
     {
         public override Judgement CreateJudgement() => new Ez2AcHeadJudgement();
-        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
+        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
 
         private class Ez2AcHeadJudgement : ManiaJudgement
         {
@@ -68,13 +68,13 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public class Ez2AcLNTail : TailNote
     {
-        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
+        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
     }
 
     public class Ez2AcNote : Note
     {
         public override Judgement CreateJudgement() => new Ez2AcNoteJudgement();
-        protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
+        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
 
         private class Ez2AcNoteJudgement : ManiaJudgement
         {

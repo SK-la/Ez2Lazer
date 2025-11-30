@@ -5,9 +5,11 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Lines;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
@@ -84,6 +86,42 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     Y = yPosition,
                     Alpha = 0.8f,
                     Colour = colours.ForHitResult(e.Result),
+                });
+            }
+
+            // 计算并绘制血量折线
+            // drawHealthLine(left_margin, right_margin);
+        }
+
+        private void drawHealthLine(float left_margin, float right_margin)
+        {
+            var sortedEvents = hitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
+            double currentHealth = 1; // 初始血量
+            List<Vector2> healthPoints = new List<Vector2>();
+
+            foreach (var e in sortedEvents)
+            {
+                var judgement = e.HitObject.CreateJudgement();
+                var judgementResult = new JudgementResult(e.HitObject, judgement) { Type = e.Result };
+                double healthIncrease = judgement.HealthIncreaseFor(judgementResult);
+                currentHealth = Math.Clamp(currentHealth + healthIncrease, 0, 1);
+
+                double time = e.HitObject.StartTime;
+                float xPosition = (float)(time / (time_bins * binSize));
+                float x = (xPosition * (DrawWidth - left_margin - right_margin)) - (DrawWidth / 2) + left_margin;
+                float y = (float)((1 - currentHealth) * DrawHeight - DrawHeight / 2);
+
+                healthPoints.Add(new Vector2(x, y));
+            }
+
+            if (healthPoints.Count > 1)
+            {
+                AddInternal(new Path
+                {
+                    PathRadius = 1,
+                    Colour = Color4.Red,
+                    Alpha = 0.5f,
+                    Vertices = healthPoints.ToArray()
                 });
             }
         }

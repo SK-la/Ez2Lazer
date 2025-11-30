@@ -7,7 +7,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
-    public class Ez2AcHitWindows : HitWindows
+    public class EzCustomHitWindows : HitWindows
     {
         private double speedMultiplier = 1;
 

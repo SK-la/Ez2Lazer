@@ -95,7 +95,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private GameHost gameHost { get; set; } = null!;
 
         [Resolved(CanBeNull = true)]
-        private ManiaScoreProcessor maniaScoreProcessor { get; set; }
+        private ManiaScoreProcessor? maniaScoreProcessor { get; set; }
 
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
@@ -373,7 +373,7 @@ namespace osu.Game.Rulesets.Mania.UI
             // Check if this column has hit object in miss window
             bool hasThisColumnHitObjectInWindow = Beatmap.HitObjects.OfType<ManiaHitObject>().Any(h => h.Column == column.Index && Math.Abs(h.StartTime - currentTime) <= missWindow);
 
-            if (hasAnyHitObjectInWindow && !hasThisColumnHitObjectInWindow)
+            if (hasAnyHitObjectInWindow && !hasThisColumnHitObjectInWindow && maniaScoreProcessor != null)
             {
                 maniaScoreProcessor.ApplyPoolResult(currentTime, column.Index);
             }
