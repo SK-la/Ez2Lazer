@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override LocalisableString Description => "LaMod: Full LN 面海, 可调面缝";
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.LA_Mod;
 
         public override Type[] IncompatibleMods => new[] { typeof(ManiaModHoldOff) };
 

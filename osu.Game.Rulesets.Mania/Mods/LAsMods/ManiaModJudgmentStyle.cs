@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override string Acronym => "CH";
         public override double ScoreMultiplier => 1;
         public override bool Ranked => false;
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.LA_Mod;
         public override LocalisableString Description => @"LaMod: Custom HitWindows. Free Hit ms.";
 
         [SettingSource("Adaptive Judgement(No Active)")]

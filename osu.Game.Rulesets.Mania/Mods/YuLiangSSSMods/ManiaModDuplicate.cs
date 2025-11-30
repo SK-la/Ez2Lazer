@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override IconUsage? Icon => FontAwesome.Solid.ArrowCircleDown;
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override bool Ranked => false;
 

@@ -50,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         [SettingSource("Difficulty", "1: Easy  2: Normal  3: Hard")]
         public BindableInt Difficulty { get; set; } = new BindableInt(1)

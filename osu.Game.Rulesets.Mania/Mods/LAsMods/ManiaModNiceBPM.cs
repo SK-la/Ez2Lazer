@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override LocalisableString Description => "LaMod: Free BPM or Speed";
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.LA_Mod;
 
         public override double ScoreMultiplier => 1;
 

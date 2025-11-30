@@ -18,9 +18,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "JP";
 
-        public override LocalisableString Description => "YuMod: 自定义判定区间";
+        public override LocalisableString Description => "DIY Judgments Area";
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override IconUsage? Icon => FontAwesome.Solid.Shower;
 

@@ -3,13 +3,13 @@
 
 using System;
 using System.Threading;
-using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
-    public static class O2HitObject
+    // 代码改编自YuLiangSSS提供的ManiaModO2Judgement
+    public static class O2HitModeExtension
     {
         public const double COOL = 7500.0;
         public const double GOOD = 22500.0;
@@ -41,31 +41,31 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         public bool PillCheck(double timeOffset)
         {
-            if (O2HitObject.PillActivated)
+            if (O2HitModeExtension.PillActivated)
             {
                 double offset = Math.Abs(timeOffset);
 
-                if (offset <= O2HitObject.CoolRange)
+                if (offset <= O2HitModeExtension.CoolRange)
                 {
-                    O2HitObject.CoolCombo++;
+                    O2HitModeExtension.CoolCombo++;
 
-                    if (O2HitObject.CoolCombo >= 15)
+                    if (O2HitModeExtension.CoolCombo >= 15)
                     {
-                        O2HitObject.CoolCombo -= 15;
+                        O2HitModeExtension.CoolCombo -= 15;
 
-                        if (O2HitObject.Pill < 5)
-                            O2HitObject.Pill++;
+                        if (O2HitModeExtension.Pill < 5)
+                            O2HitModeExtension.Pill++;
                     }
                 }
-                else if (offset > O2HitObject.CoolRange && offset <= O2HitObject.GoodRange)
-                    O2HitObject.CoolCombo = 0;
-                else if (offset > O2HitObject.GoodRange && offset <= O2HitObject.BadRange)
+                else if (offset > O2HitModeExtension.CoolRange && offset <= O2HitModeExtension.GoodRange)
+                    O2HitModeExtension.CoolCombo = 0;
+                else if (offset > O2HitModeExtension.GoodRange && offset <= O2HitModeExtension.BadRange)
                 {
-                    O2HitObject.CoolCombo = 0;
+                    O2HitModeExtension.CoolCombo = 0;
 
-                    if (O2HitObject.Pill > 0)
+                    if (O2HitModeExtension.Pill > 0)
                     {
-                        O2HitObject.Pill--;
+                        O2HitModeExtension.Pill--;
 
                         ApplyResult(GetCappedResult(HitResult.Perfect));
                         return false;
@@ -92,31 +92,31 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         public bool PillCheck(double timeOffset)
         {
-            if (O2HitObject.PillActivated)
+            if (O2HitModeExtension.PillActivated)
             {
                 double offset = Math.Abs(timeOffset);
 
-                if (offset <= O2HitObject.CoolRange)
+                if (offset <= O2HitModeExtension.CoolRange)
                 {
-                    O2HitObject.CoolCombo++;
+                    O2HitModeExtension.CoolCombo++;
 
-                    if (O2HitObject.CoolCombo >= 15)
+                    if (O2HitModeExtension.CoolCombo >= 15)
                     {
-                        O2HitObject.CoolCombo -= 15;
+                        O2HitModeExtension.CoolCombo -= 15;
 
-                        if (O2HitObject.Pill < 5)
-                            O2HitObject.Pill++;
+                        if (O2HitModeExtension.Pill < 5)
+                            O2HitModeExtension.Pill++;
                     }
                 }
-                else if (offset > O2HitObject.CoolRange && offset <= O2HitObject.GoodRange)
-                    O2HitObject.CoolCombo = 0;
-                else if (offset > O2HitObject.GoodRange && offset <= O2HitObject.BadRange)
+                else if (offset > O2HitModeExtension.CoolRange && offset <= O2HitModeExtension.GoodRange)
+                    O2HitModeExtension.CoolCombo = 0;
+                else if (offset > O2HitModeExtension.GoodRange && offset <= O2HitModeExtension.BadRange)
                 {
-                    O2HitObject.CoolCombo = 0;
+                    O2HitModeExtension.CoolCombo = 0;
 
-                    if (O2HitObject.Pill > 0)
+                    if (O2HitModeExtension.Pill > 0)
                     {
-                        O2HitObject.Pill--;
+                        O2HitModeExtension.Pill--;
 
                         ApplyResult(GetCappedResult(HitResult.Perfect));
                         return false;
@@ -143,31 +143,31 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         public bool PillCheck(double timeOffset)
         {
-            if (O2HitObject.PillActivated)
+            if (O2HitModeExtension.PillActivated)
             {
                 double offset = Math.Abs(timeOffset);
 
-                if (offset <= O2HitObject.CoolRange)
+                if (offset <= O2HitModeExtension.CoolRange)
                 {
-                    O2HitObject.CoolCombo++;
+                    O2HitModeExtension.CoolCombo++;
 
-                    if (O2HitObject.CoolCombo >= 15)
+                    if (O2HitModeExtension.CoolCombo >= 15)
                     {
-                        O2HitObject.CoolCombo -= 15;
+                        O2HitModeExtension.CoolCombo -= 15;
 
-                        if (O2HitObject.Pill < 5)
-                            O2HitObject.Pill++;
+                        if (O2HitModeExtension.Pill < 5)
+                            O2HitModeExtension.Pill++;
                     }
                 }
-                else if (offset > O2HitObject.CoolRange && offset <= O2HitObject.GoodRange)
-                    O2HitObject.CoolCombo = 0;
-                else if (offset > O2HitObject.GoodRange && offset <= O2HitObject.BadRange)
+                else if (offset > O2HitModeExtension.CoolRange && offset <= O2HitModeExtension.GoodRange)
+                    O2HitModeExtension.CoolCombo = 0;
+                else if (offset > O2HitModeExtension.GoodRange && offset <= O2HitModeExtension.BadRange)
                 {
-                    O2HitObject.CoolCombo = 0;
+                    O2HitModeExtension.CoolCombo = 0;
 
-                    if (O2HitObject.Pill > 0)
+                    if (O2HitModeExtension.Pill > 0)
                     {
-                        O2HitObject.Pill--;
+                        O2HitModeExtension.Pill--;
 
                         ApplyResult(GetCappedResult(HitResult.Perfect));
                         return false;

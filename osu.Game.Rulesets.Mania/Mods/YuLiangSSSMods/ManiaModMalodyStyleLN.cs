@@ -19,7 +19,7 @@ using osu.Game.Rulesets.UI;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    internal partial class ManiaModNoLNJudgement : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
+    internal partial class ManiaModMalodyStyleLN : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
         public override string Name => "No LN Judgement";
 
@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
 

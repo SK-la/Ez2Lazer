@@ -76,7 +76,7 @@ namespace osu.Game.Rulesets.Mania
             {
                 double bpm = beatmap.BeatmapInfo.BPM;
                 if (bpm == 0) bpm = 200;
-                O2HitObject.NowBeatmapBPM = bpm;
+                O2HitModeExtension.NowBeatmapBPM = bpm;
                 double coolRange = 7500.0 / bpm;
                 double goodRange = 22500.0 / bpm;
                 double badRange = 31250.0 / bpm;
@@ -324,13 +324,13 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModConstantSpeed(),
                         new ManiaModHoldOff(),
                         new MultiMod(
-                            // new ManiaModKey1(),
-                            // new ManiaModKey2(),
-                            // new ManiaModKey3(),
-                            // new ManiaModKey4(),
-                            // new ManiaModKey5(),
-                            // new ManiaModKey6(),
-                            // new ManiaModKey7(),
+                            new ManiaModKey1(),
+                            new ManiaModKey2(),
+                            new ManiaModKey3(),
+                            new ManiaModKey4(),
+                            new ManiaModKey5(),
+                            new ManiaModKey6(),
+                            new ManiaModKey7(),
                             new ManiaModKey8(),
                             new ManiaModKey9(),
                             new ManiaModKey10()
@@ -343,7 +343,7 @@ namespace osu.Game.Rulesets.Mania
                         new MultiMod(new ManiaModAutoplay(), new ManiaModCinema()),
                     };
 
-                case ModType.CustomMod:
+                case ModType.LA_Mod:
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
@@ -351,25 +351,39 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         // new ManiaModAdjust(),
-                        new StarRatingRebirth(),
-                        new ManiaModNoLNJudgement(),
-                        new ManiaModNtoMAnother(),
-                        new ManiaModNtoM(),
-                        new ManiaModDuplicate(),
-                        new ManiaModDoublePlay(),
-                        new ManiaModNoteAdjust(),
-                        new ManiaModLNTransformer(),
-                        new ManiaModLNLongShortAddition(),
-                        new ManiaModLNDoubleDistribution(),
-                        new ManiaModLNSimplify(),
-                        new ManiaModJackAdjust(),
-                        new ManiaModDeleteSpace(),
+                    };
+
+                case ModType.YuLiangSSS_Mod:
+                    return new Mod[]
+                    {
+                        new ManiaModAdjust(),
+                        new ManiaModChangeSpeedByAccuracy(),
                         new ManiaModCleaner(),
-                        new ManiaModNewJudgement(),
-                        new ManiaModJudgmentsAdjust(),
-                        new ManiaModRemedy(),
+                        new ManiaModDeleteSpace(),
+                        new ManiaModDoublePlay(),
+                        new ManiaModDuplicate(),
                         new ManiaModGracer(),
+                        new ManiaModJackAdjust(),
+                        new ManiaModJudgmentsAdjust(),
+                        new ManiaModJudgmentsProportion(),
+                        new ManiaModLN(),
+                        new ManiaModLNDoubleDistribution(),
+                        new ManiaModLNJudgementAdjust(),
+                        new ManiaModLNLongShortAddition(),
+                        new ManiaModLNSimplify(),
+                        new ManiaModLNTransformer(),
+                        new ManiaModMalodyStyleLN(),
+                        new ManiaModNewJudgement(),
+                        new ManiaModNoteAdjust(),
+                        new ManiaModNtoM(),
+                        new ManiaModNtoMAnother(),
+                        new ManiaModO2Health(),
+                        new ManiaModO2Judgement(),
+                        new ManiaModPlayfieldTransformation(),
                         new ManiaModReleaseAdjust(),
+                        new ManiaModRemedy(),
+                        new StarRatingRebirth(),
+                        new StarRatingRebirthNoTask(),
                     };
 
                 case ModType.Fun:

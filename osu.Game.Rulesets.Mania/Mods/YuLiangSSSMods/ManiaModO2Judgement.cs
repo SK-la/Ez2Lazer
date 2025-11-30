@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1.0;
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
@@ -84,9 +84,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            HitWindows.SetSpecialDifficultyRange(O2HitObject.CoolRange, O2HitObject.CoolRange, O2HitObject.GoodRange, O2HitObject.GoodRange, O2HitObject.BadRange, O2HitObject.BadRange);
-            O2HitObject.Pill = 0;
-            O2HitObject.PillActivated = PillMode.Value;
+            HitWindows.SetSpecialDifficultyRange(O2HitModeExtension.CoolRange, O2HitModeExtension.CoolRange, O2HitModeExtension.GoodRange, O2HitModeExtension.GoodRange, O2HitModeExtension.BadRange, O2HitModeExtension.BadRange);
+            O2HitModeExtension.Pill = 0;
+            O2HitModeExtension.PillActivated = PillMode.Value;
             Windows = HitWindows;
         }
 

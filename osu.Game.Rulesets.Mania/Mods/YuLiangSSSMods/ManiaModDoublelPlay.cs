@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override IconUsage? Icon => FontAwesome.Solid.Sun;
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override LocalisableString Description => "Convert 4k to 8k (Double 4k).";// "From YuLiangSSS' DP Tool";
 

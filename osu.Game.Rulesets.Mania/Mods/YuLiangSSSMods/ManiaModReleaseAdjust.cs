@@ -30,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Mods
 
         public override bool Ranked => false;
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override Type[] IncompatibleMods => new[] { typeof(ManiaModHoldOff) };
 

@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => "To make more or less note.";
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override IconUsage? Icon => FontAwesome.Solid.Brain;
 

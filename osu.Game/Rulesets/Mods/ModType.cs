@@ -11,6 +11,7 @@ namespace osu.Game.Rulesets.Mods
         Automation,
         Fun,
         System,
-        CustomMod
+        LA_Mod,
+        YuLiangSSS_Mod,
     }
 }

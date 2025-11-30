@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override string Name => "Ez2 Settings";
         public override string Acronym => "ES";
         public override LocalisableString Description => "LaMod: Remove Scratch, Panel.";
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.LA_Mod;
         public override IconUsage? Icon => FontAwesome.Solid.Tools;
 
         public override bool Ranked => false;

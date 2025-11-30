@@ -36,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => "Convert to grace.";
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {

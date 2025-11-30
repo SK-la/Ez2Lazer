@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => "Modify your judgement.";
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override IconUsage? Icon => FontAwesome.Solid.Shower;
 

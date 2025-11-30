@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override ModType Type => ModType.CustomMod;
+        public override ModType Type => ModType.YuLiangSSS_Mod;
 
         [SettingSource("Use original OD", "High Priority")]
         public BindableBool Original { get; set; } = new BindableBool(false);

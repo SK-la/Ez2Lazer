@@ -324,7 +324,8 @@ namespace osu.Game.Overlays.Mods
                 });
             }
 
-            yield return createModColumnContent(ModType.CustomMod);
+            yield return createModColumnContent(ModType.LA_Mod);
+            yield return createModColumnContent(ModType.YuLiangSSS_Mod);
             yield return createModColumnContent(ModType.DifficultyReduction);
             yield return createModColumnContent(ModType.DifficultyIncrease);
             yield return createModColumnContent(ModType.Automation);
