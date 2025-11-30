@@ -94,9 +94,6 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private GameHost gameHost { get; set; } = null!;
 
-        [Resolved(CanBeNull = true)]
-        private ManiaScoreProcessor? maniaScoreProcessor { get; set; }
-
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
@@ -353,29 +350,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     column.RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
                     break;
-            }
-        }
-
-        public void CheckPool(Column column)
-        {
-            double currentTime = Clock.CurrentTime;
-            double missWindow = FirstAvailableHitWindows?.WindowFor(HitResult.Miss) ?? 0;
-
-            // Check time range: from first note to last note end
-            double startTime = Beatmap.HitObjects.Min(h => h.StartTime);
-            double endTime = Beatmap.HitObjects.Max(h => h.GetEndTime());
-            if (currentTime < startTime || currentTime > endTime)
-                return;
-
-            // Check if there is any hit object in miss window globally
-            bool hasAnyHitObjectInWindow = Beatmap.HitObjects.Any(h => Math.Abs(h.StartTime - currentTime) <= missWindow);
-
-            // Check if this column has hit object in miss window
-            bool hasThisColumnHitObjectInWindow = Beatmap.HitObjects.OfType<ManiaHitObject>().Any(h => h.Column == column.Index && Math.Abs(h.StartTime - currentTime) <= missWindow);
-
-            if (hasAnyHitObjectInWindow && !hasThisColumnHitObjectInWindow && maniaScoreProcessor != null)
-            {
-                maniaScoreProcessor.ApplyPoolResult(currentTime, column.Index);
             }
         }
     }

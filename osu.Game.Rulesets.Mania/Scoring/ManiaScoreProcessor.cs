@@ -8,7 +8,6 @@ using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
@@ -26,21 +25,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             HitTimings.Add(new EzManiaHitTimingInfo(hitTime, result));
         }
 
-        public int PoolCount { get; private set; }
-
-        public void ApplyPoolResult(double time, int column)
-        {
-            PoolCount++;
-            // Create a dummy JudgementResult for IgnoreHit
-            var dummyHitObject = new PoolHitObject(time, column);
-            var judgement = new ManiaJudgement();
-            var result = new JudgementResult(dummyHitObject, judgement);
-            result.Type = HitResult.Pool;
-            // Set RawTime and GameplayRate using reflection since they are internal
-            typeof(JudgementResult).GetProperty("RawTime")?.SetValue(result, time);
-            typeof(JudgementResult).GetProperty("GameplayRate")?.SetValue(result, Clock.Rate);
-            ApplyResult(result);
-        }
+        public int PoolCount { get; set; }
 
         public double CalculateScoreWithParameters(double comboProgress, double accuracyProgress, double bonusPortion, Dictionary<HitResult, int> customHitProportionScore)
         {

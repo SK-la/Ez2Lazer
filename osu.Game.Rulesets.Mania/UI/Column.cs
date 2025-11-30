@@ -204,8 +204,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             sampleTriggerSource.Play();
 
-            // Check for pool judgement
-            checkPool();
+            // Check for pool judgement on this column
+            checkPoolJudgement();
 
             return true;
         }
@@ -214,9 +214,24 @@ namespace osu.Game.Rulesets.Mania.UI
         {
         }
 
-        private void checkPool()
+        /// <summary>
+        /// Check if a pool judgement should be applied for a key press in this column
+        /// </summary>
+        private void checkPoolJudgement()
         {
-            drawableManiaRuleset.CheckPool(this);
+            double currentTime = Time.Current;
+
+            // Check all hit objects in other columns to see if any are within pool range
+            foreach (var obj in HitObjectContainer.AliveObjects)
+            {
+                if (obj is DrawableNote note && note.HitObject is ManiaHitObject maniaHitObject)
+                {
+                    if (maniaHitObject.Column != Index)
+                    {
+                        note.CheckPoolFromOtherColumn(currentTime, this);
+                    }
+                }
+            }
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)

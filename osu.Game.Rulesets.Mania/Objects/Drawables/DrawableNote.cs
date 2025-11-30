@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System;
 using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -12,6 +13,7 @@ using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -101,6 +103,31 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             result = GetCappedResult(result);
             ApplyResult(result);
+        }
+
+        /// <summary>
+        /// Check if a pool judgement should be applied when another column is pressed
+        /// </summary>
+        public void CheckPoolFromOtherColumn(double pressTime, UI.Column pressedColumn)
+        {
+            // Only apply pool if this note hasn't been judged yet
+            if (AllJudged)
+                return;
+
+            // Check if the press time is within the pool window
+            double timeOffset = pressTime - HitObject.StartTime;
+
+            // Use EzCustomHitWindows if available
+            if (HitObject.HitWindows is EzCustomHitWindows customWindows)
+            {
+                double poolWindow = customWindows.WindowFor(HitResult.Pool);
+
+                if (Math.Abs(timeOffset) <= poolWindow)
+                {
+                    // Apply pool judgement
+                    ApplyResult(HitResult.Pool);
+                }
+            }
         }
 
         /// <summary>
