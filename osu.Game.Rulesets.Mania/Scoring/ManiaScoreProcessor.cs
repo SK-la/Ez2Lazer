@@ -94,25 +94,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Perfect:
-                    return HitProportionScore.Perfect;
-
-                case HitResult.Great:
-                    return HitProportionScore.Great;
-
-                case HitResult.Good:
-                    return HitProportionScore.Good;
-
-                case HitResult.Ok:
-                    return HitProportionScore.Ok;
-
-                case HitResult.Meh:
-                    return HitProportionScore.Meh;
-
-                case HitResult.Miss:
-                    return HitProportionScore.Miss;
-
-                case HitResult.Pool:
-                    return 0;
+                    return 305;
             }
 
             return base.GetBaseScoreForResult(result);
@@ -142,7 +124,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 results.GetValueOrDefault(HitResult.Good) > 0
                 || results.GetValueOrDefault(HitResult.Ok) > 0
                 || results.GetValueOrDefault(HitResult.Meh) > 0
-                || results.GetValueOrDefault(HitResult.Pool) > 0
                 || results.GetValueOrDefault(HitResult.Miss) > 0;
 
             return anyImperfect ? rank : ScoreRank.X;

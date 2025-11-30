@@ -19,6 +19,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Input.Handlers;
+using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -39,9 +40,8 @@ using osu.Game.Skinning;
 using osu.Game.Overlays.Settings.Sections.Gameplay;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Mania.Scoring;
-using EzLocalTextureFactory = osu.Game.LAsEzExtensions.EzLocalTextureFactory;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
@@ -51,9 +51,6 @@ namespace osu.Game.Rulesets.Mania.UI
         /// The minimum time range. This occurs at a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 40.
         /// </summary>
         public const double MIN_TIME_RANGE = 290;
-
-        [Resolved]
-        private ScoreProcessor scoreProcessor { get; set; } = null!;
 
         /// <summary>
         /// The maximum time range. This occurs with a <see cref="ManiaRulesetSetting.ScrollSpeed"/> of 1.
@@ -96,6 +93,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
         [Resolved]
         private GameHost gameHost { get; set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        private ManiaScoreProcessor maniaScoreProcessor { get; set; }
 
         [Resolved]
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
@@ -359,14 +359,23 @@ namespace osu.Game.Rulesets.Mania.UI
         public void CheckPool(Column column)
         {
             double currentTime = Clock.CurrentTime;
-            double missWindow = IBeatmapDifficultyInfo.DifficultyRange(Beatmap.Difficulty.OverallDifficulty, ManiaHitWindows.MissRange);
+            double missWindow = FirstAvailableHitWindows?.WindowFor(HitResult.Miss) ?? 0;
+
+            // Check time range: from first note to last note end
+            double startTime = Beatmap.HitObjects.Min(h => h.StartTime);
+            double endTime = Beatmap.HitObjects.Max(h => h.GetEndTime());
+            if (currentTime < startTime || currentTime > endTime)
+                return;
+
+            // Check if there is any hit object in miss window globally
+            bool hasAnyHitObjectInWindow = Beatmap.HitObjects.Any(h => Math.Abs(h.StartTime - currentTime) <= missWindow);
 
             // Check if this column has hit object in miss window
             bool hasThisColumnHitObjectInWindow = Beatmap.HitObjects.OfType<ManiaHitObject>().Any(h => h.Column == column.Index && Math.Abs(h.StartTime - currentTime) <= missWindow);
 
-            if (!hasThisColumnHitObjectInWindow)
+            if (hasAnyHitObjectInWindow && !hasThisColumnHitObjectInWindow)
             {
-                ((ManiaScoreProcessor)scoreProcessor).ApplyPoolResult(currentTime, column.Index);
+                maniaScoreProcessor.ApplyPoolResult(currentTime, column.Index);
             }
         }
     }

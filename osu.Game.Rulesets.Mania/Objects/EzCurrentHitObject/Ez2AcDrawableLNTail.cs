@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 }
                 else
                 {
-                    ApplyResult(HitResult.Miss);
+                    ApplyResult(HoldNote.Head.Result.Type);
                 }
             }
         }
