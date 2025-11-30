@@ -3,7 +3,7 @@
 
 using System.ComponentModel;
 
-namespace osu.Game.Screens.LAsEzExtensions
+namespace osu.Game.LAsEzExtensions.Configuration
 {
     public enum EzMUGHitMode
     {

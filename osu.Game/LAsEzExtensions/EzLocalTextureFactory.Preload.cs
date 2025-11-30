@@ -1,11 +1,9 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
 
-namespace osu.Game.Screens.LAsEzExtensions
+namespace osu.Game.LAsEzExtensions
 {
     public partial class EzLocalTextureFactory
     {
@@ -25,6 +23,7 @@ namespace osu.Game.Screens.LAsEzExtensions
             if (preloadCompleted || isPreloading) return;
 
             isPreloading = true;
+
             try
             {
                 string currentNoteSetName = noteSetName.Value;

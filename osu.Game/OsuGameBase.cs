@@ -62,9 +62,9 @@ using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
 using osu.Game.Utils;
+using EzLocalTextureFactory = osu.Game.LAsEzExtensions.EzLocalTextureFactory;
 using RuntimeInfo = osu.Framework.RuntimeInfo;
 
 namespace osu.Game

@@ -53,12 +53,12 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
                 var poolCount = new JudgementCount
                 {
                     DisplayName = "Pool",
-                    Types = new[] { HitResult.IgnoreHit },
+                    Types = new[] { HitResult.Pool },
                     ResultCount = new BindableInt()
                 };
 
                 counters.Add(poolCount);
-                results[HitResult.IgnoreHit] = poolCount;
+                results[HitResult.Pool] = poolCount;
             }
         }
 

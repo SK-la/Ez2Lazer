@@ -18,9 +18,9 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
 
 namespace osu.Game.Screens.Backgrounds
@@ -164,8 +164,8 @@ namespace osu.Game.Screens.Backgrounds
                         {
                             Directory.CreateDirectory(dataFolderPath);
                             //TODO： 改为游戏内提示空目录
-                            Logger.Log($"已创建视频背景目录：{dataFolderPath}\n"
-                                       + $"请将 .webm 文件放入该目录。", LoggingTarget.Performance, LogLevel.Important);
+                            Logger.Log($"Created Video Path：{dataFolderPath}\n"
+                                       + $"Add .webm files to the path", LoggingTarget.Performance, LogLevel.Important);
                         }
 
                         string[] videoFiles = Directory.GetFiles(dataFolderPath, "*.webm");

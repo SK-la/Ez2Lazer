@@ -128,7 +128,8 @@ namespace osu.Game.Rulesets.Scoring
         IgnoreHit,
 
         /// <summary>
-        /// Indicates a pool judgement in Mania mode.
+        /// mania特殊专用，按键事件的未命中结果。
+        /// 禁止用在Judgement覆写上，这不属于note返回的判定结果
         /// </summary>
         [EnumMember(Value = "pool")]
         [Order(17)]
@@ -307,6 +308,7 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.SmallTickMiss:
                 case HitResult.LargeTickMiss:
                 case HitResult.ComboBreak:
+                case HitResult.Pool:
                     return true;
 
                 default:
@@ -355,6 +357,9 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.SliderTailHit:
                     return true;
 
+                case HitResult.Pool:
+                    return false;
+
                 default:
                     // Note that IgnoreHit and IgnoreMiss are excluded as they do not affect score.
                     return result >= HitResult.Miss && result < HitResult.IgnoreMiss;
@@ -397,10 +402,10 @@ namespace osu.Game.Rulesets.Scoring
             if (maxResult == HitResult.None || !IsHit(maxResult))
                 throw new ArgumentOutOfRangeException(nameof(maxResult), $"{maxResult} is not a valid maximum judgement result.");
 
-            if (minResult == HitResult.None || (IsHit(minResult) && minResult != HitResult.Pool && minResult != HitResult.IgnoreHit))
+            if (minResult == HitResult.None || IsHit(minResult))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum judgement result.");
 
-            if (maxResult == HitResult.IgnoreHit && minResult is not (HitResult.IgnoreMiss or HitResult.ComboBreak or HitResult.IgnoreHit))
+            if (maxResult == HitResult.IgnoreHit && minResult is not (HitResult.IgnoreMiss or HitResult.ComboBreak))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum result for a {maxResult} judgement.");
 
             if (maxResult.IsBonus() && minResult != HitResult.IgnoreMiss)
@@ -422,10 +427,7 @@ namespace osu.Game.Rulesets.Scoring
             if (maxResult == HitResult.SmallTickHit && minResult != HitResult.SmallTickMiss)
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.SmallTickMiss} is the only valid minimum result for a {maxResult} judgement.");
 
-            if (maxResult == HitResult.Pool && minResult != HitResult.Pool)
-                throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.Pool} is the only valid minimum result for a {HitResult.Pool} judgement.");
-
-            if (maxResult.IsBasic() && minResult != HitResult.Miss && minResult != HitResult.ComboBreak)
+            if (maxResult.IsBasic() && minResult != HitResult.Miss)
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.Miss} is the only valid minimum result for a {maxResult} judgement.");
         }
     }

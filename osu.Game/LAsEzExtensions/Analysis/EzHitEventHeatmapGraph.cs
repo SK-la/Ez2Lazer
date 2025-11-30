@@ -12,7 +12,7 @@ using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.LAsEzExtensions
+namespace osu.Game.LAsEzExtensions.Analysis
 {
     public partial class EzHitEventHeatmapGraph : CompositeDrawable
     {

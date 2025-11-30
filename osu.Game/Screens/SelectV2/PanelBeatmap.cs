@@ -23,11 +23,12 @@ using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
 
 namespace osu.Game.Screens.SelectV2

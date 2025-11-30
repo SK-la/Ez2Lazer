@@ -12,7 +12,6 @@ using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
 using osuTK.Graphics;
 

@@ -3,11 +3,11 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Video;
 using osu.Game.Configuration;
-using osu.Game.Graphics.Backgrounds;
+using osu.Game.Screens;
 
-namespace osu.Game.Screens.LAsEzExtensions
+namespace osu.Game.LAsEzExtensions.Background
 {
-    public partial class VideoBackgroundScreen : Background
+    public partial class VideoBackgroundScreen : Graphics.Backgrounds.Background
     {
         private readonly string videoPath;
 
@@ -42,7 +42,7 @@ namespace osu.Game.Screens.LAsEzExtensions
         public static EzSkinSettingsManager? EzConfig { get; set; }
     }
 
-    public partial class StreamVideoBackgroundScreen : Background
+    public partial class StreamVideoBackgroundScreen : Graphics.Backgrounds.Background
     {
         private readonly Stream videoStream;
 

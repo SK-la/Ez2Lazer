@@ -9,9 +9,9 @@ using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Skinning;
 using osuTK;
+using EzLocalTextureFactory = osu.Game.LAsEzExtensions.EzLocalTextureFactory;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {

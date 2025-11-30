@@ -1,6 +1,6 @@
 
 using osu.Framework.Graphics.Containers;
-using osu.Game.Screens.LAsEzExtensions;
+using EzLocalTextureFactory = osu.Game.LAsEzExtensions.EzLocalTextureFactory;
 
 namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
 {

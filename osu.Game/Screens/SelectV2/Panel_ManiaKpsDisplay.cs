@@ -12,9 +12,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.LAsEzExtensions;
 using osuTK.Graphics;
 
 namespace osu.Game.Screens.SelectV2

@@ -4,7 +4,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
-namespace osu.Game.Screens.LAsEzExtensions
+namespace osu.Game.LAsEzExtensions.Analysis
 {
     public static class OptimizedBeatmapCalculator
     {

@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     break;
 
                 case HitResult.Pool:
-                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.01; // Strict health deduction for pool
+                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.02; // Strict health deduction for pool
             }
 
             return HpMultiplierNormal * increase;

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Project">
     <TargetFramework>net8.0-ios</TargetFramework>
     <SupportedOSPlatformVersion>13.4</SupportedOSPlatformVersion>

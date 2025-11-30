@@ -11,10 +11,11 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Configuration;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.LAsEzExtensions
+namespace osu.Game.LAsEzExtensions.Extensions
 {
     public static partial class SettingsColourExtensions
     {

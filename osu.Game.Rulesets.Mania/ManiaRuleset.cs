@@ -14,6 +14,9 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
+using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -46,7 +49,6 @@ using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
 using osu.Game.Screens.Edit.Setup;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
 using osu.Game.Overlays.Settings.Sections.Gameplay;
@@ -350,7 +352,6 @@ namespace osu.Game.Rulesets.Mania
                         // new ManiaModJudgmentStyle(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
-                        // new ManiaModAdjust(),
                     };
 
                 case ModType.YuLiangSSS_Mod:
@@ -358,7 +359,7 @@ namespace osu.Game.Rulesets.Mania
                     {
                         new ManiaModAdjust(),
                         new ManiaModChangeSpeedByAccuracy(),
-                        new ManiaModCleaner(),
+                        // new ManiaModCleaner(),
                         new ManiaModDeleteSpace(),
                         new ManiaModDoublePlay(),
                         new ManiaModDuplicate(),
@@ -379,7 +380,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModNtoMAnother(),
                         new ManiaModO2Health(),
                         new ManiaModO2Judgement(),
-                        new ManiaModPlayfieldTransformation(),
+                        // new ManiaModPlayfieldTransformation(), //加载有问题
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
                         new StarRatingRebirth(),

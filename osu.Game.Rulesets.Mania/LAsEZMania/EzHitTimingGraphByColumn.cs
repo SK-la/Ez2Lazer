@@ -10,11 +10,12 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Analysis.UI.Components;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Ranking.Statistics;
 
-namespace osu.Game.Rulesets.Mania.UI
+namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
     /// <summary>
     /// A graph which displays the distribution of hit timing for each column in a series of <see cref="HitEvent"/>s.

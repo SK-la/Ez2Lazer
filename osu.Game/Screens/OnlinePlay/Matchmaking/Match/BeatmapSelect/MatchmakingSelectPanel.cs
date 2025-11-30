@@ -10,6 +10,7 @@ using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps.Drawables.Cards;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Rooms;
 using osu.Game.Overlays;
@@ -19,9 +20,12 @@ using osuTK.Input;
 
 namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
 {
-    public partial class BeatmapSelectPanel : Container
+    public abstract partial class MatchmakingSelectPanel : Container
     {
-        public static readonly Vector2 SIZE = new Vector2(BeatmapCard.WIDTH, BeatmapCardNormal.HEIGHT);
+        public const float WIDTH = 345;
+        public const float HEIGHT = 80;
+
+        public static readonly Vector2 SIZE = new Vector2(WIDTH, HEIGHT);
 
         public bool AllowSelection { get; set; }
 
@@ -29,14 +33,15 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
 
         public Action<MultiplayerPlaylistItem>? Action { private get; init; }
 
+        protected override Container<Drawable> Content { get; } = new Container { RelativeSizeAxes = Axes.Both };
+
         private const float border_width = 3;
 
-        private Container scaleContainer = null!;
+        protected Container ScaleContainer = null!;
         private Drawable lighting = null!;
         private Container border = null!;
-        private BeatmapCardMatchmaking card = null!;
 
-        public BeatmapSelectPanel(MultiplayerPlaylistItem item)
+        protected MatchmakingSelectPanel(MultiplayerPlaylistItem item)
         {
             Item = item;
             Size = SIZE;
@@ -45,88 +50,70 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider)
         {
-            InternalChild = scaleContainer = new Container
+            InternalChildren = new Drawable[]
             {
-                RelativeSizeAxes = Axes.Both,
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Children = new[]
+                ScaleContainer = new Container
                 {
-                    new Container
+                    RelativeSizeAxes = Axes.Both,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Children = new[]
                     {
-                        Masking = true,
-                        CornerRadius = BeatmapCard.CORNER_RADIUS,
-                        CornerExponent = 10,
-                        RelativeSizeAxes = Axes.Both,
-                        Children = new[]
+                        new Container
                         {
-                            card = new BeatmapCardMatchmaking
+                            Masking = true,
+                            CornerRadius = BeatmapCard.CORNER_RADIUS,
+                            CornerExponent = 10,
+                            RelativeSizeAxes = Axes.Both,
+                            Children = new[]
                             {
-                                Action = () =>
+                                Content,
+                                lighting = new Box
                                 {
-                                    if (AllowSelection)
-                                        Action?.Invoke(Item);
+                                    Blending = BlendingParameters.Additive,
+                                    RelativeSizeAxes = Axes.Both,
+                                    Alpha = 0,
                                 },
-                            },
-                            lighting = new Box
-                            {
-                                Blending = BlendingParameters.Additive,
-                                RelativeSizeAxes = Axes.Both,
-                                Alpha = 0,
-                            },
-                        }
-                    },
-                    border = new Container
-                    {
-                        Alpha = 0,
-                        Masking = true,
-                        CornerRadius = BeatmapCard.CORNER_RADIUS,
-                        CornerExponent = 10,
-                        Blending = BlendingParameters.Additive,
-                        RelativeSizeAxes = Axes.Both,
-                        BorderThickness = border_width,
-                        BorderColour = colourProvider.Light1,
-                        EdgeEffect = new EdgeEffectParameters
-                        {
-                            Type = EdgeEffectType.Glow,
-                            Radius = 40,
-                            Roundness = 300,
-                            Colour = colourProvider.Light3.Opacity(0.1f),
+                            }
                         },
-                        Children = new Drawable[]
+                        border = new Container
                         {
-                            new Box
+                            Alpha = 0,
+                            Masking = true,
+                            CornerRadius = BeatmapCard.CORNER_RADIUS,
+                            CornerExponent = 10,
+                            Blending = BlendingParameters.Additive,
+                            RelativeSizeAxes = Axes.Both,
+                            BorderThickness = border_width,
+                            BorderColour = colourProvider.Light1,
+                            EdgeEffect = new EdgeEffectParameters
                             {
-                                AlwaysPresent = true,
-                                Alpha = 0,
-                                Colour = Color4.Black,
-                                RelativeSizeAxes = Axes.Both,
+                                Type = EdgeEffectType.Glow,
+                                Radius = 40,
+                                Roundness = 300,
+                                Colour = colourProvider.Light3.Opacity(0.1f),
                             },
-                        }
-                    },
-                }
+                            Children = new Drawable[]
+                            {
+                                new Box
+                                {
+                                    AlwaysPresent = true,
+                                    Alpha = 0,
+                                    Colour = Color4.Black,
+                                    RelativeSizeAxes = Axes.Both,
+                                },
+                            }
+                        },
+                    }
+                },
+                new HoverClickSounds(),
             };
-
-            if (Item.ID == -1)
-                card.DisplayRandom();
-            else
-                card.DisplayItem(Item);
         }
 
-        public void AddUser(APIUser user)
-        {
-            card.AddUser(user);
-        }
+        // TODO: making these abstract for now but avatar overlay should really be owned by the top level class
+        public abstract void AddUser(APIUser user);
 
-        public void RemoveUser(APIUser user)
-        {
-            card.RemoveUser(user);
-        }
-
-        public void DisplayItem(MultiplayerPlaylistItem item)
-        {
-            card.DisplayItem(item);
-        }
+        public abstract void RemoveUser(APIUser user);
 
         protected override bool OnHover(HoverEvent e)
         {
@@ -151,7 +138,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
         protected override bool OnMouseDown(MouseDownEvent e)
         {
             if (AllowSelection && e.Button == MouseButton.Left)
-                scaleContainer.ScaleTo(0.95f, 400, Easing.OutExpo);
+                ScaleContainer.ScaleTo(0.95f, 400, Easing.OutExpo);
 
             return base.OnMouseDown(e);
         }
@@ -161,7 +148,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
             base.OnMouseUp(e);
 
             if (e.Button == MouseButton.Left)
-                scaleContainer.ScaleTo(1f, 500, Easing.OutElasticHalf);
+                ScaleContainer.ScaleTo(1f, 500, Easing.OutElasticHalf);
         }
 
         protected override bool OnClick(ClickEvent e)
@@ -171,10 +158,11 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
                 lighting.FadeTo(0.5f, 50)
                         .Then()
                         .FadeTo(0.1f, 400);
+
+                Action?.Invoke(Item);
             }
 
-            // pass through to let the beatmap card handle actual click.
-            return false;
+            return true;
         }
 
         public void ShowChosenBorder()
@@ -194,9 +182,11 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
             border.FadeOut(500, Easing.OutQuint);
         }
 
+        public abstract void PresentAsChosenBeatmap(MatchmakingPlaylistItem playlistItem);
+
         public void FadeInAndEnterFromBelow(double duration = 500, double delay = 0, float distance = 200)
         {
-            scaleContainer
+            ScaleContainer
                 .FadeOut()
                 .MoveToY(distance)
                 .Delay(delay)
@@ -208,7 +198,7 @@ namespace osu.Game.Screens.OnlinePlay.Matchmaking.Match.BeatmapSelect
         {
             AllowSelection = false;
 
-            scaleContainer.Delay(delay)
+            ScaleContainer.Delay(delay)
                           .ScaleTo(0, duration, easing)
                           .FadeOut(duration);
 

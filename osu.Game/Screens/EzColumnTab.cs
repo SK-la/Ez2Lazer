@@ -10,9 +10,10 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Extensions;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
-using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
 using osuTK.Graphics;
 

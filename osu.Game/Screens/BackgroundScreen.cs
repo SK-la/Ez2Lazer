@@ -22,8 +22,8 @@ namespace osu.Game.Screens
         public bool AnimateEntry { get; set; } = true;
 
         /// <summary>
-        /// Whether parallax effect should be disabled for this background screen.
-        /// When disabled, the background will remain static and not respond to mouse movement.
+        /// 是否应该在这个背景屏上禁用视差效果。
+        /// 禁用后，背景将保持静态，不会响应鼠标移动。
         /// </summary>
         public bool DisableParallax { get; set; }
 

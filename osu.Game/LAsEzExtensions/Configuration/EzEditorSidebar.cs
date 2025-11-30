@@ -6,9 +6,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Screens;
 using osu.Game.Screens.Edit.Components;
 
-namespace osu.Game.Screens.LAsEzExtensions
+namespace osu.Game.LAsEzExtensions.Configuration
 {
     internal partial class EzEditorSidebar : EditorSidebar
     {

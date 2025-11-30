@@ -53,4 +53,10 @@
     <ProjectReference Include="..\..\osu-resources\osu.Game.Resources\osu.Game.Resources.csproj" />
     <ProjectReference Include="..\..\osu-framework\osu.Framework\osu.Framework.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Screens\OnlinePlay\Matchmaking\Match\BeatmapSelect\BeatmapCardMatchmaking.cs" />
+    <Compile Remove="Screens\OnlinePlay\Matchmaking\Match\BeatmapSelect\BeatmapCardMatchmakingBeatmapContent.cs" />
+    <Compile Remove="Screens\OnlinePlay\Matchmaking\Match\BeatmapSelect\BeatmapCardMatchmakingContent.cs" />
+    <Compile Remove="Screens\OnlinePlay\Matchmaking\Match\BeatmapSelect\BeatmapCardMatchmakingRandomContent.cs" />
+  </ItemGroup>
 </Project>

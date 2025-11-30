@@ -19,6 +19,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Input.Handlers;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
@@ -33,7 +34,6 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
 using osu.Game.Screens;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osu.Game.Overlays.Settings.Sections.Gameplay;
@@ -41,6 +41,7 @@ using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Mania.Scoring;
+using EzLocalTextureFactory = osu.Game.LAsEzExtensions.EzLocalTextureFactory;
 
 namespace osu.Game.Rulesets.Mania.UI
 {

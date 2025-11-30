@@ -15,13 +15,13 @@ using osu.Game.Beatmaps.Drawables.Cards;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Mods.Input;
 using osu.Game.Overlays.Settings.Sections.Gameplay;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Edit.Compose.Components;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Screens.OnlinePlay.Lounge.Components;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
@@ -167,6 +167,7 @@ namespace osu.Game.Configuration
             //新增自定义
             SetDefault(OsuSetting.EzSelectCsMode, CsItemIds.ALL.First().Id);
             SetDefault(OsuSetting.HitMode, EzMUGHitMode.EZ2AC);
+            SetDefault(OsuSetting.CustomHealthFormHitMode, true);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
@@ -442,6 +443,7 @@ namespace osu.Game.Configuration
         AccuracyCutoffS,
         AccuracyCutoffA,
         HitMode,
+        CustomHealthFormHitMode,
         // //mania用自定义
         // SelectManiaRulesetSubset,
         // ScrollBaseSpeed,

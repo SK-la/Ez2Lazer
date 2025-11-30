@@ -142,6 +142,9 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 case HitResult.Miss:
                     return miss;
 
+                case HitResult.Pool:
+                    return pool;
+
                 default:
                     throw new ArgumentOutOfRangeException(nameof(result), result, null);
             }

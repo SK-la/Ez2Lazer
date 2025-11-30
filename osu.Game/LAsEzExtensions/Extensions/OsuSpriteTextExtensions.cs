@@ -8,7 +8,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics.Sprites;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.LAsEzExtensions
+namespace osu.Game.LAsEzExtensions.Extensions
 {
     public static class OsuSpriteTextExtensions
     {

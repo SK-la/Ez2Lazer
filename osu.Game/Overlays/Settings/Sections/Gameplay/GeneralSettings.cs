@@ -6,9 +6,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.LAsEzExtensions;
 
 namespace osu.Game.Overlays.Settings.Sections.Gameplay
 {
@@ -34,6 +34,14 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     LabelText = "Hit Mode",
                     Current = config.GetBindable<EzMUGHitMode>(OsuSetting.HitMode),
                     Keywords = new[] { "scoring" }
+                },
+                new SettingsCheckbox
+                {
+                    LabelText = "Custom Health System From HitMode Setting",
+                    Current = config.GetBindable<bool>(OsuSetting.CustomHealthFormHitMode),
+                    // Alpha = config.GetBindable<EzMUGHitMode>(OsuSetting.HitMode).Value == EzMUGHitMode.O2Jam
+                    //     ? 1
+                    //     : 0
                 },
                 new SettingsSlider<double>
                 {

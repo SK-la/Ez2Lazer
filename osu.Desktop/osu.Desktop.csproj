@@ -4,8 +4,8 @@
     <OutputType>WinExe</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Description>A free-to-win rhythm game. Rhythm is just a *click* away!</Description>
-    <AssemblyName>Ez2osu!</AssemblyName>
-    <AssemblyTitle>osu!(Ez2lazer)</AssemblyTitle>
+    <AssemblyName>osu!</AssemblyName>
+    <AssemblyTitle>osu!(lazer)</AssemblyTitle>
     <Title>Ez2lazer!</Title>
     <Product>osu!(Ez2lazer)</Product>
     <ApplicationIcon>lazer.ico</ApplicationIcon>

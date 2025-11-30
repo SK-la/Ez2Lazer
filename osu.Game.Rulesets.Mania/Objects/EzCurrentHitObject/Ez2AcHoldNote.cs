@@ -62,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         private class Ez2AcHeadJudgement : ManiaJudgement
         {
-            public override HitResult MinResult => HitResult.IgnoreHit;
+            // public override HitResult MinResult => HitResult.IgnoreHit;
         }
     }
 
@@ -78,7 +78,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         private class Ez2AcNoteJudgement : ManiaJudgement
         {
-            public override HitResult MinResult => HitResult.Pool;
+            // public override HitResult MinResult => HitResult.Pool;
         }
     }
 }

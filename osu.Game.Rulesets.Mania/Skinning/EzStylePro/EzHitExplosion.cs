@@ -7,7 +7,6 @@ using osu.Framework.Graphics.Animations;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.LAsEzExtensions;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro

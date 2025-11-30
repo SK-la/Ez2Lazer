@@ -10,7 +10,7 @@ using osu.Framework.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
-using osu.Game.Screens.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Skinning;
 using osu.Game.Skinning.Components;
 

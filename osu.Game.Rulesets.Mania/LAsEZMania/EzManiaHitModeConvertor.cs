@@ -22,7 +22,6 @@ using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
-using osu.Game.Screens.LAsEzExtensions;
 
 namespace osu.Game.Rulesets.Mania.LAsEZMania
 {

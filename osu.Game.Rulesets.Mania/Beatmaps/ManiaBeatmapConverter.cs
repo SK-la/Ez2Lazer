@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Mania.Beatmaps.Patterns;
@@ -17,7 +18,6 @@ using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Utils;
 using osuTK;
-using osu.Game.Screens.LAsEzExtensions;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania.Beatmaps
