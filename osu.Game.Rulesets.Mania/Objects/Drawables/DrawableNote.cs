@@ -106,31 +106,6 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         }
 
         /// <summary>
-        /// Check if a pool judgement should be applied when another column is pressed
-        /// </summary>
-        public void CheckPoolFromOtherColumn(double pressTime, UI.Column pressedColumn)
-        {
-            // Only apply pool if this note hasn't been judged yet
-            if (AllJudged)
-                return;
-
-            // Check if the press time is within the pool window
-            double timeOffset = pressTime - HitObject.StartTime;
-
-            // Use EzCustomHitWindows if available
-            if (HitObject.HitWindows is EzCustomHitWindows customWindows)
-            {
-                double poolWindow = customWindows.WindowFor(HitResult.Pool);
-
-                if (Math.Abs(timeOffset) <= poolWindow)
-                {
-                    // Apply pool judgement
-                    ApplyResult(HitResult.Pool);
-                }
-            }
-        }
-
-        /// <summary>
         /// Some objects in mania may want to limit the max result.
         /// </summary>
         protected virtual HitResult GetCappedResult(HitResult result) => result;

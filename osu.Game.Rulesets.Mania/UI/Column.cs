@@ -15,6 +15,7 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -222,16 +223,13 @@ namespace osu.Game.Rulesets.Mania.UI
             double currentTime = Time.Current;
 
             // Check all hit objects in other columns to see if any are within pool range
-            foreach (var obj in HitObjectContainer.AliveObjects)
-            {
-                if (obj is DrawableNote note && note.HitObject is ManiaHitObject maniaHitObject)
-                {
-                    if (maniaHitObject.Column != Index)
-                    {
-                        note.CheckPoolFromOtherColumn(currentTime, this);
-                    }
-                }
-            }
+            // foreach (var obj in HitObjectContainer.AliveObjects)
+            // {
+            //     if (obj is Ez2AcDrawableNote note)
+            //     {
+            //         note.CheckPoolFromOtherColumn(currentTime, this);
+            //     }
+            // }
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)

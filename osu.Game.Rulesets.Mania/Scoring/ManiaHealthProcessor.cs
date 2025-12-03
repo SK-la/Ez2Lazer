@@ -40,30 +40,29 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Miss:
                     switch (hitObject)
                     {
-                        case HeadNote:
-                        case TailNote:
-                            return -(Beatmap.Difficulty.DrainRate + 1) * 0.00375;
+                        case HoldNoteBody:
+                            return -(Beatmap.Difficulty.DrainRate + 1) * 0.004;
 
                         default:
                             return -(Beatmap.Difficulty.DrainRate + 1) * 0.0075;
                     }
 
                 case HitResult.Meh:
-                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.0016;
+                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.005;
 
                 case HitResult.Ok:
                     return 0;
 
                 case HitResult.Good:
-                    increase = 0.004 - Beatmap.Difficulty.DrainRate * 0.0004;
+                    increase = 0.004 - Beatmap.Difficulty.DrainRate * 0.001;
                     break;
 
                 case HitResult.Great:
-                    increase = 0.005 - Beatmap.Difficulty.DrainRate * 0.0005;
+                    increase = 0.005 - Beatmap.Difficulty.DrainRate * 0.001;
                     break;
 
                 case HitResult.Perfect:
-                    increase = 0.0055 - Beatmap.Difficulty.DrainRate * 0.0005;
+                    increase = 0.0055 - Beatmap.Difficulty.DrainRate * 0.002;
                     break;
             }
 

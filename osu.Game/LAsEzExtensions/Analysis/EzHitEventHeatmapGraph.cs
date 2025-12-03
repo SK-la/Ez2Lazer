@@ -90,13 +90,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
 
             // 计算并绘制血量折线
-            // drawHealthLine(left_margin, right_margin);
+            drawHealthLine(left_margin, right_margin);
         }
 
         private void drawHealthLine(float left_margin, float right_margin)
         {
             var sortedEvents = hitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
-            double currentHealth = 1; // 初始血量
+            double currentHealth = 0.5; // 初始血量
             List<Vector2> healthPoints = new List<Vector2>();
 
             foreach (var e in sortedEvents)
@@ -120,7 +120,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 {
                     PathRadius = 1,
                     Colour = Color4.Red,
-                    Alpha = 0.5f,
+                    Alpha = 0.3f,
                     Vertices = healthPoints.ToArray()
                 });
             }

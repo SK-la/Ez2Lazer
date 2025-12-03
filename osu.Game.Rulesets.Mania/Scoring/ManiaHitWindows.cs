@@ -15,6 +15,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private static readonly DifficultyRange ok_window_range = new DifficultyRange(127, 112, 97);
         private static readonly DifficultyRange meh_window_range = new DifficultyRange(151, 136, 121);
         private static readonly DifficultyRange miss_window_range = new DifficultyRange(188, 173, 158);
+        private static readonly DifficultyRange pool_window_range = new DifficultyRange(200, 300, 500);
 
         private double speedMultiplier = 1;
 
@@ -26,6 +27,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public static DifficultyRange OkRange;
         public static DifficultyRange MehRange;
         public static DifficultyRange MissRange;
+        public static DifficultyRange PoolRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -110,6 +112,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double ok;
         private double meh;
         private double miss;
+        private double pool;
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -121,6 +124,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Ok:
                 case HitResult.Meh:
                 case HitResult.Miss:
+                case HitResult.Pool:
                     return true;
             }
 
@@ -179,6 +183,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ok = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, OkRange) * totalMultiplier;
                 meh = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MehRange) * totalMultiplier;
                 miss = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MissRange) * totalMultiplier;
+                pool = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, PoolRange) * totalMultiplier;
                 return;
             }
 
@@ -234,6 +239,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                 case HitResult.Meh:
                     return meh;
+
+                case HitResult.Pool:
+                    return pool;
 
                 case HitResult.Miss:
                     return miss;
