@@ -22,6 +22,12 @@ namespace osu.Game.Rulesets.Scoring
         //     new DifficultyRange(HitResult.Meh, 151, 136, 121),
         //     new DifficultyRange(HitResult.Miss, 188, 173, 158),
         // };
+
+        void SetHitWindows(double window);
+
+        void SetDifficulty(double difficulty);
+
+        void ResetHitWindows();
     }
 
     public static class HitWindowsExtensions

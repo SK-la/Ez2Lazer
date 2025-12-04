@@ -56,8 +56,7 @@ namespace osu.Game.Rulesets.Mania.Edit
         };
 
         public override string ConvertSelectionToString()
-            => string.Join(',', EditorBeatmap.SelectedHitObjects.Cast<ManiaHitObject>().OrderBy(h => h.StartTime)
-                                             .Select(h => FormattableString.Invariant($"{Math.Round(h.StartTime)}|{h.Column}")));
+            => string.Join(',', EditorBeatmap.SelectedHitObjects.Cast<ManiaHitObject>().OrderBy(h => h.StartTime).Select(h => $"{h.StartTime}|{h.Column}"));
 
         // 123|0,456|1,789|2 ...
         private static readonly Regex selection_regex = new Regex(@"^\d+\|\d+(,\d+\|\d+)*$", RegexOptions.Compiled);
@@ -76,10 +75,10 @@ namespace osu.Game.Rulesets.Mania.Edit
                 if (split.Length != 2)
                     continue;
 
-                if (!int.TryParse(split[0], out int time) || !int.TryParse(split[1], out int column))
+                if (!double.TryParse(split[0], out double time) || !int.TryParse(split[1], out int column))
                     continue;
 
-                ManiaHitObject? current = remainingHitObjects.FirstOrDefault(h => Precision.AlmostEquals(h.StartTime, time, 0.5) && h.Column == column);
+                ManiaHitObject? current = remainingHitObjects.FirstOrDefault(h => h.StartTime == time && h.Column == column);
 
                 if (current == null)
                     continue;

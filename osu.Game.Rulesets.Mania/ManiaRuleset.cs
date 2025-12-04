@@ -28,7 +28,6 @@ using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
@@ -51,7 +50,6 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Edit.Setup;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
-using osu.Game.Overlays.Settings.Sections.Gameplay;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania
@@ -85,11 +83,11 @@ namespace osu.Game.Rulesets.Mania
                 var hw = new ManiaHitWindows();
                 hw.SetSpecialDifficultyRange(coolRange, coolRange, goodRange, goodRange, badRange, badRange);
             }
-            else
-            {
-                var hw = new ManiaHitWindows();
-                hw.ResetRange();
-            }
+            // else
+            // {
+            //     var hw = new ManiaHitWindows();
+            //     hw.ResetRange();
+            // }
 
             return new ManiaBeatmapConverter(beatmap, this);
         }
@@ -498,7 +496,7 @@ namespace osu.Game.Rulesets.Mania
                 new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score.HitEvents, new DefaultHitWindows()) //TODO:改成可实时变更
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 180
+                    Height = 200
                 }, true),
                 new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
                 {

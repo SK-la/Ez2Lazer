@@ -405,6 +405,10 @@ namespace osu.Game.Rulesets.Scoring
             if (minResult == HitResult.None || IsHit(minResult))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum judgement result.");
 
+            // Pool is a special result that can be both max and min
+            if (minResult == HitResult.Pool)
+                return;
+
             if (maxResult == HitResult.IgnoreHit && minResult is not (HitResult.IgnoreMiss or HitResult.ComboBreak))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum result for a {maxResult} judgement.");
 
@@ -412,10 +416,6 @@ namespace osu.Game.Rulesets.Scoring
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{HitResult.IgnoreMiss} is the only valid minimum result for a {maxResult} judgement.");
 
             if (minResult == HitResult.IgnoreMiss)
-                return;
-
-            // Pool is a special result that can be both max and min
-            if (minResult == HitResult.Pool)
                 return;
 
             if (maxResult == HitResult.SliderTailHit && minResult != HitResult.LargeTickMiss)

@@ -10,7 +10,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            // apply perfect once the tail is reached
             if (HoldNote.Head.IsHit && timeOffset >= 0)
                 ApplyResult(GetCappedResult(HitResult.Perfect));
             else

@@ -37,11 +37,8 @@ using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
-using osu.Game.Overlays.Settings.Sections.Gameplay;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
-using osu.Game.Rulesets.Mania.Scoring;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
@@ -74,14 +71,6 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
         private readonly Bindable<bool> touchOverlay = new Bindable<bool>();
 
-        //自定义判定系统
-        private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
-        private readonly BindableDouble configBaseMs = new BindableDouble();
-        private readonly BindableDouble configTimePerSpeed = new BindableDouble();
-
-        // private readonly ManiaHitModeConvertor hitModeConvertor;
-        // private readonly Bindable<EzMUGHitMode> hitMode = new Bindable<EzMUGHitMode>();
-
         public double TargetTimeRange { get; protected set; }
 
         private double currentTimeRange;
@@ -99,6 +88,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
+
+        //自定义判定系统
+        private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
+        private readonly BindableDouble configBaseMs = new BindableDouble();
+        private readonly BindableDouble configTimePerSpeed = new BindableDouble();
+
+        // private readonly ManiaHitModeConvertor hitModeConvertor;
+        // private readonly Bindable<EzMUGHitMode> hitMode = new Bindable<EzMUGHitMode>();
 
         public DrawableManiaRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)
@@ -328,7 +325,7 @@ namespace osu.Game.Rulesets.Mania.UI
             switch (hitMode)
             {
                 case EzMUGHitMode.EZ2AC:
-                    column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
+                    // column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
                     column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);

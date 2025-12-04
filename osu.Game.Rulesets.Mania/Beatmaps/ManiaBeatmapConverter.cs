@@ -256,6 +256,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                             EzMUGHitMode.EZ2AC => new Ez2AcHoldNote(hold),
                             EzMUGHitMode.Melody => new NoJudgmentHoldNote(hold),
                             EzMUGHitMode.O2Jam => new O2HoldNote(hold),
+                            EzMUGHitMode.IIDX => new Ez2AcHoldNote(hold),
                             _ => hold
                         };
                     }

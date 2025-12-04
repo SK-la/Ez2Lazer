@@ -15,7 +15,6 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -48,9 +47,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private DrawablePool<PoolableHitExplosion> hitExplosionPool = null!;
         private readonly OrderedHitPolicy hitPolicy;
-
-        private DrawableManiaRuleset drawableManiaRuleset = null!;
-
         public Container UnderlayElements => HitObjectArea.UnderlayElements;
 
         private GameplaySampleTriggerSource sampleTriggerSource = null!;
@@ -147,16 +143,6 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
             NewResult += OnNewResult;
-
-            // Find the DrawableManiaRuleset by traversing up the hierarchy
-            Drawable? drawable = Parent;
-
-            while (drawable != null && !(drawable is DrawableManiaRuleset))
-            {
-                drawable = drawable.Parent;
-            }
-
-            drawableManiaRuleset = (DrawableManiaRuleset)drawable!;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -204,32 +190,11 @@ namespace osu.Game.Rulesets.Mania.UI
                 return false;
 
             sampleTriggerSource.Play();
-
-            // Check for pool judgement on this column
-            checkPoolJudgement();
-
             return true;
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
-        }
-
-        /// <summary>
-        /// Check if a pool judgement should be applied for a key press in this column
-        /// </summary>
-        private void checkPoolJudgement()
-        {
-            double currentTime = Time.Current;
-
-            // Check all hit objects in other columns to see if any are within pool range
-            // foreach (var obj in HitObjectContainer.AliveObjects)
-            // {
-            //     if (obj is Ez2AcDrawableNote note)
-            //     {
-            //         note.CheckPoolFromOtherColumn(currentTime, this);
-            //     }
-            // }
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)

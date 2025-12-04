@@ -10,7 +10,7 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Analysis.UI.Components;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Ranking.Statistics;

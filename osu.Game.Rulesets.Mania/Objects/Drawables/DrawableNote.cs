@@ -3,7 +3,6 @@
 
 #nullable disable
 
-using System;
 using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -13,7 +12,6 @@ using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;

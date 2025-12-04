@@ -12,7 +12,7 @@ using osu.Game.Screens.SelectV2;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModNewJudgement : Mod, IApplicableToDifficulty
+    public class ManiaModNewJudgement : Mod, IApplicableToDifficulty, IApplicableToBeatmap
     {
         public override string Name => "New Judgement";
 
@@ -25,19 +25,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override double ScoreMultiplier => 1.0;
 
         public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
-
-        public double NowBeatmapBPM
-        {
-            get
-            {
-                double result;
-                if (BeatmapTitleWedge.SelectedWorkingBeatmap is not null)
-                    result = BeatmapTitleWedge.SelectedWorkingBeatmap.BeatmapInfo.BPM;
-                else
-                    result = 200;
-                return result;
-            }
-        }
 
         [SettingSource("Custom BPM", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> BPM { get; set; } = new Bindable<int?>();
@@ -59,9 +46,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         [SettingSource("For 1/3 Jack")]
         public BindableBool For13Jack { get; set; } = new BindableBool();
 
+        public double BeatmapBPM;
+
+        public void ApplyToBeatmap(IBeatmap beatmap)
+        {
+            BeatmapBPM = beatmap.BeatmapInfo.BPM > 0
+                ? beatmap.BeatmapInfo.BPM
+                : 200;
+        }
+
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            double perBeatLength = 60 / NowBeatmapBPM * 1000;
+            double perBeatLength = 60 / BeatmapBPM * 1000;
             if (BPM.Value is not null) perBeatLength = 60 / (double)BPM.Value * 1000;
 
             if (For14Jack.Value) perBeatLength /= 2;

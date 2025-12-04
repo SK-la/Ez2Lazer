@@ -417,7 +417,7 @@ namespace osu.Game.Skinning.Components
                     applyEzStyleEffect(drawable, new Vector2(1f));
                     break;
 
-                case HitResult.Pool:
+                // case HitResult.Pool:
                 case HitResult.Miss:
                     // 中心小状态，放大后快速消失
                     applyEzStyleEffect(drawable, new Vector2(1f));

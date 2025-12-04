@@ -18,8 +18,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             NodeSamples = hold.NodeSamples;
         }
 
-        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
-
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
             AddNested(Head = new Ez2AcLNHead
@@ -57,28 +55,63 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public class Ez2AcLNHead : HeadNote
     {
-        public override Judgement CreateJudgement() => new Ez2AcHeadJudgement();
+        // public override Judgement CreateJudgement() => new Ez2AcJudgement();
         protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
-
-        private class Ez2AcHeadJudgement : ManiaJudgement
-        {
-            // public override HitResult MinResult => HitResult.IgnoreHit;
-        }
     }
 
     public class Ez2AcLNTail : TailNote
     {
+        // public override Judgement CreateJudgement() => new Ez2AcJudgement();
         protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
     }
 
     public class Ez2AcNote : Note
     {
-        public override Judgement CreateJudgement() => new Ez2AcNoteJudgement();
+        public Ez2AcNote(Note note)
+        {
+            StartTime = note.StartTime;
+            Column = note.Column;
+            Samples = note.Samples;
+        }
+
+        // public override Judgement CreateJudgement() => new Ez2AcJudgement();
         protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
 
-        private class Ez2AcNoteJudgement : ManiaJudgement
+        protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
-            // public override HitResult MinResult => HitResult.Pool;
+        }
+    }
+
+    public class Ez2AcJudgement : Judgement
+    {
+        protected override double HealthIncreaseFor(HitResult result)
+        {
+            switch (result)
+            {
+                // case HitResult.Pool:
+                //     return -DEFAULT_MAX_HEALTH_INCREASE * 5;
+
+                case HitResult.Miss:
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 3;
+
+                case HitResult.Meh:
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 2;
+
+                case HitResult.Ok:
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 1;
+
+                case HitResult.Good:
+                    return DEFAULT_MAX_HEALTH_INCREASE * 0.1;
+
+                case HitResult.Great:
+                    return DEFAULT_MAX_HEALTH_INCREASE * 0.8;
+
+                case HitResult.Perfect:
+                    return DEFAULT_MAX_HEALTH_INCREASE;
+
+                default:
+                    return base.HealthIncreaseFor(result);
+            }
         }
     }
 }

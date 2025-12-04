@@ -27,7 +27,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public static DifficultyRange OkRange;
         public static DifficultyRange MehRange;
         public static DifficultyRange MissRange;
-        public static DifficultyRange PoolRange;
+
+        // public static DifficultyRange PoolRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -123,8 +124,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Good:
                 case HitResult.Ok:
                 case HitResult.Meh:
+                // case HitResult.Pool:
                 case HitResult.Miss:
-                case HitResult.Pool:
                     return true;
             }
 
@@ -183,7 +184,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ok = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, OkRange) * totalMultiplier;
                 meh = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MehRange) * totalMultiplier;
                 miss = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MissRange) * totalMultiplier;
-                pool = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, PoolRange) * totalMultiplier;
+                pool = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, pool_window_range) * totalMultiplier;
                 return;
             }
 
@@ -218,6 +219,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ok = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, ok_window_range) * totalMultiplier) + 0.5;
                 meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, meh_window_range) * totalMultiplier) + 0.5;
                 miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, miss_window_range) * totalMultiplier) + 0.5;
+                pool = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, pool_window_range) * totalMultiplier) + 0.5;
             }
         }
 
@@ -240,8 +242,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Meh:
                     return meh;
 
-                case HitResult.Pool:
-                    return pool;
+                // case HitResult.Pool:
+                //     return pool;
 
                 case HitResult.Miss:
                     return miss;

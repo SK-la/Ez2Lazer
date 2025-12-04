@@ -110,6 +110,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 {
                     result = $"[{keyCount - 1}+1K]";
                 }
+                else
+                {
+                    result = $"[{keyCount}K]";
+                }
             }
             else if (keyCount >= 7)
             {
@@ -121,13 +125,17 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 {
                     result = $"[{keyCount - 2}+2K]";
                 }
+                else
+                {
+                    result = $"[{keyCount}K]";
+                }
             }
 
             int emptyColumns = sorted.Count(c => c.Value == 0);
 
             if (emptyColumns > 0)
             {
-                result = $"[{keyCount - 1}K_{emptyColumns}Null]";
+                result = $"[{keyCount - 1}K_{emptyColumns}Empty]";
             }
 
             return result;

@@ -45,6 +45,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
+using osu.Game.LAsEzExtensions;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -64,7 +65,6 @@ using osu.Game.Scoring;
 using osu.Game.Screens;
 using osu.Game.Skinning;
 using osu.Game.Utils;
-using EzLocalTextureFactory = osu.Game.LAsEzExtensions.EzLocalTextureFactory;
 using RuntimeInfo = osu.Framework.RuntimeInfo;
 
 namespace osu.Game

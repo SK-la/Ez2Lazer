@@ -3,7 +3,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osuTK;
 using osuTK.Graphics;
-using EzLocalTextureFactory = osu.Game.LAsEzExtensions.EzLocalTextureFactory;
+using osu.Game.LAsEzExtensions;
 
 namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
 {
