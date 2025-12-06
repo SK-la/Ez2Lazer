@@ -96,7 +96,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private void drawHealthLine(float left_margin, float right_margin)
         {
             var sortedEvents = hitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
-            double currentHealth = 0.5; // 初始血量
+            double currentHealth = 0.0; // 初始血量
             List<Vector2> healthPoints = new List<Vector2>();
 
             foreach (var e in sortedEvents)

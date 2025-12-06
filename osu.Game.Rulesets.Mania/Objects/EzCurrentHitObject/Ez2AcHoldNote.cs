@@ -85,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             {
                 case HitResult.Pool:
                     // Pool 判定应用严格扣血
-                    return -DEFAULT_MAX_HEALTH_INCREASE * 5;
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 50;
 
                 // case HitResult.Miss:
                 //     return -DEFAULT_MAX_HEALTH_INCREASE * 3;

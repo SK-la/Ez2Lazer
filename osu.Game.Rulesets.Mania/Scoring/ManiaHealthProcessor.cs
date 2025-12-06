@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Pool:
-                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.02; // Strict health deduction for pool
+                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.2; // Strict health deduction for pool
 
                 // case HitResult.Miss:
                 //     switch (hitObject)
@@ -59,11 +59,11 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     break;
 
                 case HitResult.Great:
-                    increase = 0.0052 - Beatmap.Difficulty.DrainRate * 0.0005;
+                    increase = 0.0051 - Beatmap.Difficulty.DrainRate * 0.0005;
                     break;
 
                 case HitResult.Perfect:
-                    increase = 0.0055 - Beatmap.Difficulty.DrainRate * 0.0005;
+                    increase = 0.0053 - Beatmap.Difficulty.DrainRate * 0.0005;
                     break;
             }
 
