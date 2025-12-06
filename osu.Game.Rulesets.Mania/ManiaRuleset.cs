@@ -67,32 +67,30 @@ namespace osu.Game.Rulesets.Mania
 
         public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new ManiaHealthProcessor(drainStartTime);
 
-        public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap) => new ManiaBeatmapConverter(beatmap, this);
+        public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap)
+        {
+            var hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
+            ManiaBeatmapConverter.CurrentHitMode = hitMode;
 
-        // public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap)
-        // {
-        //     var hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
-        //     ManiaBeatmapConverter.CurrentHitMode = hitMode;
-        //
-        //     if (hitMode == EzMUGHitMode.O2Jam)
-        //     {
-        //         double bpm = beatmap.BeatmapInfo.BPM;
-        //         if (bpm == 0) bpm = 200;
-        //         O2HitModeExtension.NowBeatmapBPM = bpm;
-        //         double coolRange = 7500.0 / bpm;
-        //         double goodRange = 22500.0 / bpm;
-        //         double badRange = 31250.0 / bpm;
-        //         var hw = new ManiaHitWindows();
-        //         hw.SetSpecialDifficultyRange(coolRange, coolRange, goodRange, goodRange, badRange, badRange);
-        //     }
-        //     else
-        //     {
-        //         var hw = new ManiaHitWindows();
-        //         hw.ResetRange();
-        //     }
-        //
-        //     return new ManiaBeatmapConverter(beatmap, this);
-        // }
+            if (hitMode == EzMUGHitMode.O2Jam)
+            {
+                double bpm = beatmap.BeatmapInfo.BPM;
+                if (bpm == 0) bpm = 200;
+                O2HitModeExtension.NowBeatmapBPM = bpm;
+                double coolRange = 7500.0 / bpm;
+                double goodRange = 22500.0 / bpm;
+                double badRange = 31250.0 / bpm;
+                var hw = new ManiaHitWindows();
+                hw.SetSpecialDifficultyRange(coolRange, coolRange, goodRange, goodRange, badRange, badRange);
+            }
+            else
+            {
+                var hw = new ManiaHitWindows();
+                hw.ResetRange();
+            }
+
+            return new ManiaBeatmapConverter(beatmap, this);
+        }
 
         public override PerformanceCalculator CreatePerformanceCalculator() => new ManiaPerformanceCalculator();
 
@@ -358,33 +356,33 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModAdjust(),
-                        // new ManiaModChangeSpeedByAccuracy(),
-                        // // new ManiaModCleaner(),
-                        // new ManiaModDeleteSpace(),
-                        // new ManiaModDoublePlay(),
-                        // new ManiaModDuplicate(),
-                        // new ManiaModGracer(),
-                        // new ManiaModJackAdjust(),
-                        // new ManiaModJudgmentsAdjust(),
-                        // new ManiaModJudgmentsProportion(),
-                        // new ManiaModLN(),
-                        // new ManiaModLNDoubleDistribution(),
-                        // new ManiaModLNJudgementAdjust(),
-                        // new ManiaModLNLongShortAddition(),
-                        // new ManiaModLNSimplify(),
-                        // new ManiaModLNTransformer(),
-                        // new ManiaModMalodyStyleLN(),
-                        // // new ManiaModNewJudgement(),
-                        // new ManiaModNoteAdjust(),
-                        // new ManiaModNtoM(),
-                        // new ManiaModNtoMAnother(),
-                        // new ManiaModO2Health(),
-                        // new ManiaModO2Judgement(),
-                        // // new ManiaModPlayfieldTransformation(), //加载有问题
-                        // new ManiaModReleaseAdjust(),
-                        // new ManiaModRemedy(),
-                        // new StarRatingRebirth(),
-                        // new StarRatingRebirthNoTask(),
+                        new ManiaModChangeSpeedByAccuracy(),
+                        // new ManiaModCleaner(),
+                        new ManiaModDeleteSpace(),
+                        new ManiaModDoublePlay(),
+                        new ManiaModDuplicate(),
+                        new ManiaModGracer(),
+                        new ManiaModJackAdjust(),
+                        new ManiaModJudgmentsAdjust(),
+                        new ManiaModJudgmentsProportion(),
+                        new ManiaModLN(),
+                        new ManiaModLNDoubleDistribution(),
+                        new ManiaModLNJudgementAdjust(),
+                        new ManiaModLNLongShortAddition(),
+                        new ManiaModLNSimplify(),
+                        new ManiaModLNTransformer(),
+                        new ManiaModMalodyStyleLN(),
+                        new ManiaModNewJudgement(),
+                        new ManiaModNoteAdjust(),
+                        new ManiaModNtoM(),
+                        new ManiaModNtoMAnother(),
+                        new ManiaModO2Health(),
+                        new ManiaModO2Judgement(),
+                        // new ManiaModPlayfieldTransformation(), //加载有问题
+                        new ManiaModReleaseAdjust(),
+                        new ManiaModRemedy(),
+                        new StarRatingRebirth(),
+                        new StarRatingRebirthNoTask(),
                     };
 
                 case ModType.Fun:

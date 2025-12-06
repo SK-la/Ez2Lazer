@@ -163,13 +163,13 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
 
             // Configure pools based on hit mode
-            // foreach (var stage in Playfield.Stages)
-            // {
-            //     foreach (var column in stage.Columns)
-            //     {
-            //         configurePools(column, ManiaBeatmapConverter.CurrentHitMode);
-            //     }
-            // }
+            foreach (var stage in Playfield.Stages)
+            {
+                foreach (var column in stage.Columns)
+                {
+                    configurePools(column, ManiaBeatmapConverter.CurrentHitMode);
+                }
+            }
 
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>

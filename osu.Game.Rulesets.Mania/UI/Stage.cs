@@ -67,11 +67,8 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private EzSkinSettingsManager ezSkinSettings { get; set; } = null!;
 
-        // private Bindable<double> columnBlur = null!;
         private Bindable<double> columnDim = null!;
         private readonly Box dimBox;
-
-        // private readonly FrostedGlassContainer acrylicEffect;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {

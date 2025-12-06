@@ -91,8 +91,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 case HitResult.Meh:
                     return meh;
 
-                // case HitResult.Pool:
-                //     return pool;
+                case HitResult.Pool:
+                    return pool;
 
                 case HitResult.Miss:
                     return miss;
