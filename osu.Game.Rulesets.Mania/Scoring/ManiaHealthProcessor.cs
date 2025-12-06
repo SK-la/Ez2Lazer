@@ -49,21 +49,21 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     }
 
                 case HitResult.Meh:
-                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.005;
+                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.0016;
 
                 case HitResult.Ok:
                     return 0;
 
                 case HitResult.Good:
-                    increase = 0.004 - Beatmap.Difficulty.DrainRate * 0.001;
+                    increase = 0.004 - Beatmap.Difficulty.DrainRate * 0.0004;
                     break;
 
                 case HitResult.Great:
-                    increase = 0.005 - Beatmap.Difficulty.DrainRate * 0.001;
+                    increase = 0.0052 - Beatmap.Difficulty.DrainRate * 0.0005;
                     break;
 
                 case HitResult.Perfect:
-                    increase = 0.0055 - Beatmap.Difficulty.DrainRate * 0.002;
+                    increase = 0.0055 - Beatmap.Difficulty.DrainRate * 0.0005;
                     break;
             }
 
