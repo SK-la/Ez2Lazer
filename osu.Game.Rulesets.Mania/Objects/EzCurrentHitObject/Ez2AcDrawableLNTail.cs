@@ -4,18 +4,13 @@
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     public partial class Ez2AcDrawableLNTail : DrawableHoldNoteTail
     {
-        // public override bool DisplayResult => false;
-        // public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
-        // {
-        //     return UpdateResult(true);
-        // }
-
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
             if (HoldNote.IsHolding.Value && timeOffset >= 0)

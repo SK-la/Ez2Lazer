@@ -64,20 +64,15 @@ namespace osu.Game.Screens
             {
                 this.FadeOut();
                 this.FadeIn(TRANSITION_LENGTH, Easing.InOutQuart);
-
-                if (!DisableParallax)
-                {
                     this.MoveToX(x_movement_amount);
                     this.MoveToX(0, TRANSITION_LENGTH, Easing.InOutQuart);
                 }
-            }
 
             base.OnEntering(e);
         }
 
         public override void OnSuspending(ScreenTransitionEvent e)
         {
-            if (!DisableParallax)
                 this.MoveToX(-x_movement_amount, TRANSITION_LENGTH, Easing.InOutQuart);
             base.OnSuspending(e);
         }
@@ -87,7 +82,6 @@ namespace osu.Game.Screens
             if (IsLoaded)
             {
                 this.FadeOut(TRANSITION_LENGTH, Easing.OutExpo);
-                if (!DisableParallax)
                     this.MoveToX(x_movement_amount, TRANSITION_LENGTH, Easing.OutExpo);
             }
 
@@ -96,7 +90,7 @@ namespace osu.Game.Screens
 
         public override void OnResuming(ScreenTransitionEvent e)
         {
-            if (IsLoaded && !DisableParallax)
+            if (IsLoaded)
                 this.MoveToX(0, TRANSITION_LENGTH, Easing.OutExpo);
             base.OnResuming(e);
         }

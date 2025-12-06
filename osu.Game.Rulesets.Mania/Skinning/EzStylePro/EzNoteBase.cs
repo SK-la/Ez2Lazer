@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
 using osuTK;
-using EzLocalTextureFactory = osu.Game.LAsEzExtensions.EzLocalTextureFactory;
+using osu.Game.LAsEzExtensions;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {

@@ -90,23 +90,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                // TODO: 需要修改framework着色器-容器实现真正效果。动态根据实际的游戏中BackgroundScreen背景或故事版绘制局部虚化效果
-                // // 注意，如果是真正的毛玻璃效果，此处就不应该在此处试图获取外部的背景内容，因为存在循环依赖问题。
-                // acrylicEffect = new FrostedGlassContainer
-                // {
-                //     Name = "Acrylic backdrop effect",
-                //     Anchor = Anchor.Centre,
-                //     Origin = Anchor.Centre,
-                //     RelativeSizeAxes = Axes.Both, //使用Both即可实现局部遮罩，因为此处父容器就是局部面板
-                //     BlurRotation = 50f,
-                //     Depth = 1, // 在背景层
-                //     Child = new Box
-                //     {
-                //         RelativeSizeAxes = Axes.Both,
-                //         Colour = Colour4.Red,
-                //         Alpha = 0.01f,
-                //     }
-                // },
                 dimBox = new Box //通过叠加覆盖实现暗化效果
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -207,19 +190,12 @@ namespace osu.Game.Rulesets.Mania.UI
             onSkinChanged();
 
             columnDim = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnDim);
-            // columnBlur = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnBlur);
 
             // 应用暗化效果
             columnDim.BindValueChanged(v =>
             {
                 dimBox.Alpha = (float)v.NewValue;
             }, true);
-
-            // // 应用虚化效果
-            // columnBlur.BindValueChanged(v =>
-            // {
-            //     acrylicEffect.BlurRotation = (float)v.NewValue;
-            // }, true);
         }
 
         private void onSkinChanged()

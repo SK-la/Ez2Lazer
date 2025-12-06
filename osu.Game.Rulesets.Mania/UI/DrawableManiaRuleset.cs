@@ -10,7 +10,6 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -164,13 +163,13 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
 
             // Configure pools based on hit mode
-            foreach (var stage in Playfield.Stages)
-            {
-                foreach (var column in stage.Columns)
-                {
-                    configurePools(column, ManiaBeatmapConverter.CurrentHitMode);
-                }
-            }
+            // foreach (var stage in Playfield.Stages)
+            // {
+            //     foreach (var column in stage.Columns)
+            //     {
+            //         configurePools(column, ManiaBeatmapConverter.CurrentHitMode);
+            //     }
+            // }
 
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>
@@ -306,26 +305,12 @@ namespace osu.Game.Rulesets.Mania.UI
                 currentSkin.SourceChanged -= onSkinChange;
         }
 
-        public bool SupportsBackgroundBlurMasking => true;
-
-        public RectangleF? GetPlayfieldBounds()
-        {
-            try
-            {
-                return Playfield.ScreenSpaceDrawQuad.AABBFloat;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
         private void configurePools(Column column, EzMUGHitMode hitMode)
         {
             switch (hitMode)
             {
                 case EzMUGHitMode.EZ2AC:
-                    // column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
+                    column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
                     column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
