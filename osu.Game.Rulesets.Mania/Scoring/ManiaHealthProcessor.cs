@@ -37,19 +37,19 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Pool:
                     return -(Beatmap.Difficulty.DrainRate + 1) * 0.02; // Strict health deduction for pool
 
-                case HitResult.Miss:
-                    switch (hitObject)
-                    {
-                        case HeadNote:
-                        case TailNote:
-                            return -(Beatmap.Difficulty.DrainRate + 1) * 0.00375;
-
-                        default:
-                            return -(Beatmap.Difficulty.DrainRate + 1) * 0.0075;
-                    }
-
-                case HitResult.Meh:
-                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.0016;
+                // case HitResult.Miss:
+                //     switch (hitObject)
+                //     {
+                //         case HeadNote:
+                //         case TailNote:
+                //             return -(Beatmap.Difficulty.DrainRate + 1) * 0.00375;
+                //
+                //         default:
+                //             return -(Beatmap.Difficulty.DrainRate + 1) * 0.0075;
+                //     }
+                //
+                // case HitResult.Meh:
+                //     return -(Beatmap.Difficulty.DrainRate + 1) * 0.0016;
 
                 case HitResult.Ok:
                     return 0;

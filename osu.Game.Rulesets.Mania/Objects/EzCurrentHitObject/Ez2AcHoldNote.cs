@@ -18,8 +18,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             NodeSamples = hold.NodeSamples;
         }
 
-        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
-
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
             AddNested(Head = new Ez2AcLNHead
@@ -57,26 +55,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public class Ez2AcLNHead : HeadNote
     {
-        public override Judgement CreateJudgement() => new Ez2AcHeadJudgement();
-        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
-
-        private class Ez2AcHeadJudgement : ManiaJudgement
-        {
-            public override HitResult MaxResult => HitResult.Perfect;
-            public override HitResult MinResult => HitResult.IgnoreMiss;
-        }
     }
 
     public class Ez2AcLNTail : TailNote
     {
-        public override Judgement CreateJudgement() => new Ez2AcTailJudgement();
-        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
-
-        private class Ez2AcTailJudgement : ManiaJudgement
-        {
-            public override HitResult MaxResult => HitResult.Perfect;
-            public override HitResult MinResult => HitResult.ComboBreak;
-        }
     }
 
     public class Ez2AcNote : Note
@@ -89,33 +71,30 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         }
 
         public override Judgement CreateJudgement() => new Ez2AcJudgement();
-        protected override HitWindows CreateHitWindows() => new EzCustomHitWindows();
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
         }
     }
 
-    public class Ez2AcJudgement : ManiaJudgement
+    public class Ez2AcJudgement : Judgement
     {
-        public override HitResult MaxResult => HitResult.Perfect;
-        public override HitResult MinResult => HitResult.Pool;
-
         protected override double HealthIncreaseFor(HitResult result)
         {
             switch (result)
             {
-                // case HitResult.Pool:
-                //     return -DEFAULT_MAX_HEALTH_INCREASE * 5;
+                case HitResult.Pool:
+                    // Pool 判定应用严格扣血
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 5;
 
-                case HitResult.Miss:
-                    return -DEFAULT_MAX_HEALTH_INCREASE * 3;
-
-                case HitResult.Meh:
-                    return -DEFAULT_MAX_HEALTH_INCREASE * 2;
-
-                case HitResult.Ok:
-                    return -DEFAULT_MAX_HEALTH_INCREASE * 1;
+                // case HitResult.Miss:
+                //     return -DEFAULT_MAX_HEALTH_INCREASE * 3;
+                //
+                // case HitResult.Meh:
+                //     return -DEFAULT_MAX_HEALTH_INCREASE * 2;
+                //
+                // case HitResult.Ok:
+                //     return -DEFAULT_MAX_HEALTH_INCREASE * 1;
 
                 case HitResult.Good:
                     return DEFAULT_MAX_HEALTH_INCREASE * 0.1;

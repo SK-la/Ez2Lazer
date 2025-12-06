@@ -7,7 +7,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
-    public class ManiaHitWindows : HitWindows
+    public partial class ManiaHitWindows : HitWindows
     {
         public static readonly DifficultyRange PERFECT_WINDOW_RANGE = new DifficultyRange(22.4D, 19.4D, 13.9D);
         private static readonly DifficultyRange great_window_range = new DifficultyRange(64, 49, 34);
@@ -183,7 +183,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ok = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, OkRange) * totalMultiplier;
                 meh = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MehRange) * totalMultiplier;
                 miss = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MissRange) * totalMultiplier;
-                pool = IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, pool_window_range) * totalMultiplier;
                 return;
             }
 
@@ -218,8 +217,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ok = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, ok_window_range) * totalMultiplier) + 0.5;
                 meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, meh_window_range) * totalMultiplier) + 0.5;
                 miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, miss_window_range) * totalMultiplier) + 0.5;
-                pool = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, pool_window_range) * totalMultiplier) + 0.5;
             }
+
+            pool = miss + 500;
         }
 
         public override double WindowFor(HitResult result)

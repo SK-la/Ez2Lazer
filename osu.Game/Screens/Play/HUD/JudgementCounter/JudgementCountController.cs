@@ -47,8 +47,8 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
                     results[r.result] = judgementCount;
             }
 
-            // Add Pool for Mania
-            if (ruleset.Value.ShortName == "mania")
+            // Add Pool for Mania if not already added by GetHitResults()
+            if (ruleset.Value.ShortName == "mania" && !results.ContainsKey(HitResult.Pool))
             {
                 var poolCount = new JudgementCount
                 {

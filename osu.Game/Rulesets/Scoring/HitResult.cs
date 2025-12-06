@@ -131,6 +131,7 @@ namespace osu.Game.Rulesets.Scoring
         /// mania特殊专用，按键事件的未命中结果。
         /// 禁止用在Judgement覆写上，这不属于note返回的判定结果
         /// </summary>
+        [Description(@"Pool")]
         [EnumMember(Value = "pool")]
         [Order(17)]
         Pool,
