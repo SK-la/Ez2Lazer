@@ -10,6 +10,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
@@ -18,20 +19,27 @@ namespace osu.Game.LAsEzExtensions.Analysis
 {
     public partial class EzHitEventHeatmapGraph : CompositeDrawable
     {
+        private readonly IReadOnlyList<HitEvent> hitEvents;
+        private readonly HitWindows hitWindows;
+
+        private double binSize;
+        private double drainRate;
+
         private const int time_bins = 50; // 时间分段数
         private const float circle_size = 5f; // 圆形大小
-        private readonly IReadOnlyList<HitEvent> hitEvents;
-        private double binSize;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
-        private readonly HitWindows hitWindows;
-
-        public EzHitEventHeatmapGraph(IReadOnlyList<HitEvent> hitEvents, HitWindows hitWindows)
+        public EzHitEventHeatmapGraph(ScoreInfo score, HitWindows hitWindows)
         {
-            this.hitEvents = hitEvents.Where(e => e.HitObject.HitWindows != HitWindows.Empty && e.Result.IsBasic() && e.Result.IsHit()).ToList();
+            this.hitEvents = score.HitEvents;
             this.hitWindows = hitWindows;
+            this.hitEvents = hitEvents.Where(e => e.HitObject.HitWindows != HitWindows.Empty && e.Result.IsBasic()).ToList();
+
+            drainRate = score.BeatmapInfo is not null
+                ? score.BeatmapInfo.Difficulty.DrainRate
+                : 10.0;
         }
 
         [BackgroundDependencyLoader]
@@ -58,7 +66,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 if (!result.IsBasic() || !result.IsHit())
                     continue;
 
-                double boundary = hitWindows.WindowFor(result);
+                double boundary = result == HitResult.Pool
+                    ? 0
+                    : hitWindows.WindowFor(result);
 
                 if (boundary <= 0)
                     continue;
@@ -93,7 +103,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             drawHealthLine(left_margin, right_margin);
         }
 
-        private void drawHealthLine(float left_margin, float right_margin)
+        private void drawHealthLine(float leftMargin, float rightMargin)
         {
             var sortedEvents = hitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
             double currentHealth = 0.0; // 初始血量
@@ -108,7 +118,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 double time = e.HitObject.StartTime;
                 float xPosition = (float)(time / (time_bins * binSize));
-                float x = (xPosition * (DrawWidth - left_margin - right_margin)) - (DrawWidth / 2) + left_margin;
+                float x = (xPosition * (DrawWidth - leftMargin - rightMargin)) - (DrawWidth / 2) + leftMargin;
                 float y = (float)((1 - currentHealth) * DrawHeight - DrawHeight / 2);
 
                 healthPoints.Add(new Vector2(x, y));

@@ -72,9 +72,7 @@ namespace osu.Game.Rulesets.Mania
             var hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
             ManiaBeatmapConverter.CurrentHitMode = hitMode;
 
-            // TODO: switch(enum EzMUGHitMode)放在ManiaHitWindows中更好？
             var hw = new ManiaHitWindows();
-
             double bpm = beatmap.BeatmapInfo.BPM;
             hw.SetHitMode(hitMode, bpm);
 
@@ -485,7 +483,7 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score.HitEvents, new DefaultHitWindows()) //TODO:改成可实时变更
+                new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score, new ManiaHitWindows()) //TODO:改成可实时变更
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 200
