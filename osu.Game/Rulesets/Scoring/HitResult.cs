@@ -24,6 +24,15 @@ namespace osu.Game.Rulesets.Scoring
         None,
 
         /// <summary>
+        /// mania特殊专用，按键事件的未命中结果。
+        /// 禁止用在Judgement覆写上，这不属于note返回的判定结果
+        /// </summary>
+        [Description(@"Pool")]
+        [EnumMember(Value = "pool")]
+        [Order(17)]
+        Pool,
+
+        /// <summary>
         /// Indicates that the object has been judged as a miss.
         /// </summary>
         /// <remarks>
@@ -126,15 +135,6 @@ namespace osu.Game.Rulesets.Scoring
         [EnumMember(Value = "ignore_hit")]
         [Order(13)]
         IgnoreHit,
-
-        /// <summary>
-        /// mania特殊专用，按键事件的未命中结果。
-        /// 禁止用在Judgement覆写上，这不属于note返回的判定结果
-        /// </summary>
-        [Description(@"Pool")]
-        [EnumMember(Value = "pool")]
-        [Order(17)]
-        Pool,
 
         /// <summary>
         /// Indicates that a combo break should occur, but does not otherwise affect score.
@@ -403,12 +403,12 @@ namespace osu.Game.Rulesets.Scoring
             if (maxResult == HitResult.None || !IsHit(maxResult))
                 throw new ArgumentOutOfRangeException(nameof(maxResult), $"{maxResult} is not a valid maximum judgement result.");
 
-            if (minResult == HitResult.None || IsHit(minResult))
-                throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum judgement result.");
-
             // Pool is a special result that can be both max and min
             if (minResult == HitResult.Pool)
                 return;
+
+            if (minResult == HitResult.None || IsHit(minResult))
+                throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum judgement result.");
 
             if (maxResult == HitResult.IgnoreHit && minResult is not (HitResult.IgnoreMiss or HitResult.ComboBreak))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum result for a {maxResult} judgement.");

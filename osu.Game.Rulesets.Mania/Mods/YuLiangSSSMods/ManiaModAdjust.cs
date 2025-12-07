@@ -301,14 +301,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             if (CustomHitRange.Value)
             {
-                DifficultyRange[] ranges =
+                double[] ranges =
                 {
-                    new DifficultyRange(PerfectHit.Value, PerfectHit.Value, PerfectHit.Value),
-                    new DifficultyRange(GreatHit.Value, GreatHit.Value, GreatHit.Value),
-                    new DifficultyRange(GoodHit.Value, GoodHit.Value, GoodHit.Value),
-                    new DifficultyRange(OkHit.Value, OkHit.Value, OkHit.Value),
-                    new DifficultyRange(MehHit.Value, MehHit.Value, MehHit.Value),
-                    new DifficultyRange(MissHit.Value, MissHit.Value, MissHit.Value)
+                    PerfectHit.Value,
+                    GreatHit.Value,
+                    GoodHit.Value,
+                    OkHit.Value,
+                    MehHit.Value,
+                    MissHit.Value,
                 };
                 HitWindows.SetSpecialDifficultyRange(ranges);
             }

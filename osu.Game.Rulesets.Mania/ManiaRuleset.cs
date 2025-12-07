@@ -83,6 +83,16 @@ namespace osu.Game.Rulesets.Mania
                 var hw = new ManiaHitWindows();
                 hw.SetSpecialDifficultyRange(coolRange, coolRange, goodRange, goodRange, badRange, badRange);
             }
+            else if (hitMode == EzMUGHitMode.EZ2AC)
+            {
+                var hw = new ManiaHitWindows();
+                hw.SetSpecialDifficultyRange(22, 32, 64, 80, 100, 120);
+            }
+            else if (hitMode == EzMUGHitMode.IIDX)
+            {
+                var hw = new ManiaHitWindows();
+                hw.SetSpecialDifficultyRange(20, 40, 60, 80, 100, 120);
+            }
             else
             {
                 var hw = new ManiaHitWindows();
