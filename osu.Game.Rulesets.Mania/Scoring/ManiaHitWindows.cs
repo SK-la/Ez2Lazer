@@ -4,6 +4,7 @@
 using System;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
@@ -168,6 +169,37 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             updateCustomHitWindows = false;
             updateWindows();
+        }
+
+        public void SetHitMode(EzMUGHitMode hitMode, double bpm = 0)
+        {
+            switch (hitMode)
+            {
+                case EzMUGHitMode.O2Jam:
+                    if (bpm == 0) bpm = 200;
+                    double coolRange = 7500.0 / bpm;
+                    double goodRange = 22500.0 / bpm;
+                    double badRange = 31250.0 / bpm;
+
+                    SetSpecialDifficultyRange(new[] { coolRange, coolRange, goodRange, goodRange, goodRange, badRange });
+                    break;
+
+                case EzMUGHitMode.EZ2AC:
+                    SetSpecialDifficultyRange(new[] { 18.0, 32.0, 64.0, 80.0, 100.0, 120.0 });
+                    break;
+
+                case EzMUGHitMode.IIDX:
+                    SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 });
+                    break;
+
+                case EzMUGHitMode.Melody:
+                    SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 });
+                    break;
+
+                default:
+                    ResetRange();
+                    break;
+            }
         }
 
         private void updateWindows()

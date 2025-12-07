@@ -46,20 +46,6 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
                 foreach (var r in group)
                     results[r.result] = judgementCount;
             }
-
-            // Add Pool for Mania if not already added by GetHitResults()
-            if (!results.ContainsKey(HitResult.Pool))
-            {
-                var poolCount = new JudgementCount
-                {
-                    DisplayName = "Pool",
-                    Types = new[] { HitResult.Pool },
-                    ResultCount = new BindableInt()
-                };
-
-                counters.Add(poolCount);
-                results[HitResult.Pool] = poolCount;
-            }
         }
 
         protected override void LoadComplete()

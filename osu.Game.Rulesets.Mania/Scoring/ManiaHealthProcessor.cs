@@ -36,6 +36,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
             {
                 case HitResult.Pool:
                     return -0.05;
+                    // 移除自定义逻辑，让它使用 Judgement.HealthIncreaseFor
+                    // break;
 
                 // case HitResult.Miss:
                 //     switch (hitObject)

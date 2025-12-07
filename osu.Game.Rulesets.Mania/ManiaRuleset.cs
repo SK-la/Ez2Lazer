@@ -71,37 +71,12 @@ namespace osu.Game.Rulesets.Mania
         {
             var hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
             ManiaBeatmapConverter.CurrentHitMode = hitMode;
+
+            // TODO: switch(enum EzMUGHitMode)放在ManiaHitWindows中更好？
             var hw = new ManiaHitWindows();
 
-            switch (hitMode)
-            {
-                case EzMUGHitMode.O2Jam:
-                    double bpm = beatmap.BeatmapInfo.BPM;
-                    if (bpm == 0) bpm = 200;
-                    O2HitModeExtension.NowBeatmapBPM = bpm;
-                    double coolRange = 7500.0 / bpm;
-                    double goodRange = 22500.0 / bpm;
-                    double badRange = 31250.0 / bpm;
-
-                    hw.SetSpecialDifficultyRange(new[] { coolRange, coolRange, goodRange, goodRange, badRange, badRange });
-                    break;
-
-                case EzMUGHitMode.EZ2AC:
-                    hw.SetSpecialDifficultyRange(new[] { 16.0, 32.0, 64.0, 80.0, 100.0, 120.0 });
-                    break;
-
-                case EzMUGHitMode.IIDX:
-                    hw.SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 });
-                    break;
-
-                case EzMUGHitMode.Melody:
-                    hw.SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 });
-                    break;
-
-                default:
-                    hw.ResetRange();
-                    break;
-            }
+            double bpm = beatmap.BeatmapInfo.BPM;
+            hw.SetHitMode(hitMode, bpm);
 
             return new ManiaBeatmapConverter(beatmap, this);
         }

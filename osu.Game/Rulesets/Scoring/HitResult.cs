@@ -250,6 +250,10 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.ComboBreak:
                     return false;
 
+                // 有这个才能把Pool添加到计数器控件中
+                case HitResult.Pool:
+                    return true;
+
                 default:
                     return IsScorable(result) && !IsTick(result) && !IsBonus(result);
             }

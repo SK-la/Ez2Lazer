@@ -111,6 +111,9 @@ namespace osu.Game.Graphics
                 case HitResult.Great:
                     return Blue;
 
+                case HitResult.Pool:
+                    return PurpleLight;
+
                 default:
                     return BlueLight;
             }

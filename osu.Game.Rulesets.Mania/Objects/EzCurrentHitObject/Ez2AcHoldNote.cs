@@ -4,6 +4,7 @@
 using System.Threading;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Judgements;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
@@ -70,8 +71,48 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             Samples = note.Samples;
         }
 
+        // public override Judgement CreateJudgement() => new Ez2AcJudgement();
+        // protected override HitWindows CreateHitWindows() => new Ez2AcHitWindows();
+
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
+        }
+    }
+
+    public class Ez2AcJudgement : ManiaJudgement
+    {
+        public override HitResult MaxResult => HitResult.Perfect;
+        public override HitResult MinResult => HitResult.Pool;
+
+        protected override double HealthIncreaseFor(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Pool:
+                    // Pool 判定应用严格扣血
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 5;
+
+                case HitResult.Miss:
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 3;
+
+                case HitResult.Meh:
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 2;
+
+                case HitResult.Ok:
+                    return -DEFAULT_MAX_HEALTH_INCREASE * 1;
+
+                case HitResult.Good:
+                    return DEFAULT_MAX_HEALTH_INCREASE * 0.1;
+
+                case HitResult.Great:
+                    return DEFAULT_MAX_HEALTH_INCREASE * 0.8;
+
+                case HitResult.Perfect:
+                    return DEFAULT_MAX_HEALTH_INCREASE;
+
+                default:
+                    return base.HealthIncreaseFor(result);
+            }
         }
     }
 }
