@@ -250,10 +250,6 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.ComboBreak:
                     return false;
 
-                // Pool is a special type that is not basic.
-                case HitResult.Pool:
-                    return false;
-
                 default:
                     return IsScorable(result) && !IsTick(result) && !IsBonus(result);
             }
@@ -385,6 +381,9 @@ namespace osu.Game.Rulesets.Scoring
                 return false;
 
             if (result == minResult || result == maxResult)
+                return true;
+
+            if (result == HitResult.Pool)
                 return true;
 
             Debug.Assert(minResult <= maxResult);

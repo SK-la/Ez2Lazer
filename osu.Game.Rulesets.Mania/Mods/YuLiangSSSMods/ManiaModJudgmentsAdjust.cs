@@ -58,7 +58,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-
         [SettingSource("Custom Hit Range", "Adjust the hit range of notes.")]
         public BindableBool CustomHitRange { get; set; } = new BindableBool(true);
 

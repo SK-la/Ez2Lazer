@@ -71,32 +71,36 @@ namespace osu.Game.Rulesets.Mania
         {
             var hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
             ManiaBeatmapConverter.CurrentHitMode = hitMode;
+            var hw = new ManiaHitWindows();
 
-            if (hitMode == EzMUGHitMode.O2Jam)
+            switch (hitMode)
             {
-                double bpm = beatmap.BeatmapInfo.BPM;
-                if (bpm == 0) bpm = 200;
-                O2HitModeExtension.NowBeatmapBPM = bpm;
-                double coolRange = 7500.0 / bpm;
-                double goodRange = 22500.0 / bpm;
-                double badRange = 31250.0 / bpm;
-                var hw = new ManiaHitWindows();
-                hw.SetSpecialDifficultyRange(coolRange, coolRange, goodRange, goodRange, badRange, badRange);
-            }
-            else if (hitMode == EzMUGHitMode.EZ2AC)
-            {
-                var hw = new ManiaHitWindows();
-                hw.SetSpecialDifficultyRange(22, 32, 64, 80, 100, 120);
-            }
-            else if (hitMode == EzMUGHitMode.IIDX)
-            {
-                var hw = new ManiaHitWindows();
-                hw.SetSpecialDifficultyRange(20, 40, 60, 80, 100, 120);
-            }
-            else
-            {
-                var hw = new ManiaHitWindows();
-                hw.ResetRange();
+                case EzMUGHitMode.O2Jam:
+                    double bpm = beatmap.BeatmapInfo.BPM;
+                    if (bpm == 0) bpm = 200;
+                    O2HitModeExtension.NowBeatmapBPM = bpm;
+                    double coolRange = 7500.0 / bpm;
+                    double goodRange = 22500.0 / bpm;
+                    double badRange = 31250.0 / bpm;
+
+                    hw.SetSpecialDifficultyRange(new[] { coolRange, coolRange, goodRange, goodRange, badRange, badRange });
+                    break;
+
+                case EzMUGHitMode.EZ2AC:
+                    hw.SetSpecialDifficultyRange(new[] { 16.0, 32.0, 64.0, 80.0, 100.0, 120.0 });
+                    break;
+
+                case EzMUGHitMode.IIDX:
+                    hw.SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 });
+                    break;
+
+                case EzMUGHitMode.Melody:
+                    hw.SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 });
+                    break;
+
+                default:
+                    hw.ResetRange();
+                    break;
             }
 
             return new ManiaBeatmapConverter(beatmap, this);

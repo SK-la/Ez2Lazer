@@ -26,7 +26,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public static double OkRange;
         public static double MehRange;
         public static double MissRange;
-        public static double PoolRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -113,6 +112,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double miss;
         private double pool;
 
+        public override bool AllowPoolEnabled => true;
+
         public override bool IsHitResultAllowed(HitResult result)
         {
             switch (result)
@@ -122,12 +123,15 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Good:
                 case HitResult.Ok:
                 case HitResult.Meh:
-                case HitResult.Pool:
                 case HitResult.Miss:
                     return true;
-            }
 
-            return false;
+                case HitResult.Pool:
+                    return AllowPoolEnabled;
+
+                default:
+                    return false;
+            }
         }
 
         public override void SetDifficulty(double difficulty)
@@ -218,7 +222,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, miss_window_range) * totalMultiplier) + 0.5;
             }
 
-            pool = miss + 500;
+            // 这里的Pool区间只是用于显示，并不会影响实际判定；实际判定请见 HitWindows.ResultFor 方法
+            pool = miss + 150;
         }
 
         public override double WindowFor(HitResult result)
@@ -249,19 +254,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 default:
                     throw new ArgumentOutOfRangeException(nameof(result), result, null);
             }
-        }
-
-        public override HitResult ResultFor(double timeOffset)
-        {
-            HitResult result = base.ResultFor(timeOffset);
-
-            if (result == HitResult.None && IsHitResultAllowed(HitResult.Pool))
-            {
-                if (timeOffset < -(miss + 500) || timeOffset > miss + 150)
-                    return HitResult.Pool;
-            }
-
-            return result;
         }
     }
 }

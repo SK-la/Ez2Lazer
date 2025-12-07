@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Pool:
-                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.2; // Strict health deduction for pool
+                    return -0.05;
 
                 // case HitResult.Miss:
                 //     switch (hitObject)

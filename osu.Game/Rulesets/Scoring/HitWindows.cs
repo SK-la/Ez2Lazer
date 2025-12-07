@@ -75,13 +75,33 @@ namespace osu.Game.Rulesets.Scoring
         public abstract void SetDifficulty(double difficulty);
 
         /// <summary>
+        /// Pool 判定是否启用
+        /// </summary>
+        public virtual bool AllowPoolEnabled { get; set; }
+
+        /// <summary>
         /// Retrieves the <see cref="HitResult"/> for a time offset.
         /// </summary>
         /// <param name="timeOffset">The time offset.</param>
         /// <returns>The hit result, or <see cref="HitResult.None"/> if <paramref name="timeOffset"/> doesn't result in a judgement.</returns>
-        public virtual HitResult ResultFor(double timeOffset)
+        public HitResult ResultFor(double timeOffset)
         {
             timeOffset = Math.Abs(timeOffset);
+
+            if (AllowPoolEnabled)
+            {
+                if (IsHitResultAllowed(HitResult.Pool))
+                {
+                    double miss = WindowFor(HitResult.Miss);
+                    double poolEarlyWindow = miss + 500;
+                    double poolLateWindow = miss + 150;
+                    if ((timeOffset > -poolEarlyWindow &&
+                         timeOffset < -miss) ||
+                        (timeOffset < poolLateWindow &&
+                         timeOffset > miss))
+                        return HitResult.Pool;
+                }
+            }
 
             for (var result = HitResult.Perfect; result >= HitResult.Miss; --result)
             {
