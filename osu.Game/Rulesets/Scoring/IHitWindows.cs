@@ -29,23 +29,4 @@ namespace osu.Game.Rulesets.Scoring
 
         void ResetHitWindows();
     }
-
-    public static class HitWindowsExtensions
-    {
-        public static void SetDifficultyRange(this HitWindows windows, double perfect, double great, double good, double ok, double meh, double miss)
-        {
-            if (windows is DefaultHitWindows defaultWindows)
-            {
-                defaultWindows.SetCustomWindows(perfect, great, good, ok, meh, miss);
-            }
-        }
-
-        public static void ResetHitWindows(this HitWindows windows)
-        {
-            if (windows is DefaultHitWindows defaultWindows)
-            {
-                defaultWindows.ResetHitWindows();
-            }
-        }
-    }
 }

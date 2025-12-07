@@ -134,9 +134,6 @@ namespace osu.Game.Screens.Select.Carousel
                 }
             }
 
-            // Schedule(() =>
-            // {
-
             Header.Children = new Drawable[]
             {
                 background = new Box

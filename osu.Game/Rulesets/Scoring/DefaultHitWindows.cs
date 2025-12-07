@@ -26,37 +26,14 @@ namespace osu.Game.Rulesets.Scoring
         private double meh;
         private double miss;
 
-        private bool isCustom;
-
-        public void ResetHitWindows()
-        {
-            isCustom = false;
-        }
-
-        public void SetCustomWindows(double perfectWindow, double greatWindow, double goodWindow,
-                                     double okWindow, double mehWindow, double missWindow)
-        {
-            isCustom = true;
-
-            perfect = perfectWindow;
-            great = greatWindow;
-            good = goodWindow;
-            ok = okWindow;
-            meh = mehWindow;
-            miss = missWindow;
-        }
-
         public override void SetDifficulty(double difficulty)
         {
-            if (!isCustom)
-            {
-                perfect = IBeatmapDifficultyInfo.DifficultyRange(difficulty, perfect_window_range);
-                great = IBeatmapDifficultyInfo.DifficultyRange(difficulty, great_window_range);
-                good = IBeatmapDifficultyInfo.DifficultyRange(difficulty, good_window_range);
-                ok = IBeatmapDifficultyInfo.DifficultyRange(difficulty, ok_window_range);
-                meh = IBeatmapDifficultyInfo.DifficultyRange(difficulty, meh_window_range);
-                miss = IBeatmapDifficultyInfo.DifficultyRange(difficulty, miss_window_range);
-            }
+            perfect = IBeatmapDifficultyInfo.DifficultyRange(difficulty, perfect_window_range);
+            great = IBeatmapDifficultyInfo.DifficultyRange(difficulty, great_window_range);
+            good = IBeatmapDifficultyInfo.DifficultyRange(difficulty, good_window_range);
+            ok = IBeatmapDifficultyInfo.DifficultyRange(difficulty, ok_window_range);
+            meh = IBeatmapDifficultyInfo.DifficultyRange(difficulty, meh_window_range);
+            miss = IBeatmapDifficultyInfo.DifficultyRange(difficulty, miss_window_range);
         }
 
         public override double WindowFor(HitResult result)

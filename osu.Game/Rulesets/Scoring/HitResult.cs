@@ -226,7 +226,7 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.ComboBreak:
                     return false;
 
-                // Pool is a special type that does not affect accuracy.
+                // 不影响ACC
                 case HitResult.Pool:
                     return false;
 
