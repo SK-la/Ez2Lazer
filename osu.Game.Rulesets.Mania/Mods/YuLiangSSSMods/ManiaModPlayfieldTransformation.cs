@@ -29,6 +29,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1.0;
 
+        public override ModType Type => ModType.YuLiangSSS_Mod;
+
         [SettingSource("Minimum scale", "The minimum scale of the playfield.")]
         public BindableFloat MinScale { get; } = new BindableFloat(0.3f)
         {

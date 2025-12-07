@@ -343,9 +343,9 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModAdjust(),
-                        new ManiaModChangeSpeedByAccuracy(),
+                        // new ManiaModChangeSpeedByAccuracy(),
                         // new ManiaModCleaner(),
-                        new ManiaModDeleteSpace(),
+                        // new ManiaModDeleteSpace(),
                         new ManiaModDoublePlay(),
                         new ManiaModDuplicate(),
                         new ManiaModGracer(),
@@ -365,7 +365,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModNtoMAnother(),
                         new ManiaModO2Health(),
                         new ManiaModO2Judgement(),
-                        // new ManiaModPlayfieldTransformation(), //加载有问题
+                        new ManiaModPlayfieldTransformation(), //加载有问题
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
                         new StarRatingRebirth(),

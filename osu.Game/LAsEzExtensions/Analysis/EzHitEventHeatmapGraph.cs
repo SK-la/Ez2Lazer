@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Lines;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
@@ -25,11 +27,17 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private double binSize;
         private double drainRate;
 
+        private int currentOffset = 0;
+        // private Bindable<int>? offsetBindable;
+
         private const int time_bins = 50; // 时间分段数
         private const float circle_size = 5f; // 圆形大小
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
+
+        // [Resolved]
+        // private OsuConfigManager config { get; set; } = null!;
 
         public EzHitEventHeatmapGraph(ScoreInfo score, HitWindows hitWindows)
         {
@@ -52,7 +60,19 @@ namespace osu.Game.LAsEzExtensions.Analysis
             binSize = Math.Max(1, binSize);
 
             Scheduler.AddOnce(updateDisplay);
+
+            // TODO: 音频偏移功能待实现, 目前下面的代码无法实现，会报错
+            // offsetBindable = config.GetBindable<int>(OsuSetting.AudioOffset);
+            // currentOffset = offsetBindable.Value;
+            //
+            // offsetBindable.BindValueChanged(updateOffset);
         }
+
+        // private void updateOffset(ValueChangedEvent<int> obj)
+        // {
+        //     currentOffset = obj.NewValue;
+        //     Scheduler.AddOnce(updateDisplay);
+        // }
 
         private void updateDisplay()
         {
@@ -85,7 +105,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 double time = e.HitObject.StartTime;
                 float xPosition = (float)(time / (time_bins * binSize)); // 计算 x 轴位置
-                float yPosition = (float)(e.TimeOffset);
+                float yPosition = (float)(e.TimeOffset + currentOffset);
 
                 AddInternal(new Circle
                 {
