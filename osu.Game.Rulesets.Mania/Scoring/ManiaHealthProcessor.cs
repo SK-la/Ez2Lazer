@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
@@ -10,6 +11,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaHealthProcessor : LegacyDrainingHealthProcessor
     {
+        private HitResult lastResult = HitResult.None;
+        private int streak;
+
         public ManiaHealthProcessor(double drainStartTime)
             : base(drainStartTime)
         {
@@ -30,28 +34,37 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override double GetHealthIncreaseFor(HitObject hitObject, HitResult result)
         {
+            if (result == lastResult)
+                streak++;
+            else
+            {
+                streak = 1;
+                lastResult = result;
+            }
+
             double increase = 0;
 
             switch (result)
             {
                 case HitResult.Pool:
-                    return -0.05;
+                    double poolIncrease = 0.05 + Math.Min(streak - 1, 4) * 0.0125;
+                    return -poolIncrease;
                     // 移除自定义逻辑，让它使用 Judgement.HealthIncreaseFor
                     // break;
 
-                // case HitResult.Miss:
-                //     switch (hitObject)
-                //     {
-                //         case HeadNote:
-                //         case TailNote:
-                //             return -(Beatmap.Difficulty.DrainRate + 1) * 0.00375;
-                //
-                //         default:
-                //             return -(Beatmap.Difficulty.DrainRate + 1) * 0.0075;
-                //     }
-                //
-                // case HitResult.Meh:
-                //     return -(Beatmap.Difficulty.DrainRate + 1) * 0.0016;
+                case HitResult.Miss:
+                    switch (hitObject)
+                    {
+                        case HeadNote:
+                        case TailNote:
+                            return -(Beatmap.Difficulty.DrainRate + 1) * 0.00375;
+
+                        default:
+                            return -(Beatmap.Difficulty.DrainRate + 1) * 0.0075;
+                    }
+
+                case HitResult.Meh:
+                    return -(Beatmap.Difficulty.DrainRate + 1) * 0.0016;
 
                 case HitResult.Ok:
                     return 0;
@@ -68,6 +81,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     increase = 0.0053 - Beatmap.Difficulty.DrainRate * 0.0005;
                     break;
             }
+
+            if (increase > 0)
+                increase *= streak;
 
             return HpMultiplierNormal * increase;
         }
