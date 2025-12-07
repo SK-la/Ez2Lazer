@@ -4,15 +4,14 @@
 
 # Ez2Lazer!
 
-
-## Running osu!
-
-If you are just looking to give the game a whirl, you can grab the latest release for your platform:
+This is always a pre-release version, maintained by me personally
 
 ### Latest release: [Windows 10+ (x64)](https://github.com/SK-la/Ez2Lazer/releases)
 - Setup [EzResources](https://la1225-my.sharepoint.com/:f:/g/personal/la_la1225_onmicrosoft_com/EiosAbw_1C9ErYCNRD1PQvkBaYvhflOkt8G9ZKHNYuppLg?e=DWY1kn) Pack to osu datebase path.
 
-- A desktop platform with the [.NET 8.0 SDK](https://dotnet.microsoft.com/download) installed.
+- A desktop platform with the [.NET 8.0 RunTime](https://dotnet.microsoft.com/download) installed.
+
+- Develop modifications using Rider + VS Code
 
 When working with the codebase, we recommend using an IDE with intelligent code completion and syntax highlighting, such as the latest version of [Visual Studio](https://visualstudio.microsoft.com/vs/), [JetBrains Rider](https://www.jetbrains.com/rider/), or [Visual Studio Code](https://code.visualstudio.com/) with the [EditorConfig](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) and [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit) plugin installed.
 
@@ -124,7 +123,10 @@ Audio System
 
 
 ## Special Thanks
-- [YuLiangSSS](https://osu.ppy.sh/users/15889644): Many fun mods contributed
+- [osu!](https://github.com/ppy/osu): The original game and framework. The code is very strong and elegant.
+- [YuLiangSSS](https://osu.ppy.sh/users/15889644): Many fun mods contributed.
+
+
 
 ## Licence
 
