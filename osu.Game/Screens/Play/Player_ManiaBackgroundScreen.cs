@@ -1,16 +1,16 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections;
-using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
-using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Backgrounds;
 using osuTK;
 
@@ -18,18 +18,21 @@ namespace osu.Game.Screens.Play
 {
     public partial class Player
     {
+        /// <summary>
+        /// 已过时的 Mania 专用背景屏幕。新的实现在mania规则集中,Stage实现。
+        /// </summary>
         public partial class PlayerManiaBackgroundScreen : BackgroundScreenBeatmap
         {
-            private readonly Player player;
-            private Container maniaBackgroundMask = null!;
-            private DimmableBackground maniaMaskedDimmable = null!;
-            private Vector2 lastDrawSize;
-
-            // Mania 专用配置（供自定义背景使用）
             private Bindable<double> maniaColumnBlur = new Bindable<double>();
             private Bindable<double> maniaColumnWidth = new Bindable<double>();
             private Bindable<double> maniaSpecialFactor = new Bindable<double>();
             private Bindable<float> uiScale = new Bindable<float>(1f);
+
+            private readonly Player player;
+
+            private Container maniaBackgroundMask = null!;
+            private DimmableBackground maniaMaskedDimmable = null!;
+            private Vector2 lastDrawSize;
 
             private int keyMode;
 
@@ -44,9 +47,13 @@ namespace osu.Game.Screens.Play
             }
 
             [BackgroundDependencyLoader]
-            private void load(OsuConfigManager config)
+            private void load(OsuConfigManager config, CancellationToken cancellationToken)
             {
-                keyMode = (int)player.Beatmap.Value.Beatmap.BeatmapInfo.Difficulty.CircleSize;
+                var playableBeatmap = player.loadPlayableBeatmap(player.Mods.Value.ToArray(), cancellationToken);
+
+                keyMode = (int)playableBeatmap.Difficulty.CircleSize;
+
+                Logger.Log($"[ManiaBackground] KeyMode: {keyMode}");
 
                 // 创建遮罩背景容器
                 // 关键：不使用嵌套结构，直接让 DimmableBackground 作为遮罩容器的子元素
@@ -94,6 +101,7 @@ namespace osu.Game.Screens.Play
                 {
                     lastDrawSize = DrawSize;
                     maniaMaskedDimmable.Size = DrawSize;
+                    updateMaskWidth();
                 }
             }
 
@@ -138,5 +146,34 @@ namespace osu.Game.Screens.Play
 //     {
 //         // 如果反射失败，回退到计算列宽总和
 //         totalWidth = 0;
+//     }
+// }
+
+// if (player.DrawableRuleset?.Playfield is ScrollingPlayfield scrollingPlayfield)
+// {
+//     try
+//     {
+//         // 通过反射访问ManiaPlayfield的私有stages字段
+//         var stagesField = scrollingPlayfield.GetType().GetField("stages", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+//
+//         if (stagesField != null)
+//         {
+//             if (stagesField.GetValue(scrollingPlayfield) is IList stages && stages.Count > 0)
+//             {
+//                 // 获取第一个Stage的DrawWidth（Mania通常只有一个Stage）
+//                 object? firstStage = stages[0];
+//                 var cs = firstStage?.GetType().GetProperty("Columns");
+//
+//                 if (cs != null)
+//                 {
+//                     keyMode = (int)cs.GetValue(firstStage)!;
+//                 }
+//             }
+//         }
+//     }
+//     catch
+//     {
+//         // 如果反射失败，回退到谱面信息获取
+//         keyMode = (int)workingBeatmap.Beatmap.Difficulty.CircleSize;
 //     }
 // }

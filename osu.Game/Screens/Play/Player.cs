@@ -28,7 +28,6 @@ using osu.Game.IO.Archives;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
-using osu.Game.Screens.Backgrounds;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -65,15 +64,9 @@ namespace osu.Game.Screens.Play
 
         protected override bool PlayExitSound => !isRestarting;
 
-        // 为 Mania 创建自定义背景（带遮罩）
-        protected override BackgroundScreen CreateBackground() =>
-            Ruleset.Value.OnlineID == 3
-                ? new PlayerManiaBackgroundScreen(Beatmap.Value, this)
-                : new BackgroundScreenBeatmap(Beatmap.Value);
-
         protected override UserActivity InitialActivity => new UserActivity.InSoloGame(Beatmap.Value.BeatmapInfo, Ruleset.Value);
 
-        public override float BackgroundParallaxAmount => ruleset?.RulesetInfo.OnlineID == 3 ? 0 : 0.1f;
+        public override float BackgroundParallaxAmount => 0.1f;
 
         public override bool HideOverlaysOnEnter => true;
 
