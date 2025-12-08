@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Logging;
+using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -71,7 +72,10 @@ namespace osu.Game.Rulesets.Mania.UI
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
-        private Player player { get; set; } = null!;
+        private OsuConfigManager osuConfig { get; set; } = null!;
+
+        [Resolved]
+        private Player? player { get; set; }
 
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = new Bindable<double>();
@@ -218,13 +222,24 @@ namespace osu.Game.Rulesets.Mania.UI
                 dimBox.Alpha = (float)v.NewValue;
             }, true);
 
-            // 设置副本背景
-            var maskedBackground = new BeatmapBackground(player.Beatmap.Value);
-            maskedBackground.FadeInFromZero(500, Easing.OutQuint);
-            maniaMaskedDimmable.Background = maskedBackground;
-            // maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(player.storyboardReplacesBackground);
-            // maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
-            maniaMaskedDimmable.IsBreakTime.BindTo(player.IsBreakTime);
+            var showStoryboard = osuConfig.GetBindable<bool>(OsuSetting.ShowStoryboard);
+
+            if (showStoryboard.Value)
+            {
+                var maskedBackgroundWithStoryboard = new BeatmapBackgroundWithStoryboard(player.Beatmap.Value);
+                maskedBackgroundWithStoryboard.FadeInFromZero(500, Easing.OutQuint);
+                maniaMaskedDimmable.Background = maskedBackgroundWithStoryboard;
+            }
+            else
+            {
+                var maskedBackground = new BeatmapBackground(player?.Beatmap.Value);
+                maskedBackground.FadeInFromZero(500, Easing.OutQuint);
+                maniaMaskedDimmable.Background = maskedBackground;
+            }
+
+            maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(showStoryboard);
+            maniaMaskedDimmable.IgnoreUserSettings.Value = false;
+            // maniaMaskedDimmable.IsBreakTime.BindTo(player?.IsBreakTime);
 
             columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
 
@@ -285,7 +300,7 @@ namespace osu.Game.Rulesets.Mania.UI
             // While masking on effectively only the Y-axis, so we need to set the width of the bar line container manually
             barLineContainer.Width = columnFlow.Width;
 
-            maniaMaskedDimmable.Size = player.DrawSize;
+            if (player != null) maniaMaskedDimmable.Size = player.DrawSize;
         }
     }
 }
