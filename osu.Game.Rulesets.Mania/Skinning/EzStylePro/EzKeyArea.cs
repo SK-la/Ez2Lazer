@@ -103,7 +103,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             stageName.BindValueChanged(_ => loadAnimation(), true);
             hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
-            ezSkinConfig.OnColumnSizeChanged += OnConfigChanged;
+            ezSkinConfig.OnNoteSizeChanged += OnConfigChanged;
         }
 
         protected virtual string KeySuffix

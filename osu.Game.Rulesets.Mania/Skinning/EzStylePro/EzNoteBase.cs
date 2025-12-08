@@ -102,8 +102,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             NoteSetName.BindValueChanged(OnNoteChanged);
             NoteSize.BindValueChanged(_ => UpdateSize(), true);
             EnabledColor.BindValueChanged(_ => UpdateColor(), true);
+            EzSkinConfig.OnNoteColourChanged += UpdateColor;
+            EzSkinConfig.OnNoteSizeChanged += (() =>
+            {
+                updatedColor = false;
+                UpdateSize();
+            });
             // columnColorBindable.BindValueChanged(_ => UpdateColor(), true);
         }
+
+        private bool updatedColor;
 
         private void OnNoteChanged(ValueChangedEvent<string> obj)
         {
@@ -113,6 +121,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             MainContainer?.Clear();
 
             Scheduler.AddOnce(OnDrawableChanged);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!updatedColor)
+                UpdateColor();
         }
 
         protected virtual void UpdateSize()
@@ -139,6 +155,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                             sideLine.UpdateGlowEffect(NoteColor);
                     }
                 }
+
+                updatedColor = true;
             }
         }
 
@@ -173,6 +191,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.Dispose(isDisposing);
 
             EzLocalTextureFactory.ClearGlobalCache();
+            EzSkinConfig.OnNoteColourChanged -= UpdateColor;
+            EzSkinConfig.OnNoteSizeChanged -= UpdateSize;
         }
     }
 }

@@ -208,7 +208,7 @@ namespace osu.Game.Screens
 
                 if (replayGeneratingMod != null)
                     screen.Push(new EndlessPlayer((beatmap, mods) => replayGeneratingMod.CreateScoreFromReplayData(beatmap, mods)));
-            }, new[] { typeof(Player)});
+            }, new[] { typeof(Player) });
         }
 
         protected override void Update()

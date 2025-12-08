@@ -14,6 +14,7 @@ using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Extensions;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
+using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
@@ -39,6 +40,9 @@ namespace osu.Game.Screens
 
         [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
+
+        [Resolved]
+        private SkinManager skinManager { get; set; } = null!;
 
         public EzColumnTab()
             : base("EZ Column Settings") { }
@@ -184,7 +188,11 @@ namespace osu.Game.Screens
         {
             return new SettingsButton
             {
-                Action = () => ezSkinConfig.Save(),
+                Action = () =>
+                {
+                    skinManager.CurrentSkinInfo.TriggerChange();
+                    ezSkinConfig.Save();
+                },
             }.WithTwoLineText("(保存颜色设置)", "Save Color Settings");
         }
 

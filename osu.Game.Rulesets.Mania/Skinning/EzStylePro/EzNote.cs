@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (animation is TextureAnimation textureAnimation && textureAnimation.FrameCount == 0)
             {
                 animation.Dispose();
-                Schedule(UpdateColor);
+                UpdateColor();
                 return;
             }
 
@@ -36,6 +36,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
 
             UpdateSize();
+            UpdateColor();
         }
 
         protected override void UpdateSize()

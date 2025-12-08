@@ -76,13 +76,8 @@ namespace osu.Game.Screens
             SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
-            SetDefault(EzSkinSetting.ColumnBlur, 0.7, 0.01, 1, 0.01);
-            SetDefault(EzSkinSetting.ColumnDim, 0.7, 0.01, 1, 0.01);
-            SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
-            SetDefault(EzSkinSetting.ColumnTypeB, Colour4.FromHex("#648FFF"));
-            SetDefault(EzSkinSetting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
-            SetDefault(EzSkinSetting.ColumnTypeE, Colour4.FromHex("#FF4A4A"));
-            SetDefault(EzSkinSetting.ColumnTypeP, Colour4.FromHex("#72FF72"));
+            SetDefault(EzSkinSetting.ColumnBlur, 0.7, 0.0, 1, 0.01);
+            SetDefault(EzSkinSetting.ColumnDim, 0.7, 0.0, 1, 0.01);
 
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
             SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
@@ -322,7 +317,8 @@ namespace osu.Game.Screens
         #region 事件发布
 
         // public event Action? OnPositionChanged;
-        public event Action? OnColumnSizeChanged;
+        public event Action? OnNoteSizeChanged;
+        public event Action? OnNoteColourChanged;
 
         private void initializeEvents()
         {
@@ -330,9 +326,23 @@ namespace osu.Game.Screens
             var specialFactorBindable = GetBindable<double>(EzSkinSetting.SpecialFactor);
             var columnWidthStyleBindable = GetBindable<EzColumnWidthStyle>(EzSkinSetting.ColumnWidthStyle);
 
-            columnWidthBindable.BindValueChanged(_ => OnColumnSizeChanged?.Invoke());
-            specialFactorBindable.BindValueChanged(_ => OnColumnSizeChanged?.Invoke());
-            columnWidthStyleBindable.BindValueChanged(_ => OnColumnSizeChanged?.Invoke());
+            columnWidthBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+            specialFactorBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+            columnWidthStyleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+
+            var colorSettingsEnabledBindable = GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            var colorABindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeA);
+            var colorBBindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeB);
+            var colorSBindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeS);
+            var colorEBindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeE);
+            var colorPBindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeP);
+
+            colorSettingsEnabledBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorABindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorBBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorSBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorEBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorPBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
         }
 
         #endregion
@@ -354,6 +364,20 @@ namespace osu.Game.Screens
 
         IBindable<float> IGameplaySettings.ComboColourNormalisationAmount => null!;
         IBindable<float> IGameplaySettings.PositionalHitsoundsLevel => null!;
+
+        public int KeyMode;
+
+        public int GetKeyMode()
+        {
+            return KeyMode;
+        }
+
+        public double ColumnTotalWidth;
+
+        public double GetColumnTotalWidth()
+        {
+            return ColumnTotalWidth;
+        }
     }
 
     public enum EzColumnWidthStyle
