@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Logging;
+using osu.Game.Graphics.Backgrounds;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
@@ -24,6 +25,8 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;
+using osu.Game.Screens.Backgrounds;
+using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -65,10 +68,16 @@ namespace osu.Game.Rulesets.Mania.UI
         private ISkinSource currentSkin = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinSettings { get; set; } = null!;
+        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+
+        [Resolved]
+        private Player player { get; set; } = null!;
 
         private Bindable<double> columnDim = null!;
+        private Bindable<double> columnBlur = new Bindable<double>();
+
         private readonly Box dimBox;
+        private readonly BackgroundScreenBeatmap.DimmableBackground maniaMaskedDimmable;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
@@ -87,7 +96,20 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                dimBox = new Box //通过叠加覆盖实现暗化效果
+                new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Masking = true,
+                    Child = maniaMaskedDimmable = new BackgroundScreenBeatmap.DimmableBackground
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                    }
+                },
+                dimBox = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
                     Colour = Colour4.Black,
@@ -151,7 +173,7 @@ namespace osu.Game.Rulesets.Mania.UI
             for (int i = 0; i < definition.Columns; i++)
             {
                 bool isSpecial = definition.IsSpecialColumn(i);
-                // bool isSpecial = ezSkinSettings.IsSpecialColumn(definition.Columns, i);
+                // bool isSpecial = ezSkinConfig.IsSpecialColumn(definition.Columns, i);
 
                 var action = columnStartAction;
                 columnStartAction++;
@@ -186,13 +208,27 @@ namespace osu.Game.Rulesets.Mania.UI
             skin.SourceChanged += onSkinChanged;
             onSkinChanged();
 
-            columnDim = ezSkinSettings.GetBindable<double>(EzSkinSetting.ColumnDim);
+            ezSkinConfig.KeyMode = Definition.Columns; //确保 KeyMode 已设置正确
+            ezSkinConfig.ColumnTotalWidth = DrawWidth; //确保 ColumnTotalWidth 已设置正确
 
+            columnDim = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnDim);
             // 应用暗化效果
             columnDim.BindValueChanged(v =>
             {
                 dimBox.Alpha = (float)v.NewValue;
             }, true);
+
+            // 设置副本背景
+            var maskedBackground = new BeatmapBackground(player.Beatmap.Value);
+            maskedBackground.FadeInFromZero(500, Easing.OutQuint);
+            maniaMaskedDimmable.Background = maskedBackground;
+            // maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(player.storyboardReplacesBackground);
+            // maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
+            maniaMaskedDimmable.IsBreakTime.BindTo(player.IsBreakTime);
+
+            columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
+
+            columnBlur.BindValueChanged(v => maniaMaskedDimmable.BlurAmount.Value = (float)v.NewValue * 50, true);
         }
 
         private void onSkinChanged()
