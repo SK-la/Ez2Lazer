@@ -37,11 +37,11 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 },
                 new SettingsCheckbox
                 {
-                    LabelText = "Custom Health System From HitMode Setting",
+                    LabelText = "O2Jam Health System",
                     Current = config.GetBindable<bool>(OsuSetting.CustomHealthFormHitMode),
-                    // Alpha = config.GetBindable<EzMUGHitMode>(OsuSetting.HitMode).Value == EzMUGHitMode.O2Jam
-                    //     ? 1
-                    //     : 0
+                    Alpha = config.GetBindable<EzMUGHitMode>(OsuSetting.HitMode).Value == EzMUGHitMode.O2Jam
+                        ? 1
+                        : 0
                 },
                 new SettingsSlider<double>
                 {

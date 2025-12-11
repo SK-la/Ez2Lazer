@@ -12,9 +12,6 @@ namespace osu.Game.Rulesets.Mania.Judgements
         {
             switch (result)
             {
-                case HitResult.Pool:
-                    return -DEFAULT_MAX_HEALTH_INCREASE * 0.5;
-
                 case HitResult.Meh:
                     return -DEFAULT_MAX_HEALTH_INCREASE * 0.5;
 
