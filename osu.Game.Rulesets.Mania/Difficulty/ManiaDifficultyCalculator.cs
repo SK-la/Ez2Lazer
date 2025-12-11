@@ -4,18 +4,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Mania.Difficulty.Skills;
+using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
 using osu.Game.Rulesets.Mania.MathUtils;
 using osu.Game.Rulesets.Mania.Mods;
-using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
@@ -40,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             originalOverallDifficulty = beatmap.BeatmapInfo.Difficulty.OverallDifficulty;
         }
 
-        public double XxySR { get; set; }
+        public double XXY_SR { get; set; }
 
         protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate)
         {
@@ -52,139 +52,18 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
             double SR = skills[0].DifficultyValue() * difficulty_multiplier;
 
-            SR = AdditionalMethod(beatmap, mods, skills, clockRate, SR);
-            XxySR = SR;
+            // SR = SRCalculator.CalculateSR(beatmap, mods, skills, clockRate, SR);
+            SR = SRCalculator.CalculateSR(beatmap);
+            XXY_SR = SR;
 
-            var attributes = new ManiaDifficultyAttributes
+            ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {
                 StarRating = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
                 Mods = mods,
-                MaxCombo = beatmap.HitObjects.Sum(maxComboForObject)
+                MaxCombo = beatmap.HitObjects.Sum(maxComboForObject),
             };
 
             return attributes;
-        }
-
-        public double AdditionalMethod(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate, double originalValue)
-        {
-            double sr = originalValue;
-
-            if (mods.Any(m => m is StarRatingRebirth))
-            {
-                var beforeCal = DateTime.Now;
-                var maniaBeatmap = (ManiaBeatmap)beatmap;
-                int keys = (int)maniaBeatmap.Difficulty.CircleSize;
-                double od = maniaBeatmap.Difficulty.OverallDifficulty;
-                int cs = (int)maniaBeatmap.Difficulty.CircleSize;
-                var hit = maniaBeatmap.HitObjects.ToList();
-                keys = maniaBeatmap.TotalColumns;
-
-                ManiaModNtoM? ntmMod = null;
-                ManiaModNtoMAnother? ntmaMod = null;
-                ManiaModDoublePlay? dpMod = null;
-                ManiaModAdjust? adjustMod = null;
-                StarRatingRebirth? starRatingRebirth = null;
-
-                foreach (var mod in mods)
-                {
-                    if (mod.GetType() == typeof(ManiaModNtoM)) ntmMod = (ManiaModNtoM)mod;
-
-                    if (mod.GetType() == typeof(ManiaModNtoMAnother)) ntmaMod = (ManiaModNtoMAnother)mod;
-
-                    if (mod.GetType() == typeof(ManiaModDoublePlay)) dpMod = (ManiaModDoublePlay)mod;
-
-                    if (mod.GetType() == typeof(StarRatingRebirth)) starRatingRebirth = (StarRatingRebirth)mod;
-
-                    if (mod.GetType() == typeof(ManiaModAdjust)) adjustMod = (ManiaModAdjust)mod;
-                }
-
-                if (mods.Any(m => m is StarRatingRebirth) && cs < keys)
-                {
-                    if (ntmMod is not null) hit = StarRatingRebirth.NTM(hit, keys, cs)!;
-                    /*if (ntma && ntmamod is not null)
-                    {
-                        hit = StarRatingRebirth.NTMA(beatmap, ntmamod.BlankColumn.Value, keys, ntmamod.Gap.Value, ntmamod.CleanDivide.Value)!;
-                    }
-                    if (dpmod is not null && cs == 4)
-                    {
-                        hit = StarRatingRebirth.DP(hit, dpmod.Style.Value);
-                    }*/
-                    // IDK why NtoM is not working (cannot get the correct HitObjects), but NtoMAnother and DP is working fine.
-                }
-
-                try
-                {
-                    if (starRatingRebirth is not null && keys <= 10 && mods.Any(m => m is StarRatingRebirth) /* && !hasNull*/)
-                    {
-                        if (starRatingRebirth.Original.Value)
-                        {
-                            if (adjustMod is not null)
-                            {
-                                //if (adjustMod.UseBPM.Value)
-                                //{
-                                //    if (beatmap.BeatmapInfo.BPM == Beatmap.BeatmapInfo.BPM)
-                                //    {
-                                //        SR = StarRatingRebirth.CalculateStarRating(hit, Beatmap.BeatmapInfo.Difficulty.OverallDifficulty, keys, adjustMod.SpeedChange.Value);
-                                //    }
-                                //    else
-                                //    {
-                                //        SR = originalValue;
-                                //    }
-                                //}
-                                //else
-                                {
-                                    sr = StarRatingRebirth.CalculateStarRating(hit, Beatmap.BeatmapInfo.Difficulty.OverallDifficulty, keys, adjustMod.SpeedChange.Value);
-                                }
-                            }
-                            else
-                                sr = StarRatingRebirth.CalculateStarRating(hit, od, keys, clockRate);
-                        }
-                        else if (starRatingRebirth.Custom.Value)
-                        {
-                            if (adjustMod is not null)
-                            {
-                                //if (adjustMod.UseBPM.Value)
-                                //{
-                                //    if (beatmap.BeatmapInfo.BPM == Beatmap.BeatmapInfo.BPM)
-                                //    {
-                                //        SR = StarRatingRebirth.CalculateStarRating(hit, starRatingRebirth.OD.Value, keys, adjustMod.SpeedChange.Value);
-                                //    }
-                                //    else
-                                //    {
-                                //        SR = originalValue;
-                                //    }
-                                //}
-                                //else
-                                {
-                                    sr = StarRatingRebirth.CalculateStarRating(hit, starRatingRebirth.OD.Value, keys, adjustMod.SpeedChange.Value);
-                                }
-                            }
-                            else
-                                sr = StarRatingRebirth.CalculateStarRating(hit, starRatingRebirth.OD.Value, keys, clockRate);
-                        }
-                        else
-                            sr = StarRatingRebirth.CalculateStarRating(hit, od, keys, clockRate);
-                    }
-                    else
-                        sr = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
-                }
-                catch
-                {
-                    try
-                    {
-                        sr = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
-                    }
-                    catch
-                    {
-                        sr = 0;
-                    }
-                }
-
-                var afterCal = DateTime.Now;
-                // Logger.Log(beatmap.Metadata.Title + " \n" + beatmap.BeatmapInfo.DifficultyName + "\n Elapsed Time: " + (afterCal - beforeCal).ToString(), level: LogLevel.Important);
-            }
-
-            return sr;
         }
 
         private static int maxComboForObject(HitObject hitObject)
