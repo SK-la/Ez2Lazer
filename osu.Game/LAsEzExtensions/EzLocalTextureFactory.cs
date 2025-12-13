@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Screens;
 using osu.Game.Skinning;
 using osuTK;
@@ -72,8 +73,8 @@ namespace osu.Game.LAsEzExtensions
         }
 
         public EzLocalTextureFactory(EzSkinSettingsManager ezSkinConfig,
-            IRenderer renderer,
-            Storage hostStorage)
+                                     IRenderer renderer,
+                                     Storage hostStorage)
         {
             this.ezSkinConfig = ezSkinConfig;
 

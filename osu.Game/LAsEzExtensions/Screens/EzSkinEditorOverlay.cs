@@ -25,6 +25,7 @@ using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
+using osu.Game.Screens;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Screens.Menu;
@@ -32,7 +33,7 @@ using osu.Game.Screens.Play;
 using osu.Game.Users;
 using osu.Game.Utils;
 
-namespace osu.Game.Screens
+namespace osu.Game.LAsEzExtensions.Screens
 {
     /// <summary>
     /// A container which handles loading a skin editor on user request for a specified target.

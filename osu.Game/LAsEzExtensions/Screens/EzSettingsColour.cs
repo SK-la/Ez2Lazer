@@ -18,7 +18,7 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
 using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Configuration
+namespace osu.Game.LAsEzExtensions.Screens
 {
     public partial class EzSettingsColour : SettingsItem<Colour4>
     {

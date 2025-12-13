@@ -3,7 +3,7 @@
 
 using osu.Framework.Bindables;
 
-namespace osu.Game.Screens
+namespace osu.Game.LAsEzExtensions.Screens
 {
     public interface IEzConfig
     {

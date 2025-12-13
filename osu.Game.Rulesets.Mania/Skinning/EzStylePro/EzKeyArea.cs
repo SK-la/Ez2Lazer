@@ -18,6 +18,7 @@ using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
 using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {

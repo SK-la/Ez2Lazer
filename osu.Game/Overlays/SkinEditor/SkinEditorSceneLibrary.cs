@@ -10,6 +10,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Localisation;
 using osu.Game.Screens;
 using osu.Game.Screens.SelectV2;

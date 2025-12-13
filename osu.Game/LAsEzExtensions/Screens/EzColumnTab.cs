@@ -13,12 +13,13 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Extensions;
 using osu.Game.Overlays.Settings;
+using osu.Game.Screens;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens
+namespace osu.Game.LAsEzExtensions.Screens
 {
     public partial class EzColumnTab : EditorSidebarSection
     {

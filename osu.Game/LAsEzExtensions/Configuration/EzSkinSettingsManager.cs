@@ -10,11 +10,9 @@ using osu.Framework.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Skinning;
 using osu.Game.Skinning.Components;
 
-namespace osu.Game.Screens
+namespace osu.Game.LAsEzExtensions.Configuration
 {
     public class EzSkinSettingsManager : IniConfigManager<EzSkinSetting>, IGameplaySettings
     {

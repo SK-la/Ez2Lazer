@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 
-namespace osu.Game.Screens
+namespace osu.Game.LAsEzExtensions.Configuration
 {
     public class EzLocalizationManager
     {

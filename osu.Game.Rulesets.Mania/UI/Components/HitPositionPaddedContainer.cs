@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens;

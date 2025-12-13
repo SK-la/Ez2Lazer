@@ -19,6 +19,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Skinning;

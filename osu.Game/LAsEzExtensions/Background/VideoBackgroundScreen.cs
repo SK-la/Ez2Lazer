@@ -3,6 +3,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Video;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Screens;
 
 namespace osu.Game.LAsEzExtensions.Background

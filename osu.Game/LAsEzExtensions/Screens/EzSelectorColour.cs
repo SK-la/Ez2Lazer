@@ -10,11 +10,11 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Screens;
+using osu.Game.LAsEzExtensions.Configuration;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Configuration
+namespace osu.Game.LAsEzExtensions.Screens
 {
     public partial class EzSelectorColour : CompositeDrawable
     {

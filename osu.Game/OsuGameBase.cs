@@ -46,6 +46,7 @@ using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;

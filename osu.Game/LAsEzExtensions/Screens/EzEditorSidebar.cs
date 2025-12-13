@@ -9,7 +9,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Screens;
 using osu.Game.Screens.Edit.Components;
 
-namespace osu.Game.LAsEzExtensions.Configuration
+namespace osu.Game.LAsEzExtensions.Screens
 {
     internal partial class EzEditorSidebar : EditorSidebar
     {
