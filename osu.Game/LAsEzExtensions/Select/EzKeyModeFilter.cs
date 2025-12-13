@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace osu.Game.Screens.SelectV2
+namespace osu.Game.LAsEzExtensions.Select
 {
     public class CsItemInfo
     {

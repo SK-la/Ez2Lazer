@@ -12,6 +12,7 @@ using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
 
 namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 {
@@ -33,7 +34,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
         /// <summary>
         ///     Computes the star rating for the supplied beatmap synchronously.
         /// </summary>
-        /// <typeparam name="T">Hit object type contained in the beatmap.</typeparam>
         /// <param name="beatmap">Beatmap instance.</param>
         /// <param name="times">Timing breakdown produced by the calculation.</param>
         /// <returns>Calculated SR value.</returns>
@@ -53,7 +53,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
         /// <summary>
         ///     Computes the star rating for the supplied beatmap asynchronously.
         /// </summary>
-        /// <typeparam name="T">Hit object type contained in the beatmap.</typeparam>
         /// <param name="beatmap">Beatmap instance.</param>
         /// <returns>Tuple containing the SR value and timing breakdown.</returns>
         public Task<(double sr, Dictionary<string, long> times)> CalculateSRAsync(IBeatmap beatmap)
@@ -64,7 +63,11 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
         private static (double sr, Dictionary<string, long> times) computeInternalXxySR(IBeatmap beatmap)
         {
             var stopwatch = Stopwatch.StartNew();
-            double sr = XxySRCalculateCore(beatmap);
+
+            ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
+            int keyCount = (int)maniaBeatmap.BeatmapInfo.Difficulty.CircleSize;
+
+            double sr = XxySRCalculateCore(maniaBeatmap, keyCount);
             stopwatch.Stop();
 
             var timings = new Dictionary<string, long>
@@ -79,9 +82,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
         #region 结构体
 
-        private readonly struct NoteData : IEquatable<NoteData>
+        private readonly struct NoteStruct : IEquatable<NoteStruct>
         {
-            public NoteData(int column, int headTime, int tailTime)
+            public NoteStruct(int column, int headTime, int tailTime)
             {
                 Column = column;
                 HeadTime = headTime;
@@ -94,14 +97,14 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             public bool IsLongNote => TailTime >= 0 && TailTime > HeadTime;
 
-            public bool Equals(NoteData other)
+            public bool Equals(NoteStruct other)
             {
                 return Column == other.Column && HeadTime == other.HeadTime && TailTime == other.TailTime;
             }
 
             public override bool Equals(object? obj)
             {
-                return obj is NoteData other && Equals(other);
+                return obj is NoteStruct other && Equals(other);
             }
 
             public override int GetHashCode()
@@ -110,9 +113,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             }
         }
 
-        private readonly struct LnRepresentation
+        private readonly struct LNRepStruct
         {
-            public LnRepresentation(int[] points, double[] cumulative, double[] values)
+            public LNRepStruct(int[] points, double[] cumulative, double[] values)
             {
                 Points = points;
                 Cumulative = cumulative;
@@ -126,49 +129,40 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
         #endregion
 
-        private static readonly Comparison<NoteData> note_comparer = compareNotes;
+        private static readonly Comparison<NoteStruct> note_comparer = compareNotes;
 
-        public static double XxySRCalculateCore(IBeatmap beatmap)
+        public static double XxySRCalculateCore(ManiaBeatmap maniaBeatmap, int keyCount)
         {
-            ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
-
-            int keyCount = Math.Max(1, (int)Math.Round(maniaBeatmap.BeatmapInfo.Difficulty.CircleSize));
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 
-            if (cross == null)
-            {
-                Console.Error.WriteLine($"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
-                throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
-            }
-
-            if (cross[0] == -1)
+            if (cross == null || cross[0] == -1)
             {
                 Console.Error.WriteLine($"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
                 throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
             }
 
             int estimatedNotes = maniaBeatmap.HitObjects.Count;
-            var notes = new List<NoteData>(estimatedNotes);
-            var notesByColumn = new List<NoteData>[keyCount];
+            if (estimatedNotes == 0) return 0.0;
+            if (estimatedNotes < 10) return 0.1;
+
+            var notes = new List<NoteStruct>(estimatedNotes);
+            var notesByColumn = new List<NoteStruct>[keyCount];
+
             for (int i = 0; i < keyCount; i++)
-                notesByColumn[i] = new List<NoteData>((estimatedNotes / keyCount) + 1);
+                notesByColumn[i] = new List<NoteStruct>((estimatedNotes / keyCount) + 1);
 
             foreach (var hitObject in maniaBeatmap.HitObjects)
             {
                 int column = hitObject.Column;
                 int head = (int)Math.Round(hitObject.StartTime);
                 int tail = (int)Math.Round(hitObject.GetEndTime());
-
-                if (tail <= head)
+                if ((hitObject as IHasDuration)?.EndTime == null)
                     tail = -1;
 
-                var note = new NoteData(column, head, tail);
+                var note = new NoteStruct(column, head, tail);
                 notes.Add(note);
                 notesByColumn[column].Add(note);
             }
-
-            if (notes.Count == 0)
-                return 0;
 
             notes.Sort(note_comparer);
             foreach (var columnNotes in notesByColumn)
@@ -196,7 +190,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             double[][] keyUsage400 = buildKeyUsage400(keyCount, totalTime, notes, baseCorners);
             double[] anchorBase = computeAnchor(keyCount, keyUsage400, baseCorners);
 
-            LnRepresentation? lnRep = longNotes.Count > 0 ? buildLnRepresentation(longNotes, totalTime) : null;
+            LNRepStruct? lnRep = longNotes.Count > 0 ? buildLnRepresentation(longNotes, totalTime) : null;
 
             (double[][] deltaKs, double[] jBarBase) = computeJBar(keyCount, totalTime, x, notesByColumn, baseCorners);
             double[] jBar = interpValues(allCorners, baseCorners, jBarBase);
@@ -280,7 +274,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return Math.Min(leniency, adjustedWindow);
         }
 
-        private static (double[] allCorners, double[] baseCorners, double[] aCorners) buildCorners(int totalTime, List<NoteData> notes)
+        private static (double[] allCorners, double[] baseCorners, double[] aCorners) buildCorners(int totalTime, List<NoteStruct> notes)
         {
             var baseSet = new HashSet<int>();
 
@@ -327,7 +321,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return (allCorners, baseCorners, aCorners);
         }
 
-        private static bool[][] buildKeyUsage(int keyCount, int totalTime, List<NoteData> notes, double[] baseCorners)
+        private static bool[][] buildKeyUsage(int keyCount, int totalTime, List<NoteStruct> notes, double[] baseCorners)
         {
             bool[][] keyUsage = new bool[keyCount][];
             for (int i = 0; i < keyCount; i++)
@@ -368,7 +362,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return active;
         }
 
-        private static double[][] buildKeyUsage400(int keyCount, int totalTime, List<NoteData> notes, double[] baseCorners)
+        private static double[][] buildKeyUsage400(int keyCount, int totalTime, List<NoteStruct> notes, double[] baseCorners)
         {
             double[][] usage = new double[keyCount][];
             for (int k = 0; k < keyCount; k++)
@@ -459,7 +453,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return anchor;
         }
 
-        private static LnRepresentation buildLnRepresentation(List<NoteData> longNotes, int totalTime)
+        private static LNRepStruct buildLnRepresentation(List<NoteStruct> longNotes, int totalTime)
         {
             var diff = new Dictionary<int, double>();
 
@@ -498,10 +492,10 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
                 cumulative[i + 1] = cumulative[i] + segment;
             }
 
-            return new LnRepresentation(points, cumulative, values);
+            return new LNRepStruct(points, cumulative, values);
         }
 
-        private static (double[][] deltaKs, double[] jBar) computeJBar(int keyCount, int totalTime, double x, List<NoteData>[] notesByColumn, double[] baseCorners)
+        private static (double[][] deltaKs, double[] jBar) computeJBar(int keyCount, int totalTime, double x, List<NoteStruct>[] notesByColumn, double[] baseCorners)
         {
             const double default_delta = 1e9;
 
@@ -574,7 +568,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return (deltaKs, jBar);
         }
 
-        private static double[] computeXBar(int keyCount, int totalTime, double x, List<NoteData>[] notesByColumn, int[][] activeColumns, double[] baseCorners, double[] cross)
+        private static double[] computeXBar(int keyCount, int totalTime, double x, List<NoteStruct>[] notesByColumn, int[][] activeColumns, double[] baseCorners, double[] cross)
         {
             double[][] xKs = new double[keyCount + 1][];
             double[][] fastCross = new double[keyCount + 1][];
@@ -588,7 +582,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             // Parallel.For(0, keyCount + 1, k =>
             Parallel.For(0, keyCount + 1, k =>
             {
-                var pair = new List<NoteData>();
+                var pair = new List<NoteStruct>();
 
                 if (k == 0)
                     pair.AddRange(notesByColumn[0]);
@@ -652,7 +646,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return SmoothOnCorners(baseCorners, xBase, 500, 0.001, SmoothMode.Sum);
         }
 
-        private static double[] computePBar(int keyCount, int totalTime, double x, List<NoteData> notes, LnRepresentation? lnRep, double[] anchor, double[] baseCorners)
+        private static double[] computePBar(int keyCount, int totalTime, double x, List<NoteStruct> notes, LNRepStruct? lnRep, double[] anchor, double[] baseCorners)
         {
             double[] pStep = new double[baseCorners.Length];
 
@@ -775,7 +769,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return SmoothOnCorners(aCorners, aStep, 250, 0, SmoothMode.Average);
         }
 
-        private static double[] computeRBar(int keyCount, int totalTime, double x, List<NoteData>[] notesByColumn, List<NoteData> tailNotes, double[] baseCorners)
+        private static double[] computeRBar(int keyCount, int totalTime, double x, List<NoteStruct>[] notesByColumn, List<NoteStruct> tailNotes, double[] baseCorners)
         {
             if (tailNotes.Count < 2) return new double[baseCorners.Length];
 
@@ -819,7 +813,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return SmoothOnCorners(baseCorners, rStep, 500, 0.001, SmoothMode.Sum);
         }
 
-        private static (double[] cStep, double[] ksStep) computeCAndKs(int keyCount, List<NoteData> notes, bool[][] keyUsage, double[] baseCorners)
+        private static (double[] cStep, double[] ksStep) computeCAndKs(int keyCount, List<NoteStruct> notes, bool[][] keyUsage, double[] baseCorners)
         {
             double[] cStep = new double[baseCorners.Length];
             double[] ksStep = new double[baseCorners.Length];
@@ -874,7 +868,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return gaps;
         }
 
-        private static double FinaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteData> notes, List<NoteData> longNotes)
+        private static double FinaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
         {
             var combined = difficulties.Zip(weights, (d, w) => (d, w)).OrderBy(pair => pair.d).ToList();
             if (combined.Count == 0)
@@ -948,12 +942,12 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return sr;
         }
 
-        private static double finaliseDifficulty(double[] difficulties, double[] weights, List<NoteData> notes, List<NoteData> longNotes)
+        private static double finaliseDifficulty(double[] difficulties, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
         {
             return FinaliseDifficulty(difficulties.ToList(), weights.ToList(), notes, longNotes);
         }
 
-        private static NoteData? findNextColumnNote(NoteData note, List<NoteData>[] notesByColumn)
+        private static NoteStruct? findNextColumnNote(NoteStruct note, List<NoteStruct>[] notesByColumn)
         {
             var columnNotes = notesByColumn[note.Column];
             int index = columnNotes.IndexOf(note);
@@ -1084,11 +1078,11 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return cumulative[prev] + contribution;
         }
 
-        private static double lnIntegral(LnRepresentation representation, int a, int b)
+        private static double lnIntegral(LNRepStruct repStruct, int a, int b)
         {
-            int[] points = representation.Points;
-            double[] cumulative = representation.Cumulative;
-            double[] values = representation.Values;
+            int[] points = repStruct.Points;
+            double[] cumulative = repStruct.Cumulative;
+            double[] values = repStruct.Values;
 
             int startIndex = UpperBound(points, a) - 1;
             int endIndex = UpperBound(points, b) - 1;
@@ -1261,7 +1255,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return Math.Abs(a - b) <= epsilon;
         }
 
-        private static int compareNotes(NoteData a, NoteData b)
+        private static int compareNotes(NoteStruct a, NoteStruct b)
         {
             int headCompare = a.HeadTime.CompareTo(b.HeadTime);
             return headCompare != 0 ? headCompare : a.Column.CompareTo(b.Column);

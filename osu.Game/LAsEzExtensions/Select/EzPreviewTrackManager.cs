@@ -18,7 +18,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 
-namespace osu.Game.Screens.SelectV2
+namespace osu.Game.LAsEzExtensions.Select
 {
     /// <summary>
     /// An enhanced preview system that can play background music, hit sounds, and storyboard samples simultaneously during beatmap preview.
@@ -29,7 +29,7 @@ namespace osu.Game.Screens.SelectV2
         private const int hitsound_threshold = 10;
         private const double preview_window_length = 10000; // 10s
         private const double scheduler_interval = 16; // ~60fps
-        private const double trigger_tolerance = 40; // ms 容差
+        private const double trigger_tolerance = 35; // ms 容差
         private const double max_dynamic_preview_length = 30000; // 动态扩展最长 s
         private readonly List<ScheduledHitSound> scheduledHitSounds = new List<ScheduledHitSound>();
 

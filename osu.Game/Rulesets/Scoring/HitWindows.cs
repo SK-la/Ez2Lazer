@@ -93,7 +93,7 @@ namespace osu.Game.Rulesets.Scoring
                 if (IsHitResultAllowed(HitResult.Pool))
                 {
                     double miss = WindowFor(HitResult.Miss);
-                    double poolEarlyWindow = miss + 500;
+                    double poolEarlyWindow = miss + 300;
                     double poolLateWindow = miss + 150;
                     if ((timeOffset > -poolEarlyWindow &&
                          timeOffset < -miss) ||

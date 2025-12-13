@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Pool:
-                    double poolIncrease = 0.05 + Math.Min(streak - 1, 4) * 0.0125;
+                    double poolIncrease = 0.075 + Math.Min(streak - 1, 4) * 0.0125;
                     return -poolIncrease;
                     // 移除自定义逻辑，让它使用 Judgement.HealthIncreaseFor
                     // break;

@@ -16,6 +16,7 @@ using osu.Game.Rulesets.Mania.Difficulty.Skills;
 using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
 using osu.Game.Rulesets.Mania.MathUtils;
 using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
@@ -52,18 +53,38 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
             double SR = skills[0].DifficultyValue() * difficulty_multiplier;
 
-            // SR = SRCalculator.CalculateSR(beatmap, mods, skills, clockRate, SR);
-            SR = SRCalculator.CalculateSR(beatmap);
+            SR = AdditionalMethod(beatmap, mods, skills, clockRate, SR);
             XXY_SR = SR;
 
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {
-                StarRating = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
+                StarRating = XXY_SR > 0
+                    ? XXY_SR
+                    : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
                 Mods = mods,
                 MaxCombo = beatmap.HitObjects.Sum(maxComboForObject),
             };
 
             return attributes;
+        }
+
+        public double AdditionalMethod(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate, double originalValue)
+        {
+            double sr = originalValue;
+
+            if (mods.Any(m => m is StarRatingRebirth))
+            {
+                try
+                {
+                    sr = SRCalculator.CalculateSR(beatmap);
+                }
+                catch
+                {
+                    sr = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
+                }
+            }
+
+            return sr;
         }
 
         private static int maxComboForObject(HitObject hitObject)
