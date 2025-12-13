@@ -18,36 +18,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaScoreProcessor : ScoreProcessor
     {
-        public List<EzManiaHitTimingInfo> HitTimings { get; private set; } = new List<EzManiaHitTimingInfo>();
-
-        public void AddHitTiming(double hitTime, HitResult result)
-        {
-            HitTimings.Add(new EzManiaHitTimingInfo(hitTime, result));
-        }
-
-        public int PoolCount { get; set; }
-
-        public double CalculateScoreWithParameters(double comboProgress, double accuracyProgress, double bonusPortion, Dictionary<HitResult, int> customHitProportionScore)
-        {
-            double totalScore = 0;
-
-            foreach (var hitTiming in HitTimings)
-            {
-                if (customHitProportionScore.TryGetValue(hitTiming.Result, out int score))
-                {
-                    totalScore += score;
-                }
-            }
-
-            totalScore += 150000 * comboProgress
-                          + 850000 * Math.Pow(accuracyProgress, 2 + 2 * accuracyProgress) * accuracyProgress
-                          + bonusPortion;
-
-            return totalScore;
-        }
-
         private const double combo_base = 4;
 
+        public int PoorCount { get; set; }
         public (int Perfect, int Great, int Good, int Ok, int Meh, int Miss) HitProportionScore = (305, 300, 200, 100, 50, 0);
 
         public ManiaScoreProcessor()

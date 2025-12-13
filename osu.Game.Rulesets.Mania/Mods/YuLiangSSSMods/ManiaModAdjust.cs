@@ -593,17 +593,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
         {
-            var mania = (ManiaScoreProcessor)scoreProcessor;
+            // var mania = (ManiaScoreProcessor)scoreProcessor;
 
-            if (CustomProportionScore.Value)
-            {
-                mania.HitProportionScore.Perfect = Perfect.Value;
-                mania.HitProportionScore.Great = Great.Value;
-                mania.HitProportionScore.Good = Good.Value;
-                mania.HitProportionScore.Ok = Ok.Value;
-                mania.HitProportionScore.Meh = Meh.Value;
-                mania.HitProportionScore.Miss = Miss.Value;
-            }
+            // if (CustomProportionScore.Value)
+            // {
+            //     mania.HitProportionScore.Perfect = Perfect.Value;
+            //     mania.HitProportionScore.Great = Great.Value;
+            //     mania.HitProportionScore.Good = Good.Value;
+            //     mania.HitProportionScore.Ok = Ok.Value;
+            //     mania.HitProportionScore.Meh = Meh.Value;
+            //     mania.HitProportionScore.Miss = Miss.Value;
+            // }
 
             combo.UnbindAll();
             accuracy.UnbindAll();

@@ -45,16 +45,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     yield return ("Miss Range", $"{MissHit.Value:0.#}");
                 }
 
-                if (CustomProportionScore.Value)
-                {
-                    yield return ("Custom Proportion Score", "On");
-                    yield return ("Perfect Score", $"{Perfect.Value:0.#}");
-                    yield return ("Great Score", $"{Great.Value:0.#}");
-                    yield return ("Good Score", $"{Good.Value:0.#}");
-                    yield return ("Ok Score", $"{Ok.Value:0.#}");
-                    yield return ("Meh Score", $"{Meh.Value:0.#}");
-                    yield return ("Miss Score", $"{Miss.Value:0.#}");
-                }
+                // if (CustomProportionScore.Value)
+                // {
+                //     yield return ("Custom Proportion Score", "On");
+                //     yield return ("Perfect Score", $"{Perfect.Value:0.#}");
+                //     yield return ("Great Score", $"{Great.Value:0.#}");
+                //     yield return ("Good Score", $"{Good.Value:0.#}");
+                //     yield return ("Ok Score", $"{Ok.Value:0.#}");
+                //     yield return ("Meh Score", $"{Meh.Value:0.#}");
+                //     yield return ("Miss Score", $"{Miss.Value:0.#}");
+                // }
             }
         }
 
@@ -169,13 +169,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
         {
-            var mania = (ManiaScoreProcessor)scoreProcessor;
-            mania.HitProportionScore.Perfect = Perfect.Value;
-            mania.HitProportionScore.Great = Great.Value;
-            mania.HitProportionScore.Good = Good.Value;
-            mania.HitProportionScore.Ok = Ok.Value;
-            mania.HitProportionScore.Meh = Meh.Value;
-            mania.HitProportionScore.Miss = Miss.Value;
+            // var mania = (ManiaScoreProcessor)scoreProcessor;
+            // mania.HitProportionScore.Perfect = Perfect.Value;
+            // mania.HitProportionScore.Great = Great.Value;
+            // mania.HitProportionScore.Good = Good.Value;
+            // mania.HitProportionScore.Ok = Ok.Value;
+            // mania.HitProportionScore.Meh = Meh.Value;
+            // mania.HitProportionScore.Miss = Miss.Value;
         }
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
