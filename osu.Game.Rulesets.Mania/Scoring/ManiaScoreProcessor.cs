@@ -5,10 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -20,16 +17,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
     {
         private const double combo_base = 4;
 
-        public int PoorCount { get; set; }
-        public (int Perfect, int Great, int Good, int Ok, int Meh, int Miss) HitProportionScore = (305, 300, 200, 100, 50, 0);
-
         public ManiaScoreProcessor()
             : base(new ManiaRuleset())
         {
-            if (ManiaBeatmapConverter.CurrentHitMode == EzMUGHitMode.O2Jam)
-            {
-                // O2JAM hit windows are set in ManiaRuleset.CreateBeatmapConverter
-            }
         }
 
         protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
