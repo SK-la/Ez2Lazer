@@ -53,6 +53,14 @@ namespace osu.Game.Screens.Edit
         /// </summary>
         public bool IsSeeking { get; private set; }
 
+        public IBindable<double> LoopStartTime => loopStartTime;
+        public IBindable<double> LoopEndTime => loopEndTime;
+        public BindableBool LoopEnabled => loopEnabled;
+
+        private readonly Bindable<double> loopStartTime = new Bindable<double>();
+        private readonly Bindable<double> loopEndTime = new Bindable<double>();
+        private readonly BindableBool loopEnabled = new BindableBool();
+
         public EditorClock(IBeatmap beatmap = null, BindableBeatDivisor beatDivisor = null)
         {
             Beatmap = beatmap ?? new Beatmap();
@@ -277,6 +285,12 @@ namespace osu.Game.Screens.Edit
                     underlyingClock.Seek(TrackLength);
             }
 
+            // Handle A-B loop
+            if (loopEnabled.Value && IsRunning && CurrentTime >= loopEndTime.Value)
+            {
+                underlyingClock.Seek(loopStartTime.Value);
+            }
+
             updateSeekingState();
         }
 
@@ -325,5 +339,9 @@ namespace osu.Game.Screens.Edit
 
             protected override void ReadIntoStartValue(EditorClock clock) => StartValue = clock.currentTime;
         }
+
+        public void SetLoopStartTime(double time) => loopStartTime.Value = time;
+
+        public void SetLoopEndTime(double time) => loopEndTime.Value = time;
     }
 }

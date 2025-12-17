@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osuTK;
 using osuTK.Graphics;
@@ -28,6 +29,7 @@ namespace osu.Game.Screens.Edit.Components
     public partial class PlaybackControl : BottomBarContainer
     {
         private IconButton playButton = null!;
+        private IconButton loopButton = null!;
         private PlaybackSpeedControl playbackSpeedControl = null!;
 
         [Resolved]
@@ -35,6 +37,7 @@ namespace osu.Game.Screens.Edit.Components
 
         private readonly Bindable<EditorScreenMode> currentScreenMode = new Bindable<EditorScreenMode>();
         private readonly BindableNumber<double> tempoAdjustment = new BindableDouble(1);
+        private readonly BindableBool loopEnabled = new BindableBool();
 
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider, Editor? editor)
@@ -52,11 +55,21 @@ namespace osu.Game.Screens.Edit.Components
                     Icon = FontAwesome.Regular.PlayCircle,
                     Action = togglePause,
                 },
+                loopButton = new IconButton
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    X = 40,
+                    Scale = new Vector2(1.2f),
+                    IconScale = new Vector2(1.2f),
+                    Icon = FontAwesome.Solid.SyncAlt,
+                    Action = toggleLoop,
+                },
                 playbackSpeedControl = new PlaybackSpeedControl
                 {
                     AutoSizeAxes = Axes.Y,
                     RelativeSizeAxes = Axes.X,
-                    Padding = new MarginPadding { Left = 45, },
+                    Padding = new MarginPadding { Left = 85, },
                     Anchor = Anchor.CentreRight,
                     Origin = Anchor.CentreRight,
                     Direction = FillDirection.Vertical,
@@ -80,6 +93,8 @@ namespace osu.Game.Screens.Edit.Components
 
             if (editor != null)
                 currentScreenMode.BindTo(editor.Mode);
+
+            loopEnabled.BindTo(editorClock.LoopEnabled);
         }
 
         protected override void LoadComplete()
@@ -135,14 +150,30 @@ namespace osu.Game.Screens.Edit.Components
                 editorClock.Start();
         }
 
+        private void toggleLoop()
+        {
+            loopEnabled.Value = !loopEnabled.Value;
+
+            if (loopEnabled.Value)
+            {
+                // Set default loop points when enabling
+                double currentTime = editorClock.CurrentTime;
+                editorClock.SetLoopStartTime(Math.Max(0, currentTime - 5000)); // 5 seconds before
+                editorClock.SetLoopEndTime(Math.Min(editorClock.TrackLength, currentTime + 5000)); // 5 seconds after
+            }
+        }
+
         private static readonly IconUsage play_icon = FontAwesome.Regular.PlayCircle;
         private static readonly IconUsage pause_icon = FontAwesome.Regular.PauseCircle;
+        private static readonly IconUsage loop_on_icon = FontAwesome.Solid.Redo;
+        private static readonly IconUsage loop_off_icon = FontAwesome.Regular.Circle;
 
         protected override void Update()
         {
             base.Update();
 
             playButton.Icon = editorClock.IsRunning ? pause_icon : play_icon;
+            loopButton.Icon = loopEnabled.Value ? loop_on_icon : loop_off_icon;
         }
 
         private partial class PlaybackSpeedControl : FillFlowContainer, IHasTooltip
