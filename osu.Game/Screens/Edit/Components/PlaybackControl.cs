@@ -158,8 +158,9 @@ namespace osu.Game.Screens.Edit.Components
             {
                 // Set default loop points when enabling
                 double currentTime = editorClock.CurrentTime;
-                editorClock.SetLoopStartTime(Math.Max(0, currentTime - 5000)); // 5 seconds before
-                editorClock.SetLoopEndTime(Math.Min(editorClock.TrackLength, currentTime + 5000)); // 5 seconds after
+                editorClock.SetLoopStartTime(Math.Max(0, currentTime - 2500)); // 2.5 seconds before
+                editorClock.SetLoopEndTime(Math.Min(editorClock.TrackLength, currentTime + 2500)); // 2.5 seconds after
+                editorClock.Seek(editorClock.LoopStartTime.Value); // Seek to start of loop
             }
         }
 

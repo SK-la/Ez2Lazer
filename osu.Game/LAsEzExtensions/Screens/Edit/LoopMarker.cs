@@ -61,8 +61,13 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
             Colour = isStart ? colours.Colour3 : colours.Colour4; // Green for A, Red for B
         }
 
+        public bool IsDragged { get; private set; }
+
         protected override bool OnMouseDown(MouseDownEvent e)
         {
+            var localPos = ToLocalSpace(e.ScreenSpaceMousePosition);
+            if (localPos.Y >= DrawHeight / 2) return false; // only upper half
+
             if (e.Button == MouseButton.Left)
             {
                 // Handle drag to set time
@@ -77,11 +82,19 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
             base.OnMouseUp(e);
         }
 
-        protected override bool OnDragStart(DragStartEvent e) => true;
+        protected override bool OnDragStart(DragStartEvent e)
+        {
+            var localPos = ToLocalSpace(e.ScreenSpaceMousePosition);
+            if (localPos.Y >= DrawHeight / 2) return false;
+
+            IsDragged = true;
+            return true;
+        }
 
         protected override void OnDrag(DragEvent e)
         {
             double newX = X + e.Delta.X;
+            X = (float)newX;
             double newTime = TimeAtX?.Invoke((float)newX) ?? 0;
             Time = newTime;
             TimeChanged?.Invoke(newTime);
@@ -89,6 +102,7 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
 
         protected override void OnDragEnd(DragEndEvent e)
         {
+            IsDragged = false;
         }
 
         /// <summary>

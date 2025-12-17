@@ -71,7 +71,18 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Both,
+                    RelativeSizeAxes = Axes.Y,
+                    Alpha = 0,
+                },
+                loopStartMarker = new LoopMarker(true)
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                },
+                loopEndMarker = new LoopMarker(false)
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
                 },
                 new KiaiPart
                 {
@@ -99,18 +110,6 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
                 },
-                loopStartMarker = new LoopMarker(true)
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Both,
-                },
-                loopEndMarker = new LoopMarker(false)
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Both,
-                },
                 new MarkerPart { RelativeSizeAxes = Axes.Both },
             };
         }
@@ -119,8 +118,8 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
         {
             base.LoadComplete();
 
-            loopStartMarker.TimeAtX = x => x / DrawWidth * editorClock.TrackLength;
-            loopEndMarker.TimeAtX = x => x / DrawWidth * editorClock.TrackLength;
+            loopStartMarker.TimeAtX = x => (x + DrawWidth / 2) / DrawWidth * editorClock.TrackLength;
+            loopEndMarker.TimeAtX = x => (x + DrawWidth / 2) / DrawWidth * editorClock.TrackLength;
 
             loopStartMarker.TimeChanged += time => editorClock.SetLoopStartTime(time);
             loopEndMarker.TimeChanged += time => editorClock.SetLoopEndTime(time);
@@ -139,15 +138,17 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
         {
             base.Update();
 
-            loopStartMarker.X = (float)(editorClock.LoopStartTime.Value / editorClock.TrackLength * DrawWidth);
-            loopEndMarker.X = (float)(editorClock.LoopEndTime.Value / editorClock.TrackLength * DrawWidth);
+            if (!loopStartMarker.IsDragged)
+                loopStartMarker.X = (float)(editorClock.LoopStartTime.Value / editorClock.TrackLength * DrawWidth - DrawWidth / 2);
+            if (!loopEndMarker.IsDragged)
+                loopEndMarker.X = (float)(editorClock.LoopEndTime.Value / editorClock.TrackLength * DrawWidth - DrawWidth / 2);
         }
 
         private void updateLoopInterval()
         {
             float startX = (float)(editorClock.LoopStartTime.Value / editorClock.TrackLength * DrawWidth);
             float endX = (float)(editorClock.LoopEndTime.Value / editorClock.TrackLength * DrawWidth);
-            loopInterval.UpdateInterval(startX, endX);
+            loopInterval.UpdateInterval(startX - DrawWidth / 2, endX - DrawWidth / 2);
         }
     }
 }
