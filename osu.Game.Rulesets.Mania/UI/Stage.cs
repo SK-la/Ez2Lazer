@@ -87,6 +87,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<bool> showStoryboard = null!;
 
         private readonly Box dimBox;
+        private readonly Container backgroundContainer;
         private readonly BackgroundScreenBeatmap.DimmableBackground maniaMaskedDimmable;
         private WorkingBeatmap? workingBeatmap;
 
@@ -107,7 +108,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                new Container
+                backgroundContainer = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
@@ -254,6 +255,11 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 // maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
                 // maniaMaskedDimmable.IsBreakTime.BindTo(player?.IsBreakTime);
+            }
+            else
+            {
+                backgroundContainer.Alpha = 0;
+                Logger.Log("Working beatmap is null, cannot load background.", level: LogLevel.Error);
             }
 
             columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);

@@ -185,11 +185,11 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     break;
 
                 case EzMUGHitMode.EZ2AC:
-                    SetSpecialDifficultyRange(new[] { 18.0, 32.0, 64.0, 80.0, 100.0, 120.0 });
+                    SetSpecialDifficultyRange(new[] { 18.0, 38.0, 68.0, 88.0, 88.0, 100.0 });
                     break;
 
                 case EzMUGHitMode.IIDX:
-                    SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 });
+                    SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 70.0, 80.0, 100.0 });
                     break;
 
                 case EzMUGHitMode.Melody:

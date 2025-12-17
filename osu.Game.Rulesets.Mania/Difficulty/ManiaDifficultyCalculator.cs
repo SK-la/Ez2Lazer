@@ -58,8 +58,8 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {
-                StarRating = XXY_SR > 0
-                    ? XXY_SR
+                StarRating = SR > 0
+                    ? SR
                     : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
                 Mods = mods,
                 MaxCombo = beatmap.HitObjects.Sum(maxComboForObject),
