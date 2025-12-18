@@ -18,11 +18,13 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModDuplicate : Mod, IApplicableAfterBeatmapConversion, IApplicableToTrack, IHasSeed
+    public class ManiaModDuplicate : Mod, IApplicableAfterBeatmapConversion, IApplicableToTrack, IHasSeed, IApplicableToPlayer, IApplicableToHUD
     {
+        private DuplicateVirtualTrack duplicateTrack;
         public override string Name => "Duplicate";
 
         public override string Acronym => "DL";
@@ -120,7 +122,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
             Seed.Value ??= RNG.Next();
-            var Rng = new Random((int)Seed.Value);
+            var rng = new Random((int)Seed.Value);
 
             if ((CutTimeStart.Value is null && CutTimeEnd.Value is not null) || (CutTimeStart.Value is not null && CutTimeEnd.Value is null))
             {
@@ -143,6 +145,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 selectedPart = maniaBeatmap.HitObjects;
                 var minTime = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
                 var maxTime = maniaBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
+
                 if (minTime is not null && maxTime is not null)
                 {
                     cutTimeStart = minTime.StartTime;
@@ -153,22 +156,20 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var newPart = new List<ManiaHitObject>();
 
-            int TimeIndex = 0;
             double beatmapLength = maniaBeatmap.BeatmapInfo.Length;
 
-            for (TimeIndex = 0; TimeIndex < Time.Value; TimeIndex++)
+            for (int timeIndex = 0; timeIndex < Time.Value; timeIndex++)
             {
-                if (TimeIndex == 0)
+                if (timeIndex == 0)
                 {
                     if (Rand.Value)
                     {
-                        var shuffledColumns = Enumerable.Range(0, maniaBeatmap.TotalColumns).OrderBy(_ => Rng.Next()).ToList();
+                        var shuffledColumns = Enumerable.Range(0, maniaBeatmap.TotalColumns).OrderBy(_ => rng.Next()).ToList();
                         selectedPart.OfType<ManiaHitObject>().ForEach(h => h.Column = shuffledColumns[h.Column]);
                     }
 
                     if (Mirror.Value)
                     {
-
                     }
 
                     newPart.AddRange(selectedPart);
@@ -184,8 +185,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         obj.Add(new HoldNote
                         {
                             Column = note.Column,
-                            StartTime = note.StartTime + TimeIndex * (breakTime + (double)length!),
-                            EndTime = note.GetEndTime() + TimeIndex * (breakTime + (double)length!),
+                            StartTime = note.StartTime + timeIndex * (breakTime + (double)length!),
+                            EndTime = note.GetEndTime() + timeIndex * (breakTime + (double)length),
                             NodeSamples = [note.Samples, Array.Empty<HitSampleInfo>()]
                         });
                     }
@@ -194,7 +195,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         obj.Add(new Note
                         {
                             Column = note.Column,
-                            StartTime = note.StartTime + TimeIndex * (breakTime + (double)length!),
+                            StartTime = note.StartTime + timeIndex * (breakTime + (double)length!),
                             Samples = note.Samples,
                         });
                     }
@@ -202,7 +203,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
                 if (Rand.Value)
                 {
-                    var shuffledColumns = Enumerable.Range(0, maniaBeatmap.TotalColumns).OrderBy(_ => Rng.Next()).ToList();
+                    var shuffledColumns = Enumerable.Range(0, maniaBeatmap.TotalColumns).OrderBy(_ => rng.Next()).ToList();
                     obj.OfType<ManiaHitObject>().ForEach(h => h.Column = shuffledColumns[h.Column]);
                 }
 
@@ -211,9 +212,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             maniaBeatmap.HitObjects = newPart;
         }
+
         public void ApplyToTrack(IAdjustableAudioComponent track)
         {
-            track.AddAdjustment(AdjustableProperty.Volume, new BindableDouble());
+            // track.AddAdjustment(AdjustableProperty.Volume, new BindableDouble());
+        }
+
+        public void ApplyToPlayer(Player player)
+        {
+            var workingBeatmap = player.Beatmap.Value;
+            duplicateTrack = new DuplicateVirtualTrack(workingBeatmap.Track, this);
         }
 
         public static string CalculateTime(double time)
@@ -223,6 +231,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             string minus = time < 0 ? "-" : string.Empty;
             string secondLessThan10 = second < 10 ? "0" : string.Empty;
             return $"{minus}{minute}:{secondLessThan10}{second:N1}";
+        }
+
+        public void ApplyToHUD(HUDOverlay overlay)
+        {
+            overlay.Add(duplicateTrack);
         }
     }
 
