@@ -77,6 +77,14 @@ namespace osu.Game.LAsEzExtensions.Select
         public double? OverrideLoopInterval { get; set; }
         public IClock? ExternalClock { get; set; }
 
+        /// <summary>
+        /// When <see cref="ExternalClock"/> is provided, defines the reference time (in the external clock's time domain)
+        /// at which this preview should be considered to start.
+        /// This is primarily used to delay preview playback until a specific time is reached (e.g. gameplay time == cutStart).
+        /// If null, the reference will be captured from the external clock at the time preview starts.
+        /// </summary>
+        public double? ExternalClockStartTime { get; set; }
+
         public void ApplyOverrides(PreviewOverrideSettings? settings)
         {
             if (settings == null)
@@ -110,6 +118,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
         private double externalClockStartReference;
         private bool externalClockStartCaptured;
+        private double lastReferenceTime;
 
         #region Disposal
 
@@ -239,7 +248,13 @@ namespace osu.Game.LAsEzExtensions.Select
             loopSegmentLength = Math.Max(1, previewEndTime - previewStartTime);
             loopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
             effectiveLoopCount = OverrideLoopCount ?? 1;
-            useExternalLooping = ExternalClock != null || loopInterval > 0 || (OverrideLooping.HasValue && !OverrideLooping.Value);
+            // When any slice/loop overrides are provided, the track must be driven manually (Stop/Seek) via updateSamples().
+            // Track.Looping/RestartPoint alone cannot enforce Duration/LoopCount/LoopInterval.
+            useExternalLooping = ExternalClock != null
+                                 || loopInterval > 0
+                                 || OverrideLoopCount.HasValue
+                                 || OverridePreviewDuration.HasValue
+                                 || (OverrideLooping.HasValue && !OverrideLooping.Value);
 
             if (currentTrack != null)
             {
@@ -251,11 +266,8 @@ namespace osu.Game.LAsEzExtensions.Select
             currentTrack?.Start();
             isPlaying = true;
 
-            // 标准预览也需要在使用外部循环时驱动调度，否则会播放完整原曲。
             if (useExternalLooping)
             {
-                nextHitSoundIndex = 0;
-                nextStoryboardSampleIndex = 0;
                 updateDelegate = Scheduler.AddDelayed(updateSamples, scheduler_interval, true);
                 updateSamples();
             }
@@ -268,6 +280,8 @@ namespace osu.Game.LAsEzExtensions.Select
         {
             double longestHitTime = 0; // 修复作用域：提前声明
             double longestStoryboardTime = 0;
+
+            lastReferenceTime = 0;
 
             void collectLongest(HitObject ho)
             {
@@ -310,17 +324,27 @@ namespace osu.Game.LAsEzExtensions.Select
                         dynamicEnd = Math.Min(previewStartTime + max_dynamic_preview_length, longestEventTime);
                 }
 
-                previewEndTime = OverridePreviewDuration.HasValue
-                    ? previewStartTime + Math.Max(0, OverridePreviewDuration.Value)
-                    : dynamicEnd;
+                double segmentLength = OverridePreviewDuration.HasValue
+                    ? Math.Max(0, OverridePreviewDuration.Value)
+                    : dynamicEnd - previewStartTime;
+
+                loopSegmentLength = Math.Max(1, segmentLength);
+                effectiveLoopCount = OverrideLoopCount ?? int.MaxValue;
+                loopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
+
+                if (effectiveLoopCount == int.MaxValue)
+                    previewEndTime = previewStartTime + loopSegmentLength;
+                else
+                    previewEndTime = previewStartTime + effectiveLoopCount * (loopSegmentLength + loopInterval) - loopInterval;
 
                 lastTrackTime = previewStartTime;
                 loopCount = 0;
                 logicalOffset = 0;
-                loopSegmentLength = Math.Max(1, previewEndTime - previewStartTime);
-                loopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
-                effectiveLoopCount = OverrideLoopCount ?? int.MaxValue;
-                useExternalLooping = ExternalClock != null || loopInterval > 0 || (OverrideLooping.HasValue && !OverrideLooping.Value);
+                useExternalLooping = ExternalClock != null
+                                     || loopInterval > 0
+                                     || OverrideLoopCount.HasValue
+                                     || OverridePreviewDuration.HasValue
+                                     || (OverrideLooping.HasValue && !OverrideLooping.Value);
                 shortBgmOneShotMode = false;
                 shortBgmMutedAfterFirstLoop = false;
 
@@ -794,7 +818,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
             if (!externalClockStartCaptured)
             {
-                externalClockStartReference = referenceTime;
+                externalClockStartReference = ExternalClockStartTime ?? referenceTime;
                 externalClockStartCaptured = true;
             }
 
@@ -808,6 +832,7 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 inBreak = true; // keep paused until start
                 logicalTime = previewStartTime;
+                lastReferenceTime = referenceTime;
                 return true;
             }
 
@@ -817,6 +842,7 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 inBreak = true;
                 logicalTime = previewStartTime;
+                lastReferenceTime = referenceTime;
                 return true;
             }
 
@@ -828,11 +854,19 @@ namespace osu.Game.LAsEzExtensions.Select
             if (offset < loopSegmentLength)
             {
                 logicalTime = previewStartTime + offset;
+                lastReferenceTime = referenceTime;
                 return true;
             }
 
             inBreak = true;
             logicalTime = previewEndTime;
+
+            if (ExternalClock == null && useExternalLooping && inBreak && currentTrack != null && !currentTrack.IsRunning)
+            {
+                referenceTime += Clock.ElapsedFrameTime;
+            }
+
+            lastReferenceTime = referenceTime;
             return true;
         }
 
@@ -876,4 +910,4 @@ namespace osu.Game.LAsEzExtensions.Select
         public bool? ForceLooping { get; init; }
         public bool EnableHitSounds { get; init; } = true;
     }
- }
+}

@@ -514,6 +514,7 @@ namespace osu.Game.Screens.SelectV2
                 return;
 
             ezPreviewManager.StopPreview();
+
             music.CurrentTrack.Looping = isHandlingLooping = false;
 
             music.TrackChanged -= ensureTrackLooping;

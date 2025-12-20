@@ -29,8 +29,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
     /// </summary>
     public class ManiaModDuplicate : Mod, IApplicableAfterBeatmapConversion, IApplicableToTrack, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider
     {
-        private DuplicateVirtualTrack duplicateTrack;
-        private bool hasValidCut;
+        // Debug: set to 1-6 to crash at a specific checkpoint in DuplicateVirtualTrack.
+        // Set to 0 to disable.
+        private const int duplicate_track_debug_crash_stage = 0;
+
+        private DuplicateVirtualTrack? duplicateTrack;
+        private IWorkingBeatmap? pendingWorkingBeatmap;
         internal double? ResolvedCutTimeStart { get; private set; }
         internal double? ResolvedCutTimeEnd { get; private set; }
         internal double ResolvedSegmentLength { get; private set; }
@@ -134,7 +138,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             ResolvedCutTimeStart = start;
             ResolvedCutTimeEnd = end;
             ResolvedSegmentLength = start.HasValue && end.HasValue ? Math.Max(0, end.Value - start.Value) : 0;
-            hasValidCut = ResolvedSegmentLength > 0;
         }
 
         private bool ensureResolvedForPreview(IWorkingBeatmap beatmap)
@@ -204,8 +207,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var newPart = new List<ManiaHitObject>();
 
-            double beatmapLength = maniaBeatmap.BeatmapInfo.Length;
-
             for (int timeIndex = 0; timeIndex < Time.Value; timeIndex++)
             {
                 if (timeIndex == 0)
@@ -213,7 +214,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     if (Rand.Value)
                     {
                         var shuffledColumns = Enumerable.Range(0, maniaBeatmap.TotalColumns).OrderBy(_ => rng.Next()).ToList();
-                        selectedPart.OfType<ManiaHitObject>().ForEach(h => h.Column = shuffledColumns[h.Column]);
+                        selectedPart.ForEach(h => h.Column = shuffledColumns[h.Column]);
                     }
 
                     if (Mirror.Value)
@@ -233,7 +234,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         obj.Add(new HoldNote
                         {
                             Column = note.Column,
-                            StartTime = note.StartTime + timeIndex * (breakTime + (double)length!),
+                            StartTime = note.StartTime + timeIndex * (breakTime + (double)length),
                             EndTime = note.GetEndTime() + timeIndex * (breakTime + (double)length),
                             NodeSamples = [note.Samples, Array.Empty<HitSampleInfo>()]
                         });
@@ -243,7 +244,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         obj.Add(new Note
                         {
                             Column = note.Column,
-                            StartTime = note.StartTime + timeIndex * (breakTime + (double)length!),
+                            StartTime = note.StartTime + timeIndex * (breakTime + (double)length),
                             Samples = note.Samples,
                         });
                     }
@@ -272,12 +273,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 return;
 
             var workingBeatmap = player.Beatmap.Value;
+            pendingWorkingBeatmap = workingBeatmap;
             duplicateTrack = new DuplicateVirtualTrack
             {
                 OverrideProvider = this,
-                PendingOverrides = GetPreviewOverrides(workingBeatmap)
+                PendingOverrides = null,
+                DebugCrashStage = duplicate_track_debug_crash_stage,
             };
-            duplicateTrack.StartPreview(workingBeatmap);
         }
 
         public static string CalculateTime(double time)
@@ -295,7 +297,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             if (duplicateTrack == null)
                 return;
 
+            if (pendingWorkingBeatmap == null)
+                return;
+
             overlay.Add(duplicateTrack);
+            duplicateTrack.StartPreview(pendingWorkingBeatmap);
         }
 
         public PreviewOverrideSettings? GetPreviewOverrides(IWorkingBeatmap beatmap)
@@ -309,8 +315,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 PreviewDuration = ResolvedSegmentLength,
                 LoopCount = Time.Value,
                 LoopInterval = BreakTime.Value * 1000,
-                // 使用外部循环控制切片+间隔，避免 Track.Looping 播放整首原曲。
-                ForceLooping = false,
+                ForceLooping = true,
                 EnableHitSounds = false
             };
         }
