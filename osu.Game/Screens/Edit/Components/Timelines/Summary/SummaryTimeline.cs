@@ -174,8 +174,8 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
             editorClock.LoopEnabled.BindValueChanged(enabled =>
             {
                 loopInterval.FadeTo(enabled.NewValue ? 1 : 0, 200, Easing.OutQuint);
-                loopStartMarker.FadeTo(enabled.NewValue ? 1 : 0, 200, Easing.OutQuint);
-                loopEndMarker.FadeTo(enabled.NewValue ? 1 : 0, 200, Easing.OutQuint);
+                // loopStartMarker.FadeTo(enabled.NewValue ? 1 : 0, 200, Easing.OutQuint);
+                // loopEndMarker.FadeTo(enabled.NewValue ? 1 : 0, 200, Easing.OutQuint);
             });
         }
 
