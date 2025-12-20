@@ -521,9 +521,21 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            ezPreviewManager.StopPreview();
+            var provider = Mods.Value.OfType<IPreviewOverrideProvider>().FirstOrDefault();
+            var overrides = provider?.GetPreviewOverrides(beatmap);
 
-            ezPreviewManager.StartPreview(beatmap);
+            ezPreviewManager.StopPreview();
+            RemoveInternal(ezPreviewManager, true);
+
+            var duplicate = new DuplicateVirtualTrack
+            {
+                OverrideProvider = provider,
+                PendingOverrides = overrides
+            };
+            ezPreviewManager = duplicate;
+            AddInternal(duplicate);
+
+            duplicate.StartPreview(beatmap);
         }
 
         #endregion

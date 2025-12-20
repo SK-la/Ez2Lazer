@@ -13,6 +13,7 @@ using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
@@ -24,9 +25,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
     /// <summary>
     /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；在功能完成后，重命名为CutLoopPlayMod更容易理解
-    /// 备注部分为我修改的内容
+    /// 备注部分为我修改的内容, 增加IApplicableToHUD, IPreviewOverrideProvider接口
     /// </summary>
-    public class ManiaModDuplicate : Mod, IApplicableAfterBeatmapConversion, IApplicableToTrack, IHasSeed, IApplicableToPlayer, IApplicableToHUD
+    public class ManiaModDuplicate : Mod, IApplicableAfterBeatmapConversion, IApplicableToTrack, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider
     {
         private DuplicateVirtualTrack duplicateTrack;
         private bool hasValidCut;
@@ -136,16 +137,46 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             hasValidCut = ResolvedSegmentLength > 0;
         }
 
+        private bool ensureResolvedForPreview(IWorkingBeatmap beatmap)
+        {
+            if (ResolvedSegmentLength > 0 && ResolvedCutTimeStart is not null && ResolvedCutTimeEnd is not null)
+                return true;
+
+            try
+            {
+                var maniaBeatmap = (ManiaBeatmap)beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
+
+                double? cutTimeStart = CutTimeStart.Value * (Millisecond.Value ? 1 : 1000);
+                double? cutTimeEnd = CutTimeEnd.Value * (Millisecond.Value ? 1 : 1000);
+
+                // 若开始为空则取最早物件时间，若结束为空则取最晚物件时间（不再整体判无效）。
+                var minTime = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
+                var maxTime = maniaBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
+                cutTimeStart ??= minTime?.StartTime;
+                cutTimeEnd ??= maxTime?.GetEndTime();
+
+                double? length = cutTimeEnd - cutTimeStart;
+
+                if (length is null || length <= 0)
+                {
+                    setResolvedCut(null, null);
+                    return false;
+                }
+
+                setResolvedCut(cutTimeStart, cutTimeEnd);
+                return true;
+            }
+            catch
+            {
+                setResolvedCut(null, null);
+                return false;
+            }
+        }
+
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
             Seed.Value ??= RNG.Next();
             var rng = new Random((int)Seed.Value);
-
-            if ((CutTimeStart.Value is null && CutTimeEnd.Value is not null) || (CutTimeStart.Value is not null && CutTimeEnd.Value is null))
-            {
-                setResolvedCut(null, null);
-                return;
-            }
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
@@ -156,21 +187,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             double breakTime = BreakTime.Value * 1000;
             double? length = cutTimeEnd - cutTimeStart;
 
+            var minTimeBeatmap = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
+            var maxTimeBeatmap = maniaBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
+            cutTimeStart ??= minTimeBeatmap?.StartTime;
+            cutTimeEnd ??= maxTimeBeatmap?.GetEndTime();
+
             var selectedPart = maniaBeatmap.HitObjects.Where(h => h.StartTime >= cutTimeStart && h.GetEndTime() <= cutTimeEnd);
-
-            if (CutTimeStart.Value is null && CutTimeEnd.Value is null)
-            {
-                selectedPart = maniaBeatmap.HitObjects;
-                var minTime = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
-                var maxTime = maniaBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
-
-                if (minTime is not null && maxTime is not null)
-                {
-                    cutTimeStart = minTime.StartTime;
-                    cutTimeEnd = maxTime.GetEndTime();
-                    length = cutTimeEnd - cutTimeStart;
-                }
-            }
 
             if (length is null || length <= 0)
             {
@@ -250,7 +272,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 return;
 
             var workingBeatmap = player.Beatmap.Value;
-            duplicateTrack = new DuplicateVirtualTrack(workingBeatmap, this);
+            duplicateTrack = new DuplicateVirtualTrack
+            {
+                OverrideProvider = this,
+                PendingOverrides = GetPreviewOverrides(workingBeatmap)
+            };
+            duplicateTrack.StartPreview(workingBeatmap);
         }
 
         public static string CalculateTime(double time)
@@ -269,6 +296,23 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 return;
 
             overlay.Add(duplicateTrack);
+        }
+
+        public PreviewOverrideSettings? GetPreviewOverrides(IWorkingBeatmap beatmap)
+        {
+            if (!ensureResolvedForPreview(beatmap))
+                return null;
+
+            return new PreviewOverrideSettings
+            {
+                PreviewStart = ResolvedCutTimeStart,
+                PreviewDuration = ResolvedSegmentLength,
+                LoopCount = Time.Value,
+                LoopInterval = BreakTime.Value * 1000,
+                // 使用外部循环控制切片+间隔，避免 Track.Looping 播放整首原曲。
+                ForceLooping = false,
+                EnableHitSounds = false
+            };
         }
     }
 

@@ -61,7 +61,7 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
             Colour = isStart ? colours.Colour3 : colours.Colour4; // Green for A, Red for B
         }
 
-        public bool IsDragged { get; private set; }
+        public new bool IsDragged { get; private set; }
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {

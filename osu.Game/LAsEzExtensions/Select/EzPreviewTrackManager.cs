@@ -77,6 +77,32 @@ namespace osu.Game.LAsEzExtensions.Select
         public double? OverrideLoopInterval { get; set; }
         public IClock? ExternalClock { get; set; }
 
+        public void ApplyOverrides(PreviewOverrideSettings? settings)
+        {
+            if (settings == null)
+            {
+                ResetOverrides();
+                return;
+            }
+
+            OverridePreviewStartTime = settings.PreviewStart;
+            OverridePreviewDuration = settings.PreviewDuration;
+            OverrideLoopCount = settings.LoopCount;
+            OverrideLoopInterval = settings.LoopInterval;
+            OverrideLooping = settings.ForceLooping;
+            EnableHitSounds = settings.EnableHitSounds;
+        }
+
+        public void ResetOverrides()
+        {
+            OverridePreviewStartTime = null;
+            OverridePreviewDuration = null;
+            OverrideLoopCount = null;
+            OverrideLoopInterval = null;
+            OverrideLooping = null;
+            EnableHitSounds = true;
+        }
+
         private bool ownsCurrentTrack;
         private bool useExternalLooping;
         private double loopInterval;
@@ -224,6 +250,15 @@ namespace osu.Game.LAsEzExtensions.Select
 
             currentTrack?.Start();
             isPlaying = true;
+
+            // 标准预览也需要在使用外部循环时驱动调度，否则会播放完整原曲。
+            if (useExternalLooping)
+            {
+                nextHitSoundIndex = 0;
+                nextStoryboardSampleIndex = 0;
+                updateDelegate = Scheduler.AddDelayed(updateSamples, scheduler_interval, true);
+                updateSamples();
+            }
         }
 
         /// <summary>
@@ -831,4 +866,14 @@ namespace osu.Game.LAsEzExtensions.Select
             return beatmap.Track;
         }
     }
-}
+
+    public class PreviewOverrideSettings
+    {
+        public double? PreviewStart { get; init; }
+        public double? PreviewDuration { get; init; }
+        public int? LoopCount { get; init; }
+        public double? LoopInterval { get; init; }
+        public bool? ForceLooping { get; init; }
+        public bool EnableHitSounds { get; init; } = true;
+    }
+ }
