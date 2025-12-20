@@ -486,10 +486,7 @@ namespace osu.Game.LAsEzExtensions.Select
         {
             if (!isPlaying || currentTrack == null) return;
 
-            double logicalTime;
-            bool inBreak;
-
-            if (!tryGetLogicalTime(out logicalTime, out inBreak))
+            if (!tryGetLogicalTime(out double logicalTime, out bool inBreak))
             {
                 stopPreviewInternal("loop-end");
                 return;
@@ -816,6 +813,25 @@ namespace osu.Game.LAsEzExtensions.Select
 
             double referenceTime = ExternalClock?.CurrentTime ?? currentTrack?.CurrentTime ?? 0;
 
+            // If the gameplay clock is paused (or effectively paused, i.e. time is not advancing), keep audio paused as well.
+            // Without this, updateSamples() will keep seeking to a fixed time while the audio track continues,
+            // resulting in an audible "stutter" (the same tiny snippet repeating).
+            if (ExternalClock != null)
+            {
+                // Some clocks may report IsRunning=true even while paused (but time stops advancing).
+                // Treat a near-zero delta as paused once we've observed at least one reference time.
+                const double paused_delta_epsilon = 0.5; // ms
+
+                if (!ExternalClock.IsRunning
+                    || (lastReferenceTime != 0 && Math.Abs(referenceTime - lastReferenceTime) <= paused_delta_epsilon))
+                {
+                    inBreak = true;
+                    logicalTime = lastTrackTime == 0 ? previewStartTime : lastTrackTime;
+                    lastReferenceTime = referenceTime;
+                    return true;
+                }
+            }
+
             if (!externalClockStartCaptured)
             {
                 externalClockStartReference = ExternalClockStartTime ?? referenceTime;
@@ -872,9 +888,6 @@ namespace osu.Game.LAsEzExtensions.Select
 
         private bool legacyTrackLogicalTime(out double logicalTime, out bool inBreak)
         {
-            logicalTime = currentTrack?.CurrentTime ?? 0;
-            inBreak = false;
-
             double physicalTime = currentTrack?.CurrentTime ?? 0;
 
             if (physicalTime + 200 < lastTrackTime)
