@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics.Sprites;
@@ -21,7 +20,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Screens.Play;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
     /// <summary>
     /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；
@@ -34,17 +33,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         internal double? ResolvedCutTimeStart { get; private set; }
         internal double? ResolvedCutTimeEnd { get; private set; }
         internal double ResolvedSegmentLength { get; private set; }
-        public override string Name => "Duplicate";
+        public override string Name => "LoopPlayClip";
 
-        public override string Acronym => "DL";
+        public override string Acronym => "LPC";
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "Practise more(Default setting if you want to duplicate whole song).";
+        public override LocalisableString Description => "Cut the beatmap into a clip for loop practice.";
 
         public override IconUsage? Icon => FontAwesome.Solid.ArrowCircleDown;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.LA_Mod;
 
         public override bool Ranked => false;
 
@@ -83,13 +82,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };*/
 
-        [SettingSource("Cut Time Start", "Select your part(second).", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource("Cut StartTime", "Default is second.", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> CutTimeStart { get; set; } = new Bindable<int?>();
 
-        [SettingSource("Cut Time End", "Select your part(second).", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource("Cut EndTime", "Default is second.", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> CutTimeEnd { get; set; } = new Bindable<int?>();
 
-        [SettingSource("Use millisecond(for cut time)", "More detailed.")]
+        [SettingSource("Use millisecond(ms)", "More detailed.")]
         public BindableBool Millisecond { get; set; } = new BindableBool(false);
 
         [SettingSource("Break Time", "If you need break(second).")]
