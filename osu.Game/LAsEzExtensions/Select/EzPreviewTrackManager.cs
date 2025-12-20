@@ -17,11 +17,15 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
+using osu.Framework.Timing;
 
 namespace osu.Game.LAsEzExtensions.Select
 {
     /// <summary>
-    /// An enhanced preview system that can play background music, hit sounds, and storyboard samples simultaneously during beatmap preview.
+    /// <para>一个增强的预览音轨管理器，支持在预览时播放note音效和故事板背景音。</para>
+    /// <para>主要有两个用途：</para>
+    /// 1. 在选歌界面实现最完整的游戏音轨预览。
+    /// <para>2. 提供拓展支持，自定义预览时间、循环次数和间隔、关联游戏时钟、开关note音效等。</para>
     /// </summary>
     public partial class EzPreviewTrackManager : CompositeDrawable
     {
@@ -60,10 +64,26 @@ namespace osu.Game.LAsEzExtensions.Select
         private ISampleStore sampleStore = null!;
 
         [Resolved]
-        private AudioManager audioManager { get; set; } = null!;
+        protected AudioManager AudioManager { get; private set; } = null!;
 
         [Resolved]
         private ISkinSource skinSource { get; set; } = null!;
+
+        public bool EnableHitSounds { get; set; } = true;
+        public double? OverridePreviewStartTime { get; set; }
+        public double? OverridePreviewDuration { get; set; }
+        public bool? OverrideLooping { get; set; }
+        public int? OverrideLoopCount { get; set; }
+        public double? OverrideLoopInterval { get; set; }
+        public IClock? ExternalClock { get; set; }
+
+        private bool ownsCurrentTrack;
+        private bool useExternalLooping;
+        private double loopInterval;
+        private int effectiveLoopCount;
+
+        private double externalClockStartReference;
+        private bool externalClockStartCaptured;
 
         #region Disposal
 
@@ -89,7 +109,9 @@ namespace osu.Game.LAsEzExtensions.Select
             StopPreview();
 
             currentBeatmap = beatmap;
-            currentTrack = beatmap.Track;
+            currentTrack = CreateTrack(beatmap, out ownsCurrentTrack);
+            externalClockStartCaptured = false;
+            externalClockStartReference = 0;
 
             bool enableEnhanced = forceEnhanced || fastCheckShouldUseEnhanced(beatmap, hitsound_threshold);
 
@@ -121,6 +143,8 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 currentTrack.Volume.Value = 1f;
                 currentTrack.Stop();
+                if (ownsCurrentTrack)
+                    currentTrack.Dispose();
             }
 
             clearEnhancedElements();
@@ -133,7 +157,7 @@ namespace osu.Game.LAsEzExtensions.Select
         private void load()
         {
             // Get sample store for playing audio samples
-            sampleStore = audioManager.Samples;
+            sampleStore = AudioManager.Samples;
 
             // Create audio container for proper audio sample management
             InternalChild = audioContainer = new Container
@@ -177,12 +201,27 @@ namespace osu.Game.LAsEzExtensions.Select
         private void startStandardPreview(IWorkingBeatmap beatmap)
         {
             beatmap.PrepareTrackForPreview(true);
-            previewStartTime = beatmap.BeatmapInfo.Metadata.PreviewTime;
+            previewStartTime = OverridePreviewStartTime ?? beatmap.BeatmapInfo.Metadata.PreviewTime;
 
             if (previewStartTime < 0 || previewStartTime > currentTrack?.Length)
                 previewStartTime = (currentTrack?.Length ?? 0) * 0.4;
 
-            currentTrack?.Seek(previewStartTime);
+            previewEndTime = OverridePreviewDuration.HasValue
+                ? previewStartTime + Math.Max(0, OverridePreviewDuration.Value)
+                : previewStartTime + preview_window_length;
+
+            loopSegmentLength = Math.Max(1, previewEndTime - previewStartTime);
+            loopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
+            effectiveLoopCount = OverrideLoopCount ?? 1;
+            useExternalLooping = ExternalClock != null || loopInterval > 0 || (OverrideLooping.HasValue && !OverrideLooping.Value);
+
+            if (currentTrack != null)
+            {
+                currentTrack.Seek(previewStartTime);
+                currentTrack.Looping = !useExternalLooping && (OverrideLooping ?? false);
+                currentTrack.RestartPoint = previewStartTime;
+            }
+
             currentTrack?.Start();
             isPlaying = true;
         }
@@ -206,7 +245,7 @@ namespace osu.Game.LAsEzExtensions.Select
                 var playableBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
 
                 beatmap.PrepareTrackForPreview(true);
-                previewStartTime = beatmap.BeatmapInfo.Metadata.PreviewTime;
+                previewStartTime = OverridePreviewStartTime ?? beatmap.BeatmapInfo.Metadata.PreviewTime;
                 if (previewStartTime < 0 || previewStartTime > (currentTrack?.Length ?? 0))
                     previewStartTime = (currentTrack?.Length ?? 0) * 0.4;
 
@@ -236,12 +275,17 @@ namespace osu.Game.LAsEzExtensions.Select
                         dynamicEnd = Math.Min(previewStartTime + max_dynamic_preview_length, longestEventTime);
                 }
 
-                previewEndTime = dynamicEnd;
+                previewEndTime = OverridePreviewDuration.HasValue
+                    ? previewStartTime + Math.Max(0, OverridePreviewDuration.Value)
+                    : dynamicEnd;
 
                 lastTrackTime = previewStartTime;
                 loopCount = 0;
                 logicalOffset = 0;
-                loopSegmentLength = currentTrack != null ? Math.Max(1, currentTrack.Length - previewStartTime) : preview_window_length;
+                loopSegmentLength = Math.Max(1, previewEndTime - previewStartTime);
+                loopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
+                effectiveLoopCount = OverrideLoopCount ?? int.MaxValue;
+                useExternalLooping = ExternalClock != null || loopInterval > 0 || (OverrideLooping.HasValue && !OverrideLooping.Value);
                 shortBgmOneShotMode = false;
                 shortBgmMutedAfterFirstLoop = false;
 
@@ -267,7 +311,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 if (currentTrack != null)
                 {
-                    currentTrack.Looping = true;
+                    currentTrack.Looping = !useExternalLooping && (OverrideLooping ?? true);
                     currentTrack.RestartPoint = previewStartTime;
                 }
 
@@ -287,6 +331,12 @@ namespace osu.Game.LAsEzExtensions.Select
         // 改为接受 endTime 参数
         private void prepareHitSounds(IBeatmap beatmap, double previewEndTime)
         {
+            if (!EnableHitSounds)
+            {
+                scheduledHitSounds.Clear();
+                return;
+            }
+
             scheduledHitSounds.Clear();
             foreach (var ho in beatmap.HitObjects)
                 schedule(ho, previewEndTime);
@@ -377,26 +427,36 @@ namespace osu.Game.LAsEzExtensions.Select
         {
             if (!isPlaying || currentTrack == null) return;
 
-            double physicalTime = currentTrack.CurrentTime;
+            double logicalTime;
+            bool inBreak;
 
-            if (physicalTime + 200 < lastTrackTime)
+            if (!tryGetLogicalTime(out logicalTime, out inBreak))
             {
-                loopCount++;
-                logicalOffset = loopCount * loopSegmentLength;
-
-                // 短BGM一次性模式：第一次循环后静音（不再听到重复），但仍利用循环推进逻辑时间
-                if (shortBgmOneShotMode && !shortBgmMutedAfterFirstLoop && currentTrack != null)
-                {
-                    currentTrack.Volume.Value = 0f;
-                    shortBgmMutedAfterFirstLoop = true;
-                }
+                stopPreviewInternal("loop-end");
+                return;
             }
 
-            double logicalTime = physicalTime + logicalOffset;
-            bool withinWindow = logicalTime <= previewEndTime + trigger_tolerance;
+            if (inBreak)
+            {
+                if (currentTrack.IsRunning)
+                    currentTrack.Stop();
+                if (Math.Abs(currentTrack.CurrentTime - logicalTime) > trigger_tolerance)
+                    currentTrack.Seek(logicalTime);
+                lastTrackTime = logicalTime;
+                activeChannels.RemoveAll(c => !c.Playing);
+                return;
+            }
 
-            // 优化：使用二分查找跳过已错过的事件，减少循环次数
-            nextHitSoundIndex = FindNextValidIndex(scheduledHitSounds, nextHitSoundIndex, logicalTime - trigger_tolerance);
+            if (!currentTrack.IsRunning)
+                currentTrack.Start();
+
+            if (Math.Abs(currentTrack.CurrentTime - logicalTime) > trigger_tolerance)
+                currentTrack.Seek(logicalTime);
+
+            double logicalTimeForEvents = logicalTime;
+            bool withinWindow = logicalTimeForEvents <= previewEndTime + trigger_tolerance;
+
+            nextHitSoundIndex = findNextValidIndex(scheduledHitSounds, nextHitSoundIndex, logicalTimeForEvents - trigger_tolerance);
 
             while (withinWindow && nextHitSoundIndex < scheduledHitSounds.Count)
             {
@@ -428,7 +488,7 @@ namespace osu.Game.LAsEzExtensions.Select
             }
 
             // 同样优化 storyboard samples
-            nextStoryboardSampleIndex = FindNextValidIndex(scheduledStoryboardSamples, nextStoryboardSampleIndex, logicalTime - trigger_tolerance);
+            nextStoryboardSampleIndex = findNextValidIndex(scheduledStoryboardSamples, nextStoryboardSampleIndex, logicalTimeForEvents - trigger_tolerance);
 
             while (withinWindow && nextStoryboardSampleIndex < scheduledStoryboardSamples.Count)
             {
@@ -458,8 +518,7 @@ namespace osu.Game.LAsEzExtensions.Select
                 else break;
             }
 
-            lastTrackTime = physicalTime;
-            // 清理已停止的音频通道，减少内存占用
+            lastTrackTime = logicalTimeForEvents;
             activeChannels.RemoveAll(c => !c.Playing);
         }
 
@@ -652,7 +711,7 @@ namespace osu.Game.LAsEzExtensions.Select
         }
 
         // 二分查找辅助方法：找到第一个 Time >= minTime 的索引
-        private static int FindNextValidIndex(List<ScheduledHitSound> list, int startIndex, double minTime)
+        private static int findNextValidIndex(List<ScheduledHitSound> list, int startIndex, double minTime)
         {
             int low = startIndex, high = list.Count - 1;
 
@@ -670,7 +729,7 @@ namespace osu.Game.LAsEzExtensions.Select
             return low;
         }
 
-        private static int FindNextValidIndex(List<ScheduledStoryboardSample> list, int startIndex, double minTime)
+        private static int findNextValidIndex(List<ScheduledStoryboardSample> list, int startIndex, double minTime)
         {
             int low = startIndex, high = list.Count - 1;
 
@@ -686,6 +745,90 @@ namespace osu.Game.LAsEzExtensions.Select
             }
 
             return low;
+        }
+
+        private bool tryGetLogicalTime(out double logicalTime, out bool inBreak)
+        {
+            logicalTime = previewStartTime;
+            inBreak = false;
+
+            if (!useExternalLooping)
+                return legacyTrackLogicalTime(out logicalTime, out inBreak);
+
+            double referenceTime = ExternalClock?.CurrentTime ?? currentTrack?.CurrentTime ?? 0;
+
+            if (!externalClockStartCaptured)
+            {
+                externalClockStartReference = referenceTime;
+                externalClockStartCaptured = true;
+            }
+
+            double timeSinceStart = referenceTime - externalClockStartReference;
+
+            double segmentLen = loopSegmentLength + loopInterval;
+            if (segmentLen <= 0)
+                return false;
+
+            if (timeSinceStart < 0)
+            {
+                inBreak = true; // keep paused until start
+                logicalTime = previewStartTime;
+                return true;
+            }
+
+            double segment = Math.Floor(timeSinceStart / segmentLen);
+
+            if (segment < 0)
+            {
+                inBreak = true;
+                logicalTime = previewStartTime;
+                return true;
+            }
+
+            if (segment >= effectiveLoopCount)
+                return false;
+
+            double offset = timeSinceStart - segment * segmentLen;
+
+            if (offset < loopSegmentLength)
+            {
+                logicalTime = previewStartTime + offset;
+                return true;
+            }
+
+            inBreak = true;
+            logicalTime = previewEndTime;
+            return true;
+        }
+
+        private bool legacyTrackLogicalTime(out double logicalTime, out bool inBreak)
+        {
+            logicalTime = currentTrack?.CurrentTime ?? 0;
+            inBreak = false;
+
+            double physicalTime = currentTrack?.CurrentTime ?? 0;
+
+            if (physicalTime + 200 < lastTrackTime)
+            {
+                loopCount++;
+                logicalOffset = loopCount * loopSegmentLength;
+
+                if (shortBgmOneShotMode && !shortBgmMutedAfterFirstLoop && currentTrack != null)
+                {
+                    currentTrack.Volume.Value = 0f;
+                    shortBgmMutedAfterFirstLoop = true;
+                }
+            }
+
+            logicalTime = physicalTime + logicalOffset;
+            inBreak = false;
+            return true;
+        }
+
+        protected virtual Track? CreateTrack(IWorkingBeatmap beatmap, out bool ownsTrack)
+        {
+            ownsTrack = false;
+            return beatmap.Track;
         }
     }
 }

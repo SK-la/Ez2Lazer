@@ -22,9 +22,17 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
+    /// <summary>
+    /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；在功能完成后，重命名为CutLoopPlayMod更容易理解
+    /// 备注部分为我修改的内容
+    /// </summary>
     public class ManiaModDuplicate : Mod, IApplicableAfterBeatmapConversion, IApplicableToTrack, IHasSeed, IApplicableToPlayer, IApplicableToHUD
     {
         private DuplicateVirtualTrack duplicateTrack;
+        private bool hasValidCut;
+        internal double? ResolvedCutTimeStart { get; private set; }
+        internal double? ResolvedCutTimeEnd { get; private set; }
+        internal double ResolvedSegmentLength { get; private set; }
         public override string Name => "Duplicate";
 
         public override string Acronym => "DL";
@@ -119,6 +127,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         [SettingSource("Seed", "Use a custom seed instead of a random one", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
+        // 提供切片时间点给 DuplicateVirtualTrack 使用
+        private void setResolvedCut(double? start, double? end)
+        {
+            ResolvedCutTimeStart = start;
+            ResolvedCutTimeEnd = end;
+            ResolvedSegmentLength = start.HasValue && end.HasValue ? Math.Max(0, end.Value - start.Value) : 0;
+            hasValidCut = ResolvedSegmentLength > 0;
+        }
+
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
             Seed.Value ??= RNG.Next();
@@ -126,6 +143,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             if ((CutTimeStart.Value is null && CutTimeEnd.Value is not null) || (CutTimeStart.Value is not null && CutTimeEnd.Value is null))
             {
+                setResolvedCut(null, null);
                 return;
             }
 
@@ -153,6 +171,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     length = cutTimeEnd - cutTimeStart;
                 }
             }
+
+            if (length is null || length <= 0)
+            {
+                setResolvedCut(null, null);
+                return;
+            }
+
+            setResolvedCut(cutTimeStart, cutTimeEnd);
 
             var newPart = new List<ManiaHitObject>();
 
@@ -215,13 +241,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToTrack(IAdjustableAudioComponent track)
         {
-            // track.AddAdjustment(AdjustableProperty.Volume, new BindableDouble());
         }
 
+        //将Beatmap给DuplicateVirtualTrack来创建虚拟音轨
         public void ApplyToPlayer(Player player)
         {
+            if (ResolvedSegmentLength <= 0)
+                return;
+
             var workingBeatmap = player.Beatmap.Value;
-            duplicateTrack = new DuplicateVirtualTrack(workingBeatmap.Track, this);
+            duplicateTrack = new DuplicateVirtualTrack(workingBeatmap, this);
         }
 
         public static string CalculateTime(double time)
@@ -233,8 +262,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return $"{minus}{minute}:{secondLessThan10}{second:N1}";
         }
 
+        // 需要有一个Drawable来承载虚拟音轨
         public void ApplyToHUD(HUDOverlay overlay)
         {
+            if (duplicateTrack == null)
+                return;
+
             overlay.Add(duplicateTrack);
         }
     }

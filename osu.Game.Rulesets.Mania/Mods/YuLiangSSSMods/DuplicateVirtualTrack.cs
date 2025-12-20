@@ -1,89 +1,73 @@
 using System;
+using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Threading;
+using osu.Game.Beatmaps;
 using osu.Game.Screens.Play;
+using osu.Framework.Timing;
+using osu.Framework.Allocation;
+using osu.Game.LAsEzExtensions.Select;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public partial class DuplicateVirtualTrack : CompositeDrawable
+    public partial class DuplicateVirtualTrack : EzPreviewTrackManager
     {
-        private readonly Track originalTrack;
+        private readonly WorkingBeatmap workingBeatmap;
         private readonly ManiaModDuplicate mod;
-        private ScheduledDelegate? updateDelegate;
+        private float? originalGameplayTrackVolume;
 
-        public DuplicateVirtualTrack(Track track, ManiaModDuplicate mod)
+        [Resolved]
+        private IGameplayClock gameplayClock { get; set; } = null!;
+
+        public DuplicateVirtualTrack(WorkingBeatmap workingBeatmap, ManiaModDuplicate mod)
         {
-            this.originalTrack = track;
+            this.workingBeatmap = workingBeatmap;
             this.mod = mod;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            Start();
+
+            if (mod.ResolvedSegmentLength <= 0 || mod.ResolvedCutTimeStart is null)
+                return;
+
+            if (workingBeatmap.Track != null)
+            {
+                originalGameplayTrackVolume = (float)workingBeatmap.Track.Volume.Value;
+                workingBeatmap.Track.Volume.Value = 0f; // 静音原始游戏音轨，仅在游戏内生效
+            }
+
+            OverridePreviewStartTime = mod.ResolvedCutTimeStart;
+            OverridePreviewDuration = mod.ResolvedSegmentLength;
+            OverrideLoopCount = mod.Time.Value;
+            OverrideLoopInterval = mod.BreakTime.Value * 1000;
+            OverrideLooping = true; // we handle looping manually when interval > 0
+            ExternalClock = gameplayClock;
+
+            EnableHitSounds = false; // mod 下不需要在虚拟音轨里重复敲击音效
+
+            StartPreview(workingBeatmap);
         }
 
-        public void Start()
+        protected override Track? CreateTrack(IWorkingBeatmap beatmap, out bool ownsTrack)
         {
-            updateDelegate = Scheduler.AddDelayed(UpdateAudio, 16, true);
-        }
+            ownsTrack = false;
+            string? audioFile = workingBeatmap.BeatmapInfo?.Metadata?.AudioFile;
+            if (string.IsNullOrEmpty(audioFile))
+                return beatmap.Track;
 
-        public void Stop()
-        {
-            updateDelegate?.Cancel();
-            if (originalTrack.IsRunning)
-                originalTrack.Stop();
-        }
-
-        private void UpdateAudio()
-        {
-            double gameTime = Clock.CurrentTime;
-            double audioTime = MapTime(gameTime);
-            if (audioTime < 0)
-            {
-                if (originalTrack.IsRunning)
-                    originalTrack.Stop();
-            }
-            else
-            {
-                if (!originalTrack.IsRunning)
-                    originalTrack.Start();
-                originalTrack.Seek(audioTime);
-            }
-        }
-
-        private double MapTime(double gameTime)
-        {
-            double? cutTimeStart = mod.CutTimeStart.Value * (mod.Millisecond.Value ? 1 : 1000);
-            double? cutTimeEnd = mod.CutTimeEnd.Value * (mod.Millisecond.Value ? 1 : 1000);
-            if (cutTimeStart == null || cutTimeEnd == null)
-            {
-                cutTimeStart = 0;
-                cutTimeEnd = originalTrack.Length;
-            }
-            double length = (double)(cutTimeEnd - cutTimeStart);
-            double breakTime = mod.BreakTime.Value * 1000;
-            int times = mod.Time.Value;
-            double segmentLength = length + breakTime;
-            int segment = (int)(gameTime / segmentLength);
-            if (segment >= times)
-                return -1;
-            double offset = gameTime % segmentLength;
-            if (offset < length)
-            {
-                return (double)cutTimeStart + offset;
-            }
-            else
-            {
-                return -1;
-            }
+            ownsTrack = true;
+            return AudioManager.Tracks.Get(workingBeatmap.BeatmapSetInfo.GetPathForFile(audioFile));
         }
 
         protected override void Dispose(bool isDisposing)
         {
-            Stop();
+            if (originalGameplayTrackVolume.HasValue && workingBeatmap.Track != null)
+                workingBeatmap.Track.Volume.Value = originalGameplayTrackVolume.Value;
+
             base.Dispose(isDisposing);
         }
     }
