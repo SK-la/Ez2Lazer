@@ -39,6 +39,18 @@ namespace osu.Game.LAsEzExtensions.Select
         private const double preview_window_length = 10000; // 10s
         private const double scheduler_interval = 16; // ~60fps
         private const double trigger_tolerance = 15; // ms 容差
+
+        // 外部时钟驱动（gameplay）模式下，过短的切片会导致高频 Seek/Restart，音频听感会明显“撕裂”。
+        // 这里设置一个最小切片长度作为下限，避免 1ms 这类极端情况。
+        private const double min_external_loop_segment_length = 200; // ms
+
+        // 在 gameplay 外部时钟驱动模式下，音频设备/解码缓冲会导致 Track.CurrentTime 与外部时钟存在微小漂移。
+        // 若仍按 15ms 容差每帧 Seek，会产生明显的“撕裂/卡带”听感。
+        // 因此对“音频轨道重同步”使用更宽容差，并加入冷却时间。
+        private const double audio_resync_tolerance = 80; // ms
+        private const double audio_resync_cooldown = 250; // ms
+
+        private double last_audio_resync_clock_time;
         private const double max_dynamic_preview_length = 30000; // 动态扩展最长 s
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
 
@@ -257,7 +269,9 @@ namespace osu.Game.LAsEzExtensions.Select
                 ? playback.PreviewStartTime + Math.Max(0, OverridePreviewDuration.Value)
                 : playback.PreviewStartTime + preview_window_length;
 
-            playback.LoopSegmentLength = Math.Max(1, playback.PreviewEndTime - playback.PreviewStartTime);
+            double segmentLength = playback.PreviewEndTime - playback.PreviewStartTime;
+            double minSegmentLength = ExternalClock != null ? min_external_loop_segment_length : 1;
+            playback.LoopSegmentLength = Math.Max(minSegmentLength, segmentLength);
             playback.LoopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
             playback.EffectiveLoopCount = OverrideLoopCount ?? 1;
             // 当存在“切片/循环”相关 override 时，需要通过 updateSamples() 手动驱动 Track（Stop/Seek）。
@@ -340,7 +354,8 @@ namespace osu.Game.LAsEzExtensions.Select
                     ? Math.Max(0, OverridePreviewDuration.Value)
                     : dynamicEnd - playback.PreviewStartTime;
 
-                playback.LoopSegmentLength = Math.Max(1, segmentLength);
+                double minSegmentLength = ExternalClock != null ? min_external_loop_segment_length : 1;
+                playback.LoopSegmentLength = Math.Max(minSegmentLength, segmentLength);
                 playback.EffectiveLoopCount = OverrideLoopCount ?? int.MaxValue;
                 playback.LoopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
 
@@ -516,8 +531,27 @@ namespace osu.Game.LAsEzExtensions.Select
             if (!currentTrack.IsRunning)
                 currentTrack.Start();
 
-            if (Math.Abs(currentTrack.CurrentTime - logicalTime) > trigger_tolerance)
-                currentTrack.Seek(logicalTime);
+            double drift = Math.Abs(currentTrack.CurrentTime - logicalTime);
+
+            // 在 gameplay 外部时钟模式下，不要为了微小漂移每帧 Seek。
+            // 只在漂移明显且超过冷却时间时才重同步一次。
+            if (ExternalClock != null)
+            {
+                if (drift > audio_resync_tolerance && Clock.CurrentTime - last_audio_resync_clock_time >= audio_resync_cooldown)
+                {
+                    currentTrack.Seek(logicalTime);
+                    last_audio_resync_clock_time = Clock.CurrentTime;
+                }
+            }
+            else
+            {
+                if (drift > trigger_tolerance)
+                    currentTrack.Seek(logicalTime);
+            }
+
+            // 记录上一次逻辑时间，供外部时钟“暂停/不推进”判定使用。
+            // 否则在某些情况下会被误判为暂停，从而导致重复 Seek 到固定时间点。
+            playback.LastTrackTime = logicalTime;
 
             double logicalTimeForEvents = logicalTime;
             bool withinWindow = logicalTimeForEvents <= playback.PreviewEndTime + trigger_tolerance;

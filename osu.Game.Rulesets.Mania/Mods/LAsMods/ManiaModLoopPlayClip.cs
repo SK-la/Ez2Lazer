@@ -27,20 +27,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；
     /// <para></para>备注部分为我修改的内容, 增加IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider接口的使用
     /// </summary>
-    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider, ILoopTimeRangeMod
+    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider, ILoopTimeRangeMod, IApplicableFailOverride
     {
         private DuplicateVirtualTrack? duplicateTrack;
         private IWorkingBeatmap? pendingWorkingBeatmap;
         internal double? ResolvedCutTimeStart { get; private set; }
         internal double? ResolvedCutTimeEnd { get; private set; }
         internal double ResolvedSegmentLength { get; private set; }
-        public override string Name => "LoopPlayClip";
+        public override string Name => "Loop Play Clip (No Fail)";
 
-        public override string Acronym => "LPC";
+        public override string Acronym => "LP";
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "Cut the beatmap into a clip for loop practice.(The original is YuLiangSSS's Duplicate Mod)";
+        public override LocalisableString Description => "Cut the beatmap into a clip for loop practice. (The original is YuLiangSSS's Duplicate Mod)";
 
         public override IconUsage? Icon => FontAwesome.Solid.ArrowCircleDown;
 
@@ -52,10 +52,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             get
             {
-                yield return ($"{LoopCount.Value}", "Times");
+                yield return ($"{LoopCount.Value}", "Loop Count");
+                yield return ("Break", $"{BreakTime:N1}s");
                 yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : CalculateTime((int)CutTimeStart.Value))}");
                 yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : CalculateTime((int)CutTimeEnd.Value))}");
-                yield return ("Break", $"{BreakTime:N1}s");
             }
         }
 
@@ -390,6 +390,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (UseGlobalAbRange.Value)
                 applyRangeFromStore();
         }
+
+        public bool PerformFail() => false;
+
+        public bool RestartOnFail => false;
     }
 
     /*public partial class CutStart : RoundedSliderBar<double>
