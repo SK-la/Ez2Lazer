@@ -42,29 +42,49 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
 
         private readonly bool isStart;
 
+        private readonly Container clippedBottomHalf;
+
         public LoopMarker(bool isStart)
         {
             this.isStart = isStart;
 
             RelativeSizeAxes = Axes.Y;
             Width = 8;
-            Masking = true;
-            InternalChildren = new Drawable[]
+
+            // Only show the bottom half of the marker visuals to keep the upper half of the timeline clean
+            // for the active playback cursor.
+            InternalChild = clippedBottomHalf = new Container
             {
-                new Box
+                RelativeSizeAxes = Axes.Both,
+                Height = 0.5f,
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
+                Masking = true,
+                Child = new Container
                 {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Y,
-                    Width = 1.4f,
-                    EdgeSmoothness = new Vector2(1, 0)
-                },
-                new VerticalTriangles
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
+                    // 2x the height of the clip container => full marker height.
                     RelativeSizeAxes = Axes.Both,
-                    EdgeSmoothness = Vector2.One
+                    Height = 2,
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            RelativeSizeAxes = Axes.Y,
+                            Width = 1.4f,
+                            EdgeSmoothness = new Vector2(1, 0)
+                        },
+                        new VerticalTriangles
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            RelativeSizeAxes = Axes.Both,
+                            EdgeSmoothness = Vector2.One
+                        }
+                    }
                 }
             };
         }
@@ -75,13 +95,20 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
             Colour = isStart ? colours.Colour3 : colours.Colour4; // Green for A, Red for B
         }
 
+        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
+        {
+            if (!base.ReceivePositionalInputAt(screenSpacePos))
+                return false;
+
+            // Only allow interaction in the lower half of the timeline.
+            var localPos = ToLocalSpace(screenSpacePos);
+            return localPos.Y >= DrawHeight / 2;
+        }
+
         public new bool IsDragged { get; private set; }
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
-            var localPos = ToLocalSpace(e.ScreenSpaceMousePosition);
-            if (localPos.Y >= DrawHeight / 2) return false; // only upper half
-
             if (e.Button == MouseButton.Left)
             {
                 // Handle drag to set time
@@ -94,7 +121,10 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
         protected override bool OnDragStart(DragStartEvent e)
         {
             var localPos = ToLocalSpace(e.ScreenSpaceMousePosition);
-            if (localPos.Y >= DrawHeight / 2) return false;
+
+            // Only allow dragging in the lower half of the timeline (matching ReceivePositionalInputAt).
+            if (localPos.Y < DrawHeight / 2)
+                return false;
 
             IsDragged = true;
             return true;

@@ -36,6 +36,16 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary.Parts
 
         private double? lastSeekTime;
 
+        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
+        {
+            if (!base.ReceivePositionalInputAt(screenSpacePos))
+                return false;
+
+            // Only allow interaction in the upper half of the timeline.
+            var localPos = ToLocalSpace(screenSpacePos);
+            return localPos.Y < DrawHeight / 2;
+        }
+
         protected override bool OnDragStart(DragStartEvent e) => true;
 
         protected override void OnDrag(DragEvent e)
