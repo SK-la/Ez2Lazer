@@ -24,9 +24,23 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
 
         public Func<float, double>? TimeAtX { get; set; }
 
-        private readonly bool isStart;
+        /// <summary>
+        /// Optional snapping function applied to times produced by <see cref="TimeAtX"/>.
+        /// </summary>
+        public Func<double, double>? SnapTime { get; set; }
 
-        private readonly VerticalTriangles triangles;
+        /// <summary>
+        /// Optional mapping from time back to X (in parent centre-based coordinates).
+        /// When provided, the marker will visually jump to the snapped position while dragging.
+        /// </summary>
+        public Func<double, float>? XAtTime { get; set; }
+
+        /// <summary>
+        /// Optional clamp for X (in parent centre-based coordinates).
+        /// </summary>
+        public Func<float, float>? ClampX { get; set; }
+
+        private readonly bool isStart;
 
         public LoopMarker(bool isStart)
         {
@@ -45,7 +59,7 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
                     Width = 1.4f,
                     EdgeSmoothness = new Vector2(1, 0)
                 },
-                triangles = new VerticalTriangles
+                new VerticalTriangles
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
@@ -77,11 +91,6 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
             return base.OnMouseDown(e);
         }
 
-        protected override void OnMouseUp(MouseUpEvent e)
-        {
-            base.OnMouseUp(e);
-        }
-
         protected override bool OnDragStart(DragStartEvent e)
         {
             var localPos = ToLocalSpace(e.ScreenSpaceMousePosition);
@@ -93,9 +102,26 @@ namespace osu.Game.LAsEzExtensions.Screens.Edit
 
         protected override void OnDrag(DragEvent e)
         {
-            double newX = X + e.Delta.X;
-            X = (float)newX;
-            double newTime = TimeAtX?.Invoke((float)newX) ?? 0;
+            if (Parent == null)
+                return;
+
+            // Use absolute mouse position mapped into parent space to avoid scale/unit mismatches.
+            Vector2 parentLocal = Parent.ToLocalSpace(e.ScreenSpaceMousePosition);
+            float anchorX = Parent.ChildOffset.X + Parent.ChildSize.X / 2;
+            float newX = parentLocal.X - anchorX;
+
+            if (ClampX != null)
+                newX = ClampX(newX);
+
+            double newTime = TimeAtX?.Invoke(newX) ?? 0;
+
+            if (SnapTime != null)
+                newTime = SnapTime(newTime);
+
+            if (XAtTime != null)
+                newX = XAtTime(newTime);
+
+            X = newX;
             Time = newTime;
             TimeChanged?.Invoke(newTime);
         }

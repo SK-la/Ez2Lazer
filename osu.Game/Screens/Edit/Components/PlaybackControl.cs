@@ -17,9 +17,11 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osuTK.Input;
@@ -28,6 +30,10 @@ namespace osu.Game.Screens.Edit.Components
 {
     public partial class PlaybackControl : BottomBarContainer
     {
+        private const float button_spacing = 40;
+
+        private LoopPointButton setAButton = null!;
+        private LoopPointButton setBButton = null!;
         private IconButton playButton = null!;
         private IconButton loopButton = null!;
         private PlaybackSpeedControl playbackSpeedControl = null!;
@@ -46,30 +52,46 @@ namespace osu.Game.Screens.Edit.Components
 
             Children = new Drawable[]
             {
-                playButton = new IconButton
+                setAButton = new LoopPointButton("A")
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
                     Scale = new Vector2(1.2f),
-                    IconScale = new Vector2(1.2f),
-                    Icon = FontAwesome.Regular.PlayCircle,
-                    Action = togglePause,
+                    Action = setLoopStartToCurrentTime,
+                },
+                setBButton = new LoopPointButton("B")
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    X = button_spacing,
+                    Scale = new Vector2(1.2f),
+                    Action = setLoopEndToCurrentTime,
                 },
                 loopButton = new IconButton
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
-                    X = 40,
+                    X = button_spacing * 2,
                     Scale = new Vector2(1.2f),
                     IconScale = new Vector2(1.2f),
                     Icon = FontAwesome.Solid.SyncAlt,
                     Action = toggleLoop,
                 },
+                playButton = new IconButton
+                {
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    X = button_spacing * 3,
+                    Scale = new Vector2(1.2f),
+                    IconScale = new Vector2(1.2f),
+                    Icon = FontAwesome.Regular.PlayCircle,
+                    Action = togglePause,
+                },
                 playbackSpeedControl = new PlaybackSpeedControl
                 {
                     AutoSizeAxes = Axes.Y,
                     RelativeSizeAxes = Axes.X,
-                    Padding = new MarginPadding { Left = 85, },
+                    Padding = new MarginPadding { Left = 165, },
                     Anchor = Anchor.CentreRight,
                     Origin = Anchor.CentreRight,
                     Direction = FillDirection.Vertical,
@@ -156,12 +178,45 @@ namespace osu.Game.Screens.Edit.Components
 
             if (loopEnabled.Value)
             {
-                // Set default loop points when enabling
-                double currentTime = editorClock.CurrentTime;
-                editorClock.SetLoopStartTime(Math.Max(0, currentTime - 2500)); // 2.5 seconds before
-                editorClock.SetLoopEndTime(Math.Min(editorClock.TrackLength, currentTime + 2500)); // 2.5 seconds after
+                // Prefer persisted session A/B range (ms). Only fall back to defaults when not available.
+                if (LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
+                {
+                    editorClock.SetLoopStartTime(editorClock.GetSnappedTime(startMs));
+                    editorClock.SetLoopEndTime(editorClock.GetSnappedTime(endMs));
+                }
+                else
+                {
+                    // Set default loop points when enabling.
+                    double currentTime = editorClock.CurrentTime;
+                    editorClock.SetLoopStartTime(editorClock.GetSnappedTime(Math.Max(0, currentTime - 2500))); // 2.5 seconds before
+                    editorClock.SetLoopEndTime(editorClock.GetSnappedTime(Math.Min(editorClock.TrackLength, currentTime + 2500))); // 2.5 seconds after
+                }
+
                 editorClock.Seek(editorClock.LoopStartTime.Value); // Seek to start of loop
             }
+        }
+
+        private void setLoopStartToCurrentTime()
+        {
+            double currentTime = Math.Clamp(editorClock.CurrentTime, 0, editorClock.TrackLength);
+            editorClock.SetLoopStartTime(editorClock.GetSnappedTime(currentTime));
+            persistLoopRangeIfValid();
+        }
+
+        private void setLoopEndToCurrentTime()
+        {
+            double currentTime = Math.Clamp(editorClock.CurrentTime, 0, editorClock.TrackLength);
+            editorClock.SetLoopEndTime(editorClock.GetSnappedTime(currentTime));
+            persistLoopRangeIfValid();
+        }
+
+        private void persistLoopRangeIfValid()
+        {
+            double start = editorClock.LoopStartTime.Value;
+            double end = editorClock.LoopEndTime.Value;
+
+            if (end > start)
+                LoopTimeRangeStore.Set(start, end);
         }
 
         private static readonly IconUsage play_icon = FontAwesome.Regular.PlayCircle;
@@ -175,6 +230,23 @@ namespace osu.Game.Screens.Edit.Components
 
             playButton.Icon = editorClock.IsRunning ? pause_icon : play_icon;
             loopButton.Icon = loopEnabled.Value ? loop_on_icon : loop_off_icon;
+        }
+
+        private partial class LoopPointButton : OsuAnimatedButton
+        {
+            public LoopPointButton(string label)
+                : base(HoverSampleSet.Button)
+            {
+                Size = new Vector2(IconButton.DEFAULT_BUTTON_SIZE);
+
+                Add(new OsuSpriteText
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Text = label,
+                    Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
+                });
+            }
         }
 
         private partial class PlaybackSpeedControl : FillFlowContainer, IHasTooltip

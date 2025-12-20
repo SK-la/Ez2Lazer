@@ -12,6 +12,7 @@ using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -26,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；
     /// <para></para>备注部分为我修改的内容, 增加IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider接口的使用
     /// </summary>
-    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider
+    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider, ILoopTimeRangeMod
     {
         private DuplicateVirtualTrack? duplicateTrack;
         private IWorkingBeatmap? pendingWorkingBeatmap;
@@ -39,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "Cut the beatmap into a clip for loop practice.";
+        public override LocalisableString Description => "Cut the beatmap into a clip for loop practice.(The original is YuLiangSSS's Duplicate Mod)";
 
         public override IconUsage? Icon => FontAwesome.Solid.ArrowCircleDown;
 
@@ -51,15 +52,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             get
             {
-                yield return ($"{Time.Value}", "Times");
+                yield return ($"{LoopCount.Value}", "Times");
                 yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : CalculateTime((int)CutTimeStart.Value))}");
                 yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : CalculateTime((int)CutTimeEnd.Value))}");
                 yield return ("Break", $"{BreakTime:N1}s");
             }
         }
 
-        [SettingSource("Time", "Duplicate times.")]
-        public BindableInt Time { get; set; } = new BindableInt(20)
+        [SettingSource("Loop Count", "Loop Clip Count.")]
+        public BindableInt LoopCount { get; set; } = new BindableInt(20)
         {
             MinValue = 1,
             MaxValue = 100,
@@ -89,7 +90,35 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public Bindable<int?> CutTimeEnd { get; set; } = new Bindable<int?>();
 
         [SettingSource("Use millisecond(ms)", "More detailed.")]
-        public BindableBool Millisecond { get; set; } = new BindableBool(false);
+        public BindableBool Millisecond { get; set; } = new BindableBool(true);
+
+        [SettingSource("Use global A-B range", "Always use the editor A/B range stored for this session (ms).")]
+        public BindableBool UseGlobalAbRange { get; set; } = new BindableBool(true);
+
+        public ManiaModLoopPlayClip()
+        {
+            UseGlobalAbRange.BindValueChanged(_ => applyRangeFromStore(), true);
+        }
+
+        public override void ResetSettingsToDefaults()
+        {
+            base.ResetSettingsToDefaults();
+            applyRangeFromStore();
+        }
+
+        private void applyRangeFromStore()
+        {
+            if (!UseGlobalAbRange.Value)
+                return;
+
+            if (!LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
+                return;
+
+            // Store is always milliseconds.
+            CutTimeStart.Value = Millisecond.Value ? (int)startMs : (int)(startMs / 1000d);
+            CutTimeEnd.Value = Millisecond.Value ? (int)endMs : (int)(endMs / 1000d);
+            setResolvedCut(null, null);
+        }
 
         [SettingSource("Break Time", "If you need break(second).")]
         public BindableDouble BreakTime { get; set; } = new BindableDouble(0)
@@ -144,8 +173,19 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 var maniaBeatmap = (ManiaBeatmap)beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
 
-                double? cutTimeStart = CutTimeStart.Value * (Millisecond.Value ? 1 : 1000);
-                double? cutTimeEnd = CutTimeEnd.Value * (Millisecond.Value ? 1 : 1000);
+                double? cutTimeStart;
+                double? cutTimeEnd;
+
+                if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
+                {
+                    cutTimeStart = startMs;
+                    cutTimeEnd = endMs;
+                }
+                else
+                {
+                    cutTimeStart = CutTimeStart.Value * (Millisecond.Value ? 1 : 1000);
+                    cutTimeEnd = CutTimeEnd.Value * (Millisecond.Value ? 1 : 1000);
+                }
 
                 // 若开始为空则取最早物件时间，若结束为空则取最晚物件时间（不再整体判无效）。
                 var minTime = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
@@ -180,8 +220,22 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             maniaBeatmap.Breaks.Clear();
 
-            double? cutTimeStart = CutTimeStart.Value * (Millisecond.Value ? 1 : 1000);
-            double? cutTimeEnd = CutTimeEnd.Value * (Millisecond.Value ? 1 : 1000);
+            double? cutTimeStart;
+            double? cutTimeEnd;
+
+            if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
+            {
+                cutTimeStart = startMs;
+                cutTimeEnd = endMs;
+            }
+            else
+            {
+                double? timeStart = CutTimeStart.Value;
+                double? timeEnd = CutTimeEnd.Value;
+                cutTimeStart = timeStart * (Millisecond.Value ? 1 : 1000);
+                cutTimeEnd = timeEnd * (Millisecond.Value ? 1 : 1000);
+            }
+
             double breakTime = BreakTime.Value * 1000;
             double? length = cutTimeEnd - cutTimeStart;
 
@@ -203,7 +257,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             var newPart = new List<ManiaHitObject>();
 
-            for (int timeIndex = 0; timeIndex < Time.Value; timeIndex++)
+            for (int timeIndex = 0; timeIndex < LoopCount.Value; timeIndex++)
             {
                 if (timeIndex == 0)
                 {
@@ -303,11 +357,38 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 PreviewStart = ResolvedCutTimeStart,
                 PreviewDuration = ResolvedSegmentLength,
-                LoopCount = Time.Value,
+                LoopCount = LoopCount.Value,
                 LoopInterval = BreakTime.Value * 1000,
                 ForceLooping = true,
                 EnableHitSounds = false
             };
+        }
+
+        public void SetLoopTimeRange(double startTime, double endTime)
+        {
+            if (endTime <= startTime)
+                return;
+
+            LoopTimeRangeStore.Set(startTime, endTime);
+
+            // The editor timeline works in milliseconds, while this mod exposes seconds by default.
+            if (Millisecond.Value)
+            {
+                CutTimeStart.Value = (int)startTime;
+                CutTimeEnd.Value = (int)endTime;
+            }
+            else
+            {
+                CutTimeStart.Value = (int)(startTime / 1000d);
+                CutTimeEnd.Value = (int)(endTime / 1000d);
+            }
+
+            // Reset preview cache so changes take effect immediately where used.
+            setResolvedCut(null, null);
+
+            // Keep current instance in sync with the session store when global mode is enabled.
+            if (UseGlobalAbRange.Value)
+                applyRangeFromStore();
         }
     }
 

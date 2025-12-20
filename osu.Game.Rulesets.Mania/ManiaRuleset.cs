@@ -337,6 +337,7 @@ namespace osu.Game.Rulesets.Mania
                         // new ManiaModJudgmentStyle(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
+                        new ManiaModLoopPlayClip(),
                     };
 
                 case ModType.YuLiangSSS_Mod:
@@ -347,7 +348,6 @@ namespace osu.Game.Rulesets.Mania
                         // new ManiaModCleaner(),
                         // new ManiaModDeleteSpace(),
                         new ManiaModDoublePlay(),
-                        new ManiaModLoopPlayClip(),
                         new ManiaModGracer(),
                         new ManiaModJackAdjust(),
                         new ManiaModJudgmentsAdjust(),

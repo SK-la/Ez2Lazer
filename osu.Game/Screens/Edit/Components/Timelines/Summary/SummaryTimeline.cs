@@ -1,13 +1,22 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Threading;
+using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Screens.Edit;
 using osu.Game.Overlays;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Edit.Components.Timelines.Summary.Parts;
+using osu.Game.Utils;
 using osuTK;
 
 namespace osu.Game.Screens.Edit.Components.Timelines.Summary
@@ -21,6 +30,11 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
 
         [Resolved]
         private EditorClock editorClock { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private IBindable<IReadOnlyList<Mod>>? mods { get; set; }
+
+        private ScheduledDelegate? pendingSync;
 
         private LoopMarker loopStartMarker = null!;
         private LoopMarker loopEndMarker = null!;
@@ -118,14 +132,45 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
         {
             base.LoadComplete();
 
-            loopStartMarker.TimeAtX = x => (x + DrawWidth / 2) / DrawWidth * editorClock.TrackLength;
-            loopEndMarker.TimeAtX = x => (x + DrawWidth / 2) / DrawWidth * editorClock.TrackLength;
+            float getTimelineWidth() => Content.ChildSize.X;
+
+            float clampX(float x)
+            {
+                float w = getTimelineWidth();
+                return Math.Clamp(x, -w / 2, w / 2);
+            }
+
+            float xAtTime(double time)
+            {
+                float w = getTimelineWidth();
+                return (float)(time / editorClock.TrackLength * w - w / 2);
+            }
+
+            double timeAtX(float x)
+            {
+                float w = getTimelineWidth();
+                x = clampX(x);
+                return (x + w / 2) / w * editorClock.TrackLength;
+            }
+
+            loopStartMarker.ClampX = clampX;
+            loopStartMarker.XAtTime = xAtTime;
+            loopStartMarker.SnapTime = editorClock.GetSnappedTime;
+            loopStartMarker.TimeAtX = timeAtX;
+
+            loopEndMarker.ClampX = clampX;
+            loopEndMarker.XAtTime = xAtTime;
+            loopEndMarker.SnapTime = editorClock.GetSnappedTime;
+            loopEndMarker.TimeAtX = timeAtX;
 
             loopStartMarker.TimeChanged += time => editorClock.SetLoopStartTime(time);
             loopEndMarker.TimeChanged += time => editorClock.SetLoopEndTime(time);
 
             editorClock.LoopStartTime.BindValueChanged(_ => updateLoopInterval());
             editorClock.LoopEndTime.BindValueChanged(_ => updateLoopInterval());
+            editorClock.LoopStartTime.BindValueChanged(_ => scheduleSyncToMods());
+            editorClock.LoopEndTime.BindValueChanged(_ => scheduleSyncToMods());
+            editorClock.LoopEnabled.BindValueChanged(_ => scheduleSyncToMods());
             editorClock.LoopEnabled.BindValueChanged(enabled =>
             {
                 loopInterval.FadeTo(enabled.NewValue ? 1 : 0, 200, Easing.OutQuint);
@@ -138,17 +183,54 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
         {
             base.Update();
 
+            float timelineWidth = Content.ChildSize.X;
+
             if (!loopStartMarker.IsDragged)
-                loopStartMarker.X = (float)(editorClock.LoopStartTime.Value / editorClock.TrackLength * DrawWidth - DrawWidth / 2);
+                loopStartMarker.X = (float)(editorClock.LoopStartTime.Value / editorClock.TrackLength * timelineWidth - timelineWidth / 2);
             if (!loopEndMarker.IsDragged)
-                loopEndMarker.X = (float)(editorClock.LoopEndTime.Value / editorClock.TrackLength * DrawWidth - DrawWidth / 2);
+                loopEndMarker.X = (float)(editorClock.LoopEndTime.Value / editorClock.TrackLength * timelineWidth - timelineWidth / 2);
         }
 
         private void updateLoopInterval()
         {
-            float startX = (float)(editorClock.LoopStartTime.Value / editorClock.TrackLength * DrawWidth);
-            float endX = (float)(editorClock.LoopEndTime.Value / editorClock.TrackLength * DrawWidth);
-            loopInterval.UpdateInterval(startX - DrawWidth / 2, endX - DrawWidth / 2);
+            float timelineWidth = Content.ChildSize.X;
+            float startX = (float)(editorClock.LoopStartTime.Value / editorClock.TrackLength * timelineWidth - timelineWidth / 2);
+            float endX = (float)(editorClock.LoopEndTime.Value / editorClock.TrackLength * timelineWidth - timelineWidth / 2);
+            loopInterval.UpdateInterval(startX, endX);
+        }
+
+        private void scheduleSyncToMods()
+        {
+            pendingSync?.Cancel();
+            pendingSync = Scheduler.AddDelayed(syncLoopRangeToMods, 200);
+        }
+
+        private void syncLoopRangeToMods()
+        {
+            double start = editorClock.LoopStartTime.Value;
+            double end = editorClock.LoopEndTime.Value;
+
+            if (end <= start)
+                return;
+
+            // Always update the global session store, regardless of loop enabled state.
+            LoopTimeRangeStore.Set(start, end);
+
+            if (mods == null)
+                return;
+
+            bool applied = false;
+
+            foreach (var rangeMod in ModUtils.FlattenMods(mods.Value).OfType<ILoopTimeRangeMod>())
+            {
+                rangeMod.SetLoopTimeRange(start, end);
+                applied = true;
+            }
+
+            // If the user returns to song select without restarting, the mod overlay may already be alive.
+            // It only reacts to SelectedMods bindable value changes, so force a value update to propagate the changed settings.
+            if (applied && mods is Bindable<IReadOnlyList<Mod>> writableMods)
+                writableMods.Value = writableMods.Value.ToArray();
         }
     }
 }

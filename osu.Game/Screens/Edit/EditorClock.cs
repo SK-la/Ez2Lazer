@@ -55,11 +55,10 @@ namespace osu.Game.Screens.Edit
 
         public IBindable<double> LoopStartTime => loopStartTime;
         public IBindable<double> LoopEndTime => loopEndTime;
-        public BindableBool LoopEnabled => loopEnabled;
+        public BindableBool LoopEnabled { get; } = new BindableBool();
 
         private readonly Bindable<double> loopStartTime = new Bindable<double>();
         private readonly Bindable<double> loopEndTime = new Bindable<double>();
-        private readonly BindableBool loopEnabled = new BindableBool();
 
         public EditorClock(IBeatmap beatmap = null, BindableBeatDivisor beatDivisor = null)
         {
@@ -67,7 +66,9 @@ namespace osu.Game.Screens.Edit
 
             this.beatDivisor = beatDivisor ?? new BindableBeatDivisor();
 
-            underlyingClock = new FramedBeatmapClock(applyOffsets: true, requireDecoupling: true);
+            // The editor operates in raw beatmap time. Applying offsets here breaks seek/loop logic
+            // (FramedBeatmapClock seeks in raw time but reports CurrentTime with offsets applied).
+            underlyingClock = new FramedBeatmapClock(applyOffsets: false, requireDecoupling: true);
             AddInternal(underlyingClock);
 
             track.BindValueChanged(_ => TrackChanged?.Invoke());
@@ -80,23 +81,17 @@ namespace osu.Game.Screens.Edit
         /// <returns>Whether the seek could be performed.</returns>
         public bool SeekSnapped(double position)
         {
-            var timingPoint = ControlPointInfo.TimingPointAt(position);
-            double beatSnapLength = timingPoint.BeatLength / beatDivisor.Value;
+            return Seek(GetSnappedTime(position));
+        }
 
-            // We will be snapping to beats within the timing point
-            position -= timingPoint.Time;
-
-            // Determine the index from the current timing point of the closest beat to position
-            int closestBeat = (int)Math.Round(position / beatSnapLength);
-            position = timingPoint.Time + closestBeat * beatSnapLength;
-
-            // Depending on beatSnapLength, we may snap to a beat that is beyond timingPoint's end time, but we want to instead snap to
-            // the next timing point's start time
-            var nextTimingPoint = ControlPointInfo.TimingPoints.FirstOrDefault(t => t.Time > timingPoint.Time);
-            if (position > nextTimingPoint?.Time)
-                position = nextTimingPoint.Time;
-
-            return Seek(position);
+        /// <summary>
+        /// Returns <paramref name="time"/> snapped to the currently configured editor beat divisor.
+        /// This matches the displayed editor grid granularity.
+        /// </summary>
+        public double GetSnappedTime(double time)
+        {
+            double snapped = ControlPointInfo.GetClosestSnappedTime(time, beatDivisor.Value);
+            return Math.Clamp(snapped, 0, TrackLength);
         }
 
         /// <summary>
@@ -296,7 +291,7 @@ namespace osu.Game.Screens.Edit
             }
 
             // Handle A-B loop
-            if (loopEnabled.Value && IsRunning && CurrentTime >= loopEndTime.Value)
+            if (LoopEnabled.Value && IsRunning && CurrentTime >= loopEndTime.Value)
             {
                 underlyingClock.Seek(loopStartTime.Value);
             }
