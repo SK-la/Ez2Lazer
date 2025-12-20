@@ -24,15 +24,11 @@ using osu.Game.Screens.Play;
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
     /// <summary>
-    /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；在功能完成后，重命名为CutLoopPlayMod更容易理解
-    /// 备注部分为我修改的内容, 增加IApplicableToHUD, IPreviewOverrideProvider接口
+    /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；
+    /// <para></para>备注部分为我修改的内容, 增加IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider接口的使用
     /// </summary>
-    public class ManiaModDuplicate : Mod, IApplicableAfterBeatmapConversion, IApplicableToTrack, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider
+    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider
     {
-        // Debug: set to 1-6 to crash at a specific checkpoint in DuplicateVirtualTrack.
-        // Set to 0 to disable.
-        private const int duplicate_track_debug_crash_stage = 0;
-
         private DuplicateVirtualTrack? duplicateTrack;
         private IWorkingBeatmap? pendingWorkingBeatmap;
         internal double? ResolvedCutTimeStart { get; private set; }
@@ -190,6 +186,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             double breakTime = BreakTime.Value * 1000;
             double? length = cutTimeEnd - cutTimeStart;
 
+            // 改为最少一个非空设置
             var minTimeBeatmap = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
             var maxTimeBeatmap = maniaBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
             cutTimeStart ??= minTimeBeatmap?.StartTime;
@@ -262,23 +259,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             maniaBeatmap.HitObjects = newPart;
         }
 
-        public void ApplyToTrack(IAdjustableAudioComponent track)
-        {
-        }
-
-        //将Beatmap给DuplicateVirtualTrack来创建虚拟音轨
+        // 将 Beatmap 交给 DuplicateVirtualTrack，用独立 Track 实例按切片参数播放
         public void ApplyToPlayer(Player player)
         {
             if (ResolvedSegmentLength <= 0)
                 return;
 
-            var workingBeatmap = player.Beatmap.Value;
-            pendingWorkingBeatmap = workingBeatmap;
+            pendingWorkingBeatmap = player.Beatmap.Value;
             duplicateTrack = new DuplicateVirtualTrack
             {
                 OverrideProvider = this,
                 PendingOverrides = null,
-                DebugCrashStage = duplicate_track_debug_crash_stage,
             };
         }
 
@@ -332,7 +323,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     return "Original Start Time";
                 }
-                return ManiaModDuplicate.CalculateTime(value);
+                return ManiaModLoopPlayClip.CalculateTime(value);
             }
         }
     }
@@ -348,7 +339,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     return "Original End Time";
                 }
-                return ManiaModDuplicate.CalculateTime(value);
+                return ManiaModLoopPlayClip.CalculateTime(value);
             }
         }
     }*/

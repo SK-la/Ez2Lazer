@@ -30,10 +30,11 @@ namespace osu.Game.LAsEzExtensions.Select
     public partial class EzPreviewTrackManager : CompositeDrawable
     {
         public bool IsPlaying => isPlaying && currentTrack?.IsRunning == true;
+
         private const int hitsound_threshold = 10;
         private const double preview_window_length = 10000; // 10s
         private const double scheduler_interval = 16; // ~60fps
-        private const double trigger_tolerance = 35; // ms 容差
+        private const double trigger_tolerance = 15; // ms 容差
         private const double max_dynamic_preview_length = 30000; // 动态扩展最长 s
         private readonly List<ScheduledHitSound> scheduledHitSounds = new List<ScheduledHitSound>();
 
@@ -69,22 +70,62 @@ namespace osu.Game.LAsEzExtensions.Select
         [Resolved]
         private ISkinSource skinSource { get; set; } = null!;
 
+        /// <summary>
+        /// 是否播放命中音效（hitsound）与故事板音效（storyboard sample）。
+        /// 仅影响“增强预览”路径下的样本调度，不影响 BGM 本体。
+        /// </summary>
         public bool EnableHitSounds { get; set; } = true;
+
+        /// <summary>
+        /// 覆盖预览起点时间（毫秒）。
+        /// 若为 null，则使用谱面元数据的预览时间（PreviewTime）。
+        /// </summary>
         public double? OverridePreviewStartTime { get; set; }
+
+        /// <summary>
+        /// 覆盖预览段长度（毫秒）。
+        /// 若为 null，则使用默认窗口长度，并在增强预览中可能动态延长以覆盖更多事件。
+        /// </summary>
         public double? OverridePreviewDuration { get; set; }
+
+        /// <summary>
+        /// 覆盖底层 Track 的 Looping 行为。
+        /// 注意：当启用外部驱动（存在 Duration/LoopCount/LoopInterval/ExternalClock 等）时，
+        /// 预览会通过 <see cref="updateSamples"/> 的 Stop/Seek/Start 来严格实现切片与间隔，
+        /// 此时 Track.Looping/RestartPoint 不再用于控制循环。
+        /// </summary>
         public bool? OverrideLooping { get; set; }
+
+        /// <summary>
+        /// 覆盖循环次数。
+        /// - 标准预览中默认 1 次。
+        /// - 增强预览中默认无限（直到用户停止预览）。
+        /// </summary>
         public int? OverrideLoopCount { get; set; }
+
+        /// <summary>
+        /// 覆盖循环间隔（毫秒）。
+        /// 仅在使用外部驱动的切片循环模式下生效。
+        /// </summary>
         public double? OverrideLoopInterval { get; set; }
+
+        /// <summary>
+        /// 外部时钟源。
+        /// 设定后将使用该时钟的时间域来计算“逻辑播放时间”，用于与 gameplay 等场景同步（例如切片从 cutStart 开始）。
+        /// </summary>
         public IClock? ExternalClock { get; set; }
 
         /// <summary>
-        /// When <see cref="ExternalClock"/> is provided, defines the reference time (in the external clock's time domain)
-        /// at which this preview should be considered to start.
-        /// This is primarily used to delay preview playback until a specific time is reached (e.g. gameplay time == cutStart).
-        /// If null, the reference will be captured from the external clock at the time preview starts.
+        /// 当提供 <see cref="ExternalClock"/> 时，定义预览“开始”的参考时间（毫秒，属于外部时钟的时间域）。
+        /// 主要用于把预览延后到某个外部时间点才开始生效（例如 gameplay 时间到达 cutStart 时再开始切片播放）。
+        /// 若为 null，则会在 <see cref="StartPreview"/> 实际启动时捕获当下的外部时钟时间作为参考。
         /// </summary>
         public double? ExternalClockStartTime { get; set; }
 
+        /// <summary>
+        /// 从 <see cref="PreviewOverrideSettings"/> 批量应用覆盖参数。
+        /// 传入 null 等同于 <see cref="ResetOverrides"/>。
+        /// </summary>
         public void ApplyOverrides(PreviewOverrideSettings? settings)
         {
             if (settings == null)
@@ -131,11 +172,11 @@ namespace osu.Game.LAsEzExtensions.Select
         #endregion
 
         /// <summary>
-        /// Starts enhanced preview for the given beatmap.
-        /// Will fall back to standard BGM-only preview if hitsound count is below threshold.
+        /// 为指定谱面启动预览。
+        /// 若命中音效数量低于阈值，会自动回退到“仅 BGM”的标准预览。
         /// </summary>
-        /// <param name="beatmap">The beatmap to preview</param>
-        /// <param name="forceEnhanced">Force enhanced preview regardless of hitsound count</param>
+        /// <param name="beatmap">要预览的谱面</param>
+        /// <param name="forceEnhanced">是否强制使用增强预览（忽略命中音效数量阈值）</param>
         public void StartPreview(IWorkingBeatmap beatmap, bool forceEnhanced = false)
         {
             if (isPlaying && currentBeatmap == beatmap)
@@ -159,9 +200,6 @@ namespace osu.Game.LAsEzExtensions.Select
             startEnhancedPreview(beatmap);
         }
 
-        /// <summary>
-        /// Stops the current preview and cleans up resources.
-        /// </summary>
         public void StopPreview()
         {
             stopPreviewInternal("manual");
@@ -191,10 +229,8 @@ namespace osu.Game.LAsEzExtensions.Select
         [BackgroundDependencyLoader]
         private void load()
         {
-            // Get sample store for playing audio samples
             sampleStore = AudioManager.Samples;
 
-            // Create audio container for proper audio sample management
             InternalChild = audioContainer = new Container
             {
                 RelativeSizeAxes = Axes.Both
@@ -230,9 +266,6 @@ namespace osu.Game.LAsEzExtensions.Select
             }
         }
 
-        /// <summary>
-        /// Starts standard BGM-only preview.
-        /// </summary>
         private void startStandardPreview(IWorkingBeatmap beatmap)
         {
             beatmap.PrepareTrackForPreview(true);
@@ -248,8 +281,8 @@ namespace osu.Game.LAsEzExtensions.Select
             loopSegmentLength = Math.Max(1, previewEndTime - previewStartTime);
             loopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
             effectiveLoopCount = OverrideLoopCount ?? 1;
-            // When any slice/loop overrides are provided, the track must be driven manually (Stop/Seek) via updateSamples().
-            // Track.Looping/RestartPoint alone cannot enforce Duration/LoopCount/LoopInterval.
+            // 当存在“切片/循环”相关 override 时，需要通过 updateSamples() 手动驱动 Track（Stop/Seek）。
+            // 仅靠 Track.Looping/RestartPoint 无法严格约束 Duration/LoopCount/LoopInterval。
             useExternalLooping = ExternalClock != null
                                  || loopInterval > 0
                                  || OverrideLoopCount.HasValue
@@ -274,7 +307,7 @@ namespace osu.Game.LAsEzExtensions.Select
         }
 
         /// <summary>
-        /// Starts enhanced preview with BGM, hitsounds, and storyboard samples.
+        /// 启动增强预览（BGM + 命中音效 + 故事板音效）。
         /// </summary>
         private void startEnhancedPreview(IWorkingBeatmap beatmap)
         {
@@ -400,7 +433,6 @@ namespace osu.Game.LAsEzExtensions.Select
             foreach (var ho in beatmap.HitObjects)
                 schedule(ho, previewEndTime);
             scheduledHitSounds.Sort((a, b) => a.Time.CompareTo(b.Time));
-            // 移除成功日志
 
             void schedule(HitObject ho, double end)
             {
@@ -736,7 +768,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
         private void clearEnhancedElements()
         {
-            // Stop all active sample channels
+            // 停止所有仍在播放的样本通道
             foreach (var channel in activeChannels)
                 channel.Stop();
             activeChannels.Clear();
@@ -813,13 +845,13 @@ namespace osu.Game.LAsEzExtensions.Select
 
             double referenceTime = ExternalClock?.CurrentTime ?? currentTrack?.CurrentTime ?? 0;
 
-            // If the gameplay clock is paused (or effectively paused, i.e. time is not advancing), keep audio paused as well.
-            // Without this, updateSamples() will keep seeking to a fixed time while the audio track continues,
-            // resulting in an audible "stutter" (the same tiny snippet repeating).
+            // 如果 gameplay 时钟暂停（或“看似在跑但时间不推进”），音频也应保持暂停。
+            // 否则 updateSamples() 会每帧 Seek 到固定时间点，而音频设备继续播放，
+            // 听起来像“卡带”一样重复同一小段。
             if (ExternalClock != null)
             {
-                // Some clocks may report IsRunning=true even while paused (but time stops advancing).
-                // Treat a near-zero delta as paused once we've observed at least one reference time.
+                // 有些时钟在暂停时仍可能 IsRunning=true，但 CurrentTime 不再推进。
+                // 这里在已观察到上一次 referenceTime 后，把近似 0 的 delta 视为暂停。
                 const double paused_delta_epsilon = 0.5; // ms
 
                 if (!ExternalClock.IsRunning
@@ -846,7 +878,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
             if (timeSinceStart < 0)
             {
-                inBreak = true; // keep paused until start
+                inBreak = true; // 外部时钟尚未到达起点，保持暂停
                 logicalTime = previewStartTime;
                 lastReferenceTime = referenceTime;
                 return true;

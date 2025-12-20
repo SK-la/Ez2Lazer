@@ -347,7 +347,7 @@ namespace osu.Game.Rulesets.Mania
                         // new ManiaModCleaner(),
                         // new ManiaModDeleteSpace(),
                         new ManiaModDoublePlay(),
-                        new ManiaModDuplicate(),
+                        new ManiaModLoopPlayClip(),
                         new ManiaModGracer(),
                         new ManiaModJackAdjust(),
                         new ManiaModJudgmentsAdjust(),
