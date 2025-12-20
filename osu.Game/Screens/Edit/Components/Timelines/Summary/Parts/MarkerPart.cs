@@ -36,13 +36,7 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary.Parts
 
         private double? lastSeekTime;
 
-        protected override bool OnDragStart(DragStartEvent e)
-        {
-            var localPos = ToLocalSpace(e.ScreenSpaceMousePosition);
-            if (localPos.Y <= DrawHeight / 2) return false;
-
-            return true;
-        }
+        protected override bool OnDragStart(DragStartEvent e) => true;
 
         protected override void OnDrag(DragEvent e)
         {
@@ -58,9 +52,6 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary.Parts
 
         protected override bool OnMouseDown(MouseDownEvent e)
         {
-            var localPos = ToLocalSpace(e.ScreenSpaceMousePosition);
-            if (localPos.Y <= DrawHeight / 2) return false; // only lower half
-
             seekToPosition(e.ScreenSpaceMousePosition, instant: true);
             return true;
         }

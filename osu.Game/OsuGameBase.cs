@@ -63,7 +63,6 @@ using osu.Game.Resources;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
-using osu.Game.Screens;
 using osu.Game.Skinning;
 using osu.Game.Utils;
 using RuntimeInfo = osu.Framework.RuntimeInfo;

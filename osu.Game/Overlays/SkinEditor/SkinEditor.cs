@@ -35,7 +35,6 @@ using osu.Game.Screens.Edit.Components.Menus;
 using osu.Game.Skinning;
 using osu.Framework.Graphics.Cursor;
 using osu.Game.Input.Bindings;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Utils;
 
