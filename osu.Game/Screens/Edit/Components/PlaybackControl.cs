@@ -193,7 +193,7 @@ namespace osu.Game.Screens.Edit.Components
                     double startTime = editorClock.GetSnappedTime(currentTime);
                     var timingPoint = editorClock.ControlPointInfo.TimingPointAt(startTime);
 
-                    double endTime = startTime + timingPoint.BeatLength * 2;
+                    double endTime = startTime + timingPoint.BeatLength * 8;
                     endTime = Math.Min(endTime, editorClock.TrackLength);
                     endTime = editorClock.GetSnappedTime(endTime);
 
