@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Extensions;
 using osu.Game.Beatmaps;
@@ -158,6 +159,18 @@ namespace osu.Game.LAsEzExtensions.Select
                         if (newTrack != null)
                         {
                             ensureTrackLengthPopulated(newTrack);
+
+                            // 重要：游戏内的变速 Mod（DT/HT/RateAdjust 等）会把调整应用到
+                            // GameplayClockContainer.AdjustmentsFromMods 上，并由 MasterGameplayClockContainer 绑定到主音轨。
+                            // 但在 gameplay 场景下 DuplicateVirtualTrack 使用的是“独立的 Track 实例”，
+                            // 所以这里必须把同一套 adjustments 绑定到新 Track，确保音频变速与游戏时钟/下落判定保持一致。
+                            if (gameplayClockContainer != null)
+                                newTrack.BindAdjustments(gameplayClockContainer.AdjustmentsFromMods);
+
+                            // 同步用户的播放速率调整（若存在）。
+                            if (gameplayClockContainer is MasterGameplayClockContainer master)
+                                newTrack.AddAdjustment(AdjustableProperty.Frequency, master.UserPlaybackRate);
+
                             ownsTrack = true;
                             return newTrack;
                         }

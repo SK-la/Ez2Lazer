@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Graphics.Sprites;
@@ -19,7 +20,9 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
+using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
@@ -27,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；
     /// <para></para>备注部分为我修改的内容, 增加IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider接口的使用
     /// </summary>
-    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider, ILoopTimeRangeMod, IApplicableFailOverride
+    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider, ILoopTimeRangeMod, IApplicableFailOverride, IApplicableToRate, IApplicableToDrawableRuleset<ManiaHitObject>
     {
         private DuplicateVirtualTrack? duplicateTrack;
         private IWorkingBeatmap? pendingWorkingBeatmap;
@@ -48,10 +51,19 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override bool Ranked => false;
 
+        // LP 内置变速（复刻 HT 的实现）后，为避免叠加导致体验混乱，直接与其它变速 Mod 互斥。
+        public override Type[] IncompatibleMods => new[]
+        {
+            typeof(ModRateAdjust),
+            typeof(ModTimeRamp),
+            typeof(ModAdaptiveSpeed)
+        };
+
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
             get
             {
+                yield return ($"Speed x{SpeedChange.Value:N2}", AdjustPitch.Value ? "Pitch Adjusted" : "Pitch Unchanged");
                 yield return ($"{LoopCount.Value}", "Loop Count");
                 yield return ("Break", $"{BreakTime:N1}s");
                 yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : CalculateTime((int)CutTimeStart.Value))}");
@@ -66,6 +78,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             MaxValue = 100,
             Precision = 1
         };
+
+        [SettingSource("Speed Change", "The actual decrease to apply. Don't add other rate-mod.", SettingControlType = typeof(MultiplierSettingsSlider))]
+        public BindableNumber<double> SpeedChange { get; } = new BindableDouble(0.75)
+        {
+            MinValue = 0.5,
+            MaxValue = 2.0,
+            Precision = 0.01,
+        };
+
+        [SettingSource("Adjust pitch", "Should pitch be adjusted with speed.(变速又变调)")]
+        public BindableBool AdjustPitch { get; } = new BindableBool();
+
+        [SettingSource("Constant Speed", "No more tricky speed changes.(恒定速度/忽略谱面中的变速)")]
+        public BindableBool ConstantSpeed { get; } = new BindableBool(true);
 
         /*[SettingSource("Cut Time Start", "Select your part(second).", SettingControlType = typeof(SettingsSlider<int, CutStart>))]
         public BindableInt CutTimeStart { get; set; } = new BindableInt(-10)
@@ -95,9 +121,33 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource("Use global A-B range", "Always use the editor A/B range stored for this session (ms).")]
         public BindableBool UseGlobalAbRange { get; set; } = new BindableBool(true);
 
+        private readonly RateAdjustModHelper rateAdjustHelper;
+
         public ManiaModLoopPlayClip()
         {
+            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
+            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
+
             UseGlobalAbRange.BindValueChanged(_ => applyRangeFromStore(), true);
+        }
+
+        public void ApplyToTrack(IAdjustableAudioComponent track) => rateAdjustHelper.ApplyToTrack(track);
+
+        public void ApplyToSample(IAdjustableAudioComponent sample)
+        {
+            // 与 ModRateAdjust 一致：sample 仅做音高/频率调整即可。
+            sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
+        }
+
+        public double ApplyToRate(double time, double rate = 1) => rate * SpeedChange.Value;
+
+        public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
+        {
+            if (!ConstantSpeed.Value)
+                return;
+
+            if (drawableRuleset is DrawableManiaRuleset maniaRuleset)
+                maniaRuleset.VisualisationMethod = ScrollVisualisationMethod.Constant;
         }
 
         public override void ResetSettingsToDefaults()
@@ -115,8 +165,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 return;
 
             // Store is always milliseconds.
-            CutTimeStart.Value = Millisecond.Value ? (int)startMs : (int)(startMs / 1000d);
-            CutTimeEnd.Value = Millisecond.Value ? (int)endMs : (int)(endMs / 1000d);
+            setCutTimeFromMs(startMs, endMs);
             setResolvedCut(null, null);
         }
 
@@ -173,19 +222,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 var maniaBeatmap = (ManiaBeatmap)beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
 
-                double? cutTimeStart;
-                double? cutTimeEnd;
-
-                if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
-                {
-                    cutTimeStart = startMs;
-                    cutTimeEnd = endMs;
-                }
-                else
-                {
-                    cutTimeStart = CutTimeStart.Value * (Millisecond.Value ? 1 : 1000);
-                    cutTimeEnd = CutTimeEnd.Value * (Millisecond.Value ? 1 : 1000);
-                }
+                var (cutTimeStart, cutTimeEnd) = getEffectiveCutTimeMs();
 
                 // 若开始为空则取最早物件时间，若结束为空则取最晚物件时间（不再整体判无效）。
                 var minTime = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
@@ -220,21 +257,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             maniaBeatmap.Breaks.Clear();
 
-            double? cutTimeStart;
-            double? cutTimeEnd;
-
-            if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
-            {
-                cutTimeStart = startMs;
-                cutTimeEnd = endMs;
-            }
-            else
-            {
-                double? timeStart = CutTimeStart.Value;
-                double? timeEnd = CutTimeEnd.Value;
-                cutTimeStart = timeStart * (Millisecond.Value ? 1 : 1000);
-                cutTimeEnd = timeEnd * (Millisecond.Value ? 1 : 1000);
-            }
+            var (cutTimeStart, cutTimeEnd) = getEffectiveCutTimeMs();
 
             double breakTime = BreakTime.Value * 1000;
             double? length = cutTimeEnd - cutTimeStart;
@@ -372,16 +395,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             LoopTimeRangeStore.Set(startTime, endTime);
 
             // The editor timeline works in milliseconds, while this mod exposes seconds by default.
-            if (Millisecond.Value)
-            {
-                CutTimeStart.Value = (int)startTime;
-                CutTimeEnd.Value = (int)endTime;
-            }
-            else
-            {
-                CutTimeStart.Value = (int)(startTime / 1000d);
-                CutTimeEnd.Value = (int)(endTime / 1000d);
-            }
+            setCutTimeFromMs(startTime, endTime);
 
             // Reset preview cache so changes take effect immediately where used.
             setResolvedCut(null, null);
@@ -394,6 +408,56 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public bool PerformFail() => false;
 
         public bool RestartOnFail => false;
+
+        // 简化后的统一参数访问器，自动适配全局/本地，单位换算集中
+        private double? cutTimeStartMs
+        {
+            get => UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out _)
+                ? startMs
+                : toMs(CutTimeStart.Value);
+            set
+            {
+                if (UseGlobalAbRange.Value)
+                    setGlobalRange(value, cutTimeEndMs);
+                else
+                    CutTimeStart.Value = fromMs(value);
+            }
+        }
+
+        private double? cutTimeEndMs
+        {
+            get => UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out _, out double endMs)
+                ? endMs
+                : toMs(CutTimeEnd.Value);
+            set
+            {
+                if (UseGlobalAbRange.Value)
+                    setGlobalRange(cutTimeStartMs, value);
+                else
+                    CutTimeEnd.Value = fromMs(value);
+            }
+        }
+
+        // 工具方法，集中单位换算和全局写入
+        private double? toMs(int? v) => v == null ? null : v * (Millisecond.Value ? 1 : 1000);
+        private int? fromMs(double? ms) => ms == null ? null : (Millisecond.Value ? (int)ms : (int)(ms / 1000d));
+        private void setGlobalRange(double? start, double? end) => LoopTimeRangeStore.Set(start ?? 0, end ?? 0);
+
+        // 新增：根据当前单位设置 CutTimeStart/End
+        private void setCutTimeFromMs(double startMs, double endMs)
+        {
+            CutTimeStart.Value = Millisecond.Value ? (int)startMs : (int)(startMs / 1000d);
+            CutTimeEnd.Value = Millisecond.Value ? (int)endMs : (int)(endMs / 1000d);
+        }
+
+        // 获取当前生效的切片起止时间（毫秒）
+        private (double? startMs, double? endMs) getEffectiveCutTimeMs()
+        {
+            if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
+                return (startMs, endMs);
+
+            return (cutTimeStartMs, cutTimeEndMs);
+        }
     }
 
     /*public partial class CutStart : RoundedSliderBar<double>

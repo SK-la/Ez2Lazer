@@ -186,13 +186,13 @@ namespace osu.Game.Screens.Edit.Components
                 }
                 else
                 {
-                    // Set default loop points when enabling.
+                    // 设置默认的循环范围为当前时间前后2.5秒
                     double currentTime = editorClock.CurrentTime;
-                    editorClock.SetLoopStartTime(editorClock.GetSnappedTime(Math.Max(0, currentTime - 2500))); // 2.5 seconds before
-                    editorClock.SetLoopEndTime(editorClock.GetSnappedTime(Math.Min(editorClock.TrackLength, currentTime + 2500))); // 2.5 seconds after
+                    editorClock.SetLoopStartTime(editorClock.GetSnappedTime(Math.Max(0, currentTime - 2500)));
+                    editorClock.SetLoopEndTime(editorClock.GetSnappedTime(Math.Min(editorClock.TrackLength, currentTime + 2500)));
                 }
 
-                editorClock.Seek(editorClock.LoopStartTime.Value); // Seek to start of loop
+                editorClock.Seek(editorClock.LoopStartTime.Value); // 跳转到开头
             }
         }
 
