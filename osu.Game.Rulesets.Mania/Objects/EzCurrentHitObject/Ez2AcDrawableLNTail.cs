@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
@@ -13,10 +14,21 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (HoldNote.IsHolding.Value && timeOffset >= 0)
+            if (!HoldNote.Head.IsHit)
+            {
+                return;
+            }
+
+            if (timeOffset >= 0 && HoldNote.IsHolding.Value)
+            {
                 ApplyMaxResult();
-            else
-                base.CheckForResult(userTriggered, timeOffset);
+                return;
+            }
+            else if (timeOffset > 0)
+            {
+                ApplyMinResult();
+                return;
+            }
         }
     }
 
