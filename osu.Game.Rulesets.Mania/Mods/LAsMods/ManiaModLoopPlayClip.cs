@@ -56,7 +56,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             typeof(ModRateAdjust),
             typeof(ModTimeRamp),
-            typeof(ModAdaptiveSpeed)
+            typeof(ModAdaptiveSpeed),
+            typeof(ManiaModConstantSpeed),
+            typeof(ManiaModNoFail),
         };
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
