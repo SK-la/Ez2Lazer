@@ -195,6 +195,8 @@ namespace osu.Game.Skinning.Components
             if (!judgement.Type.IsScorable() || judgement.Type.IsBonus())
                 return;
 
+            if (judgement.Type == HitResult.Meh) return;
+
             // 清除内部元素前先结束所有变换
             StaticSprite?.FinishTransforms();
 

@@ -318,8 +318,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 case EzMUGHitMode.Melody:
                     column.RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
-                    column.RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
                     column.RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
+                    column.RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
                     break;
 
                 case EzMUGHitMode.IIDX:

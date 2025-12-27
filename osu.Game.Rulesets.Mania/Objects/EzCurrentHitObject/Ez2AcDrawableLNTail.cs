@@ -9,15 +9,12 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     public partial class Ez2AcDrawableLNTail : DrawableHoldNoteTail
     {
+        public override bool DisplayResult => false;
+
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (HoldNote.Head.IsHit &&
-                HoldNote.IsHolding.Value &&
-                timeOffset >= 0 &&
-                !HoldNote.Body.HasHoldBreak)
-                ApplyResult(HitResult.None);
-            else if (HoldNote.Body.HasHoldBreak || !HoldNote.Head.IsHit)
-                ApplyResult(HitResult.Miss);
+            if (HoldNote.IsHolding.Value && timeOffset >= 0)
+                ApplyMaxResult();
             else
                 base.CheckForResult(userTriggered, timeOffset);
         }

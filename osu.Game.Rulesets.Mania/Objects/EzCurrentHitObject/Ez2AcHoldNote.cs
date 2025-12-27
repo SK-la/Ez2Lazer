@@ -64,6 +64,13 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public class Ez2AcLNTail : TailNote
     {
+        public override Judgement CreateJudgement() => new NoComboBreakTailJudgement();
+
+        public class NoComboBreakTailJudgement : ManiaJudgement
+        {
+            public override HitResult MaxResult => HitResult.IgnoreHit;
+            public override HitResult MinResult => HitResult.ComboBreak;
+        }
     }
 
     public class Ez2AcNote : Note

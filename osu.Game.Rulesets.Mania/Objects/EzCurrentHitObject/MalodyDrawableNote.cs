@@ -12,7 +12,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         public new bool HasHoldBreak => false;
 
-        internal override void TriggerResult(bool hit)
+        internal new void TriggerResult(bool hit)
         {
             if (AllJudged) return;
 
@@ -38,8 +38,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 ApplyMaxResult();
                 return;
             }
-
-            if (timeOffset > 0)
+            else if (timeOffset > 0)
             {
                 ApplyMinResult();
                 return;
