@@ -20,6 +20,8 @@ namespace osu.Game.LAsEzExtensions.Select
         private bool started;
         private IWorkingBeatmap? pendingBeatmap;
 
+        private double? beatmapTrackVolumeBeforeMute;
+
         [Resolved(canBeNull: true)]
         private IGameplayClock? gameplayClock { get; set; }
 
@@ -44,24 +46,29 @@ namespace osu.Game.LAsEzExtensions.Select
             ExternalClockStartTime = overrides?.PreviewStart ?? OverridePreviewStartTime;
             EnableHitSounds = overrides?.EnableHitSounds ?? true;
 
-            // 在 gameplay 中，MasterGameplayClockContainer 默认使用 beatmap.Track 作为音频源。
-            // 如果不把它“断开”，原曲会继续整首播放。
-            // 切换到虚拟时钟源后，除非我们在这里显式播放，否则不会有音频输出。
-            if (gameplayClockContainer is MasterGameplayClockContainer master)
+            // gameplay 下不要把 MasterGameplayClockContainer 从真实 beatmap.Track “断开”。
+            // 断开会导致：
+            // 1) 变速 Mod（HT/DT/RateAdjust）对 gameplay 时钟不生效（TrackVirtual 不一定按 Tempo/Frequency 推进时间）。
+            // 2) SubmittingPlayer 的播放校验会持续报 "System audio playback is not working"。
+            // 这里改为：保留 beatmap.Track 作为时钟来源，但将其静音，避免听到整首歌。
+            if (gameplayClock != null && beatmap.Track != null)
             {
-                master.StopUsingBeatmapClock();
-            }
-
-            // 即使切换了 gameplay 时钟源，原 beatmap.Track 也可能已经在跑。
-            // 这里显式 Stop，确保只剩下切片音轨在播放。
-            if (gameplayClock != null)
-            {
-                beatmap.Track?.Stop();
+                beatmapTrackVolumeBeforeMute ??= beatmap.Track.Volume.Value;
+                beatmap.Track.Volume.Value = 0;
             }
 
             // 不直接开播：等待本 Drawable 完成依赖注入，并在 gameplay 时钟 running 时再开始。
             //（选歌界面无 gameplayClock，则下一帧启动即可）
             started = false;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            // 尽可能恢复 beatmap.Track 的音量，避免退出/切换后一直静音。
+            if (pendingBeatmap?.Track != null && beatmapTrackVolumeBeforeMute != null)
+                pendingBeatmap.Track.Volume.Value = beatmapTrackVolumeBeforeMute.Value;
+
+            base.Dispose(isDisposing);
         }
 
         protected override void UpdateAfterChildren()
