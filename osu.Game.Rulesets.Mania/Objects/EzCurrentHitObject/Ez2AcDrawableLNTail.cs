@@ -11,13 +11,15 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (HoldNote.Head.IsHit)
-            {
-                if (HoldNote.IsHolding.Value && (timeOffset < 0 || HoldNote.Body.HasHoldBreak))
-                    ApplyResult(HitResult.Meh);
-                else
-                    ApplyResult(HitResult.Miss);
-            }
+            if (HoldNote.Head.IsHit &&
+                HoldNote.IsHolding.Value &&
+                timeOffset >= 0 &&
+                !HoldNote.Body.HasHoldBreak)
+                ApplyResult(HitResult.None);
+            else if (HoldNote.Body.HasHoldBreak || !HoldNote.Head.IsHit)
+                ApplyResult(HitResult.Miss);
+            else
+                base.CheckForResult(userTriggered, timeOffset);
         }
     }
 
