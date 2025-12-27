@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
@@ -37,6 +38,8 @@ namespace osu.Game.Screens.SelectV2
         public const float HEIGHT_FROM_SCREEN_TOP = 141 - corner_radius;
 
         private const float corner_radius = 10;
+
+        public Bindable<BeatmapSetInfo?> ScopedBeatmapSet { get; } = new Bindable<BeatmapSetInfo?>();
 
         private SongSelectSearchTextBox searchTextBox = null!;
         private ShearedToggleButton showConvertedBeatmapsButton = null!;
@@ -160,6 +163,7 @@ namespace osu.Game.Screens.SelectV2
                                 new Dimension(maxSize: 180),
                                 new Dimension(GridSizeMode.Absolute, 5),
                                 new Dimension(),
+                                new Dimension(GridSizeMode.AutoSize),
                             },
                             Content = new[]
                             {
@@ -183,6 +187,11 @@ namespace osu.Game.Screens.SelectV2
                                     },
                                 }
                             }
+                        },
+                        new ScopedBeatmapSetDisplay
+                        {
+                            ScopedBeatmapSet = ScopedBeatmapSet,
+                            Depth = float.MinValue, // hack to ensure that the scoped display handles `GlobalAction.Back` input before the filter control
                         },
                         csSelector = new EzKeyModeSelector
                         {

@@ -186,10 +186,22 @@ namespace osu.Game.Screens.Edit.Components
                 }
                 else
                 {
-                    // 设置默认的循环范围为当前时间前后2.5秒
-                    double currentTime = editorClock.CurrentTime;
-                    editorClock.SetLoopStartTime(editorClock.GetSnappedTime(Math.Max(0, currentTime - 2500)));
-                    editorClock.SetLoopEndTime(editorClock.GetSnappedTime(Math.Min(editorClock.TrackLength, currentTime + 2500)));
+                    // 默认范围：以当前活动光标为 A 起点，向后 8 个 1/4 节拍为 B 终点。
+                    // 8 * (1/4 beat) = 2 beats.
+                    double currentTime = Math.Clamp(editorClock.CurrentTime, 0, editorClock.TrackLength);
+
+                    double startTime = editorClock.GetSnappedTime(currentTime);
+                    var timingPoint = editorClock.ControlPointInfo.TimingPointAt(startTime);
+
+                    double endTime = startTime + timingPoint.BeatLength * 2;
+                    endTime = Math.Min(endTime, editorClock.TrackLength);
+                    endTime = editorClock.GetSnappedTime(endTime);
+
+                    if (endTime <= startTime)
+                        endTime = Math.Min(editorClock.TrackLength, startTime + 1);
+
+                    editorClock.SetLoopStartTime(startTime);
+                    editorClock.SetLoopEndTime(endTime);
                 }
 
                 editorClock.Seek(editorClock.LoopStartTime.Value); // 跳转到开头

@@ -1225,6 +1225,8 @@ namespace osu.Game.Screens.SelectV2
                 beatmaps.Restore(b);
         }
 
+        public Bindable<BeatmapSetInfo?> ScopedBeatmapSet => filterControl.ScopedBeatmapSet;
+
         #endregion
     }
 }
