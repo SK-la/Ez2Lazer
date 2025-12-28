@@ -64,6 +64,13 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             sampleRateDropdown.Current.Value = audio.GetSampleRate();
             sampleRateDropdown.Current.ValueChanged += e => audio.SetSampleRate(e.NewValue);
 
+            // Setup ASIO sample rate synchronization
+            audio.SetupAsioSampleRateSync(actualSampleRate =>
+            {
+                // Update the sample rate dropdown to reflect the actual rate used by ASIO device
+                Schedule(() => sampleRateDropdown.Current.Value = actualSampleRate);
+            });
+
             onDeviceChanged(string.Empty);
         }
 

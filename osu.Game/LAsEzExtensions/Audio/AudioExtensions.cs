@@ -37,9 +37,14 @@ namespace osu.Game.LAsEzExtensions.Audio
             (var mode, string deviceName, int? asioIndex) = parseSelection(audioManager.AudioDevice.Value, audioManager.UseExperimentalWasapi.Value);
 
             // 对于ASIO设备，设置首选采样率以便在设备初始化时使用
-            if (mode == AudioOutputMode.Asio) audioManager.SetPreferredAsioSampleRate(sampleRate);
+            if (mode == AudioOutputMode.Asio)
+            {
+                audioManager.SetPreferredAsioSampleRate(sampleRate);
+                // ASIO设备的采样率在初始化时决定，不需要运行时设置
+                return;
+            }
 
-            // 尝试实际设置采样率
+            // 尝试实际设置采样率（仅对非ASIO设备）
             trySetActualSampleRate(audioManager, sampleRate);
         }
 
@@ -82,6 +87,20 @@ namespace osu.Game.LAsEzExtensions.Audio
                 // 如果获取失败，返回默认列表
                 return common_sample_rates;
             }
+        }
+
+        // 扩展方法：设置ASIO设备初始化事件监听器
+        public static void SetupAsioSampleRateSync(this AudioManager audioManager, Action<int> onSampleRateChanged)
+        {
+            audioManager.OnAsioDeviceInitialized += sampleRate =>
+            {
+                int intSampleRate = (int)sampleRate;
+                onSampleRateChanged(intSampleRate);
+
+                // 更新设备采样率缓存
+                string deviceKey = audioManager.AudioDevice.Value;
+                device_sample_rates[deviceKey] = intSampleRate;
+            };
         }
 
         // 尝试设置实际的采样率
