@@ -3,11 +3,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
+using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
+using osu.Framework.Platform;
 using osu.Framework.Text;
 using osu.Game.Graphics.Sprites;
 
@@ -32,13 +37,18 @@ namespace osu.Game.Skinning.Components
         }
 
         [BackgroundDependencyLoader]
-        private void load(TextureStore textures)
+        private void load(GameHost host, IRenderer renderer)
         {
-            // Spacing = new Vector2(-2f, 0f);
+            Storage gameStorage = host.Storage;
+
+            var userResourceStore = new StorageBackedResourceStore(gameStorage);
+            var textureLoader = new TextureLoaderStore(userResourceStore);
+            var localSkinStore = new TextureStore(renderer, textureLoader);
+
             FontName.BindValueChanged(e =>
             {
                 Font = new FontUsage(FontName.Value.ToString(), 1);
-                glyphStore = new GlyphStore(textures, getLookup);
+                glyphStore = new GlyphStore(localSkinStore, getLookup);
 
                 foreach (char c in new[] { '.', '%', 'c', 'e', 'l', 'j' })
                     glyphStore.Get(FontName.Value.ToString(), c);
@@ -77,6 +87,7 @@ namespace osu.Game.Skinning.Components
                     string textureNameReplace = textureName.Replace(" ", "_");
 
                     string[] possiblePaths;
+                    string themeRoot = Path.Combine("EzResources", "GameTheme", textureNameReplace);
 
                     switch (character)
                     {
@@ -86,29 +97,29 @@ namespace osu.Game.Skinning.Components
                         case 'l':
                             possiblePaths = new[]
                             {
-                                $"EzResources/GameTheme/{textureNameReplace}/{lookup}",
+                                Path.Combine(themeRoot, lookup)
                             };
                             break;
 
                         case 'c':
                             possiblePaths = new[]
                             {
-                                $"EzResources/GameTheme/{textureNameReplace}/combo/{lookup}", //combo图
+                                Path.Combine(themeRoot, "combo", lookup)
                             };
                             break;
 
                         case 'j':
                             possiblePaths = new[]
                             {
-                                $"EzResources/GameTheme/{textureNameReplace}/judgement/",
+                                Path.Combine(themeRoot, "judgement")
                             };
                             break;
 
                         default:
                             possiblePaths = new[]
                             {
-                                $"EzResources/GameTheme/{textureNameReplace}/combo/number/{lookup}", //数字
-                                $"EzResources/GameTheme/{textureNameReplace}/judgement/{lookup}", //判定
+                                Path.Combine(themeRoot, "combo", "number", lookup),
+                                Path.Combine(themeRoot, "judgement", lookup)
                             };
                             break;
                     }
@@ -121,6 +132,7 @@ namespace osu.Game.Skinning.Components
                         {
                             glyph = new TexturedCharacterGlyph(new CharacterGlyph(character, 0, 0, texture.Width, texture.Height, null),
                                 texture, 0.125f);
+                            break;
                         }
                     }
                 }
