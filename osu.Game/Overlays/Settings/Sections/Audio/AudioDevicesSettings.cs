@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
 using osu.Framework.Extensions.ObjectExtensions;
+using osu.Game.LAsEzExtensions.Audio;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -23,6 +24,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private SettingsDropdown<string> dropdown = null!;
 
+        private SettingsDropdown<int> sampleRateDropdown = null!;
+
         private SettingsCheckbox? wasapiExperimental;
 
         [BackgroundDependencyLoader]
@@ -34,6 +37,11 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 {
                     LabelText = AudioSettingsStrings.OutputDevice,
                     Keywords = new[] { "speaker", "headphone", "output" }
+                },
+                sampleRateDropdown = new SettingsDropdown<int>
+                {
+                    LabelText = "Sample Rate",
+                    Keywords = new[] { "sample", "rate", "frequency" }
                 },
             };
 
@@ -53,21 +61,34 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             audio.OnNewDevice += onDeviceChanged;
             audio.OnLostDevice += onDeviceChanged;
             dropdown.Current = audio.AudioDevice;
+            sampleRateDropdown.Current.Value = audio.GetSampleRate();
+            sampleRateDropdown.Current.ValueChanged += e => audio.SetSampleRate(e.NewValue);
 
             onDeviceChanged(string.Empty);
         }
 
         private void onDeviceChanged(string _)
         {
-            updateItems();
-
-            if (wasapiExperimental != null)
+            // Audio device notifications may arrive from the audio thread.
+            // Ensure UI mutations happen on the update thread.
+            Schedule(() =>
             {
-                if (wasapiExperimental.Current.Value)
-                    wasapiExperimental.SetNoticeText(AudioSettingsStrings.WasapiNotice, true);
-                else
-                    wasapiExperimental.ClearNoticeText();
-            }
+                updateItems();
+                updateSampleRates();
+
+                // 重新应用当前设备的采样率设置
+                int currentSampleRate = audio.GetSampleRate();
+                sampleRateDropdown.Current.Value = currentSampleRate;
+                audio.SetSampleRate(currentSampleRate);
+
+                if (wasapiExperimental != null)
+                {
+                    if (wasapiExperimental.Current.Value)
+                        wasapiExperimental.SetNoticeText(AudioSettingsStrings.WasapiNotice, true);
+                    else
+                        wasapiExperimental.ClearNoticeText();
+                }
+            });
         }
 
         private void updateItems()
@@ -90,6 +111,12 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                              .Where(i => i.IsNotNull())
                              .Distinct()
                              .ToList();
+        }
+
+        private void updateSampleRates()
+        {
+            var supportedRates = audio.GetSupportedSampleRates(audio.AudioDevice.Value);
+            sampleRateDropdown.Items = supportedRates.ToList();
         }
 
         protected override void Dispose(bool isDisposing)
