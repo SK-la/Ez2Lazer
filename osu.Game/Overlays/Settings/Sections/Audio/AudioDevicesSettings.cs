@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Framework.Localisation;
@@ -41,7 +42,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 sampleRateDropdown = new SettingsDropdown<int>
                 {
                     LabelText = "Sample Rate",
-                    Keywords = new[] { "sample", "rate", "frequency" }
+                    Keywords = new[] { "sample", "rate", "frequency" },
+                    Current = new Bindable<int>(48000),
                 },
             };
 

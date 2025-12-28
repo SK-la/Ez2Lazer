@@ -13,7 +13,7 @@ namespace osu.Game.LAsEzExtensions.Audio
     public static class AudioExtensions
     {
         // 固定采样率列表，常见的值
-        private static readonly int[] common_sample_rates = { 44100, 48000, 96000, 176400, 192000 };
+        private static readonly int[] common_sample_rates = { 44100, 48000, 96000, 192000 };
 
         // 存储用户选择的采样率设置
         private static readonly Dictionary<string, int> device_sample_rates = new Dictionary<string, int>();
