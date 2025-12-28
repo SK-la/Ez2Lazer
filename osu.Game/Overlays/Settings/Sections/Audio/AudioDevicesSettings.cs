@@ -44,6 +44,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     LabelText = "Sample Rate",
                     Keywords = new[] { "sample", "rate", "frequency" },
                     Current = new Bindable<int>(48000),
+                    TooltipText = "48k is better, too high a value will cause delays and clock synchronization errors"
                 },
             };
 
