@@ -86,10 +86,9 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 updateItems();
                 updateSampleRates();
 
-                // 重新应用当前设备的采样率设置
+                // 重新应用当前统一的采样率设置
                 int currentSampleRate = audio.GetSampleRate();
                 sampleRateDropdown.Current.Value = currentSampleRate;
-                audio.SetSampleRate(currentSampleRate);
 
                 if (wasapiExperimental != null)
                 {

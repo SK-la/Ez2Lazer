@@ -12,40 +12,21 @@ namespace osu.Game.LAsEzExtensions.Audio
 {
     public static class AudioExtensions
     {
-        // 固定采样率列表，常见的值
-        private static readonly int[] common_sample_rates = { 44100, 48000, 96000, 192000 };
-
-        // 存储用户选择的采样率设置
-        private static readonly Dictionary<string, int> device_sample_rates = new Dictionary<string, int>();
+        // 固定采样率列表，优先使用48kHz
+        private static readonly int[] common_sample_rates = { 48000, 44100, 96000, 192000 };
 
         // 扩展方法：获取当前采样率
         public static int GetSampleRate(this AudioManager audioManager)
         {
-            string deviceKey = audioManager.AudioDevice.Value;
-            return device_sample_rates.GetValueOrDefault(deviceKey, 44100);
-
-            // 如果没有保存的设置，返回默认值
+            // Use the unified sample rate from AudioManager
+            return (int)audioManager.SampleRate.Value;
         }
 
         // 扩展方法：设置采样率
         public static void SetSampleRate(this AudioManager audioManager, int sampleRate)
         {
-            string deviceKey = audioManager.AudioDevice.Value;
-            device_sample_rates[deviceKey] = sampleRate;
-
-            // 解析当前选择的设备来确定输出模式
-            (var mode, string deviceName, int? asioIndex) = parseSelection(audioManager.AudioDevice.Value, audioManager.UseExperimentalWasapi.Value);
-
-            // 对于ASIO设备，设置首选采样率以便在设备初始化时使用
-            if (mode == AudioOutputMode.Asio)
-            {
-                audioManager.SetPreferredAsioSampleRate(sampleRate);
-                // ASIO设备的采样率在初始化时决定，不需要运行时设置
-                return;
-            }
-
-            // 尝试实际设置采样率（仅对非ASIO设备）
-            trySetActualSampleRate(audioManager, sampleRate);
+            // Set the unified sample rate, which will trigger device reload
+            audioManager.SampleRate.Value = sampleRate;
         }
 
         // 扩展方法：获取支持的采样率列表
@@ -97,9 +78,8 @@ namespace osu.Game.LAsEzExtensions.Audio
                 int intSampleRate = (int)sampleRate;
                 onSampleRateChanged(intSampleRate);
 
-                // 更新设备采样率缓存
-                string deviceKey = audioManager.AudioDevice.Value;
-                device_sample_rates[deviceKey] = intSampleRate;
+                // 更新统一的采样率设置以反映实际使用的采样率
+                audioManager.SampleRate.Value = intSampleRate;
             };
         }
 
