@@ -37,6 +37,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
+        [SettingSource("Add Shield", "给面海加个盾牌，超难。Add Shield is super hard.", SettingControlType = typeof(MultiplierSettingsSlider))]
+        public BindableBool Shield { get; } = new BindableBool();
+
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
             var maniaBeatmap = (ManiaBeatmap)beatmap;
@@ -47,13 +50,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 var newColumnObjects = new List<ManiaHitObject>();
 
-                var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples))
-                                      .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                      {
-                                          (startTime: h.StartTime, samples: h.GetNodeSamples(0)),
-                                          (startTime: h.EndTime, samples: h.GetNodeSamples(1))
-                                      }))
-                                      .OrderBy(h => h.startTime).ToList();
+                var locations = Shield.Value
+                    ? column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples))
+                            .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
+                            {
+                                (startTime: h.StartTime, samples: h.GetNodeSamples(0)),
+                                (startTime: h.EndTime, samples: h.GetNodeSamples(1))
+                            }))
+                            .OrderBy(h => h.startTime).ToList()
+                    : column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples))
+                            .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
+                            {
+                                (startTime: h.StartTime, samples: h.GetNodeSamples(0)),
+                            }))
+                            .OrderBy(h => h.startTime).ToList();
 
                 for (int i = 0; i < locations.Count - 1; i++)
                 {
