@@ -37,11 +37,12 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 dropdown = new AudioDeviceSettingsDropdown
                 {
                     LabelText = AudioSettingsStrings.OutputDevice,
-                    Keywords = new[] { "speaker", "headphone", "output" }
+                    Keywords = new[] { "speaker", "headphone", "output" },
+                    TooltipText = "ASIO is testing!"
                 },
                 sampleRateDropdown = new SettingsDropdown<int>
                 {
-                    LabelText = "Sample Rate",
+                    LabelText = "Sample Rate(Testing)",
                     Keywords = new[] { "sample", "rate", "frequency" },
                     Current = new Bindable<int>(48000),
                     TooltipText = "48k is better, too high a value will cause delays and clock synchronization errors"
