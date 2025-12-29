@@ -41,11 +41,10 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private static readonly Dictionary<string, string> resource_paths = new Dictionary<string, string>
         {
-            ["note"] = @"EzResources\note",
-            ["Stage"] = @"EzResources\Stage",
-            ["GameTheme"] = @"EzResources\GameTheme"
+            ["note"] = Path.Combine("EzResources", "note"),
+            ["Stage"] = Path.Combine("EzResources", "Stage"),
+            ["GameTheme"] = Path.Combine("EzResources", "GameTheme")
         };
-
         private static readonly Dictionary<bool, (Color4 Color, string TopText, string BottomText)> position_mode_config = new Dictionary<bool, (Color4 Color, string TopText, string BottomText)>
         {
             [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), "SwitchToAbsolute".Localize(), "SwitchToAbsolute".Localize()),
