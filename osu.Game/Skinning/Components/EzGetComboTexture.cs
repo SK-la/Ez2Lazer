@@ -39,6 +39,7 @@ namespace osu.Game.Skinning.Components
         [BackgroundDependencyLoader]
         private void load(GameHost host, IRenderer renderer)
         {
+            // TODO: 需要测试资源管理，以及退回方案
             Storage gameStorage = host.Storage;
 
             var userResourceStore = new StorageBackedResourceStore(gameStorage);

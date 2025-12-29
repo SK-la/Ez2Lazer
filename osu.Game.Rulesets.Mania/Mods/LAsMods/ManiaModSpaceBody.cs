@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource("Add Shield", "给面海加个盾牌，超难。Add Shield is super hard.", SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource("Add Shield", "原始面条转盾牌，超难。Convert original LN to Shield. Very Hard.")]
         public BindableBool Shield { get; } = new BindableBool();
 
         public void ApplyToBeatmap(IBeatmap beatmap)
