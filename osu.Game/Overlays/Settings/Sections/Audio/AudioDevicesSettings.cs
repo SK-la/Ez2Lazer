@@ -13,6 +13,7 @@ using osu.Game.LAsEzExtensions.Audio;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
+using osu.Framework.Logging;
 
 namespace osu.Game.Overlays.Settings.Sections.Audio
 {
@@ -125,8 +126,28 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private void updateSampleRates()
         {
-            var supportedRates = audio.GetSupportedSampleRates(audio.AudioDevice.Value);
-            sampleRateDropdown.Items = supportedRates.ToList();
+            string selectedDevice = audio.AudioDevice.Value;
+            
+            // Check if the selected device is an ASIO device
+            if (selectedDevice.Contains("(ASIO)"))
+            {
+                // For ASIO devices, get the actual device name without the "(ASIO)" suffix
+                string asioDeviceName = selectedDevice.Replace(" (ASIO)", "");
+                
+                // Get supported sample rates for this specific ASIO device
+                var supportedRates = audio.GetAsioDeviceSupportedSampleRates(asioDeviceName);
+                
+                // Convert double array to int array for the dropdown
+                sampleRateDropdown.Items = supportedRates.Select(rate => (int)rate).ToList();
+                
+                Logger.Log($"Updated ASIO sample rates for device '{asioDeviceName}': {string.Join(", ", supportedRates)}", LoggingTarget.Runtime, LogLevel.Debug);
+            }
+            else
+            {
+                // For non-ASIO devices, use the existing method
+                var supportedRates = audio.GetSupportedSampleRates(selectedDevice);
+                sampleRateDropdown.Items = supportedRates.ToList();
+            }
         }
 
         protected override void Dispose(bool isDisposing)

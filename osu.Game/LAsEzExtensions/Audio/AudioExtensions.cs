@@ -41,16 +41,20 @@ namespace osu.Game.LAsEzExtensions.Audio
                 switch (mode)
                 {
                     case AudioOutputMode.Asio:
-                        // 对于ASIO设备，尝试获取支持的采样率
-                        var asioAudioFormatType = typeof(AudioManager).Assembly.GetType("osu.Framework.Audio.Asio.AsioAudioFormat");
-                        var supportedSampleRatesProperty = asioAudioFormatType?.GetProperty("SupportedSampleRates", BindingFlags.Public | BindingFlags.Static);
-
-                        if (supportedSampleRatesProperty != null)
+                        // 对于ASIO设备，查询设备实际支持的采样率
+                        if (asioIndex.HasValue)
                         {
-                            if (supportedSampleRatesProperty.GetValue(null) is IEnumerable<double> rates)
-                                return rates.Select(r => (int)r);
+                            var asioDeviceManagerType = typeof(AudioManager).Assembly.GetType("osu.Framework.Audio.Asio.AsioDeviceManager");
+                            var getSupportedRatesMethod = asioDeviceManagerType?.GetMethod("GetSupportedSampleRates", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(int) }, null);
+
+                            if (getSupportedRatesMethod != null)
+                            {
+                                if (getSupportedRatesMethod.Invoke(null, new object[] { asioIndex.Value }) is IEnumerable<double> rates)
+                                    return rates.Select(r => (int)r).OrderByDescending(r => r); // 按降序排列，高采样率优先
+                            }
                         }
 
+                        // 如果查询失败，返回常见的采样率列表
                         return common_sample_rates;
 
                     case AudioOutputMode.WasapiExclusive:
@@ -135,7 +139,41 @@ namespace osu.Game.LAsEzExtensions.Audio
                 return (AudioOutputMode.WasapiExclusive, baseName, null);
 
             // 检查是否是ASIO模式
-            if (tryParseSuffixed(selection, "(ASIO)", out baseName)) return (AudioOutputMode.Asio, baseName, null);
+            if (tryParseSuffixed(selection, "(ASIO)", out baseName))
+            {
+                int? index = null;
+
+                if (RuntimeInfo.OS == RuntimeInfo.Platform.Windows)
+                {
+                    try
+                    {
+                        // 通过反射获取AsioDeviceManager.AvailableDevices
+                        var asioDeviceManagerType = typeof(AudioManager).Assembly.GetType("osu.Framework.Audio.Asio.AsioDeviceManager");
+                        var availableDevicesProperty = asioDeviceManagerType?.GetProperty("AvailableDevices", BindingFlags.Public | BindingFlags.Static);
+
+                        if (availableDevicesProperty != null)
+                        {
+                            if (availableDevicesProperty.GetValue(null) is IEnumerable<(int Index, string Name)> devices)
+                            {
+                                foreach (var device in devices)
+                                {
+                                    if (device.Name == baseName)
+                                    {
+                                        index = device.Index;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // 如果反射失败，忽略错误
+                    }
+                }
+
+                return (AudioOutputMode.Asio, baseName, index);
+            }
 
             // 其他情况默认为默认模式
             return (AudioOutputMode.Default, selection, null);
