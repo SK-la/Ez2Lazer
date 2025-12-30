@@ -39,7 +39,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 {
                     LabelText = AudioSettingsStrings.OutputDevice,
                     Keywords = new[] { "speaker", "headphone", "output" },
-                    TooltipText = "ASIO is testing!"
+                    TooltipText = "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive."
                 },
                 sampleRateDropdown = new SettingsDropdown<int>
                 {
