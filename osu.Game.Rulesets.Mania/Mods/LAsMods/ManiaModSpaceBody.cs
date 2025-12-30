@@ -45,6 +45,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
             var newObjects = new List<ManiaHitObject>();
+            var lastHolds = new List<HoldNote>();
 
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
@@ -67,13 +68,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                 for (int i = 0; i < locations.Count - 1; i++)
                 {
-                    // Full duration of the hold note.
+                    // 长按音符的完整持续时间。
                     double duration = locations[i + 1].startTime - locations[i].startTime;
 
-                    // Beat length at the end of the hold note.
+                    // 长按音符结束时的拍长。
                     double beatLength = beatmap.ControlPointInfo.TimingPointAt(locations[i + 1].startTime).BeatLength;
 
-                    // Decrease the duration by at most a 1/4 beat to ensure there's no instantaneous notes.
+                    // 减少持续时间最多1/4拍，以确保没有瞬时音符。
                     // duration = Math.Max(duration / 2, duration - beatLength / 4);
                     duration = Math.Max(duration / 2, duration - beatLength / SpaceBeat.Value);
 
@@ -87,11 +88,34 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 }
 
                 newObjects.AddRange(newColumnObjects);
+
+                if (newColumnObjects.Any())
+                {
+                    var last = (HoldNote)newColumnObjects.Last();
+                    lastHolds.Add(last);
+                }
+            }
+
+            // 将每列最后一个长按音符的结束时间对齐到下一个 1/4 节拍
+            if (lastHolds.Any())
+            {
+                double maxEndTime = lastHolds.Max(h => h.StartTime + h.Duration);
+                var timingPoint = beatmap.ControlPointInfo.TimingPointAt(maxEndTime);
+                double beatLength = timingPoint.BeatLength;
+                double offset = timingPoint.Time;
+                double currentBeats = (maxEndTime - offset) / beatLength;
+                double alignedBeats = Math.Ceiling(currentBeats * 4) / 4;
+                double alignedEndTime = offset + alignedBeats * beatLength;
+
+                foreach (var last in lastHolds)
+                {
+                    last.Duration = alignedEndTime - last.StartTime;
+                }
             }
 
             maniaBeatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ToList();
 
-            // No breaks
+            // 无休息时间
             maniaBeatmap.Breaks.Clear();
         }
     }
