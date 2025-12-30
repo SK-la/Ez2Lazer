@@ -127,19 +127,19 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private void updateSampleRates()
         {
             string selectedDevice = audio.AudioDevice.Value;
-            
+
             // Check if the selected device is an ASIO device
             if (selectedDevice.Contains("(ASIO)"))
             {
                 // For ASIO devices, get the actual device name without the "(ASIO)" suffix
                 string asioDeviceName = selectedDevice.Replace(" (ASIO)", "");
-                
+
                 // Get supported sample rates for this specific ASIO device
-                var supportedRates = audio.GetAsioDeviceSupportedSampleRates(asioDeviceName);
-                
+                double[]? supportedRates = audio.GetAsioDeviceSupportedSampleRates(asioDeviceName);
+
                 // Convert double array to int array for the dropdown
                 sampleRateDropdown.Items = supportedRates.Select(rate => (int)rate).ToList();
-                
+
                 Logger.Log($"Updated ASIO sample rates for device '{asioDeviceName}': {string.Join(", ", supportedRates)}", LoggingTarget.Runtime, LogLevel.Debug);
             }
             else

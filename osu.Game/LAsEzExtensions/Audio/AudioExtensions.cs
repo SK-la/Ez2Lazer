@@ -27,7 +27,6 @@ namespace osu.Game.LAsEzExtensions.Audio
         {
             // Set both the unified sample rate and ASIO-specific sample rate
             audioManager.SampleRate.Value = sampleRate;
-            audioManager.AsioConfig.SampleRate.Value = sampleRate;
         }
 
         // 扩展方法：获取支持的采样率列表
@@ -85,7 +84,6 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                 // 更新统一的采样率设置和ASIO特定设置以反映实际使用的采样率
                 audioManager.SampleRate.Value = intSampleRate;
-                audioManager.AsioConfig.SampleRate.Value = intSampleRate;
             };
         }
 
