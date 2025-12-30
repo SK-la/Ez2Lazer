@@ -78,7 +78,7 @@ namespace osu.Game.Screens.Play
                 var maskedBackground = new BeatmapBackground(player.Beatmap.Value);
                 maskedBackground.FadeInFromZero(500, Easing.OutQuint);
                 maniaMaskedDimmable.Background = maskedBackground;
-                maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(player.storyboardReplacesBackground);
+                maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(player.StoryboardReplacesBackground);
                 maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
                 maniaMaskedDimmable.IsBreakTime.BindTo(player.IsBreakTime);
 

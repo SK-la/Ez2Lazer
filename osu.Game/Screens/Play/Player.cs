@@ -102,7 +102,7 @@ namespace osu.Game.Screens.Play
         private bool isRestarting;
         private bool skipExitTransition;
 
-        private readonly Bindable<bool> storyboardReplacesBackground = new Bindable<bool>();
+        public readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
 
         public IBindable<bool> LocalUserPlaying => localUserPlaying;
 
@@ -1126,7 +1126,7 @@ namespace osu.Game.Screens.Play
                 // bind component bindables.
                 ((IBindable<bool>)b.IsBreakTime).BindTo(breakTracker.IsBreakTime);
 
-                b.StoryboardReplacesBackground.BindTo(storyboardReplacesBackground);
+                b.StoryboardReplacesBackground.BindTo(StoryboardReplacesBackground);
 
                 failAnimationContainer.Background = b;
             });
@@ -1136,7 +1136,7 @@ namespace osu.Game.Screens.Play
 
             DimmableStoryboard.IsBreakTime.BindTo(breakTracker.IsBreakTime);
 
-            storyboardReplacesBackground.Value = GameplayState.Storyboard.ReplacesBackground && GameplayState.Storyboard.HasDrawable;
+            StoryboardReplacesBackground.Value = GameplayState.Storyboard.ReplacesBackground && GameplayState.Storyboard.HasDrawable;
 
             foreach (var mod in GameplayState.Mods.OfType<IApplicableToPlayer>())
                 mod.ApplyToPlayer(this);
@@ -1300,7 +1300,7 @@ namespace osu.Game.Screens.Play
                     }
                 });
 
-                storyboardReplacesBackground.Value = false;
+                StoryboardReplacesBackground.Value = false;
             }
         }
 

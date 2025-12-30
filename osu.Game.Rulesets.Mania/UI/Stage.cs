@@ -84,12 +84,12 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<double> osuConfigDim = null!;
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = null!;
-        private Bindable<bool> showStoryboard = null!;
+        private Bindable<bool> showBlurStoryboard = new Bindable<bool>();
+        private Bindable<WorkingBeatmap> workingBeatmap { get; set; } = null!;
 
         private readonly Box dimBox;
         private readonly Container backgroundContainer;
         private readonly BackgroundScreenBeatmap.DimmableBackground maniaMaskedDimmable;
-        private WorkingBeatmap? workingBeatmap;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
@@ -119,6 +119,7 @@ namespace osu.Game.Rulesets.Mania.UI
                         RelativeSizeAxes = Axes.None,
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
+                        Alpha = 0,
                     }
                 },
                 dimBox = new Box
@@ -225,50 +226,16 @@ namespace osu.Game.Rulesets.Mania.UI
 
             uiScale = osuConfig.GetBindable<float>(OsuSetting.UIScale);
             osuConfigDim = osuConfig.GetBindable<double>(OsuSetting.DimLevel);
-            showStoryboard = osuConfig.GetBindable<bool>(OsuSetting.ShowStoryboard);
-            showStoryboard.BindValueChanged(obj => updateBackgroundAlpha());
-            maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(showStoryboard);
 
             columnDim = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnDim);
             columnDim.BindValueChanged(v =>
             {
-                dimBox.Alpha = (float)Math.Max(v.NewValue, osuConfigDim.Value);
+                dimBox.Alpha = (float)Math.Max(v.NewValue, osuConfigDim.Value / 2);
             }, true);
 
-            workingBeatmap = player != null
-                ? player.Beatmap.Value
-                : BeatmapTitleWedge.SelectedWorkingBeatmap;
-
-            if (workingBeatmap != null)
-            {
-                // if (showStoryboard.Value && workingBeatmap.Storyboard.HasDrawable)
-                // {
-                //     var maskedBackgroundWithStoryboard = new BeatmapBackgroundWithStoryboard(workingBeatmap);
-                //     maskedBackgroundWithStoryboard.FadeInFromZero(500, Easing.OutQuint);
-                //     maniaMaskedDimmable.Background = maskedBackgroundWithStoryboard;
-                // }
-                // else
-                // {
-                var maskedBackground = new BeatmapBackground(workingBeatmap);
-                maskedBackground.FadeInFromZero(500, Easing.OutQuint);
-                maniaMaskedDimmable.Background = maskedBackground;
-
-                // maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
-                // maniaMaskedDimmable.IsBreakTime.BindTo(player?.IsBreakTime);
-            }
-            else
-            {
-                backgroundContainer.Alpha = 0;
-                Logger.Log("Working beatmap is null, cannot load background.", level: LogLevel.Error);
-            }
-
+            loadBackgroundAsync();
             columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
             columnBlur.BindValueChanged(v => maniaMaskedDimmable.BlurAmount.Value = (float)v.NewValue * 50, true);
-        }
-
-        private void updateBackgroundAlpha()
-        {
-            maniaMaskedDimmable.Alpha = showStoryboard.Value ? 0 : 1;
         }
 
         private void onSkinChanged()
@@ -298,6 +265,45 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
             NewResult += OnNewResult;
+        }
+
+        private void updateDimmableAlphaOpen(bool _ = true)
+        {
+            maniaMaskedDimmable.Alpha = _ ? 1 : 0;
+        }
+
+        private void loadBackgroundAsync()
+        {
+            if (player != null)
+            {
+                updateDimmableAlphaOpen();
+                workingBeatmap = player.Beatmap;
+
+                if (player.DimmableStoryboard != null)
+                {
+                    showBlurStoryboard.Value = player.DimmableStoryboard.ContentDisplayed &&
+                                               !player.DimmableStoryboard.HasStoryboardEnded.Value;
+
+                    if (showBlurStoryboard.Value)
+                    {
+                        updateDimmableAlphaOpen(false);
+                        return;
+                    }
+                }
+
+                var maskedBackground = new BeatmapBackground(workingBeatmap.Value);
+                maskedBackground.FadeInFromZero(500, Easing.OutQuint);
+                maniaMaskedDimmable.Background = maskedBackground;
+
+                maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(player?.StoryboardReplacesBackground);
+                maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
+                maniaMaskedDimmable.IsBreakTime.BindTo(player?.IsBreakTime);
+            }
+            else
+            {
+                updateDimmableAlphaOpen(false);
+                Logger.Log("Working beatmap is null, cannot load background.", level: LogLevel.Error);
+            }
         }
 
         public override void Add(HitObject hitObject) => Columns[((ManiaHitObject)hitObject).Column - firstColumnIndex].Add(hitObject);
