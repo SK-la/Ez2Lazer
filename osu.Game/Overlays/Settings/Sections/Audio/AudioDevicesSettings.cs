@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Graphics;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
@@ -128,9 +129,13 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         {
             string selectedDevice = audio.AudioDevice.Value;
 
+            Logger.Log($"[AudioDevicesSettings] updateSampleRates called with selectedDevice: '{selectedDevice}'", LoggingTarget.Runtime, LogLevel.Debug);
+
             // Check if the selected device is an ASIO device
             if (selectedDevice.Contains("(ASIO)"))
             {
+                Logger.Log($"[AudioDevicesSettings] Detected ASIO device: '{selectedDevice}'", LoggingTarget.Runtime, LogLevel.Debug);
+
                 // For ASIO devices, get the actual device name without the "(ASIO)" suffix
                 string asioDeviceName = selectedDevice.Replace(" (ASIO)", "");
 
@@ -138,15 +143,31 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 double[]? supportedRates = audio.GetAsioDeviceSupportedSampleRates(asioDeviceName);
 
                 // Convert double array to int array for the dropdown
-                sampleRateDropdown.Items = supportedRates.Select(rate => (int)rate).ToList();
+                var newItems = supportedRates?.Select(rate => (int)rate).ToList() ?? new List<int>();
+                sampleRateDropdown.Items = newItems;
 
-                Logger.Log($"Updated ASIO sample rates for device '{asioDeviceName}': {string.Join(", ", supportedRates)}", LoggingTarget.Runtime, LogLevel.Debug);
+                // Ensure current sample rate is valid for this device
+                int currentRate = audio.GetSampleRate();
+                if (!newItems.Contains(currentRate) && newItems.Count > 0)
+                {
+                    // Set to first available rate if current rate is not supported
+                    sampleRateDropdown.Current.Value = newItems[0];
+                }
             }
             else
             {
                 // For non-ASIO devices, use the existing method
                 var supportedRates = audio.GetSupportedSampleRates(selectedDevice);
-                sampleRateDropdown.Items = supportedRates.ToList();
+                var newItems = supportedRates.ToList();
+                sampleRateDropdown.Items = newItems;
+
+                // Ensure current sample rate is valid for this device
+                int currentRate = audio.GetSampleRate();
+                if (!newItems.Contains(currentRate) && newItems.Count > 0)
+                {
+                    // Set to first available rate if current rate is not supported
+                    sampleRateDropdown.Current.Value = newItems[0];
+                }
             }
         }
 

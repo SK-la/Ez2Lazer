@@ -19,7 +19,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         public static int GetSampleRate(this AudioManager audioManager)
         {
             // Use the unified sample rate from AudioManager
-            return (int)audioManager.SampleRate.Value;
+            return audioManager.SampleRate.Value;
         }
 
         // 扩展方法：设置采样率
@@ -35,6 +35,8 @@ namespace osu.Game.LAsEzExtensions.Audio
             // 解析设备名称来确定输出模式
             (var mode, string parsedDeviceName, int? asioIndex) = parseSelection(deviceName, audioManager.UseExperimentalWasapi.Value);
 
+            System.Diagnostics.Debug.WriteLine($"GetSupportedSampleRates: deviceName='{deviceName}', mode={mode}, parsedDeviceName='{parsedDeviceName}', asioIndex={asioIndex}");
+
             try
             {
                 switch (mode)
@@ -49,7 +51,10 @@ namespace osu.Game.LAsEzExtensions.Audio
                             if (getSupportedRatesMethod != null)
                             {
                                 if (getSupportedRatesMethod.Invoke(null, new object[] { asioIndex.Value }) is IEnumerable<double> rates)
-                                    return rates.Select(r => (int)r).OrderByDescending(r => r); // 按降序排列，高采样率优先
+                                {
+                                    var result = rates.Select(r => (int)r).OrderByDescending(r => r).ToList();
+                                    return result;
+                                }
                             }
                         }
 
