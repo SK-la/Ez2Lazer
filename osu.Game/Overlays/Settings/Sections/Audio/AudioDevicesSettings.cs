@@ -148,6 +148,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
                 // Ensure current sample rate is valid for this device
                 int currentRate = audio.GetSampleRate();
+
                 if (!newItems.Contains(currentRate) && newItems.Count > 0)
                 {
                     // Set to first available rate if current rate is not supported
@@ -163,6 +164,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
                 // Ensure current sample rate is valid for this device
                 int currentRate = audio.GetSampleRate();
+
                 if (!newItems.Contains(currentRate) && newItems.Count > 0)
                 {
                     // Set to first available rate if current rate is not supported

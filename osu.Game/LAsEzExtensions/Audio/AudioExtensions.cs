@@ -92,40 +92,6 @@ namespace osu.Game.LAsEzExtensions.Audio
             };
         }
 
-        // 尝试设置实际的采样率
-        private static void trySetActualSampleRate(AudioManager audioManager, int sampleRate)
-        {
-            // 解析当前选择的设备来确定输出模式
-            (var mode, string deviceName, int? asioIndex) = parseSelection(audioManager.AudioDevice.Value, audioManager.UseExperimentalWasapi.Value);
-
-            try
-            {
-                switch (mode)
-                {
-                    case AudioOutputMode.Asio:
-                        // 对于ASIO设备，尝试通过反射设置采样率
-                        var bassAsioType = typeof(AudioManager).Assembly.GetType("osu.Framework.Audio.Asio.BassAsio");
-                        var setRateMethod = bassAsioType?.GetMethod("SetRate", BindingFlags.Public | BindingFlags.Static);
-                        if (setRateMethod != null) setRateMethod.Invoke(null, new object[] { (double)sampleRate });
-                        break;
-
-                    case AudioOutputMode.WasapiExclusive:
-                    case AudioOutputMode.WasapiShared:
-                        // 对于WASAPI设备，暂时不做任何操作
-                        break;
-
-                    case AudioOutputMode.Default:
-                    default:
-                        // 对于默认BASS设备，采样率通常不能运行时改变
-                        break;
-                }
-            }
-            catch
-            {
-                // 如果设置失败，忽略错误
-            }
-        }
-
         // 解析设备选择字符串，返回输出模式
         private static (AudioOutputMode mode, string deviceName, int? asioDeviceIndex) parseSelection(string selection, bool useExperimentalWasapi)
         {
