@@ -42,7 +42,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 },
                 sampleRateDropdown = new SettingsDropdown<int>
                 {
-                    LabelText = "Sample Rate(Testing)",
+                    LabelText = "ASIO Sample Rate(Testing)",
                     Keywords = new[] { "sample", "rate", "frequency" },
                     Current = new Bindable<int>(48000),
                     TooltipText = "48k is better, too high a value will cause delays and clock synchronization errors"
