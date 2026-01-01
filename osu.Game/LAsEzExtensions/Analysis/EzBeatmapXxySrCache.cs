@@ -14,6 +14,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Lists;
+using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -34,6 +35,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
     /// </summary>
     public partial class EzBeatmapXxySrCache : MemoryCachingComponent<EzBeatmapXxySrCache.XxySrCacheLookup, double?>
     {
+        private const string logger_name = "xxy_sr";
         private const int mod_settings_debounce = 150;
 
         private readonly ThreadedTaskScheduler updateScheduler = new ThreadedTaskScheduler(1, nameof(EzBeatmapXxySrCache));
@@ -141,8 +143,31 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 cancellationToken.ThrowIfCancellationRequested();
 
+                // 明显异常：如果 hitobjects 为空，仍计算出 SR 会导致离谱结果。
+                // 这种情况更像是转换/加载/算法输入不对，直接记录并返回 null。
+                if (playableBeatmap.HitObjects.Count == 0)
+                {
+                    string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
+                    Logger.Log($"xxy_SR aborted: playableBeatmap has 0 hitobjects. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", logger_name, LogLevel.Error);
+                    return null;
+                }
+
                 if (!XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr))
                     return null;
+
+                // Defensive: avoid propagating invalid values to UI.
+                if (double.IsNaN(sr) || double.IsInfinity(sr))
+                {
+                    Logger.Log($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}", logger_name, LogLevel.Error);
+                    return null;
+                }
+
+                // "异常"：出现极端偏差时记录（不记录正常计算）。
+                if (sr < 0 || sr > 1000)
+                {
+                    string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
+                    Logger.Log($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", logger_name, LogLevel.Error);
+                }
 
                 return sr;
             }
@@ -150,9 +175,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
-                // 忽略：选歌面板快速滚动/拖动时，失败不应影响 UI。
+                // 只记录异常：用于排查“值偏差非常大/计算失败导致空 pill”。
+                string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
+                Logger.Error(ex, $"xxy_SR compute exception. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", logger_name);
                 return null;
             }
         }
@@ -317,13 +344,20 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             private static readonly Lazy<MethodInfo?> calculateMethod = new Lazy<MethodInfo?>(resolveCalculateMethod, LazyThreadSafetyMode.ExecutionAndPublication);
 
+            private static int resolve_fail_logged;
+            private static int invoke_fail_count;
+
             public static bool TryCalculate(IBeatmap beatmap, out double sr)
             {
                 sr = 0;
 
                 var method = calculateMethod.Value;
                 if (method == null)
+                {
+                    if (Interlocked.Exchange(ref resolve_fail_logged, 1) == 0)
+                        Logger.Log($"xxy_SR bridge failed to resolve {calculator_type_name}.{calculator_method_name}(IBeatmap).", logger_name, LogLevel.Error);
                     return false;
+                }
 
                 try
                 {
@@ -337,8 +371,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                     return false;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    // Avoid spamming logs if something is systematically broken.
+                    if (Interlocked.Increment(ref invoke_fail_count) <= 10)
+                        Logger.Error(ex, $"xxy_SR bridge invoke exception. beatmapType={beatmap.GetType().FullName}", logger_name);
                     return false;
                 }
             }
@@ -353,8 +390,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                     return type.GetMethod(calculator_method_name, BindingFlags.Public | BindingFlags.Static, binder: null, types: new[] { typeof(IBeatmap) }, modifiers: null);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    if (Interlocked.Exchange(ref resolve_fail_logged, 1) == 0)
+                        Logger.Error(ex, $"xxy_SR bridge resolve exception for {calculator_type_name}.{calculator_method_name}(IBeatmap).", logger_name);
                     return null;
                 }
             }

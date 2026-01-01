@@ -15,6 +15,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics;
@@ -57,6 +58,7 @@ namespace osu.Game.Screens.SelectV2
         private ManiaKpsDisplay maniaKpsDisplay = null!;
         private ManiaKpcDisplay maniaKpcDisplay = null!;
         private EzXxySrDisplay xxySrDisplay = null!;
+        private OsuSpriteText notesLabel = null!;
 
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
@@ -96,6 +98,9 @@ namespace osu.Game.Screens.SelectV2
 
         private IBindable<double?>? xxySrBindable;
         private CancellationTokenSource? xxySrCancellationSource;
+
+        private double? lastStarRatingStars;
+        private Guid? loggedLargeXxyDiffBeatmapId;
 
         public PanelBeatmap()
         {
@@ -225,7 +230,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
-                                        new OsuSpriteText
+                                        notesLabel = new OsuSpriteText
                                         {
                                             Text = "[Notes] ",
                                             Font = OsuFont.GetFont(size: 14),
@@ -273,6 +278,10 @@ namespace osu.Game.Screens.SelectV2
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             cachedScratchText = null;
+
+            lastStarRatingStars = null;
+            loggedLargeXxyDiffBeatmapId = null;
+
             bindManiaAnalysis();
             bindXxySr();
             resetManiaAnalysisDisplay();
@@ -291,8 +300,46 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
+            if (ruleset.Value.OnlineID != 3)
+                return;
+
             xxySrBindable = xxySrCache.GetBindableXxySr(beatmap, xxySrCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            xxySrBindable.BindValueChanged(_ => maybeLogLargeStarDiff(), true);
             xxySrDisplay.Current.BindTo((Bindable<double?>)xxySrBindable);
+        }
+
+        private void maybeLogLargeStarDiff()
+        {
+            if (Item == null)
+                return;
+
+            // 仅用于排查：无 mod 时，原版 star 与 xxy_SR 差值过大。
+            if (ruleset.Value.OnlineID != 3)
+                return;
+
+            if (mods.Value.Count != 0)
+                return;
+
+            double? star = lastStarRatingStars;
+            double? xxy = xxySrDisplay.Current.Value;
+
+            if (star == null || xxy == null)
+                return;
+
+            Guid beatmapId = beatmap.ID;
+            if (loggedLargeXxyDiffBeatmapId == beatmapId)
+                return;
+
+            double diff = Math.Abs(star.Value - xxy.Value);
+            if (diff <= 3)
+                return;
+
+            loggedLargeXxyDiffBeatmapId = beatmapId;
+
+            Logger.Log(
+                $"xxy_SR large diff (no-mod): beatmapId={beatmapId} onlineId={beatmap.OnlineID} diff=\"{beatmap.DifficultyName}\" star={star:0.###} xxy={xxy:0.###} absDiff={diff:0.###}",
+                "xxy_sr",
+                LogLevel.Error);
         }
 
         private Drawable getRulesetIcon(RulesetInfo rulesetInfo)
@@ -341,9 +388,26 @@ namespace osu.Game.Screens.SelectV2
             {
                 maniaKpsDisplay.Show();
                 maniaKpsDisplay.SetKps(0, 0);
+
+                notesLabel.Show();
+                maniaKpcDisplay.Show();
+                xxySrDisplay.Show();
             }
             else
+            {
                 maniaKpsDisplay.Hide();
+
+                // 非 mania：隐藏 mania 专属 UI。
+                notesLabel.Hide();
+                maniaKpcDisplay.Hide();
+                xxySrDisplay.Hide();
+
+                xxySrCancellationSource?.Cancel();
+                xxySrCancellationSource = null;
+                xxySrBindable = null;
+                xxySrDisplay.Current.UnbindAll();
+                xxySrDisplay.Current.Value = null;
+            }
         }
 
         private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts)
@@ -388,6 +452,9 @@ namespace osu.Game.Screens.SelectV2
             xxySrBindable = null;
             xxySrDisplay.Current.UnbindAll();
             xxySrDisplay.Current.Value = null;
+
+            lastStarRatingStars = null;
+            loggedLargeXxyDiffBeatmapId = null;
         }
 
         private void computeStarRating()
@@ -403,6 +470,9 @@ namespace osu.Game.Screens.SelectV2
             {
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 starCounter.Current = (float)starDifficulty.NewValue.Stars;
+
+                lastStarRatingStars = starDifficulty.NewValue.Stars;
+                maybeLogLargeStarDiff();
             }, true);
         }
 
@@ -414,6 +484,16 @@ namespace osu.Game.Screens.SelectV2
             {
                 starDifficultyCancellationSource?.Cancel();
                 starDifficultyCancellationSource = null;
+
+                // 离屏时取消 xxy_SR 计算，避免后台为不可见项占用计算预算。
+                xxySrCancellationSource?.Cancel();
+                xxySrCancellationSource = null;
+            }
+            else
+            {
+                // 重新可见时再触发一次绑定/计算。
+                if (xxySrCancellationSource == null && Item != null)
+                    bindXxySr();
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.

@@ -112,10 +112,10 @@ namespace osu.Game.Beatmaps.Drawables
             {
                 srText.Text = "...";
 
-                // Match StarRatingDisplay's fallback colour handling.
+                // Placeholder state: keep the pill background subtle, but ensure icon/text remain visible.
                 background.Colour = colourProvider?.Background5 ?? Color4Extensions.FromHex("303d47");
-                moonIcon.Colour = colourProvider?.Background5 ?? Color4Extensions.FromHex("303d47");
-                srText.Colour = colourProvider?.Background5 ?? Color4.Black.Opacity(0.75f);
+                moonIcon.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
+                srText.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
                 return;
             }
 
