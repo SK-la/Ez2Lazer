@@ -211,6 +211,7 @@ namespace osu.Game
 
         private BeatmapDifficultyCache difficultyCache;
         private osu.Game.LAsEzExtensions.Analysis.EzBeatmapManiaAnalysisCache maniaAnalysisCache;
+        private osu.Game.LAsEzExtensions.Analysis.EzBeatmapXxySrCache xxySrCache;
         private IBeatmapUpdater beatmapUpdater;
 
         private UserLookupCache userCache;
@@ -342,6 +343,7 @@ namespace osu.Game
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
             dependencies.Cache(maniaAnalysisCache = new osu.Game.LAsEzExtensions.Analysis.EzBeatmapManiaAnalysisCache());
+            dependencies.Cache(xxySrCache = new osu.Game.LAsEzExtensions.Analysis.EzBeatmapXxySrCache());
 
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
             dependencies.Cache(ScoreDownloader = new ScoreModelDownloader(ScoreManager, API));
@@ -349,6 +351,7 @@ namespace osu.Game
             // Add after all the above cache operations as it depends on them.
             base.Content.Add(difficultyCache);
             base.Content.Add(maniaAnalysisCache);
+            base.Content.Add(xxySrCache);
 
             // TODO: OsuGame or OsuGameBase?
             dependencies.CacheAs(beatmapUpdater = CreateBeatmapUpdater());

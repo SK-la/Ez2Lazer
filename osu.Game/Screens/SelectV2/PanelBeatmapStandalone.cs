@@ -59,6 +59,9 @@ namespace osu.Game.Screens.SelectV2
         private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         [Resolved]
+        private EzBeatmapXxySrCache xxySrCache { get; set; } = null!;
+
+        [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
 
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
@@ -66,7 +69,10 @@ namespace osu.Game.Screens.SelectV2
         private string? cachedScratchText;
         private ManiaKpsDisplay maniaKpsDisplay = null!;
         private ManiaKpcDisplay maniaKpcDisplay = null!;
-        private OsuSpriteText extraStarText = null!;
+
+        private EzXxySrDisplay xxySrDisplay = null!;
+        private IBindable<double?>? xxySrBindable;
+        private CancellationTokenSource? xxySrCancellationSource;
 
         private IBindable<StarDifficulty>? starDifficultyBindable;
         private CancellationTokenSource? starDifficultyCancellationSource;
@@ -112,16 +118,6 @@ namespace osu.Game.Screens.SelectV2
             Background = backgroundBorder = new Box
             {
                 RelativeSizeAxes = Axes.Both,
-            };
-
-            // 预留：未来新增的 star 算法显示位（暂不实现）。
-            extraStarText = new OsuSpriteText
-            {
-                Text = string.Empty,
-                Font = OsuFont.GetFont(size: 14),
-                Colour = Colour4.GhostWhite,
-                Anchor = Anchor.BottomLeft,
-                Origin = Anchor.BottomLeft
             };
 
             Content.Children = new Drawable[]
@@ -220,13 +216,18 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
+                                        xxySrDisplay = new EzXxySrDisplay()
+                                        {
+                                            Origin = Anchor.CentreLeft,
+                                            Anchor = Anchor.CentreLeft,
+                                            Scale = new Vector2(0.875f),
+                                        },
                                         spreadDisplay = new SpreadDisplay
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
                                             Enabled = { BindTarget = Selected }
                                         },
-                                        extraStarText,
                                         new OsuSpriteText
                                         {
                                             Text = "[Notes] ",
@@ -288,10 +289,26 @@ namespace osu.Game.Screens.SelectV2
 
             cachedScratchText = null;
             bindManiaAnalysis();
+            bindXxySr();
             resetManiaAnalysisDisplay();
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
+        }
+
+        private void bindXxySr()
+        {
+            xxySrCancellationSource?.Cancel();
+            xxySrCancellationSource = new CancellationTokenSource();
+
+            xxySrDisplay.Current.UnbindAll();
+            xxySrDisplay.Current.Value = null;
+
+            if (Item == null)
+                return;
+
+            xxySrBindable = xxySrCache.GetBindableXxySr(beatmap, xxySrCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            xxySrDisplay.Current.BindTo((Bindable<double?>)xxySrBindable);
         }
 
         private void bindManiaAnalysis()
@@ -374,6 +391,11 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisBindable = null;
             cachedScratchText = null;
+
+            xxySrCancellationSource?.Cancel();
+            xxySrBindable = null;
+            xxySrDisplay.Current.UnbindAll();
+            xxySrDisplay.Current.Value = null;
         }
 
         private void computeStarRating()
