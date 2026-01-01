@@ -1758,7 +1758,7 @@ namespace osu.Game
 
             // For invalid refresh rates let's assume 60 Hz as it is most common.
             if (refreshRate <= 0)
-                refreshRate = 60;
+                refreshRate = 120;
 
             int drawLimiter;
             bool shouldVSync;
@@ -1819,7 +1819,7 @@ namespace osu.Game
             if (shouldThrottleTextureUploads)
             {
                 // 偏保守的默认值：优先保证交互流畅，代价是缩略图/封面加载完成会稍慢。
-                gameHost.SetTextureUploadLimits(maxTexturesUploadedPerFrame: 8, maxPixelsUploadedPerFrame: 1024 * 1024);
+                gameHost.SetTextureUploadLimits(maxTexturesUploadedPerFrame: 4, maxPixelsUploadedPerFrame: 1024 * 1024);
             }
             else
             {

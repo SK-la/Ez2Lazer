@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
@@ -72,78 +73,75 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         public static string GetScratch(IBeatmap beatmap, int keyCount)
         {
-            // 预处理：获取列分组数据和KPS数据
-            var columnGroups = beatmap.HitObjects.OfType<IHasColumn>()
-                                      .Where(h => !(h is IHasDuration))
-                                      .GroupBy(h => h.Column)
-                                      .ToDictionary(g => g.Key, g => g.Count());
+            // 旧路径：直接从 IBeatmap 现算。
+            // 注意：选歌面板快速滚动时这个路径非常重（会再次算 KPS/列统计），
+            // 新代码优先走 GetScratchFromPrecomputed()。
+            var columnCounts = GetColumnNoteCounts(beatmap);
+            var (_, maxKps, kpsList) = GetKps(beatmap);
+            return GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+        }
 
-            if (columnGroups.Count == 0)
+        /// <summary>
+        /// 复用外部已经计算好的列统计与 KPS 数据，生成 Scratch 标签。
+        /// 用于选歌面板：避免重复遍历 HitObjects / 重复计算 KPS。
+        /// </summary>
+        public static string GetScratchFromPrecomputed(Dictionary<int, int> columnCounts, double maxKps, List<double> kpsList, int keyCount)
+        {
+            if (keyCount <= 0)
+                return "[?K]";
+
+            // 将列统计映射为固定长度数组，方便计算 empty 列。
+            var countsByColumn = new int[keyCount];
+            foreach (var (column, count) in columnCounts)
+            {
+                if ((uint)column < (uint)keyCount)
+                    countsByColumn[column] = count;
+            }
+
+            int totalNotes = countsByColumn.Sum();
+            if (totalNotes == 0)
                 return $"[{keyCount}K]";
 
-            var (_, maxKps, kpsList) = GetKps(beatmap);
-            var sorted = columnGroups.OrderBy(kv => kv.Key).ToList();
+            int firstCount = countsByColumn[0];
+            int lastCount = countsByColumn[^1];
 
-            // 列统计优化
-            int firstCol = sorted.First().Key;
-            int lastCol = sorted.Last().Key;
-            bool isFirstHigh = checkHighSpeed(beatmap, firstCol, maxKps, kpsList);
-            bool isLastHigh = checkHighSpeed(beatmap, lastCol, maxKps, kpsList);
+            bool isFirstHigh = checkHighSpeed(maxKps, kpsList);
+            bool isLastHigh = isFirstHigh;
 
-            var remainingColumns = sorted.Skip(1).Take(sorted.Count - 2).ToList();
+            // 去掉两侧列，计算“中间列”平均/最大。
+            var middleCounts = keyCount > 2 ? countsByColumn.Skip(1).Take(keyCount - 2).ToArray() : Array.Empty<int>();
+            double averageNotes = middleCounts.Length > 0 ? middleCounts.Average() : 0;
+            int maxNotesInMiddle = middleCounts.Length > 0 ? middleCounts.Max() : 0;
 
-            double averageNotes = remainingColumns.Any() ? remainingColumns.Average(c => c.Value) : 0;
-            int maxNotesInRemainingColumns = remainingColumns.Any() ? remainingColumns.Max(c => c.Value) : 0;
-
-            bool isFirstColumnLow = firstCol < averageNotes * 0.3 || firstCol < maxNotesInRemainingColumns / 3;
-            bool isLastColumnLow = lastCol < averageNotes * 0.3 || lastCol < maxNotesInRemainingColumns / 3;
+            bool isFirstColumnLow = averageNotes > 0 && (firstCount < averageNotes * 0.3 || (maxNotesInMiddle > 0 && firstCount < maxNotesInMiddle / 3.0));
+            bool isLastColumnLow = averageNotes > 0 && (lastCount < averageNotes * 0.3 || (maxNotesInMiddle > 0 && lastCount < maxNotesInMiddle / 3.0));
 
             string result = $"[{keyCount}K]";
 
             if (keyCount == 6 || keyCount == 8)
             {
                 if (isFirstHigh || isLastHigh)
-                {
                     result = $"[{keyCount - 1}K1S]";
-                }
                 else if (isFirstColumnLow || isLastColumnLow)
-                {
                     result = $"[{keyCount - 1}+1K]";
-                }
-                else
-                {
-                    result = $"[{keyCount}K]";
-                }
             }
             else if (keyCount >= 7)
             {
                 if (isFirstHigh || isLastHigh)
-                {
                     result = $"[{keyCount - 2}K2S]";
-                }
                 else if (isFirstColumnLow || isLastColumnLow)
-                {
                     result = $"[{keyCount - 2}+2K]";
-                }
-                else
-                {
-                    result = $"[{keyCount}K]";
-                }
             }
 
-            int emptyColumns = sorted.Count(c => c.Value == 0);
-
+            int emptyColumns = countsByColumn.Count(c => c == 0);
             if (emptyColumns > 0)
-            {
                 result = $"[{keyCount - 1}K_{emptyColumns}Empty]";
-            }
 
             return result;
         }
 
-        private static bool checkHighSpeed(IBeatmap beatmap, int column, double maxKps, List<double> kpsList)
+        private static bool checkHighSpeed(double maxKps, List<double> kpsList)
         {
-            // 使用预处理的分组数据优化（需调整参数传递）
             double threshold = maxKps / 4;
 
             foreach (double kps in kpsList)

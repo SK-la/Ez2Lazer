@@ -58,13 +58,9 @@ namespace osu.Game.Screens.SelectV2
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
 
-        private IBeatmap? iBeatmap;
-
-        private readonly Dictionary<string, (double averageKps, double maxKps, List<double> kpsList)> kpsCache = new Dictionary<string, (double, double, List<double>)>();
-        // private LineGraph kpsGraph = null!;
-
-        // 添加异步计算相关字段
         private CancellationTokenSource? kpsCalculationCancellationSource;
+        private ScheduledDelegate? scheduledKpsCalculation;
+        private string? cachedScratchText;
         private ManiaKpsDisplay maniaKpsDisplay = null!;
         private ManiaKpcDisplay maniaKpcDisplay = null!;
 
@@ -238,8 +234,21 @@ namespace osu.Game.Screens.SelectV2
         {
             base.LoadComplete();
 
-            ruleset.BindValueChanged(_ => updateKeyCount());
-            mods.BindValueChanged(_ => updateKeyCount(), true);
+            ruleset.BindValueChanged(_ =>
+            {
+                cachedScratchText = null;
+                if (Item != null)
+                    updateCalculationsAsync(beatmap);
+                updateKeyCount();
+            });
+
+            mods.BindValueChanged(_ =>
+            {
+                cachedScratchText = null;
+                if (Item != null)
+                    updateCalculationsAsync(beatmap);
+                updateKeyCount();
+            }, true);
 
             Selected.BindValueChanged(s => Expanded.Value = s.NewValue, true);
         }
@@ -264,6 +273,7 @@ namespace osu.Game.Screens.SelectV2
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
+            cachedScratchText = null;
             updateCalculationsAsync(beatmap);
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
@@ -278,56 +288,67 @@ namespace osu.Game.Screens.SelectV2
             kpsCalculationCancellationSource?.Cancel();
             kpsCalculationCancellationSource = new CancellationTokenSource();
             var cancellationToken = kpsCalculationCancellationSource.Token;
+            scheduledKpsCalculation?.Cancel();
 
-            string cacheKey = $"{beatmapInfo.Hash}_{string.Join(",", mods.Value?.Select(m => m.Acronym) ?? Array.Empty<string>())}";
+            // 注意：面板来自 DrawablePool，快速拖动滚动条时会被频繁回收/复用。
+            // 任何延迟执行的回调都不能再依赖 Item/beatmap 这类由当前面板状态决定的属性，否则会空引用崩溃。
+            // 因此这里对 ruleset/mods 做快照，后续只使用快照数据。
+            var rulesetSnapshot = ruleset.Value;
+            var modsSnapshot = mods.Value.ToArray();
 
-            if (kpsCache.TryGetValue(cacheKey, out var cachedResult))
+            scheduledKpsCalculation = Scheduler.AddDelayed(() =>
             {
-                updateUI(cachedResult, null);
-                return;
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
+                ILegacyRuleset legacyRuleset = (ILegacyRuleset)rulesetSnapshot.CreateInstance();
+                int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, modsSnapshot);
+
+                string cacheKey = ManiaBeatmapAnalysisCache.CreateCacheKey(beatmapInfo, rulesetSnapshot, modsSnapshot);
+
+                if (ManiaBeatmapAnalysisCache.TryGet(cacheKey, out var cached))
+                {
+                    cachedScratchText = cached.ScratchText;
+                    updateUI((cached.AverageKps, cached.MaxKps, cached.KpsList), cached.ColumnCounts);
+                    updateKeyCount();
+                    return;
+                }
+
+                startKpsCalculationAsync(beatmapInfo, rulesetSnapshot, modsSnapshot, keyCount, cancellationToken);
+            }, 120);
+        }
+
+        private async void startKpsCalculationAsync(BeatmapInfo beatmapInfo, RulesetInfo ruleset, Mod[] mods, int keyCount, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var result = await ManiaBeatmapAnalysisCache.GetOrComputeAsync(
+                        beatmapManager,
+                        beatmapInfo,
+                        ruleset,
+                        mods,
+                    keyCount)
+                    .ConfigureAwait(false);
+
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+
+                Schedule(() =>
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        return;
+
+                    cachedScratchText = result.ScratchText;
+                    updateUI((result.AverageKps, result.MaxKps, result.KpsList), result.ColumnCounts);
+                    updateKeyCount();
+                });
             }
-
-            Task.Run(() =>
+            catch (OperationCanceledException)
             {
-                try
-                {
-                    var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                    var playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.Value, mods.Value, cancellationToken);
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    // 使用优化后的计算器一次性获取所有数据
-                    var (averageKps, maxKps, kpsList, columnCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
-                    var kpsResult = (averageKps, maxKps, kpsList);
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    kpsCache[cacheKey] = kpsResult;
-
-                    Schedule(() =>
-                    {
-                        if (!cancellationToken.IsCancellationRequested)
-                        {
-                            iBeatmap = playableBeatmap;
-                            updateUI(kpsResult, columnCounts);
-                            updateKeyCount();
-                        }
-                    });
-                }
-                catch (OperationCanceledException)
-                {
-                }
-                catch (Exception)
-                {
-                    Schedule(() =>
-                    {
-                        if (!cancellationToken.IsCancellationRequested)
-                        {
-                            updateUI((0, 0, new List<double>()), null);
-                        }
-                    });
-                }
-            }, cancellationToken);
+            }
+            catch
+            {
+            }
         }
 
         private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts)
@@ -356,6 +377,9 @@ namespace osu.Game.Screens.SelectV2
 
             starDifficultyCancellationSource?.Cancel();
             kpsCalculationCancellationSource?.Cancel();
+            scheduledKpsCalculation?.Cancel();
+            scheduledKpsCalculation = null;
+            cachedScratchText = null;
         }
 
         private void computeStarRating()
@@ -409,15 +433,7 @@ namespace osu.Game.Screens.SelectV2
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
 
-                if (iBeatmap != null)
-                {
-                    string keyCountTextValue = EzBeatmapCalculator.GetScratch(iBeatmap, keyCount);
-                    keyCountText.Text = keyCountTextValue;
-                }
-                else
-                {
-                    keyCountText.Text = $"[{keyCount}K] ";
-                }
+                keyCountText.Text = cachedScratchText ?? $"[{keyCount}K] ";
 
                 keyCountText.Alpha = 1;
             }
