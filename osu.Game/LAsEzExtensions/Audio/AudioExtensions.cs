@@ -42,34 +42,15 @@ namespace osu.Game.LAsEzExtensions.Audio
                 switch (mode)
                 {
                     case AudioOutputMode.Asio:
-                        // 对于ASIO设备，查询设备实际支持的采样率
-                        if (asioIndex.HasValue)
-                        {
-                            var asioDeviceManagerType = typeof(AudioManager).Assembly.GetType("osu.Framework.Audio.Asio.AsioDeviceManager");
-                            var getSupportedRatesMethod = asioDeviceManagerType?.GetMethod("GetSupportedSampleRates", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(int) }, null);
-
-                            if (getSupportedRatesMethod != null)
-                            {
-                                if (getSupportedRatesMethod.Invoke(null, new object[] { asioIndex.Value }) is IEnumerable<double> rates)
-                                {
-                                    var result = rates.Select(r => (int)r).OrderByDescending(r => r).ToList();
-                                    return result;
-                                }
-                            }
-                        }
-
-                        // 如果查询失败，返回常见的采样率列表
+                        // 对于ASIO设备，返回固定的常见采样率列表，因为实际支持的采样率是从这些中选择的
                         return common_sample_rates;
 
                     case AudioOutputMode.WasapiExclusive:
                     case AudioOutputMode.WasapiShared:
-                        // 对于WASAPI设备，返回常见的采样率
-                        return common_sample_rates;
-
                     case AudioOutputMode.Default:
                     default:
-                        // 对于默认BASS设备，返回常见的采样率
-                        return common_sample_rates;
+                        // 对于其他设备，不需要采样率设置，返回空列表
+                        return Enumerable.Empty<int>();
                 }
             }
             catch

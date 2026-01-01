@@ -42,17 +42,17 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     Keywords = new[] { "speaker", "headphone", "output" },
                     TooltipText = "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive."
                 },
-                sampleRateDropdown = new SettingsDropdown<int>
+            };
+
+            if (RuntimeInfo.OS == RuntimeInfo.Platform.Windows)
+            {
+                Add(sampleRateDropdown = new SettingsDropdown<int>
                 {
                     LabelText = "ASIO Sample Rate(Testing)",
                     Keywords = new[] { "sample", "rate", "frequency" },
                     Current = new Bindable<int>(48000),
                     TooltipText = "48k is better, too high a value will cause delays and clock synchronization errors"
-                },
-            };
-
-            if (RuntimeInfo.OS == RuntimeInfo.Platform.Windows)
-            {
+                });
                 Add(wasapiExperimental = new SettingsCheckbox
                 {
                     LabelText = AudioSettingsStrings.WasapiLabel,
@@ -78,20 +78,28 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             });
 
             onDeviceChanged(string.Empty);
+
+            // 根据初始设备类型显示或隐藏采样率设置
+            string initialDevice = audio.AudioDevice.Value;
+            sampleRateDropdown.FadeTo(initialDevice.Contains("(ASIO)") ? 1 : 0);
         }
 
-        private void onDeviceChanged(string _)
+        private void onDeviceChanged(string deviceName)
         {
             // Audio device notifications may arrive from the audio thread.
             // Ensure UI mutations happen on the update thread.
             Schedule(() =>
             {
                 updateItems();
-                updateSampleRates();
+                updateSampleRates(!string.IsNullOrEmpty(deviceName));
 
                 // 重新应用当前统一的采样率设置
                 int currentSampleRate = audio.GetSampleRate();
                 sampleRateDropdown.Current.Value = currentSampleRate;
+
+                // 根据设备类型显示或隐藏采样率设置
+                string selectedDevice = audio.AudioDevice.Value;
+                sampleRateDropdown.FadeTo(selectedDevice.Contains("(ASIO)") ? 1 : 0);
 
                 if (wasapiExperimental != null)
                 {
@@ -125,11 +133,11 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                              .ToList();
         }
 
-        private void updateSampleRates()
+        private void updateSampleRates(bool forceSetCurrent = false)
         {
             string selectedDevice = audio.AudioDevice.Value;
 
-            Logger.Log($"[AudioDevicesSettings] updateSampleRates called with selectedDevice: '{selectedDevice}'", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log($"[AudioDevicesSettings] updateSampleRates called with selectedDevice: '{selectedDevice}', forceSetCurrent: {forceSetCurrent}", LoggingTarget.Runtime, LogLevel.Debug);
 
             // Check if the selected device is an ASIO device
             if (selectedDevice.Contains("(ASIO)"))
@@ -149,7 +157,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 // Ensure current sample rate is valid for this device
                 int currentRate = audio.GetSampleRate();
 
-                if (!newItems.Contains(currentRate) && newItems.Count > 0)
+                if (forceSetCurrent && !newItems.Contains(currentRate) && newItems.Count > 0)
                 {
                     // Set to first available rate if current rate is not supported
                     sampleRateDropdown.Current.Value = newItems[0];
@@ -165,7 +173,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 // Ensure current sample rate is valid for this device
                 int currentRate = audio.GetSampleRate();
 
-                if (!newItems.Contains(currentRate) && newItems.Count > 0)
+                if (forceSetCurrent && !newItems.Contains(currentRate) && newItems.Count > 0)
                 {
                     // Set to first available rate if current rate is not supported
                     sampleRateDropdown.Current.Value = newItems[0];
