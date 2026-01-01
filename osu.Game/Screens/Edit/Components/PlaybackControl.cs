@@ -29,12 +29,11 @@ namespace osu.Game.Screens.Edit.Components
 {
     public partial class PlaybackControl : BottomBarContainer
     {
-        private const float button_spacing = 40;
-
         private LoopPointButton setAButton = null!;
         private LoopPointButton setBButton = null!;
-        private IconButton playButton = null!;
         private IconButton loopButton = null!;
+
+        private IconButton playButton = null!;
         private PlaybackSpeedControl playbackSpeedControl = null!;
 
         [Resolved]
@@ -51,46 +50,54 @@ namespace osu.Game.Screens.Edit.Components
 
             Children = new Drawable[]
             {
-                setAButton = new LoopPointButton("A")
+                new FillFlowContainer
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
-                    Scale = new Vector2(1.2f),
-                    Action = setLoopStartToCurrentTime,
-                },
-                setBButton = new LoopPointButton("B")
-                {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                    X = button_spacing,
-                    Scale = new Vector2(1.2f),
-                    Action = setLoopEndToCurrentTime,
-                },
-                loopButton = new IconButton
-                {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                    X = button_spacing * 2,
-                    Scale = new Vector2(1.2f),
-                    IconScale = new Vector2(1.2f),
-                    Icon = FontAwesome.Solid.SyncAlt,
-                    Action = toggleLoop,
-                },
-                playButton = new IconButton
-                {
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                    X = button_spacing * 3,
-                    Scale = new Vector2(1.2f),
-                    IconScale = new Vector2(1.2f),
-                    Icon = FontAwesome.Regular.PlayCircle,
-                    Action = togglePause,
+                    RelativeSizeAxes = Axes.Both,
+                    Direction = FillDirection.Horizontal,
+                    Spacing = new Vector2(5, 0),
+                    Children = new Drawable[]
+                    {
+                        setAButton = new LoopPointButton("A")
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(1.2f),
+                            Action = setLoopStartToCurrentTime,
+                        },
+                        setBButton = new LoopPointButton("B")
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(1.2f),
+                            Action = setLoopEndToCurrentTime,
+                        },
+                        loopButton = new IconButton
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(1.2f),
+                            IconScale = new Vector2(1.2f),
+                            Icon = FontAwesome.Solid.SyncAlt,
+                            Action = toggleLoop,
+                        },
+                        playButton = new IconButton
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(1.2f),
+                            IconScale = new Vector2(1.2f),
+                            Icon = FontAwesome.Regular.PlayCircle,
+                            Action = togglePause,
+                        },
+                    },
                 },
                 playbackSpeedControl = new PlaybackSpeedControl
                 {
                     AutoSizeAxes = Axes.Y,
-                    RelativeSizeAxes = Axes.X,
-                    Padding = new MarginPadding { Left = 165, },
+                    Width = 180,
+                    Padding = new MarginPadding { Left = 45, },
                     Anchor = Anchor.CentreRight,
                     Origin = Anchor.CentreRight,
                     Direction = FillDirection.Vertical,

@@ -51,7 +51,7 @@ namespace osu.Game.Screens.Edit
                     {
                         new Dimension(GridSizeMode.Absolute, 150),
                         new Dimension(),
-                        new Dimension(GridSizeMode.Absolute, 220),
+                        new Dimension(GridSizeMode.Absolute, 330),
                         new Dimension(GridSizeMode.Absolute, HitObjectComposer.TOOLBOX_CONTRACTED_SIZE_RIGHT),
                     },
                     Content = new[]
