@@ -1,7 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -28,10 +30,14 @@ namespace osu.Game.LAsEzExtensions.Screens
     /// </summary>
     public partial class EzSkinEditorScreen : OverlayContainer
     {
-        protected override bool BlockNonPositionalInput => true;
+        // Must not block the rest of the SkinEditor UI (sidebars/toolbar).
+        protected override bool BlockNonPositionalInput => false;
 
         [Resolved]
         private ISkinSource skinSource { get; set; } = null!;
+
+        [Resolved]
+        private SkinManager skinManager { get; set; } = null!;
 
         [Resolved]
         private Bindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -39,8 +45,9 @@ namespace osu.Game.LAsEzExtensions.Screens
         [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
-        [Resolved]
-        private DialogOverlay dialogOverlay { get; set; } = null!;
+        // 必须这样，否则会构建失败
+        [Resolved(canBeNull: true)]
+        private IDialogOverlay? dialogOverlay { get; set; }
 
         private ISkinEditorVirtualProvider? provider;
 
@@ -53,6 +60,10 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         public EzSkinEditorScreen()
         {
+            RelativeSizeAxes = Axes.Both;
+            Anchor = Anchor.Centre;
+            Origin = Anchor.Centre;
+
             // AddLayout(drawSizeLayout = new LayoutValue(Invalidation.DrawSize));
         }
 
@@ -76,44 +87,55 @@ namespace osu.Game.LAsEzExtensions.Screens
                     RelativeSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
-                        // 左侧：虚拟播放场景
-                        leftPlaybackContainer = new Container
+                        new GridContainer
                         {
-                            RelativeSizeAxes = Axes.Y,
-                            Width = 200,
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                        },
-                        // 中间：note 显示
-                        centerNoteDisplayContainer = new Container
-                        {
-                            RelativeSizeAxes = Axes.Y,
-                            Width = 300,
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
-                        },
-                        // 右侧：设置面板
-                        rightSettingsContainer = new Container
-                        {
-                            RelativeSizeAxes = Axes.Y,
-                            Width = 250,
-                            Anchor = Anchor.CentreRight,
-                            Origin = Anchor.CentreRight,
-                            Children = new Drawable[]
+                            RelativeSizeAxes = Axes.Both,
+                            ColumnDimensions = new[]
                             {
-                                settingsScrollContainer = new OsuScrollContainer
+                                new Dimension(GridSizeMode.Relative, 0.3f),
+                                new Dimension(GridSizeMode.Relative, 0.4f),
+                                new Dimension(GridSizeMode.Relative, 0.3f),
+                            },
+                            RowDimensions = new[]
+                            {
+                                new Dimension(GridSizeMode.Relative, 1),
+                            },
+                            Content = new[]
+                            {
+                                new Drawable[]
                                 {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Height = 0.9f, // 为应用按钮留出空间
-                                },
-                                applyButton = new ApplySettingsButton
-                                {
-                                    Text = "Apply Settings",
-                                    RelativeSizeAxes = Axes.X,
-                                    Height = 40,
-                                    Anchor = Anchor.BottomCentre,
-                                    Origin = Anchor.BottomCentre,
-                                    Action = ApplySettings,
+                                    // 左侧：虚拟播放场景
+                                    leftPlaybackContainer = new Container
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                    },
+                                    // 中间：note 显示
+                                    centerNoteDisplayContainer = new Container
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                    },
+                                    // 右侧：设置面板
+                                    rightSettingsContainer = new Container
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                        Children = new Drawable[]
+                                        {
+                                            settingsScrollContainer = new OsuScrollContainer
+                                            {
+                                                RelativeSizeAxes = Axes.Both,
+                                                Height = 0.9f, // 为应用按钮留出空间
+                                            },
+                                            applyButton = new ApplySettingsButton
+                                            {
+                                                Text = "Apply Settings",
+                                                RelativeSizeAxes = Axes.X,
+                                                Height = 40,
+                                                Anchor = Anchor.BottomCentre,
+                                                Origin = Anchor.BottomCentre,
+                                                Action = ApplySettings,
+                                            }
+                                        }
+                                    },
                                 }
                             }
                         }
@@ -135,8 +157,20 @@ namespace osu.Game.LAsEzExtensions.Screens
         public void PopulateSettings()
         {
             // 注意：这里不要创建 HitObjectComposer（会引入编辑器依赖）。
-            // Provider 从当前 ruleset 实例获取，以保持规则集可扩展性。
-            provider = ruleset.Value?.CreateInstance() as ISkinEditorVirtualProvider;
+            // 本功能目前只服务 mania + EzPro，通过 registry 解析 provider。
+            var currentBeatmap = beatmap.Value.Beatmap;
+            var ezProSkin = skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager);
+
+            // 尽量确保 mania 程序集已加载，以便其在模块初始化时完成 provider 注册。
+            try
+            {
+                Assembly.Load("osu.Game.Rulesets.Mania");
+            }
+            catch
+            {
+            }
+
+            provider = createManiaProviderOrNull();
 
             // 当调用时初始化屏幕
             InitializeLeftPlayback();
@@ -144,9 +178,28 @@ namespace osu.Game.LAsEzExtensions.Screens
             InitializeRightSettings();
         }
 
+        private static ISkinEditorVirtualProvider? createManiaProviderOrNull()
+        {
+            // 仅针对 mania + EzPro 的简化实现：用反射创建 provider，避免引入 registry/额外文件。
+            const string type_name = "osu.Game.Rulesets.Mania.Skinning.Editor.ManiaEzProSkinEditorVirtualProvider, osu.Game.Rulesets.Mania";
+
+            try
+            {
+                var providerType = Type.GetType(type_name, throwOnError: false);
+                if (providerType == null)
+                    return null;
+
+                return Activator.CreateInstance(providerType) as ISkinEditorVirtualProvider;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private void InitializeLeftPlayback()
         {
-            var currentSkin = skinSource;
+            var currentSkin = skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager);
             var currentBeatmap = beatmap.Value.Beatmap;
 
             if (provider != null)
@@ -160,7 +213,6 @@ namespace osu.Game.LAsEzExtensions.Screens
                         p.RelativeSizeAxes = Axes.Both;
                         p.Anchor = Anchor.Centre;
                         p.Origin = Anchor.Centre;
-                        p.Scale = new Vector2(0.5f); // Scale down to fit
                     })
                 };
             }
@@ -193,8 +245,8 @@ namespace osu.Game.LAsEzExtensions.Screens
                         Spacing = new Vector2(10),
                         Children = new[]
                         {
-                            provider.CreateCurrentSkinNoteDisplay(skinSource),
-                            provider.CreateEditedNoteDisplay(skinSource),
+                            provider.CreateCurrentSkinNoteDisplay(skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager)),
+                            provider.CreateEditedNoteDisplay(skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager)),
                         }
                     }
                 };
@@ -251,6 +303,13 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private void ShowExitDialog()
         {
+            // 里程碑A阶段：dialog overlay 可能在当前依赖树里不可用，务必降级为直接退出。
+            if (dialogOverlay == null)
+            {
+                Hide();
+                return;
+            }
+
             dialogOverlay.Push(new ConfirmDialog("应用更改到皮肤？", () =>
             {
                 ApplySettings();

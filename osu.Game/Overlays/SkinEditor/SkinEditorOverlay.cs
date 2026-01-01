@@ -116,6 +116,12 @@ namespace osu.Game.Overlays.SkinEditor
             switch (e.Action)
             {
                 case GlobalAction.Back:
+                    if (ezSkinEditorScreen?.State.Value == Visibility.Visible)
+                    {
+                        ToggleEzSkinEditor();
+                        return true;
+                    }
+
                     if (skinEditor?.State.Value != Visibility.Visible)
                         break;
 
@@ -185,9 +191,16 @@ namespace osu.Game.Overlays.SkinEditor
                 return;
 
             if (ezSkinEditorScreen.State.Value == Visibility.Visible)
+            {
                 ezSkinEditorScreen.Hide();
+            }
             else
+            {
                 ezSkinEditorScreen.Show();
+
+                // Ensure sizing is applied immediately when showing.
+                Scheduler.AddOnce(updateScreenSizing);
+            }
         }
 
         public void PresentGameplay() => presentGameplay(false);
@@ -266,6 +279,15 @@ namespace osu.Game.Overlays.SkinEditor
                 1f - relativeToolbarHeight - padding / DrawHeight);
 
             scalingContainer.SetCustomRect(rect, true);
+
+            // Keep Ez overlay constrained to the same central preview area.
+            if (ezSkinEditorScreen != null)
+            {
+                ezSkinEditorScreen.RelativePositionAxes = Axes.Both;
+                ezSkinEditorScreen.RelativeSizeAxes = Axes.Both;
+                ezSkinEditorScreen.Position = rect.Location;
+                ezSkinEditorScreen.Size = rect.Size;
+            }
         }
 
         private void updateComponentVisibility()
