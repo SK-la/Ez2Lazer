@@ -13,7 +13,7 @@ namespace osu.Game.LAsEzExtensions.Audio
     public static class AudioExtensions
     {
         // 固定采样率列表，优先使用48kHz
-        private static readonly int[] common_sample_rates = { 48000, 44100, 96000, 192000 };
+        public static readonly int[] COMMON_SAMPLE_RATES = { 48000, 44100, 96000, 192000 };
 
         // 扩展方法：获取当前采样率
         public static int GetSampleRate(this AudioManager audioManager)
@@ -43,7 +43,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 {
                     case AudioOutputMode.Asio:
                         // 对于ASIO设备，返回固定的常见采样率列表，因为实际支持的采样率是从这些中选择的
-                        return common_sample_rates;
+                        return COMMON_SAMPLE_RATES;
 
                     case AudioOutputMode.WasapiExclusive:
                     case AudioOutputMode.WasapiShared:
@@ -56,7 +56,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             catch
             {
                 // 如果获取失败，返回默认列表
-                return common_sample_rates;
+                return COMMON_SAMPLE_RATES;
             }
         }
 
