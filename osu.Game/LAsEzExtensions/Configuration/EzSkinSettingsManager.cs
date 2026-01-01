@@ -73,6 +73,10 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(EzSkinSetting.NoteHeightScaleToWidth, 1, 0.1, 2, 0.1);
             SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
+            // Mania 长按尾部相关（皮肤编辑器用，暂时只作为占位设置项）。
+            SetDefault(EzSkinSetting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
+            SetDefault(EzSkinSetting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 200.0, 1.0);
+
             SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
             SetDefault(EzSkinSetting.ColumnBlur, 0.7, 0.0, 1, 0.01);
             SetDefault(EzSkinSetting.ColumnDim, 0.7, 0.0, 1, 0.01);
@@ -409,6 +413,11 @@ namespace osu.Game.LAsEzExtensions.Configuration
         VisualHitPosition,
         NoteHeightScaleToWidth,
         NoteTrackLineHeight,
+
+        // Mania 长按尾部相关（EzSkinEditor 用）
+        ManiaHoldTailAlpha,
+        ManiaHoldTailMaskGradientHeight,
+
         GlobalTextureName,
         NoteSetName,
         StageName,

@@ -13,6 +13,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Localisation;
 using osu.Game.Screens;
+using osu.Game.Screens.Play;
 using osu.Game.Screens.SelectV2;
 using osuTK;
 using SongSelect = osu.Game.Screens.Select.SongSelect;
@@ -95,10 +96,7 @@ namespace osu.Game.Overlays.SkinEditor
                                     Text = "Mania Note Editor(Testing)",
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
-                                    Action = () => performer?.PerformFromScreen(screen =>
-                                    {
-                                        screen.Push(new EzSkinEditorScreen());
-                                    }, new[] { typeof(Screen) })
+                                    Action = () => skinEditorOverlay?.ToggleEzSkinEditor(),
                                 },
                             }
                         },

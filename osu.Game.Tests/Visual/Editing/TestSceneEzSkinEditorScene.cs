@@ -20,15 +20,19 @@ namespace osu.Game.Tests.Visual.Editing
         [Cached]
         private readonly OverlayColourProvider overlayColour = new OverlayColourProvider(OverlayColourScheme.Aquamarine);
 
-        private EzSkinEditorScreen ezSkinEditorScreen = null!;
+    [Cached]
+    private readonly DialogOverlay dialogOverlay = new DialogOverlay();
 
-        [BackgroundDependencyLoader]
-        private void load()
-        {
-            // Instantiate the screen for testing purposes
-            ezSkinEditorScreen = new EzSkinEditorScreen();
-            Child = ezSkinEditorScreen;
-        }
+    private EzSkinEditorScreen ezSkinEditorScreen = null!;
+
+    [BackgroundDependencyLoader]
+    private void load()
+    {
+        // Instantiate the screen for testing purposes
+        ezSkinEditorScreen = new EzSkinEditorScreen();
+        Child = ezSkinEditorScreen;
+        Add(dialogOverlay);
+    }
 
         [Test]
         public void TestLoadScreen()
