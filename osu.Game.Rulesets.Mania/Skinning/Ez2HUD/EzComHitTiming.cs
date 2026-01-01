@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [SettingSource("Offset Text Font", "Offset Text Font", SettingControlType = typeof(OffsetTextNameSelector))]
         public Bindable<EzEnumGameThemeName> TextNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
-        [SettingSource("AloneShow", "Show only Early or: Late separately")]
+        [SettingSource("Single Show", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
 
         [SettingSource("(显示阈值) Displaying Threshold", "(显示阈值) Displaying Threshold")]
@@ -49,8 +49,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1,
         };
 
-        [SettingSource("Alpha", "The alpha value of this box")]
-        public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
+        [SettingSource("Text Alpha", "The alpha value of this offset text")]
+        public BindableNumber<float> TextAlpha { get; } = new BindableNumber<float>(1)
+        {
+            MinValue = 0,
+            MaxValue = 1,
+            Precision = 0.01f,
+        };
+
+        [SettingSource("Number Alpha", "The alpha value of the offset number")]
+        public BindableNumber<float> NumberAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,
             MaxValue = 1,
@@ -92,7 +100,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                     AutoSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Alpha = 0,
                     Children = new Drawable[]
                     {
                         timingContainer = new Container
@@ -145,7 +152,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             base.LoadComplete();
 
-            BoxAlpha.BindValueChanged(alpha => errorContainer.Alpha = alpha.NewValue, true);
+            TextAlpha.BindValueChanged(alpha => timingContainer.Alpha = alpha.NewValue, true);
+            NumberAlpha.BindValueChanged(alpha => offsetText.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => errorContainer.Colour = AccentColour.Value, true);
 
             NumberNameDropdown.BindValueChanged(e =>
@@ -207,7 +215,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             offsetText.Text = judgement.TimeOffset == 0 ? "0" : $"{judgement.TimeOffset:+0;-0}";
             backgroundBox.Colour = GetColourForHitResult(judgement.Type);
 
-            errorContainer.FadeTo(BoxAlpha.Value, 10); // 渐现动画
+            timingContainer.FadeTo(TextAlpha.Value, 10); // 渐现动画（上半文字）
+            offsetText.FadeTo(NumberAlpha.Value, 10); // 渐现动画（下半数字）
             resetDisappearTask();
         }
 
@@ -250,7 +259,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             // 启动新的任务，在持续时间后渐隐至透明度为零
             disappearTask = Scheduler.AddDelayed(() =>
             {
-                errorContainer.FadeOutFromOne(300); // 渐隐动画
+                timingContainer.FadeOut(300); // 渐隐动画（上半文字）
+                offsetText.FadeOut(300); // 渐隐动画（下半数字）
             }, DisplayDuration.Value);
         }
 
