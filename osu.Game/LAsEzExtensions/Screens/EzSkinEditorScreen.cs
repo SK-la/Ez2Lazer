@@ -30,7 +30,9 @@ namespace osu.Game.LAsEzExtensions.Screens
     /// </summary>
     public partial class EzSkinEditorScreen : OverlayContainer
     {
-        // Must not block the rest of the SkinEditor UI (sidebars/toolbar).
+        // Only block interactions inside the central preview rect.
+        // Keep non-positional input (handled by SkinEditorOverlay) working for sidebars/menus.
+        protected override bool BlockPositionalInput => true;
         protected override bool BlockNonPositionalInput => false;
 
         [Resolved]
@@ -52,6 +54,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         private ISkinEditorVirtualProvider? provider;
 
         private Container? mainContainer;
+        private Container? backgroundContainer;
         private Container? leftPlaybackContainer;
         private Container? centerNoteDisplayContainer;
         private Container? rightSettingsContainer;
@@ -87,9 +90,15 @@ namespace osu.Game.LAsEzExtensions.Screens
                     RelativeSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
+                        // Background plate (use the same skin component as mania stage background).
+                        backgroundContainer = new Container
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                        },
                         new GridContainer
                         {
                             RelativeSizeAxes = Axes.Both,
+                            Padding = new MarginPadding(10),
                             ColumnDimensions = new[]
                             {
                                 new Dimension(GridSizeMode.Relative, 0.3f),
@@ -143,14 +152,14 @@ namespace osu.Game.LAsEzExtensions.Screens
                 }
             };
 
-            // 延迟到下一帧调用PopulateSettings，确保所有依赖已加载
-            Schedule(PopulateSettings);
+            // PopulateSettings is invoked from LoadComplete to ensure dependencies are available.
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            // 确保在所有依赖加载完成后调用PopulateSettings
+
+            // Ensure dependencies are available before initialising.
             PopulateSettings();
         }
 
@@ -169,6 +178,9 @@ namespace osu.Game.LAsEzExtensions.Screens
             catch
             {
             }
+
+            backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
+            backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
             provider = createManiaProviderOrNull();
 
@@ -190,6 +202,40 @@ namespace osu.Game.LAsEzExtensions.Screens
                     return null;
 
                 return Activator.CreateInstance(providerType) as ISkinEditorVirtualProvider;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Drawable? createManiaStageBackgroundOrNull()
+        {
+            var lookup = tryCreateManiaSkinComponentLookupOrNull("StageBackground");
+            if (lookup == null)
+                return null;
+
+            return new SkinnableDrawable(lookup)
+            {
+                RelativeSizeAxes = Axes.Both
+            };
+        }
+
+        private static ISkinComponentLookup? tryCreateManiaSkinComponentLookupOrNull(string componentName)
+        {
+            const string lookup_type_name = "osu.Game.Rulesets.Mania.ManiaSkinComponentLookup, osu.Game.Rulesets.Mania";
+            const string enum_type_name = "osu.Game.Rulesets.Mania.ManiaSkinComponents, osu.Game.Rulesets.Mania";
+
+            try
+            {
+                var lookupType = Type.GetType(lookup_type_name, throwOnError: false);
+                var enumType = Type.GetType(enum_type_name, throwOnError: false);
+
+                if (lookupType == null || enumType == null)
+                    return null;
+
+                object componentValue = Enum.Parse(enumType, componentName, ignoreCase: false);
+                return Activator.CreateInstance(lookupType, componentValue) as ISkinComponentLookup;
             }
             catch
             {

@@ -81,8 +81,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Editor
                         },
                         new Container
                         {
-                            RelativeSizeAxes = Axes.Both,
-                            Height = 1,
+                            RelativeSizeAxes = Axes.X,
+                            Height = 220,
                             Children = new Drawable[]
                             {
                                 new Box
@@ -176,7 +176,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Editor
         private sealed partial class HoldNotePreview : CompositeDrawable
         {
             private const double time_range = 2000;
-            private const double cycle_length = 2400;
+            private const double cycle_length = time_range;
 
             private readonly bool looping;
             private readonly int column;
@@ -185,9 +185,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Editor
             private readonly Column columnDependency;
             private readonly StageDefinition stageDefinition = new StageDefinition(2);
 
+            private readonly StopwatchClock playbackClock = new StopwatchClock(true);
+            private readonly ManualClock manualClock = new ManualClock();
+
             private DrawableHoldNote drawableHoldNote = null!;
 
             private Container judgementArea = null!;
+
+            private double staticPreviewTime;
 
             public HoldNotePreview(bool looping, int column, ManiaAction maniaAction)
             {
@@ -202,7 +207,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Editor
 
                 RelativeSizeAxes = Axes.Both;
 
-                Clock = new FramedClock(new StopwatchClock(true));
+                // Drive time manually to:
+                // - loop previews without lifetime expiry
+                // - keep centre previews completely static
+                Clock = new FramedClock(manualClock);
             }
 
             protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
@@ -223,11 +231,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Editor
 
                 var hold = new HoldNote
                 {
-                    StartTime = 1000,
+                    StartTime = time_range,
                     Duration = 1200,
                     Column = column,
                 };
                 hold.ApplyDefaults(new ControlPointInfo(), new BeatmapDifficulty());
+
+                // Centre preview should be static and always visible.
+                // Freeze time at the hitobject start time and do not animate.
+                staticPreviewTime = hold.StartTime;
+                manualClock.CurrentTime = looping ? 0 : staticPreviewTime;
 
                 InternalChildren = new Drawable[]
                 {
@@ -266,12 +279,30 @@ namespace osu.Game.Rulesets.Mania.Skinning.Editor
                 if (drawableHoldNote == null)
                     return;
 
-                double currentTime = looping ? Time.Current % cycle_length : 0;
+                if (!looping)
+                {
+                    // Static centre preview: no movement, no alpha gating, no time progression.
+                    manualClock.CurrentTime = staticPreviewTime;
+                    drawableHoldNote.Y = 0;
+                    drawableHoldNote.Alpha = 1;
+                    updateJudgementArea();
+                    return;
+                }
+
+                double currentTime;
+
+                if (looping)
+                    currentTime = playbackClock.CurrentTime % cycle_length;
+                else
+                    currentTime = staticPreviewTime;
+
+                manualClock.CurrentTime = currentTime;
 
                 // Scroll the whole hold note. Nested hitobjects are positioned by DrawableHoldNote itself based on IScrollingInfo.
                 double finalPosition = (drawableHoldNote.HitObject.StartTime - currentTime) / scrollingInfo.TimeRange.Value;
                 float scrollLength = DrawHeight;
-                drawableHoldNote.Y = (float)(-finalPosition * scrollLength);
+                // Map [0..1] to [0..H] so motion is visible across full height.
+                drawableHoldNote.Y = (float)((1 - finalPosition) * scrollLength);
                 drawableHoldNote.Alpha = finalPosition >= 0 && finalPosition <= 1 ? 1 : 0;
 
                 updateJudgementArea();
