@@ -33,9 +33,6 @@ namespace osu.Game.Overlays.SkinEditor
         [Resolved]
         private SkinEditorOverlay? skinEditorOverlay { get; set; }
 
-        [Resolved]
-        private EzSkinEditorOverlay? ezSkinEditorOverlay { get; set; }
-
         public SkinEditorSceneLibrary()
         {
             Height = HEIGHT;
@@ -98,10 +95,10 @@ namespace osu.Game.Overlays.SkinEditor
                                     Text = "Mania Note Editor(Testing)",
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
-                                    Action = () =>
+                                    Action = () => performer?.PerformFromScreen(screen =>
                                     {
-                                        ezSkinEditorOverlay?.PopulateSettings();
-                                    },
+                                        screen.Push(new EzSkinEditorScreen());
+                                    }, new[] { typeof(Screen) })
                                 },
                             }
                         },
