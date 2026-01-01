@@ -308,6 +308,11 @@ namespace osu.Game.Screens.SelectV2
                 if (ruleset.Value.OnlineID != 3)
                     return;
 
+                // DrawablePool 回收/Item 变更期间可能仍收到旧 bindable 的回调。
+                // 这时 beatmap 属性会因为 Item 为 null 而抛出异常，因此直接忽略。
+                if (Item == null)
+                    return;
+
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
 
@@ -332,13 +337,24 @@ namespace osu.Game.Screens.SelectV2
 
         private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts)
         {
+            if (Item == null)
+                return;
+
             var (averageKps, maxKps, _) = result;
 
             maniaKpsDisplay.SetKps(averageKps, maxKps);
 
-            if (columnCounts != null && columnCounts.Any())
+            if (columnCounts != null)
             {
-                maniaKpcDisplay.UpdateColumnCounts(columnCounts);
+                // 同 PanelBeatmap：补齐缺失列为 0，避免列号错位。
+                ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
+                int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
+
+                var normalized = new Dictionary<int, int>(keyCount);
+                for (int i = 0; i < keyCount; i++)
+                    normalized[i] = columnCounts.GetValueOrDefault(i);
+
+                maniaKpcDisplay.UpdateColumnCounts(normalized);
             }
         }
 

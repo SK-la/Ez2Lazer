@@ -302,6 +302,11 @@ namespace osu.Game.Screens.SelectV2
                 if (ruleset.Value.OnlineID != 3)
                     return;
 
+                // DrawablePool 回收/Item 变更期间可能仍收到旧 bindable 的回调。
+                // 这时 beatmap 属性会因为 Item 为 null 而抛出异常，因此直接忽略。
+                if (Item == null)
+                    return;
+
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
 
@@ -326,13 +331,27 @@ namespace osu.Game.Screens.SelectV2
 
         private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts)
         {
+            if (Item == null)
+                return;
+
             var (averageKps, maxKps, _) = result;
 
             maniaKpsDisplay.SetKps(averageKps, maxKps);
 
-            if (columnCounts != null && columnCounts.Any())
+            if (columnCounts != null)
             {
-                maniaKpcDisplay.UpdateColumnCounts(columnCounts);
+                // 注意：分析结果里的 ColumnCounts 只包含“出现过的列”。
+                // 当某个 mod 删除了某一列的所有 notes 时，这一列会缺失，
+                // 直接显示会导致列号错位（看起来像“没有更新”）。
+                // 这里把字典补齐到 0..keyCount-1，缺失列填 0。
+                ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
+                int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
+
+                var normalized = new Dictionary<int, int>(keyCount);
+                for (int i = 0; i < keyCount; i++)
+                    normalized[i] = columnCounts.GetValueOrDefault(i);
+
+                maniaKpcDisplay.UpdateColumnCounts(normalized);
             }
         }
 

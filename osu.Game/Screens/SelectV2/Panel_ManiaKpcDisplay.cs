@@ -104,7 +104,7 @@ namespace osu.Game.Screens.SelectV2
             // 高性能的数字显示模式
             columnNotesContainer.Children = columnNoteCounts
                                             .OrderBy(c => c.Key)
-                                            .Select((c, index) => new FillFlowContainer
+                                            .Select(c => new FillFlowContainer
                                             {
                                                 Direction = FillDirection.Horizontal,
                                                 AutoSizeAxes = Axes.Both,
@@ -112,7 +112,7 @@ namespace osu.Game.Screens.SelectV2
                                                 {
                                                     new OsuSpriteText
                                                     {
-                                                        Text = $"{index + 1}/",
+                                                        Text = $"{c.Key + 1}/",
                                                         Font = OsuFont.GetFont(size: 14),
                                                         Colour = Color4.Gray,
                                                     },
@@ -140,7 +140,7 @@ namespace osu.Game.Screens.SelectV2
             const float bar_spacing = 2f;
 
             columnNotesContainer.Children = sortedCounts
-                                            .Select((c, index) =>
+                                            .Select(c =>
                                             {
                                                 float normalizedHeight = maxCount > 0 ? (float)c.Value / maxCount * max_bar_height : 0;
 
@@ -173,7 +173,7 @@ namespace osu.Game.Screens.SelectV2
                                                         // 列标签
                                                         new OsuSpriteText
                                                         {
-                                                            Text = $"{index + 1}",
+                                                            Text = $"{c.Key + 1}",
                                                             Font = OsuFont.GetFont(size: 12),
                                                             Colour = Color4.Gray,
                                                             Anchor = Anchor.BottomCentre,
