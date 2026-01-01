@@ -89,7 +89,9 @@ namespace osu.Game.Screens.SelectV2
             var cancellationToken = calculationCancellationSource.Token;
 
             // 生成缓存键
-            string cacheKey = $"{beatmapInfo.Hash}_{string.Join(",", mods?.Select(m => m.Acronym) ?? Array.Empty<string>())}";
+            string cacheKey = mods == null
+                ? $"{beatmapInfo.Hash}"
+                : ManiaBeatmapAnalysisCache.CreateCacheKey(beatmapInfo, ruleset, mods);
 
             // 检查缓存
             if (kpsCache.TryGetValue(cacheKey, out var cachedResult))

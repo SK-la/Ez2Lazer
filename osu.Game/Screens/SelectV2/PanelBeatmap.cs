@@ -56,6 +56,7 @@ namespace osu.Game.Screens.SelectV2
 
         private ManiaKpsDisplay maniaKpsDisplay = null!;
         private ManiaKpcDisplay maniaKpcDisplay = null!;
+        private OsuSpriteText extraStarText = null!;
 
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
@@ -68,6 +69,9 @@ namespace osu.Game.Screens.SelectV2
 
         [Resolved]
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
+
+        [Resolved]
+        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -83,8 +87,8 @@ namespace osu.Game.Screens.SelectV2
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
 
-        private CancellationTokenSource? kpsCalculationCancellationSource;
-        private ScheduledDelegate? scheduledKpsCalculation;
+        private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
+        private CancellationTokenSource? maniaAnalysisCancellationSource;
         private string? cachedScratchText;
 
         public PanelBeatmap()
@@ -107,6 +111,16 @@ namespace osu.Game.Screens.SelectV2
             Background = backgroundBorder = new Box
             {
                 RelativeSizeAxes = Axes.Both,
+            };
+
+            // 预留：未来新增的 star 算法显示位（暂不实现）。
+            extraStarText = new OsuSpriteText
+            {
+                Text = string.Empty,
+                Font = OsuFont.GetFont(size: 14),
+                Colour = Colour4.GhostWhite,
+                Anchor = Anchor.BottomLeft,
+                Origin = Anchor.BottomLeft
             };
 
             Content.Children = new Drawable[]
@@ -209,7 +223,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
-                                        // TODO: 在此处增加XXY_SR
+                                        extraStarText,
                                         new OsuSpriteText
                                         {
                                             Text = "[Notes] ",
@@ -235,18 +249,14 @@ namespace osu.Game.Screens.SelectV2
             ruleset.BindValueChanged(_ =>
             {
                 computeStarRating();
-                cachedScratchText = null;
-                if (Item != null)
-                    updateCalculationsAsync(beatmap);
+                resetManiaAnalysisDisplay();
                 updateKeyCount();
             });
 
             mods.BindValueChanged(_ =>
             {
                 computeStarRating();
-                cachedScratchText = null;
-                if (Item != null)
-                    updateCalculationsAsync(beatmap);
+                resetManiaAnalysisDisplay();
                 updateKeyCount();
             }, true);
         }
@@ -262,7 +272,8 @@ namespace osu.Game.Screens.SelectV2
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             cachedScratchText = null;
-            updateCalculationsAsync(beatmap);
+            bindManiaAnalysis();
+            resetManiaAnalysisDisplay();
             computeStarRating();
             updateKeyCount();
         }
@@ -277,76 +288,40 @@ namespace osu.Game.Screens.SelectV2
             return rulesetInstance.CreateIcon();
         }
 
-        private void updateCalculationsAsync(BeatmapInfo beatmapInfo)
+        private void bindManiaAnalysis()
         {
-            if (ruleset.Value.OnlineID != 3)
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = new CancellationTokenSource();
+
+            if (Item == null)
                 return;
 
-            // 取消之前的计算/调度。
-            kpsCalculationCancellationSource?.Cancel();
-            kpsCalculationCancellationSource = new CancellationTokenSource();
-            var cancellationToken = kpsCalculationCancellationSource.Token;
-            scheduledKpsCalculation?.Cancel();
-
-            var rulesetSnapshot = ruleset.Value;
-            var modsSnapshot = mods.Value.ToArray();
-
-            // 延迟触发：拖动滚动条时面板会飞速换内容。
-            // 不延迟会在极短时间内排队大量解析任务，把线程池/CPU 打爆，导致“几乎卡死”。
-            scheduledKpsCalculation = Scheduler.AddDelayed(() =>
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            maniaAnalysisBindable.BindValueChanged(result =>
             {
-                if (cancellationToken.IsCancellationRequested)
+                if (ruleset.Value.OnlineID != 3)
                     return;
 
-                ILegacyRuleset legacyRuleset = (ILegacyRuleset)rulesetSnapshot.CreateInstance();
-                int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, modsSnapshot);
+                if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
+                    cachedScratchText = result.NewValue.ScratchText;
 
-                string cacheKey = ManiaBeatmapAnalysisCache.CreateCacheKey(beatmapInfo, rulesetSnapshot, modsSnapshot);
-
-                if (ManiaBeatmapAnalysisCache.TryGet(cacheKey, out var cached))
-                {
-                    cachedScratchText = cached.ScratchText;
-                    updateUI((cached.AverageKps, cached.MaxKps, cached.KpsList), cached.ColumnCounts);
-                    updateKeyCount();
-                    return;
-                }
-
-                startKpsCalculationAsync(beatmapInfo, rulesetSnapshot, modsSnapshot, keyCount, cancellationToken);
-            }, 120);
+                updateUI((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts);
+                updateKeyCount();
+            }, true);
         }
 
-        private async void startKpsCalculationAsync(BeatmapInfo beatmapInfo, RulesetInfo ruleset, Mod[] mods, int keyCount, CancellationToken cancellationToken)
+        private void resetManiaAnalysisDisplay()
         {
-            try
-            {
-                var result = await ManiaBeatmapAnalysisCache.GetOrComputeAsync(
-                        beatmapManager,
-                        beatmapInfo,
-                        ruleset,
-                        mods,
-                    keyCount)
-                    .ConfigureAwait(false);
+            cachedScratchText = null;
+            maniaKpcDisplay.Clear();
 
-                if (cancellationToken.IsCancellationRequested)
-                    return;
-
-                Schedule(() =>
-                {
-                    if (cancellationToken.IsCancellationRequested)
-                        return;
-
-                    cachedScratchText = result.ScratchText;
-                    updateUI((result.AverageKps, result.MaxKps, result.KpsList), result.ColumnCounts);
-                    updateKeyCount();
-                });
-            }
-            catch (OperationCanceledException)
+            if (ruleset.Value.OnlineID == 3)
             {
+                maniaKpsDisplay.Show();
+                maniaKpsDisplay.SetKps(0, 0);
             }
-            catch
-            {
-                // 忽略：面板快速滚动/回收时，这里的失败不应影响 UI。
-            }
+            else
+                maniaKpsDisplay.Hide();
         }
 
         private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts)
@@ -369,9 +344,8 @@ namespace osu.Game.Screens.SelectV2
             starDifficultyBindable = null;
 
             starDifficultyCancellationSource?.Cancel();
-            kpsCalculationCancellationSource?.Cancel();
-            scheduledKpsCalculation?.Cancel();
-            scheduledKpsCalculation = null;
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisBindable = null;
             cachedScratchText = null;
         }
 
