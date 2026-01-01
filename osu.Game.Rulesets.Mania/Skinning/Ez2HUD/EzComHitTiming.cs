@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [SettingSource("Offset Text Font", "Offset Text Font", SettingControlType = typeof(OffsetTextNameSelector))]
         public Bindable<EzEnumGameThemeName> TextNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
-        [SettingSource("Single Show", "Show only Early or: Late separately")]
+        [SettingSource("Single Show E/L", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
 
         [SettingSource("(显示阈值) Displaying Threshold", "(显示阈值) Displaying Threshold")]
