@@ -23,6 +23,7 @@ namespace osu.Game.Rulesets.Mods
             sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
         }
 
+        // 供override的速率调整使用
         public virtual double ApplyToRate(double time, double rate) => rate * SpeedChange.Value;
 
         public override Type[] IncompatibleMods => new[] { typeof(ModTimeRamp), typeof(ModAdaptiveSpeed), typeof(ModRateAdjust) };

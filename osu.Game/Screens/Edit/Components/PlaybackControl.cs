@@ -17,7 +17,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
-using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -186,13 +185,13 @@ namespace osu.Game.Screens.Edit.Components
                 }
                 else
                 {
-                    // 默认范围：以当前活动光标为 A 起点，向后 8 个 1/4 节拍为 B 终点。
-                    // 8 * (1/4 beat) = 2 beats.
+                    // 默认范围：以当前活动光标为 A 起点，向后 设置 B 终点。
                     double currentTime = Math.Clamp(editorClock.CurrentTime, 0, editorClock.TrackLength);
 
                     double startTime = editorClock.GetSnappedTime(currentTime);
                     var timingPoint = editorClock.ControlPointInfo.TimingPointAt(startTime);
 
+                    // 8 * (4/4 beat) = 8 beats.也就是8根白线。
                     double endTime = startTime + timingPoint.BeatLength * 8;
                     endTime = Math.Min(endTime, editorClock.TrackLength);
                     endTime = editorClock.GetSnappedTime(endTime);

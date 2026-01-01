@@ -212,6 +212,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
+                                        // TODO: 在此处增加XXY_SR
                                         new OsuSpriteText
                                         {
                                             Text = "[Notes] ",
@@ -413,6 +414,7 @@ namespace osu.Game.Screens.SelectV2
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
 
+                // TODO: 当前机制不健全，显示内容可能不准确，怀疑被缓存影响而未能及时更新
                 if (iBeatmap != null)
                 {
                     string keyCountTextValue = EzBeatmapCalculator.GetScratch(iBeatmap, keyCount);

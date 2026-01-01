@@ -102,6 +102,7 @@ namespace osu.Game.Screens.Play
         private bool isRestarting;
         private bool skipExitTransition;
 
+        // 公开以供外部检查当前状态。
         public readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
 
         public IBindable<bool> LocalUserPlaying => localUserPlaying;

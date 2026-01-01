@@ -322,7 +322,10 @@ namespace osu.Game.Rulesets.Mania.UI
                     column.RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
                     break;
 
+                // TODO: 暂时先用 EZ2AC 的物件池，以后根据使用反馈单独实现
                 case EzMUGHitMode.IIDX:
+                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
                     break;

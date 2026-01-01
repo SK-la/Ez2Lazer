@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Scoring;
@@ -137,7 +138,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             Colour = colour ?? Colour4.White;
         }
 
-        protected override string DisplayValue(string? value)
+        protected override LocalisableString DisplayValue(string? value)
         {
             return value ?? "N/A";
         }

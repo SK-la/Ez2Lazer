@@ -50,7 +50,6 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Edit.Setup;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania
 {

@@ -175,6 +175,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             switch (hitMode)
             {
+                // TODO: 判定值应该调整，太松了
                 case EzMUGHitMode.O2Jam:
                     if (bpm == 0) bpm = 200;
                     double coolRange = 7500.0 / bpm;

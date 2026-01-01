@@ -66,8 +66,8 @@ namespace osu.Game.Screens.Edit
 
             this.beatDivisor = beatDivisor ?? new BindableBeatDivisor();
 
-            // The editor operates in raw beatmap time. Applying offsets here breaks seek/loop logic
-            // (FramedBeatmapClock seeks in raw time but reports CurrentTime with offsets applied).
+            // 编辑器使用谱面原始时间。若在此应用偏移会破坏寻迹/循环逻辑
+            // （FramedBeatmapClock 在原始时间上进行寻迹，但报告的 CurrentTime 却应用了偏移）。
             underlyingClock = new FramedBeatmapClock(applyOffsets: false, requireDecoupling: true);
             AddInternal(underlyingClock);
 
@@ -85,8 +85,9 @@ namespace osu.Game.Screens.Edit
         }
 
         /// <summary>
-        /// Returns <paramref name="time"/> snapped to the currently configured editor beat divisor.
-        /// This matches the displayed editor grid granularity.
+        /// 这个方法返回根据当前编辑器节拍除数配置进行捕捉的<paramref name="time"/>。
+        /// 对其到显示的编辑器网格粒度。
+        /// TODO: 尽管如此，视觉上也依然难以发觉捕捉效果。最好在编辑器顶部的时间轴上同步显示光标位置。
         /// </summary>
         public double GetSnappedTime(double time)
         {

@@ -13,7 +13,6 @@ using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Skinning;
-using osu.Game.Screens;
 using osu.Game.Skinning;
 using osuTK;
 

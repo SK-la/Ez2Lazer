@@ -255,11 +255,18 @@ namespace osu.Game.Screens.SelectV2
 
             localUser.BindValueChanged(_ => updateCriteria());
             localUserFavouriteBeatmapSets.BindCollectionChanged((_, _) => updateCriteria());
+            ScopedBeatmapSet.BindValueChanged(_ => updateCriteria(clearScopedSet: false));
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
             csSelector.EzKeyModeFilter.SelectionChanged += updateCriteria;
 
             updateCriteria();
+        }
+
+        private void updateCriteria()
+        {
+            currentCriteria = CreateCriteria();
+            CriteriaChanged?.Invoke(currentCriteria);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -278,6 +285,7 @@ namespace osu.Game.Screens.SelectV2
 
             var criteria = new FilterCriteria
             {
+                SelectedBeatmapSet = ScopedBeatmapSet.Value,
                 Sort = sortDropdown.Current.Value,
                 Group = groupDropdown.Current.Value,
                 AllowConvertedBeatmaps = showConvertedBeatmapsButton.Active.Value,
@@ -332,8 +340,16 @@ namespace osu.Game.Screens.SelectV2
             }
         }
 
-        private void updateCriteria()
+        private void updateCriteria(bool clearScopedSet = true)
         {
+            if (clearScopedSet && ScopedBeatmapSet.Value != null)
+            {
+                ScopedBeatmapSet.Value = null;
+                // because `ScopedBeatmapSet` has a value change callback bound to it that calls `updateCriteria()` again,
+                // we can just do nothing other than clear it to avoid extra work and duplicated `CriteriaChanged` invocations
+                return;
+            }
+
             currentCriteria = CreateCriteria();
             CriteriaChanged?.Invoke(currentCriteria);
         }

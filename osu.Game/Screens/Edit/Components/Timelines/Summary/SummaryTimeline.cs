@@ -10,7 +10,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Threading;
-using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Screens.Edit;
 using osu.Game.Overlays;
@@ -227,8 +226,8 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
                 applied = true;
             }
 
-            // If the user returns to song select without restarting, the mod overlay may already be alive.
-            // It only reacts to SelectedMods bindable value changes, so force a value update to propagate the changed settings.
+            // 如果用户在不重启的情况下返回歌曲选择，Mod覆盖可能已经存在。
+            // 它只对 SelectedMods 绑定值的更改做出反应，因此强制值更新以传播更改的设置。
             if (applied && mods is Bindable<IReadOnlyList<Mod>> writableMods)
                 writableMods.Value = writableMods.Value.ToArray();
         }

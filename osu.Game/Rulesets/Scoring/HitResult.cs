@@ -26,6 +26,7 @@ namespace osu.Game.Rulesets.Scoring
         /// <summary>
         /// mania特殊专用，按键事件的未命中结果。
         /// 禁止用在Judgement覆写上，这不属于note返回的判定结果
+        /// TODO: 这是一个错误拼写，为了突出这是一个临时解决方案。未来应当通过更好的方式实现可切换的空判机制，并改为正确的Poor。
         /// </summary>
         [Description(@"Pool")]
         [EnumMember(Value = "pool")]

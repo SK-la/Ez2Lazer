@@ -95,7 +95,7 @@ namespace osu.Game.Overlays.SkinEditor
                                 },
                                 new SceneButton
                                 {
-                                    Text = "Skin.ini(Null)",
+                                    Text = "Mania Note Editor(Testing)",
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
                                     Action = () =>

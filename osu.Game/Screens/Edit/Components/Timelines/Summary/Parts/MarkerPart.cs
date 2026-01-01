@@ -41,7 +41,7 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary.Parts
             if (!base.ReceivePositionalInputAt(screenSpacePos))
                 return false;
 
-            // Only allow interaction in the upper half of the timeline.
+            // 改为只在上半部分响应交互，为了配合A-B Loop光标仅下半区的UI交互
             var localPos = ToLocalSpace(screenSpacePos);
             return localPos.Y < DrawHeight / 2;
         }

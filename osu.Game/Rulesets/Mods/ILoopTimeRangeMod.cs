@@ -4,13 +4,13 @@
 namespace osu.Game.Rulesets.Mods
 {
     /// <summary>
-    /// Exposes a mod time range that can be updated from editor timeline UI.
-    /// All times are in milliseconds.
+    /// 用于链接循环时间范围的Mod接口。
+    /// 单位是ms。
     /// </summary>
     public interface ILoopTimeRangeMod
     {
         /// <summary>
-        /// Updates the time range represented by this mod.
+        /// 更新循环时间范围。
         /// </summary>
         /// <param name="startTime">Start time in milliseconds.</param>
         /// <param name="endTime">End time in milliseconds.</param>
