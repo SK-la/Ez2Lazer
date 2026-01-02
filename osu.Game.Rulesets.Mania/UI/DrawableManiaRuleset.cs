@@ -86,10 +86,10 @@ namespace osu.Game.Rulesets.Mania.UI
         private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
-        private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
+        private Bindable<bool> globalHitPosition = new Bindable<bool>();
 
         //自定义判定系统
-        private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
+        private Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
 
@@ -144,7 +144,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 TargetTimeRange = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value);
             });
 
-            Config.BindWith(ManiaRulesetSetting.ScrollStyle, scrollingStyle);
+            scrollingStyle = Config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle);
             scrollingStyle.BindValueChanged(_ => updateTimeRange());
 
             TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
@@ -157,7 +157,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
             hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
-            ezSkinConfig.BindWith(EzSkinSetting.GlobalHitPosition, globalHitPosition);
+            globalHitPosition = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
         }
 
@@ -248,6 +248,8 @@ namespace osu.Game.Rulesets.Mania.UI
         private void updateTimeRange()
         {
             const float length_to_default_hit_position = 768 - LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION;
+
+            skinChanged();
             float lengthToHitPosition = 768 - hitPosition;
 
             // This scaling factor preserves the scroll speed as the scroll length varies from changes to the hit position.
@@ -262,7 +264,8 @@ namespace osu.Game.Rulesets.Mania.UI
                     break;
 
                 case EzManiaScrollingStyle.ScrollTimeForRealJudgement:
-                    scale = lengthToHitPosition / hitPosition;
+                    // 直接使用设置的速度作为时间范围，忽略 hit position 的影响
+                    scale = 1.0f;
                     break;
 
                 case EzManiaScrollingStyle.ScrollTimeStyleFixed:
