@@ -371,7 +371,6 @@ namespace osu.Game.Screens.SelectV2
             cachedScratchText = null;
             maniaKpcDisplay.Clear();
 
-            xxySrDisplay.Current.UnbindAll();
             xxySrDisplay.Current.Value = null;
 
             if (ruleset.Value.OnlineID == 3)
@@ -432,7 +431,6 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisBindable = null;
             cachedScratchText = null;
 
-            xxySrDisplay.Current.UnbindAll();
             xxySrDisplay.Current.Value = null;
 
             lastStarRatingStars = null;
@@ -475,7 +473,11 @@ namespace osu.Game.Screens.SelectV2
             {
                 // 重新可见时再触发一次绑定/计算。
                 if (maniaAnalysisCancellationSource == null && Item != null && ruleset.Value.OnlineID == 3)
+                {
+                    // 离屏期间取消分析后再次可见时，先清空旧值，避免短暂显示上一次谱面的结果。
+                    resetManiaAnalysisDisplay();
                     bindManiaAnalysis();
+                }
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.

@@ -3,9 +3,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Track;
@@ -37,7 +37,14 @@ namespace osu.Game.LAsEzExtensions.Analysis
     public partial class EzBeatmapManiaAnalysisCache : MemoryCachingComponent<EzBeatmapManiaAnalysisCache.ManiaAnalysisCacheLookup, ManiaBeatmapAnalysisResult?>
     {
         // 太多同时更新会导致卡顿；这里保持与 star cache 一样的策略：只用一条后台线程。
-        private readonly ThreadedTaskScheduler updateScheduler = new ThreadedTaskScheduler(1, nameof(EzBeatmapManiaAnalysisCache));
+        // 另外 warmup 需要“永远不阻塞可见项”，因此 warmup 使用独立的低优先级调度器。
+        private readonly ThreadedTaskScheduler highPriorityScheduler = new ThreadedTaskScheduler(1, nameof(EzBeatmapManiaAnalysisCache));
+        private readonly ThreadedTaskScheduler lowPriorityScheduler = new ThreadedTaskScheduler(1, $"{nameof(EzBeatmapManiaAnalysisCache)} (Warmup)");
+
+        private readonly ManualResetEventSlim highPriorityIdleEvent = new ManualResetEventSlim(true);
+        private int highPriorityWorkCount;
+
+        private static readonly AsyncLocal<int> lowPriorityScopeDepth = new AsyncLocal<int>();
 
         private readonly WeakList<BindableManiaBeatmapAnalysis> trackedBindables = new WeakList<BindableManiaBeatmapAnalysis>();
         private readonly List<CancellationTokenSource> linkedCancellationSources = new List<CancellationTokenSource>();
@@ -90,6 +97,25 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         protected override bool CacheNullValues => false;
 
+        /// <summary>
+        /// Marks the current async flow as low-priority (warmup). Any cache misses triggered within the returned scope
+        /// will be executed on the low-priority scheduler.
+        /// </summary>
+        public IDisposable BeginLowPriorityScope()
+        {
+            lowPriorityScopeDepth.Value++;
+            return new InvokeOnDisposal(() => lowPriorityScopeDepth.Value--);
+        }
+
+        /// <summary>
+        /// Blocks until there are no pending/running high-priority (visible) computations.
+        /// Intended for warmup to avoid competing with visible content.
+        /// </summary>
+        public void WaitForHighPriorityIdle(CancellationToken cancellationToken = default)
+        {
+            highPriorityIdleEvent.Wait(cancellationToken);
+        }
+
         public IBindable<ManiaBeatmapAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
@@ -127,13 +153,43 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         protected override Task<ManiaBeatmapAnalysisResult?> ComputeValueAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token = default)
         {
+            bool isLowPriority = lowPriorityScopeDepth.Value > 0;
+            var scheduler = isLowPriority ? lowPriorityScheduler : highPriorityScheduler;
+
             return Task.Factory.StartNew(() =>
             {
                 if (CheckExists(lookup, out var existing))
                     return existing;
 
-                return computeAnalysis(lookup, token);
-            }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, updateScheduler);
+                // Warmup: never compete with visible/high-priority computations.
+                if (isLowPriority)
+                    highPriorityIdleEvent.Wait(token);
+
+                if (!isLowPriority)
+                    enterHighPriorityWork();
+
+                try
+                {
+                    return computeAnalysis(lookup, token);
+                }
+                finally
+                {
+                    if (!isLowPriority)
+                        exitHighPriorityWork();
+                }
+            }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, scheduler);
+        }
+
+        private void enterHighPriorityWork()
+        {
+            if (Interlocked.Increment(ref highPriorityWorkCount) == 1)
+                highPriorityIdleEvent.Reset();
+        }
+
+        private void exitHighPriorityWork()
+        {
+            if (Interlocked.Decrement(ref highPriorityWorkCount) == 0)
+                highPriorityIdleEvent.Set();
         }
 
         private ManiaBeatmapAnalysisResult? computeAnalysis(in ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken)
@@ -228,6 +284,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 foreach (var b in trackedBindables)
                 {
+                    // 只重算仍“活跃”的 bindable：离屏/回收的面板会取消 token。
+                    // 这样可以确保计算预算优先服务当前可见内容。
+                    if (b.CancellationToken.IsCancellationRequested)
+                        continue;
+
                     var localBeatmapInfo = b.BeatmapInfo as BeatmapInfo;
                     if (localBeatmapInfo == null)
                         continue;
@@ -261,6 +322,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                     CancellationToken cancellationToken = default,
                                     int computationDelay = 0)
         {
+            // bindable 已失效（离屏/回收）时，不再触发计算/写回。
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
             // 关键点：计算不应被单个 UI 项（DrawablePool / 离屏）取消，否则快速滚动会导致结果永远算不出来/无法填充缓存。
             // 这里将“计算”与“写回 bindable”解耦：
             // - 计算一律使用 CancellationToken.None，以便后台完成并写入 MemoryCachingComponent 的缓存。
@@ -287,7 +352,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
             modSettingChangeTracker?.Dispose();
 
             cancelTrackedBindableUpdate();
-            updateScheduler.Dispose();
+            highPriorityScheduler.Dispose();
+            lowPriorityScheduler.Dispose();
+            highPriorityIdleEvent.Dispose();
         }
 
         public readonly struct ManiaAnalysisCacheLookup : IEquatable<ManiaAnalysisCacheLookup>
@@ -304,15 +371,17 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
 
             public bool Equals(ManiaAnalysisCacheLookup other)
-                => BeatmapInfo.Equals(other.BeatmapInfo)
-                   && Ruleset.Equals(other.Ruleset)
-                   && OrderedMods.SequenceEqual(other.OrderedMods);
+                     => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
+                         && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
+                         && Ruleset.Equals(other.Ruleset)
+                         && OrderedMods.SequenceEqual(other.OrderedMods);
 
             public override int GetHashCode()
             {
                 var hashCode = new HashCode();
 
                 hashCode.Add(BeatmapInfo.ID);
+                hashCode.Add(BeatmapInfo.Hash);
                 hashCode.Add(Ruleset.ShortName);
 
                 foreach (var mod in OrderedMods)

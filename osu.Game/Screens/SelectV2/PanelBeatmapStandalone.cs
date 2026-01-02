@@ -374,7 +374,6 @@ namespace osu.Game.Screens.SelectV2
             cachedScratchText = null;
             maniaKpcDisplay.Clear();
 
-            xxySrDisplay.Current.UnbindAll();
             xxySrDisplay.Current.Value = null;
 
             if (ruleset.Value.OnlineID == 3)
@@ -437,7 +436,6 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisBindable = null;
             cachedScratchText = null;
 
-            xxySrDisplay.Current.UnbindAll();
             xxySrDisplay.Current.Value = null;
 
             lastStarRatingStars = null;

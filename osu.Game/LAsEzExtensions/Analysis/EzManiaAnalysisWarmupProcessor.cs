@@ -132,9 +132,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 try
                 {
                     // 仅预热 no-mod 的缓存项：与官方 star 预计算一致（基础值持久化/复用），modded 部分仍按需计算。
-                    maniaAnalysisCache.GetAnalysisAsync(beatmap, beatmap.Ruleset, mods: null, CancellationToken.None)
-                                     .GetAwaiter()
-                                     .GetResult();
+                    // 关键：warmup 绝不阻塞可见项。
+                    // - 等待当前所有高优先级（可见项）计算完成后再启动 warmup。
+                    // - 并且将本次计算派发到低优先级调度器。
+                    maniaAnalysisCache.WaitForHighPriorityIdle();
+                    using (maniaAnalysisCache.BeginLowPriorityScope())
+                    {
+                        maniaAnalysisCache.GetAnalysisAsync(beatmap, beatmap.Ruleset, mods: null, CancellationToken.None)
+                                         .GetAwaiter()
+                                         .GetResult();
+                    }
 
                     ++processedCount;
                 }

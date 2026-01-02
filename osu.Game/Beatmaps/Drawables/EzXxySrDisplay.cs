@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
+using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -119,7 +120,21 @@ namespace osu.Game.Beatmaps.Drawables
                 return;
             }
 
-            srText.Text = sr.Value < 0 ? "-" : sr.Value.FormatStarRating();
+            if (sr.Value < 0)
+            {
+                srText.Text = "-";
+            }
+            else
+            {
+#if DEBUG
+                // Debug: show 4 decimal places for easier detection of value reuse.
+                // Keep the same "never round up" behaviour as FormatUtils.FormatStarRating().
+                srText.Text = sr.Value.FloorToDecimalDigits(4).ToLocalisableString("0.0000");
+#else
+                // Release: match official star formatting (2 decimal places).
+                srText.Text = sr.Value.FormatStarRating();
+#endif
+            }
 
             background.Colour = colours.ForStarDifficulty(sr.Value);
 
