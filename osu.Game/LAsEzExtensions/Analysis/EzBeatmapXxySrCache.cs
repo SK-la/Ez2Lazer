@@ -33,6 +33,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
     /// - 使用单线程 <see cref="ThreadedTaskScheduler"/> 统一调度，避免拖动滚动条时同时触发大量重算。
     /// - 跟随 ruleset/mods 及 mod 设置变化自动更新已追踪的 bindable。
     /// </summary>
+    [Obsolete("已由 EzBeatmapManiaAnalysisCache 接管（统一缓存 KPS/KPC/Scratch/xxy_SR）。该类型仅保留为备份/回归对比用途，请不要在运行时再注入或使用。")]
     public partial class EzBeatmapXxySrCache : MemoryCachingComponent<EzBeatmapXxySrCache.XxySrCacheLookup, double?>
     {
         private const string logger_name = "xxy_sr";
