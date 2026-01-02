@@ -5,6 +5,7 @@ using System;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
@@ -183,7 +184,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     double badRange = 31250.0 / bpm;
 
                     // 注意：O2Jam的判定窗口是基于BPM变化的。Bad约等于om的Miss。
+                    // 此处的作用只是为了方便显示和计算，并不会影响实际判定。
                     SetSpecialDifficultyRange(new[] { coolRange, coolRange, goodRange, goodRange, badRange, badRange });
+
+                    // 这里是真正影响判定的BPM设定
+                    O2HitModeExtension.NowBeatmapBPM = bpm > 0 ? bpm : O2HitModeExtension.DEFAULT_BPM;
+                    O2HitModeExtension.Pill = 0;
+                    O2HitModeExtension.CoolCombo = 0;
                     break;
 
                 case EzMUGHitMode.EZ2AC:

@@ -20,9 +20,9 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         public static bool PillActivated; // = ManiaModO2Judgement.PillMode.Value;
         public static int Pill;
         public static int CoolCombo;
-        public static double CoolRange => 7500.0 / NowBeatmapBPM;
-        public static double GoodRange => 22500.0 / NowBeatmapBPM;
-        public static double BadRange => 31250.0 / NowBeatmapBPM;
+        public static double CoolRange => COOL / NowBeatmapBPM;
+        public static double GoodRange => GOOD / NowBeatmapBPM;
+        public static double BadRange => BAD / NowBeatmapBPM;
         public static double NowBeatmapBPM = 200;
     }
 
