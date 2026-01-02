@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.LAsEzExtensions.Analysis.Persistence;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Performance;
@@ -38,6 +39,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         [Resolved]
         private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+
+        [Resolved]
+        private EzManiaAnalysisPersistentStore persistentStore { get; set; } = null!;
 
         [Resolved]
         private INotificationOverlay? notificationOverlay { get; set; }
@@ -73,32 +77,47 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private void populateManiaAnalysis()
         {
-            HashSet<Guid> beatmapIds = new HashSet<Guid>();
+            if (!EzManiaAnalysisPersistentStore.Enabled)
+            {
+                Logger.Log("Mania analysis persistence is disabled; skipping warmup.");
+                return;
+            }
+
+            List<(Guid id, string hash)> beatmaps = new List<(Guid id, string hash)>();
 
             Logger.Log("Querying for mania beatmaps to warm up analysis cache...");
 
             realmAccess.Run(r =>
             {
                 foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && !b.Hidden && b.Ruleset.OnlineID == 3))
-                    beatmapIds.Add(b.ID);
+                    beatmaps.Add((b.ID, b.Hash));
             });
 
-            if (beatmapIds.Count == 0)
+            if (beatmaps.Count == 0)
                 return;
 
-            Logger.Log($"Found {beatmapIds.Count} beatmaps to precompute mania analysis for.");
+            // 增量：只重算缺失/过期（hash/version 不匹配）的条目。
+            var needingRecompute = persistentStore.GetBeatmapsNeedingRecompute(beatmaps);
 
-            var notification = showProgressNotification(beatmapIds.Count, "Precomputing mania analysis for beatmaps", "beatmaps' mania analysis has been precomputed");
+            if (needingRecompute.Count == 0)
+            {
+                Logger.Log("No beatmaps require mania analysis warmup.");
+                return;
+            }
+
+            Logger.Log($"Found {needingRecompute.Count} beatmaps which require mania analysis warmup.");
+
+            var notification = showProgressNotification(needingRecompute.Count, "Precomputing mania analysis for beatmaps", "beatmaps' mania analysis has been precomputed");
 
             int processedCount = 0;
             int failedCount = 0;
 
-            foreach (Guid id in beatmapIds)
+            foreach (Guid id in needingRecompute)
             {
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 
-                updateNotificationProgress(notification, processedCount, beatmapIds.Count);
+                updateNotificationProgress(notification, processedCount, needingRecompute.Count);
 
                 sleepIfRequired();
 
@@ -129,7 +148,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
             }
 
-            completeNotification(notification, processedCount, beatmapIds.Count, failedCount);
+            completeNotification(notification, processedCount, needingRecompute.Count, failedCount);
         }
 
         private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)

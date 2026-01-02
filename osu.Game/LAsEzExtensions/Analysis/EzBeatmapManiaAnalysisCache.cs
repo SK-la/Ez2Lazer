@@ -18,6 +18,7 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.LAsEzExtensions.Analysis.Persistence;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -46,6 +47,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
+
+        [Resolved]
+        private EzManiaAnalysisPersistentStore persistentStore { get; set; } = null!;
 
         [Resolved]
         private Bindable<RulesetInfo> currentRuleset { get; set; } = null!;
@@ -139,6 +143,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 if (lookup.Ruleset.OnlineID != 3)
                     return null;
 
+                // 持久化仅对 no-mod 生效：
+                // - 避免 mod 组合/设置导致存储爆炸。
+                // - 与官方 star 的“基础值可预处理、modded 按需计算”体验对齐。
+                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
+                    return persisted;
+
                 var rulesetInstance = lookup.Ruleset.CreateInstance();
                 if (rulesetInstance is not ILegacyRuleset legacyRuleset)
                     return null;
@@ -181,13 +191,18 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 string scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
 
-                return new ManiaBeatmapAnalysisResult(
+                var analysis = new ManiaBeatmapAnalysisResult(
                     averageKps,
                     maxKps,
                     kpsList,
                     columnCounts,
                     scratchText,
                     xxySr);
+
+                if (lookup.OrderedMods.Length == 0)
+                    persistentStore.Store(lookup.BeatmapInfo, analysis);
+
+                return analysis;
             }
             catch (OperationCanceledException)
             {

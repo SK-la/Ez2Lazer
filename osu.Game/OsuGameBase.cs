@@ -47,6 +47,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Analysis.Persistence;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -341,6 +342,7 @@ namespace osu.Game
             dependencies.Cache(BeatmapManager = new BeatmapManager(Storage, realm, API, Audio, Resources, Host, defaultBeatmap, difficultyCache, performOnlineLookups: true));
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
+            dependencies.Cache(new EzManiaAnalysisPersistentStore(Storage));
             dependencies.Cache(maniaAnalysisCache = new osu.Game.LAsEzExtensions.Analysis.EzBeatmapManiaAnalysisCache());
 
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
