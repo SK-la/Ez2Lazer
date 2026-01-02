@@ -68,8 +68,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 yield return ($"Speed x{SpeedChange.Value:N2}", AdjustPitch.Value ? "Pitch Adjusted" : "Pitch Unchanged");
                 yield return ($"{LoopCount.Value}", "Loop Count");
                 yield return ("Break", $"{BreakTime:N1}s");
-                yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : CalculateTime((int)CutTimeStart.Value))}");
-                yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : CalculateTime((int)CutTimeEnd.Value))}");
+                yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : (Millisecond.Value ? $"{CutTimeStart.Value} ms" : CalculateTime((int)CutTimeStart.Value)))}");
+                yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : (Millisecond.Value ? $"{CutTimeEnd.Value} ms" : CalculateTime((int)CutTimeEnd.Value)))}");
+                yield return ("Infinite Loop", InfiniteLoop.Value ? "Enabled" : "Disabled");
             }
         }
 
@@ -82,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         };
 
         [SettingSource("Speed Change", "The actual decrease to apply. Don't add other rate-mod.", SettingControlType = typeof(MultiplierSettingsSlider))]
-        public BindableNumber<double> SpeedChange { get; } = new BindableDouble(0.75)
+        public BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.5,
             MaxValue = 2.0,
@@ -131,6 +132,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
 
             UseGlobalAbRange.BindValueChanged(_ => applyRangeFromStore(), true);
+
+            // 当全局A/B范围改变时，更新设置
+            LoopTimeRangeStore.START_TIME_MS.BindValueChanged(_ => applyRangeFromStoreIfGlobal());
+            LoopTimeRangeStore.END_TIME_MS.BindValueChanged(_ => applyRangeFromStoreIfGlobal());
         }
 
         public void ApplyToTrack(IAdjustableAudioComponent track) => rateAdjustHelper.ApplyToTrack(track);
@@ -171,6 +176,12 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             setResolvedCut(null, null);
         }
 
+        private void applyRangeFromStoreIfGlobal()
+        {
+            if (UseGlobalAbRange.Value)
+                applyRangeFromStore();
+        }
+
         [SettingSource("Break Time", "If you need break(second).")]
         public BindableDouble BreakTime { get; set; } = new BindableDouble(0)
         {
@@ -184,6 +195,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         [SettingSource("Mirror", "Mirror next part.")]
         public BindableBool Mirror { get; set; } = new BindableBool(true);
+
+        [SettingSource("Infinite Loop", "Enable infinite loop playback.")]
+        public BindableBool InfiniteLoop { get; set; } = new BindableBool(false);
 
         [SettingSource("Mirror Time", "Every next time part will be mirrored.")]
         public BindableInt MirrorTime { get; set; } = new BindableInt(1)
@@ -270,7 +284,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             cutTimeStart ??= minTimeBeatmap?.StartTime;
             cutTimeEnd ??= maxTimeBeatmap?.GetEndTime();
 
-            var selectedPart = maniaBeatmap.HitObjects.Where(h => h.StartTime >= cutTimeStart && h.GetEndTime() <= cutTimeEnd);
+            var selectedPart = maniaBeatmap.HitObjects.Where(h => h.StartTime > cutTimeStart && h.GetEndTime() < cutTimeEnd).ToList();
 
             if (length is null || length <= 0)
             {
@@ -344,6 +358,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 return;
 
             pendingWorkingBeatmap = player.Beatmap.Value;
+
+            // 计算总循环长度
+            double totalLength = InfiniteLoop.Value ? double.MaxValue : LoopCount.Value * (ResolvedSegmentLength + BreakTime.Value * 1000);
+            pendingWorkingBeatmap.Track.Length = totalLength;
+
             duplicateTrack = new DuplicateVirtualTrack
             {
                 OverrideProvider = this,
