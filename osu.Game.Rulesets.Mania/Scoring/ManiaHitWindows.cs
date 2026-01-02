@@ -175,14 +175,15 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             switch (hitMode)
             {
-                // TODO: 判定值应该调整，太松了
                 case EzMUGHitMode.O2Jam:
-                    if (bpm == 0) bpm = 200;
+                    if (bpm <= 0) bpm = 200;
+
                     double coolRange = 7500.0 / bpm;
                     double goodRange = 22500.0 / bpm;
                     double badRange = 31250.0 / bpm;
 
-                    SetSpecialDifficultyRange(new[] { coolRange, coolRange, goodRange, goodRange, goodRange, badRange });
+                    // 注意：O2Jam的判定窗口是基于BPM变化的。Bad约等于om的Miss。
+                    SetSpecialDifficultyRange(new[] { coolRange, coolRange, goodRange, goodRange, badRange, badRange });
                     break;
 
                 case EzMUGHitMode.EZ2AC:
