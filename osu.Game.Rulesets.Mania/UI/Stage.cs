@@ -78,12 +78,16 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private Player? player { get; set; }
 
+        [Resolved(canBeNull: true)]
+        private IBindable<WorkingBeatmap>? beatmap { get; set; }
+
         private Bindable<float> uiScale = null!;
         private Bindable<double> osuConfigDim = null!;
+        private Bindable<bool> editorShowStoryboard = null!;
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = null!;
         private Bindable<bool> showBlurStoryboard = new Bindable<bool>();
-        private Bindable<WorkingBeatmap> workingBeatmap { get; set; } = null!;
+        private IBindable<WorkingBeatmap> workingBeatmap { get; set; } = new Bindable<WorkingBeatmap>();
 
         private readonly Box dimBox;
         private readonly Container backgroundContainer;
@@ -224,6 +228,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             uiScale = osuConfig.GetBindable<float>(OsuSetting.UIScale);
             osuConfigDim = osuConfig.GetBindable<double>(OsuSetting.DimLevel);
+            editorShowStoryboard = osuConfig.GetBindable<bool>(OsuSetting.EditorShowStoryboard);
+            editorShowStoryboard.BindValueChanged(_ => loadBackgroundAsync());
 
             columnDim = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnDim);
             columnDim.BindValueChanged(v =>
@@ -231,10 +237,37 @@ namespace osu.Game.Rulesets.Mania.UI
                 dimBox.Alpha = (float)Math.Max(v.NewValue, osuConfigDim.Value / 2);
             }, true);
 
+            bindWorkingBeatmapSource();
             loadBackgroundAsync();
             columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
             columnBlur.BindValueChanged(v => maniaMaskedDimmable.BlurAmount.Value = (float)v.NewValue * 50, true);
         }
+
+        private void bindWorkingBeatmapSource()
+        {
+            // Prefer the beatmap provided by Player (gameplay). In editor, Player will be missing,
+            // but a bindable beatmap is still available via dependency injection.
+            workingBeatmap.ValueChanged -= onWorkingBeatmapChanged;
+            workingBeatmap.UnbindAll();
+
+            // Rebind to an appropriate upstream source.
+            // GetBoundCopy() is used because we may only have access to IBindable<T> (editor), not Bindable<T>.
+            IBindable<WorkingBeatmap>? newWorkingBeatmap = null;
+
+            if (player?.Beatmap.Value != null)
+                newWorkingBeatmap = player.Beatmap.GetBoundCopy();
+            else if (beatmap != null)
+                newWorkingBeatmap = beatmap.GetBoundCopy();
+
+            workingBeatmap = newWorkingBeatmap ?? new Bindable<WorkingBeatmap>();
+
+            // Editor may swap DummyWorkingBeatmap -> real beatmap asynchronously.
+            // Refresh the background as soon as the bindable updates.
+            workingBeatmap.ValueChanged += onWorkingBeatmapChanged;
+        }
+
+        private void onWorkingBeatmapChanged(ValueChangedEvent<WorkingBeatmap> _)
+            => loadBackgroundAsync();
 
         private void onSkinChanged()
         {
@@ -252,6 +285,9 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             // must happen before children are disposed in base call to prevent illegal accesses to the judgement pool.
             NewResult -= OnNewResult;
+
+            workingBeatmap.ValueChanged -= onWorkingBeatmapChanged;
+            workingBeatmap.UnbindAll();
 
             base.Dispose(isDisposing);
 
@@ -272,20 +308,15 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void loadBackgroundAsync()
         {
-            if (player != null)
+            if (player?.DimmableStoryboard != null)
             {
-                workingBeatmap = player.Beatmap.Value != null ? player.Beatmap.GetBoundCopy() : null!;
+                showBlurStoryboard.Value = player.DimmableStoryboard.ContentDisplayed &&
+                                           !player.DimmableStoryboard.HasStoryboardEnded.Value;
 
-                if (player.DimmableStoryboard != null)
+                if (showBlurStoryboard.Value)
                 {
-                    showBlurStoryboard.Value = player.DimmableStoryboard.ContentDisplayed &&
-                                               !player.DimmableStoryboard.HasStoryboardEnded.Value;
-
-                    if (showBlurStoryboard.Value)
-                    {
-                        updateDimmableAlphaOpen(false);
-                        return;
-                    }
+                    updateDimmableAlphaOpen(false);
+                    return;
                 }
             }
 
@@ -296,9 +327,32 @@ namespace osu.Game.Rulesets.Mania.UI
                 maskedBackground.FadeInFromZero(500, Easing.OutQuint);
                 maniaMaskedDimmable.Background = maskedBackground;
 
-                maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(player?.StoryboardReplacesBackground);
-                maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
-                maniaMaskedDimmable.IsBreakTime.BindTo(player?.IsBreakTime);
+                // Gameplay: bind to player state. Editor: use editor settings + beatmap storyboard metadata.
+                if (player != null)
+                {
+                    maniaMaskedDimmable.StoryboardReplacesBackground.BindTo(player.StoryboardReplacesBackground);
+                    maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
+                    maniaMaskedDimmable.IsBreakTime.BindTo(player.IsBreakTime);
+                }
+                else
+                {
+                    maniaMaskedDimmable.StoryboardReplacesBackground.UnbindAll();
+                    maniaMaskedDimmable.IgnoreUserSettings.UnbindAll();
+                    maniaMaskedDimmable.IsBreakTime.UnbindAll();
+
+                    // We don't have gameplay break tracking in editor, so assume not in break.
+                    ((Bindable<bool>)maniaMaskedDimmable.IsBreakTime).Value = false;
+
+                    // Keep behaviour consistent with gameplay mania background screen:
+                    // ignore user storyboard setting and drive replacement ourselves.
+                    maniaMaskedDimmable.IgnoreUserSettings.Value = true;
+
+                    // Match editor behaviour: only consider storyboard replacement when editor storyboard display is enabled.
+                    // (EditorBackgroundScreen also uses EditorShowStoryboard).
+                    maniaMaskedDimmable.StoryboardReplacesBackground.Value = editorShowStoryboard.Value
+                                                                             && workingBeatmap.Value.Storyboard.ReplacesBackground
+                                                                             && workingBeatmap.Value.Storyboard.HasDrawable;
+                }
             }
             else
             {
