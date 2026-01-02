@@ -15,7 +15,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         [Description("ms值 相对默认判定线")]
         ScrollTimeForDefaultJudgement,
 
-        [Description("ms值 相对屏幕底部")]
+        [Description("ms值 相对实际判定线")]
         ScrollTimeForRealJudgement,
 
         [Description("ms值 相对屏幕底部")]
