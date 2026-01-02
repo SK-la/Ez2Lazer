@@ -57,6 +57,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 foreach (var column in stage.Columns)
                 {
                     column.RegisterPool<O2Note, O2DrawableNote>(10, 50);
+                    column.RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
                     column.RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
                 }

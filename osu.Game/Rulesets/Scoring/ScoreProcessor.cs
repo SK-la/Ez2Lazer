@@ -245,10 +245,15 @@ namespace osu.Game.Rulesets.Scoring
 
             ScoreResultCounts[result.Type] = ScoreResultCounts.GetValueOrDefault(result.Type) + 1;
 
-            if (result.Type.IncreasesCombo())
-                Combo.Value++;
-            else if (result.Type.BreaksCombo())
-                Combo.Value = 0;
+            if (result.Type.AffectsCombo())
+            {
+                bool isComboHit = result.IsComboHit ?? result.Type.IsHit();
+
+                if (isComboHit)
+                    Combo.Value++;
+                else
+                    Combo.Value = 0;
+            }
 
             HighestCombo.Value = Math.Max(HighestCombo.Value, Combo.Value);
 

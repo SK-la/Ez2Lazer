@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
@@ -100,24 +101,10 @@ namespace osu.Game.Skinning.Components
 
             AlwaysPresent = true;
 
-            Schedule(() =>
-            {
-                fullComboSprite = new Container
-                {
-                    Child = new Sprite
-                    {
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Scale = new Vector2(1.5f),
-                        Alpha = 0, // 初始隐藏
-                        Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2.png")
-                    }
-                };
+            // Schedule(() =>
+            // {
 
-                AddInternal(fullComboSprite);
-
-                fullComboSound = sampleStore.Get("EzResources/AllCombo/full_combo_sound");
-            });
+            // });
         }
 
         // private void showPreview() => previewOverlay.Show();
@@ -195,7 +182,10 @@ namespace osu.Game.Skinning.Components
             if (!judgement.Type.IsScorable() || judgement.Type.IsBonus())
                 return;
 
-            if (judgement.Type == HitResult.Meh) return;
+            if (judgement.Type == HitResult.Meh &&
+                (judgement.HitObject.HitWindows?.WindowFor(HitResult.Meh)
+                 == judgement.HitObject.HitWindows?.WindowFor(HitResult.Miss)))
+                return;
 
             // 清除内部元素前先结束所有变换
             StaticSprite?.FinishTransforms();
@@ -335,9 +325,23 @@ namespace osu.Game.Skinning.Components
             var missCounter = judgementCountController.Counters
                                                       .FirstOrDefault(counter => counter.Types.Contains(HitResult.Miss));
 
-            if (missCounter.ResultCount.Value == 0 && fullComboSprite != null)
+            if (missCounter.ResultCount.Value == 0)
             {
-                fullComboSprite.Alpha = 1;
+                fullComboSprite = new Container
+                {
+                    Child = new Sprite
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Scale = new Vector2(1.5f),
+                        Alpha = 1,
+                        Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2.png")
+                    }
+                };
+
+                AddInternal(fullComboSprite);
+
+                fullComboSound = sampleStore.Get("EzResources/AllCombo/full_combo_sound");
                 fullComboSprite.FadeIn(50).Then().FadeOut(5000);
 
                 fullComboSound?.Play();

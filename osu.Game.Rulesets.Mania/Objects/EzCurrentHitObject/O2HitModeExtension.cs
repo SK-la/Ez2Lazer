@@ -40,11 +40,14 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         /// <summary>
         /// 统一的 Pill 判定逻辑：将原本分散在各 Drawable 的重复实现合并到这里。
         /// 返回值：true 表示继续执行后续判定逻辑；false 表示应中断后续判定（保留以便未来扩展）。
-        /// out 参数 `applyComboBreak`：当命中落入 Bad 范围时为 true，调用者应先应用一个 <see cref="HitResult.ComboBreak"/>（不影响后续基础判定）。
+        /// out 参数：
+        /// - <paramref name="applyComboBreak"/>：当命中落入 Bad 范围且没有可用 Pill 时为 true。
+        /// - <paramref name="upgradeToPerfect"/>：当命中落入 Bad 范围且消耗了 Pill 时为 true（调用者应将该次判定提升为 <see cref="HitResult.Perfect"/>）。
         /// </summary>
-        public static bool PillCheck(double timeOffset, out bool applyComboBreak)
+        public static bool PillCheck(double timeOffset, out bool applyComboBreak, out bool upgradeToPerfect)
         {
             applyComboBreak = false;
+            upgradeToPerfect = false;
 
             if (!PillActivated)
                 return true;
@@ -70,12 +73,16 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             else if (offset > GoodRange && offset <= BadRange)
             {
                 CoolCombo = 0;
-                // 在 Bad 范围时应先应用一次 ComboBreak（由调用者负责实际应用），然后继续基础判定流程。
-                applyComboBreak = true;
-
                 if (PillCount.Value > 0)
                 {
+                    // 有 Pill 时：消耗 1 个，并将该次判定提升为 Perfect（不应断连）。
                     PillCount.Value--;
+                    upgradeToPerfect = true;
+                }
+                else
+                {
+                    // 无 Pill 时：该次判定视作断连（实际表现由调用者决定）。
+                    applyComboBreak = true;
                 }
             }
 
@@ -87,24 +94,42 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            bool upgradeToPerfect = false;
+
             if (userTriggered)
             {
-                bool flowControl = PillCheck(timeOffset);
-                if (!flowControl) return;
+                bool applyComboBreak;
+                bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak, out upgradeToPerfect);
+                if (!cont) return;
             }
 
-            base.CheckForResult(userTriggered, timeOffset);
-        }
+            // Replicate base implementation to allow attaching combo semantics overrides.
+            if (!userTriggered)
+            {
+                if (!HitObject.HitWindows.CanBeHit(timeOffset))
+                    ApplyMinResult();
 
-        public bool PillCheck(double timeOffset)
-        {
-            bool applyComboBreak;
-            bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak);
+                return;
+            }
 
-            if (applyComboBreak)
-                ApplyResult(GetCappedResult(HitResult.ComboBreak));
+            var result = HitObject.HitWindows.ResultFor(timeOffset);
 
-            return cont;
+            if (result == HitResult.None)
+                return;
+
+            result = GetCappedResult(result);
+
+            if (upgradeToPerfect)
+                result = HitResult.Perfect;
+
+            ApplyResult(static (r, state) =>
+            {
+                r.Type = state;
+
+                // In O2Jam hit mode, Meh should break combo.
+                if (state == HitResult.Meh)
+                    r.IsComboHit = false;
+            }, result);
         }
     }
 
@@ -112,24 +137,42 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            bool upgradeToPerfect = false;
+
             if (userTriggered)
             {
-                bool flowControl = PillCheck(timeOffset);
-                if (!flowControl) return;
+                bool applyComboBreak;
+                bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak, out upgradeToPerfect);
+                if (!cont) return;
             }
 
-            base.CheckForResult(userTriggered, timeOffset);
-        }
+            // Replicate base implementation to allow attaching combo semantics overrides.
+            if (!userTriggered)
+            {
+                if (!HitObject.HitWindows.CanBeHit(timeOffset))
+                    ApplyMinResult();
 
-        public bool PillCheck(double timeOffset)
-        {
-            bool applyComboBreak;
-            bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak);
+                return;
+            }
 
-            if (applyComboBreak)
-                ApplyResult(GetCappedResult(HitResult.ComboBreak));
+            var result = HitObject.HitWindows.ResultFor(timeOffset);
 
-            return cont;
+            if (result == HitResult.None)
+                return;
+
+            result = GetCappedResult(result);
+
+            if (upgradeToPerfect)
+                result = HitResult.Perfect;
+
+            ApplyResult(static (r, state) =>
+            {
+                r.Type = state;
+
+                // In O2Jam hit mode, Meh should break combo.
+                if (state == HitResult.Meh)
+                    r.IsComboHit = false;
+            }, result);
         }
     }
 
@@ -137,24 +180,79 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            bool upgradeToPerfect = false;
+
             if (userTriggered)
             {
-                bool flowControl = PillCheck(timeOffset);
-                if (!flowControl) return;
+                bool applyComboBreak;
+                bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak, out upgradeToPerfect);
+                if (!cont) return;
             }
 
-            base.CheckForResult(userTriggered, timeOffset * TailNote.RELEASE_WINDOW_LENIENCE);
+            // Behaviour parity with previous implementation:
+            // Previously we forwarded `timeOffset * RELEASE_WINDOW_LENIENCE` to base, which then divided by RELEASE_WINDOW_LENIENCE,
+            // resulting in `timeOffset` being used for hit windows.
+            double adjustedOffset = timeOffset;
+
+            if (!userTriggered)
+            {
+                if (!HitObject.HitWindows.CanBeHit(adjustedOffset))
+                    ApplyMinResult();
+
+                return;
+            }
+
+            var result = HitObject.HitWindows.ResultFor(adjustedOffset);
+
+            if (result == HitResult.None)
+                return;
+
+            result = GetCappedResult(result);
+
+            if (upgradeToPerfect)
+                result = HitResult.Perfect;
+
+            ApplyResult(static (r, state) =>
+            {
+                r.Type = state;
+
+                // In O2Jam hit mode, Meh should break combo.
+                if (state == HitResult.Meh)
+                    r.IsComboHit = false;
+            }, result);
         }
+    }
 
-        public bool PillCheck(double timeOffset)
+    public partial class O2DrawableHoldNote : DrawableHoldNote
+    {
+        protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            bool applyComboBreak;
-            bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak);
+            if (Tail.AllJudged)
+            {
+                if (Tail.IsHit)
+                {
+                    bool breakComboFromTailMeh = Tail.Result.Type == HitResult.Meh;
 
-            if (applyComboBreak)
-                ApplyResult(GetCappedResult(HitResult.ComboBreak));
+                    ApplyResult(static (r, breakCombo) =>
+                    {
+                        r.Type = r.Judgement.MaxResult;
 
-            return cont;
+                        // In O2Jam hit mode, a Meh on the tail should terminally break combo.
+                        // Prevent the parent hold note result from immediately re-increasing combo afterwards.
+                        if (breakCombo)
+                            r.IsComboHit = false;
+                    }, breakComboFromTailMeh);
+                }
+                else
+                    MissForcefully();
+
+                // Make sure that the hold note is fully judged by giving the body a judgement.
+                if (!Body.AllJudged)
+                    Body.TriggerResult(Tail.IsHit);
+
+                // Important that this is always called when a result is applied.
+                Result.ReportHoldState(Time.Current, false);
+            }
         }
     }
 

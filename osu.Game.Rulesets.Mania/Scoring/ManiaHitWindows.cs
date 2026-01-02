@@ -191,6 +191,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     O2HitModeExtension.NowBeatmapBPM = bpm > 0 ? bpm : O2HitModeExtension.DEFAULT_BPM;
                     O2HitModeExtension.PillCount.Value = 0;
                     O2HitModeExtension.CoolCombo = 0;
+                    O2HitModeExtension.PillActivated = true;
                     break;
 
                 case EzMUGHitMode.EZ2AC:

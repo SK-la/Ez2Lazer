@@ -52,7 +52,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         };
 
         [SettingSource("Box Element Alpha", "The alpha value of background")]
-        public BindableNumber<float> BoxElementAlpha { get; } = new BindableNumber<float>(0f)
+        public BindableNumber<float> BoxElementAlpha { get; } = new BindableNumber<float>(0.7f)
         {
             MinValue = 0,
             MaxValue = 1,
@@ -145,7 +145,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             {
                 currentPillCount = value.NewValue;
                 rebuildPills();
-            });
+            }, true);
         }
 
         private void updateLayout()
@@ -185,9 +185,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             base.LoadComplete();
 
             PillCount.BindTo(O2HitModeExtension.PillCount);
-            PillCount = O2HitModeExtension.PillCount;
             AccentColour.BindValueChanged(_ => Colour = AccentColour.Value, true);
-            rebuildPills();
         }
 
         protected override void Update()
