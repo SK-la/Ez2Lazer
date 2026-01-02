@@ -65,7 +65,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             var stopwatch = Stopwatch.StartNew();
 
             ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
-            int keyCount = (int)maniaBeatmap.BeatmapInfo.Difficulty.CircleSize;
+            // Prefer TotalColumns (reflects keymods / conversion output) over CS.
+            int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.BeatmapInfo.Difficulty.CircleSize));
 
             double sr = XxySRCalculateCore(maniaBeatmap, keyCount);
             stopwatch.Stop();
@@ -143,7 +144,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             int estimatedNotes = maniaBeatmap.HitObjects.Count;
             if (estimatedNotes == 0) return 0.0;
-            if (estimatedNotes < 10) return 0.1;
 
             var notes = new List<NoteStruct>(estimatedNotes);
             var notesByColumn = new List<NoteStruct>[keyCount];
@@ -153,7 +153,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             foreach (var hitObject in maniaBeatmap.HitObjects)
             {
-                int column = hitObject.Column;
+                int column = Math.Clamp(hitObject.Column, 0, keyCount - 1);
                 int head = (int)Math.Round(hitObject.StartTime);
                 int tail = (int)Math.Round(hitObject.GetEndTime());
                 if ((hitObject as IHasDuration)?.EndTime == null)

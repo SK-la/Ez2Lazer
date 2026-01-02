@@ -242,7 +242,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                     CancellationToken cancellationToken = default,
                                     int computationDelay = 0)
         {
-            GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, cancellationToken, computationDelay)
+            // 关键点：计算不应被单个 UI 项（DrawablePool / 离屏）取消，否则快速滚动会导致结果永远算不出来/无法填充缓存。
+            // 这里将“计算”与“写回 bindable”解耦：
+            // - 计算一律使用 CancellationToken.None，以便后台完成并写入 MemoryCachingComponent 的缓存。
+            // - cancellationToken 仅用于控制是否将结果写回到 bindable（避免旧 Item 收到回调）。
+            GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, CancellationToken.None, computationDelay)
                 .ContinueWith(task =>
                 {
                     Schedule(() =>
