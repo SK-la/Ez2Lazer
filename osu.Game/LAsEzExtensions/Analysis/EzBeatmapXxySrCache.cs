@@ -137,9 +137,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 var workingBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
 
-                // 复用同一份 playable beatmap，避免重复转换。
-                var cachedWorking = new PlayableCachedWorkingBeatmap(workingBeatmap);
-                var playableBeatmap = cachedWorking.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+                // 注意：playable beatmap 的内容取决于 mods。
+                // 这里必须按当前 lookup.OrderedMods 获取，否则会导致“关 mod 后仍显示旧 SR”的问题。
+                var playableBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -301,39 +301,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 BeatmapInfo = beatmapInfo;
                 CancellationToken = cancellationToken;
             }
-        }
-
-        private class PlayableCachedWorkingBeatmap : IWorkingBeatmap
-        {
-            private readonly IWorkingBeatmap working;
-            private IBeatmap? playable;
-
-            public PlayableCachedWorkingBeatmap(IWorkingBeatmap working)
-            {
-                this.working = working;
-            }
-
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods)
-                => playable ??= working.GetPlayableBeatmap(ruleset, mods);
-
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken)
-                => playable ??= working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
-
-            IBeatmapInfo IWorkingBeatmap.BeatmapInfo => working.BeatmapInfo;
-            bool IWorkingBeatmap.BeatmapLoaded => working.BeatmapLoaded;
-            bool IWorkingBeatmap.TrackLoaded => working.TrackLoaded;
-            IBeatmap IWorkingBeatmap.Beatmap => working.Beatmap;
-            Texture IWorkingBeatmap.GetBackground() => working.GetBackground();
-            Texture IWorkingBeatmap.GetPanelBackground() => working.GetPanelBackground();
-            Waveform IWorkingBeatmap.Waveform => working.Waveform;
-            Storyboard IWorkingBeatmap.Storyboard => working.Storyboard;
-            ISkin IWorkingBeatmap.Skin => working.Skin;
-            Track IWorkingBeatmap.Track => working.Track;
-            Track IWorkingBeatmap.LoadTrack() => working.LoadTrack();
-            Stream IWorkingBeatmap.GetStream(string storagePath) => working.GetStream(storagePath);
-            void IWorkingBeatmap.BeginAsyncLoad() => working.BeginAsyncLoad();
-            void IWorkingBeatmap.CancelAsyncLoad() => working.CancelAsyncLoad();
-            void IWorkingBeatmap.PrepareTrackForPreview(bool looping, double offsetFromPreviewPoint) => working.PrepareTrackForPreview(looping, offsetFromPreviewPoint);
         }
 
         private static class XxySrCalculatorBridge
