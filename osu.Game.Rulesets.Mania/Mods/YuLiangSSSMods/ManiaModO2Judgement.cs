@@ -1,28 +1,27 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.UI;
-using osu.Game.Screens.SelectV2;
+using osu.Game.Screens.Play;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public partial class ManiaModO2Judgement : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
+    public partial class ManiaModO2Judgement : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>, IApplicableToHUD
     {
         public static ManiaHitWindows Windows = new ManiaHitWindows();
 
@@ -85,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
             HitWindows.SetSpecialDifficultyRange(O2HitModeExtension.CoolRange, O2HitModeExtension.CoolRange, O2HitModeExtension.GoodRange, O2HitModeExtension.GoodRange, O2HitModeExtension.BadRange, O2HitModeExtension.BadRange);
-            O2HitModeExtension.PillCount = 0;
+            O2HitModeExtension.PillCount.Value = 0;
             O2HitModeExtension.PillActivated = PillMode.Value;
             Windows = HitWindows;
         }
@@ -94,6 +93,19 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             base.ResetSettingsToDefaults();
             HitWindows.ResetRange();
+        }
+
+        public void ApplyToHUD(HUDOverlay overlay)
+        {
+            if (!PillMode.Value)
+                return;
+
+            var pillUI = new EzComO2JamPillUI
+            {
+                Anchor = Anchor.CentreRight,
+                Origin = Anchor.CentreRight,
+            };
+            overlay.Add(pillUI);
         }
     }
 }

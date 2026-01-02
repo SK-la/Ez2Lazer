@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading;
+using osu.Framework.Bindables;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 
@@ -22,9 +23,9 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         // 注意：初始值和持久化逻辑取决于外部设置/开关，这里仅作为全局运行时状态使用。
         public static bool PillActivated; // = ManiaModO2Judgement.PillMode.Value;
 
-        // 💊数量
+        // 💊数量（可绑定）
         // 上限为 5，在达到一定 Cool 连击后会增加，发生较大偏移时会减少。
-        public static int PillCount;
+        public static Bindable<int> PillCount = new Bindable<int>(0);
 
         // Cool 连击计数（用于追踪在 Cool 判定内的连续命中次数）
         // 语义：每次命中判断在 Cool 范围内时递增；当计数达到 15 时会重置（减去 15）并使 `Pill` 增加（最多至 5）。
@@ -58,8 +59,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 {
                     CoolCombo -= 15;
 
-                    if (PillCount < 5)
-                        PillCount++;
+                    if (PillCount.Value < 5)
+                        PillCount.Value++;
                 }
             }
             else if (offset > CoolRange && offset <= GoodRange)
@@ -72,9 +73,9 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 // 在 Bad 范围时应先应用一次 ComboBreak（由调用者负责实际应用），然后继续基础判定流程。
                 applyComboBreak = true;
 
-                if (PillCount > 0)
+                if (PillCount.Value > 0)
                 {
-                    PillCount--;
+                    PillCount.Value--;
                 }
             }
 

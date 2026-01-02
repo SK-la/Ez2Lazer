@@ -161,6 +161,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                 new EzComHitResultScore(),
                                 new EzComHitTiming(),
                                 new EzComHitTiming(),
+                                new EzComO2JamPillUI()
+                                {
+                                    Anchor = Anchor.CentreRight,
+                                    Origin = Anchor.CentreRight,
+                                },
                             };
                     }
 
