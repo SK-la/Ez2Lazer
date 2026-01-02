@@ -46,6 +46,7 @@ using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Analysis.Persistence;
 using osu.Game.Localisation;
@@ -211,7 +212,7 @@ namespace osu.Game
         public readonly Bindable<Dictionary<ModType, IReadOnlyList<Mod>>> AvailableMods = new Bindable<Dictionary<ModType, IReadOnlyList<Mod>>>(new Dictionary<ModType, IReadOnlyList<Mod>>());
 
         private BeatmapDifficultyCache difficultyCache;
-        private osu.Game.LAsEzExtensions.Analysis.EzBeatmapManiaAnalysisCache maniaAnalysisCache;
+        private EzBeatmapManiaAnalysisCache maniaAnalysisCache;
         private IBeatmapUpdater beatmapUpdater;
 
         private UserLookupCache userCache;
@@ -343,7 +344,7 @@ namespace osu.Game
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
             dependencies.Cache(new EzManiaAnalysisPersistentStore(Storage));
-            dependencies.Cache(maniaAnalysisCache = new osu.Game.LAsEzExtensions.Analysis.EzBeatmapManiaAnalysisCache());
+            dependencies.Cache(maniaAnalysisCache = new EzBeatmapManiaAnalysisCache());
 
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
             dependencies.Cache(ScoreDownloader = new ScoreModelDownloader(ScoreManager, API));

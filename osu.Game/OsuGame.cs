@@ -44,7 +44,6 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
-using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API.Requests;
@@ -1753,6 +1752,9 @@ namespace osu.Game
 
         private void updateDrawLimiter()
         {
+            // 暂时屏蔽测试情况
+            return;
+
             if (gameHost?.Window == null)
                 return;
 

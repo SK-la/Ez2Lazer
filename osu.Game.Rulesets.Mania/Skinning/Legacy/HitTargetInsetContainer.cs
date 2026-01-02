@@ -8,7 +8,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Legacy

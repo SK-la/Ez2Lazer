@@ -85,13 +85,15 @@ namespace osu.Game.LAsEzExtensions.Analysis
         /// 复用外部已经计算好的列统计与 KPS 数据，生成 Scratch 标签。
         /// 用于选歌面板：避免重复遍历 HitObjects / 重复计算 KPS。
         /// </summary>
+        // TODO: 计算比较粗糙，后续可优化。
         public static string GetScratchFromPrecomputed(Dictionary<int, int> columnCounts, double maxKps, List<double> kpsList, int keyCount)
         {
             if (keyCount <= 0)
                 return "[?K]";
 
             // 将列统计映射为固定长度数组，方便计算 empty 列。
-            var countsByColumn = new int[keyCount];
+            int[] countsByColumn = new int[keyCount];
+
             foreach (var (column, count) in columnCounts)
             {
                 if ((uint)column < (uint)keyCount)

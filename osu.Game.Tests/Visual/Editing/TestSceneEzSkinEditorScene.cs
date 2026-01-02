@@ -3,14 +3,8 @@
 
 using NUnit.Framework;
 using osu.Framework.Allocation;
-using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
-using osu.Framework.Screens;
-using osu.Framework.Testing;
 using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Overlays;
-using osu.Game.Screens.Edit;
-using osu.Game.Screens.Menu;
 
 namespace osu.Game.Tests.Visual.Editing
 {
@@ -20,19 +14,19 @@ namespace osu.Game.Tests.Visual.Editing
         [Cached]
         private readonly OverlayColourProvider overlayColour = new OverlayColourProvider(OverlayColourScheme.Aquamarine);
 
-    [Cached]
-    private readonly DialogOverlay dialogOverlay = new DialogOverlay();
+        [Cached]
+        private readonly DialogOverlay dialogOverlay = new DialogOverlay();
 
-    private EzSkinEditorScreen ezSkinEditorScreen = null!;
+        private EzSkinEditorScreen ezSkinEditorScreen = null!;
 
-    [BackgroundDependencyLoader]
-    private void load()
-    {
-        // Instantiate the screen for testing purposes
-        ezSkinEditorScreen = new EzSkinEditorScreen();
-        Child = ezSkinEditorScreen;
-        Add(dialogOverlay);
-    }
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            // Instantiate the screen for testing purposes
+            ezSkinEditorScreen = new EzSkinEditorScreen();
+            Child = ezSkinEditorScreen;
+            Add(dialogOverlay);
+        }
 
         [Test]
         public void TestLoadScreen()
