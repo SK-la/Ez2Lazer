@@ -18,7 +18,6 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -48,12 +47,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
-
-        [Resolved]
-        private BeatmapStore beatmapStore { get; set; } = null!;
-
-        [Resolved]
-        private INotificationOverlay? notificationOverlay { get; set; }
 
         private ProgressNotification? warmupNotification;
         private long lastWarmupNotificationUpdate;
@@ -359,8 +352,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             try
             {
-                // 获取全曲库快照（线程安全的 detached store）。
-                var beatmapSets = beatmapStore.GetBeatmapSets(token).ToList();
+                // 获取全曲库快照。
+                // BeatmapStore / INotificationOverlay 都是在 OsuGame 层级才会绑定到全局依赖容器，
+                // 而本缓存组件在 OsuGameBase 就会被加载并注入依赖。
+                // 为避免启动阶段依赖未注册导致崩溃，这里使用 BeatmapManager 的 detached 查询入口。
+                // IMPORTANT: 上游标注“tests only”，但该方法内部返回 detached realm 对象，且在这里仅用于后台预热。
+                var beatmapSets = beatmapManager.GetAllUsableBeatmapSets();
 
                 var beatmaps = beatmapSets
                               .SelectMany(s => s.Beatmaps)
@@ -431,7 +428,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private ProgressNotification? showWarmupProgressNotification(int totalCount)
         {
-            if (notificationOverlay == null)
+            // NotificationOverlay 是在 OsuGame 完成初始化后才绑定到 BeatmapManager.PostNotification。
+            // 在绑定前不显示通知，但预热仍可继续进行。
+            if (beatmapManager.PostNotification == null)
                 return null;
 
             // 太少不值得显示。
@@ -449,7 +448,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 Progress = 0
             };
 
-            notificationOverlay.Post(notification);
+            beatmapManager.PostNotification(notification);
             return notification;
         }
 

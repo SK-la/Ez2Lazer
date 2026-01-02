@@ -213,7 +213,7 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        xxySrDisplay = new EzXxySrDisplay()
+                                        xxySrDisplay = new EzXxySrDisplay
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,

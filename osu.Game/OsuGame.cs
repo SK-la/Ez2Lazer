@@ -1820,7 +1820,7 @@ namespace osu.Game
             {
                 // 偏保守的默认值：优先保证交互流畅，代价是缩略图/封面加载完成会稍慢。
                 // 前者提高随机速度，后者提高顺序速度。
-                gameHost.SetTextureUploadLimits(maxTexturesUploadedPerFrame: 8, maxPixelsUploadedPerFrame: 1024 * 1024);
+                gameHost.SetTextureUploadLimits(maxTexturesUploadedPerFrame: 12, maxPixelsUploadedPerFrame: 1024 * 1024);
             }
             else
             {

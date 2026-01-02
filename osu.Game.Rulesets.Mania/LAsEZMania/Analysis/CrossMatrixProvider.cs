@@ -13,6 +13,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
         ///     索引0对应K=1，索引1对应K=2，以此类推
         ///     null表示不支持该键数
         /// </summary>
+        // TODO: 未来考虑支持在游戏内配置这些矩阵动态调试对比
         private static readonly double[][] default_cross_matrices =
         [
             [-1], // CS=0
@@ -28,6 +29,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             [0.325, 0.55, 0.45, 0.35, 0.25, 0.05, 0.25, 0.35, 0.45, 0.55, 0.325], // 10key
             // Inferred matrices for K=11 to 18 based on user-specified patterns
             [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1], // K=11 (odd, unsupported)
+            // 更高K的矩阵没有经过严格验证，仅提供占位
             [0.8, 0.8, 0.8, 0.6, 0.4, 0.2, 0.05, 0.2, 0.4, 0.6, 0.8, 0.8, 0.8], // K=12 (even, sides 3 columns higher)
             [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1], // K=13 (odd, unsupported)
             [0.4, 0.4, 0.2, 0.2, 0.3, 0.3, 0.1, 0.1, 0.3, 0.3, 0.2, 0.2, 0.4, 0.4, 0.4], // K=14 (wave: low-low-high-high-low-low-high-high)
