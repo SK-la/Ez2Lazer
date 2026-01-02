@@ -18,7 +18,6 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -48,9 +47,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
 
-        private ProgressNotification? warmupNotification;
-        private long lastWarmupNotificationUpdate;
-
         [Resolved]
         private Bindable<RulesetInfo> currentRuleset { get; set; } = null!;
 
@@ -61,14 +57,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private ScheduledDelegate? debouncedModSettingsChange;
 
         private int modsRevision;
-
-        private bool warmupRequested;
-        private CancellationTokenSource? warmupCancellationSource;
-        private Task? warmupTask;
-        private string? warmupSignature;
-
-        // 最近一次“前台/交互请求”（例如可见面板绑定）的时间戳。用于避免 warmup 抢占计算队列。
-        private long lastInteractiveRequest;
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致（150ms）。
         private const int mod_settings_debounce = 150;
@@ -114,10 +102,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             lock (bindableUpdateLock)
                 trackedBindables.Add(bindable);
-
-            // 第一次被 UI 触发时开启“全曲库预热”。
-            warmupRequested = true;
-            ensureWarmupRunning();
 
             return bindable;
         }
@@ -239,9 +223,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     updateBindable(b, localBeatmapInfo, currentRuleset.Value, currentMods.Value, linkedSource.Token);
                 }
             }
-
-            // ruleset / mods 变化后，重启 warmup（若已请求）。
-            ensureWarmupRunning();
         }
 
         private void cancelTrackedBindableUpdate()
@@ -265,9 +246,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                     CancellationToken cancellationToken = default,
                                     int computationDelay = 0)
         {
-            // 记录交互请求时间，用于 warmup 节流。
-            lastInteractiveRequest = Environment.TickCount64;
-
             // 关键点：计算不应被单个 UI 项（DrawablePool / 离屏）取消，否则快速滚动会导致结果永远算不出来/无法填充缓存。
             // 这里将“计算”与“写回 bindable”解耦：
             // - 计算一律使用 CancellationToken.None，以便后台完成并写入 MemoryCachingComponent 的缓存。
@@ -285,215 +263,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
                             bindable.Value = analysis.Value;
                     });
                 }, cancellationToken);
-        }
-
-        private void ensureWarmupRunning()
-        {
-            if (!warmupRequested)
-                return;
-
-            if (currentRuleset.Value.OnlineID != 3)
-            {
-                cancelWarmup();
-                return;
-            }
-
-            string signature = getWarmupSignature(currentRuleset.Value, currentMods.Value);
-            if (warmupSignature == signature && warmupTask is { IsCompleted: false })
-                return;
-
-            cancelWarmup();
-
-            warmupSignature = signature;
-            warmupCancellationSource = new CancellationTokenSource();
-            var token = warmupCancellationSource.Token;
-
-            // 在后台线程顺序遍历全曲库，逐个计算并填充缓存。
-            warmupTask = Task.Run(() => runWarmup(signature, token), token);
-        }
-
-        private void cancelWarmup()
-        {
-            warmupSignature = null;
-
-            // Mark any existing notification as stale/cancelled.
-            if (warmupNotification != null)
-            {
-                var notification = warmupNotification;
-                warmupNotification = null;
-
-                Scheduler.Add(() =>
-                {
-                    notification.State = ProgressNotificationState.Cancelled;
-                });
-            }
-
-            warmupCancellationSource?.Cancel();
-            warmupCancellationSource?.Dispose();
-            warmupCancellationSource = null;
-
-            warmupTask = null;
-        }
-
-        private string getWarmupSignature(RulesetInfo ruleset, IReadOnlyList<Mod> mods)
-        {
-            // 需要随着 mod 以及其设置变化而变化。
-            // - modsRevision 确保“设置变化但 hash 不变”时也会重启 warmup。
-            // - GetHashCode() 作为额外近似来源，避免不必要的重复重启。
-            string modsSig = mods.Count == 0
-                ? "(none)"
-                : string.Join("|", mods.OrderBy(m => m.Acronym).Select(m => $"{m.Acronym}:{m.GetHashCode()}"));
-
-            int revision = Volatile.Read(ref modsRevision);
-            return $"ruleset={ruleset.OnlineID};modsRev={revision};mods={modsSig}";
-        }
-
-        private void runWarmup(string signature, CancellationToken token)
-        {
-            try
-            {
-                // 获取全曲库快照。
-                // BeatmapStore / INotificationOverlay 都是在 OsuGame 层级才会绑定到全局依赖容器，
-                // 而本缓存组件在 OsuGameBase 就会被加载并注入依赖。
-                // 为避免启动阶段依赖未注册导致崩溃，这里使用 BeatmapManager 的 detached 查询入口。
-                // IMPORTANT: 上游标注“tests only”，但该方法内部返回 detached realm 对象，且在这里仅用于后台预热。
-                var beatmapSets = beatmapManager.GetAllUsableBeatmapSets();
-
-                var beatmaps = beatmapSets
-                              .SelectMany(s => s.Beatmaps)
-                              // 仅预热 Mania 原生谱面（避免对非 mania 进行转换预热导致成本爆炸）。
-                              .Where(b => !b.Hidden && b.Ruleset.OnlineID == 3)
-                              .ToList();
-
-                int totalCount = beatmaps.Count;
-
-                Scheduler.Add(() =>
-                {
-                    warmupNotification = showWarmupProgressNotification(totalCount);
-                    lastWarmupNotificationUpdate = Environment.TickCount64;
-                });
-
-                int processedCount = 0;
-
-                foreach (var beatmap in beatmaps)
-                {
-                    token.ThrowIfCancellationRequested();
-
-                    if (warmupSignature != signature)
-                        return;
-
-                    // 节流：只要用户还在频繁触发交互请求，就暂停 warmup。
-                    long sinceInteractive = Environment.TickCount64 - lastInteractiveRequest;
-                    if (sinceInteractive < 250)
-                    {
-                        int sleep = (int)Math.Clamp(250 - sinceInteractive, 1, 250);
-                        Thread.Sleep(sleep);
-                        continue;
-                    }
-
-                    // 触发一次计算并进入缓存；不使用 token 取消计算。
-                    // 注意：GetAnalysisAsync 内部会通过 updateScheduler 串行执行，整体不会爆并发。
-                    GetAnalysisAsync(beatmap, currentRuleset.Value, currentMods.Value, CancellationToken.None).GetAwaiter().GetResult();
-                    processedCount++;
-
-                    // 通知更新节流：避免每首歌都更新 UI。
-                    if (processedCount == totalCount || processedCount % 25 == 0)
-                    {
-                        long now = Environment.TickCount64;
-                        if (now - lastWarmupNotificationUpdate > 250)
-                        {
-                            lastWarmupNotificationUpdate = now;
-                            Scheduler.Add(() => updateWarmupProgressNotification(warmupNotification, processedCount, totalCount));
-                        }
-                    }
-                }
-
-                Scheduler.Add(() => completeWarmupProgressNotification(warmupNotification, processedCount, totalCount));
-                Scheduler.Add(() => warmupNotification = null);
-            }
-            catch (OperationCanceledException)
-            {
-                Scheduler.Add(() => completeWarmupProgressNotification(warmupNotification, 0, 0, cancelled: true));
-                Scheduler.Add(() => warmupNotification = null);
-            }
-            catch (Exception ex)
-            {
-                // warmup 不应影响游戏运行，仅记录（避免刷屏）。
-                Logger.Error(ex, "EzBeatmapManiaAnalysisCache warmup failed.");
-
-                Scheduler.Add(() => completeWarmupProgressNotification(warmupNotification, 0, 0, failed: true));
-                Scheduler.Add(() => warmupNotification = null);
-            }
-        }
-
-        private ProgressNotification? showWarmupProgressNotification(int totalCount)
-        {
-            // NotificationOverlay 是在 OsuGame 完成初始化后才绑定到 BeatmapManager.PostNotification。
-            // 在绑定前不显示通知，但预热仍可继续进行。
-            if (beatmapManager.PostNotification == null)
-                return null;
-
-            // 太少不值得显示。
-            if (totalCount < 10)
-                return null;
-
-            // 通知文案定义位置：
-            // - Text：任务进行中在通知里显示的主文本（后续会在 updateWarmupProgressNotification() 动态追加 "(processed of total)"）。
-            // - CompletionText：任务完成后显示的文本（completeWarmupProgressNotification() 会在前面加上处理数量）。
-            var notification = new ProgressNotification
-            {
-                Text = "Precomputing mania analysis…",
-                CompletionText = "mania analysis precomputed.",
-                State = ProgressNotificationState.Active,
-                Progress = 0
-            };
-
-            beatmapManager.PostNotification(notification);
-            return notification;
-        }
-
-        private void updateWarmupProgressNotification(ProgressNotification? notification, int processedCount, int totalCount)
-        {
-            if (notification == null)
-                return;
-
-            if (totalCount <= 0)
-                return;
-
-            notification.Text = $"Precomputing mania analysis… ({processedCount} of {totalCount})";
-            notification.Progress = (float)processedCount / totalCount;
-        }
-
-        private void completeWarmupProgressNotification(ProgressNotification? notification, int processedCount, int totalCount, bool cancelled = false, bool failed = false)
-        {
-            if (notification == null)
-                return;
-
-            if (failed)
-            {
-                notification.Text = "Precomputing mania analysis failed. Check logs.";
-                notification.State = ProgressNotificationState.Cancelled;
-                return;
-            }
-
-            if (cancelled)
-            {
-                notification.Text = "Precomputing mania analysis cancelled.";
-                notification.State = ProgressNotificationState.Cancelled;
-                return;
-            }
-
-            if (totalCount > 0 && processedCount >= totalCount)
-            {
-                notification.CompletionText = $"{processedCount} {notification.CompletionText}";
-                notification.Progress = 1;
-                notification.State = ProgressNotificationState.Completed;
-            }
-            else
-            {
-                notification.Text = $"{processedCount} of {totalCount} {notification.CompletionText}";
-                notification.State = ProgressNotificationState.Cancelled;
-            }
         }
 
         protected override void Dispose(bool isDisposing)
