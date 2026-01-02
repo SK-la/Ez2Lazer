@@ -51,6 +51,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.01f
         };
 
+        [SettingSource("Box Element Alpha", "The alpha value of background")]
+        public BindableNumber<float> BoxElementAlpha { get; } = new BindableNumber<float>(0f)
+        {
+            MinValue = 0,
+            MaxValue = 1,
+            Precision = 0.01f,
+        };
+
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
@@ -92,6 +100,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                     Size = new Vector2(60, 280), // 默认垂直形状
                     Masking = true,
                     CornerRadius = 8,
+                    Alpha = BoxElementAlpha.Value,
                     Children = new Drawable[]
                     {
                         new Box
@@ -126,6 +135,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                 }
             };
 
+            BoxElementAlpha.BindValueChanged(value =>
+            {
+                backgroundContainer.Alpha = value.NewValue;
+            }, true);
             SpriteDropdown.BindValueChanged(_ => rebuildPills());
             PillFillDirection.BindValueChanged(_ => updateLayout());
             PillCount.BindValueChanged(value =>

@@ -105,6 +105,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
             };
+            pillUI.BoxElementAlpha.Value = 0.7f;
             overlay.Add(pillUI);
         }
     }
