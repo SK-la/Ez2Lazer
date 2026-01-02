@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Configuration
             // SetDefault(ManiaRulesetSetting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(ManiaRulesetSetting.ScrollBaseSpeed, 500, 100, 1000, 1.0);
             SetDefault(ManiaRulesetSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
-            SetDefault(ManiaRulesetSetting.ScrollStyle, EzManiaScrollingStyle.ScrollTimeStyleFixed);
+            SetDefault(ManiaRulesetSetting.ScrollStyle, EzManiaScrollingStyle.ScrollTimeForScreenBottom);
 
             SetDefault(ManiaRulesetSetting.ScrollPerKeyMode, false);
             SetDefault(ManiaRulesetSetting.PerspectiveAngle, 90.0f, 30.0f, 90.0f);

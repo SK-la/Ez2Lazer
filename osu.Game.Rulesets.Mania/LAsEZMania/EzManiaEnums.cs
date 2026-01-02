@@ -13,9 +13,12 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
 
         // [LocalisableDescription(typeof(RulesetSettingsStrings), nameof(RulesetSettingsStrings.ScrollingDirectionDown))]
         [Description("ms值 相对默认判定线")]
-        ScrollTimeStyle,
+        ScrollTimeForDefaultJudgement,
 
         [Description("ms值 相对屏幕底部")]
-        ScrollTimeStyleFixed,
+        ScrollTimeForRealJudgement,
+
+        [Description("ms值 相对屏幕底部")]
+        ScrollTimeForScreenBottom,
     }
 }
