@@ -18,10 +18,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         public const double DEFAULT_BPM = 200;
 
         // TODO: 💊缺少UI显示，以及合适的开关
-        // 是否启用💊
+        // 是否启用💊, 此处默认开启，否则必须搭配ManiaModO2Judgement.PillMode.Value才能生效
         // 启用 Pill 模式的特殊判定逻辑（如累积/消耗 Pill、使用 CoolCombo 逻辑等）。
         // 注意：初始值和持久化逻辑取决于外部设置/开关，这里仅作为全局运行时状态使用。
-        public static bool PillActivated; // = ManiaModO2Judgement.PillMode.Value;
+        public static bool PillActivated = true; // = ManiaModO2Judgement.PillMode.Value;
 
         // 💊数量（可绑定）
         // 上限为 5，在达到一定 Cool 连击后会增加，发生较大偏移时会减少。
