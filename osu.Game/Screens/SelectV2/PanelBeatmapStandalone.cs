@@ -60,9 +60,6 @@ namespace osu.Game.Screens.SelectV2
         private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapXxySrCache xxySrCache { get; set; } = null!;
-
-        [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
 
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
@@ -73,8 +70,6 @@ namespace osu.Game.Screens.SelectV2
         private OsuSpriteText notesLabel = null!;
 
         private EzXxySrDisplay xxySrDisplay = null!;
-        private IBindable<double?>? xxySrBindable;
-        private CancellationTokenSource? xxySrCancellationSource;
 
         private IBindable<StarDifficulty>? starDifficultyBindable;
         private CancellationTokenSource? starDifficultyCancellationSource;
@@ -258,6 +253,7 @@ namespace osu.Game.Screens.SelectV2
             ruleset.BindValueChanged(_ =>
             {
                 cachedScratchText = null;
+                bindManiaAnalysis();
                 resetManiaAnalysisDisplay();
                 updateKeyCount();
             });
@@ -265,6 +261,7 @@ namespace osu.Game.Screens.SelectV2
             mods.BindValueChanged(_ =>
             {
                 cachedScratchText = null;
+                bindManiaAnalysis();
                 resetManiaAnalysisDisplay();
                 updateKeyCount();
             }, true);
@@ -298,30 +295,10 @@ namespace osu.Game.Screens.SelectV2
             loggedLargeXxyDiffBeatmapId = null;
 
             bindManiaAnalysis();
-            bindXxySr();
             resetManiaAnalysisDisplay();
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
-        }
-
-        private void bindXxySr()
-        {
-            xxySrCancellationSource?.Cancel();
-            xxySrCancellationSource = new CancellationTokenSource();
-
-            xxySrDisplay.Current.UnbindAll();
-            xxySrDisplay.Current.Value = null;
-
-            if (Item == null)
-                return;
-
-            if (ruleset.Value.OnlineID != 3)
-                return;
-
-            xxySrBindable = xxySrCache.GetBindableXxySr(beatmap, xxySrCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
-            xxySrBindable.BindValueChanged(_ => maybeLogLargeStarDiff(), true);
-            xxySrDisplay.Current.BindTo((Bindable<double?>)xxySrBindable);
         }
 
         private void maybeLogLargeStarDiff()
@@ -360,15 +337,22 @@ namespace osu.Game.Screens.SelectV2
         private void bindManiaAnalysis()
         {
             maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = new CancellationTokenSource();
+            maniaAnalysisCancellationSource = null;
 
             if (Item == null)
                 return;
 
+            if (ruleset.Value.OnlineID != 3)
+                return;
+
+            maniaAnalysisCancellationSource = new CancellationTokenSource();
+            var localCancellationSource = maniaAnalysisCancellationSource;
+
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                if (ruleset.Value.OnlineID != 3)
+                // 旧 bindable 的回调（比如切换 mods / 取消重绑）直接忽略。
+                if (localCancellationSource != maniaAnalysisCancellationSource)
                     return;
 
                 // DrawablePool 回收/Item 变更期间可能仍收到旧 bindable 的回调。
@@ -380,6 +364,10 @@ namespace osu.Game.Screens.SelectV2
                     cachedScratchText = result.NewValue.ScratchText;
 
                 updateUI((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts);
+
+                xxySrDisplay.Current.Value = result.NewValue.XxySr;
+                maybeLogLargeStarDiff();
+
                 updateKeyCount();
             }, true);
         }
@@ -388,6 +376,9 @@ namespace osu.Game.Screens.SelectV2
         {
             cachedScratchText = null;
             maniaKpcDisplay.Clear();
+
+            xxySrDisplay.Current.UnbindAll();
+            xxySrDisplay.Current.Value = null;
 
             if (ruleset.Value.OnlineID == 3)
             {
@@ -406,12 +397,6 @@ namespace osu.Game.Screens.SelectV2
                 notesLabel.Hide();
                 maniaKpcDisplay.Hide();
                 xxySrDisplay.Hide();
-
-                xxySrCancellationSource?.Cancel();
-                xxySrCancellationSource = null;
-                xxySrBindable = null;
-                xxySrDisplay.Current.UnbindAll();
-                xxySrDisplay.Current.Value = null;
             }
         }
 
@@ -455,8 +440,6 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisBindable = null;
             cachedScratchText = null;
 
-            xxySrCancellationSource?.Cancel();
-            xxySrBindable = null;
             xxySrDisplay.Current.UnbindAll();
             xxySrDisplay.Current.Value = null;
 
@@ -492,15 +475,15 @@ namespace osu.Game.Screens.SelectV2
                 starDifficultyCancellationSource?.Cancel();
                 starDifficultyCancellationSource = null;
 
-                // 离屏时取消 xxy_SR 计算，避免后台为不可见项占用计算预算。
-                xxySrCancellationSource?.Cancel();
-                xxySrCancellationSource = null;
+                // 离屏时取消 mania 分析（其中包含 xxy_SR），避免后台为不可见项占用计算预算。
+                maniaAnalysisCancellationSource?.Cancel();
+                maniaAnalysisCancellationSource = null;
             }
             else
             {
                 // 重新可见时再触发一次绑定/计算。
-                if (xxySrCancellationSource == null && Item != null)
-                    bindXxySr();
+                if (maniaAnalysisCancellationSource == null && Item != null && ruleset.Value.OnlineID == 3)
+                    bindManiaAnalysis();
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.

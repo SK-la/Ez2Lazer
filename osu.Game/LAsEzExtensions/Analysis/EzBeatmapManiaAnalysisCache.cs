@@ -13,6 +13,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Lists;
+using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -147,6 +148,31 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 var (averageKps, maxKps, kpsList, columnCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
+                // 同一次 playable beatmap 里顺带计算 xxy_SR（只在异常/失败时写 xxy_sr 日志）。
+                double? xxySr = null;
+                if (playableBeatmap.HitObjects.Count == 0)
+                {
+                    string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
+                    Logger.Log($"xxy_SR aborted: playableBeatmap has 0 hitobjects. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", "xxy_sr", LogLevel.Error);
+                }
+                else if (XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr))
+                {
+                    if (double.IsNaN(sr) || double.IsInfinity(sr))
+                    {
+                        Logger.Log($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}", "xxy_sr", LogLevel.Error);
+                    }
+                    else
+                    {
+                        xxySr = sr;
+
+                        if (sr < 0 || sr > 1000)
+                        {
+                            string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
+                            Logger.Log($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", "xxy_sr", LogLevel.Error);
+                        }
+                    }
+                }
+
                 cancellationToken.ThrowIfCancellationRequested();
 
                 string scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
@@ -156,7 +182,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     maxKps,
                     kpsList,
                     columnCounts,
-                    scratchText);
+                    scratchText,
+                    xxySr);
             }
             catch (OperationCanceledException)
             {

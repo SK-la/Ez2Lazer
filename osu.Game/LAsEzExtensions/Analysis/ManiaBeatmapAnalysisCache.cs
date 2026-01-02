@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
@@ -85,6 +86,30 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 var (averageKps, maxKps, kpsList, columnCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
+                double? xxySr = null;
+                if (playableBeatmap.HitObjects.Count == 0)
+                {
+                    string modsStr = mods.Count == 0 ? "(none)" : string.Join(',', mods.Select(m => m.Acronym));
+                    Logger.Log($"xxy_SR aborted: playableBeatmap has 0 hitobjects. beatmapId={beatmapInfo.ID} diff=\"{beatmapInfo.DifficultyName}\" ruleset={ruleset.ShortName} mods={modsStr}", "xxy_sr", LogLevel.Error);
+                }
+                else if (XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr))
+                {
+                    if (double.IsNaN(sr) || double.IsInfinity(sr))
+                    {
+                        Logger.Log($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={beatmapInfo.ID} ruleset={ruleset.ShortName}", "xxy_sr", LogLevel.Error);
+                    }
+                    else
+                    {
+                        xxySr = sr;
+
+                        if (sr < 0 || sr > 1000)
+                        {
+                            string modsStr = mods.Count == 0 ? "(none)" : string.Join(',', mods.Select(m => m.Acronym));
+                            Logger.Log($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={beatmapInfo.ID} diff=\"{beatmapInfo.DifficultyName}\" ruleset={ruleset.ShortName} mods={modsStr}", "xxy_sr", LogLevel.Error);
+                        }
+                    }
+                }
+
                 // 复用已算出的 columnCounts/kpsList，避免 GetScratch() 再次遍历/计算。
                 string scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
 
@@ -93,7 +118,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     maxKps,
                     kpsList,
                     columnCounts,
-                    scratchText);
+                    scratchText,
+                    xxySr);
 
                 result_cache[cacheKey] = result;
                 return result;
@@ -113,7 +139,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                                              double MaxKps,
                                                              List<double> KpsList,
                                                              Dictionary<int, int> ColumnCounts,
-                                                             string ScratchText);
+                                                             string ScratchText,
+                                                             double? XxySr);
 
     public static class ManiaBeatmapAnalysisDefaults
     {
@@ -123,6 +150,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 0,
                 new List<double>(),
                 new Dictionary<int, int>(),
-                string.Empty);
+                string.Empty,
+                null);
     }
 }
