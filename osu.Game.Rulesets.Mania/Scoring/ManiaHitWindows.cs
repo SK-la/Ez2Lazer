@@ -189,7 +189,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                     // 这里是真正影响判定的BPM设定
                     O2HitModeExtension.NowBeatmapBPM = bpm > 0 ? bpm : O2HitModeExtension.DEFAULT_BPM;
-                    O2HitModeExtension.Pill = 0;
+                    O2HitModeExtension.PillCount = 0;
                     O2HitModeExtension.CoolCombo = 0;
                     break;
 

@@ -85,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
             HitWindows.SetSpecialDifficultyRange(O2HitModeExtension.CoolRange, O2HitModeExtension.CoolRange, O2HitModeExtension.GoodRange, O2HitModeExtension.GoodRange, O2HitModeExtension.BadRange, O2HitModeExtension.BadRange);
-            O2HitModeExtension.Pill = 0;
+            O2HitModeExtension.PillCount = 0;
             O2HitModeExtension.PillActivated = PillMode.Value;
             Windows = HitWindows;
         }
