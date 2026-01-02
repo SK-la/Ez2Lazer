@@ -94,7 +94,7 @@ namespace osu.Game.Screens.SelectV2
         private string? cachedScratchText;
 
         private double? lastStarRatingStars;
-        private Guid? loggedLargeXxyDiffBeatmapId;
+        private Guid? loggedAbnormalXxySrBeatmapId;
 
         public PanelBeatmap()
         {
@@ -276,7 +276,7 @@ namespace osu.Game.Screens.SelectV2
             cachedScratchText = null;
 
             lastStarRatingStars = null;
-            loggedLargeXxyDiffBeatmapId = null;
+            loggedAbnormalXxySrBeatmapId = null;
 
             bindManiaAnalysis();
             resetManiaAnalysisDisplay();
@@ -289,7 +289,7 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
-            // 仅用于排查：无 mod 时，原版 star 与 xxy_SR 差值过大。
+            // 仅用于排查：无 mod 时，原版 star 与 xxy_SR 差值过大，或 xxy_SR 计算异常（null 或 0）。
             if (ruleset.Value.OnlineID != 3)
                 return;
 
@@ -299,18 +299,32 @@ namespace osu.Game.Screens.SelectV2
             double? star = lastStarRatingStars;
             double? xxy = xxySrDisplay.Current.Value;
 
-            if (star == null || xxy == null)
+            Guid beatmapId = beatmap.ID;
+
+            // 如果已经为这个 beatmap 记录过异常，则跳过
+            if (loggedAbnormalXxySrBeatmapId == beatmapId)
                 return;
 
-            Guid beatmapId = beatmap.ID;
-            if (loggedLargeXxyDiffBeatmapId == beatmapId)
+            // 检查 xxy_SR 是否为 null 或 0
+            if (xxy == null || xxy == 0)
+            {
+                loggedAbnormalXxySrBeatmapId = beatmapId;
+
+                Logger.Log(
+                    XxySrDebugJson.FormatNullOrZeroSr(beatmap, xxy),
+                    "xxy_sr",
+                    LogLevel.Error);
+                return;
+            }
+
+            if (star == null)
                 return;
 
             double diff = Math.Abs(star.Value - xxy.Value);
             if (diff <= 3)
                 return;
 
-            loggedLargeXxyDiffBeatmapId = beatmapId;
+            loggedAbnormalXxySrBeatmapId = beatmapId;
 
             Logger.Log(
                 XxySrDebugJson.FormatLargeDiffNoMod(beatmap, star.Value, xxy.Value),
@@ -434,7 +448,7 @@ namespace osu.Game.Screens.SelectV2
             xxySrDisplay.Current.Value = null;
 
             lastStarRatingStars = null;
-            loggedLargeXxyDiffBeatmapId = null;
+            loggedAbnormalXxySrBeatmapId = null;
         }
 
         private void computeStarRating()

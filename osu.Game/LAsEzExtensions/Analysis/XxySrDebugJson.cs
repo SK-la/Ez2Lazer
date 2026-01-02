@@ -11,17 +11,15 @@ namespace osu.Game.LAsEzExtensions.Analysis
 {
     internal static class XxySrDebugJson
     {
-        public static string FormatLargeDiffNoMod(BeatmapInfo beatmap, double star, double xxySr)
+        public static string FormatAbnormalSr(BeatmapInfo beatmap, string eventType, double? star = null, double? xxySr = null)
         {
-            double absDiff = Math.Abs(star - xxySr);
-
             var buffer = new ArrayBufferWriter<byte>(256);
             using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = false }))
             {
                 writer.WriteStartObject();
 
                 // Fixed property order for stable diffs.
-                writer.WriteString("event", "xxy_sr_large_diff_no_mod");
+                writer.WriteString("event", eventType);
 
                 writer.WriteString("beatmap_id", beatmap.ID.ToString());
                 writer.WriteString("beatmap_hash", beatmap.Hash);
@@ -53,15 +51,37 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 writer.WriteStartArray("mods");
                 writer.WriteEndArray();
 
-                writer.WriteNumber("star", star);
-                writer.WriteNumber("xxy_sr", xxySr);
-                writer.WriteNumber("abs_diff", absDiff);
+                if (star.HasValue)
+                    writer.WriteNumber("star", star.Value);
+                else
+                    writer.WriteNull("star");
+
+                if (xxySr.HasValue)
+                    writer.WriteNumber("xxy_sr", xxySr.Value);
+                else
+                    writer.WriteNull("xxy_sr");
+
+                if (star.HasValue && xxySr.HasValue)
+                {
+                    double absDiff = Math.Abs(star.Value - xxySr.Value);
+                    writer.WriteNumber("abs_diff", absDiff);
+                }
 
                 writer.WriteEndObject();
                 writer.Flush();
             }
 
             return Encoding.UTF8.GetString(buffer.WrittenSpan);
+        }
+
+        public static string FormatLargeDiffNoMod(BeatmapInfo beatmap, double star, double xxySr)
+        {
+            return FormatAbnormalSr(beatmap, "xxy_sr_large_diff_no_mod", star, xxySr);
+        }
+
+        public static string FormatNullOrZeroSr(BeatmapInfo beatmap, double? xxySr)
+        {
+            return FormatAbnormalSr(beatmap, "xxy_sr_null_or_zero", null, xxySr);
         }
     }
 }
