@@ -326,7 +326,7 @@ namespace osu.Game.Screens.SelectV2
             loggedLargeXxyDiffBeatmapId = beatmapId;
 
             Logger.Log(
-                $"xxy_SR large diff (no-mod): beatmapId={beatmapId} onlineId={beatmap.OnlineID} diff=\"{beatmap.DifficultyName}\" star={star:0.###} xxy={xxy:0.###} absDiff={diff:0.###}",
+                XxySrDebugJson.FormatLargeDiffNoMod(beatmap, star.Value, xxy.Value),
                 "xxy_sr",
                 LogLevel.Error);
         }
@@ -480,7 +480,12 @@ namespace osu.Game.Screens.SelectV2
             {
                 // 重新可见时再触发一次绑定/计算。
                 if (maniaAnalysisCancellationSource == null && Item != null && ruleset.Value.OnlineID == 3)
+                {
+                    // 离屏期间我们会 cancel 掉分析（避免浪费计算预算）。
+                    // 重新变为可见时，必须先清空旧显示值，否则会短暂显示上一次谱面的结果（表现为 xxySR 跳变）。
+                    resetManiaAnalysisDisplay();
                     bindManiaAnalysis();
+                }
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.

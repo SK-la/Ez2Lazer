@@ -2,11 +2,16 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -23,6 +28,28 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
     {
         [Resolved]
         protected RulesetInfo RulesetInfo { get; set; } = null!;
+
+        /// <summary>
+        /// Emits a single-line JSON trace per computation to the <c>xxy_sr</c> logger.
+        /// Intended for script-based diffing between implementations.
+        /// </summary>
+        // 默认关闭；当调试器附加（Rider Debug 启动 / Attach）时自动开启，避免用户手动配置环境变量。
+        public static bool TraceEnabled => Debugger.IsAttached || getTraceEnabledFromEnv();
+
+        private const int trace_sample_count = 16;
+
+        private static bool getTraceEnabledFromEnv()
+        {
+            // Opt-in only. Intended for ad-hoc debugging and script-based diffs.
+            // Accepted values: 1/true/yes (case-insensitive).
+            string? value = Environment.GetEnvironmentVariable("XXY_SR_TRACE");
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+
+            return value.Equals("1", StringComparison.OrdinalIgnoreCase)
+                   || value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                   || value.Equals("yes", StringComparison.OrdinalIgnoreCase);
+        }
 
         /// <summary>
         ///     Singleton entry point for SR calculations.
@@ -138,7 +165,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             if (cross == null || cross[0] == -1)
             {
-                Console.Error.WriteLine($"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
+                Console.WriteLine($"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
                 throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
             }
 
@@ -157,6 +184,10 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
                 int head = (int)Math.Round(hitObject.StartTime);
                 int tail = (int)Math.Round(hitObject.GetEndTime());
                 if ((hitObject as IHasDuration)?.EndTime == null)
+                    tail = -1;
+
+                // Align with the original library behaviour: treat non-positive durations as non-LN.
+                if (tail <= head)
                     tail = -1;
 
                 var note = new NoteStruct(column, head, tail);
@@ -178,11 +209,11 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             int maxTail = longNotes.Count > 0 ? longNotes.Max(n => n.TailTime) : maxHead;
             int totalTime = Math.Max(maxHead, maxTail) + 1;
 
-            //Console.WriteLine($"C# maxHead: {maxHead}, maxTail: {maxTail}, totalTime: {totalTime}");
+            //Logger.Log($"C# maxHead: {maxHead}, maxTail: {maxTail}, totalTime: {totalTime}");
 
             (double[] allCorners, double[] baseCorners, double[] aCorners) = buildCorners(totalTime, notes);
 
-            //Console.WriteLine($"C# allCorners length: {allCorners.Length}, baseCorners length: {baseCorners.Length}");
+            //Logger.Log($"C# allCorners length: {allCorners.Length}, baseCorners length: {baseCorners.Length}");
 
             bool[][] keyUsage = buildKeyUsage(keyCount, totalTime, notes, baseCorners);
             int[][] activeColumns = deriveActiveColumns(keyUsage);
@@ -198,12 +229,12 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             double[] xBarBase = computeXBar(keyCount, totalTime, x, notesByColumn, activeColumns, baseCorners, cross);
             double[] xBar = interpValues(allCorners, baseCorners, xBarBase);
 
-            //Console.WriteLine($"C# xBarBase sample: {string.Join(", ", xBarBase.Take(10))}");
+            //Logger.Log($"C# xBarBase sample: {string.Join(", ", xBarBase.Take(10))}");
 
             double[] pBarBase = computePBar(keyCount, totalTime, x, notes, lnRep, anchorBase, baseCorners);
             double[] pBar = interpValues(allCorners, baseCorners, pBarBase);
 
-            //Console.WriteLine($"C# pBarBase sample: {string.Join(", ", pBarBase.Take(10))}");
+            //Logger.Log($"C# pBarBase sample: {string.Join(", ", pBarBase.Take(10))}");
 
             double[] aBarBase = computeABar(keyCount, totalTime, deltaKs, activeColumns, aCorners, baseCorners);
             double[] aBar = interpValues(allCorners, aCorners, aBarBase);
@@ -260,7 +291,21 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             double sr = finaliseDifficulty(dAll, effectiveWeights, notes, longNotes);
 
-            //Console.WriteLine($"C# final SR: {sr}");
+            if (TraceEnabled)
+            {
+                try
+                {
+                    // Important: ensure the line makes it into runtime logs without requiring verbose log level.
+                    Console.WriteLine(formatTraceJson(maniaBeatmap, keyCount, sr, notes, longNotes), "xxy_sr", LogLevel.Important);
+                }
+                catch (Exception ex)
+                {
+                    // Never fail SR computation due to trace formatting.
+                    Console.WriteLine($"xxy_sr_trace_failed: {ex.GetType().Name}: {ex.Message}", "xxy_sr", LogLevel.Important);
+                }
+            }
+
+            //Logger.Log($"C# final SR: {sr}");
 
             return sr;
         }
@@ -269,9 +314,116 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
         {
             double leniency = 0.3 * Math.Sqrt((64.5 - Math.Ceiling(overallDifficulty * 3.0)) / 500.0);
             double offset = leniency - 0.09;
+
             double scaledOffset = 0.6 * offset;
             double adjustedWindow = scaledOffset + 0.09;
             return Math.Min(leniency, adjustedWindow);
+        }
+
+        private static string formatTraceJson(ManiaBeatmap maniaBeatmap, int keyCount, double sr, List<NoteStruct> notes, List<NoteStruct> longNotes)
+        {
+            string beatmapId = maniaBeatmap.BeatmapInfo.ID.ToString();
+            string beatmapHash = maniaBeatmap.BeatmapInfo.Hash;
+
+            int[] perColumn = new int[keyCount];
+            int[] perColumnLn = new int[keyCount];
+
+            foreach (var n in notes)
+                perColumn[n.Column]++;
+            foreach (var ln in longNotes)
+                perColumnLn[ln.Column]++;
+
+            string notesHash = hashNotes(notes);
+            string longNotesHash = hashNotes(longNotes);
+
+            var buffer = new ArrayBufferWriter<byte>(512);
+
+            using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = false }))
+            {
+                writer.WriteStartObject();
+
+                // Fixed property order for stable diffs.
+                writer.WriteString("event", "xxy_sr_trace");
+                writer.WriteNumber("trace_version", 1);
+                writer.WriteString("impl", "osu");
+                writer.WriteString("beatmap_id", beatmapId);
+                writer.WriteString("beatmap_hash", beatmapHash);
+
+                writer.WriteNumber("key_count", keyCount);
+                writer.WriteNumber("cs", maniaBeatmap.BeatmapInfo.Difficulty.CircleSize);
+                writer.WriteNumber("total_columns", maniaBeatmap.TotalColumns);
+                writer.WriteNumber("od", maniaBeatmap.BeatmapInfo.Difficulty.OverallDifficulty);
+
+                writer.WriteNumber("hitobjects_total", maniaBeatmap.HitObjects.Count);
+                writer.WriteNumber("notes_total", notes.Count);
+                writer.WriteNumber("long_notes_total", longNotes.Count);
+
+                writer.WriteString("notes_hash", notesHash);
+                writer.WriteString("long_notes_hash", longNotesHash);
+
+                writer.WriteStartArray("column_note_counts");
+                for (int i = 0; i < perColumn.Length; i++)
+                    writer.WriteNumberValue(perColumn[i]);
+                writer.WriteEndArray();
+
+                writer.WriteStartArray("column_long_note_counts");
+                for (int i = 0; i < perColumnLn.Length; i++)
+                    writer.WriteNumberValue(perColumnLn[i]);
+                writer.WriteEndArray();
+
+                writer.WriteStartArray("note_sample");
+
+                for (int i = 0; i < Math.Min(trace_sample_count, notes.Count); i++)
+                {
+                    var n = notes[i];
+                    writer.WriteStartObject();
+                    writer.WriteNumber("c", n.Column);
+                    writer.WriteNumber("h", n.HeadTime);
+                    writer.WriteNumber("t", n.TailTime);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+
+                writer.WriteStartArray("long_note_sample");
+
+                for (int i = 0; i < Math.Min(trace_sample_count, longNotes.Count); i++)
+                {
+                    var n = longNotes[i];
+                    writer.WriteStartObject();
+                    writer.WriteNumber("c", n.Column);
+                    writer.WriteNumber("h", n.HeadTime);
+                    writer.WriteNumber("t", n.TailTime);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+
+                writer.WriteNumber("sr", sr);
+
+                writer.WriteEndObject();
+                writer.Flush();
+            }
+
+            return Encoding.UTF8.GetString(buffer.WrittenSpan);
+        }
+
+        private static string hashNotes(IReadOnlyList<NoteStruct> notes)
+        {
+            if (notes.Count == 0)
+                return "";
+
+            var sb = new StringBuilder(notes.Count * 12);
+
+            for (int i = 0; i < notes.Count; i++)
+            {
+                var n = notes[i];
+                sb.Append(n.Column).Append(',').Append(n.HeadTime).Append(',').Append(n.TailTime).Append(';');
+            }
+
+            byte[] bytes = Encoding.UTF8.GetBytes(sb.ToString());
+            byte[] hash = SHA256.HashData(bytes);
+            return Convert.ToHexString(hash);
         }
 
         private static (double[] allCorners, double[] baseCorners, double[] aCorners) buildCorners(int totalTime, List<NoteStruct> notes)
@@ -905,7 +1057,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             percentile83 /= 4.0;
 
-            //Console.WriteLine($"C# percentile93: {percentile93}, percentile83: {percentile83}");
+            //Logger.Log($"C# percentile93: {percentile93}, percentile83: {percentile83}");
 
             double weightedMeanNumerator = 0;
             for (int i = 0; i < sortedD.Length; i++)
@@ -913,7 +1065,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             double weightedMean = Math.Pow(Math.Max(weightedMeanNumerator / totalWeight, 0), 0.2);
 
-            //Console.WriteLine($"C# weightedMean: {weightedMean}");
+            //Logger.Log($"C# weightedMean: {weightedMean}");
 
             double topComponent = 0.25 * 0.88 * percentile93;
             double middleComponent = 0.2 * 0.94 * percentile83;
@@ -921,7 +1073,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             double sr = topComponent + middleComponent + meanComponent;
             sr = Math.Pow(sr, 1.0) / Math.Pow(8, 1.0) * 8;
 
-            //Console.WriteLine($"C# sr before notes adjustment: {sr}");
+            //Logger.Log($"C# sr before notes adjustment: {sr}");
 
             double totalNotes = notes.Count;
 
@@ -931,13 +1083,13 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
                 totalNotes += 0.5 * (len / 200.0);
             }
 
-            //Console.WriteLine($"C# totalNotes: {totalNotes}");
+            //Logger.Log($"C# totalNotes: {totalNotes}");
 
             sr *= totalNotes / (totalNotes + 60);
             sr = rescaleHigh(sr);
             sr *= 0.975;
 
-            //Console.WriteLine($"C# final SR: {sr}");
+            //Logger.Log($"C# final SR: {sr}");
 
             return sr;
         }

@@ -313,7 +313,7 @@ namespace osu.Game.Screens.SelectV2
             loggedLargeXxyDiffBeatmapId = beatmapId;
 
             Logger.Log(
-                $"xxy_SR large diff (no-mod): beatmapId={beatmapId} onlineId={beatmap.OnlineID} diff=\"{beatmap.DifficultyName}\" star={star:0.###} xxy={xxy:0.###} absDiff={diff:0.###}",
+                XxySrDebugJson.FormatLargeDiffNoMod(beatmap, star.Value, xxy.Value),
                 "xxy_sr",
                 LogLevel.Error);
         }

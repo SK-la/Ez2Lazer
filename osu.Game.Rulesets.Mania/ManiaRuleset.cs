@@ -367,7 +367,6 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
                         new StarRatingRebirth(),
-                        new StarRatingRebirthNoTask(),
                     };
 
                 case ModType.Fun:
