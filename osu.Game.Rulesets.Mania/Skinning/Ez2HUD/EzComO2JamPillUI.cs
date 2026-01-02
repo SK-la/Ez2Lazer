@@ -80,6 +80,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         private Container backgroundContainer = null!;
 
+        private bool rebuildScheduled;
+        private bool layoutScheduled;
+
         public EzComO2JamPillUI()
         {
             AutoSizeAxes = Axes.Both;
@@ -135,26 +138,67 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                 }
             };
 
-            BoxElementAlpha.BindValueChanged(value =>
-            {
-                backgroundContainer.Alpha = value.NewValue;
-            }, true);
-            SpriteDropdown.BindValueChanged(_ => rebuildPills());
-            PillFillDirection.BindValueChanged(_ => updateLayout());
+            BoxElementAlpha.BindValueChanged(value => requestAlphaUpdate(value.NewValue), true);
+            SpriteDropdown.BindValueChanged(_ => requestRebuild());
+            PillFillDirection.BindValueChanged(_ => requestLayoutUpdate());
             PillCount.BindValueChanged(value =>
             {
                 currentPillCount = value.NewValue;
-                rebuildPills();
+                requestRebuild();
             }, true);
         }
 
-        private void updateLayout()
+        private void requestAlphaUpdate(float alpha)
         {
-            pillContainer.Direction = PillFillDirection.Value;
-            backgroundContainer.Size = PillFillDirection.Value == FillDirection.Vertical
-                ? new Vector2(60, 280)
-                : new Vector2(280, 60);
-            rebuildPills();
+            // Mutations must occur on the update thread.
+            Schedule(() =>
+            {
+                if (IsDisposed)
+                    return;
+
+                backgroundContainer.Alpha = alpha;
+            });
+        }
+
+        private void requestLayoutUpdate()
+        {
+            if (layoutScheduled)
+                return;
+
+            layoutScheduled = true;
+
+            Schedule(() =>
+            {
+                layoutScheduled = false;
+
+                if (IsDisposed)
+                    return;
+
+                pillContainer.Direction = PillFillDirection.Value;
+                backgroundContainer.Size = PillFillDirection.Value == FillDirection.Vertical
+                    ? new Vector2(60, 280)
+                    : new Vector2(280, 60);
+
+                requestRebuild();
+            });
+        }
+
+        private void requestRebuild()
+        {
+            if (rebuildScheduled)
+                return;
+
+            rebuildScheduled = true;
+
+            Schedule(() =>
+            {
+                rebuildScheduled = false;
+
+                if (IsDisposed)
+                    return;
+
+                rebuildPills();
+            });
         }
 
         private void rebuildPills()
