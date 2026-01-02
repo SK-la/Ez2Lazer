@@ -274,8 +274,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             if (player != null)
             {
-                updateDimmableAlphaOpen();
-                workingBeatmap = player.Beatmap;
+                workingBeatmap = player.Beatmap.Value != null ? player.Beatmap.GetBoundCopy() : null!;
 
                 if (player.DimmableStoryboard != null)
                 {
@@ -288,7 +287,11 @@ namespace osu.Game.Rulesets.Mania.UI
                         return;
                     }
                 }
+            }
 
+            if (workingBeatmap.Value != null)
+            {
+                updateDimmableAlphaOpen();
                 var maskedBackground = new BeatmapBackground(workingBeatmap.Value);
                 maskedBackground.FadeInFromZero(500, Easing.OutQuint);
                 maniaMaskedDimmable.Background = maskedBackground;
@@ -300,7 +303,7 @@ namespace osu.Game.Rulesets.Mania.UI
             else
             {
                 updateDimmableAlphaOpen(false);
-                Logger.Log("Working beatmap is null, cannot load background.", level: LogLevel.Error);
+                Logger.Log("Working beatmap is null, cannot load background.", LoggingTarget.Runtime, LogLevel.Error);
             }
         }
 
