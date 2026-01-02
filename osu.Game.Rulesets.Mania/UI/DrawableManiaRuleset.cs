@@ -253,7 +253,7 @@ namespace osu.Game.Rulesets.Mania.UI
             switch (scrollingStyle.Value)
             {
                 case EzManiaScrollingStyle.ScrollSpeedStyle:
-                case EzManiaScrollingStyle.ScrollTimeForDefaultJudgement:
+                case EzManiaScrollingStyle.ScrollTimeStyle:
                     // Preserve the scroll speed as the scroll length varies from changes to the hit position.
                     scale = lengthToHitPosition / length_to_default_hit_position;
                     break;
@@ -262,7 +262,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     scale = lengthToHitPosition / hitPosition;
                     break;
 
-                case EzManiaScrollingStyle.ScrollTimeForScreenBottom:
+                case EzManiaScrollingStyle.ScrollTimeStyleFixed:
                     // Ensure the travel time from the top of the screen to the hit position remains constant.
                     scale = lengthToHitPosition / 768;
                     break;

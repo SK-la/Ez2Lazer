@@ -13,19 +13,19 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         ScrollSpeedStyle = 0,
 
         // [LocalisableDescription(typeof(RulesetSettingsStrings), nameof(RulesetSettingsStrings.ScrollingDirectionDown))]
-        [Description("ms值 相对默认判定线")]
-        ScrollTimeForDefaultJudgement = 1,
+        [Description("(ms) For Default Judgement Line")]
+        ScrollTimeStyle = 1,
 
-        [Description("ms值 相对实际判定线")]
+        [Description("(ms) For Real Judgement Line")]
         ScrollTimeForRealJudgement = 2,
 
-        [Description("ms值 相对屏幕底部")]
-        ScrollTimeForScreenBottom = 3,
+        [Description("(ms) For Screen Bottom")]
+        ScrollTimeStyleFixed = 3,
 
-        [Obsolete("Renamed to ScrollTimeForScreenBottom. Kept for backward compatibility with stored settings.")]
-        ScrollTimeStyle = ScrollTimeForScreenBottom,
-
-        [Obsolete("Renamed to ScrollTimeForScreenBottom. Kept for backward compatibility with stored settings.")]
-        ScrollTimeStyleFixed = ScrollTimeForScreenBottom,
+        // [Obsolete("Renamed to ScrollTimeStyleFixed. Kept for backward compatibility with stored settings.")]
+        // ScrollTimeStyle = ScrollTimeStyleFixed,
+        //
+        // [Obsolete("Renamed to ScrollTimeStyleFixed. Kept for backward compatibility with stored settings.")]
+        // ScrollTimeStyleFixed = ScrollTimeStyleFixed,
     }
 }
