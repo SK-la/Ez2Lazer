@@ -2,12 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -28,28 +25,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
     {
         [Resolved]
         protected RulesetInfo RulesetInfo { get; set; } = null!;
-
-        /// <summary>
-        /// Emits a single-line JSON trace per computation to the <c>xxy_sr</c> logger.
-        /// Intended for script-based diffing between implementations.
-        /// </summary>
-        // 默认关闭；当调试器附加（Rider Debug 启动 / Attach）时自动开启，避免用户手动配置环境变量。
-        public static bool TraceEnabled => Debugger.IsAttached || getTraceEnabledFromEnv();
-
-        private const int trace_sample_count = 16;
-
-        private static bool getTraceEnabledFromEnv()
-        {
-            // Opt-in only. Intended for ad-hoc debugging and script-based diffs.
-            // Accepted values: 1/true/yes (case-insensitive).
-            string? value = Environment.GetEnvironmentVariable("XXY_SR_TRACE");
-            if (string.IsNullOrWhiteSpace(value))
-                return false;
-
-            return value.Equals("1", StringComparison.OrdinalIgnoreCase)
-                   || value.Equals("true", StringComparison.OrdinalIgnoreCase)
-                   || value.Equals("yes", StringComparison.OrdinalIgnoreCase);
-        }
 
         /// <summary>
         ///     Singleton entry point for SR calculations.
@@ -291,20 +266,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             double sr = finaliseDifficulty(dAll, effectiveWeights, notes, longNotes);
 
-            if (TraceEnabled)
-            {
-                try
-                {
-                    // Important: ensure the line makes it into runtime logs without requiring verbose log level.
-                    Console.WriteLine(formatTraceJson(maniaBeatmap, keyCount, sr, notes, longNotes), "xxy_sr", LogLevel.Important);
-                }
-                catch (Exception ex)
-                {
-                    // Never fail SR computation due to trace formatting.
-                    Console.WriteLine($"xxy_sr_trace_failed: {ex.GetType().Name}: {ex.Message}", "xxy_sr", LogLevel.Important);
-                }
-            }
-
             //Logger.Log($"C# final SR: {sr}");
 
             return sr;
@@ -318,112 +279,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             double scaledOffset = 0.6 * offset;
             double adjustedWindow = scaledOffset + 0.09;
             return Math.Min(leniency, adjustedWindow);
-        }
-
-        private static string formatTraceJson(ManiaBeatmap maniaBeatmap, int keyCount, double sr, List<NoteStruct> notes, List<NoteStruct> longNotes)
-        {
-            string beatmapId = maniaBeatmap.BeatmapInfo.ID.ToString();
-            string beatmapHash = maniaBeatmap.BeatmapInfo.Hash;
-
-            int[] perColumn = new int[keyCount];
-            int[] perColumnLn = new int[keyCount];
-
-            foreach (var n in notes)
-                perColumn[n.Column]++;
-            foreach (var ln in longNotes)
-                perColumnLn[ln.Column]++;
-
-            string notesHash = hashNotes(notes);
-            string longNotesHash = hashNotes(longNotes);
-
-            var buffer = new ArrayBufferWriter<byte>(512);
-
-            using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = false }))
-            {
-                writer.WriteStartObject();
-
-                // Fixed property order for stable diffs.
-                writer.WriteString("event", "xxy_sr_trace");
-                writer.WriteNumber("trace_version", 1);
-                writer.WriteString("impl", "osu");
-                writer.WriteString("beatmap_id", beatmapId);
-                writer.WriteString("beatmap_hash", beatmapHash);
-
-                writer.WriteNumber("key_count", keyCount);
-                writer.WriteNumber("cs", maniaBeatmap.BeatmapInfo.Difficulty.CircleSize);
-                writer.WriteNumber("total_columns", maniaBeatmap.TotalColumns);
-                writer.WriteNumber("od", maniaBeatmap.BeatmapInfo.Difficulty.OverallDifficulty);
-
-                writer.WriteNumber("hitobjects_total", maniaBeatmap.HitObjects.Count);
-                writer.WriteNumber("notes_total", notes.Count);
-                writer.WriteNumber("long_notes_total", longNotes.Count);
-
-                writer.WriteString("notes_hash", notesHash);
-                writer.WriteString("long_notes_hash", longNotesHash);
-
-                writer.WriteStartArray("column_note_counts");
-                for (int i = 0; i < perColumn.Length; i++)
-                    writer.WriteNumberValue(perColumn[i]);
-                writer.WriteEndArray();
-
-                writer.WriteStartArray("column_long_note_counts");
-                for (int i = 0; i < perColumnLn.Length; i++)
-                    writer.WriteNumberValue(perColumnLn[i]);
-                writer.WriteEndArray();
-
-                writer.WriteStartArray("note_sample");
-
-                for (int i = 0; i < Math.Min(trace_sample_count, notes.Count); i++)
-                {
-                    var n = notes[i];
-                    writer.WriteStartObject();
-                    writer.WriteNumber("c", n.Column);
-                    writer.WriteNumber("h", n.HeadTime);
-                    writer.WriteNumber("t", n.TailTime);
-                    writer.WriteEndObject();
-                }
-
-                writer.WriteEndArray();
-
-                writer.WriteStartArray("long_note_sample");
-
-                for (int i = 0; i < Math.Min(trace_sample_count, longNotes.Count); i++)
-                {
-                    var n = longNotes[i];
-                    writer.WriteStartObject();
-                    writer.WriteNumber("c", n.Column);
-                    writer.WriteNumber("h", n.HeadTime);
-                    writer.WriteNumber("t", n.TailTime);
-                    writer.WriteEndObject();
-                }
-
-                writer.WriteEndArray();
-
-                writer.WriteNumber("sr", sr);
-
-                writer.WriteEndObject();
-                writer.Flush();
-            }
-
-            return Encoding.UTF8.GetString(buffer.WrittenSpan);
-        }
-
-        private static string hashNotes(IReadOnlyList<NoteStruct> notes)
-        {
-            if (notes.Count == 0)
-                return "";
-
-            var sb = new StringBuilder(notes.Count * 12);
-
-            for (int i = 0; i < notes.Count; i++)
-            {
-                var n = notes[i];
-                sb.Append(n.Column).Append(',').Append(n.HeadTime).Append(',').Append(n.TailTime).Append(';');
-            }
-
-            byte[] bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            byte[] hash = SHA256.HashData(bytes);
-            return Convert.ToHexString(hash);
         }
 
         private static (double[] allCorners, double[] baseCorners, double[] aCorners) buildCorners(int totalTime, List<NoteStruct> notes)
