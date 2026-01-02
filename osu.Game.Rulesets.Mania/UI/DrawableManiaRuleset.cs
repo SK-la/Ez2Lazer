@@ -144,6 +144,9 @@ namespace osu.Game.Rulesets.Mania.UI
                 TargetTimeRange = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value);
             });
 
+            Config.BindWith(ManiaRulesetSetting.ScrollStyle, scrollingStyle);
+            scrollingStyle.BindValueChanged(_ => updateTimeRange());
+
             TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
