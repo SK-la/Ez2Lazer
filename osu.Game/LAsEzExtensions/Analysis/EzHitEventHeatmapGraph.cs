@@ -148,6 +148,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 AddInternal(new Path
                 {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
                     PathRadius = 1,
                     Colour = Color4.Red,
                     Alpha = 0.3f,
