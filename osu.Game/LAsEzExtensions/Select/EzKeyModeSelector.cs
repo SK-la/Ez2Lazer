@@ -46,6 +46,7 @@ namespace osu.Game.LAsEzExtensions.Select
             AutoSizeAxes = Axes.Y;
             CornerRadius = 8;
             Masking = true;
+            Shear = OsuGame.SHEAR;
         }
 
         [BackgroundDependencyLoader]
@@ -57,28 +58,26 @@ namespace osu.Game.LAsEzExtensions.Select
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
-                    Shear = -OsuGame.SHEAR,
                     RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
                     ColumnDimensions = new[]
                     {
-                        new Dimension(),
-                        new Dimension(GridSizeMode.Absolute),
+                        new Dimension(GridSizeMode.Distributed),
                         new Dimension(GridSizeMode.AutoSize),
                     },
                     Content = new[]
                     {
-                        new[]
+                        new Drawable[]
                         {
                             tabControl = new ShearedCsModeTabControl
                             {
                                 RelativeSizeAxes = Axes.X,
                             },
-                            Empty(),
                             multiSelectButton = new ShearedToggleButton
                             {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
                                 Text = "Multi",
+                                Shear = OsuGame.SHEAR / 6,
                                 Height = 30f,
                             }
                         }
@@ -171,7 +170,6 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
-                Shear = OsuGame.SHEAR;
                 CornerRadius = ShearedButton.CORNER_RADIUS;
                 Masking = true;
                 LabelContainer = new Container
@@ -193,7 +191,7 @@ namespace osu.Game.LAsEzExtensions.Select
                             Margin = new MarginPadding
                                 { Horizontal = 8f, Vertical = 7f },
                             Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                            Shear = -OsuGame.SHEAR,
+                            // Shear = -OsuGame.SHEAR,
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
                         },
@@ -209,14 +207,16 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 TabContainer.Anchor = Anchor.CentreLeft;
                 TabContainer.Origin = Anchor.CentreLeft;
-                TabContainer.Shear = -OsuGame.SHEAR;
+                // TabContainer.Shear = -OsuGame.SHEAR;
                 TabContainer.RelativeSizeAxes = Axes.X;
                 TabContainer.AutoSizeAxes = Axes.Y;
                 TabContainer.Spacing = new Vector2(0f);
                 TabContainer.Margin = new MarginPadding
                 {
-                    Left = LabelContainer.DrawWidth + 8,
+                    Left = LabelContainer.DrawWidth,
                 };
+
+                // LabelContainer.Shear = OsuGame.SHEAR;
             }
 
             public void UpdateForRuleset(int rulesetId)
@@ -308,10 +308,11 @@ namespace osu.Game.LAsEzExtensions.Select
                 public ShearedCsModeTabItem(string value)
                     : base(value)
                 {
-                    Shear = OsuGame.SHEAR;
+                    // Shear = OsuGame.SHEAR;
                     CornerRadius = ShearedButton.CORNER_RADIUS;
                     Masking = true;
-                    AutoSizeAxes = Axes.Both;
+                    Width = 40;
+                    AutoSizeAxes = Axes.Y;
                     Margin = new MarginPadding { Left = 4 };
 
                     background = new Box
@@ -328,7 +329,7 @@ namespace osu.Game.LAsEzExtensions.Select
                         Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
-                        Shear = -OsuGame.SHEAR,
+                        // Shear = -OsuGame.SHEAR,
                         Colour = Colour4.White,
                     };
 

@@ -166,6 +166,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
 
             //新增自定义
+            SetDefault(OsuSetting.KeySoundPreview, false);
             SetDefault(OsuSetting.EzSelectCsMode, CsItemIds.ALL.First().Id);
             SetDefault(OsuSetting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(OsuSetting.CustomHealthFormHitMode, true);
@@ -440,6 +441,7 @@ namespace osu.Game.Configuration
         ScoreDisplayMode,
 
         //自定义
+        KeySoundPreview,
         EzSelectCsMode,
         ScalingGameMode,
         AccuracyCutoffS,

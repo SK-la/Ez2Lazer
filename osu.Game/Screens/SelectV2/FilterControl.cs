@@ -48,6 +48,7 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
         private EzKeyModeSelector csSelector = null!;
+        private ShearedToggleButton keySoundPreviewButton = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -193,9 +194,36 @@ namespace osu.Game.Screens.SelectV2
                             ScopedBeatmapSet = ScopedBeatmapSet,
                             Depth = float.MinValue, // hack to ensure that the scoped display handles `GlobalAction.Back` input before the filter control
                         },
-                        csSelector = new EzKeyModeSelector
+                        new GridContainer
                         {
                             RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Shear = -OsuGame.SHEAR,
+                            RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                            ColumnDimensions = new[]
+                            {
+                                new Dimension(),
+                                new Dimension(GridSizeMode.Absolute), // can probably be removed?
+                                new Dimension(GridSizeMode.AutoSize),
+                            },
+                            Content = new[]
+                            {
+                                new[]
+                                {
+                                    csSelector = new EzKeyModeSelector
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                    },
+                                    Empty(),
+                                    keySoundPreviewButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.Centre,
+                                        Origin = Anchor.Centre,
+                                        Text = "kSound Preview",
+                                        Height = 30f,
+                                    },
+                                },
+                            }
                         },
                     },
                 }
@@ -211,6 +239,7 @@ namespace osu.Game.Screens.SelectV2
 
             difficultyRangeSlider.LowerBound = config.GetBindable<double>(OsuSetting.DisplayStarsMinimum);
             difficultyRangeSlider.UpperBound = config.GetBindable<double>(OsuSetting.DisplayStarsMaximum);
+            config.BindWith(OsuSetting.KeySoundPreview, keySoundPreviewButton.Active);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
             config.BindWith(OsuSetting.SongSelectGroupMode, groupDropdown.Current);

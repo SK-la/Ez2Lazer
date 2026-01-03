@@ -282,7 +282,7 @@ namespace osu.Game.LAsEzExtensions.Select
             if (currentTrack != null)
             {
                 currentTrack.Seek(playback.PreviewStartTime);
-                currentTrack.Looping = !playback.UseExternalLooping && (OverrideLooping ?? false);
+                currentTrack.Looping = !playback.UseExternalLooping && (OverrideLooping ?? true);
                 currentTrack.RestartPoint = playback.PreviewStartTime;
             }
 
@@ -357,7 +357,7 @@ namespace osu.Game.LAsEzExtensions.Select
                 playback.LoopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
 
                 if (playback.EffectiveLoopCount == int.MaxValue)
-                    playback.PreviewEndTime = playback.PreviewStartTime + playback.LoopSegmentLength;
+                    playback.PreviewEndTime = double.MaxValue;
                 else
                     playback.PreviewEndTime = playback.PreviewStartTime + playback.EffectiveLoopCount * (playback.LoopSegmentLength + playback.LoopInterval) - playback.LoopInterval;
 
@@ -378,7 +378,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 prepareHitSounds(playableBeatmap, playback.PreviewEndTime);
                 prepareStoryboardSamples(beatmap.Storyboard, playback.PreviewEndTime);
-                preloadSamples();
+                // preloadSamples();
 
                 if (sampleScheduler.ScheduledHitSounds.Count == 0 && sampleScheduler.ScheduledStoryboardSamples.Count == 0)
                 {
@@ -526,7 +526,15 @@ namespace osu.Game.LAsEzExtensions.Select
             }
 
             if (!currentTrack.IsRunning)
+            {
+                if (currentTrack.IsDisposed)
+                {
+                    StopPreview();
+                    return;
+                }
+
                 currentTrack.Start();
+            }
 
             double drift = Math.Abs(currentTrack.CurrentTime - logicalTime);
 

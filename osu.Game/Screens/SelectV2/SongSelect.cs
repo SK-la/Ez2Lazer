@@ -159,6 +159,7 @@ namespace osu.Game.Screens.SelectV2
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
         private EzPreviewTrackManager ezPreviewManager = null!;
+        private Bindable<bool> keySoundPreview = null!;
 
         [BackgroundDependencyLoader]
         private void load(AudioManager audio, OsuConfigManager config)
@@ -308,6 +309,7 @@ namespace osu.Game.Screens.SelectV2
                 updateBackgroundDim();
             });
 
+            keySoundPreview = config.GetBindable<bool>(OsuSetting.KeySoundPreview);
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
         }
 
@@ -513,7 +515,8 @@ namespace osu.Game.Screens.SelectV2
             if (!isHandlingLooping)
                 return;
 
-            ezPreviewManager.StopPreview();
+            if (keySoundPreview.Value)
+                ezPreviewManager.StopPreview();
 
             music.CurrentTrack.Looping = isHandlingLooping = false;
 
@@ -522,21 +525,28 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            var provider = Mods.Value.OfType<IPreviewOverrideProvider>().FirstOrDefault();
-            var overrides = provider?.GetPreviewOverrides(beatmap);
-
-            ezPreviewManager.StopPreview();
-            RemoveInternal(ezPreviewManager, true);
-
-            var duplicate = new DuplicateVirtualTrack
+            if (keySoundPreview.Value)
             {
-                OverrideProvider = provider,
-                PendingOverrides = overrides
-            };
-            ezPreviewManager = duplicate;
-            AddInternal(duplicate);
+                var provider = Mods.Value.OfType<IPreviewOverrideProvider>().FirstOrDefault();
+                var overrides = provider?.GetPreviewOverrides(beatmap);
 
-            duplicate.StartPreview(beatmap);
+                ezPreviewManager.StopPreview();
+                RemoveInternal(ezPreviewManager, true);
+
+                var duplicate = new DuplicateVirtualTrack
+                {
+                    OverrideProvider = provider,
+                    PendingOverrides = overrides
+                };
+                ezPreviewManager = duplicate;
+                AddInternal(duplicate);
+
+                duplicate.StartPreview(beatmap);
+            }
+            else
+            {
+                beatmap.PrepareTrackForPreview(true);
+            }
         }
 
         #endregion
