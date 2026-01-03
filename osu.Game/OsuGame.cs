@@ -1395,6 +1395,24 @@ namespace osu.Game
             if (entry.Exception is SentryOnlyDiagnosticsException)
                 return;
 
+            // Custom builds may hit server-side gating for online features.
+            // These messages are not actionable for end-users of this fork, so avoid spamming notifications.
+            if (entry.Message?.Contains("Realtime online functionality is not supported on this version of the game", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("Please ensure that you are using the latest version of the official game releases", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("Your score will not be submitted", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("This is not an official build of the game", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            // Some of the above messages are logged with a blank separator line at important level.
+            if (string.IsNullOrWhiteSpace(entry.Message) && entry.Target == LoggingTarget.Network)
+                return;
+
             const int short_term_display_limit = 3;
 
             if (generalLogRecentCount < short_term_display_limit)
