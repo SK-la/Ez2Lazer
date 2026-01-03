@@ -169,6 +169,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.EzSelectCsMode, CsItemIds.ALL.First().Id);
             SetDefault(OsuSetting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(OsuSetting.CustomHealthFormHitMode, true);
+            SetDefault(OsuSetting.CustomPoorHitResult, true);
             SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
@@ -445,6 +446,7 @@ namespace osu.Game.Configuration
         AccuracyCutoffA,
         HitMode,
         CustomHealthFormHitMode,
+        CustomPoorHitResult,
         // //mania用自定义
         // SelectManiaRulesetSubset,
         // ScrollBaseSpeed,

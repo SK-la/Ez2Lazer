@@ -8,6 +8,8 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
+using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -62,6 +64,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         public ManiaBeatmapConverter(IBeatmap beatmap, Ruleset ruleset)
             : this(beatmap, LegacyBeatmapConversionDifficultyInfo.FromBeatmap(beatmap), ruleset)
         {
+            CurrentHitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
         }
 
         private ManiaBeatmapConverter(IBeatmap? beatmap, LegacyBeatmapConversionDifficultyInfo difficulty, Ruleset ruleset)

@@ -77,7 +77,7 @@ namespace osu.Game.Rulesets.Scoring
         /// <summary>
         /// Pool 判定是否启用
         /// </summary>
-        public virtual bool AllowPoolEnabled { get; set; }
+        public virtual bool AllowPoolEnabled { get; set; } = false;
 
         /// <summary>
         /// Retrieves the <see cref="HitResult"/> for a time offset.

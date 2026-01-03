@@ -3,6 +3,8 @@
 
 using System;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
@@ -114,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double miss;
         private double pool;
 
-        public override bool AllowPoolEnabled => true;
+        public override bool AllowPoolEnabled => GlobalConfigStore.Config?.Get<bool>(OsuSetting.CustomPoorHitResult) ?? false;
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -172,12 +174,16 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        public void SetHitMode(EzMUGHitMode hitMode, double bpm = 0)
+        public void SetHitMode(IBeatmap beatmap)
         {
+            EzMUGHitMode hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
+
             switch (hitMode)
             {
                 case EzMUGHitMode.O2Jam:
-                    if (bpm <= 0) bpm = 200;
+                    double bpm = beatmap.BeatmapInfo.BPM <= 0
+                        ? O2HitModeExtension.DEFAULT_BPM
+                        : beatmap.BeatmapInfo.BPM;
 
                     double coolRange = 7500.0 / bpm;
                     double goodRange = 22500.0 / bpm;
@@ -188,7 +194,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     SetSpecialDifficultyRange(new[] { coolRange, coolRange, goodRange, goodRange, badRange, badRange });
 
                     // 这里是真正影响判定的BPM设定
-                    O2HitModeExtension.NowBeatmapBPM = bpm > 0 ? bpm : O2HitModeExtension.DEFAULT_BPM;
+                    O2HitModeExtension.NowBeatmapBPM = bpm;
                     O2HitModeExtension.PillCount.Value = 0;
                     O2HitModeExtension.CoolCombo = 0;
                     O2HitModeExtension.PillActivated = true;

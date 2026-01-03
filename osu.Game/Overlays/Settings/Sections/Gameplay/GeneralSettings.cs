@@ -15,9 +15,27 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
     {
         protected override LocalisableString Header => CommonStrings.General;
 
+        private SettingsEnumDropdown<EzMUGHitMode> hitMode;
+        private SettingsCheckbox o2JamCheckbox;
+        private SettingsCheckbox poorHitResultCheckbox;
+
         [BackgroundDependencyLoader]
         private void load(OsuConfigManager config)
         {
+            o2JamCheckbox = new SettingsCheckbox
+            {
+                LabelText = "O2Jam Health System",
+                Current = config.GetBindable<bool>(OsuSetting.CustomHealthFormHitMode),
+                TooltipText = "Only for O2Jam HitMode. 只用于O2Jam模式。"
+            };
+            poorHitResultCheckbox = new SettingsCheckbox
+            {
+                LabelText = "Poor HitResult System",
+                Current = config.GetBindable<bool>(OsuSetting.CustomPoorHitResult),
+                TooltipText = "Added a strict penalty for wrong presses outside the Miss range. "
+                              + "will significantly increase the difficulty. Recommended for Ez2Ac and IIDX modes"
+            };
+
             Children = new Drawable[]
             {
                 new SettingsEnumDropdown<ScoringMode>
@@ -27,21 +45,15 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = config.GetBindable<ScoringMode>(OsuSetting.ScoreDisplayMode),
                     Keywords = new[] { "scoring" }
                 },
-                new SettingsEnumDropdown<EzMUGHitMode>
+                hitMode = new SettingsEnumDropdown<EzMUGHitMode>
                 {
                     ClassicDefault = EzMUGHitMode.EZ2AC,
                     LabelText = "Hit Mode",
                     Current = config.GetBindable<EzMUGHitMode>(OsuSetting.HitMode),
                     Keywords = new[] { "scoring" }
                 },
-                new SettingsCheckbox
-                {
-                    LabelText = "O2Jam Health System",
-                    Current = config.GetBindable<bool>(OsuSetting.CustomHealthFormHitMode),
-                    Alpha = config.GetBindable<EzMUGHitMode>(OsuSetting.HitMode).Value == EzMUGHitMode.O2Jam
-                        ? 1
-                        : 0
-                },
+                o2JamCheckbox,
+                poorHitResultCheckbox,
                 new SettingsSlider<double>
                 {
                     LabelText = "Accuracy Cutoff S",
@@ -67,6 +79,14 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = config.GetBindable<bool>(OsuSetting.StarFountains)
                 },
             };
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            hitMode.Current.BindValueChanged(mode =>
+                o2JamCheckbox.Alpha = mode.NewValue == EzMUGHitMode.O2Jam ? 1 : 0, true);
         }
     }
 }

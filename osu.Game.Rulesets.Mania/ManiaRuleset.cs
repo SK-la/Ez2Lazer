@@ -68,12 +68,8 @@ namespace osu.Game.Rulesets.Mania
 
         public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap)
         {
-            var hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
-            ManiaBeatmapConverter.CurrentHitMode = hitMode;
-
-            var hw = new ManiaHitWindows();
-            double bpm = beatmap.BeatmapInfo.BPM;
-            hw.SetHitMode(hitMode, bpm);
+            var hitWindows = new ManiaHitWindows();
+            hitWindows.SetHitMode(beatmap);
 
             return new ManiaBeatmapConverter(beatmap, this);
         }
