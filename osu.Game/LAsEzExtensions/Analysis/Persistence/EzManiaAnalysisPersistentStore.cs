@@ -34,11 +34,13 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         /// - 你在调试 xxySR 算法时建议保持 false，确保每次都走实时计算，不会被旧的持久化结果“遮住”。
         /// - 等算法稳定后再改成 true，即可启用 SQLite 持久化 + 版本号增量预热。
         /// </summary>
-        public static bool Enabled = false;
+        public static bool Enabled = true;
 
         public const string DATABASE_FILENAME = @"mania-analysis.sqlite";
 
-        // 手动维护：算法/序列化格式变更时递增。
+        // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
+        // 注意：此版本号与 osu! 官方服务器端的版本号无关，仅用于本地持久化存储的失效控制。
+        // 注意：更新版本号后，务必通过注释保存旧版本的变更记录，方便日后排查问题。
         public const int ANALYSIS_VERSION = 2;
 
         private readonly Storage storage;
@@ -67,6 +69,8 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+
+                    Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", "mania_analysis", LogLevel.Important);
 
                     using var connection = openConnection();
 
@@ -279,6 +283,9 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
         }
 
         public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps)
+            => GetBeatmapsNeedingRecompute(beatmaps, progress: null);
+
+        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps, Action<int, int>? progress)
         {
             if (!Enabled)
                 return Array.Empty<Guid>();
@@ -311,8 +318,16 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
 
                 List<Guid> needing = new List<Guid>();
 
+                int processed = 0;
+                int total = beatmapList.Count;
+
                 foreach (var (id, hash) in beatmapList)
                 {
+                    processed++;
+
+                    if (processed == 1 || processed % 200 == 0)
+                        progress?.Invoke(processed, total);
+
                     if (!existing.TryGetValue(id, out var row))
                     {
                         needing.Add(id);
@@ -322,6 +337,8 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
                     if (row.version != ANALYSIS_VERSION || !string.Equals(row.hash, hash, StringComparison.Ordinal))
                         needing.Add(id);
                 }
+
+                progress?.Invoke(total, total);
 
                 // 可选清理：删除已不存在的条目（避免无限增长）。
                 // 这里用 HashSet 做 membership 判断，避免每条都查库。

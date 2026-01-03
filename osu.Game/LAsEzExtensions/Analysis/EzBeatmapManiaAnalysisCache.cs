@@ -24,6 +24,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
+using System.Collections.Concurrent;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -68,6 +69,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private ScheduledDelegate? debouncedModSettingsChange;
 
         private int modsRevision;
+
+        // When persistence is disabled, keep only a bounded amount of in-memory results.
+        // This prevents unbounded memory growth when scrolling through many beatmaps.
+        private const int max_in_memory_entries_without_persistence = 128;
+        private readonly ConcurrentQueue<ManiaAnalysisCacheLookup> nonPersistentCacheInsertionOrder = new ConcurrentQueue<ManiaAnalysisCacheLookup>();
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致（150ms）。
         private const int mod_settings_debounce = 150;
@@ -116,6 +122,32 @@ namespace osu.Game.LAsEzExtensions.Analysis
             highPriorityIdleEvent.Wait(cancellationToken);
         }
 
+        /// <summary>
+        /// Warm up the persistent store only (no-mod baseline) without populating the in-memory cache.
+        /// Intended for startup warmup to avoid retaining a large set of results in memory.
+        /// </summary>
+        public Task WarmupPersistentOnlyAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+        {
+            if (!EzManiaAnalysisPersistentStore.Enabled)
+                return Task.CompletedTask;
+
+            // Only mania is supported.
+            if (beatmapInfo.Ruleset is not RulesetInfo rulesetInfo || rulesetInfo.OnlineID != 3)
+                return Task.CompletedTask;
+
+            // Always run as low-priority and never compete with visible computations.
+            return Task.Factory.StartNew(() =>
+            {
+                highPriorityIdleEvent.Wait(cancellationToken);
+
+                // No mods: only baseline is persisted.
+                var lookup = new ManiaAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null);
+
+                // computeAnalysis() will early-return persisted values and will store baseline results when computed.
+                computeAnalysis(lookup, cancellationToken);
+            }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, lowPriorityScheduler);
+        }
+
         public IBindable<ManiaBeatmapAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
@@ -148,7 +180,25 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (localBeatmapInfo == null || localRulesetInfo == null)
                 return Task.FromResult<ManiaBeatmapAnalysisResult?>(null);
 
-            return GetAsync(new ManiaAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods), cancellationToken, computationDelay);
+            var lookup = new ManiaAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
+
+            return getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay);
+        }
+
+        private async Task<ManiaBeatmapAnalysisResult?> getAndMaybeEvictAsync(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
+        {
+            var result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
+
+            // Non-persistent mode should not grow indefinitely.
+            if (!EzManiaAnalysisPersistentStore.Enabled && result != null)
+            {
+                nonPersistentCacheInsertionOrder.Enqueue(lookup);
+
+                while (CacheCount > max_in_memory_entries_without_persistence && nonPersistentCacheInsertionOrder.TryDequeue(out var toRemove))
+                    TryRemove(toRemove);
+            }
+
+            return result;
         }
 
         protected override Task<ManiaBeatmapAnalysisResult?> ComputeValueAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token = default)
@@ -326,11 +376,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (cancellationToken.IsCancellationRequested)
                 return;
 
-            // 关键点：计算不应被单个 UI 项（DrawablePool / 离屏）取消，否则快速滚动会导致结果永远算不出来/无法填充缓存。
-            // 这里将“计算”与“写回 bindable”解耦：
-            // - 计算一律使用 CancellationToken.None，以便后台完成并写入 MemoryCachingComponent 的缓存。
-            // - cancellationToken 仅用于控制是否将结果写回到 bindable（避免旧 Item 收到回调）。
-            GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, CancellationToken.None, computationDelay)
+            // Persistent mode: decouple computation from UI cancellation so results can be cached/persisted even if the item is rapidly scrolled off-screen.
+            // Non-persistent mode: only compute for visible items to prevent unbounded in-memory growth.
+            var computeToken = EzManiaAnalysisPersistentStore.Enabled ? CancellationToken.None : cancellationToken;
+
+            GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, computeToken, computationDelay)
                 .ContinueWith(task =>
                 {
                     Schedule(() =>

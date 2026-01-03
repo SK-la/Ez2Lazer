@@ -43,7 +43,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         [Resolved]
         private EzManiaAnalysisPersistentStore persistentStore { get; set; } = null!;
 
-        [Resolved]
+        [Resolved(CanBeNull = true)]
         private INotificationOverlay? notificationOverlay { get; set; }
 
         [Resolved]
@@ -89,14 +89,61 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             realmAccess.Run(r =>
             {
-                foreach (var b in r.All<BeatmapInfo>().Where(b => b.BeatmapSet != null && !b.Hidden && b.Ruleset.OnlineID == 3))
+                int totalBeatmaps = 0;
+                int totalWithSet = 0;
+                int maniaTotal = 0;
+                int maniaWithSet = 0;
+                int maniaHidden = 0;
+
+                Dictionary<string, int> rulesetDistribution = new Dictionary<string, int>();
+
+                // Align with official BackgroundDataStoreProcessor: don't exclude Hidden beatmaps here.
+                // Hidden beatmaps can still be attached to sets and may contribute to cache hit rates.
+                foreach (var b in r.All<BeatmapInfo>())
+                {
+                    totalBeatmaps++;
+
+                    bool isMania = b.Ruleset.OnlineID == 3 || string.Equals(b.Ruleset.ShortName, "mania", StringComparison.OrdinalIgnoreCase);
+                    if (isMania)
+                    {
+                        maniaTotal++;
+                        if (b.Hidden)
+                            maniaHidden++;
+                    }
+
+                    if (totalBeatmaps <= 2000)
+                    {
+                        string key = $"{b.Ruleset.ShortName}:{b.Ruleset.OnlineID}";
+                        rulesetDistribution.TryGetValue(key, out int count);
+                        rulesetDistribution[key] = count + 1;
+                    }
+
+                    if (b.BeatmapSet == null)
+                        continue;
+
+                    totalWithSet++;
+
+                    if (!isMania)
+                        continue;
+
+                    maniaWithSet++;
                     beatmaps.Add((b.ID, b.Hash));
+                }
+
+                Logger.Log($"Warmup beatmap query summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}", "mania_analysis", LogLevel.Important);
+
+                if (maniaTotal == 0)
+                {
+                    string dist = string.Join(", ", rulesetDistribution.OrderByDescending(kvp => kvp.Value).Take(10).Select(kvp => $"{kvp.Key}={kvp.Value}"));
+                    Logger.Log($"Warmup beatmap ruleset distribution (first 2000): {dist}", "mania_analysis", LogLevel.Important);
+                }
             });
 
             if (beatmaps.Count == 0)
                 return;
 
             // 增量：只重算缺失/过期（hash/version 不匹配）的条目。
+            // 与官方 star rating 进度通知一致：只在确实需要做“预计算”时展示一条 ProgressNotification。
             var needingRecompute = persistentStore.GetBeatmapsNeedingRecompute(beatmaps);
 
             if (needingRecompute.Count == 0)
@@ -106,6 +153,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
 
             Logger.Log($"Found {needingRecompute.Count} beatmaps which require mania analysis warmup.");
+
+            Logger.Log($"Starting mania analysis warmup. total={needingRecompute.Count}");
 
             var notification = showProgressNotification(needingRecompute.Count, "Precomputing mania analysis for beatmaps", "beatmaps' mania analysis has been precomputed");
 
@@ -134,14 +183,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     // 仅预热 no-mod 的缓存项：与官方 star 预计算一致（基础值持久化/复用），modded 部分仍按需计算。
                     // 关键：warmup 绝不阻塞可见项。
                     // - 等待当前所有高优先级（可见项）计算完成后再启动 warmup。
-                    // - 并且将本次计算派发到低优先级调度器。
-                    maniaAnalysisCache.WaitForHighPriorityIdle();
-                    using (maniaAnalysisCache.BeginLowPriorityScope())
-                    {
-                        maniaAnalysisCache.GetAnalysisAsync(beatmap, beatmap.Ruleset, mods: null, CancellationToken.None)
-                                         .GetAwaiter()
-                                         .GetResult();
-                    }
+                    // - 启用持久化时，仅预热 SQLite，不把所有结果长期留在内存缓存里。
+                    maniaAnalysisCache.WarmupPersistentOnlyAsync(beatmap, CancellationToken.None)
+                                     .GetAwaiter()
+                                     .GetResult();
 
                     ++processedCount;
                 }
@@ -163,11 +208,14 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (notification == null)
                 return;
 
-            notification.Text = notification.Text.ToString().Split('(').First().TrimEnd() + $" ({processedCount} of {totalCount})";
-            notification.Progress = (float)processedCount / totalCount;
+            Schedule(() =>
+            {
+                notification.Text = notification.Text.ToString().Split('(').First().TrimEnd() + $" ({processedCount} of {totalCount})";
+                notification.Progress = (float)processedCount / totalCount;
+            });
 
             if (processedCount % 100 == 0)
-                Logger.Log(notification.Text.ToString());
+                Logger.Log($"Warmup progress: {processedCount} of {totalCount}");
         }
 
         private void completeNotification(ProgressNotification? notification, int processedCount, int totalCount, int failedCount)
@@ -175,29 +223,35 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (notification == null)
                 return;
 
-            if (processedCount == totalCount)
+            Schedule(() =>
             {
-                notification.CompletionText = $"{processedCount} {notification.CompletionText}";
-                notification.Progress = 1;
-                notification.State = ProgressNotificationState.Completed;
-            }
-            else
-            {
-                notification.Text = $"{processedCount} of {totalCount} {notification.CompletionText}";
+                if (processedCount == totalCount)
+                {
+                    notification.CompletionText = $"{processedCount} {notification.CompletionText}";
+                    notification.Progress = 1;
+                    notification.State = ProgressNotificationState.Completed;
+                }
+                else
+                {
+                    notification.Text = $"{processedCount} of {totalCount} {notification.CompletionText}";
 
-                if (failedCount > 0)
-                    notification.Text += $" Check logs for issues with {failedCount} failed items.";
+                    if (failedCount > 0)
+                        notification.Text += $" Check logs for issues with {failedCount} failed items.";
 
-                notification.State = ProgressNotificationState.Cancelled;
-            }
+                    notification.State = ProgressNotificationState.Cancelled;
+                }
+            });
         }
 
         private ProgressNotification? showProgressNotification(int totalCount, string running, string completed)
         {
             if (notificationOverlay == null)
+            {
+                Logger.Log("INotificationOverlay is null; mania analysis warmup progress notification will not be shown.", "mania_analysis", LogLevel.Important);
                 return null;
+            }
 
-            if (totalCount < 10)
+            if (totalCount <= 0)
                 return null;
 
             ProgressNotification notification = new ProgressNotification
@@ -207,7 +261,18 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 State = ProgressNotificationState.Active
             };
 
-            notificationOverlay.Post(notification);
+            Schedule(() =>
+            {
+                try
+                {
+                    notificationOverlay?.Post(notification);
+                    Logger.Log("Posted mania analysis warmup progress notification.", "mania_analysis", LogLevel.Important);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to post mania analysis warmup notification.");
+                }
+            });
             return notification;
         }
 
