@@ -95,6 +95,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                 new EzComHitTiming(),
                                 new EzComComboCounter(),
                                 new BarHitErrorMeter(),
+                                new YuComFastSlowDisplay(),
                             };
                     }
 

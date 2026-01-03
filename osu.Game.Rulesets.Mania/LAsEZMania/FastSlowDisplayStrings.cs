@@ -5,6 +5,10 @@ using osu.Framework.Localisation;
 
 namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
+    /// <summary>
+    /// 供 FastSlowDisplay HUD组件使用的本地化字符串。
+    /// 代码文件来自于 YuLiangSSS。
+    /// </summary>
     public static class FastSlowDisplayStrings
     {
         private const string prefix = @"osu.Game.Rulesets.Mania.LAsEZMania.FastSlowDisplay";
@@ -208,7 +212,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         /// "Display only one text at a time."
         /// </summary>
         public static LocalisableString OnlyDisplayOneDescription => "Display only one text at a time.";
-
 
         /// <summary>
         /// "None"
