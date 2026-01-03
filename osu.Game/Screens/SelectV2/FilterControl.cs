@@ -35,7 +35,7 @@ namespace osu.Game.Screens.SelectV2
     public partial class FilterControl : OverlayContainer
     {
         // taken from draw visualiser. used for carousel alignment purposes.
-        public const float HEIGHT_FROM_SCREEN_TOP = 141 - corner_radius;
+        public const float HEIGHT_FROM_SCREEN_TOP = 171 - corner_radius;
 
         private const float corner_radius = 10;
 
