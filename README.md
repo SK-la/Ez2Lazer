@@ -6,8 +6,8 @@
 
 This is always a pre-release version, maintained by me personally
 
-### Latest release: [Windows 10+ (x64)](https://github.com/SK-la/Ez2Lazer/releases)
-- Setup [EzResources](https://la1225-my.sharepoint.com/:f:/g/personal/la_la1225_onmicrosoft_com/EiosAbw_1C9ErYCNRD1PQvkBaYvhflOkt8G9ZKHNYuppLg?e=DWY1kn) Pack to osu datebase path.
+## Latest release: [Windows 10+ (x64)](https://github.com/SK-la/Ez2Lazer/releases)
+- **Setup [EzResources](https://la1225-my.sharepoint.com/:f:/g/personal/la_la1225_onmicrosoft_com/EiosAbw_1C9ErYCNRD1PQvkBaYvhflOkt8G9ZKHNYuppLg?e=DWY1kn) Pack to osu datebase path.**
 
 - A desktop platform with the [.NET 8.0 RunTime](https://dotnet.microsoft.com/download) installed.
 
@@ -15,7 +15,20 @@ This is always a pre-release version, maintained by me personally
 
 When working with the codebase, we recommend using an IDE with intelligent code completion and syntax highlighting, such as the latest version of [Visual Studio](https://visualstudio.microsoft.com/vs/), [JetBrains Rider](https://www.jetbrains.com/rider/), or [Visual Studio Code](https://code.visualstudio.com/) with the [EditorConfig](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) and [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit) plugin installed.
 
-## Feature support
+## Build Instructions
+- Clone the repository
+```bash
+
+git clone SK-la/Ez2Lazer
+git clone SK-la/osu-framework
+git clone SK-la/osu-resources
+// There is a lack of special texture resources in Resource, so it is recommended that you use the DLL in the release package to replace it after building
+
+build Ez2Lazer
+```
+
+## Feature support 
+(It's not always updated here)
 
 ### Vedio Main Background
 - Support vedio as main background (.webm)
