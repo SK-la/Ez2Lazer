@@ -25,6 +25,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [SettingSource("Single Show E/L", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
 
+        [SettingSource("Test Mode", "Show E/L on perfect hits for testing")]
+        public Bindable<bool> TestMode { get; } = new Bindable<bool>();
+
         [SettingSource("(显示阈值) Displaying Threshold", "(显示阈值) Displaying Threshold")]
         public BindableNumber<double> Threshold { get; } = new BindableNumber<double>(22)
         {
@@ -201,9 +204,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             if (judgement.TimeOffset == 0)
             {
-                timingText.Text = "e/l";
-                timingTextL.Text = "e";
-                timingTextR.Text = "l";
+                if (TestMode.Value)
+                {
+                    // 测试模式：显示 E 和 L
+                    timingText.Text = "e/l";
+                    timingTextL.Text = "e";
+                    timingTextR.Text = "l";
+                }
+                else
+                {
+                    // 默认：不显示
+                    timingText.Text = string.Empty;
+                    timingTextL.Text = string.Empty;
+                    timingTextR.Text = string.Empty;
+                }
             }
             else
             {
