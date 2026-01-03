@@ -36,7 +36,7 @@ namespace osu.Game.LAsEzExtensions.Select
         public bool IsPlaying => playback.IsPlaying && currentTrack?.IsRunning == true;
 
         private const int hitsound_threshold = 10;
-        private const double preview_window_length = 10000; // 10s
+        private const double preview_window_length = 20000; // 20s
         private const double scheduler_interval = 16; // ~60fps
         private const double trigger_tolerance = 15; // ms 容差
 
@@ -51,7 +51,7 @@ namespace osu.Game.LAsEzExtensions.Select
         private const double audio_resync_cooldown = 250; // ms
 
         private double lastAudioResyncClockTime;
-        private const double max_dynamic_preview_length = 30000; // 动态扩展最长 ms
+        private const double max_dynamic_preview_length = 60000; // 动态扩展最长 ms
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
         private readonly PlaybackState playback = new PlaybackState();
 
