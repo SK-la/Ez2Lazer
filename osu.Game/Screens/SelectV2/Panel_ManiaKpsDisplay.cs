@@ -20,7 +20,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Screens.SelectV2
 {
-    public partial class ManiaKpsDisplay : CompositeDrawable
+    public partial class EzKpsDisplay : CompositeDrawable
     {
         private readonly OsuSpriteText kpsText;
         // private readonly LineGraph kpsGraph;
@@ -34,7 +34,7 @@ namespace osu.Game.Screens.SelectV2
         public event Action<Dictionary<int, int>>? ColumnCountsUpdated;
         public event Action<IBeatmap?>? BeatmapUpdated;
 
-        public ManiaKpsDisplay()
+        public EzKpsDisplay()
         {
             AutoSizeAxes = Axes.Both;
 

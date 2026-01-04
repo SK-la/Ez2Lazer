@@ -14,7 +14,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Screens.SelectV2
 {
-    public partial class ManiaKpcDisplay : CompositeDrawable
+    public partial class EzKpcDisplay : CompositeDrawable
     {
         /// <summary>
         /// 显示模式枚举
@@ -57,7 +57,7 @@ namespace osu.Game.Screens.SelectV2
             }
         }
 
-        public ManiaKpcDisplay()
+        public EzKpcDisplay()
         {
             AutoSizeAxes = Axes.Both;
 

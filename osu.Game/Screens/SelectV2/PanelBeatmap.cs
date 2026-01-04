@@ -55,9 +55,9 @@ namespace osu.Game.Screens.SelectV2
 
         private TrianglesV2 triangles = null!;
 
-        private LineGraph maniaKpsGraph = null!;
-        private ManiaKpsDisplay maniaKpsDisplay = null!;
-        private ManiaKpcDisplay maniaKpcDisplay = null!;
+        private LineGraph kpsGraph = null!;
+        private EzKpsDisplay kpsDisplay = null!;
+        private EzKpcDisplay kpcDisplay = null!;
         private EzXxySrDisplay xxySrDisplay = null!;
         private OsuSpriteText notesLabel = null!;
 
@@ -190,13 +190,13 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
-                                        maniaKpsDisplay = new ManiaKpsDisplay
+                                        kpsDisplay = new EzKpsDisplay
                                         {
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
                                         },
                                         Empty(),
-                                        maniaKpsGraph = new LineGraph
+                                        kpsGraph = new LineGraph
                                         {
                                             Size = new Vector2(300, 20),
                                             LineColour = Color4.CornflowerBlue.Opacity(0.8f),
@@ -240,7 +240,7 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
-                                        maniaKpcDisplay = new ManiaKpcDisplay(),
+                                        kpcDisplay = new EzKpcDisplay(),
                                     },
                                 }
                             }
@@ -363,14 +363,14 @@ namespace osu.Game.Screens.SelectV2
         private void resetManiaAnalysisDisplay()
         {
             cachedScratchText = null;
-            maniaKpcDisplay.Clear();
+            kpcDisplay.Clear();
 
             xxySrDisplay.Current.Value = null;
 
-            maniaKpsGraph.Show();
-            maniaKpsDisplay.Show();
-            maniaKpsDisplay.SetKps(0, 0);
-            maniaKpcDisplay.Show();
+            kpsGraph.Show();
+            kpsDisplay.Show();
+            kpsDisplay.SetKps(0, 0);
+            kpcDisplay.Show();
 
             if (ruleset.Value.OnlineID == 3)
             {
@@ -379,8 +379,8 @@ namespace osu.Game.Screens.SelectV2
             }
             else
             {
-                // maniaKpsDisplay.Hide();
-                // maniaKpcDisplay.Hide();
+                // kpsDisplay.Hide();
+                // kpcDisplay.Hide();
 
                 // 非 mania：隐藏 mania 专属 UI。
                 notesLabel.Hide();
@@ -395,11 +395,11 @@ namespace osu.Game.Screens.SelectV2
 
             var (averageKps, maxKps, kpsList) = result;
 
-            maniaKpsDisplay.SetKps(averageKps, maxKps);
+            kpsDisplay.SetKps(averageKps, maxKps);
 
             // Update KPS graph with the KPS list
             if (kpsList.Count > 0)
-                maniaKpsGraph.Values = kpsList.Select(k => (float)k);
+                kpsGraph.Values = kpsList.Select(k => (float)k);
 
             if (columnCounts != null)
             {
@@ -414,7 +414,7 @@ namespace osu.Game.Screens.SelectV2
                 for (int i = 0; i < keyCount; i++)
                     normalized[i] = columnCounts.GetValueOrDefault(i);
 
-                maniaKpcDisplay.UpdateColumnCounts(normalized);
+                kpcDisplay.UpdateColumnCounts(normalized);
             }
         }
 

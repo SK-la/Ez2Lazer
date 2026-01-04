@@ -68,9 +68,9 @@ namespace osu.Game.Screens.SelectV2
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
         private string? cachedScratchText;
-        private ManiaKpsDisplay maniaKpsDisplay = null!;
+        private EzKpsDisplay ezKpsDisplay = null!;
         private LineGraph maniaKpsGraph = null!;
-        private ManiaKpcDisplay maniaKpcDisplay = null!;
+        private EzKpcDisplay ezKpcDisplay = null!;
         private OsuSpriteText notesLabel = null!;
 
         private EzXxySrDisplay xxySrDisplay = null!;
@@ -204,7 +204,7 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
-                                        maniaKpsDisplay = new ManiaKpsDisplay
+                                        ezKpsDisplay = new EzKpsDisplay
                                         {
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
@@ -254,7 +254,7 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
-                                        maniaKpcDisplay = new ManiaKpcDisplay(),
+                                        ezKpcDisplay = new EzKpcDisplay(),
                                     },
                                 }
                             }
@@ -379,28 +379,28 @@ namespace osu.Game.Screens.SelectV2
         private void resetManiaAnalysisDisplay()
         {
             cachedScratchText = null;
-            maniaKpcDisplay.Clear();
+            ezKpcDisplay.Clear();
 
             xxySrDisplay.Current.Value = null;
 
             if (ruleset.Value.OnlineID == 3)
             {
-                maniaKpsDisplay.Show();
-                maniaKpsDisplay.SetKps(0, 0);
+                ezKpsDisplay.Show();
+                ezKpsDisplay.SetKps(0, 0);
                 maniaKpsGraph.Show();
 
                 notesLabel.Show();
-                maniaKpcDisplay.Show();
+                ezKpcDisplay.Show();
                 xxySrDisplay.Show();
             }
             else
             {
-                maniaKpsDisplay.Hide();
+                ezKpsDisplay.Hide();
                 maniaKpsGraph.Hide();
 
                 // 非 mania：隐藏 mania 专属 UI。
                 notesLabel.Hide();
-                maniaKpcDisplay.Hide();
+                ezKpcDisplay.Hide();
                 xxySrDisplay.Hide();
             }
         }
@@ -412,7 +412,7 @@ namespace osu.Game.Screens.SelectV2
 
             var (averageKps, maxKps, kpsList) = result;
 
-            maniaKpsDisplay.SetKps(averageKps, maxKps);
+            ezKpsDisplay.SetKps(averageKps, maxKps);
 
             // Update KPS graph with the KPS list
             if (kpsList.Count > 0)
@@ -428,7 +428,7 @@ namespace osu.Game.Screens.SelectV2
                 for (int i = 0; i < keyCount; i++)
                     normalized[i] = columnCounts.GetValueOrDefault(i);
 
-                maniaKpcDisplay.UpdateColumnCounts(normalized);
+                ezKpcDisplay.UpdateColumnCounts(normalized);
             }
         }
 
