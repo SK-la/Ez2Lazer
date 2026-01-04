@@ -46,6 +46,7 @@ namespace osu.Game.LAsEzExtensions.Select
             AutoSizeAxes = Axes.Y;
             CornerRadius = 8;
             Masking = true;
+            Shear = OsuGame.SHEAR;
         }
 
         [BackgroundDependencyLoader]
@@ -57,7 +58,7 @@ namespace osu.Game.LAsEzExtensions.Select
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
-                    Shear = -OsuGame.SHEAR,
+                    // Shear = -OsuGame.SHEAR,
                     RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
                     ColumnDimensions = new[]
                     {
@@ -78,6 +79,7 @@ namespace osu.Game.LAsEzExtensions.Select
                             {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
+                                Shear = new Vector2(0),
                                 Text = "Multi",
                                 Height = 30f,
                             }
@@ -171,7 +173,7 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
-                Shear = OsuGame.SHEAR;
+                // Shear = OsuGame.SHEAR;
                 CornerRadius = ShearedButton.CORNER_RADIUS;
                 Masking = true;
                 LabelContainer = new Container
@@ -209,7 +211,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 TabContainer.Anchor = Anchor.CentreLeft;
                 TabContainer.Origin = Anchor.CentreLeft;
-                TabContainer.Shear = -OsuGame.SHEAR;
+                // TabContainer.Shear = OsuGame.SHEAR;
                 TabContainer.RelativeSizeAxes = Axes.X;
                 TabContainer.AutoSizeAxes = Axes.Y;
                 TabContainer.Spacing = new Vector2(0f);
@@ -308,7 +310,7 @@ namespace osu.Game.LAsEzExtensions.Select
                 public ShearedCsModeTabItem(string value)
                     : base(value)
                 {
-                    Shear = OsuGame.SHEAR;
+                    // Shear = OsuGame.SHEAR;
                     CornerRadius = ShearedButton.CORNER_RADIUS;
                     Masking = true;
                     Width = 40;

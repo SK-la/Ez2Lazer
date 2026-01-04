@@ -49,6 +49,7 @@ namespace osu.Game.Screens.SelectV2
         private CollectionDropdown collectionDropdown = null!;
         private EzKeyModeSelector csSelector = null!;
         private ShearedToggleButton keySoundPreviewButton = null!;
+        private ShearedToggleButton xxySrFilterButton = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -197,9 +198,37 @@ namespace osu.Game.Screens.SelectV2
                                 }
                             }
                         },
-                        csSelector = new EzKeyModeSelector
+                        new GridContainer
                         {
                             RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Shear = -OsuGame.SHEAR,
+                            RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                            ColumnDimensions = new[]
+                            {
+                                new Dimension(),
+                                new Dimension(GridSizeMode.Absolute), // can probably be removed?
+                                new Dimension(GridSizeMode.AutoSize),
+                            },
+                            Content = new[]
+                            {
+                                new[]
+                                {
+                                    csSelector = new EzKeyModeSelector
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                    },
+                                    Empty(),
+                                    xxySrFilterButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.Centre,
+                                        Origin = Anchor.Centre,
+                                        Text = "xxy_SR Filter",
+                                        TooltipText = "(NoActive)Filter, sort beatmaps by Xxy Star Rating",
+                                        Height = 30f,
+                                    },
+                                },
+                            }
                         },
                         new ScopedBeatmapSetDisplay
                         {
@@ -232,10 +261,16 @@ namespace osu.Game.Screens.SelectV2
                 if (ruleset.Value.OnlineID == 2)
                 {
                     csSelector.Hide();
+                    xxySrFilterButton.Hide();
                 }
                 else
                 {
                     csSelector.Show();
+
+                    if (ruleset.Value.OnlineID == 3)
+                    {
+                        xxySrFilterButton.Show();
+                    }
                 }
             });
             mods.BindValueChanged(m =>
