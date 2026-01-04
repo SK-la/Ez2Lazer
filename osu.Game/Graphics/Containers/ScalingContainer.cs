@@ -134,12 +134,12 @@ namespace osu.Game.Graphics.Containers
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(GameHost host, OsuConfigManager config, ISafeArea safeArea)
+        private void load(GameHost host, OsuConfigManager config, ISafeArea safeArea, Ez2ConfigManager ezConfig)
         {
             scalingMode = config.GetBindable<ScalingMode>(OsuSetting.Scaling);
             scalingMode.ValueChanged += _ => Scheduler.AddOnce(updateSize);
 
-            scalingGameMode = config.GetBindable<ScalingGameMode>(OsuSetting.ScalingGameMode);
+            scalingGameMode = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode);
             scalingGameMode.ValueChanged += _ => Scheduler.AddOnce(updateSize);
 
             sizeX = config.GetBindable<float>(OsuSetting.ScalingSizeX);

@@ -15,9 +15,9 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
     {
         protected override LocalisableString Header => CommonStrings.General;
 
-        private SettingsEnumDropdown<EzMUGHitMode> hitMode;
-        private SettingsCheckbox o2JamCheckbox;
-        private SettingsCheckbox poorHitResultCheckbox;
+        private SettingsEnumDropdown<EzMUGHitMode> hitMode = null!;
+        private SettingsCheckbox o2JamCheckbox = null!;
+        private SettingsCheckbox poorHitResultCheckbox = null!;
 
         [BackgroundDependencyLoader]
         private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
@@ -57,14 +57,14 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 new SettingsSlider<double>
                 {
                     LabelText = "Accuracy Cutoff S",
-                    Current = config.GetBindable<double>(OsuSetting.AccuracyCutoffS),
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true
                 },
                 new SettingsSlider<double>
                 {
                     LabelText = "Accuracy Cutoff A",
-                    Current = config.GetBindable<double>(OsuSetting.AccuracyCutoffA),
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true
                 },

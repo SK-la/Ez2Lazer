@@ -165,16 +165,6 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
 
-            //新增自定义
-            SetDefault(OsuSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
-            SetDefault(OsuSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
-
-            // SetDefault(OsuSetting.ScrollBaseSpeed, 500, 100, 1000, 1.0);
-            // SetDefault(OsuSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
-            // SetDefault(OsuSetting.ScrollStyle, EzManiaScrollingStyle.ScrollTimeStyleFixed);
-            // SetDefault(OsuSetting.ScrollPerKeyMode, false);
-            // SetDefault(OsuSetting.PerspectiveAngle, 90.0f, 30.0f, 90.0f);
-
             SetDefault(OsuSetting.IncreaseFirstObjectVisibility, true);
             SetDefault(OsuSetting.GameplayDisableWinKey, true);
 
@@ -190,7 +180,6 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.ScreenshotCaptureMenuCursor, false);
 
             SetDefault(OsuSetting.Scaling, ScalingMode.Off);
-            SetDefault(OsuSetting.ScalingGameMode, ScalingGameMode.Mania);
             SetDefault(OsuSetting.SafeAreaConsiderations, true);
             SetDefault(OsuSetting.ScalingBackgroundDim, 0.9f, 0.5f, 1f, 0.01f);
 
@@ -434,12 +423,6 @@ namespace osu.Game.Configuration
         BeatmapHitsounds,
         IncreaseFirstObjectVisibility,
         ScoreDisplayMode,
-
-        //自定义
-        ScalingGameMode,
-        AccuracyCutoffS,
-        AccuracyCutoffA,
-
         ExternalLinkWarning,
         PreferNoVideo,
         Scaling,

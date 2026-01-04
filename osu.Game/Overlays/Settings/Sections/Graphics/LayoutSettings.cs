@@ -71,7 +71,7 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
         private const int transition_duration = 400;
 
         [BackgroundDependencyLoader]
-        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, GameHost host)
+        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, GameHost host, Ez2ConfigManager ezConfig)
         {
             window = host.Window;
 
@@ -154,7 +154,7 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 new SettingsEnumDropdown<ScalingGameMode>
                 {
                     LabelText = "Scaling To Game Mode",
-                    Current = osuConfig.GetBindable<ScalingGameMode>(OsuSetting.ScalingGameMode),
+                    Current = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode),
                 },
                 scalingSettings = new FillFlowContainer<SettingsSlider<float>>
                 {
@@ -235,9 +235,9 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 resolutionWindowedDropdown.Current = buffer;
 
                 var fullscreenResolutions = display.NewValue.DisplayModes
-                                                                          .Where(m => m.Size.Width >= 800 && m.Size.Height >= 600)
-                                                                          .OrderByDescending(m => Math.Max(m.Size.Height, m.Size.Width))
-                                                                          .Select(m => m.Size)
+                                                   .Where(m => m.Size.Width >= 800 && m.Size.Height >= 600)
+                                                   .OrderByDescending(m => Math.Max(m.Size.Height, m.Size.Width))
+                                                   .Select(m => m.Size)
                                                    .Distinct()
                                                    .ToList();
                 var windowedResolutions = fullscreenResolutions

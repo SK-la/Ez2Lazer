@@ -12,6 +12,7 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
@@ -205,10 +206,10 @@ namespace osu.Game.Rulesets.Scoring
         private static double accA;
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(Ez2ConfigManager ezConfig)
         {
-            accS = config.Get<double>(OsuSetting.AccuracyCutoffS);
-            accA = config.Get<double>(OsuSetting.AccuracyCutoffA);
+            accS = ezConfig.Get<double>(Ez2Setting.AccuracyCutoffS);
+            accA = ezConfig.Get<double>(Ez2Setting.AccuracyCutoffA);
         }
 
         public ScoreProcessor(Ruleset ruleset)
