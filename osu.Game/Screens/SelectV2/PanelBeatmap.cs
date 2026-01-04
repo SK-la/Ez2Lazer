@@ -384,22 +384,22 @@ namespace osu.Game.Screens.SelectV2
 
             xxySrDisplay.Current.Value = null;
 
+            maniaKpsDisplay.Show();
+            maniaKpsDisplay.SetKps(0, 0);
+            maniaKpcDisplay.Show();
+
             if (ruleset.Value.OnlineID == 3)
             {
-                maniaKpsDisplay.Show();
-                maniaKpsDisplay.SetKps(0, 0);
-
                 notesLabel.Show();
-                maniaKpcDisplay.Show();
                 xxySrDisplay.Show();
             }
             else
             {
-                maniaKpsDisplay.Hide();
+                // maniaKpsDisplay.Hide();
+                // maniaKpcDisplay.Hide();
 
                 // 非 mania：隐藏 mania 专属 UI。
                 notesLabel.Hide();
-                maniaKpcDisplay.Hide();
                 xxySrDisplay.Hide();
             }
         }

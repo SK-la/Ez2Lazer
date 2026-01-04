@@ -165,6 +165,7 @@ namespace osu.Game.Screens.SelectV2
                                 new Dimension(GridSizeMode.Absolute, 5),
                                 new Dimension(),
                                 new Dimension(GridSizeMode.AutoSize),
+                                new Dimension(GridSizeMode.AutoSize),
                             },
                             Content = new[]
                             {
@@ -186,44 +187,24 @@ namespace osu.Game.Screens.SelectV2
                                     {
                                         RelativeSizeAxes = Axes.X,
                                     },
+                                    keySoundPreviewButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.TopCentre,
+                                        Origin = Anchor.TopCentre,
+                                        Text = "kSound Preview",
+                                        Height = 30f,
+                                    },
                                 }
                             }
+                        },
+                        csSelector = new EzKeyModeSelector
+                        {
+                            RelativeSizeAxes = Axes.X,
                         },
                         new ScopedBeatmapSetDisplay
                         {
                             ScopedBeatmapSet = ScopedBeatmapSet,
                             Depth = float.MinValue, // hack to ensure that the scoped display handles `GlobalAction.Back` input before the filter control
-                        },
-                        new GridContainer
-                        {
-                            RelativeSizeAxes = Axes.X,
-                            AutoSizeAxes = Axes.Y,
-                            Shear = -OsuGame.SHEAR,
-                            RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
-                            ColumnDimensions = new[]
-                            {
-                                new Dimension(),
-                                new Dimension(GridSizeMode.Absolute), // can probably be removed?
-                                new Dimension(GridSizeMode.AutoSize),
-                            },
-                            Content = new[]
-                            {
-                                new[]
-                                {
-                                    csSelector = new EzKeyModeSelector
-                                    {
-                                        RelativeSizeAxes = Axes.X,
-                                    },
-                                    Empty(),
-                                    keySoundPreviewButton = new ShearedToggleButton
-                                    {
-                                        Anchor = Anchor.Centre,
-                                        Origin = Anchor.Centre,
-                                        Text = "kSound Preview",
-                                        Height = 30f,
-                                    },
-                                },
-                            }
                         },
                     },
                 }
@@ -244,7 +225,19 @@ namespace osu.Game.Screens.SelectV2
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
             config.BindWith(OsuSetting.SongSelectGroupMode, groupDropdown.Current);
 
-            ruleset.BindValueChanged(_ => updateCriteria());
+            ruleset.BindValueChanged(_ =>
+            {
+                updateCriteria();
+
+                if (ruleset.Value.OnlineID == 2)
+                {
+                    csSelector.Hide();
+                }
+                else
+                {
+                    csSelector.Show();
+                }
+            });
             mods.BindValueChanged(m =>
             {
                 // The following is a note carried from old song select and may not be a valid reason anymore:
