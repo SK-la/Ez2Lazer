@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -23,11 +24,13 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Screens.SelectV2
 {
@@ -52,6 +55,7 @@ namespace osu.Game.Screens.SelectV2
 
         private TrianglesV2 triangles = null!;
 
+        private LineGraph maniaKpsGraph = null!;
         private ManiaKpsDisplay maniaKpsDisplay = null!;
         private ManiaKpcDisplay maniaKpcDisplay = null!;
         private EzXxySrDisplay xxySrDisplay = null!;
@@ -186,14 +190,21 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
-                                        maniaKpsDisplay = new ManiaKpsDisplay(),
-                                        // kpsGraph = new LineGraph
-                                        // {
-                                        //     Size = new Vector2(300, 20),
-                                        //     Colour = OsuColour.Gray(0.25f),
-                                        //     Anchor = Anchor.BottomLeft,
-                                        //     Origin = Anchor.BottomLeft,
-                                        // },
+                                        maniaKpsDisplay = new ManiaKpsDisplay
+                                        {
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                        },
+                                        Empty(),
+                                        maniaKpsGraph = new LineGraph
+                                        {
+                                            Size = new Vector2(300, 20),
+                                            LineColour = Color4.White,
+                                            Blending = BlendingParameters.Additive,
+                                            Colour = ColourInfo.GradientHorizontal(Color4.White, new Color4(1f, 1f, 1f, 0.5f)),
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                        },
                                     }
                                 },
                                 new FillFlowContainer
@@ -356,6 +367,7 @@ namespace osu.Game.Screens.SelectV2
 
             xxySrDisplay.Current.Value = null;
 
+            maniaKpsGraph.Show();
             maniaKpsDisplay.Show();
             maniaKpsDisplay.SetKps(0, 0);
             maniaKpcDisplay.Show();
@@ -381,9 +393,13 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
-            var (averageKps, maxKps, _) = result;
+            var (averageKps, maxKps, kpsList) = result;
 
             maniaKpsDisplay.SetKps(averageKps, maxKps);
+
+            // Update KPS graph with the KPS list
+            if (kpsList.Count > 0)
+                maniaKpsGraph.Values = kpsList.Select(k => (float)k);
 
             if (columnCounts != null)
             {

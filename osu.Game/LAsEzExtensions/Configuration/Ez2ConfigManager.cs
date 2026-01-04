@@ -56,6 +56,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         protected override void InitialiseDefaults()
         {
+            #region 皮肤类
+
             SetDefault(Ez2Setting.SelectedKeyMode, 4);
             SetDefault(Ez2Setting.ColumnWidthStyle, EzColumnWidthStyle.EzStyleProOnly);
             SetDefault(Ez2Setting.GlobalHitPosition, false);
@@ -74,9 +76,9 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 2, 0.1);
             SetDefault(Ez2Setting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
-            // Mania 长按尾部相关（皮肤编辑器用，暂时只作为占位设置项）。
-            SetDefault(Ez2Setting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 50.0, 1.0);
+            #endregion
+
+            #region 列类型、着色系统
 
             SetDefault(Ez2Setting.ColorSettingsEnabled, true);
             SetDefault(Ez2Setting.ColumnBlur, 0.7, 0.0, 1, 0.01);
@@ -97,6 +99,16 @@ namespace osu.Game.LAsEzExtensions.Configuration
                 GetColumnTypes(keyMode);
                 GetSpecialColumnsBools(keyMode);
             }
+
+            #endregion
+
+            #region 定制皮肤编辑器
+
+            // Mania 长按尾部相关（皮肤编辑器用，暂时只作为占位设置项）。
+            SetDefault(Ez2Setting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 50.0, 1.0);
+
+            #endregion
 
             SetDefault(Ez2Setting.KeySoundPreview, false);
             SetDefault(Ez2Setting.EzSelectCsMode, CsItemIds.ALL.First().Id);

@@ -3,10 +3,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.UserInterface;
@@ -19,12 +21,15 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Screens.SelectV2
 {
@@ -63,6 +68,7 @@ namespace osu.Game.Screens.SelectV2
         private CancellationTokenSource? maniaAnalysisCancellationSource;
         private string? cachedScratchText;
         private ManiaKpsDisplay maniaKpsDisplay = null!;
+        private LineGraph maniaKpsGraph = null!;
         private ManiaKpcDisplay maniaKpcDisplay = null!;
         private OsuSpriteText notesLabel = null!;
 
@@ -197,7 +203,21 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
-                                        maniaKpsDisplay = new ManiaKpsDisplay(),
+                                        maniaKpsDisplay = new ManiaKpsDisplay
+                                        {
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                        },
+                                        Empty(),
+                                        maniaKpsGraph = new LineGraph
+                                        {
+                                            Size = new Vector2(300, 20),
+                                            LineColour = Color4.White,
+                                            Blending = BlendingParameters.Additive,
+                                            Colour = ColourInfo.GradientHorizontal(Color4.White, new Color4(1f, 1f, 1f, 0.5f)),
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                        },
                                     }
                                 },
                                 new FillFlowContainer
@@ -366,6 +386,7 @@ namespace osu.Game.Screens.SelectV2
             {
                 maniaKpsDisplay.Show();
                 maniaKpsDisplay.SetKps(0, 0);
+                maniaKpsGraph.Show();
 
                 notesLabel.Show();
                 maniaKpcDisplay.Show();
@@ -374,6 +395,7 @@ namespace osu.Game.Screens.SelectV2
             else
             {
                 maniaKpsDisplay.Hide();
+                maniaKpsGraph.Hide();
 
                 // 非 mania：隐藏 mania 专属 UI。
                 notesLabel.Hide();
@@ -387,9 +409,13 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
-            var (averageKps, maxKps, _) = result;
+            var (averageKps, maxKps, kpsList) = result;
 
             maniaKpsDisplay.SetKps(averageKps, maxKps);
+
+            // Update KPS graph with the KPS list
+            if (kpsList.Count > 0)
+                maniaKpsGraph.Values = kpsList.Select(k => (float)k);
 
             if (columnCounts != null)
             {
