@@ -43,10 +43,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Origin = Anchor.BottomCentre;
 
             Alpha = (float)hitTargetAlpha.Value;
-            hitTargetAlpha = EzSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetAlpha);
+            hitTargetAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha);
             hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
 
-            hitTargetFloatFixed = EzSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetFloatFixed);
+            hitTargetFloatFixed = EzSkinConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed);
             hitTargetFloatFixed.BindValueChanged(_ => updatePosition());
         }
 

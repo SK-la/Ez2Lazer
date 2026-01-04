@@ -106,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             base.LoadComplete();
 
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
             hitPosition.BindValueChanged(_ => OnConfigChanged(), true);
         }
 

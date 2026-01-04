@@ -71,8 +71,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             floatingAverages = new double[keyCount];
             judgementMarkers = new Box[keyCount];
             recreateComponents();
-            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
         }
 
         private void recreateComponents()

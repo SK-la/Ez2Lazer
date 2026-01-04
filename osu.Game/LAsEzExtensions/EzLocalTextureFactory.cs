@@ -96,12 +96,12 @@ namespace osu.Game.LAsEzExtensions
             stageTextureStore = new LargeTextureStore(renderer, limitedLoader);
             stageTextureStore.AddTextureSource(baseTextureLoaderStore);
 
-            noteSetName = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
-            stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
-            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
+            noteSetName = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
 
             // noteSetName.BindValueChanged(e =>
             // {

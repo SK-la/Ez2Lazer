@@ -68,9 +68,9 @@ namespace osu.Game.LAsEzExtensions.Screens
             loadFolderSets("Stage");
             // loadFolderSets("GameTheme");
 
-            nameOfNote = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
-            nameOfStage = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
-            nameOfGameTheme = ezSkinConfig.GetBindable<EzEnumGameThemeName>(EzSkinSetting.GameThemeName);
+            nameOfNote = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+            nameOfStage = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+            nameOfGameTheme = ezSkinConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
             // setDefaultSelection(nameOfGameTheme, availableGameThemes);
             createUI();
         }
@@ -79,9 +79,9 @@ namespace osu.Game.LAsEzExtensions.Screens
         {
             base.LoadComplete();
 
-            nameOfNote.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.NoteSetName, e.NewValue));
-            nameOfStage.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.StageName, e.NewValue));
-            nameOfGameTheme.BindValueChanged(e => ezSkinConfig.SetValue(EzSkinSetting.GameThemeName, e.NewValue));
+            nameOfNote.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.NoteSetName, e.NewValue));
+            nameOfStage.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.StageName, e.NewValue));
+            nameOfGameTheme.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.GameThemeName, e.NewValue));
             nameOfGameTheme.BindValueChanged(e => updateAllEzTextureNames(e.NewValue));
         }
 
@@ -129,61 +129,61 @@ namespace osu.Game.LAsEzExtensions.Screens
                         {
                             LabelText = "ColumnWidthStyle".Localize(),
                             TooltipText = "ColumnWidthStyleTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<EzColumnWidthStyle>(EzSkinSetting.ColumnWidthStyle),
+                            Current = ezSkinConfig.GetBindable<EzColumnWidthStyle>(Ez2Setting.ColumnWidthStyle),
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "ColumnWidth".Localize(),
                             TooltipText = "ColumnWidthTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth),
                             KeyboardStep = 1.0f,
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "SpecialFactor".Localize(),
                             TooltipText = "SpecialFactorTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsCheckbox
                         {
                             LabelText = "GlobalHitPosition".Localize(),
                             TooltipText = "GlobalHitPositionTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition),
+                            Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition),
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "HitPosition".Localize(),
                             TooltipText = "HitPositionTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition),
                             KeyboardStep = 1f,
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "HitTargetFloatFixed".Localize(),
                             TooltipText = "HitTargetFloatFixedTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetFloatFixed),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "HitTargetAlpha".Localize(),
                             TooltipText = "HitTargetAlphaTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitTargetAlpha),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha),
                             KeyboardStep = 0.01f,
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "NoteHeightScale".Localize(),
                             TooltipText = "NoteHeightScaleTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
                             LabelText = "NoteTrackLine".Localize(),
                             TooltipText = "NoteTrackLineTooltip".Localize(),
-                            Current = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteTrackLineHeight),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight),
                         },
                         refreshSkinButton = new SettingsButton
                         {

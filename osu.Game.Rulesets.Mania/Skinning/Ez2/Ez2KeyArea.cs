@@ -57,7 +57,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
-            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition).Value;
+            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition).Value;
 
             InternalChild = directionContainer = new Container
             {

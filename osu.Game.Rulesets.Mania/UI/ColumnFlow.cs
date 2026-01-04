@@ -83,9 +83,9 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
 
-            ezSkinConfig.BindWith(EzSkinSetting.ColumnWidthStyle, ezColumnWidthStyle);
-            ezSkinConfig.BindWith(EzSkinSetting.ColumnWidth, columnWidthBindable);
-            ezSkinConfig.BindWith(EzSkinSetting.SpecialFactor, specialFactorBindable);
+            ezSkinConfig.BindWith(Ez2Setting.ColumnWidthStyle, ezColumnWidthStyle);
+            ezSkinConfig.BindWith(Ez2Setting.ColumnWidth, columnWidthBindable);
+            ezSkinConfig.BindWith(Ez2Setting.SpecialFactor, specialFactorBindable);
             ezColumnWidthStyle.BindValueChanged(v => updateColumnSize());
             columnWidthBindable.BindValueChanged(v => updateColumnSize());
             specialFactorBindable.BindValueChanged(v => updateColumnSize());

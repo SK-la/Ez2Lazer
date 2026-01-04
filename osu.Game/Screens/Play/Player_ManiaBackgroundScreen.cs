@@ -82,9 +82,9 @@ namespace osu.Game.Screens.Play
                 maniaMaskedDimmable.IgnoreUserSettings.BindTo(new Bindable<bool>(true));
                 maniaMaskedDimmable.IsBreakTime.BindTo(player.IsBreakTime);
 
-                maniaColumnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
-                maniaColumnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-                maniaSpecialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+                maniaColumnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
+                maniaColumnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+                maniaSpecialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
 
                 maniaColumnBlur.BindValueChanged(v => maniaMaskedDimmable.BlurAmount.Value = (float)v.NewValue * 50, true);
                 maniaColumnWidth.BindValueChanged(_ => updateMaskWidth(), true);

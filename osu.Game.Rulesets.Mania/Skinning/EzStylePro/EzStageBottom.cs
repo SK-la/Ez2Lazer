@@ -53,9 +53,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             cs = stageDefinition.Columns;
 
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
         }
 
         protected override void LoadComplete()

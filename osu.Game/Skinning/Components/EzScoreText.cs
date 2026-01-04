@@ -74,7 +74,7 @@ namespace osu.Game.Skinning.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            FontName.BindTo(ezSkinConfig.GetBindable<EzEnumGameThemeName>(EzSkinSetting.GameThemeName));
+            FontName.BindTo(ezSkinConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName));
 
             float scale = calculateScale(TextPart.Height);
             TextPart.Scale = new Vector2(scale);

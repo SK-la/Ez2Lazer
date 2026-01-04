@@ -37,9 +37,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             // this.config = config ?? throw new ArgumentNullException(nameof(config));
             // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
 
-            columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)

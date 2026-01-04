@@ -310,7 +310,7 @@ namespace osu.Game.Screens.SelectV2
                 updateBackgroundDim();
             });
 
-            keySoundPreview = ezConfig.GetBindable<bool>(EzSkinSetting.KeySoundPreview);
+            keySoundPreview = ezConfig.GetBindable<bool>(Ez2Setting.KeySoundPreview);
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
         }
 

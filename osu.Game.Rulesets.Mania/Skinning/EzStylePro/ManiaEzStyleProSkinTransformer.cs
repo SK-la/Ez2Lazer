@@ -34,10 +34,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             this.beatmap = (ManiaBeatmap)beatmap;
             this.ezSkinConfig = ezSkinConfig;
-            columnWidthBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactorBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            virtualHitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.VisualHitPosition);
+            columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            virtualHitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.VisualHitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)

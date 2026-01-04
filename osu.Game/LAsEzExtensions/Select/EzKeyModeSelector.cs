@@ -94,7 +94,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
             multiSelectButton.Active.BindTo(isMultiSelectMode);
 
-            keyModeId = ezConfig.GetBindable<string>(EzSkinSetting.EzSelectCsMode);
+            keyModeId = ezConfig.GetBindable<string>(Ez2Setting.EzSelectCsMode);
             keyModeId.BindValueChanged(onSelectorChanged, true);
 
             isMultiSelectMode.BindValueChanged(_ => updateValue(), true);

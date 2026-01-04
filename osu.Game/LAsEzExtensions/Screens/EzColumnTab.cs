@@ -26,7 +26,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         private static readonly List<int> available_key_modes = new List<int> { 0, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
 
         private readonly Dictionary<int, List<EzSelectorColour>> columnSelectorCache = new Dictionary<int, List<EzSelectorColour>>();
-        private readonly Dictionary<EzSkinSetting, BindableColour4> colorBindables = new Dictionary<EzSkinSetting, BindableColour4>();
+        private readonly Dictionary<Ez2Setting, BindableColour4> colorBindables = new Dictionary<Ez2Setting, BindableColour4>();
 
         private FillFlowContainer columnsContainer = null!;
         private FillFlowContainer baseColorsContainer = null!;
@@ -51,16 +51,16 @@ namespace osu.Game.LAsEzExtensions.Screens
         [BackgroundDependencyLoader]
         private void load()
         {
-            keyModeSelection = ezSkinConfig.GetBindable<int>(EzSkinSetting.SelectedKeyMode);
-            colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
-            columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
-            columnDim = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnDim);
+            keyModeSelection = ezSkinConfig.GetBindable<int>(Ez2Setting.SelectedKeyMode);
+            colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
+            columnDim = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim);
 
-            colorBindables[EzSkinSetting.ColumnTypeA] = createColorBindable(EzSkinSetting.ColumnTypeA);
-            colorBindables[EzSkinSetting.ColumnTypeB] = createColorBindable(EzSkinSetting.ColumnTypeB);
-            colorBindables[EzSkinSetting.ColumnTypeS] = createColorBindable(EzSkinSetting.ColumnTypeS);
-            colorBindables[EzSkinSetting.ColumnTypeE] = createColorBindable(EzSkinSetting.ColumnTypeE);
-            colorBindables[EzSkinSetting.ColumnTypeP] = createColorBindable(EzSkinSetting.ColumnTypeP);
+            colorBindables[Ez2Setting.ColumnTypeA] = createColorBindable(Ez2Setting.ColumnTypeA);
+            colorBindables[Ez2Setting.ColumnTypeB] = createColorBindable(Ez2Setting.ColumnTypeB);
+            colorBindables[Ez2Setting.ColumnTypeS] = createColorBindable(Ez2Setting.ColumnTypeS);
+            colorBindables[Ez2Setting.ColumnTypeE] = createColorBindable(Ez2Setting.ColumnTypeE);
+            colorBindables[Ez2Setting.ColumnTypeP] = createColorBindable(Ez2Setting.ColumnTypeP);
             createUI();
             updateKeyModeFromCurrentBeatmap();
         }
@@ -138,11 +138,11 @@ namespace osu.Game.LAsEzExtensions.Screens
                         Margin = new MarginPadding { Bottom = 5 },
                         Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14)
                     }.WithUnderline(),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_A, colorBindables[EzSkinSetting.ColumnTypeA]),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_B, colorBindables[EzSkinSetting.ColumnTypeB]),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_S, colorBindables[EzSkinSetting.ColumnTypeS]),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_E, colorBindables[EzSkinSetting.ColumnTypeE]),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_P, colorBindables[EzSkinSetting.ColumnTypeP]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_A, colorBindables[Ez2Setting.ColumnTypeA]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_B, colorBindables[Ez2Setting.ColumnTypeB]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_S, colorBindables[Ez2Setting.ColumnTypeS]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_E, colorBindables[Ez2Setting.ColumnTypeE]),
+                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_P, colorBindables[Ez2Setting.ColumnTypeP]),
                 }
             };
         }
@@ -203,14 +203,14 @@ namespace osu.Game.LAsEzExtensions.Screens
             keyModeSelection.BindValueChanged(e => updateColumnsType(e.NewValue));
 
             // 设置颜色变化事件
-            colorBindables[EzSkinSetting.ColumnTypeA].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeA, EzConstants.COLUMN_TYPE_A));
-            colorBindables[EzSkinSetting.ColumnTypeB].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeB, EzConstants.COLUMN_TYPE_B));
-            colorBindables[EzSkinSetting.ColumnTypeS].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeS, EzConstants.COLUMN_TYPE_S));
-            colorBindables[EzSkinSetting.ColumnTypeE].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeE, EzConstants.COLUMN_TYPE_E));
-            colorBindables[EzSkinSetting.ColumnTypeP].BindValueChanged(e => updateBaseColour(e.NewValue, EzSkinSetting.ColumnTypeP, EzConstants.COLUMN_TYPE_P));
+            colorBindables[Ez2Setting.ColumnTypeA].BindValueChanged(e => updateBaseColour(e.NewValue, Ez2Setting.ColumnTypeA, EzConstants.COLUMN_TYPE_A));
+            colorBindables[Ez2Setting.ColumnTypeB].BindValueChanged(e => updateBaseColour(e.NewValue, Ez2Setting.ColumnTypeB, EzConstants.COLUMN_TYPE_B));
+            colorBindables[Ez2Setting.ColumnTypeS].BindValueChanged(e => updateBaseColour(e.NewValue, Ez2Setting.ColumnTypeS, EzConstants.COLUMN_TYPE_S));
+            colorBindables[Ez2Setting.ColumnTypeE].BindValueChanged(e => updateBaseColour(e.NewValue, Ez2Setting.ColumnTypeE, EzConstants.COLUMN_TYPE_E));
+            colorBindables[Ez2Setting.ColumnTypeP].BindValueChanged(e => updateBaseColour(e.NewValue, Ez2Setting.ColumnTypeP, EzConstants.COLUMN_TYPE_P));
         }
 
-        private BindableColour4 createColorBindable(EzSkinSetting setting)
+        private BindableColour4 createColorBindable(Ez2Setting setting)
         {
             var configBindable = ezSkinConfig.GetBindable<Colour4>(setting);
             var result = new BindableColour4(configBindable.Value);
@@ -226,7 +226,7 @@ namespace osu.Game.LAsEzExtensions.Screens
             baseColorsContainer.Alpha = e.NewValue ? 1f : 0f;
         }
 
-        private void updateBaseColour(Colour4 newColor, EzSkinSetting setting, string type)
+        private void updateBaseColour(Colour4 newColor, Ez2Setting setting, string type)
         {
             if (!colorSettingsEnabled.Value)
                 return;
@@ -307,11 +307,11 @@ namespace osu.Game.LAsEzExtensions.Screens
         {
             return new Dictionary<string, Color4>
             {
-                [EzConstants.COLUMN_TYPE_A] = colorBindables[EzSkinSetting.ColumnTypeA].Value,
-                [EzConstants.COLUMN_TYPE_B] = colorBindables[EzSkinSetting.ColumnTypeB].Value,
-                [EzConstants.COLUMN_TYPE_S] = colorBindables[EzSkinSetting.ColumnTypeS].Value,
-                [EzConstants.COLUMN_TYPE_E] = colorBindables[EzSkinSetting.ColumnTypeE].Value,
-                [EzConstants.COLUMN_TYPE_P] = colorBindables[EzSkinSetting.ColumnTypeP].Value
+                [EzConstants.COLUMN_TYPE_A] = colorBindables[Ez2Setting.ColumnTypeA].Value,
+                [EzConstants.COLUMN_TYPE_B] = colorBindables[Ez2Setting.ColumnTypeB].Value,
+                [EzConstants.COLUMN_TYPE_S] = colorBindables[Ez2Setting.ColumnTypeS].Value,
+                [EzConstants.COLUMN_TYPE_E] = colorBindables[Ez2Setting.ColumnTypeE].Value,
+                [EzConstants.COLUMN_TYPE_P] = colorBindables[Ez2Setting.ColumnTypeP].Value
             };
         }
 

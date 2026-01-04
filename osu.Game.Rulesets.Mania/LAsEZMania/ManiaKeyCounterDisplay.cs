@@ -46,8 +46,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         [BackgroundDependencyLoader]
         private void load()
         {
-            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
         }
 
         protected override void LoadComplete()

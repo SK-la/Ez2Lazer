@@ -231,7 +231,7 @@ namespace osu.Game.Rulesets.Mania.UI
             editorShowStoryboard = osuConfig.GetBindable<bool>(OsuSetting.EditorShowStoryboard);
             editorShowStoryboard.BindValueChanged(_ => loadBackgroundAsync());
 
-            columnDim = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnDim);
+            columnDim = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim);
             columnDim.BindValueChanged(v =>
             {
                 dimBox.Alpha = (float)Math.Max(v.NewValue, osuConfigDim.Value / 2);
@@ -239,7 +239,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             bindWorkingBeatmapSource();
             loadBackgroundAsync();
-            columnBlur = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnBlur);
+            columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
             columnBlur.BindValueChanged(v => maniaMaskedDimmable.BlurAmount.Value = (float)v.NewValue * 50, true);
         }
 

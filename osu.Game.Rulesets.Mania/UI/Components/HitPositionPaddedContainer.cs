@@ -33,8 +33,8 @@ namespace osu.Game.Rulesets.Mania.UI.Components
             Direction.BindTo(scrollingInfo.Direction);
             Direction.BindValueChanged(_ => UpdateHitPosition(), true);
 
-            globalHitPosition = ezSkinConfig.GetBindable<bool>(EzSkinSetting.GlobalHitPosition);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            globalHitPosition = ezSkinConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
             skin.SourceChanged += onSkinChanged;
         }
 

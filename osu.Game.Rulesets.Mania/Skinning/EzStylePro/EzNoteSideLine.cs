@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             };
 
-            noteTrackLineHeight = ezSkinConfig.GetBindable<double>(EzSkinSetting.NoteTrackLineHeight);
+            noteTrackLineHeight = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight);
         }
 
         protected override void LoadComplete()

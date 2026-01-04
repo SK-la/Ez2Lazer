@@ -54,9 +54,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             };
 
-            noteSetName = ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
-            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
+            noteSetName = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
         }
 
         protected override void LoadComplete()

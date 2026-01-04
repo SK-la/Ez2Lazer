@@ -48,9 +48,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             KeyMode = StageDefinition.Columns;
             ColumnIndex = Column.Index;
-            EnabledColor = EzSkinConfig.GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
+            EnabledColor = EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             // columnColorBindable = EzSkinConfig.GetColumnColorBindable(KeyMode, ColumnIndex);
-            NoteSetName = EzSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName);
+            NoteSetName = EzSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
 
             createSeparators();
             MainContainer = new Container

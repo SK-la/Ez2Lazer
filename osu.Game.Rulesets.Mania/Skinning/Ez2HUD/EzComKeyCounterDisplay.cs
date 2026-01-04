@@ -44,8 +44,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [BackgroundDependencyLoader]
         private void load(EzSkinSettingsManager ezSkinConfig)
         {
-            columnWidth = ezSkinConfig.GetBindable<double>(EzSkinSetting.ColumnWidth);
-            specialFactor = ezSkinConfig.GetBindable<double>(EzSkinSetting.SpecialFactor);
+            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
             updateWidths();
         }
 

@@ -15,7 +15,7 @@ using osu.Game.Skinning.Components;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
-    public class EzSkinSettingsManager : IniConfigManager<EzSkinSetting>, IGameplaySettings
+    public class EzSkinSettingsManager : IniConfigManager<Ez2Setting>, IGameplaySettings
     {
         protected override string Filename => "EzSkinSettings.ini";
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
@@ -24,28 +24,28 @@ namespace osu.Game.LAsEzExtensions.Configuration
         public static readonly Dictionary<int, EzColumnType[]> COLUMN_TYPE_CACHE = new Dictionary<int, EzColumnType[]>();
         public static readonly Dictionary<int, bool[]> IS_SPECIAL_CACHE = new Dictionary<int, bool[]>();
 
-        private static readonly Dictionary<int, EzSkinSetting> key_mode_to_column_color_setting = new Dictionary<int, EzSkinSetting>
+        private static readonly Dictionary<int, Ez2Setting> key_mode_to_column_color_setting = new Dictionary<int, Ez2Setting>
         {
-            { 4, EzSkinSetting.ColumnTypeOf4K },
-            { 5, EzSkinSetting.ColumnTypeOf5K },
-            { 6, EzSkinSetting.ColumnTypeOf6K },
-            { 7, EzSkinSetting.ColumnTypeOf7K },
-            { 8, EzSkinSetting.ColumnTypeOf8K },
-            { 9, EzSkinSetting.ColumnTypeOf9K },
-            { 10, EzSkinSetting.ColumnTypeOf10K },
-            { 12, EzSkinSetting.ColumnTypeOf12K },
-            { 14, EzSkinSetting.ColumnTypeOf14K },
-            { 16, EzSkinSetting.ColumnTypeOf16K },
-            { 18, EzSkinSetting.ColumnTypeOf18K },
+            { 4, Ez2Setting.ColumnTypeOf4K },
+            { 5, Ez2Setting.ColumnTypeOf5K },
+            { 6, Ez2Setting.ColumnTypeOf6K },
+            { 7, Ez2Setting.ColumnTypeOf7K },
+            { 8, Ez2Setting.ColumnTypeOf8K },
+            { 9, Ez2Setting.ColumnTypeOf9K },
+            { 10, Ez2Setting.ColumnTypeOf10K },
+            { 12, Ez2Setting.ColumnTypeOf12K },
+            { 14, Ez2Setting.ColumnTypeOf14K },
+            { 16, Ez2Setting.ColumnTypeOf16K },
+            { 18, Ez2Setting.ColumnTypeOf18K },
         };
 
-        private static readonly Dictionary<EzColumnType, EzSkinSetting> column_type_to_setting = new Dictionary<EzColumnType, EzSkinSetting>
+        private static readonly Dictionary<EzColumnType, Ez2Setting> column_type_to_setting = new Dictionary<EzColumnType, Ez2Setting>
         {
-            [EzColumnType.A] = EzSkinSetting.ColumnTypeA,
-            [EzColumnType.B] = EzSkinSetting.ColumnTypeB,
-            [EzColumnType.S] = EzSkinSetting.ColumnTypeS,
-            [EzColumnType.E] = EzSkinSetting.ColumnTypeE,
-            [EzColumnType.P] = EzSkinSetting.ColumnTypeP,
+            [EzColumnType.A] = Ez2Setting.ColumnTypeA,
+            [EzColumnType.B] = Ez2Setting.ColumnTypeB,
+            [EzColumnType.S] = Ez2Setting.ColumnTypeS,
+            [EzColumnType.E] = Ez2Setting.ColumnTypeE,
+            [EzColumnType.P] = Ez2Setting.ColumnTypeP,
         };
 
         public EzSkinSettingsManager(Storage storage)
@@ -56,38 +56,38 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         protected override void InitialiseDefaults()
         {
-            SetDefault(EzSkinSetting.SelectedKeyMode, 4);
-            SetDefault(EzSkinSetting.ColumnWidthStyle, EzColumnWidthStyle.EzStyleProOnly);
-            SetDefault(EzSkinSetting.GlobalHitPosition, false);
-            SetDefault(EzSkinSetting.GlobalTextureName, 4);
+            SetDefault(Ez2Setting.SelectedKeyMode, 4);
+            SetDefault(Ez2Setting.ColumnWidthStyle, EzColumnWidthStyle.EzStyleProOnly);
+            SetDefault(Ez2Setting.GlobalHitPosition, false);
+            SetDefault(Ez2Setting.GlobalTextureName, 4);
 
-            SetDefault(EzSkinSetting.ColumnWidth, 60, 5, 400.0, 1.0);
-            SetDefault(EzSkinSetting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
-            SetDefault(EzSkinSetting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
-            SetDefault(EzSkinSetting.VisualHitPosition, 0.0, -100, 100, 1.0);
-            SetDefault(EzSkinSetting.HitTargetFloatFixed, 6, 0, 10, 0.1);
-            SetDefault(EzSkinSetting.HitTargetAlpha, 0.6, 0, 1, 0.01);
+            SetDefault(Ez2Setting.ColumnWidth, 60, 5, 400.0, 1.0);
+            SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
+            SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
+            SetDefault(Ez2Setting.VisualHitPosition, 0.0, -100, 100, 1.0);
+            SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
+            SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
 
-            SetDefault(EzSkinSetting.NoteSetName, "lucenteclat");
-            SetDefault(EzSkinSetting.StageName, "Celeste_Lumiere");
-            SetDefault(EzSkinSetting.GameThemeName, EzEnumGameThemeName.Celeste_Lumiere);
-            SetDefault(EzSkinSetting.NoteHeightScaleToWidth, 1, 0.1, 2, 0.1);
-            SetDefault(EzSkinSetting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
+            SetDefault(Ez2Setting.NoteSetName, "lucenteclat");
+            SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
+            SetDefault(Ez2Setting.GameThemeName, EzEnumGameThemeName.Celeste_Lumiere);
+            SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 2, 0.1);
+            SetDefault(Ez2Setting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             // Mania 长按尾部相关（皮肤编辑器用，暂时只作为占位设置项）。
-            SetDefault(EzSkinSetting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
-            SetDefault(EzSkinSetting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 50.0, 1.0);
+            SetDefault(Ez2Setting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 50.0, 1.0);
 
-            SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
-            SetDefault(EzSkinSetting.ColumnBlur, 0.7, 0.0, 1, 0.01);
-            SetDefault(EzSkinSetting.ColumnDim, 0.7, 0.0, 1, 0.01);
+            SetDefault(Ez2Setting.ColorSettingsEnabled, true);
+            SetDefault(Ez2Setting.ColumnBlur, 0.7, 0.0, 1, 0.01);
+            SetDefault(Ez2Setting.ColumnDim, 0.7, 0.0, 1, 0.01);
 
-            SetDefault(EzSkinSetting.ColorSettingsEnabled, true);
-            SetDefault(EzSkinSetting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
-            SetDefault(EzSkinSetting.ColumnTypeB, Colour4.FromHex("#648FFF"));
-            SetDefault(EzSkinSetting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
-            SetDefault(EzSkinSetting.ColumnTypeE, Colour4.FromHex("#FF4A4A"));
-            SetDefault(EzSkinSetting.ColumnTypeP, Colour4.FromHex("#72FF72"));
+            SetDefault(Ez2Setting.ColorSettingsEnabled, true);
+            SetDefault(Ez2Setting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
+            SetDefault(Ez2Setting.ColumnTypeB, Colour4.FromHex("#648FFF"));
+            SetDefault(Ez2Setting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
+            SetDefault(Ez2Setting.ColumnTypeE, Colour4.FromHex("#FF4A4A"));
+            SetDefault(Ez2Setting.ColumnTypeP, Colour4.FromHex("#72FF72"));
 
             initializeColumnTypeDefaults();
 
@@ -98,15 +98,15 @@ namespace osu.Game.LAsEzExtensions.Configuration
                 GetSpecialColumnsBools(keyMode);
             }
 
-            SetDefault(EzSkinSetting.KeySoundPreview, false);
-            SetDefault(EzSkinSetting.EzSelectCsMode, CsItemIds.ALL.First().Id);
-            SetDefault(EzSkinSetting.HitMode, EzMUGHitMode.EZ2AC);
-            SetDefault(EzSkinSetting.CustomHealthFormHitMode, true);
-            SetDefault(EzSkinSetting.CustomPoorHitResult, true);
-            SetDefault(EzSkinSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
-            SetDefault(EzSkinSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
+            SetDefault(Ez2Setting.KeySoundPreview, false);
+            SetDefault(Ez2Setting.EzSelectCsMode, CsItemIds.ALL.First().Id);
+            SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
+            SetDefault(Ez2Setting.CustomHealthFormHitMode, true);
+            SetDefault(Ez2Setting.CustomPoorHitResult, true);
+            SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
+            SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
-            SetDefault(EzSkinSetting.ScalingGameMode, ScalingGameMode.Mania);
+            SetDefault(Ez2Setting.ScalingGameMode, ScalingGameMode.Mania);
         }
 
         #region 列类型管理
@@ -161,7 +161,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             }
         }
 
-        private static EzSkinSetting getColumnTypeListSetting(int keyMode)
+        private static Ez2Setting getColumnTypeListSetting(int keyMode)
         {
             if (key_mode_to_column_color_setting.TryGetValue(keyMode, out var setting))
                 return setting;
@@ -175,8 +175,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         public float GetTotalWidth(int keyMode)
         {
-            double baseWidth = GetBindable<double>(EzSkinSetting.ColumnWidth).Value;
-            double specialFactor = GetBindable<double>(EzSkinSetting.SpecialFactor).Value;
+            double baseWidth = GetBindable<double>(Ez2Setting.ColumnWidth).Value;
+            double specialFactor = GetBindable<double>(Ez2Setting.SpecialFactor).Value;
             float totalWidth = 0;
             int forMode = keyMode == 14 ? keyMode - 1 : keyMode;
             bool[] isSpecials = GetSpecialColumnsBools(keyMode);
@@ -197,7 +197,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             if (column_type_to_setting.TryGetValue(colorType, out var setting))
                 return Get<Colour4>(setting);
 
-            return Get<Colour4>(EzSkinSetting.ColumnTypeA);
+            return Get<Colour4>(Ez2Setting.ColumnTypeA);
         }
 
         public IBindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
@@ -207,7 +207,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             if (column_type_to_setting.TryGetValue(colorType, out var setting))
                 return GetBindable<Colour4>(setting);
 
-            return GetBindable<Colour4>(EzSkinSetting.ColumnTypeA);
+            return GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
         }
 
         public bool IsSpecialColumn(int keyMode, int columnIndex)
@@ -335,20 +335,20 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         private void initializeEvents()
         {
-            var columnWidthBindable = GetBindable<double>(EzSkinSetting.ColumnWidth);
-            var specialFactorBindable = GetBindable<double>(EzSkinSetting.SpecialFactor);
-            var columnWidthStyleBindable = GetBindable<EzColumnWidthStyle>(EzSkinSetting.ColumnWidthStyle);
+            var columnWidthBindable = GetBindable<double>(Ez2Setting.ColumnWidth);
+            var specialFactorBindable = GetBindable<double>(Ez2Setting.SpecialFactor);
+            var columnWidthStyleBindable = GetBindable<EzColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
 
             columnWidthBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
             specialFactorBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
             columnWidthStyleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
 
-            var colorSettingsEnabledBindable = GetBindable<bool>(EzSkinSetting.ColorSettingsEnabled);
-            var colorABindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeA);
-            var colorBBindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeB);
-            var colorSBindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeS);
-            var colorEBindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeE);
-            var colorPBindable = GetBindable<Colour4>(EzSkinSetting.ColumnTypeP);
+            var colorSettingsEnabledBindable = GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            var colorABindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
+            var colorBBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
+            var colorSBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
+            var colorEBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
+            var colorPBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
 
             colorSettingsEnabledBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
             colorABindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
@@ -360,12 +360,12 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         #endregion
 
-        public new Bindable<T> GetBindable<T>(EzSkinSetting setting)
+        public new Bindable<T> GetBindable<T>(Ez2Setting setting)
         {
             return base.GetBindable<T>(setting);
         }
 
-        public new void SetValue<T>(EzSkinSetting lookup, T value)
+        public new void SetValue<T>(Ez2Setting lookup, T value)
         {
             base.SetValue(lookup, value);
         }
@@ -405,7 +405,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         GlobalTotalWidth,
     }
 
-    public enum EzSkinSetting
+    public enum Ez2Setting
     {
         SelectedKeyMode,
 

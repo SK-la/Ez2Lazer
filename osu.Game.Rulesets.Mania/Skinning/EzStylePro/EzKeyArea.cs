@@ -75,8 +75,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             keyMode = stageDefinition.Columns;
             columnIndex = column.Index;
 
-            stageName = ezSkinConfig.GetBindable<string>(EzSkinSetting.StageName);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm * 64;

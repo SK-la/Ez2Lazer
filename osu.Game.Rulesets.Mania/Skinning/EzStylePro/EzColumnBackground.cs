@@ -106,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (!Column.BackgroundContainer.Children.Contains(hitOverlay))
                 Column.BackgroundContainer.Add(hitOverlay);
 
-            hitPosition = ezSkinConfig.GetBindable<double>(EzSkinSetting.HitPosition);
+            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
             hitPosition.BindValueChanged(_ => updateSeparator(), true);
         }
 
