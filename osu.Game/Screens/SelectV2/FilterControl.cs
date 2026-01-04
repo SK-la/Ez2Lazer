@@ -19,6 +19,7 @@ using osu.Game.Database;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -50,6 +51,9 @@ namespace osu.Game.Screens.SelectV2
         private EzKeyModeSelector csSelector = null!;
         private ShearedToggleButton keySoundPreviewButton = null!;
         private ShearedToggleButton xxySrFilterButton = null!;
+
+        [Resolved]
+        private EzSkinSettingsManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -249,7 +253,7 @@ namespace osu.Game.Screens.SelectV2
 
             difficultyRangeSlider.LowerBound = config.GetBindable<double>(OsuSetting.DisplayStarsMinimum);
             difficultyRangeSlider.UpperBound = config.GetBindable<double>(OsuSetting.DisplayStarsMaximum);
-            config.BindWith(OsuSetting.KeySoundPreview, keySoundPreviewButton.Active);
+            ezConfig.BindWith(EzSkinSetting.KeySoundPreview, keySoundPreviewButton.Active);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
             config.BindWith(OsuSetting.SongSelectGroupMode, groupDropdown.Current);

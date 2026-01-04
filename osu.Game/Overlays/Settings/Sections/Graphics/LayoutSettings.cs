@@ -19,6 +19,7 @@ using osu.Framework.Platform.Windows;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osuTK;
 using osuTK.Graphics;

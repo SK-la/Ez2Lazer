@@ -166,8 +166,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.ScoreDisplayMode, ScoringMode.Standardised);
 
             //新增自定义
-            SetDefault(OsuSetting.KeySoundPreview, false);
-            SetDefault(OsuSetting.EzSelectCsMode, CsItemIds.ALL.First().Id);
+            // SetDefault(OsuSetting.EzSelectCsMode, CsItemIds.ALL.First().Id);
             SetDefault(OsuSetting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(OsuSetting.CustomHealthFormHitMode, true);
             SetDefault(OsuSetting.CustomPoorHitResult, true);
@@ -441,22 +440,14 @@ namespace osu.Game.Configuration
         ScoreDisplayMode,
 
         //自定义
-        KeySoundPreview,
-        EzSelectCsMode,
+
+        // EzSelectCsMode,
         ScalingGameMode,
         AccuracyCutoffS,
         AccuracyCutoffA,
         HitMode,
         CustomHealthFormHitMode,
         CustomPoorHitResult,
-        // //mania用自定义
-        // SelectManiaRulesetSubset,
-        // ScrollBaseSpeed,
-        // ScrollTimePerSpeed,
-        // ScrollStyle,
-        //
-        // PerspectiveAngle,
-        // ScrollPerKeyMode,
 
         ExternalLinkWarning,
         PreferNoVideo,

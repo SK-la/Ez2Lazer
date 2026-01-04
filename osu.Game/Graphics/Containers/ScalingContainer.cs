@@ -12,6 +12,7 @@ using osu.Framework.Layout;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Screens.Backgrounds;
@@ -323,16 +324,5 @@ namespace osu.Game.Graphics.Containers
                 host.Window.CursorConfineRect = coversWholeScreen ? null : ToScreenSpace(DrawRectangle).AABBFloat;
             }
         }
-    }
-
-    public enum ScalingGameMode
-    {
-        Standard,
-
-        Taiko,
-
-        Mania,
-
-        Catch,
     }
 }

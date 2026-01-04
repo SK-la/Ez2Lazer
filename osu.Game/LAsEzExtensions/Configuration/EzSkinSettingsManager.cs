@@ -10,6 +10,7 @@ using osu.Framework.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Skinning.Components;
 
 namespace osu.Game.LAsEzExtensions.Configuration
@@ -96,6 +97,16 @@ namespace osu.Game.LAsEzExtensions.Configuration
                 GetColumnTypes(keyMode);
                 GetSpecialColumnsBools(keyMode);
             }
+
+            SetDefault(EzSkinSetting.KeySoundPreview, false);
+            SetDefault(EzSkinSetting.EzSelectCsMode, CsItemIds.ALL.First().Id);
+            SetDefault(EzSkinSetting.HitMode, EzMUGHitMode.EZ2AC);
+            SetDefault(EzSkinSetting.CustomHealthFormHitMode, true);
+            SetDefault(EzSkinSetting.CustomPoorHitResult, true);
+            SetDefault(EzSkinSetting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
+            SetDefault(EzSkinSetting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
+
+            SetDefault(EzSkinSetting.ScalingGameMode, ScalingGameMode.Mania);
         }
 
         #region 列类型管理
@@ -445,7 +456,17 @@ namespace osu.Game.LAsEzExtensions.Configuration
         ColumnTypeE,
         ColumnTypeP,
         ColumnBlur,
-        ColumnDim
+        ColumnDim,
+
+        // 其他设置
+        KeySoundPreview,
+        EzSelectCsMode,
+        ScalingGameMode,
+        AccuracyCutoffS,
+        AccuracyCutoffA,
+        HitMode,
+        CustomHealthFormHitMode,
+        CustomPoorHitResult,
     }
 
     public enum EzColumnType

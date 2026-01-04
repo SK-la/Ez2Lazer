@@ -15,6 +15,7 @@ using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osuTK;
@@ -29,6 +30,9 @@ namespace osu.Game.LAsEzExtensions.Select
 
         private ShearedCsModeTabControl tabControl = null!;
         private ShearedToggleButton multiSelectButton = null!;
+
+        [Resolved]
+        private EzSkinSettingsManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
@@ -90,7 +94,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
             multiSelectButton.Active.BindTo(isMultiSelectMode);
 
-            keyModeId = config.GetBindable<string>(OsuSetting.EzSelectCsMode);
+            keyModeId = ezConfig.GetBindable<string>(EzSkinSetting.EzSelectCsMode);
             keyModeId.BindValueChanged(onSelectorChanged, true);
 
             isMultiSelectMode.BindValueChanged(_ => updateValue(), true);

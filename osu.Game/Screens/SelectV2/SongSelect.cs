@@ -37,6 +37,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
@@ -162,7 +163,7 @@ namespace osu.Game.Screens.SelectV2
         private Bindable<bool> keySoundPreview = null!;
 
         [BackgroundDependencyLoader]
-        private void load(AudioManager audio, OsuConfigManager config)
+        private void load(AudioManager audio, OsuConfigManager config, EzSkinSettingsManager ezConfig)
         {
             errorSample = audio.Samples.Get(@"UI/generic-error");
 
@@ -309,7 +310,7 @@ namespace osu.Game.Screens.SelectV2
                 updateBackgroundDim();
             });
 
-            keySoundPreview = config.GetBindable<bool>(OsuSetting.KeySoundPreview);
+            keySoundPreview = ezConfig.GetBindable<bool>(EzSkinSetting.KeySoundPreview);
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
         }
 
