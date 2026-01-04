@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         public ManiaBeatmapConverter(IBeatmap beatmap, Ruleset ruleset)
             : this(beatmap, LegacyBeatmapConversionDifficultyInfo.FromBeatmap(beatmap), ruleset)
         {
-            CurrentHitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
+            CurrentHitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
         }
 
         private ManiaBeatmapConverter(IBeatmap? beatmap, LegacyBeatmapConversionDifficultyInfo difficulty, Ruleset ruleset)

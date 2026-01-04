@@ -68,7 +68,10 @@ namespace osu.Game.Screens.Ranking
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;
 
-        private Bindable<EzMUGHitMode> hitModeSetting = new Bindable<EzMUGHitMode>();
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private readonly Bindable<EzMUGHitMode> hitModeSetting = new Bindable<EzMUGHitMode>();
 
         private HitModeButton hitModeButton = null!;
 
@@ -266,10 +269,10 @@ namespace osu.Game.Screens.Ranking
         {
             base.LoadComplete();
 
-            hitModeSetting.Value = config.Get<EzMUGHitMode>(OsuSetting.HitMode);
+            hitModeSetting.Value = ezConfig.Get<EzMUGHitMode>(Ez2Setting.HitMode);
             hitModeSetting.BindValueChanged(v =>
             {
-                config.SetValue(OsuSetting.HitMode, v.NewValue);
+                ezConfig.SetValue(Ez2Setting.HitMode, v.NewValue);
                 refreshStatistics();
             });
 

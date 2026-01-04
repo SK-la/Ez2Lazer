@@ -116,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double miss;
         private double pool;
 
-        public override bool AllowPoolEnabled => GlobalConfigStore.Config?.Get<bool>(OsuSetting.CustomPoorHitResult) ?? false;
+        public override bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResult) ?? false;
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -176,7 +176,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public void SetHitMode(IBeatmap beatmap)
         {
-            EzMUGHitMode hitMode = GlobalConfigStore.Config?.Get<EzMUGHitMode>(OsuSetting.HitMode) ?? EzMUGHitMode.Lazer;
+            EzMUGHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
 
             switch (hitMode)
             {

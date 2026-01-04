@@ -20,18 +20,18 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
         private SettingsCheckbox poorHitResultCheckbox;
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             o2JamCheckbox = new SettingsCheckbox
             {
                 LabelText = "O2Jam Health System",
-                Current = config.GetBindable<bool>(OsuSetting.CustomHealthFormHitMode),
+                Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomHealthFormHitMode),
                 TooltipText = "Only for O2Jam HitMode. 只用于O2Jam模式。"
             };
             poorHitResultCheckbox = new SettingsCheckbox
             {
                 LabelText = "Poor HitResult System",
-                Current = config.GetBindable<bool>(OsuSetting.CustomPoorHitResult),
+                Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResult),
                 TooltipText = "Added a strict penalty for wrong presses outside the Miss range. "
                               + "will significantly increase the difficulty. Recommended for Ez2Ac and IIDX modes"
             };
@@ -49,7 +49,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 {
                     ClassicDefault = EzMUGHitMode.EZ2AC,
                     LabelText = "Hit Mode",
-                    Current = config.GetBindable<EzMUGHitMode>(OsuSetting.HitMode),
+                    Current = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode),
                     Keywords = new[] { "scoring" }
                 },
                 o2JamCheckbox,

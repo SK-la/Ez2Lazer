@@ -100,9 +100,11 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             SetDefault(Ez2Setting.KeySoundPreview, false);
             SetDefault(Ez2Setting.EzSelectCsMode, CsItemIds.ALL.First().Id);
+
             SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(Ez2Setting.CustomHealthFormHitMode, true);
             SetDefault(Ez2Setting.CustomPoorHitResult, true);
+
             SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
