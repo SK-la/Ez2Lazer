@@ -79,6 +79,7 @@ namespace osu.Game.Screens.SelectV2
 
             if (!match) return false;
 
+            // TODO: 这里要改成根据 xxySrFilter 的设置来决定是用 star rating 还是 xxy star rating 进行过滤
             match &= !criteria.StarDifficulty.HasFilter || criteria.StarDifficulty.IsInRange(beatmap.StarRating.FloorToDecimalDigits(2));
             match &= !criteria.ApproachRate.HasFilter || criteria.ApproachRate.IsInRange(beatmap.Difficulty.ApproachRate);
             match &= !criteria.DrainRate.HasFilter || criteria.DrainRate.IsInRange(beatmap.Difficulty.DrainRate);

@@ -253,6 +253,7 @@ namespace osu.Game.Screens.SelectV2
 
             difficultyRangeSlider.LowerBound = config.GetBindable<double>(OsuSetting.DisplayStarsMinimum);
             difficultyRangeSlider.UpperBound = config.GetBindable<double>(OsuSetting.DisplayStarsMaximum);
+            ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
@@ -320,6 +321,7 @@ namespace osu.Game.Screens.SelectV2
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
             csSelector.EzKeyModeFilter.SelectionChanged += updateCriteria;
+            xxySrFilterButton.Active.BindValueChanged(_ => updateCriteria());
 
             updateCriteria();
         }

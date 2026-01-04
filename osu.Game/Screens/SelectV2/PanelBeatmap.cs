@@ -24,7 +24,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Analysis;
-using osu.Game.LAsEzExtensions.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
@@ -60,6 +60,10 @@ namespace osu.Game.Screens.SelectV2
         private EzKpcDisplay kpcDisplay = null!;
         private EzXxySrDisplay xxySrDisplay = null!;
         private OsuSpriteText notesLabel = null!;
+        private Bindable<bool> xxySrFilterSetting = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
@@ -269,6 +273,16 @@ namespace osu.Game.Screens.SelectV2
                 resetManiaAnalysisDisplay();
                 updateKeyCount();
             }, true);
+
+            // 设置 XxySRFilter 设置的绑定
+            xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
+            xxySrFilterSetting.BindValueChanged(value =>
+            {
+                // 根据 XxySRFilter 设置切换图标
+                starCounter.Icon = value.NewValue
+                    ? FontAwesome.Solid.Moon
+                    : FontAwesome.Solid.Star;
+            }, true); // true 表示立即触发一次以设置初始状态
         }
 
         protected override void PrepareForUse()

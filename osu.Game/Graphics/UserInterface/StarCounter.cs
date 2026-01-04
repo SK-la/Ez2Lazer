@@ -35,6 +35,19 @@ namespace osu.Game.Graphics.UserInterface
             set => stars.Direction = value;
         }
 
+        /// <summary>
+        /// The icon to display for stars. Defaults to a star.
+        /// </summary>
+        public IconUsage Icon
+        {
+            get => (stars.Children.FirstOrDefault() as DefaultStar)?.Icon.Icon ?? FontAwesome.Solid.Star;
+            set
+            {
+                foreach (var star in stars.Children.OfType<DefaultStar>())
+                    star.Icon.Icon = value;
+            }
+        }
+
         private float current;
 
         /// <summary>

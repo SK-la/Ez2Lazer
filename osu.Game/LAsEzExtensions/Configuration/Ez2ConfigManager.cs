@@ -110,6 +110,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             #endregion
 
+            SetDefault(Ez2Setting.XxySRFilter, false);
             SetDefault(Ez2Setting.KeySoundPreview, false);
             SetDefault(Ez2Setting.EzSelectCsMode, CsItemIds.ALL.First().Id);
 
@@ -481,6 +482,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         HitMode,
         CustomHealthFormHitMode,
         CustomPoorHitResult,
+        XxySRFilter
     }
 
     public enum EzColumnType
