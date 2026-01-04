@@ -148,6 +148,15 @@ namespace osu.Game.LAsEzExtensions.Select
             EnableHitSounds = true;
         }
 
+        /// <summary>
+        /// 重置循环状态，用于在开始新预览时清除之前的循环进度。
+        /// </summary>
+        public void ResetLoopState()
+        {
+            playback.ResetExternalClockCapture();
+            // 其他重置逻辑如果需要
+        }
+
         private bool ownsCurrentTrack;
 
         #region Disposal

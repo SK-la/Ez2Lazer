@@ -103,6 +103,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!cont) return;
             }
 
+            // 此处有潜在的崩溃风险，与播放动画有关，待调查。
             // Replicate base implementation to allow attaching combo semantics overrides.
             if (!userTriggered)
             {

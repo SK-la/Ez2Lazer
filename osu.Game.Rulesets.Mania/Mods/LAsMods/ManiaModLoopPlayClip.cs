@@ -310,6 +310,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     {
                     }
 
+                    // 调整时间从切片起点开始
+                    foreach (var note in selectedPart)
+                    {
+                        note.StartTime -= (float)cutTimeStart!;
+                        if (note is HoldNote holdNote)
+                            holdNote.EndTime -= (float)cutTimeStart;
+                    }
+
                     newPart.AddRange(selectedPart);
                     continue;
                 }

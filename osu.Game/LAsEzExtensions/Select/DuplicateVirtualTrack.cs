@@ -46,6 +46,9 @@ namespace osu.Game.LAsEzExtensions.Select
             ExternalClockStartTime = overrides?.PreviewStart ?? OverridePreviewStartTime;
             EnableHitSounds = overrides?.EnableHitSounds ?? true;
 
+            // 重置循环状态
+            ResetLoopState();
+
             // gameplay 下不要把 MasterGameplayClockContainer 从真实 beatmap.Track “断开”。
             // 断开会导致：
             // 1) 变速 Mod（HT/DT/RateAdjust）对 gameplay 时钟不生效（TrackVirtual 不一定按 Tempo/Frequency 推进时间）。
