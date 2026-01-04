@@ -199,9 +199,9 @@ namespace osu.Game.Screens.SelectV2
                                         maniaKpsGraph = new LineGraph
                                         {
                                             Size = new Vector2(300, 20),
-                                            LineColour = Color4.White,
-                                            Blending = BlendingParameters.Additive,
-                                            Colour = ColourInfo.GradientHorizontal(Color4.White, new Color4(1f, 1f, 1f, 0.5f)),
+                                            LineColour = Color4.CornflowerBlue.Opacity(0.8f),
+                                            Blending = BlendingParameters.Mixture,
+                                            Colour = ColourInfo.GradientHorizontal(Color4.White, Color4.CornflowerBlue),
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
                                         },

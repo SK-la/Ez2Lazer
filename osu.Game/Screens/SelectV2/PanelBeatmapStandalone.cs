@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
@@ -212,9 +213,9 @@ namespace osu.Game.Screens.SelectV2
                                         maniaKpsGraph = new LineGraph
                                         {
                                             Size = new Vector2(300, 20),
-                                            LineColour = Color4.White,
-                                            Blending = BlendingParameters.Additive,
-                                            Colour = ColourInfo.GradientHorizontal(Color4.White, new Color4(1f, 1f, 1f, 0.5f)),
+                                            LineColour = Color4.CornflowerBlue.Opacity(0.8f),
+                                            Blending = BlendingParameters.Mixture,
+                                            Colour = ColourInfo.GradientHorizontal(Color4.White, Color4.CornflowerBlue),
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
                                         },
