@@ -314,35 +314,7 @@ namespace osu.Game.Screens.SelectV2
 
             Guid beatmapId = beatmap.ID;
 
-            // 如果已经为这个 beatmap 记录过异常，则跳过
-            if (loggedAbnormalXxySrBeatmapId == beatmapId)
-                return;
-
-            // 检查 xxy_SR 是否为 null 或 0
-            if (xxy == null || xxy == 0)
-            {
-                loggedAbnormalXxySrBeatmapId = beatmapId;
-
-                Logger.Log(
-                    XxySrDebugJson.FormatNullOrZeroSr(beatmap, xxy),
-                    "xxy_sr",
-                    LogLevel.Error);
-                return;
-            }
-
-            if (star == null)
-                return;
-
-            double diff = Math.Abs(star.Value - xxy.Value);
-            if (diff <= 3)
-                return;
-
-            loggedAbnormalXxySrBeatmapId = beatmapId;
-
-            Logger.Log(
-                XxySrDebugJson.FormatLargeDiffNoMod(beatmap, star.Value, xxy.Value),
-                "xxy_sr",
-                LogLevel.Error);
+            XxySrDebugJson.LogAbnormalSr(beatmap, star, xxy, beatmapId, ref loggedAbnormalXxySrBeatmapId);
         }
 
         private void bindManiaAnalysis()

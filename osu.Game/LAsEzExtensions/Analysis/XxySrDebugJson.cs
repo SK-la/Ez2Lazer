@@ -5,6 +5,7 @@ using System;
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 
 namespace osu.Game.LAsEzExtensions.Analysis
@@ -14,6 +15,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         public static string FormatAbnormalSr(BeatmapInfo beatmap, string eventType, double? star = null, double? xxySr = null)
         {
             var buffer = new ArrayBufferWriter<byte>(256);
+
             using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = false }))
             {
                 writer.WriteStartObject();
@@ -74,14 +76,30 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return Encoding.UTF8.GetString(buffer.WrittenSpan);
         }
 
-        public static string FormatLargeDiffNoMod(BeatmapInfo beatmap, double star, double xxySr)
+        public static void LogAbnormalSr(BeatmapInfo? beatmap, double? star, double? xxySr, Guid beatmapId, ref Guid? loggedAbnormalId)
         {
-            return FormatAbnormalSr(beatmap, "xxy_sr_large_diff_no_mod", star, xxySr);
-        }
+            if (beatmap == null || star == null)
+                return;
 
-        public static string FormatNullOrZeroSr(BeatmapInfo beatmap, double? xxySr)
-        {
-            return FormatAbnormalSr(beatmap, "xxy_sr_null_or_zero", null, xxySr);
+            if (loggedAbnormalId == beatmapId)
+                return;
+
+            loggedAbnormalId = beatmapId;
+
+            if (xxySr == null || xxySr == 0)
+            {
+                Logger.Log(
+                    FormatAbnormalSr(beatmap, "xxySR_null", null, xxySr),
+                    "xxy_sr",
+                    LogLevel.Error);
+            }
+            else if (Math.Abs(star.Value - xxySr.Value) > 3)
+            {
+                Logger.Log(
+                    FormatAbnormalSr(beatmap, "xxySR_large_diff", star, xxySr),
+                    "xxy_sr",
+                    LogLevel.Error);
+            }
         }
     }
 }
