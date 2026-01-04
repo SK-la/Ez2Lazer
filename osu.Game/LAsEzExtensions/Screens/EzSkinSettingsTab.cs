@@ -28,7 +28,7 @@ namespace osu.Game.LAsEzExtensions.Screens
     public partial class EzSkinSettings : EditorSidebarSection
     {
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;

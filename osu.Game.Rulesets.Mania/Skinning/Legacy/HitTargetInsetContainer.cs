@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource skin, EzSkinSettingsManager ezSkinConfig, IScrollingInfo scrollingInfo)
+        private void load(ISkinSource skin, Ez2ConfigManager ezSkinConfig, IScrollingInfo scrollingInfo)
         {
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);

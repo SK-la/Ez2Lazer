@@ -37,7 +37,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         private Bindable<double> columnDim = new Bindable<double>();
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
         private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;

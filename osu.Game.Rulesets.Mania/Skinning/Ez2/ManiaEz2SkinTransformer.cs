@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private readonly IBindable<double> hitPosition;
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
-        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, EzSkinSettingsManager ezSkinConfig)
+        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, Ez2ConfigManager ezSkinConfig)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;

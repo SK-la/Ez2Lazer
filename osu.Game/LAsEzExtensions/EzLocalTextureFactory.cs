@@ -33,7 +33,7 @@ namespace osu.Game.LAsEzExtensions
         private static readonly ConcurrentDictionary<string, float> note_ratio_cache = new ConcurrentDictionary<string, float>();
 
         private readonly Dictionary<string, TextureLoaderStore> loaderStoreCache = new Dictionary<string, TextureLoaderStore>();
-        private readonly EzSkinSettingsManager ezSkinConfig;
+        private readonly Ez2ConfigManager ezSkinConfig;
 
         private readonly LargeTextureStore stageTextureStore;
         private readonly TextureStore textureStore;
@@ -72,7 +72,7 @@ namespace osu.Game.LAsEzExtensions
             public override int GetHashCode() => HashCode.Combine(Textures, HasComponent, LastAccess);
         }
 
-        public EzLocalTextureFactory(EzSkinSettingsManager ezSkinConfig,
+        public EzLocalTextureFactory(Ez2ConfigManager ezSkinConfig,
                                      IRenderer renderer,
                                      Storage hostStorage)
         {

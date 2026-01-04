@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private StageDefinition stageDefinition { get; set; } = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         public Ez2ColumnBackground()
         {

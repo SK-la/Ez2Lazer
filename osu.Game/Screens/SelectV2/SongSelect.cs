@@ -163,7 +163,7 @@ namespace osu.Game.Screens.SelectV2
         private Bindable<bool> keySoundPreview = null!;
 
         [BackgroundDependencyLoader]
-        private void load(AudioManager audio, OsuConfigManager config, EzSkinSettingsManager ezConfig)
+        private void load(AudioManager audio, OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             errorSample = audio.Samples.Get(@"UI/generic-error");
 

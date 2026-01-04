@@ -18,7 +18,7 @@ namespace osu.Game.LAsEzExtensions.Background
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config, EzSkinSettingsManager ezSkinConfig)
+        private void load(OsuConfigManager config, Ez2ConfigManager ezSkinConfig)
         {
             var video = new Video(videoPath)
             {
@@ -40,7 +40,7 @@ namespace osu.Game.LAsEzExtensions.Background
     public static class GlobalConfigStore
     {
         public static OsuConfigManager? Config { get; set; }
-        public static EzSkinSettingsManager? EzConfig { get; set; }
+        public static Ez2ConfigManager? EzConfig { get; set; }
     }
 
     public partial class StreamVideoBackgroundScreen : Graphics.Backgrounds.Background

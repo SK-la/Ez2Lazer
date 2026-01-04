@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private SkinManager skinManager { get; set; } = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
         private readonly Bindable<double> columnWidthBindable = new Bindable<double>();

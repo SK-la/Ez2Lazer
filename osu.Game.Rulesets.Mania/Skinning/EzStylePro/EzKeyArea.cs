@@ -46,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private EzLocalTextureFactory factory { get; set; } = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         private Bindable<string> stageName = null!;
         private Bindable<double> hitPositonBindable = null!;

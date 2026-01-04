@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.UI.Components
         private ISkinSource skin { get; set; } = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private Bindable<bool> globalHitPosition = new Bindable<bool>();

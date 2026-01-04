@@ -16,7 +16,7 @@ namespace osu.Game.Skinning.Components
     public partial class EzScoreText : CompositeDrawable, IHasText
     {
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         public readonly EzGetScoreTexture TextPart;
         public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);

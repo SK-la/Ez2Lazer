@@ -70,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private ISkinSource currentSkin = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
         private OsuConfigManager osuConfig { get; set; } = null!;

@@ -32,7 +32,7 @@ namespace osu.Game.LAsEzExtensions.Select
         private ShearedToggleButton multiSelectButton = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezConfig { get; set; } = null!;
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private OsuConfigManager config { get; set; } = null!;

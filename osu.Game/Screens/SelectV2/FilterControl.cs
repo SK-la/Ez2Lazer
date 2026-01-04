@@ -53,7 +53,7 @@ namespace osu.Game.Screens.SelectV2
         private ShearedToggleButton xxySrFilterButton = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezConfig { get; set; } = null!;
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;

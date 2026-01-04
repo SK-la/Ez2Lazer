@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         protected InputCountController Controller { get; private set; } = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         protected readonly FillFlowContainer<KeyCounter> KeyFlow;
 

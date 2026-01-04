@@ -176,7 +176,7 @@ namespace osu.Game
 
         protected Storage Storage { get; set; }
 
-        protected EzSkinSettingsManager EzSkinSettingsManager { get; private set; }
+        protected Ez2ConfigManager Ez2ConfigManager { get; private set; }
 
         protected EzLocalTextureFactory NoteFactory { get; private set; }
 
@@ -286,11 +286,11 @@ namespace osu.Game
             Resources.AddStore(new DllResourceStore(OsuResources.ResourceAssembly));
 
             // 初始化并注册EzSkinSettingsManager
-            dependencies.Cache(EzSkinSettingsManager = new EzSkinSettingsManager(Storage));
+            dependencies.Cache(Ez2ConfigManager = new Ez2ConfigManager(Storage));
 
             dependencies.Cache(
                 NoteFactory = new EzLocalTextureFactory(
-                    EzSkinSettingsManager,
+                    Ez2ConfigManager,
                     Host.Renderer,
                     Storage));
 

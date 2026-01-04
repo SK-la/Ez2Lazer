@@ -65,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         }
 
         [BackgroundDependencyLoader]
-        private void load(EzSkinSettingsManager ezSkinConfig)
+        private void load(Ez2ConfigManager ezSkinConfig)
         {
             keyCount = controller.Triggers.Count;
             floatingAverages = new double[keyCount];

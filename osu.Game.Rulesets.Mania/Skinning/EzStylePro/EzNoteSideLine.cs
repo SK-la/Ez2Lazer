@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private TextureStore textures { get; set; } = null!;
 
         [Resolved]
-        private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load()

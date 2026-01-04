@@ -38,7 +38,7 @@ namespace osu.Game.Screens.Play
             private int keyMode;
 
             [Resolved]
-            private EzSkinSettingsManager ezSkinConfig { get; set; } = null!;
+            private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
             public PlayerManiaBackgroundScreen(WorkingBeatmap beatmap, Player player)
                 : base(beatmap)

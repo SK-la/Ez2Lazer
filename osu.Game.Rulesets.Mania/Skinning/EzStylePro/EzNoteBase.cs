@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected StageDefinition StageDefinition { get; private set; } = null!;
 
         [Resolved]
-        protected EzSkinSettingsManager EzSkinConfig { get; private set; } = null!;
+        protected Ez2ConfigManager EzSkinConfig { get; private set; } = null!;
 
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;

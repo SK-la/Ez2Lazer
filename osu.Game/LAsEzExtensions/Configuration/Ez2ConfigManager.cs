@@ -15,9 +15,9 @@ using osu.Game.Skinning.Components;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
-    public class EzSkinSettingsManager : IniConfigManager<Ez2Setting>, IGameplaySettings
+    public class Ez2ConfigManager : IniConfigManager<Ez2Setting>, IGameplaySettings
     {
-        protected override string Filename => "EzSkinSettings.ini";
+        protected override string Filename => "EzSkinSettings.ini"; // 以后可能改成 Ez2Settings.ini
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;
 
@@ -48,7 +48,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             [EzColumnType.P] = Ez2Setting.ColumnTypeP,
         };
 
-        public EzSkinSettingsManager(Storage storage)
+        public Ez2ConfigManager(Storage storage)
             : base(storage)
         {
             initializeEvents();

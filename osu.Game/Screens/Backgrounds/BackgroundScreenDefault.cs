@@ -47,7 +47,7 @@ namespace osu.Game.Screens.Backgrounds
         protected virtual bool AllowStoryboardBackground => true;
 
         [BackgroundDependencyLoader]
-        private void load(IAPIProvider api, SkinManager skinManager, OsuConfigManager config, EzSkinSettingsManager ezSkinConfig)
+        private void load(IAPIProvider api, SkinManager skinManager, OsuConfigManager config, Ez2ConfigManager ezSkinConfig)
         {
             user = api.LocalUser.GetBoundCopy();
             skin = skinManager.CurrentSkin.GetBoundCopy();
