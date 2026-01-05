@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Select;
+using osu.Game.Screens.SelectV2;
 using osu.Game.Skinning.Components;
 
 namespace osu.Game.LAsEzExtensions.Configuration
@@ -110,6 +111,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             #endregion
 
+            SetDefault(Ez2Setting.KpcDisplayMode, EzKpcDisplay.KpcDisplayMode.Numbers);
             SetDefault(Ez2Setting.XxySRFilter, false);
             SetDefault(Ez2Setting.KeySoundPreview, false);
             SetDefault(Ez2Setting.EzSelectCsMode, CsItemIds.ALL.First().Id);

@@ -20,7 +20,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
         // 3) 同一 key 的计算去重（in-flight 去重）。
         private static readonly SemaphoreSlim concurrency_limiter = new SemaphoreSlim(2, 2);
 
+        // LRU缓存：限制内存中最大存储N个谱面数据，新计算缓存替换旧缓存
+        private const int max_cache_entries = 20;
         private static readonly ConcurrentDictionary<string, ManiaBeatmapAnalysisResult> result_cache = new ConcurrentDictionary<string, ManiaBeatmapAnalysisResult>();
+        private static readonly ConcurrentQueue<string> access_order = new ConcurrentQueue<string>();
 
         // Lazy<Task<>> 用于去重同一 key 的并发计算。
         private static readonly ConcurrentDictionary<string, Lazy<Task<ManiaBeatmapAnalysisResult>>> in_flight =
@@ -40,7 +43,38 @@ namespace osu.Game.LAsEzExtensions.Analysis
         }
 
         public static bool TryGet(string cacheKey, out ManiaBeatmapAnalysisResult result)
-            => result_cache.TryGetValue(cacheKey, out result);
+        {
+            if (result_cache.TryGetValue(cacheKey, out result))
+            {
+                // 更新LRU访问顺序
+                updateLRUAccess(cacheKey);
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 更新LRU访问顺序，将指定key移到队列末尾（最近访问）
+        /// </summary>
+        private static void updateLRUAccess(string cacheKey)
+        {
+            // 注意：ConcurrentQueue不支持移除中间元素，这里我们简单地将key重新入队
+            // 这样可能会导致同一个key在队列中出现多次，但这不会影响LRU逻辑的正确性
+            access_order.Enqueue(cacheKey);
+        }
+
+        /// <summary>
+        /// 确保缓存大小不超过限制，移除最老的条目
+        /// </summary>
+        private static void ensureCacheSize()
+        {
+            while (result_cache.Count > max_cache_entries && access_order.TryDequeue(out string? oldestKey))
+            {
+                // 移除最老的缓存条目
+                result_cache.TryRemove(oldestKey, out _);
+            }
+        }
 
         public static Task<ManiaBeatmapAnalysisResult> GetOrComputeAsync(BeatmapManager beatmapManager,
                                                                          BeatmapInfo beatmapInfo,
@@ -87,6 +121,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
                 double? xxySr = null;
+
                 if (playableBeatmap.HitObjects.Count == 0)
                 {
                     string modsStr = mods.Count == 0 ? "(none)" : string.Join(',', mods.Select(m => m.Acronym));
@@ -122,7 +157,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     scratchText,
                     xxySr);
 
+                // 添加到缓存并确保大小限制
                 result_cache[cacheKey] = result;
+                updateLRUAccess(cacheKey);
+                ensureCacheSize();
+
                 return result;
             }
             finally

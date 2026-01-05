@@ -71,12 +71,17 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private int modsRevision;
 
         // When persistence is disabled, keep only a bounded amount of in-memory results.
+        // When persistence is enabled, also limit cache size to prevent memory growth during extensive browsing.
         // This prevents unbounded memory growth when scrolling through many beatmaps.
         private const int max_in_memory_entries_without_persistence = 128;
         private readonly ConcurrentQueue<ManiaAnalysisCacheLookup> nonPersistentCacheInsertionOrder = new ConcurrentQueue<ManiaAnalysisCacheLookup>();
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致（150ms）。
         private const int mod_settings_debounce = 150;
+
+        // xxy_sr 错误日志节流：每秒最多记录一次
+        private DateTimeOffset lastXxySrErrorLogTime = DateTimeOffset.MinValue;
+        private readonly object logLock = new object();
 
         protected override void LoadComplete()
         {
@@ -189,12 +194,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             var result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
 
-            // Non-persistent mode should not grow indefinitely.
-            if (!EzManiaAnalysisPersistentStore.Enabled && result != null)
+            // 即使在持久化模式下，也要限制内存缓存大小，避免内存无限增长
+            // 持久化模式主要用于预计算，但内存缓存仍需限制以应对大量谱面浏览
+            if (result != null)
             {
                 nonPersistentCacheInsertionOrder.Enqueue(lookup);
 
-                while (CacheCount > max_in_memory_entries_without_persistence && nonPersistentCacheInsertionOrder.TryDequeue(out var toRemove))
+                // 持久化模式下使用更小的缓存限制（因为主要依赖SQLite）
+                int maxEntries = EzManiaAnalysisPersistentStore.Enabled ? 48 : max_in_memory_entries_without_persistence;
+
+                while (CacheCount > maxEntries && nonPersistentCacheInsertionOrder.TryDequeue(out var toRemove))
                     TryRemove(toRemove);
             }
 
@@ -268,29 +277,31 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
-                // 同一次 playable beatmap 里顺带计算 xxy_SR（只在异常/失败时写 xxy_sr 日志）。
+                // 同一次 playable beatmap 里顺带计算 xxy_SR（只在其他数据成功但 xxy_sr 计算出错时记录日志）。
                 double? xxySr = null;
 
-                if (playableBeatmap.HitObjects.Count == 0)
+                if (playableBeatmap.HitObjects.Count > 0)
                 {
-                    string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-                    Logger.Log($"xxy_SR aborted: playableBeatmap has 0 hitobjects. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", "xxy_sr", LogLevel.Error);
-                }
-                else if (XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr))
-                {
-                    if (double.IsNaN(sr) || double.IsInfinity(sr))
+                    if (XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr))
                     {
-                        Logger.Log($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}", "xxy_sr", LogLevel.Error);
+                        if (double.IsNaN(sr) || double.IsInfinity(sr))
+                        {
+                            logXxySrError($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}");
+                        }
+                        else
+                        {
+                            xxySr = sr;
+
+                            if (sr < 0 || sr > 1000)
+                            {
+                                string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
+                                logXxySrError($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}");
+                            }
+                        }
                     }
                     else
                     {
-                        xxySr = sr;
-
-                        if (sr < 0 || sr > 1000)
-                        {
-                            string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-                            Logger.Log($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", "xxy_sr", LogLevel.Error);
-                        }
+                        logXxySrError($"xxy_SR calculation failed. beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}");
                     }
                 }
 
@@ -397,16 +408,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 }, cancellationToken);
         }
 
-        protected override void Dispose(bool isDisposing)
+        private void logXxySrError(string message)
         {
-            base.Dispose(isDisposing);
-
-            modSettingChangeTracker?.Dispose();
-
-            cancelTrackedBindableUpdate();
-            highPriorityScheduler.Dispose();
-            lowPriorityScheduler.Dispose();
-            highPriorityIdleEvent.Dispose();
+            lock (logLock)
+            {
+                if ((DateTimeOffset.Now - lastXxySrErrorLogTime).TotalSeconds > 1)
+                {
+                    Logger.Log(message, "xxy_sr", LogLevel.Error);
+                    lastXxySrErrorLogTime = DateTimeOffset.Now;
+                }
+            }
         }
 
         public readonly struct ManiaAnalysisCacheLookup : IEquatable<ManiaAnalysisCacheLookup>
