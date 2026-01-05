@@ -82,7 +82,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         }
 
         /// <summary>
-        /// 复用外部已经计算好的列统计与 KPS 数据，生成 Scratch 标签。
+        /// 复用外部已经计算好的 列统计与 KPS 数据，生成 Scratch 标签。
         /// 用于选歌面板：避免重复遍历 HitObjects / 重复计算 KPS。
         /// </summary>
         // TODO: 计算比较粗糙，后续可优化。
@@ -111,7 +111,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             bool isLastHigh = isFirstHigh;
 
             // 去掉两侧列，计算“中间列”平均/最大。
-            var middleCounts = keyCount > 2 ? countsByColumn.Skip(1).Take(keyCount - 2).ToArray() : Array.Empty<int>();
+            int[] middleCounts = keyCount > 2 ? countsByColumn.Skip(1).Take(keyCount - 2).ToArray() : Array.Empty<int>();
             double averageNotes = middleCounts.Length > 0 ? middleCounts.Average() : 0;
             int maxNotesInMiddle = middleCounts.Length > 0 ? middleCounts.Max() : 0;
 

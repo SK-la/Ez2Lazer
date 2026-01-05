@@ -100,6 +100,7 @@ namespace osu.Game.Screens.SelectV2
 
         private double? lastStarRatingStars;
         private Guid? loggedAbnormalXxySrBeatmapId;
+        private Bindable<EzKpcDisplay.KpcDisplayMode> kpcDisplayMode = null!;
 
         public PanelBeatmap()
         {
@@ -283,6 +284,12 @@ namespace osu.Game.Screens.SelectV2
                     ? FontAwesome.Solid.Moon
                     : FontAwesome.Solid.Star;
             }, true); // true 表示立即触发一次以设置初始状态
+
+            kpcDisplayMode = ezConfig.GetBindable<EzKpcDisplay.KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            kpcDisplayMode.BindValueChanged(mode =>
+            {
+                kpcDisplay.CurrentKpcDisplayMode = mode.NewValue;
+            }, true);
         }
 
         protected override void PrepareForUse()
@@ -365,7 +372,7 @@ namespace osu.Game.Screens.SelectV2
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
 
-                updateUI((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts);
+                updateUI((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 
                 xxySrDisplay.Current.Value = result.NewValue.XxySr;
                 maybeLogLargeStarDiff();
@@ -402,7 +409,7 @@ namespace osu.Game.Screens.SelectV2
             }
         }
 
-        private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts)
+        private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
             if (Item == null)
                 return;
@@ -424,11 +431,16 @@ namespace osu.Game.Screens.SelectV2
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
 
-                var normalized = new Dictionary<int, int>(keyCount);
-                for (int i = 0; i < keyCount; i++)
-                    normalized[i] = columnCounts.GetValueOrDefault(i);
+                var normalizedColumnCounts = new Dictionary<int, int>(keyCount);
+                var normalizedHoldNoteCounts = new Dictionary<int, int>(keyCount);
 
-                kpcDisplay.UpdateColumnCounts(normalized);
+                for (int i = 0; i < keyCount; i++)
+                {
+                    normalizedColumnCounts[i] = columnCounts.GetValueOrDefault(i);
+                    normalizedHoldNoteCounts[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                }
+
+                kpcDisplay.UpdateColumnCounts(normalizedColumnCounts, normalizedHoldNoteCounts);
             }
         }
 

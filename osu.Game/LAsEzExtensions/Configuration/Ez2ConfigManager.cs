@@ -482,7 +482,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
         HitMode,
         CustomHealthFormHitMode,
         CustomPoorHitResult,
-        XxySRFilter
+        XxySRFilter,
+        KpcDisplayMode,
     }
 
     public enum EzColumnType

@@ -114,7 +114,7 @@ namespace osu.Game.Screens.SelectV2
                     cancellationToken.ThrowIfCancellationRequested();
 
                     // 使用优化后的计算器一次性获取所有数据
-                    var (averageKps, maxKps, kpsList, columnCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
+                    var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
                     var kpsResult = (averageKps, maxKps, kpsList);
 
                     cancellationToken.ThrowIfCancellationRequested();

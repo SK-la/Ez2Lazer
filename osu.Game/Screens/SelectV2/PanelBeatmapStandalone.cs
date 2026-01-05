@@ -367,7 +367,7 @@ namespace osu.Game.Screens.SelectV2
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
 
-                updateUI((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts);
+                updateUI((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 
                 xxySrDisplay.Current.Value = result.NewValue.XxySr;
                 maybeLogLargeStarDiff();
@@ -405,7 +405,7 @@ namespace osu.Game.Screens.SelectV2
             }
         }
 
-        private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts)
+        private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
             if (Item == null)
                 return;
@@ -424,11 +424,15 @@ namespace osu.Game.Screens.SelectV2
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
 
-                var normalized = new Dictionary<int, int>(keyCount);
+                var normalizedColumnCounts = new Dictionary<int, int>(keyCount);
+                var normalizedHoldNoteCounts = new Dictionary<int, int>(keyCount);
                 for (int i = 0; i < keyCount; i++)
-                    normalized[i] = columnCounts.GetValueOrDefault(i);
+                {
+                    normalizedColumnCounts[i] = columnCounts.GetValueOrDefault(i);
+                    normalizedHoldNoteCounts[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                }
 
-                ezKpcDisplay.UpdateColumnCounts(normalized);
+                ezKpcDisplay.UpdateColumnCounts(normalizedColumnCounts, normalizedHoldNoteCounts);
             }
         }
 

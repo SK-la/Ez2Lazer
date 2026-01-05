@@ -19,7 +19,7 @@ namespace osu.Game.Screens.SelectV2
         /// <summary>
         /// 显示模式枚举
         /// </summary>
-        public enum DisplayMode
+        public enum KpcDisplayMode
         {
             /// <summary>
             /// 数字（默认，最高性能）
@@ -33,26 +33,27 @@ namespace osu.Game.Screens.SelectV2
         }
 
         private readonly FillFlowContainer columnNotesContainer;
-        private DisplayMode currentDisplayMode = DisplayMode.Numbers;
+        private KpcDisplayMode currentKpcDisplayMode = KpcDisplayMode.Numbers;
         private Dictionary<int, int>? currentColumnCounts;
+        private Dictionary<int, int>? currentHoldNoteCounts;
 
         /// <summary>
         /// 当前显示模式
         /// </summary>
-        public DisplayMode CurrentDisplayMode
+        public KpcDisplayMode CurrentKpcDisplayMode
         {
-            get => currentDisplayMode;
+            get => currentKpcDisplayMode;
             set
             {
-                if (currentDisplayMode == value)
+                if (currentKpcDisplayMode == value)
                     return;
 
-                currentDisplayMode = value;
+                currentKpcDisplayMode = value;
 
                 // 如果有数据，立即重新渲染
                 if (currentColumnCounts != null)
                 {
-                    updateDisplay(currentColumnCounts);
+                    updateDisplay(currentColumnCounts, currentHoldNoteCounts);
                 }
             }
         }
@@ -74,75 +75,100 @@ namespace osu.Game.Screens.SelectV2
         /// 更新列音符数量显示
         /// </summary>
         /// <param name="columnNoteCounts">每列的音符数量</param>
-        public void UpdateColumnCounts(Dictionary<int, int> columnNoteCounts)
+        public void UpdateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             currentColumnCounts = columnNoteCounts;
-            updateDisplay(columnNoteCounts);
+            currentHoldNoteCounts = holdNoteCounts;
+            updateDisplay(columnNoteCounts, holdNoteCounts);
         }
 
-        private void updateDisplay(Dictionary<int, int> columnNoteCounts)
+        private void updateDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             columnNotesContainer.Clear();
 
             if (!columnNoteCounts.Any())
                 return;
 
-            switch (currentDisplayMode)
+            switch (currentKpcDisplayMode)
             {
-                case DisplayMode.Numbers:
-                    createNumbersDisplay(columnNoteCounts);
+                case KpcDisplayMode.Numbers:
+                    createNumbersDisplay(columnNoteCounts, holdNoteCounts);
                     break;
 
-                case DisplayMode.BarChart:
-                    createBarChartDisplay(columnNoteCounts);
+                case KpcDisplayMode.BarChart:
+                    createBarChartDisplay(columnNoteCounts, holdNoteCounts);
                     break;
             }
         }
 
-        private void createNumbersDisplay(Dictionary<int, int> columnNoteCounts)
+        private void createNumbersDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             // 高性能的数字显示模式
             columnNotesContainer.Children = columnNoteCounts
                                             .OrderBy(c => c.Key)
-                                            .Select(c => new FillFlowContainer
+                                            .Select(c =>
                                             {
-                                                Direction = FillDirection.Horizontal,
-                                                AutoSizeAxes = Axes.Both,
-                                                Children = new Drawable[]
+                                                int holdNotes = holdNoteCounts?.GetValueOrDefault(c.Key) ?? 0;
+                                                return new FillFlowContainer
                                                 {
-                                                    new OsuSpriteText
+                                                    Direction = FillDirection.Horizontal,
+                                                    AutoSizeAxes = Axes.Both,
+                                                    Children = new Drawable[]
                                                     {
-                                                        Text = $"{c.Key + 1}/",
-                                                        Font = OsuFont.GetFont(size: 14),
-                                                        Colour = Color4.Gray,
-                                                    },
-                                                    new OsuSpriteText
-                                                    {
-                                                        Text = $"{c.Value} ",
-                                                        Font = OsuFont.GetFont(size: 16),
-                                                        Colour = Color4.LightCoral,
+                                                        new OsuSpriteText
+                                                        {
+                                                            Text = $"{c.Key + 1}/",
+                                                            Font = OsuFont.GetFont(size: 14),
+                                                            Colour = Color4.Gray,
+                                                        },
+                                                        new OsuSpriteText
+                                                        {
+                                                            Text = $"{c.Value}",
+                                                            Font = OsuFont.GetFont(size: 16),
+                                                            Colour = Color4.LightCoral,
+                                                        },
+                                                        new OsuSpriteText
+                                                        {
+                                                            Text = holdNotes > 0 ? $"/{holdNotes} " : " ",
+                                                            Font = OsuFont.GetFont(size: 14),
+                                                            Colour = Color4.LightGoldenrodYellow.Darken(0.2f),
+                                                            Anchor = Anchor.BottomLeft,
+                                                            Origin = Anchor.BottomLeft,
+                                                        }
                                                     }
-                                                }
+                                                };
                                             }).ToArray();
         }
 
-        private void createBarChartDisplay(Dictionary<int, int> columnNoteCounts)
+        private void createBarChartDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             var sortedCounts = columnNoteCounts.OrderBy(c => c.Key).ToArray();
             if (!sortedCounts.Any()) return;
 
-            // 计算最大值用于归一化
-            int maxCount = sortedCounts.Max(c => c.Value);
+            // 计算最大值用于归一化（包括hold notes）
+            int maxCount = sortedCounts.Max(c =>
+            {
+                int holdNotes = holdNoteCounts?.GetValueOrDefault(c.Key) ?? 0;
+                return c.Value + holdNotes;
+            });
             if (maxCount == 0) return;
 
             const float max_bar_height = 30f;
             const float bar_width = 20f;
             const float bar_spacing = 2f;
 
+            // 米黄色用于hold notes
+            Color4 holdNoteColor = Color4Extensions.FromHex("#FFD39B"); // 米黄色
+
             columnNotesContainer.Children = sortedCounts
                                             .Select(c =>
                                             {
-                                                float normalizedHeight = maxCount > 0 ? (float)c.Value / maxCount * max_bar_height : 0;
+                                                int totalNotes = c.Value;
+                                                int holdNotes = holdNoteCounts?.GetValueOrDefault(c.Key) ?? 0;
+                                                int regularNotes = totalNotes - holdNotes; // 普通notes = 总数 - 长按notes
+
+                                                float totalNormalizedHeight = maxCount > 0 ? (float)totalNotes / maxCount * max_bar_height : 0;
+                                                float regularNormalizedHeight = maxCount > 0 ? (float)regularNotes / maxCount * max_bar_height : 0;
 
                                                 return new Container
                                                 {
@@ -160,15 +186,25 @@ namespace osu.Game.Screens.SelectV2
                                                             Origin = Anchor.BottomCentre,
                                                             Margin = new MarginPadding { Bottom = 15 }
                                                         },
-                                                        // 实际数据柱
+                                                        // 普通notes柱（底部）
                                                         new Box
                                                         {
                                                             RelativeSizeAxes = Axes.X,
-                                                            Height = normalizedHeight,
+                                                            Height = regularNormalizedHeight,
                                                             Colour = Color4.LightCoral,
                                                             Anchor = Anchor.BottomCentre,
                                                             Origin = Anchor.BottomCentre,
                                                             Margin = new MarginPadding { Bottom = 15 }
+                                                        },
+                                                        // 长按notes柱（叠加在普通notes上面）
+                                                        new Box
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            Height = totalNormalizedHeight - regularNormalizedHeight,
+                                                            Colour = holdNoteColor,
+                                                            Anchor = Anchor.BottomCentre,
+                                                            Origin = Anchor.BottomCentre,
+                                                            Margin = new MarginPadding { Bottom = 15 + regularNormalizedHeight }
                                                         },
                                                         // 列标签
                                                         new OsuSpriteText
@@ -183,12 +219,12 @@ namespace osu.Game.Screens.SelectV2
                                                         // 数值标签（显示在柱子顶部）
                                                         new OsuSpriteText
                                                         {
-                                                            Text = c.Value.ToString(),
+                                                            Text = holdNotes > 0 ? $"{totalNotes}({holdNotes})" : totalNotes.ToString(),
                                                             Font = OsuFont.GetFont(size: 10),
                                                             Colour = Color4.White,
                                                             Anchor = Anchor.BottomCentre,
                                                             Origin = Anchor.BottomCentre,
-                                                            Y = -(normalizedHeight + 17) // 定位在柱子顶部
+                                                            Y = -(totalNormalizedHeight + 17) // 定位在柱子顶部
                                                         }
                                                     }
                                                 };

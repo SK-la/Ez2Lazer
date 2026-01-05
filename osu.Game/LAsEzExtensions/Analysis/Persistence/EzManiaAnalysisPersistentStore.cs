@@ -41,7 +41,9 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
         // 注意：此版本号与 osu! 官方服务器端的版本号无关，仅用于本地持久化存储的失效控制。
         // 注意：更新版本号后，务必通过注释保存旧版本的变更记录，方便日后排查问题。
-        public const int ANALYSIS_VERSION = 2;
+        // v2: 初始版本，包含 kps_list_json, column_counts_json
+        // v3: 添加 hold_note_counts_json 字段，分离普通note和长按note统计
+        public const int ANALYSIS_VERSION = 3;
 
         private readonly Storage storage;
         private readonly object initLock = new object();
@@ -117,6 +119,13 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
                         cmd.ExecuteNonQuery();
                     }
 
+                    if (!hasColumn(connection, "mania_analysis", "hold_note_counts_json"))
+                    {
+                        using var cmd = connection.CreateCommand();
+                        cmd.CommandText = "ALTER TABLE mania_analysis ADD COLUMN hold_note_counts_json TEXT NOT NULL DEFAULT '{}';";
+                        cmd.ExecuteNonQuery();
+                    }
+
                     // Store the current analysis version as meta (informational).
                     setMeta(connection, "analysis_version", ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
 
@@ -163,7 +172,7 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
                 using var cmd = connection.CreateCommand();
 
                 cmd.CommandText = @"
-SELECT beatmap_hash, analysis_version, average_kps, max_kps, kps_list_json, scratch_text, xxy_sr, column_counts_json
+SELECT beatmap_hash, analysis_version, average_kps, max_kps, kps_list_json, scratch_text, xxy_sr, column_counts_json, hold_note_counts_json
 FROM mania_analysis
 WHERE beatmap_id = $id
 LIMIT 1;
@@ -188,8 +197,10 @@ LIMIT 1;
 
                 double? xxySr = reader.IsDBNull(6) ? null : reader.GetDouble(6);
                 string columnCountsJson = reader.GetString(7);
+                string holdNoteCountsJson = reader.GetString(8);
 
                 var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
+                var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
 
                 var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
 
@@ -198,6 +209,7 @@ LIMIT 1;
                     maxKps,
                     kpsList,
                     columnCounts,
+                    holdNoteCounts,
                     scratchText,
                     xxySr);
 
@@ -224,6 +236,7 @@ LIMIT 1;
 
                 string kpsListJson = JsonSerializer.Serialize(analysis.KpsList);
                 string columnCountsJson = JsonSerializer.Serialize(analysis.ColumnCounts);
+                string holdNoteCountsJson = JsonSerializer.Serialize(analysis.HoldNoteCounts);
 
                 cmd.CommandText = @"
 INSERT INTO mania_analysis(
@@ -235,7 +248,8 @@ INSERT INTO mania_analysis(
     kps_list_json,
     scratch_text,
     xxy_sr,
-    column_counts_json
+    column_counts_json,
+    hold_note_counts_json
 )
 VALUES(
     $id,
@@ -246,7 +260,8 @@ VALUES(
     $kps,
     $scratch,
     $xxy,
-    $cols
+    $cols,
+    $holds
 )
 ON CONFLICT(beatmap_id) DO UPDATE SET
     beatmap_hash = excluded.beatmap_hash,
@@ -256,7 +271,8 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
     kps_list_json = excluded.kps_list_json,
     scratch_text = excluded.scratch_text,
     xxy_sr = excluded.xxy_sr,
-    column_counts_json = excluded.column_counts_json;
+    column_counts_json = excluded.column_counts_json,
+    hold_note_counts_json = excluded.hold_note_counts_json;
 ";
 
                 cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
@@ -273,6 +289,7 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
                     cmd.Parameters.AddWithValue("$xxy", DBNull.Value);
 
                 cmd.Parameters.AddWithValue("$cols", columnCountsJson);
+                cmd.Parameters.AddWithValue("$holds", holdNoteCountsJson);
 
                 cmd.ExecuteNonQuery();
             }

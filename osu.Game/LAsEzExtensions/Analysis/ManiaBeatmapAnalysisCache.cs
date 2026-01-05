@@ -84,7 +84,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
                 var playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset, mods, CancellationToken.None);
 
-                var (averageKps, maxKps, kpsList, columnCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
+                var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
                 double? xxySr = null;
                 if (playableBeatmap.HitObjects.Count == 0)
@@ -118,6 +118,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     maxKps,
                     kpsList,
                     columnCounts,
+                    holdNoteCounts,
                     scratchText,
                     xxySr);
 
@@ -139,6 +140,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                                              double MaxKps,
                                                              List<double> KpsList,
                                                              Dictionary<int, int> ColumnCounts,
+                                                             Dictionary<int, int> HoldNoteCounts,
                                                              string ScratchText,
                                                              double? XxySr);
 
@@ -149,6 +151,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 0,
                 0,
                 new List<double>(),
+                new Dictionary<int, int>(),
                 new Dictionary<int, int>(),
                 string.Empty,
                 null);

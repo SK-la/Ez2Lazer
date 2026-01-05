@@ -138,12 +138,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
             double averageKps,
             double maxKps,
             List<double> kpsList,
-            Dictionary<int, int> columnCounts
+            Dictionary<int, int> columnCounts,
+            Dictionary<int, int> holdNoteCounts
             ) GetAllDataOptimized(IBeatmap beatmap)
         {
             var hitObjects = beatmap.HitObjects;
             if (hitObjects.Count == 0)
-                return (0, 0, new List<double>(), new Dictionary<int, int>());
+                return (0, 0, new List<double>(), new Dictionary<int, int>(), new Dictionary<int, int>());
 
             // 一次遍历完成KPS和列统计
             double bpm = beatmap.BeatmapInfo.BPM;
@@ -153,6 +154,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             int estimatedIntervals = (int)((songEndTime / interval) + 1);
             var kpsList = new List<double>(estimatedIntervals);
             var columnCounts = new Dictionary<int, int>();
+            var holdNoteCounts = new Dictionary<int, int>();
 
             // 同时处理KPS和列统计
             var hitObjectsArray = hitObjects as HitObject[] ?? hitObjects.ToArray();
@@ -160,9 +162,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
             // 预处理列统计
             foreach (var obj in hitObjectsArray)
             {
-                if (obj is IHasColumn columnObj && !(obj is IHasDuration))
+                if (obj is IHasColumn columnObj)
                 {
+                    // 统计所有note（包括普通note和长按note）
                     columnCounts[columnObj.Column] = columnCounts.GetValueOrDefault(columnObj.Column) + 1;
+
+                    // 单独统计长按note
+                    if (obj is IHasDuration)
+                    {
+                        holdNoteCounts[columnObj.Column] = holdNoteCounts.GetValueOrDefault(columnObj.Column) + 1;
+                    }
                 }
             }
 
@@ -190,12 +199,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
 
             if (kpsList.Count == 0)
-                return (0, 0, kpsList, columnCounts);
+                return (0, 0, kpsList, columnCounts, holdNoteCounts);
 
             double average = kpsList.Sum() / kpsList.Count;
             double max = kpsList.Max();
 
-            return (average, max, kpsList, columnCounts);
+            return (average, max, kpsList, columnCounts, holdNoteCounts);
         }
     }
 }

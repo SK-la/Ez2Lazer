@@ -45,7 +45,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private readonly ManualResetEventSlim highPriorityIdleEvent = new ManualResetEventSlim(true);
         private int highPriorityWorkCount;
 
-        private static readonly AsyncLocal<int> lowPriorityScopeDepth = new AsyncLocal<int>();
+        private static readonly AsyncLocal<int> low_priority_scope_depth = new AsyncLocal<int>();
 
         private readonly WeakList<BindableManiaBeatmapAnalysis> trackedBindables = new WeakList<BindableManiaBeatmapAnalysis>();
         private readonly List<CancellationTokenSource> linkedCancellationSources = new List<CancellationTokenSource>();
@@ -109,8 +109,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
         /// </summary>
         public IDisposable BeginLowPriorityScope()
         {
-            lowPriorityScopeDepth.Value++;
-            return new InvokeOnDisposal(() => lowPriorityScopeDepth.Value--);
+            low_priority_scope_depth.Value++;
+            return new InvokeOnDisposal(() => low_priority_scope_depth.Value--);
         }
 
         /// <summary>
@@ -203,7 +203,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         protected override Task<ManiaBeatmapAnalysisResult?> ComputeValueAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token = default)
         {
-            bool isLowPriority = lowPriorityScopeDepth.Value > 0;
+            bool isLowPriority = low_priority_scope_depth.Value > 0;
             var scheduler = isLowPriority ? lowPriorityScheduler : highPriorityScheduler;
 
             return Task.Factory.StartNew(() =>
@@ -266,10 +266,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var (averageKps, maxKps, kpsList, columnCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
+                var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
                 // 同一次 playable beatmap 里顺带计算 xxy_SR（只在异常/失败时写 xxy_sr 日志）。
                 double? xxySr = null;
+
                 if (playableBeatmap.HitObjects.Count == 0)
                 {
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
@@ -302,6 +303,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     maxKps,
                     kpsList,
                     columnCounts,
+                    holdNoteCounts,
                     scratchText,
                     xxySr);
 
@@ -421,10 +423,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
 
             public bool Equals(ManiaAnalysisCacheLookup other)
-                     => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
-                         && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
-                         && Ruleset.Equals(other.Ruleset)
-                         && OrderedMods.SequenceEqual(other.OrderedMods);
+                => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
+                   && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
+                   && Ruleset.Equals(other.Ruleset)
+                   && OrderedMods.SequenceEqual(other.OrderedMods);
 
             public override int GetHashCode()
             {
