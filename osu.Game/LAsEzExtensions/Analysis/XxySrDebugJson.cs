@@ -86,7 +86,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             loggedAbnormalId = beatmapId;
 
-            if (xxySr == null || xxySr == 0)
+            if (xxySr == null)
             {
                 Logger.Log(
                     FormatAbnormalSr(beatmap, "xxySR_null", null, xxySr),
