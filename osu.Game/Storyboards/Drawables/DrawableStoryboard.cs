@@ -68,6 +68,7 @@ namespace osu.Game.Storyboards.Drawables
             if (!onlyHasVideoElements)
             {
                 Size = new Vector2(640, 480);
+                // TODO:考虑更多比例的适配
                 Width = Height * (storyboard.Beatmap.WidescreenStoryboard ? 16 / 9f : 4 / 3f);
             }
 

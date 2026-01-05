@@ -80,25 +80,6 @@ namespace osu.Game.Database
             cache.TryGetValue(lookup, out value);
 
         /// <summary>
-        /// Current number of cached entries.
-        /// </summary>
-        protected int CacheCount => cache.Count;
-
-        /// <summary>
-        /// Try to remove a cached entry.
-        /// Intended for derived caches which want bounded in-memory behaviour.
-        /// </summary>
-        protected bool TryRemove(TLookup lookup)
-        {
-            bool removed = cache.TryRemove(lookup, out _);
-
-            if (removed)
-                statistics.Value.Usage = cache.Count;
-
-            return removed;
-        }
-
-        /// <summary>
         /// Called on cache miss to compute the value for the specified lookup.
         /// </summary>
         /// <param name="lookup">The lookup to retrieve.</param>

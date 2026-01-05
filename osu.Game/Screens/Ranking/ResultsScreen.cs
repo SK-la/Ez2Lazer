@@ -36,7 +36,6 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Ranking.Expanded.Accuracy;
 using osu.Game.Screens.Ranking.Statistics;
-using osu.Game.Screens.SelectV2;
 using osu.Game.Skinning;
 using osuTK;
 

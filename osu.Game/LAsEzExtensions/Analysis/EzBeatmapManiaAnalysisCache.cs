@@ -73,15 +73,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
         // When persistence is disabled, keep only a bounded amount of in-memory results.
         // When persistence is enabled, also limit cache size to prevent memory growth during extensive browsing.
         // This prevents unbounded memory growth when scrolling through many beatmaps.
-        private const int max_in_memory_entries_without_persistence = 128;
-        private readonly ConcurrentQueue<ManiaAnalysisCacheLookup> nonPersistentCacheInsertionOrder = new ConcurrentQueue<ManiaAnalysisCacheLookup>();
+        // private const int max_in_memory_entries_without_persistence = 128;
+        // private readonly ConcurrentQueue<ManiaAnalysisCacheLookup> nonPersistentCacheInsertionOrder = new ConcurrentQueue<ManiaAnalysisCacheLookup>();
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致（150ms）。
-        private const int mod_settings_debounce = 150;
+        private const int mod_settings_debounce = 500;
 
-        // xxy_sr 错误日志节流：每秒最多记录一次
-        private DateTimeOffset lastXxySrErrorLogTime = DateTimeOffset.MinValue;
-        private readonly object logLock = new object();
 
         protected override void LoadComplete()
         {
@@ -196,16 +193,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             // 即使在持久化模式下，也要限制内存缓存大小，避免内存无限增长
             // 持久化模式主要用于预计算，但内存缓存仍需限制以应对大量谱面浏览
-            if (result != null)
-            {
-                nonPersistentCacheInsertionOrder.Enqueue(lookup);
-
-                // 持久化模式下使用更小的缓存限制（因为主要依赖SQLite）
-                int maxEntries = EzManiaAnalysisPersistentStore.Enabled ? 48 : max_in_memory_entries_without_persistence;
-
-                while (CacheCount > maxEntries && nonPersistentCacheInsertionOrder.TryDequeue(out var toRemove))
-                    TryRemove(toRemove);
-            }
+            // while (CacheCount > maxEntries && nonPersistentCacheInsertionOrder.TryDequeue(out var toRemove))
+            //     TryRemove(toRemove);
 
             return result;
         }
@@ -286,7 +275,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     {
                         if (double.IsNaN(sr) || double.IsInfinity(sr))
                         {
-                            logXxySrError($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}");
+                            // logXxySrError($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}");
                         }
                         else
                         {
@@ -295,13 +284,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
                             if (sr < 0 || sr > 1000)
                             {
                                 string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-                                logXxySrError($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}");
+                                // logXxySrError($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}");
                             }
                         }
                     }
                     else
                     {
-                        logXxySrError($"xxy_SR calculation failed. beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}");
+                        // logXxySrError($"xxy_SR calculation failed. beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}");
                     }
                 }
 
@@ -408,16 +397,18 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 }, cancellationToken);
         }
 
-        private void logXxySrError(string message)
+
+
+        protected override void Dispose(bool isDisposing)
         {
-            lock (logLock)
-            {
-                if ((DateTimeOffset.Now - lastXxySrErrorLogTime).TotalSeconds > 1)
-                {
-                    Logger.Log(message, "xxy_sr", LogLevel.Error);
-                    lastXxySrErrorLogTime = DateTimeOffset.Now;
-                }
-            }
+            base.Dispose(isDisposing);
+
+            modSettingChangeTracker?.Dispose();
+
+            cancelTrackedBindableUpdate();
+            highPriorityScheduler.Dispose();
+            lowPriorityScheduler.Dispose();
+            highPriorityIdleEvent.Dispose();
         }
 
         public readonly struct ManiaAnalysisCacheLookup : IEquatable<ManiaAnalysisCacheLookup>

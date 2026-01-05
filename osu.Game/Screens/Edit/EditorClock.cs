@@ -81,6 +81,22 @@ namespace osu.Game.Screens.Edit
         /// <returns>Whether the seek could be performed.</returns>
         public bool SeekSnapped(double position)
         {
+            var timingPoint = ControlPointInfo.TimingPointAt(position);
+            double beatSnapLength = timingPoint.BeatLength / beatDivisor.Value;
+
+            // We will be snapping to beats within the timing point
+            position -= timingPoint.Time;
+
+            // Determine the index from the current timing point of the closest beat to position
+            int closestBeat = (int)Math.Round(position / beatSnapLength);
+            position = timingPoint.Time + closestBeat * beatSnapLength;
+
+            // Depending on beatSnapLength, we may snap to a beat that is beyond timingPoint's end time, but we want to instead snap to
+            // the next timing point's start time
+            var nextTimingPoint = ControlPointInfo.TimingPoints.FirstOrDefault(t => t.Time > timingPoint.Time);
+            if (position > nextTimingPoint?.Time)
+                position = nextTimingPoint.Time;
+
             return Seek(GetSnappedTime(position));
         }
 
@@ -213,7 +229,7 @@ namespace osu.Game.Screens.Edit
         }
 
         /// <summary>
-        /// Seek smoothly to the provided destination.
+        /// Seek smoothly to the provided destination, if within a certain proximity to the current viewport.
         /// Use <see cref="Seek"/> to perform an immediate seek.
         /// </summary>
         /// <param name="seekDestination"></param>
@@ -221,13 +237,18 @@ namespace osu.Game.Screens.Edit
         {
             seekingOrStopped.Value = true;
 
-            if (IsRunning)
-                Seek(seekDestination);
-            else
+            // The whole point of seeking smoothly is to maintain continuity for the user.
+            // Above a certain proximity, there's little reason to do this as the jump is already huge.
+            const double smooth_seek_max_proximity = 5000;
+
+            if (IsRunning || Math.Abs(seekDestination - currentTime) > smooth_seek_max_proximity)
             {
+                Seek(seekDestination);
+                return;
+            }
+
                 transformSeekTo(seekDestination, transform_time, Easing.OutQuint);
             }
-        }
 
         public void BindAdjustments() => track.Value?.BindAdjustments(AudioAdjustments);
 

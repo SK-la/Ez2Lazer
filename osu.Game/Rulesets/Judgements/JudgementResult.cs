@@ -107,6 +107,7 @@ namespace osu.Game.Rulesets.Judgements
         /// <remarks>
         /// This is intended for hit modes that treat some hit results (e.g. <see cref="HitResult.Meh"/>) as combo breaks
         /// while still keeping their original scoring/accuracy semantics.
+        /// 为了实现非MISS判定可打断combo
         /// </remarks>
         public bool? IsComboHit;
 

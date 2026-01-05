@@ -19,7 +19,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
 using osu.Framework.Localisation;
-using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
@@ -41,22 +40,6 @@ namespace osu.Game.Screens.SelectV2
     [Cached]
     public partial class BeatmapCarousel : Carousel<BeatmapInfo>
     {
-        private const int base_max_textures_uploaded_per_frame = 8;
-        private const int base_max_pixels_uploaded_per_frame = 1024 * 1024;
-
-        private const int boost_max_textures_uploaded_per_frame = 16;
-        private const int boost_max_pixels_uploaded_per_frame = 4 * 1024 * 1024;
-
-        private const double scroll_speed_to_boost = 2000; // px/s
-        private const double boost_hold_time = 250; // ms
-
-        private bool boostTextureUploads;
-        private double boostUntil;
-        private double lastScrollTarget;
-
-        [Resolved]
-        private GameHost gameHost { get; set; } = null!;
-
         public Action<BeatmapInfo>? RequestPresentBeatmap { private get; init; }
 
         /// <summary>
@@ -149,8 +132,6 @@ namespace osu.Game.Screens.SelectV2
         {
             base.LoadComplete();
             detachedBeatmaps.BindCollectionChanged(beatmapSetsChanged, true);
-
-            lastScrollTarget = Scroll.Target;
         }
 
         #region Beatmap source hookup
@@ -796,35 +777,6 @@ namespace osu.Game.Screens.SelectV2
             base.Update();
 
             selectionFocusOffset = (float)Interpolation.DampContinuously(selectionFocusOffset, VisuallyFocusSelected ? 300 : 0, 100, Time.Elapsed);
-
-            updateTextureUploadLimits();
-        }
-
-        private void updateTextureUploadLimits()
-        {
-            // Only boost during user-driven scrolling; programmatic scrolls (eg. scroll-to-selection) should not affect this.
-            if (Time.Elapsed > 0)
-            {
-                double target = Scroll.Target;
-                double speed = Math.Abs(target - lastScrollTarget) / Time.Elapsed * 1000;
-                lastScrollTarget = target;
-
-                if ((Scroll.UserScrolling || Scroll.AbsoluteScrolling) && speed > scroll_speed_to_boost)
-                    boostUntil = Math.Max(boostUntil, Time.Current + boost_hold_time);
-            }
-
-            bool shouldBoost = Time.Current < boostUntil;
-            if (shouldBoost == boostTextureUploads)
-                return;
-
-            boostTextureUploads = shouldBoost;
-
-            // Apply on draw thread via GameHost scheduler.
-            // Important: do not overwrite the original captured limits; OsuGame manages base/restores on screen switches.
-            if (boostTextureUploads)
-                gameHost.SetTextureUploadLimits(boost_max_textures_uploaded_per_frame, boost_max_pixels_uploaded_per_frame, rememberOriginal: false);
-            else
-                gameHost.SetTextureUploadLimits(base_max_textures_uploaded_per_frame, base_max_pixels_uploaded_per_frame, rememberOriginal: false);
         }
 
         protected override float GetPanelXOffset(Drawable panel)

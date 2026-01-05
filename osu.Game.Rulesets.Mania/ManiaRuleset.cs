@@ -16,7 +16,6 @@ using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Background;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -97,7 +96,7 @@ namespace osu.Game.Rulesets.Mania
                 case Ez2Skin:
                     if (GlobalConfigStore.EzConfig == null)
                     {
-                        Logger.Log("!EGlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
+                        Logger.Log("!GlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
                         break;
                     }
 

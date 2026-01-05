@@ -17,7 +17,7 @@ using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Beatmaps.Drawables
+namespace osu.Game.LAsEzExtensions.UserInterface
 {
     /// <summary>
     /// A pill that displays xxy_SR (mania).

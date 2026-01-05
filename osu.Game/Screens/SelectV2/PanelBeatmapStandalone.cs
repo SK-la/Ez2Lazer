@@ -426,6 +426,7 @@ namespace osu.Game.Screens.SelectV2
 
                 var normalizedColumnCounts = new Dictionary<int, int>(keyCount);
                 var normalizedHoldNoteCounts = new Dictionary<int, int>(keyCount);
+
                 for (int i = 0; i < keyCount; i++)
                 {
                     normalizedColumnCounts[i] = columnCounts.GetValueOrDefault(i);

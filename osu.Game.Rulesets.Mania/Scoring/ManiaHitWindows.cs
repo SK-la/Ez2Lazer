@@ -3,7 +3,6 @@
 
 using System;
 using osu.Game.Beatmaps;
-using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.LAsEzExtensions.Configuration;

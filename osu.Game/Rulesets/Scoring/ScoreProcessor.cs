@@ -250,9 +250,9 @@ namespace osu.Game.Rulesets.Scoring
             {
                 bool isComboHit = result.IsComboHit ?? result.Type.IsHit();
 
-                if (isComboHit)
+                if (result.Type.IncreasesCombo() || isComboHit)
                     Combo.Value++;
-                else
+                else if (result.Type.BreaksCombo() || !isComboHit)
                     Combo.Value = 0;
             }
 

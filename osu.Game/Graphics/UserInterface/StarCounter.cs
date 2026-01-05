@@ -36,7 +36,7 @@ namespace osu.Game.Graphics.UserInterface
         }
 
         /// <summary>
-        /// The icon to display for stars. Defaults to a star.
+        /// 提供属性修改星星图标
         /// </summary>
         public IconUsage Icon
         {
