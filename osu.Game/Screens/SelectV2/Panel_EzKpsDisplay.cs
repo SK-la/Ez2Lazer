@@ -25,7 +25,11 @@ namespace osu.Game.Screens.SelectV2
         private readonly OsuSpriteText kpsText;
         // private readonly LineGraph kpsGraph;
 
+        public static bool KpsCacheEnabled = true;
+
+        private const int max_kps_cache_entries = 24;
         private readonly Dictionary<string, (double averageKps, double maxKps, List<double> kpsList)> kpsCache = new Dictionary<string, (double, double, List<double>)>();
+        private readonly Queue<string> kpsCacheInsertionOrder = new Queue<string>();
         private CancellationTokenSource? calculationCancellationSource;
 
         [Resolved]
@@ -93,8 +97,8 @@ namespace osu.Game.Screens.SelectV2
                 ? $"{beatmapInfo.Hash}"
                 : ManiaBeatmapAnalysisCache.CreateCacheKey(beatmapInfo, ruleset, mods);
 
-            // 检查缓存
-            if (kpsCache.TryGetValue(cacheKey, out var cachedResult))
+            // 检查缓存（可开关，便于对比测试）
+            if (KpsCacheEnabled && kpsCache.TryGetValue(cacheKey, out var cachedResult))
             {
                 updateUI(cachedResult, null, null);
                 return;
@@ -120,7 +124,17 @@ namespace osu.Game.Screens.SelectV2
                     cancellationToken.ThrowIfCancellationRequested();
 
                     // 缓存结果
-                    kpsCache[cacheKey] = kpsResult;
+                    if (KpsCacheEnabled)
+                    {
+                        kpsCache[cacheKey] = kpsResult;
+                        kpsCacheInsertionOrder.Enqueue(cacheKey);
+
+                        while (kpsCache.Count > max_kps_cache_entries && kpsCacheInsertionOrder.Count > 0)
+                        {
+                            string oldest = kpsCacheInsertionOrder.Dequeue();
+                            kpsCache.Remove(oldest);
+                        }
+                    }
 
                     // 在UI线程中更新界面
                     Schedule(() =>

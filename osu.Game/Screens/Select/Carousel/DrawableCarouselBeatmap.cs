@@ -73,6 +73,9 @@ namespace osu.Game.Screens.Select.Carousel
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
 
         [Resolved]
+        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+
+        [Resolved]
         private ManageCollectionsDialog? manageCollectionsDialog { get; set; }
 
         [Resolved]
@@ -96,6 +99,9 @@ namespace osu.Game.Screens.Select.Carousel
         private IBindable<StarDifficulty> starDifficultyBindable = null!;
         private CancellationTokenSource? starDifficultyCancellationSource;
 
+        private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
+        private CancellationTokenSource? maniaAnalysisCancellationSource;
+
         private IBeatmap playableBeatmap = null!;
         private WorkingBeatmap working = null!;
         private FillFlowContainer columnNotes = null!;
@@ -103,7 +109,6 @@ namespace osu.Game.Screens.Select.Carousel
         private OsuSpriteText kpsText = null!;
 
         private Dictionary<int, int> columnNoteCounts = new Dictionary<int, int>();
-        private readonly Dictionary<string, (double averageKps, double maxKps, List<double> kpsList)> kpsCache = new Dictionary<string, (double, double, List<double>)>();
         private (double averageKps, double maxKps, List<double> kpsList) kpsResult;
 
         public DrawableCarouselBeatmap(CarouselBeatmap panel)
@@ -308,68 +313,50 @@ namespace osu.Game.Screens.Select.Carousel
             if (manager == null || ruleset.Value.OnlineID != 3)
                 return;
 
-            working = manager.GetWorkingBeatmap(beatmapInfo);
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = new CancellationTokenSource();
+            var localCancellationSource = maniaAnalysisCancellationSource;
 
-            if (mods.Value == null)
+            // 旧选歌界面与 V2 统一：通过 EzBeatmapManiaAnalysisCache 获取分析结果（会优先走 SQLite 持久化）。
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 200);
+            maniaAnalysisBindable.BindValueChanged(result =>
             {
-                string beatmapHash = beatmapInfo.Hash;
+                if (localCancellationSource != maniaAnalysisCancellationSource)
+                    return;
 
-                if (!kpsCache.TryGetValue(beatmapHash, out kpsResult))
-                {
-                    kpsResult = EzBeatmapCalculator.GetKps(working.Beatmap);
-                    kpsCache[beatmapHash] = kpsResult;
-                }
-                else
-                {
-                    kpsResult = kpsCache[beatmapHash];
-                }
-            }
-            else
-            {
-                kpsCache.Clear();
+                var value = result.NewValue;
 
-                try
-                {
-                    playableBeatmap = working.GetPlayableBeatmap(ruleset.Value, mods.Value);
-                }
-                catch (BeatmapInvalidForRulesetException)
-                {
-                    playableBeatmap = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset, mods.Value);
-                }
+                kpsResult = (value.AverageKps, value.MaxKps, value.KpsList);
+                columnNoteCounts = value.ColumnCounts;
 
-                kpsResult = EzBeatmapCalculator.GetKps(playableBeatmap);
-            }
+                var (averageKps, maxKps, kpsList) = kpsResult;
+                kpsGraph.Values = kpsList.Count > 0 ? kpsList.Select(kps => (float)kps).ToArray() : new[] { 0f };
+                kpsText.Text = averageKps > 0 ? $"  KPS: {averageKps:F1} ({maxKps:F1} Max)" : "  KPS: calculating...";
 
-            columnNoteCounts = EzBeatmapCalculator.GetColumnNoteCounts(playableBeatmap);
-            var (averageKps, maxKps, kpsList) = kpsResult;
-            // Schedule(() =>
-            // {
-            kpsGraph.Values = kpsList.Count > 0 ? kpsList.Select(kps => (float)kps).ToArray() : new[] { 0f };
-            kpsText.Text = $"  KPS: {averageKps:F1} ({maxKps:F1} Max)";
-
-            columnNotes.Clear();
-            columnNotes.Children = columnNoteCounts
-                                   .OrderBy(c => c.Key)
-                                   .Select((c, index) => new FillFlowContainer
-                                   {
-                                       Direction = FillDirection.Horizontal,
-                                       AutoSizeAxes = Axes.Both,
-                                       Children = new Drawable[]
+                columnNotes.Clear();
+                columnNotes.Children = columnNoteCounts
+                                       .OrderBy(c => c.Key)
+                                       .Select((c, index) => new FillFlowContainer
                                        {
-                                           new OsuSpriteText
+                                           Direction = FillDirection.Horizontal,
+                                           AutoSizeAxes = Axes.Both,
+                                           Children = new Drawable[]
                                            {
-                                               Text = $"{index + 1}/",
-                                               Font = OsuFont.GetFont(size: 12),
-                                               Colour = Colour4.Gray,
-                                           },
-                                           new OsuSpriteText
-                                           {
-                                               Text = $"{c.Value} ",
-                                               Font = OsuFont.GetFont(size: 14),
-                                               Colour = Colour4.LightCoral,
+                                               new OsuSpriteText
+                                               {
+                                                   Text = $"{index + 1}/",
+                                                   Font = OsuFont.GetFont(size: 12),
+                                                   Colour = Colour4.Gray,
+                                               },
+                                               new OsuSpriteText
+                                               {
+                                                   Text = $"{c.Value} ",
+                                                   Font = OsuFont.GetFont(size: 14),
+                                                   Colour = Colour4.LightCoral,
+                                               }
                                            }
-                                       }
-                                   }).ToArray();
+                                       }).ToArray();
+            }, true);
         }
 
         protected override void Selected()
@@ -409,6 +396,13 @@ namespace osu.Game.Screens.Select.Carousel
                 starCounter.ReplayAnimation();
 
             starDifficultyCancellationSource?.Cancel();
+
+            // Only compute mania analysis when the item is visible.
+            if (Item?.State.Value == CarouselItemState.Collapsed)
+            {
+                maniaAnalysisCancellationSource?.Cancel();
+                maniaAnalysisCancellationSource = null;
+            }
 
             // Only compute difficulty when the item is visible.
             if (Item?.State.Value != CarouselItemState.Collapsed)

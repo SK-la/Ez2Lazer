@@ -70,15 +70,21 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private int modsRevision;
 
-        // When persistence is disabled, keep only a bounded amount of in-memory results.
-        // When persistence is enabled, also limit cache size to prevent memory growth during extensive browsing.
-        // This prevents unbounded memory growth when scrolling through many beatmaps.
-        // private const int max_in_memory_entries_without_persistence = 128;
-        // private readonly ConcurrentQueue<ManiaAnalysisCacheLookup> nonPersistentCacheInsertionOrder = new ConcurrentQueue<ManiaAnalysisCacheLookup>();
+        // Limit in-memory cache size.
+        // - When persistence is available, keep a small working set (current page) in memory.
+        // - When persistence is unavailable/disabled, allow a slightly larger set to reduce recomputation.
+        private const int max_in_memory_entries_with_persistence = 24;
+        private const int max_in_memory_entries_without_persistence = 48;
+        private readonly ConcurrentQueue<ManiaAnalysisCacheLookup> cacheInsertionOrder = new ConcurrentQueue<ManiaAnalysisCacheLookup>();
+
+        // We avoid modifying the official MemoryCachingComponent by keeping our own set of cached keys.
+        // Eviction is then performed by calling Invalidate(key == oldest), which is O(n) over the base cache,
+        // but n is bounded to a small working set (24/48) so this is fine.
+        private readonly ConcurrentDictionary<ManiaAnalysisCacheLookup, byte> cachedLookups = new ConcurrentDictionary<ManiaAnalysisCacheLookup, byte>();
+        private int cachedLookupsCount;
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致（150ms）。
-        private const int mod_settings_debounce = 500;
-
+        private const int mod_settings_debounce = 150;
 
         protected override void LoadComplete()
         {
@@ -191,10 +197,26 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             var result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
 
-            // 即使在持久化模式下，也要限制内存缓存大小，避免内存无限增长
-            // 持久化模式主要用于预计算，但内存缓存仍需限制以应对大量谱面浏览
-            // while (CacheCount > maxEntries && nonPersistentCacheInsertionOrder.TryDequeue(out var toRemove))
-            //     TryRemove(toRemove);
+            if (result != null)
+            {
+                cacheInsertionOrder.Enqueue(lookup);
+
+                if (cachedLookups.TryAdd(lookup, 0))
+                    Interlocked.Increment(ref cachedLookupsCount);
+
+                int maxEntries = EzManiaAnalysisPersistentStore.Enabled
+                    ? max_in_memory_entries_with_persistence
+                    : max_in_memory_entries_without_persistence;
+
+                while (Volatile.Read(ref cachedLookupsCount) > maxEntries && cacheInsertionOrder.TryDequeue(out var toRemove))
+                {
+                    if (!cachedLookups.TryRemove(toRemove, out _))
+                        continue;
+
+                    Interlocked.Decrement(ref cachedLookupsCount);
+                    Invalidate(k => k.Equals(toRemove));
+                }
+            }
 
             return result;
         }
@@ -266,31 +288,43 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
-                // 同一次 playable beatmap 里顺带计算 xxy_SR（只在其他数据成功但 xxy_sr 计算出错时记录日志）。
+                // 同一次 playable beatmap 里顺带计算 xxy_SR。
+                // 仅当除 xxy_SR 外的分析数据都已成功产出（不为 null/未被取消）且 xxy_SR 失败/非法/异常时记录日志。
                 double? xxySr = null;
+                bool otherDataOk = playableBeatmap.HitObjects.Count > 0
+                                   && kpsList.Count > 0
+                                   && columnCounts.Count > 0;
+
+                // Copy lookup info to locals so we don't capture the `in` parameter in a local function.
+                Guid beatmapId = lookup.BeatmapInfo.ID;
+                string difficultyName = lookup.BeatmapInfo.DifficultyName;
+                string rulesetShortName = lookup.Ruleset.ShortName;
+                string modsText = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
+
+                void logXxySrError(string message)
+                {
+                    if (!otherDataOk)
+                        return;
+
+                    Logger.Log($"{message} beatmapId={beatmapId} diff=\"{difficultyName}\" ruleset={rulesetShortName} mods={modsText} hitobjects={playableBeatmap.HitObjects.Count}", "xxy_sr", LogLevel.Error);
+                }
 
                 if (playableBeatmap.HitObjects.Count > 0)
                 {
-                    if (XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr))
+                    if (!XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr))
                     {
-                        if (double.IsNaN(sr) || double.IsInfinity(sr))
-                        {
-                            // logXxySrError($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}");
-                        }
-                        else
-                        {
-                            xxySr = sr;
-
-                            if (sr < 0 || sr > 1000)
-                            {
-                                string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-                                // logXxySrError($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}");
-                            }
-                        }
+                        logXxySrError("xxy_SR calculation failed.");
+                    }
+                    else if (double.IsNaN(sr) || double.IsInfinity(sr))
+                    {
+                        logXxySrError("xxy_SR returned invalid value (NaN/Infinity).");
                     }
                     else
                     {
-                        // logXxySrError($"xxy_SR calculation failed. beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}");
+                        xxySr = sr;
+
+                        if (sr < 0 || sr > 1000)
+                            logXxySrError($"xxy_SR abnormal value: {sr}.");
                     }
                 }
 
