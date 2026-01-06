@@ -355,7 +355,7 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisCancellationSource = new CancellationTokenSource();
             var localCancellationSource = maniaAnalysisCancellationSource;
 
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE, requireXxySr: true);
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: 0, requireXxySr: true);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
                 // 旧 bindable 的回调（比如切换 mods / 取消重绑）直接忽略。
@@ -579,7 +579,7 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
-            starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, computationDelay: 0);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
