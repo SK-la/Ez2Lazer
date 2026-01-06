@@ -16,7 +16,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
     {
         public const int MAX_HEALTH = 1000;
 
-        public static int HP = 1000;
+        public Bindable<int> HP = new Bindable<int>(1000);
 
         private readonly int[][] difficultySettings =
         {
@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             new[] { 1, 0, -5, -30 } // Hard
         };
 
-        public double Health => (double)HP / MAX_HEALTH;
+        public double Health => (double)HP.Value / MAX_HEALTH;
 
         public override string Name => "O2JAM Health";
 
@@ -62,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            HP = MAX_HEALTH;
+            HP.Value = MAX_HEALTH;
         }
 
         protected override bool FailCondition(HealthProcessor healthProcessor, JudgementResult result)
@@ -89,11 +89,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     break;
             }
 
-            HP += healthChange;
+            HP.Value += healthChange;
+
+            if (HP.Value > MAX_HEALTH)
+                HP.Value = MAX_HEALTH;
 
             healthProcessor.Health.Value = Health;
 
-            return HP <= 0;
+            return HP.Value <= 0;
         }
     }
 }

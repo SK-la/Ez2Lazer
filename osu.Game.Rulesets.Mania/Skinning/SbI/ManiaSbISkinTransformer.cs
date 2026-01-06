@@ -3,6 +3,7 @@
 
 using System.Linq;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
@@ -173,14 +174,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         return SkinUtils.As<TValue>(new Bindable<float>(0));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-
                         return SkinUtils.As<TValue>(new Bindable<float>(width));
 
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:
                         return SkinUtils.As<TValue>(new Bindable<int>(0));
 
                     case LegacyManiaSkinConfigurationLookups.BarLineColour:
-                        return SkinUtils.As<TValue>(new Bindable<Color4>(Color4.Transparent));
+                        return SkinUtils.As<TValue>(new Bindable<Color4>(Color4.Transparent.Opacity(0f)));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
 

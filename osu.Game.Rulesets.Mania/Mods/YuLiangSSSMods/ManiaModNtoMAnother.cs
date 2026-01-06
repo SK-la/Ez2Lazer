@@ -18,7 +18,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModNtoMAnother : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed
+    public class ManiaModNtoMAnother : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, osu.Game.Rulesets.Mods.IHasApplyOrder
     {
         public const double INTERVAL = 50;
 
@@ -108,6 +108,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
+        [SettingSource("Apply Order", "Order in which this mod is applied after beatmap conversion. Lower runs earlier.", SettingControlType = typeof(SettingsNumberBox))]
+        public BindableNumber<int> ApplyOrderSetting { get; } = new BindableInt(0)
+        {
+            MinValue = -1000,
+            MaxValue = 1000,
+            Precision = 1
+        };
+
         public void ApplyToBeatmapConverter(IBeatmapConverter converter)
         {
             var mbc = (ManiaBeatmapConverter)converter;
@@ -133,6 +141,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             int keys = (int)maniaBeatmap.Difficulty.CircleSize;
 
             int blank = BlankColumn.Value;
+
             if (blank > Key.Value - keys)
             {
                 blank = Key.Value - keys;
@@ -446,5 +455,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             return (newObjects, checkColumn);
         }
+
+        public int ApplyOrder => ApplyOrderSetting.Value;
     }
 }

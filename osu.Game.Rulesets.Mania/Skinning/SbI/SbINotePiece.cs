@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
 using osuTK;
@@ -15,7 +16,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    internal partial class SbINotePiece : CompositeDrawable
+    internal partial class SbINotePiece : EzNoteBase
     {
         public const float NOTE_HEIGHT = 45;
         public const float NOTE_ACCENT_RATIO = 1f;
@@ -24,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private readonly IBindable<Color4> accentColour = new Bindable<Color4>();
 
-        private readonly Box colouredBox;
+        private Box colouredBox = null!;
 
         public SbINotePiece()
         {
@@ -32,35 +33,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             CornerRadius = CORNER_RADIUS;
             // Masking = true;
-
-            InternalChildren = new[]
-            {
-                new Container
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Child = new Box
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        // BorderColour = Color4.White.Opacity(1f),
-                        // BorderColour = ColourInfo.GradientVertical(Color4.White.Opacity(0), Colour4.Black),
-                    }
-                },
-                new Container
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = Axes.Both,
-                    // Masking = true,
-                    // CornerRadius = CORNER_RADIUS,
-                    Children = new Drawable[]
-                    {
-                        colouredBox = new Box
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                        }
-                    }
-                },
-            };
         }
 
         protected override void Update()
@@ -74,6 +46,38 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [BackgroundDependencyLoader(true)]
         private void load(IScrollingInfo scrollingInfo, DrawableHitObject? drawableObject)
         {
+            if (MainContainer != null)
+            {
+                MainContainer.Children = new[]
+                {
+                    new Container
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Child = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            // BorderColour = Color4.White.Opacity(1f),
+                            // BorderColour = ColourInfo.GradientVertical(Color4.White.Opacity(0), Colour4.Black),
+                        }
+                    },
+                    new Container
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        RelativeSizeAxes = Axes.Both,
+                        // Masking = true,
+                        // CornerRadius = CORNER_RADIUS,
+                        Children = new Drawable[]
+                        {
+                            colouredBox = new Box
+                            {
+                                RelativeSizeAxes = Axes.Both,
+                            }
+                        }
+                    },
+                };
+            }
+
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 

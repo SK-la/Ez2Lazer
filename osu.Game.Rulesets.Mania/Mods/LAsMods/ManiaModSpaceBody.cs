@@ -16,9 +16,9 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModSpaceBody : Mod, IApplicableAfterBeatmapConversion
+    public class ManiaModSpaceBody : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
     {
-        public override string Name => "SpaceBody";
+        public override string Name => "Space Body";
 
         public override string Acronym => "SB";
         public override double ScoreMultiplier => 1;
@@ -39,6 +39,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         [SettingSource("Add Shield", "原始面条转盾牌，超难。Convert original LN to Shield. Very Hard.")]
         public BindableBool Shield { get; } = new BindableBool();
+
+        [SettingSource("Apply Order", "Order in which this mod is applied after beatmap conversion. Lower runs earlier.", SettingControlType = typeof(SettingsNumberBox))]
+        public BindableNumber<int> ApplyOrderSetting { get; } = new BindableInt(100)
+        {
+            MinValue = -1000,
+            MaxValue = 1000,
+            Precision = 1
+        };
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -118,5 +126,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             // 无休息时间
             maniaBeatmap.Breaks.Clear();
         }
+
+        // 确认此 Mod 在其他转换后 Mod 之后应用，返回更高的应用顺序。
+        // 没有此接口的 Mod 被视为顺序 0。
+        public int ApplyOrder => ApplyOrderSetting.Value;
     }
 }

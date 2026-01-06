@@ -8,12 +8,13 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    public partial class SbIHoldBodyPiece : CompositeDrawable, IHoldNoteBody
+    public partial class SbIHoldBodyPiece : EzNoteBase, IHoldNoteBody
     {
         private readonly Bindable<Color4> accentColour = new Bindable<Color4>();
 
@@ -31,14 +32,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [BackgroundDependencyLoader(true)]
         private void load(DrawableHitObject? drawableObject)
         {
-            InternalChildren = new[]
+            if (MainContainer != null)
             {
-                new Box
+                MainContainer.Children = new[]
                 {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Colour4.White,
-                },
-            };
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Colour4.White,
+                    },
+                };
+            }
 
             if (drawableObject != null)
             {

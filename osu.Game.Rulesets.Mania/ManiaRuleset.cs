@@ -324,20 +324,12 @@ namespace osu.Game.Rulesets.Mania
                         new MultiMod(new ManiaModAutoplay(), new ManiaModCinema()),
                     };
 
-                case ModType.LA_Mod:
-                    return new Mod[]
-                    {
-                        new ManiaModEz2Settings(),
-                        // new ManiaModJudgmentStyle(),
-                        new ManiaModNiceBPM(),
-                        new ManiaModSpaceBody(),
-                        new ManiaModLoopPlayClip(),
-                    };
-
                 case ModType.YuLiangSSS_Mod:
                     return new Mod[]
                     {
                         new ManiaModAdjust(),
+                        new ManiaModNtoM(),
+                        new ManiaModNtoMAnother(),
                         // new ManiaModChangeSpeedByAccuracy(),
                         // new ManiaModCleaner(),
                         // new ManiaModDeleteSpace(),
@@ -354,14 +346,21 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModMalodyStyleLN(),
                         new ManiaModNewJudgement(),
                         new ManiaModNoteAdjust(),
-                        new ManiaModNtoM(),
-                        new ManiaModNtoMAnother(),
                         new ManiaModO2Health(),
                         new ManiaModO2Judgement(),
                         new ManiaModPlayfieldTransformation(), //加载有问题
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
                         new StarRatingRebirth(),
+                    };
+
+                case ModType.LA_Mod:
+                    return new Mod[]
+                    {
+                        new ManiaModEz2Settings(),
+                        new ManiaModNiceBPM(),
+                        new ManiaModSpaceBody(),
+                        new ManiaModLoopPlayClip(),
                     };
 
                 case ModType.Fun:

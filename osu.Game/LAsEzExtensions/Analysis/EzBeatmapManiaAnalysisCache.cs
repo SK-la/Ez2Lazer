@@ -46,6 +46,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private readonly ManualResetEventSlim highPriorityIdleEvent = new ManualResetEventSlim(true);
         private int highPriorityWorkCount;
 
+        // A small gate to avoid flooding SQLite with too many concurrent readers.
+        private readonly SemaphoreSlim persistenceReadGate = new SemaphoreSlim(4, 4);
+
         private static readonly AsyncLocal<int> low_priority_scope_depth = new AsyncLocal<int>();
 
         private readonly WeakList<BindableManiaBeatmapAnalysis> trackedBindables = new WeakList<BindableManiaBeatmapAnalysis>();
@@ -226,17 +229,61 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         protected override Task<ManiaBeatmapAnalysisResult?> ComputeValueAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token = default)
         {
+            return computeValueInternalAsync(lookup, token);
+        }
+
+        private async Task<ManiaBeatmapAnalysisResult?> computeValueInternalAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token)
+        {
+            // Quick path: if a persisted no-mod baseline exists, return it without entering the single-thread compute queue.
+            // This avoids head-of-line blocking where one expensive miss would delay many cheap hits.
+            if (lookup.OrderedMods.Length == 0 && EzManiaAnalysisPersistentStore.Enabled)
+            {
+                bool gateAcquired = false;
+
+                try
+                {
+                    await persistenceReadGate.WaitAsync(token).ConfigureAwait(false);
+                    gateAcquired = true;
+
+                    var persistedResult = await Task.Run<ManiaBeatmapAnalysisResult?>(() =>
+                    {
+                        if (persistentStore.TryGet(lookup.BeatmapInfo, requireXxySr: lookup.RequireXxySr, out var persisted, out bool missingRequiredXxy))
+                        {
+                            // If required xxySR is missing, fall back to the compute queue to patch it in a controlled manner.
+                            if (!missingRequiredXxy)
+                                return persisted;
+                        }
+
+                        return null;
+                    }, token).ConfigureAwait(false);
+
+                    if (persistedResult != null)
+                        return persistedResult;
+                }
+                catch (OperationCanceledException)
+                {
+                    return null;
+                }
+                catch
+                {
+                    // Ignore persistence failures and fall back to compute.
+                }
+                finally
+                {
+                    if (gateAcquired)
+                        persistenceReadGate.Release();
+                }
+            }
+
             bool isLowPriority = low_priority_scope_depth.Value > 0;
             var scheduler = isLowPriority ? lowPriorityScheduler : highPriorityScheduler;
 
-            return Task.Factory.StartNew(() =>
+            return await Task.Factory.StartNew(() =>
             {
                 bool persistHit = false;
 
                 if (CheckExists(lookup, out var existing))
-                {
                     return existing;
-                }
 
                 // Warmup: never compete with visible/high-priority computations.
                 if (isLowPriority)
@@ -247,15 +294,14 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 try
                 {
-                    var result = computeAnalysis(lookup, token, out persistHit);
-                    return result;
+                    return computeAnalysis(lookup, token, out persistHit);
                 }
                 finally
                 {
                     if (!isLowPriority)
                         exitHighPriorityWork();
                 }
-            }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, scheduler);
+            }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, scheduler).ConfigureAwait(false);
         }
 
         private void enterHighPriorityWork()
