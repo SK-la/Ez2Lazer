@@ -52,6 +52,10 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         private bool initialised;
         private string dbPath = string.Empty;
 
+        // Old versions earlier than v3 may not have sufficient data to safely upgrade without recomputation.
+        // v3 introduced hold note counts, which are relied upon by parts of the UI.
+        private const int MIN_INPLACE_UPGRADE_VERSION = 3;
+
         public EzManiaAnalysisPersistentStore(Storage storage)
         {
             this.storage = storage;
@@ -72,6 +76,10 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+
+                    // If this is a new versioned DB file, attempt to clone from the latest previous version to avoid
+                    // forcing a full recompute (when changes are only schema/serialization related).
+                    tryClonePreviousDatabaseIfMissing();
 
                     Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", "mania_analysis", LogLevel.Important);
 
@@ -180,42 +188,88 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
                 Initialise();
 
                 using var connection = openConnection();
-                using var cmd = connection.CreateCommand();
 
-                cmd.CommandText = @"
+                string storedHash;
+                string storedMd5;
+                int storedVersion;
+                double averageKps;
+                double maxKps;
+                string kpsListJson;
+                string scratchText;
+                double? xxySr;
+                string columnCountsJson;
+                string holdNoteCountsJson;
+
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
 SELECT beatmap_hash, beatmap_md5, analysis_version, average_kps, max_kps, kps_list_json, scratch_text, xxy_sr, column_counts_json, hold_note_counts_json
 FROM mania_analysis
 WHERE beatmap_id = $id
 LIMIT 1;
 ";
-                cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+                    cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
 
-                using var reader = cmd.ExecuteReader();
+                    using var reader = cmd.ExecuteReader();
 
-                if (!reader.Read())
+                    if (!reader.Read())
+                        return false;
+
+                    storedHash = reader.GetString(0);
+                    storedMd5 = reader.GetString(1);
+                    storedVersion = reader.GetInt32(2);
+                    averageKps = reader.GetDouble(3);
+                    maxKps = reader.GetDouble(4);
+                    kpsListJson = reader.GetString(5);
+                    scratchText = reader.GetString(6);
+                    xxySr = reader.IsDBNull(7) ? null : reader.GetDouble(7);
+                    columnCountsJson = reader.GetString(8);
+                    holdNoteCountsJson = reader.GetString(9);
+                }
+
+                if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                     return false;
 
-                string storedHash = reader.GetString(0);
-                string storedMd5 = reader.GetString(1);
-                int storedVersion = reader.GetInt32(2);
-
-                if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal)
-                    || (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
-                    || storedVersion != ANALYSIS_VERSION)
+                // md5 validation:
+                // - If stored md5 is empty (older versions), accept hash match and upgrade in-place.
+                // - If stored md5 is present, require it to match.
+                if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                     return false;
 
-                double averageKps = reader.GetDouble(3);
-                double maxKps = reader.GetDouble(4);
-                string kpsListJson = reader.GetString(5);
-                string scratchText = reader.GetString(6);
-
-                double? xxySr = reader.IsDBNull(7) ? null : reader.GetDouble(7);
-                string columnCountsJson = reader.GetString(8);
-                string holdNoteCountsJson = reader.GetString(9);
+                // If the stored version is newer than this build, ignore and let caller recompute.
+                if (storedVersion > ANALYSIS_VERSION)
+                    return false;
 
                 var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                 var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
                 var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
+
+                // Allow in-place upgrade of compatible older entries to avoid full recompute.
+                // If an older version is not compatible, treat it as a miss.
+                if (storedVersion != ANALYSIS_VERSION)
+                {
+                    if (!canUpgradeInPlace(storedVersion))
+                        return false;
+
+                    bool mutated = false;
+
+                    // v4: store md5 for extra safety (hash already guards real content).
+                    if (string.IsNullOrEmpty(storedMd5))
+                        mutated = true;
+
+                    // v4: kps_list_json is UI graph only; keep it capped for perf.
+                    if (kpsList.Count > OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS)
+                    {
+                        kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
+                        mutated = true;
+                    }
+
+                    if (mutated || storedVersion < ANALYSIS_VERSION)
+                    {
+                        // Persist the upgraded row (without recomputing analysis).
+                        writeUpgradedRow(connection, beatmap, averageKps, maxKps, kpsList, scratchText, xxySr, columnCounts, holdNoteCounts);
+                    }
+                }
 
                 result = new ManiaBeatmapAnalysisResult(
                     averageKps,
@@ -370,7 +424,12 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
                         continue;
                     }
 
-                    if (row.version != ANALYSIS_VERSION || !string.Equals(row.hash, hash, StringComparison.Ordinal))
+                    // Only force recompute on:
+                    // - missing entries
+                    // - hash mismatch (beatmap changed)
+                    // - versions which cannot be upgraded in-place.
+                    // Version bumps which are only schema/serialization should be upgraded lazily on TryGet().
+                    if (!string.Equals(row.hash, hash, StringComparison.Ordinal) || !canUpgradeInPlace(row.version) || row.version > ANALYSIS_VERSION)
                         needing.Add(id);
                 }
 
@@ -430,6 +489,113 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             cmd.Parameters.AddWithValue("$k", key);
             cmd.Parameters.AddWithValue("$v", value);
             cmd.ExecuteNonQuery();
+        }
+
+        private static bool canUpgradeInPlace(int storedVersion)
+            => storedVersion >= MIN_INPLACE_UPGRADE_VERSION && storedVersion <= ANALYSIS_VERSION;
+
+        private void tryClonePreviousDatabaseIfMissing()
+        {
+            if (string.IsNullOrEmpty(dbPath))
+                return;
+
+            if (File.Exists(dbPath))
+                return;
+
+            string? dir = Path.GetDirectoryName(dbPath);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+                return;
+
+            // Find the latest previous DB file (by version suffix) which we can potentially upgrade from.
+            // Even if it contains older rows, we will still validate per-row and decide upgrade vs recompute.
+            string? bestCandidate = null;
+            int bestVersion = -1;
+
+            foreach (string file in Directory.EnumerateFiles(dir, "mania-analysis_v*.sqlite", SearchOption.TopDirectoryOnly))
+            {
+                if (string.Equals(file, dbPath, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!tryParseDatabaseVersion(file, out int version))
+                    continue;
+
+                if (version >= ANALYSIS_VERSION)
+                    continue;
+
+                if (version > bestVersion)
+                {
+                    bestVersion = version;
+                    bestCandidate = file;
+                }
+            }
+
+            if (bestCandidate == null)
+                return;
+
+            try
+            {
+                File.Copy(bestCandidate, dbPath);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Cloned DB from v{bestVersion} to v{ANALYSIS_VERSION}: {Path.GetFileName(bestCandidate)} -> {Path.GetFileName(dbPath)}", LoggingTarget.Database);
+            }
+            catch (Exception e)
+            {
+                // If cloning fails, we simply fall back to creating a fresh DB and recomputing as needed.
+                Logger.Error(e, "[EzManiaAnalysisPersistentStore] Failed to clone previous DB; falling back to fresh database.");
+            }
+        }
+
+        private static bool tryParseDatabaseVersion(string filePath, out int version)
+        {
+            version = 0;
+
+            string name = Path.GetFileName(filePath);
+            const string prefix = "mania-analysis_v";
+            const string suffix = ".sqlite";
+
+            if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || !name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            string number = name.Substring(prefix.Length, name.Length - prefix.Length - suffix.Length);
+            return int.TryParse(number, NumberStyles.Integer, CultureInfo.InvariantCulture, out version);
+        }
+
+        private static void writeUpgradedRow(
+            SqliteConnection connection,
+            BeatmapInfo beatmap,
+            double averageKps,
+            double maxKps,
+            IReadOnlyList<double> kpsList,
+            string scratchText,
+            double? xxySr,
+            IReadOnlyDictionary<int, int> columnCounts,
+            IReadOnlyDictionary<int, int> holdNoteCounts)
+        {
+            string kpsListJson = JsonSerializer.Serialize(kpsList);
+            string columnCountsJson = JsonSerializer.Serialize(columnCounts);
+            string holdNoteCountsJson = JsonSerializer.Serialize(holdNoteCounts);
+
+            using var update = connection.CreateCommand();
+            update.CommandText = @"
+UPDATE mania_analysis
+SET beatmap_md5 = $md5,
+    analysis_version = $version,
+    kps_list_json = $kps_list_json,
+    scratch_text = $scratch_text,
+    xxy_sr = $xxy_sr,
+    column_counts_json = $column_counts_json,
+    hold_note_counts_json = $hold_note_counts_json
+WHERE beatmap_id = $id;
+";
+            update.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+            update.Parameters.AddWithValue("$md5", beatmap.MD5Hash ?? string.Empty);
+            update.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
+            update.Parameters.AddWithValue("$kps_list_json", kpsListJson);
+            update.Parameters.AddWithValue("$scratch_text", scratchText);
+            update.Parameters.AddWithValue("$xxy_sr", xxySr is null ? DBNull.Value : xxySr.Value);
+            update.Parameters.AddWithValue("$column_counts_json", columnCountsJson);
+            update.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
+
+            update.ExecuteNonQuery();
         }
 
         private bool hasColumn(SqliteConnection connection, string tableName, string columnName)

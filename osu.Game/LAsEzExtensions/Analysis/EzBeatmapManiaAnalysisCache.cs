@@ -25,6 +25,7 @@ using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 using System.Collections.Concurrent;
+using osu.Game.Screens.SelectV2;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -84,7 +85,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private int cachedLookupsCount;
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致。
-        private const int mod_settings_debounce = 300;
+        private const int mod_settings_debounce = SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE;
 
         protected override void LoadComplete()
         {
