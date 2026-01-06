@@ -3,9 +3,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
-using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -15,7 +13,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
-using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
@@ -25,7 +22,6 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Analysis;
-using osu.Game.LAsEzExtensions.Analysis.Diagnostics;
 using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -85,7 +81,6 @@ namespace osu.Game.Screens.SelectV2
         private CancellationTokenSource? starDifficultyCancellationSource;
 
         private double? lastStarRatingStars;
-        private Guid? loggedAbnormalXxySrBeatmapId;
 
         private int cachedKpcKeyCount = -1;
         private Guid cachedKpcBeatmapId;
@@ -349,7 +344,6 @@ namespace osu.Game.Screens.SelectV2
             cachedScratchText = null;
 
             lastStarRatingStars = null;
-            loggedAbnormalXxySrBeatmapId = null;
 
             bindManiaAnalysis();
             resetManiaAnalysisDisplay();
@@ -429,25 +423,6 @@ namespace osu.Game.Screens.SelectV2
             }, background_load_delay_ms, false);
         }
 
-        private void maybeLogLargeStarDiff()
-        {
-            if (Item == null)
-                return;
-
-            if (ruleset.Value.OnlineID != 3)
-                return;
-
-            if (mods.Value.Count != 0)
-                return;
-
-            double? star = lastStarRatingStars;
-            double? xxy = xxySrDisplay.Current.Value;
-
-            Guid beatmapId = beatmap.ID;
-
-            XxySrDebugJson.LogAbnormalSr(beatmap, star, xxy, beatmapId, ref loggedAbnormalXxySrBeatmapId);
-        }
-
         private void bindManiaAnalysis()
         {
             maniaAnalysisCancellationSource?.Cancel();
@@ -462,7 +437,7 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisCancellationSource = new CancellationTokenSource();
             var localCancellationSource = maniaAnalysisCancellationSource;
 
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE, requireXxySr: true);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
                 // 旧 bindable 的回调（比如切换 mods / 取消重绑）直接忽略。
@@ -480,7 +455,6 @@ namespace osu.Game.Screens.SelectV2
                 queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 
                 xxySrDisplay.Current.Value = result.NewValue.XxySr;
-                maybeLogLargeStarDiff();
 
                 updateKeyCount();
             }, true);
@@ -546,10 +520,6 @@ namespace osu.Game.Screens.SelectV2
             if (Item.IsVisible != true)
                 return;
 
-            bool perfEnabled = EzManiaAnalysisPerf.Enabled;
-            long uiStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
-            long uiAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
-
             var (averageKps, maxKps, kpsList) = result;
 
             ezKpsDisplay.SetKps(averageKps, maxKps);
@@ -557,20 +527,11 @@ namespace osu.Game.Screens.SelectV2
             // Update KPS graph with the KPS list
             if (kpsList.Count > 0)
             {
-                long gStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
-                long gAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
-
                 maniaKpsGraph.SetValues(kpsList);
-
-                if (perfEnabled)
-                    EzManiaAnalysisPerf.RecordUiGraphSet(kpsList.Count, Stopwatch.GetTimestamp() - gStart, GC.GetAllocatedBytesForCurrentThread() - gAllocStart);
             }
 
             if (columnCounts != null)
             {
-                long kStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
-                long kAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
-
                 // 同 PanelBeatmap：补齐缺失列为 0，避免列号错位。
                 int keyCount = getCachedKpcKeyCount();
                 ensureNormalizedCounts(keyCount);
@@ -590,15 +551,6 @@ namespace osu.Game.Screens.SelectV2
                     lastKpcMode = mode;
                     ezKpcDisplay.UpdateColumnCounts(normalizedColumnCounts!, normalizedHoldNoteCounts!);
                 }
-
-                if (perfEnabled)
-                    EzManiaAnalysisPerf.RecordUiKpcUpdate(keyCount, ezKpcDisplay.CurrentKpcDisplayMode == EzKpcDisplay.KpcDisplayMode.BarChart, Stopwatch.GetTimestamp() - kStart, GC.GetAllocatedBytesForCurrentThread() - kAllocStart);
-            }
-
-            if (perfEnabled)
-            {
-                EzManiaAnalysisPerf.RecordUiUpdate(Stopwatch.GetTimestamp() - uiStart, GC.GetAllocatedBytesForCurrentThread() - uiAllocStart);
-                EzManiaAnalysisPerf.MaybeLog();
             }
         }
 
@@ -632,7 +584,6 @@ namespace osu.Game.Screens.SelectV2
             xxySrDisplay.Current.Value = null;
 
             lastStarRatingStars = null;
-            loggedAbnormalXxySrBeatmapId = null;
 
             cachedKpcKeyCount = -1;
             cachedKpcRulesetId = -1;
@@ -723,7 +674,6 @@ namespace osu.Game.Screens.SelectV2
                 spreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
 
                 lastStarRatingStars = starDifficulty.NewValue.Stars;
-                maybeLogLargeStarDiff();
             }, true);
         }
 

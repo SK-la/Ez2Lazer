@@ -7,12 +7,10 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Analysis.Diagnostics;
 
 namespace osu.Game.LAsEzExtensions.Analysis.Persistence
 {
@@ -38,14 +36,15 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         /// </summary>
         public static bool Enabled = true;
 
-        public const string DATABASE_FILENAME = @"mania-analysis.sqlite";
+        public static readonly string DATABASE_FILENAME = $@"mania-analysis_v{ANALYSIS_VERSION}.sqlite";
 
         // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
         // 注意：此版本号与 osu! 官方服务器端的版本号无关，仅用于本地持久化存储的失效控制。
         // 注意：更新版本号后，务必通过注释保存旧版本的变更记录，方便日后排查问题。
         // v2: 初始版本，包含 kps_list_json, column_counts_json
         // v3: 添加 hold_note_counts_json 字段，分离普通note和长按note统计
-        public const int ANALYSIS_VERSION = 3;
+        // v4: 添加 beatmap_md5 校验字段；kps_list_json 仅保存用于 UI 的下采样曲线（<=256 点）。
+        public const int ANALYSIS_VERSION = 4;
 
         private readonly Storage storage;
         private readonly object initLock = new object();
@@ -99,13 +98,15 @@ CREATE TABLE IF NOT EXISTS meta (
 CREATE TABLE IF NOT EXISTS mania_analysis (
     beatmap_id TEXT PRIMARY KEY,
     beatmap_hash TEXT NOT NULL,
+    beatmap_md5 TEXT NOT NULL,
     analysis_version INTEGER NOT NULL,
     average_kps REAL NOT NULL,
     max_kps REAL NOT NULL,
     kps_list_json TEXT NOT NULL,
     scratch_text TEXT NOT NULL,
     xxy_sr REAL NULL,
-    column_counts_json TEXT NOT NULL
+    column_counts_json TEXT NOT NULL,
+    hold_note_counts_json TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis_version);
@@ -125,6 +126,13 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
                     {
                         using var cmd = connection.CreateCommand();
                         cmd.CommandText = "ALTER TABLE mania_analysis ADD COLUMN hold_note_counts_json TEXT NOT NULL DEFAULT '{}';";
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    if (!hasColumn(connection, "mania_analysis", "beatmap_md5"))
+                    {
+                        using var cmd = connection.CreateCommand();
+                        cmd.CommandText = "ALTER TABLE mania_analysis ADD COLUMN beatmap_md5 TEXT NOT NULL DEFAULT '';";
                         cmd.ExecuteNonQuery();
                     }
 
@@ -159,9 +167,10 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
             }
         }
 
-        public bool TryGet(BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
+        public bool TryGet(BeatmapInfo beatmap, bool requireXxySr, out ManiaBeatmapAnalysisResult result, out bool missingRequiredXxySr)
         {
             result = ManiaBeatmapAnalysisDefaults.EMPTY;
+            missingRequiredXxySr = false;
 
             if (!Enabled)
                 return false;
@@ -174,7 +183,7 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
                 using var cmd = connection.CreateCommand();
 
                 cmd.CommandText = @"
-SELECT beatmap_hash, analysis_version, average_kps, max_kps, kps_list_json, scratch_text, xxy_sr, column_counts_json, hold_note_counts_json
+SELECT beatmap_hash, beatmap_md5, analysis_version, average_kps, max_kps, kps_list_json, scratch_text, xxy_sr, column_counts_json, hold_note_counts_json
 FROM mania_analysis
 WHERE beatmap_id = $id
 LIMIT 1;
@@ -187,34 +196,26 @@ LIMIT 1;
                     return false;
 
                 string storedHash = reader.GetString(0);
-                int storedVersion = reader.GetInt32(1);
+                string storedMd5 = reader.GetString(1);
+                int storedVersion = reader.GetInt32(2);
 
-                if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal) || storedVersion != ANALYSIS_VERSION)
+                if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal)
+                    || (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                    || storedVersion != ANALYSIS_VERSION)
                     return false;
 
-                double averageKps = reader.GetDouble(2);
-                double maxKps = reader.GetDouble(3);
-                string kpsListJson = reader.GetString(4);
-                string scratchText = reader.GetString(5);
+                double averageKps = reader.GetDouble(3);
+                double maxKps = reader.GetDouble(4);
+                string kpsListJson = reader.GetString(5);
+                string scratchText = reader.GetString(6);
 
-                double? xxySr = reader.IsDBNull(6) ? null : reader.GetDouble(6);
-                string columnCountsJson = reader.GetString(7);
-                string holdNoteCountsJson = reader.GetString(8);
-
-                long deserStart = Stopwatch.GetTimestamp();
+                double? xxySr = reader.IsDBNull(7) ? null : reader.GetDouble(7);
+                string columnCountsJson = reader.GetString(8);
+                string holdNoteCountsJson = reader.GetString(9);
 
                 var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                 var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
                 var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
-
-                long deserTicks = Stopwatch.GetTimestamp() - deserStart;
-                EzManiaAnalysisPerf.RecordPersistenceTryGet(
-                    hit: true,
-                    deserializeTicks: deserTicks,
-                    kpsJsonChars: kpsListJson.Length,
-                    colsJsonChars: columnCountsJson.Length,
-                    holdsJsonChars: holdNoteCountsJson.Length);
-                EzManiaAnalysisPerf.MaybeLog();
 
                 result = new ManiaBeatmapAnalysisResult(
                     averageKps,
@@ -225,13 +226,12 @@ LIMIT 1;
                     scratchText,
                     xxySr);
 
+                missingRequiredXxySr = requireXxySr && xxySr == null;
+
                 return true;
             }
             catch (Exception e)
             {
-                // Even on failure, record a miss so we can correlate spikes with error paths.
-                EzManiaAnalysisPerf.RecordPersistenceTryGet(hit: false, deserializeTicks: 0, kpsJsonChars: 0, colsJsonChars: 0, holdsJsonChars: 0);
-                EzManiaAnalysisPerf.MaybeLog();
                 Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.");
                 return false;
             }
@@ -246,8 +246,6 @@ LIMIT 1;
             {
                 Initialise();
 
-                long serStart = Stopwatch.GetTimestamp();
-
                 using var connection = openConnection();
                 using var cmd = connection.CreateCommand();
 
@@ -255,14 +253,11 @@ LIMIT 1;
                 string columnCountsJson = JsonSerializer.Serialize(analysis.ColumnCounts);
                 string holdNoteCountsJson = JsonSerializer.Serialize(analysis.HoldNoteCounts);
 
-                long serTicks = Stopwatch.GetTimestamp() - serStart;
-                EzManiaAnalysisPerf.RecordPersistenceStore(serTicks);
-                EzManiaAnalysisPerf.MaybeLog();
-
                 cmd.CommandText = @"
 INSERT INTO mania_analysis(
     beatmap_id,
     beatmap_hash,
+    beatmap_md5,
     analysis_version,
     average_kps,
     max_kps,
@@ -275,6 +270,7 @@ INSERT INTO mania_analysis(
 VALUES(
     $id,
     $hash,
+    $md5,
     $version,
     $avg,
     $max,
@@ -286,6 +282,7 @@ VALUES(
 )
 ON CONFLICT(beatmap_id) DO UPDATE SET
     beatmap_hash = excluded.beatmap_hash,
+    beatmap_md5 = excluded.beatmap_md5,
     analysis_version = excluded.analysis_version,
     average_kps = excluded.average_kps,
     max_kps = excluded.max_kps,
@@ -298,6 +295,7 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
 
                 cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
                 cmd.Parameters.AddWithValue("$hash", beatmap.Hash);
+                cmd.Parameters.AddWithValue("$md5", beatmap.MD5Hash ?? string.Empty);
                 cmd.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
                 cmd.Parameters.AddWithValue("$avg", analysis.AverageKps);
                 cmd.Parameters.AddWithValue("$max", analysis.MaxKps);

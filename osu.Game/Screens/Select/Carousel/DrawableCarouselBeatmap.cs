@@ -318,7 +318,7 @@ namespace osu.Game.Screens.Select.Carousel
             var localCancellationSource = maniaAnalysisCancellationSource;
 
             // 旧选歌界面与 V2 统一：通过 EzBeatmapManiaAnalysisCache 获取分析结果（会优先走 SQLite 持久化）。
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 200);
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 200, requireXxySr: false);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
                 if (localCancellationSource != maniaAnalysisCancellationSource)

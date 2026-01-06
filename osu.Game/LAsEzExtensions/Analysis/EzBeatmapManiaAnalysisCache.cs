@@ -25,8 +25,6 @@ using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using osu.Game.LAsEzExtensions.Analysis.Diagnostics;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -85,8 +83,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private readonly ConcurrentDictionary<ManiaAnalysisCacheLookup, byte> cachedLookups = new ConcurrentDictionary<ManiaAnalysisCacheLookup, byte>();
         private int cachedLookupsCount;
 
-        // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致（150ms）。
-        private const int mod_settings_debounce = 150;
+        // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致。
+        private const int mod_settings_debounce = 300;
 
         protected override void LoadComplete()
         {
@@ -151,7 +149,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 highPriorityIdleEvent.Wait(cancellationToken);
 
                 // No mods: only baseline is persisted.
-                var lookup = new ManiaAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null);
+                var lookup = new ManiaAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null, requireXxySr: false);
 
                 // computeAnalysis() will early-return persisted values and will store baseline results when computed.
                 bool persistHit;
@@ -159,7 +157,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, lowPriorityScheduler);
         }
 
-        public IBindable<ManiaBeatmapAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
+        public IBindable<ManiaBeatmapAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0, bool requireXxySr = false)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
 
@@ -171,7 +169,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (localBeatmapInfo == null)
                 return bindable;
 
-            updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay);
+            updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay, requireXxySr);
 
             lock (bindableUpdateLock)
                 trackedBindables.Add(bindable);
@@ -183,18 +181,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                                                   IRulesetInfo? rulesetInfo = null,
                                                                   IEnumerable<Mod>? mods = null,
                                                                   CancellationToken cancellationToken = default,
-                                                                  int computationDelay = 0)
+                                                                  int computationDelay = 0,
+                                                                  bool requireXxySr = false)
         {
-            EzManiaAnalysisPerf.RecordRequest();
-            EzManiaAnalysisPerf.MaybeLog();
-
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
             var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
 
             if (localBeatmapInfo == null || localRulesetInfo == null)
                 return Task.FromResult<ManiaBeatmapAnalysisResult?>(null);
 
-            var lookup = new ManiaAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
+            var lookup = new ManiaAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods, requireXxySr);
 
             return getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay);
         }
@@ -214,8 +210,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     ? max_in_memory_entries_with_persistence
                     : max_in_memory_entries_without_persistence;
 
-                EzManiaAnalysisPerf.UpdateCacheGauges(Volatile.Read(ref cachedLookupsCount), maxEntries);
-
                 while (Volatile.Read(ref cachedLookupsCount) > maxEntries && cacheInsertionOrder.TryDequeue(out var toRemove))
                 {
                     if (!cachedLookups.TryRemove(toRemove, out _))
@@ -223,12 +217,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                     Interlocked.Decrement(ref cachedLookupsCount);
                     Invalidate(k => k.Equals(toRemove));
-
-                    EzManiaAnalysisPerf.RecordEviction();
                 }
-
-                EzManiaAnalysisPerf.UpdateCacheGauges(Volatile.Read(ref cachedLookupsCount), maxEntries);
-                EzManiaAnalysisPerf.MaybeLog();
             }
 
             return result;
@@ -241,15 +230,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             return Task.Factory.StartNew(() =>
             {
-                EzManiaAnalysisPerf.RecordComputeStart(isLowPriority);
-
-                long startTimestamp = Stopwatch.GetTimestamp();
                 bool persistHit = false;
 
                 if (CheckExists(lookup, out var existing))
                 {
-                    EzManiaAnalysisPerf.RecordComputeElapsedTicks(Stopwatch.GetTimestamp() - startTimestamp, wasPersistHit: false);
-                    EzManiaAnalysisPerf.RecordComputeEnd(isLowPriority);
                     return existing;
                 }
 
@@ -269,10 +253,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 {
                     if (!isLowPriority)
                         exitHighPriorityWork();
-
-                    EzManiaAnalysisPerf.RecordComputeElapsedTicks(Stopwatch.GetTimestamp() - startTimestamp, persistHit);
-                    EzManiaAnalysisPerf.RecordComputeEnd(isLowPriority);
-                    EzManiaAnalysisPerf.MaybeLog();
                 }
             }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, scheduler);
         }
@@ -301,10 +281,38 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 // 持久化仅对 no-mod 生效：
                 // - 避免 mod 组合/设置导致存储爆炸。
                 // - 与官方 star 的“基础值可预处理、modded 按需计算”体验对齐。
-                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
+                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, requireXxySr: lookup.RequireXxySr, out var persisted, out bool missingRequiredXxy))
                 {
                     persistHit = true;
-                    return persisted;
+
+                    if (!missingRequiredXxy)
+                        return persisted;
+
+                    // Baseline entry exists but required xxySR is missing; compute xxySR on-demand and patch the stored result.
+                    var rulesetInstanceForXxy = lookup.Ruleset.CreateInstance();
+                    if (rulesetInstanceForXxy is not ILegacyRuleset)
+                        return persisted;
+
+                    PlayableCachedWorkingBeatmap workingBeatmapForXxy = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+                    var playableBeatmapForXxy = workingBeatmapForXxy.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    double? xxySrPatched = null;
+                    if (playableBeatmapForXxy.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmapForXxy, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
+                        xxySrPatched = sr;
+
+                    var patched = new ManiaBeatmapAnalysisResult(
+                        persisted.AverageKps,
+                        persisted.MaxKps,
+                        persisted.KpsList,
+                        persisted.ColumnCounts,
+                        persisted.HoldNoteCounts,
+                        persisted.ScratchText,
+                        xxySrPatched);
+
+                    persistentStore.Store(lookup.BeatmapInfo, patched);
+                    return patched;
                 }
 
                 var rulesetInstance = lookup.Ruleset.CreateInstance();
@@ -320,52 +328,20 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
-                // 同一次 playable beatmap 里顺带计算 xxy_SR。
-                // 仅当除 xxy_SR 外的分析数据都已成功产出（不为 null/未被取消）且 xxy_SR 失败/非法/异常时记录日志。
                 double? xxySr = null;
-                bool otherDataOk = playableBeatmap.HitObjects.Count > 0
-                                   && kpsList.Count > 0
-                                   && columnCounts.Count > 0;
-
-                // Copy lookup info to locals so we don't capture the lookup in a local function.
-                Guid beatmapId = lookup.BeatmapInfo.ID;
-                string difficultyName = lookup.BeatmapInfo.DifficultyName;
-                string rulesetShortName = lookup.Ruleset.ShortName;
-                string modsText = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-
-                void logXxySrError(string message)
+                if (lookup.RequireXxySr)
                 {
-                    // Disabled by request: avoid log spam during song select scrolling.
-                    return;
-
-                    if (!otherDataOk)
-                        return;
-
-                    Logger.Log($"{message} beatmapId={beatmapId} diff=\"{difficultyName}\" ruleset={rulesetShortName} mods={modsText} hitobjects={playableBeatmap.HitObjects.Count}", "xxy_sr", LogLevel.Error);
-                }
-
-                if (playableBeatmap.HitObjects.Count > 0)
-                {
-                    if (!XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr))
-                    {
-                        logXxySrError("xxy_SR calculation failed.");
-                    }
-                    else if (double.IsNaN(sr) || double.IsInfinity(sr))
-                    {
-                        logXxySrError("xxy_SR returned invalid value (NaN/Infinity).");
-                    }
-                    else
-                    {
+                    if (playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
                         xxySr = sr;
-
-                        if (sr < 0 || sr > 1000)
-                            logXxySrError($"xxy_SR abnormal value: {sr}.");
-                    }
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
                 string scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+
+                // KPS 曲线用于 UI 展示/持久化：固定下采样到 256 点以降低 JSON 大小与 UI 更新成本。
+                // 平均/最大 KPS 仍使用全量计算结果。
+                kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
 
                 var analysis = new ManiaBeatmapAnalysisResult(
                     averageKps,
@@ -383,7 +359,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
             catch (OperationCanceledException)
             {
-                EzManiaAnalysisPerf.RecordComputeCancelled();
                 return null;
             }
             catch
@@ -418,7 +393,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(trackedUpdateCancellationSource.Token, b.CancellationToken);
                     linkedCancellationSources.Add(linkedSource);
 
-                    updateBindable(b, localBeatmapInfo, currentRuleset.Value, currentMods.Value, linkedSource.Token);
+                    updateBindable(b, localBeatmapInfo, currentRuleset.Value, currentMods.Value, linkedSource.Token, requireXxySr: false);
                 }
             }
         }
@@ -442,17 +417,15 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                     IRulesetInfo? rulesetInfo,
                                     IEnumerable<Mod>? mods,
                                     CancellationToken cancellationToken = default,
-                                    int computationDelay = 0)
+                                    int computationDelay = 0,
+                                    bool requireXxySr = false)
         {
             // bindable 已失效（离屏/回收）时，不再触发计算/写回。
             if (cancellationToken.IsCancellationRequested)
                 return;
 
-            // Persistent mode: decouple computation from UI cancellation so results can be cached/persisted even if the item is rapidly scrolled off-screen.
-            // Non-persistent mode: only compute for visible items to prevent unbounded in-memory growth.
-            var computeToken = EzManiaAnalysisPersistentStore.Enabled ? CancellationToken.None : cancellationToken;
-
-            GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, computeToken, computationDelay)
+            // 按需计算：离屏项取消计算，避免后台为不可见项占用预算（特别是 xxySR）。
+            GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, cancellationToken, computationDelay, requireXxySr)
                 .ContinueWith(task =>
                 {
                     Schedule(() =>
@@ -486,18 +459,21 @@ namespace osu.Game.LAsEzExtensions.Analysis
             public readonly BeatmapInfo BeatmapInfo;
             public readonly RulesetInfo Ruleset;
             public readonly Mod[] OrderedMods;
+            public readonly bool RequireXxySr;
 
-            public ManiaAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IEnumerable<Mod>? mods)
+            public ManiaAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IEnumerable<Mod>? mods, bool requireXxySr)
             {
                 BeatmapInfo = beatmapInfo;
                 Ruleset = ruleset;
                 OrderedMods = mods?.OrderBy(m => m.Acronym).Select(mod => mod.DeepClone()).ToArray() ?? Array.Empty<Mod>();
+                RequireXxySr = requireXxySr;
             }
 
             public bool Equals(ManiaAnalysisCacheLookup other)
                 => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
                    && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
                    && Ruleset.Equals(other.Ruleset)
+                   && RequireXxySr == other.RequireXxySr
                    && OrderedMods.SequenceEqual(other.OrderedMods);
 
             public override int GetHashCode()
@@ -507,6 +483,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 hashCode.Add(BeatmapInfo.ID);
                 hashCode.Add(BeatmapInfo.Hash);
                 hashCode.Add(Ruleset.ShortName);
+                hashCode.Add(RequireXxySr);
 
                 foreach (var mod in OrderedMods)
                     hashCode.Add(mod);

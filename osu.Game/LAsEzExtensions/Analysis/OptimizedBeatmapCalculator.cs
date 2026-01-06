@@ -8,6 +8,38 @@ namespace osu.Game.LAsEzExtensions.Analysis
 {
     public static class OptimizedBeatmapCalculator
     {
+        public const int DEFAULT_KPS_GRAPH_POINTS = 256;
+
+        public static List<double> DownsampleToFixedCount(IReadOnlyList<double> source, int targetCount)
+        {
+            if (source.Count == 0)
+                return new List<double>();
+
+            if (targetCount <= 0)
+                return new List<double>();
+
+            if (source.Count <= targetCount)
+                return source as List<double> ?? source.ToList();
+
+            // Uniform re-sampling by index. Keeps endpoints stable.
+            var result = new List<double>(targetCount);
+
+            if (targetCount == 1)
+            {
+                result.Add(source[0]);
+                return result;
+            }
+
+            int lastIndex = source.Count - 1;
+            for (int i = 0; i < targetCount; i++)
+            {
+                int index = (int)((long)i * lastIndex / (targetCount - 1));
+                result.Add(source[index]);
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// 高性能KPS计算，结合了缓存和优化的算法
         /// </summary>
