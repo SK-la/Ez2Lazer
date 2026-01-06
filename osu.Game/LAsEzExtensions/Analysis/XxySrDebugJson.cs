@@ -12,6 +12,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
 {
     internal static class XxySrDebugJson
     {
+        // Performance/debugging note:
+        // This logging can be very spammy during song select scrolling and may impact frame times.
+        // Keep disabled unless actively investigating xxy_SR correctness.
+        private const bool enabled = false;
+
         public static string FormatAbnormalSr(BeatmapInfo beatmap, string eventType, double? star = null, double? xxySr = null)
         {
             var buffer = new ArrayBufferWriter<byte>(256);
@@ -78,6 +83,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         public static void LogAbnormalSr(BeatmapInfo? beatmap, double? star, double? xxySr, Guid beatmapId, ref Guid? loggedAbnormalId)
         {
+            if (!enabled)
+                return;
+
             if (beatmap == null || star == null)
                 return;
 

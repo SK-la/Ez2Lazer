@@ -7,10 +7,12 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Analysis.Diagnostics;
 
 namespace osu.Game.LAsEzExtensions.Analysis.Persistence
 {
@@ -199,10 +201,20 @@ LIMIT 1;
                 string columnCountsJson = reader.GetString(7);
                 string holdNoteCountsJson = reader.GetString(8);
 
+                long deserStart = Stopwatch.GetTimestamp();
+
                 var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                 var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
-
                 var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
+
+                long deserTicks = Stopwatch.GetTimestamp() - deserStart;
+                EzManiaAnalysisPerf.RecordPersistenceTryGet(
+                    hit: true,
+                    deserializeTicks: deserTicks,
+                    kpsJsonChars: kpsListJson.Length,
+                    colsJsonChars: columnCountsJson.Length,
+                    holdsJsonChars: holdNoteCountsJson.Length);
+                EzManiaAnalysisPerf.MaybeLog();
 
                 result = new ManiaBeatmapAnalysisResult(
                     averageKps,
@@ -217,6 +229,9 @@ LIMIT 1;
             }
             catch (Exception e)
             {
+                // Even on failure, record a miss so we can correlate spikes with error paths.
+                EzManiaAnalysisPerf.RecordPersistenceTryGet(hit: false, deserializeTicks: 0, kpsJsonChars: 0, colsJsonChars: 0, holdsJsonChars: 0);
+                EzManiaAnalysisPerf.MaybeLog();
                 Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.");
                 return false;
             }
@@ -231,12 +246,18 @@ LIMIT 1;
             {
                 Initialise();
 
+                long serStart = Stopwatch.GetTimestamp();
+
                 using var connection = openConnection();
                 using var cmd = connection.CreateCommand();
 
                 string kpsListJson = JsonSerializer.Serialize(analysis.KpsList);
                 string columnCountsJson = JsonSerializer.Serialize(analysis.ColumnCounts);
                 string holdNoteCountsJson = JsonSerializer.Serialize(analysis.HoldNoteCounts);
+
+                long serTicks = Stopwatch.GetTimestamp() - serStart;
+                EzManiaAnalysisPerf.RecordPersistenceStore(serTicks);
+                EzManiaAnalysisPerf.MaybeLog();
 
                 cmd.CommandText = @"
 INSERT INTO mania_analysis(

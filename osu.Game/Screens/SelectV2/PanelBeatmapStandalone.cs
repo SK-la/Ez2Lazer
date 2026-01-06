@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -24,6 +25,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Analysis.Diagnostics;
 using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -37,6 +39,10 @@ namespace osu.Game.Screens.SelectV2
     public partial class PanelBeatmapStandalone : Panel
     {
         public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT * 1.6f;
+
+        private const int mania_ui_update_throttle_ms = 100;
+        private const int background_load_delay_ms = 200;
+        private const int metadata_text_delay_ms = 150;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -69,7 +75,7 @@ namespace osu.Game.Screens.SelectV2
         private CancellationTokenSource? maniaAnalysisCancellationSource;
         private string? cachedScratchText;
         private EzKpsDisplay ezKpsDisplay = null!;
-        private LineGraph maniaKpsGraph = null!;
+        private EzLineGraph maniaKpsGraph = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
         private OsuSpriteText notesLabel = null!;
 
@@ -81,8 +87,30 @@ namespace osu.Game.Screens.SelectV2
         private double? lastStarRatingStars;
         private Guid? loggedAbnormalXxySrBeatmapId;
 
+        private int cachedKpcKeyCount = -1;
+        private Guid cachedKpcBeatmapId;
+        private int cachedKpcRulesetId = -1;
+        private int cachedKpcModsHash;
+
+        private Dictionary<int, int>? normalizedColumnCounts;
+        private Dictionary<int, int>? normalizedHoldNoteCounts;
+        private int normalizedCountsKeyCount;
+
+        private int lastKpcCountsHash;
+        private EzKpcDisplay.KpcDisplayMode lastKpcMode;
+
         private PanelSetBackground beatmapBackground = null!;
         private ScheduledDelegate? scheduledBackgroundRetrieval;
+
+        private ScheduledDelegate? scheduledMetadataTextUpdate;
+        private Guid scheduledMetadataBeatmapId;
+        private bool metadataTextApplied;
+
+        private ScheduledDelegate? scheduledManiaUiUpdate;
+        private (double averageKps, double maxKps, List<double> kpsList) pendingKpsResult;
+        private Dictionary<int, int>? pendingColumnCounts;
+        private Dictionary<int, int>? pendingHoldNoteCounts;
+        private bool hasPendingUiUpdate;
 
         private OsuSpriteText titleText = null!;
         private OsuSpriteText artistText = null!;
@@ -210,7 +238,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.BottomLeft,
                                         },
                                         Empty(),
-                                        maniaKpsGraph = new LineGraph
+                                        maniaKpsGraph = new EzLineGraph
                                         {
                                             Size = new Vector2(300, 20),
                                             LineColour = Color4.CornflowerBlue.Opacity(0.8f),
@@ -293,10 +321,20 @@ namespace osu.Game.Screens.SelectV2
 
             var beatmapSet = beatmap.BeatmapSet!;
 
-            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
+            // Background/texture uploads are a major draw FPS limiter during fast scrolling.
+            // Delay background retrieval and only load if still visible and not pooled/reused.
+            scheduledBackgroundRetrieval?.Cancel();
+            scheduledBackgroundRetrieval = null;
+            beatmapBackground.Beatmap = null;
+            scheduleBackgroundLoad();
 
-            titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
-            artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
+            // Delay high-variance metadata text assignment to reduce glyph/atlas churn during fast scrolling.
+            scheduledMetadataTextUpdate?.Cancel();
+            scheduledMetadataTextUpdate = null;
+            scheduledMetadataBeatmapId = beatmap.ID;
+            metadataTextApplied = false;
+            titleText.Text = string.Empty;
+            artistText.Text = string.Empty;
             updateButton.BeatmapSet = beatmapSet;
             statusPill.Status = beatmap.Status;
 
@@ -304,8 +342,9 @@ namespace osu.Game.Screens.SelectV2
             difficultyIcon.Show();
 
             localRank.Beatmap = beatmap;
-            difficultyText.Text = beatmap.DifficultyName;
-            authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
+            difficultyText.Text = string.Empty;
+            authorText.Text = string.Empty;
+            scheduleMetadataTextUpdate();
 
             cachedScratchText = null;
 
@@ -317,6 +356,77 @@ namespace osu.Game.Screens.SelectV2
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
+        }
+
+        private void scheduleMetadataTextUpdate()
+        {
+            if (metadataTextApplied)
+                return;
+
+            if (Item == null)
+                return;
+
+            if (Item.IsVisible != true)
+                return;
+
+            if (scheduledMetadataTextUpdate != null)
+                return;
+
+            Guid expectedBeatmapId = scheduledMetadataBeatmapId;
+
+            scheduledMetadataTextUpdate = Scheduler.AddDelayed(() =>
+            {
+                scheduledMetadataTextUpdate = null;
+
+                if (Item == null)
+                    return;
+
+                if (Item.IsVisible != true)
+                    return;
+
+                // Guard against pooled reuse.
+                if (beatmap.ID != expectedBeatmapId)
+                    return;
+
+                var beatmapSet = beatmap.BeatmapSet!;
+                titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
+                artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
+                difficultyText.Text = beatmap.DifficultyName;
+                authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
+                metadataTextApplied = true;
+            }, metadata_text_delay_ms, false);
+        }
+
+        private void scheduleBackgroundLoad()
+        {
+            if (Item == null)
+                return;
+
+            // Only attempt to load backgrounds for currently visible panels.
+            if (Item.IsVisible != true)
+                return;
+
+            if (scheduledBackgroundRetrieval != null)
+                return;
+
+            Guid scheduledBeatmapId = beatmap.ID;
+
+            scheduledBackgroundRetrieval = Scheduler.AddDelayed(() =>
+            {
+                scheduledBackgroundRetrieval = null;
+
+                if (Item == null)
+                    return;
+
+                if (Item.IsVisible != true)
+                    return;
+
+                // Guard against pooled reuse.
+                if (beatmap.ID != scheduledBeatmapId)
+                    return;
+
+                beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(beatmap);
+            }, background_load_delay_ms, false);
         }
 
         private void maybeLogLargeStarDiff()
@@ -367,13 +477,36 @@ namespace osu.Game.Screens.SelectV2
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
 
-                updateUI((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
+                queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 
                 xxySrDisplay.Current.Value = result.NewValue.XxySr;
                 maybeLogLargeStarDiff();
 
                 updateKeyCount();
             }, true);
+        }
+
+        private void queueManiaUiUpdate((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
+        {
+            pendingKpsResult = result;
+            pendingColumnCounts = columnCounts;
+            pendingHoldNoteCounts = holdNoteCounts;
+            hasPendingUiUpdate = true;
+
+            // Coalesce multiple incoming analysis updates into a single UI update.
+            if (scheduledManiaUiUpdate != null)
+                return;
+
+            scheduledManiaUiUpdate = Scheduler.AddDelayed(() =>
+            {
+                scheduledManiaUiUpdate = null;
+
+                if (!hasPendingUiUpdate)
+                    return;
+
+                hasPendingUiUpdate = false;
+                updateUI(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
+            }, mania_ui_update_throttle_ms, false);
         }
 
         private void resetManiaAnalysisDisplay()
@@ -410,30 +543,62 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
+            if (Item.IsVisible != true)
+                return;
+
+            bool perfEnabled = EzManiaAnalysisPerf.Enabled;
+            long uiStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
+            long uiAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
+
             var (averageKps, maxKps, kpsList) = result;
 
             ezKpsDisplay.SetKps(averageKps, maxKps);
 
             // Update KPS graph with the KPS list
             if (kpsList.Count > 0)
-                maniaKpsGraph.Values = kpsList.Select(k => (float)k);
+            {
+                long gStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
+                long gAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
+
+                maniaKpsGraph.SetValues(kpsList);
+
+                if (perfEnabled)
+                    EzManiaAnalysisPerf.RecordUiGraphSet(kpsList.Count, Stopwatch.GetTimestamp() - gStart, GC.GetAllocatedBytesForCurrentThread() - gAllocStart);
+            }
 
             if (columnCounts != null)
             {
-                // 同 PanelBeatmap：补齐缺失列为 0，避免列号错位。
-                ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
-                int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
+                long kStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
+                long kAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
 
-                var normalizedColumnCounts = new Dictionary<int, int>(keyCount);
-                var normalizedHoldNoteCounts = new Dictionary<int, int>(keyCount);
+                // 同 PanelBeatmap：补齐缺失列为 0，避免列号错位。
+                int keyCount = getCachedKpcKeyCount();
+                ensureNormalizedCounts(keyCount);
 
                 for (int i = 0; i < keyCount; i++)
                 {
-                    normalizedColumnCounts[i] = columnCounts.GetValueOrDefault(i);
-                    normalizedHoldNoteCounts[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                    normalizedColumnCounts![i] = columnCounts.GetValueOrDefault(i);
+                    normalizedHoldNoteCounts![i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
                 }
 
-                ezKpcDisplay.UpdateColumnCounts(normalizedColumnCounts, normalizedHoldNoteCounts);
+                int countsHash = computeCountsHash(normalizedColumnCounts!, normalizedHoldNoteCounts!, keyCount);
+                var mode = ezKpcDisplay.CurrentKpcDisplayMode;
+
+                if (countsHash != lastKpcCountsHash || mode != lastKpcMode)
+                {
+                    lastKpcCountsHash = countsHash;
+                    lastKpcMode = mode;
+                    ezKpcDisplay.UpdateColumnCounts(normalizedColumnCounts!, normalizedHoldNoteCounts!);
+                }
+
+                if (perfEnabled)
+                    EzManiaAnalysisPerf.RecordUiKpcUpdate(keyCount, ezKpcDisplay.CurrentKpcDisplayMode == EzKpcDisplay.KpcDisplayMode.BarChart, Stopwatch.GetTimestamp() - kStart, GC.GetAllocatedBytesForCurrentThread() - kAllocStart);
+            }
+
+            if (perfEnabled)
+            {
+                EzManiaAnalysisPerf.RecordUiUpdate(Stopwatch.GetTimestamp() - uiStart, GC.GetAllocatedBytesForCurrentThread() - uiAllocStart);
+                EzManiaAnalysisPerf.MaybeLog();
             }
         }
 
@@ -443,6 +608,16 @@ namespace osu.Game.Screens.SelectV2
 
             scheduledBackgroundRetrieval?.Cancel();
             scheduledBackgroundRetrieval = null;
+
+            scheduledMetadataTextUpdate?.Cancel();
+            scheduledMetadataTextUpdate = null;
+            metadataTextApplied = false;
+
+            scheduledManiaUiUpdate?.Cancel();
+            scheduledManiaUiUpdate = null;
+            hasPendingUiUpdate = false;
+            pendingColumnCounts = null;
+            pendingHoldNoteCounts = null;
             beatmapBackground.Beatmap = null;
             updateButton.BeatmapSet = null;
             localRank.Beatmap = null;
@@ -458,6 +633,79 @@ namespace osu.Game.Screens.SelectV2
 
             lastStarRatingStars = null;
             loggedAbnormalXxySrBeatmapId = null;
+
+            cachedKpcKeyCount = -1;
+            cachedKpcRulesetId = -1;
+            cachedKpcModsHash = 0;
+            normalizedColumnCounts = null;
+            normalizedHoldNoteCounts = null;
+            normalizedCountsKeyCount = 0;
+
+            lastKpcCountsHash = 0;
+            lastKpcMode = default;
+        }
+
+        private int getCachedKpcKeyCount()
+        {
+            Guid beatmapId = beatmap.ID;
+            int rulesetId = ruleset.Value.OnlineID;
+            int modsHash = computeModsHash(mods.Value);
+
+            if (cachedKpcKeyCount >= 0
+                && cachedKpcBeatmapId == beatmapId
+                && cachedKpcRulesetId == rulesetId
+                && cachedKpcModsHash == modsHash)
+                return cachedKpcKeyCount;
+
+            ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
+            cachedKpcKeyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
+            cachedKpcBeatmapId = beatmapId;
+            cachedKpcRulesetId = rulesetId;
+            cachedKpcModsHash = modsHash;
+            return cachedKpcKeyCount;
+        }
+
+        private void ensureNormalizedCounts(int keyCount)
+        {
+            if (normalizedColumnCounts != null && normalizedHoldNoteCounts != null && normalizedCountsKeyCount == keyCount)
+                return;
+
+            normalizedCountsKeyCount = keyCount;
+            normalizedColumnCounts = new Dictionary<int, int>(keyCount);
+            normalizedHoldNoteCounts = new Dictionary<int, int>(keyCount);
+
+            for (int i = 0; i < keyCount; i++)
+            {
+                normalizedColumnCounts[i] = 0;
+                normalizedHoldNoteCounts[i] = 0;
+            }
+        }
+
+        private static int computeModsHash(IReadOnlyList<Mod> mods)
+        {
+            unchecked
+            {
+                int hash = 17;
+                for (int i = 0; i < mods.Count; i++)
+                    hash = hash * 31 + mods[i].GetHashCode();
+
+                return hash;
+            }
+        }
+
+        private static int computeCountsHash(Dictionary<int, int> columnCounts, Dictionary<int, int> holdCounts, int keyCount)
+        {
+            unchecked
+            {
+                int hash = 17;
+                for (int i = 0; i < keyCount; i++)
+                {
+                    hash = hash * 31 + columnCounts.GetValueOrDefault(i);
+                    hash = hash * 31 + holdCounts.GetValueOrDefault(i);
+                }
+
+                return hash;
+            }
         }
 
         private void computeStarRating()
@@ -485,6 +733,12 @@ namespace osu.Game.Screens.SelectV2
 
             if (Item?.IsVisible != true)
             {
+                scheduledBackgroundRetrieval?.Cancel();
+                scheduledBackgroundRetrieval = null;
+
+                scheduledMetadataTextUpdate?.Cancel();
+                scheduledMetadataTextUpdate = null;
+
                 starDifficultyCancellationSource?.Cancel();
                 starDifficultyCancellationSource = null;
 
@@ -494,6 +748,12 @@ namespace osu.Game.Screens.SelectV2
             }
             else
             {
+                if (beatmapBackground.Beatmap == null)
+                    scheduleBackgroundLoad();
+
+                if (!metadataTextApplied)
+                    scheduleMetadataTextUpdate();
+
                 // 重新可见时再触发一次绑定/计算。
                 if (maniaAnalysisCancellationSource == null && Item != null && ruleset.Value.OnlineID == 3)
                 {

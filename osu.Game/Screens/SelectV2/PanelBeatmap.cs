@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -15,6 +16,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Logging;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics;
@@ -24,6 +26,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Analysis.Diagnostics;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Overlays;
@@ -38,6 +41,8 @@ namespace osu.Game.Screens.SelectV2
     public partial class PanelBeatmap : Panel
     {
         public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT;
+
+        private const int mania_ui_update_throttle_ms = 50;
 
         private StarCounter starCounter = null!;
         private ConstrainedIconContainer difficultyIcon = null!;
@@ -56,7 +61,7 @@ namespace osu.Game.Screens.SelectV2
 
         private TrianglesV2 triangles = null!;
 
-        private LineGraph kpsGraph = null!;
+        private EzLineGraph kpsGraph = null!;
         private EzKpsDisplay kpsDisplay = null!;
         private EzKpcDisplay kpcDisplay = null!;
         private EzXxySrDisplay xxySrDisplay = null!;
@@ -99,9 +104,27 @@ namespace osu.Game.Screens.SelectV2
         private CancellationTokenSource? maniaAnalysisCancellationSource;
         private string? cachedScratchText;
 
+        private ScheduledDelegate? scheduledManiaUiUpdate;
+        private (double averageKps, double maxKps, List<double> kpsList) pendingKpsResult;
+        private Dictionary<int, int>? pendingColumnCounts;
+        private Dictionary<int, int>? pendingHoldNoteCounts;
+        private bool hasPendingUiUpdate;
+
         private double? lastStarRatingStars;
         private Guid? loggedAbnormalXxySrBeatmapId;
         private Bindable<EzKpcDisplay.KpcDisplayMode> kpcDisplayMode = null!;
+
+        private int cachedKpcKeyCount = -1;
+        private Guid cachedKpcBeatmapId;
+        private int cachedKpcRulesetId = -1;
+        private int cachedKpcModsHash;
+
+        private Dictionary<int, int>? normalizedColumnCounts;
+        private Dictionary<int, int>? normalizedHoldNoteCounts;
+        private int normalizedCountsKeyCount;
+
+        private int lastKpcCountsHash;
+        private EzKpcDisplay.KpcDisplayMode lastKpcMode;
 
         public PanelBeatmap()
         {
@@ -202,7 +225,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.BottomLeft,
                                         },
                                         Empty(),
-                                        kpsGraph = new LineGraph
+                                        kpsGraph = new EzLineGraph
                                         {
                                             Size = new Vector2(300, 20),
                                             LineColour = Color4.CornflowerBlue.Opacity(0.8f),
@@ -373,13 +396,35 @@ namespace osu.Game.Screens.SelectV2
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
 
-                updateUI((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
+                queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 
                 xxySrDisplay.Current.Value = result.NewValue.XxySr;
                 maybeLogLargeStarDiff();
 
                 updateKeyCount();
             }, true);
+        }
+
+        private void queueManiaUiUpdate((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
+        {
+            pendingKpsResult = result;
+            pendingColumnCounts = columnCounts;
+            pendingHoldNoteCounts = holdNoteCounts;
+            hasPendingUiUpdate = true;
+
+            if (scheduledManiaUiUpdate != null)
+                return;
+
+            scheduledManiaUiUpdate = Scheduler.AddDelayed(() =>
+            {
+                scheduledManiaUiUpdate = null;
+
+                if (!hasPendingUiUpdate)
+                    return;
+
+                hasPendingUiUpdate = false;
+                updateUI(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
+            }, mania_ui_update_throttle_ms, false);
         }
 
         private void resetManiaAnalysisDisplay()
@@ -415,33 +460,67 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
+            // 滚动过程中会有大量不可见/刚离屏的面板仍收到分析回调。
+            // 这些面板的 UI 更新会造成明显 GC 压力与 Draw FPS 下降，因此直接跳过。
+            if (Item.IsVisible != true)
+                return;
+
+            bool perfEnabled = EzManiaAnalysisPerf.Enabled;
+            long uiStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
+            long uiAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
+
             var (averageKps, maxKps, kpsList) = result;
 
             kpsDisplay.SetKps(averageKps, maxKps);
 
             // Update KPS graph with the KPS list
             if (kpsList.Count > 0)
-                kpsGraph.Values = kpsList.Select(k => (float)k);
+            {
+                long gStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
+                long gAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
+
+                kpsGraph.SetValues(kpsList);
+
+                if (perfEnabled)
+                    EzManiaAnalysisPerf.RecordUiGraphSet(kpsList.Count, Stopwatch.GetTimestamp() - gStart, GC.GetAllocatedBytesForCurrentThread() - gAllocStart);
+            }
 
             if (columnCounts != null)
             {
+                long kStart = perfEnabled ? Stopwatch.GetTimestamp() : 0;
+                long kAllocStart = perfEnabled ? GC.GetAllocatedBytesForCurrentThread() : 0;
+
                 // 注意：分析结果里的 ColumnCounts 只包含“出现过的列”。
                 // 当某个 mod 删除了某一列的所有 notes 时，这一列会缺失，
                 // 直接显示会导致列号错位（看起来像“没有更新”）。
                 // 这里把字典补齐到 0..keyCount-1，缺失列填 0。
-                ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
-                int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
-
-                var normalizedColumnCounts = new Dictionary<int, int>(keyCount);
-                var normalizedHoldNoteCounts = new Dictionary<int, int>(keyCount);
+                int keyCount = getCachedKpcKeyCount();
+                ensureNormalizedCounts(keyCount);
 
                 for (int i = 0; i < keyCount; i++)
                 {
-                    normalizedColumnCounts[i] = columnCounts.GetValueOrDefault(i);
-                    normalizedHoldNoteCounts[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                    normalizedColumnCounts![i] = columnCounts.GetValueOrDefault(i);
+                    normalizedHoldNoteCounts![i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
                 }
 
-                kpcDisplay.UpdateColumnCounts(normalizedColumnCounts, normalizedHoldNoteCounts);
+                int countsHash = computeCountsHash(normalizedColumnCounts!, normalizedHoldNoteCounts!, keyCount);
+                var mode = kpcDisplay.CurrentKpcDisplayMode;
+
+                if (countsHash != lastKpcCountsHash || mode != lastKpcMode)
+                {
+                    lastKpcCountsHash = countsHash;
+                    lastKpcMode = mode;
+                    kpcDisplay.UpdateColumnCounts(normalizedColumnCounts!, normalizedHoldNoteCounts!);
+                }
+
+                if (perfEnabled)
+                    EzManiaAnalysisPerf.RecordUiKpcUpdate(keyCount, kpcDisplay.CurrentKpcDisplayMode == EzKpcDisplay.KpcDisplayMode.BarChart, Stopwatch.GetTimestamp() - kStart, GC.GetAllocatedBytesForCurrentThread() - kAllocStart);
+            }
+
+            if (perfEnabled)
+            {
+                EzManiaAnalysisPerf.RecordUiUpdate(Stopwatch.GetTimestamp() - uiStart, GC.GetAllocatedBytesForCurrentThread() - uiAllocStart);
+                EzManiaAnalysisPerf.MaybeLog();
             }
         }
 
@@ -457,10 +536,89 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisBindable = null;
             cachedScratchText = null;
 
+            scheduledManiaUiUpdate?.Cancel();
+            scheduledManiaUiUpdate = null;
+            hasPendingUiUpdate = false;
+            pendingColumnCounts = null;
+            pendingHoldNoteCounts = null;
+
             xxySrDisplay.Current.Value = null;
 
             lastStarRatingStars = null;
             loggedAbnormalXxySrBeatmapId = null;
+
+            cachedKpcKeyCount = -1;
+            cachedKpcRulesetId = -1;
+            cachedKpcModsHash = 0;
+            normalizedColumnCounts = null;
+            normalizedHoldNoteCounts = null;
+            normalizedCountsKeyCount = 0;
+
+            lastKpcCountsHash = 0;
+            lastKpcMode = default;
+        }
+
+        private int getCachedKpcKeyCount()
+        {
+            Guid beatmapId = beatmap.ID;
+            int rulesetId = ruleset.Value.OnlineID;
+            int modsHash = computeModsHash(mods.Value);
+
+            if (cachedKpcKeyCount >= 0
+                && cachedKpcBeatmapId == beatmapId
+                && cachedKpcRulesetId == rulesetId
+                && cachedKpcModsHash == modsHash)
+                return cachedKpcKeyCount;
+
+            ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
+            cachedKpcKeyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
+            cachedKpcBeatmapId = beatmapId;
+            cachedKpcRulesetId = rulesetId;
+            cachedKpcModsHash = modsHash;
+            return cachedKpcKeyCount;
+        }
+
+        private void ensureNormalizedCounts(int keyCount)
+        {
+            if (normalizedColumnCounts != null && normalizedHoldNoteCounts != null && normalizedCountsKeyCount == keyCount)
+                return;
+
+            normalizedCountsKeyCount = keyCount;
+            normalizedColumnCounts = new Dictionary<int, int>(keyCount);
+            normalizedHoldNoteCounts = new Dictionary<int, int>(keyCount);
+
+            for (int i = 0; i < keyCount; i++)
+            {
+                normalizedColumnCounts[i] = 0;
+                normalizedHoldNoteCounts[i] = 0;
+            }
+        }
+
+        private static int computeModsHash(IReadOnlyList<Mod> mods)
+        {
+            unchecked
+            {
+                int hash = 17;
+                for (int i = 0; i < mods.Count; i++)
+                    hash = hash * 31 + mods[i].GetHashCode();
+
+                return hash;
+            }
+        }
+
+        private static int computeCountsHash(Dictionary<int, int> columnCounts, Dictionary<int, int> holdCounts, int keyCount)
+        {
+            unchecked
+            {
+                int hash = 17;
+                for (int i = 0; i < keyCount; i++)
+                {
+                    hash = hash * 31 + columnCounts.GetValueOrDefault(i);
+                    hash = hash * 31 + holdCounts.GetValueOrDefault(i);
+                }
+
+                return hash;
+            }
         }
 
         private void computeStarRating()

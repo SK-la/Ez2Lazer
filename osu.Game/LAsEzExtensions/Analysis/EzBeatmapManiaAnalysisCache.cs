@@ -25,6 +25,8 @@ using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using osu.Game.LAsEzExtensions.Analysis.Diagnostics;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -152,7 +154,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 var lookup = new ManiaAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null);
 
                 // computeAnalysis() will early-return persisted values and will store baseline results when computed.
-                computeAnalysis(lookup, cancellationToken);
+                bool persistHit;
+                computeAnalysis(lookup, cancellationToken, out persistHit);
             }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, lowPriorityScheduler);
         }
 
@@ -182,6 +185,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                                                   CancellationToken cancellationToken = default,
                                                                   int computationDelay = 0)
         {
+            EzManiaAnalysisPerf.RecordRequest();
+            EzManiaAnalysisPerf.MaybeLog();
+
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
             var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
 
@@ -208,6 +214,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     ? max_in_memory_entries_with_persistence
                     : max_in_memory_entries_without_persistence;
 
+                EzManiaAnalysisPerf.UpdateCacheGauges(Volatile.Read(ref cachedLookupsCount), maxEntries);
+
                 while (Volatile.Read(ref cachedLookupsCount) > maxEntries && cacheInsertionOrder.TryDequeue(out var toRemove))
                 {
                     if (!cachedLookups.TryRemove(toRemove, out _))
@@ -215,7 +223,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                     Interlocked.Decrement(ref cachedLookupsCount);
                     Invalidate(k => k.Equals(toRemove));
+
+                    EzManiaAnalysisPerf.RecordEviction();
                 }
+
+                EzManiaAnalysisPerf.UpdateCacheGauges(Volatile.Read(ref cachedLookupsCount), maxEntries);
+                EzManiaAnalysisPerf.MaybeLog();
             }
 
             return result;
@@ -228,8 +241,17 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             return Task.Factory.StartNew(() =>
             {
+                EzManiaAnalysisPerf.RecordComputeStart(isLowPriority);
+
+                long startTimestamp = Stopwatch.GetTimestamp();
+                bool persistHit = false;
+
                 if (CheckExists(lookup, out var existing))
+                {
+                    EzManiaAnalysisPerf.RecordComputeElapsedTicks(Stopwatch.GetTimestamp() - startTimestamp, wasPersistHit: false);
+                    EzManiaAnalysisPerf.RecordComputeEnd(isLowPriority);
                     return existing;
+                }
 
                 // Warmup: never compete with visible/high-priority computations.
                 if (isLowPriority)
@@ -240,12 +262,17 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 try
                 {
-                    return computeAnalysis(lookup, token);
+                    var result = computeAnalysis(lookup, token, out persistHit);
+                    return result;
                 }
                 finally
                 {
                     if (!isLowPriority)
                         exitHighPriorityWork();
+
+                    EzManiaAnalysisPerf.RecordComputeElapsedTicks(Stopwatch.GetTimestamp() - startTimestamp, persistHit);
+                    EzManiaAnalysisPerf.RecordComputeEnd(isLowPriority);
+                    EzManiaAnalysisPerf.MaybeLog();
                 }
             }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, scheduler);
         }
@@ -262,8 +289,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 highPriorityIdleEvent.Set();
         }
 
-        private ManiaBeatmapAnalysisResult? computeAnalysis(in ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken)
+        private ManiaBeatmapAnalysisResult? computeAnalysis(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken, out bool persistHit)
         {
+            persistHit = false;
+
             try
             {
                 if (lookup.Ruleset.OnlineID != 3)
@@ -273,7 +302,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 // - 避免 mod 组合/设置导致存储爆炸。
                 // - 与官方 star 的“基础值可预处理、modded 按需计算”体验对齐。
                 if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
+                {
+                    persistHit = true;
                     return persisted;
+                }
 
                 var rulesetInstance = lookup.Ruleset.CreateInstance();
                 if (rulesetInstance is not ILegacyRuleset legacyRuleset)
@@ -295,7 +327,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                    && kpsList.Count > 0
                                    && columnCounts.Count > 0;
 
-                // Copy lookup info to locals so we don't capture the `in` parameter in a local function.
+                // Copy lookup info to locals so we don't capture the lookup in a local function.
                 Guid beatmapId = lookup.BeatmapInfo.ID;
                 string difficultyName = lookup.BeatmapInfo.DifficultyName;
                 string rulesetShortName = lookup.Ruleset.ShortName;
@@ -303,6 +335,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 void logXxySrError(string message)
                 {
+                    // Disabled by request: avoid log spam during song select scrolling.
+                    return;
+
                     if (!otherDataOk)
                         return;
 
@@ -348,6 +383,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
             catch (OperationCanceledException)
             {
+                EzManiaAnalysisPerf.RecordComputeCancelled();
                 return null;
             }
             catch
