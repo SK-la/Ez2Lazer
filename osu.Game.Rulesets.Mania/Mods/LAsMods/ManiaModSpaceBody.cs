@@ -41,12 +41,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public BindableBool Shield { get; } = new BindableBool();
 
         [SettingSource("Apply Order", "Order in which this mod is applied after beatmap conversion. Lower runs earlier.", SettingControlType = typeof(SettingsNumberBox))]
-        public BindableNumber<int> ApplyOrderSetting { get; } = new BindableInt(100)
-        {
-            MinValue = -1000,
-            MaxValue = 1000,
-            Precision = 1
-        };
+        public Bindable<int?> ApplyOrderSetting { get; } = new Bindable<int?>(100);
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -129,6 +124,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         // 确认此 Mod 在其他转换后 Mod 之后应用，返回更高的应用顺序。
         // 没有此接口的 Mod 被视为顺序 0。
-        public int ApplyOrder => ApplyOrderSetting.Value;
+        public int ApplyOrder => ApplyOrderSetting.Value ?? 100;
     }
 }

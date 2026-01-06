@@ -109,12 +109,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         [SettingSource("Apply Order", "Order in which this mod is applied after beatmap conversion. Lower runs earlier.", SettingControlType = typeof(SettingsNumberBox))]
-        public BindableNumber<int> ApplyOrderSetting { get; } = new BindableInt(0)
-        {
-            MinValue = -1000,
-            MaxValue = 1000,
-            Precision = 1
-        };
+        public Bindable<int?> ApplyOrderSetting { get; } = new Bindable<int?>(0);
 
         public void ApplyToBeatmapConverter(IBeatmapConverter converter)
         {
@@ -456,6 +451,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return (newObjects, checkColumn);
         }
 
-        public int ApplyOrder => ApplyOrderSetting.Value;
+        public int ApplyOrder => ApplyOrderSetting.Value ?? 0;
     }
 }
