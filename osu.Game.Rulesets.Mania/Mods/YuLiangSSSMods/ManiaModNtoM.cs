@@ -20,7 +20,7 @@ using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModNtoM : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, osu.Game.Rulesets.Mods.IHasApplyOrder
+    public class ManiaModNtoM : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
     {
         public override string Name => "Nk to Mk Converter";
 
@@ -81,9 +81,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            Random? Rng;
             Seed.Value ??= RNG.Next();
-            Rng = new Random((int)Seed.Value);
+            var rng = new Random((int)Seed.Value);
+            if (rng == null) throw new ArgumentNullException(nameof(rng));
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
@@ -119,7 +119,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             int keyValue = keys + 1;
             bool firstKeyFlag = true;
 
-            int emptyColumn = Rng.Next(-1, 1 + keyValue - 2);
+            int emptyColumn = rng.Next(-1, 1 + keyValue - 2);
 
             while (keyValue <= Key.Value)
             {
@@ -136,8 +136,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     }
 
                     for (int i = 0; i < Key.Value; i++)
+                    {
                         if (!confirmNull[i])
                             nullColumnList.Add(i);
+                    }
+
                     firstKeyFlag = false;
                 }
 
@@ -155,9 +158,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     var hold = new HoldNote();
                     int columnNum = locations[i].column;
                     int minusColumn = 0;
+
                     foreach (int nul in nullColumnList)
+                    {
                         if (columnNum > nul)
                             minusColumn++;
+                    }
+
                     columnNum -= minusColumn;
 
                     #endregion
@@ -180,10 +187,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     bool error = changeTime != locations[i].startTime;
 
                     if (keys < 4) // why you are converting 1k 2k 3k into upper keys?
-                        columnNum = Rng.Next(keyValue);
+                        columnNum = rng.Next(keyValue);
                     else
                     {
-                        if (error && Rng.Next(100) < Probability.Value && atLeast < 0)
+                        if (error && rng.Next(100) < Probability.Value && atLeast < 0)
                         {
                             changeTime = locations[i].startTime;
                             atLeast = keys - 2;
@@ -258,7 +265,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     if (newColumnObjects[i].Column < 0 || newColumnObjects[i].Column > Key.Value - 1)
                     {
                         outIndex = true;
-                        newColumnObjects[i].Column = Rng.Next(Key.Value - 1);
+                        newColumnObjects[i].Column = rng.Next(Key.Value - 1);
                     }
 
                     for (int j = i + 1; j < newColumnObjects.Count; j++)
@@ -267,9 +274,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                                                                      && newColumnObjects[i].StartTime <= newColumnObjects[j].StartTime + 2) overlap = true;
 
                         if (newColumnObjects[j].StartTime != newColumnObjects[j].GetEndTime())
+                        {
                             if (newColumnObjects[i].Column == newColumnObjects[j].Column && newColumnObjects[i].StartTime >= newColumnObjects[j].StartTime - 2
                                                                                          && newColumnObjects[i].StartTime <= newColumnObjects[j].GetEndTime() + 2)
                                 overlap = true;
+                        }
                     }
 
                     if (outIndex) overlap = true;
@@ -312,7 +321,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                                       endTime: h.EndTime,
                                                       duration: h.EndTime - h.StartTime
                                                   ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
-                    ;
+
                     emptyColumn = -1;
                     fixedColumnObjects.Clear();
                     newColumnObjects.Clear();
