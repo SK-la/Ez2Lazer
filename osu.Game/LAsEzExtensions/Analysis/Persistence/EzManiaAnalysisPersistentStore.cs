@@ -228,13 +228,19 @@ LIMIT 1;
                 }
 
                 if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
+                {
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_hash mismatch for {beatmap.ID}: stored={storedHash} runtime={beatmap.Hash}", "mania_analysis", LogLevel.Debug);
                     return false;
+                }
 
                 // md5 validation:
                 // - If stored md5 is empty (older versions), accept hash match and upgrade in-place.
                 // - If stored md5 is present, require it to match.
                 if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                {
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_md5 mismatch for {beatmap.ID}: stored={storedMd5} runtime={beatmap.MD5Hash}", "mania_analysis", LogLevel.Debug);
                     return false;
+                }
 
                 // If the stored version is newer than this build, ignore and let caller recompute.
                 if (storedVersion > ANALYSIS_VERSION)
@@ -243,7 +249,6 @@ LIMIT 1;
                 var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                 var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
                 var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
-
                 // Allow in-place upgrade of compatible older entries to avoid full recompute.
                 // If an older version is not compatible, treat it as a miss.
                 if (storedVersion != ANALYSIS_VERSION)

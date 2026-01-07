@@ -4,7 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Logging;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
@@ -437,9 +439,16 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisCancellationSource = new CancellationTokenSource();
             var localCancellationSource = maniaAnalysisCancellationSource;
 
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: 0, requireXxySr: true);
+            var requestTime = System.DateTimeOffset.UtcNow;
+            Logger.Log($"[PanelBeatmapStandalone] mania analysis requested for {beatmap.OnlineID}/{beatmap.ID} requireXxy=false at {requestTime:O}", LoggingTarget.Runtime, LogLevel.Debug);
+
+            // Request baseline first (avoid forcing expensive xxy compute on-visible).
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: 0, requireXxySr: false);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
+                var responseTime = System.DateTimeOffset.UtcNow;
+                var latency = responseTime - requestTime;
+                Logger.Log($"[PanelBeatmapStandalone] mania analysis response for {beatmap.OnlineID}/{beatmap.ID} latency={latency.TotalMilliseconds}ms xxy_present={(result.NewValue.XxySr != null)} kps_count={(result.NewValue.KpsList?.Count ?? 0)}", LoggingTarget.Runtime, LogLevel.Debug);
                 // 旧 bindable 的回调（比如切换 mods / 取消重绑）直接忽略。
                 if (localCancellationSource != maniaAnalysisCancellationSource)
                     return;
@@ -454,7 +463,36 @@ namespace osu.Game.Screens.SelectV2
 
                 queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 
-                xxySrDisplay.Current.Value = result.NewValue.XxySr;
+                // Only update if present.
+                if (result.NewValue.XxySr != null)
+                    xxySrDisplay.Current.Value = result.NewValue.XxySr;
+
+                // If xxy is missing from the baseline, trigger an on-demand background request
+                // to compute and patch xxy without blocking the main UI updates.
+                if (result.NewValue.XxySr == null && maniaAnalysisCancellationSource != null && !maniaAnalysisCancellationSource.IsCancellationRequested)
+                {
+                    var token = maniaAnalysisCancellationSource.Token;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var full = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods.Value, token, computationDelay: 0, requireXxySr: true).ConfigureAwait(false);
+
+                            if (full?.XxySr != null)
+                            {
+                                Schedule(() => xxySrDisplay.Current.Value = full.Value.XxySr);
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // ignore
+                        }
+                        catch
+                        {
+                            // ignore failures; shouldn't block UI
+                        }
+                    }, token);
+                }
 
                 updateKeyCount();
             }, true);
@@ -661,6 +699,7 @@ namespace osu.Game.Screens.SelectV2
 
         private void computeStarRating()
         {
+            Logger.Log($"[PanelBeatmapStandalone] computeStarRating called for beatmap {beatmap.OnlineID}/{beatmap.ID}", LoggingTarget.Runtime, LogLevel.Debug);
             starDifficultyCancellationSource?.Cancel();
             starDifficultyCancellationSource = new CancellationTokenSource();
 
@@ -670,6 +709,7 @@ namespace osu.Game.Screens.SelectV2
             starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, computationDelay: 0);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
+                Logger.Log($"[PanelBeatmapStandalone] starDifficulty changed for beatmap {beatmap.OnlineID}/{beatmap.ID} stars={starDifficulty.NewValue.Stars}", LoggingTarget.Runtime, LogLevel.Debug);
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 spreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
 

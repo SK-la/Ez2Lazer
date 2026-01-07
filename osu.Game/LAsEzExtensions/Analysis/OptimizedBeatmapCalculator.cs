@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
@@ -161,6 +162,61 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 return counts;
             }
+        }
+
+        /// <summary>
+        /// 快速仅统计列计数与长按计数（单次遍历，避免 KPS 相关开销）。
+        /// </summary>
+        public static (Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts) GetCountsOnly(IBeatmap beatmap)
+        {
+            var columnCounts = new Dictionary<int, int>();
+            var holdNoteCounts = new Dictionary<int, int>();
+
+            foreach (var obj in beatmap.HitObjects)
+            {
+                if (obj is IHasColumn columnObj)
+                {
+                    columnCounts[columnObj.Column] = columnCounts.GetValueOrDefault(columnObj.Column) + 1;
+                    if (obj is IHasDuration)
+                        holdNoteCounts[columnObj.Column] = holdNoteCounts.GetValueOrDefault(columnObj.Column) + 1;
+                }
+            }
+
+            return (columnCounts, holdNoteCounts);
+        }
+
+        /// <summary>
+        /// 计算粗略 KPS 曲线并返回平均/最大值。使用固定较少的桶（bucket）以快速得到可展示的基线数据。
+        /// </summary>
+        public static (double averageKps, double maxKps, List<double> kpsList) GetKpsCoarse(IBeatmap beatmap, int buckets = 64)
+        {
+            var hitObjects = beatmap.HitObjects;
+            if (hitObjects.Count == 0)
+                return (0, 0, new List<double>());
+
+            double songStart = hitObjects[0].StartTime;
+            double songEnd = hitObjects[^1].StartTime;
+            double duration = Math.Max(1, songEnd - songStart);
+
+            var bucketsCounts = new long[buckets];
+
+            foreach (var obj in hitObjects)
+            {
+                int idx = (int)((obj.StartTime - songStart) * buckets / duration);
+                if (idx < 0) idx = 0;
+                if (idx >= buckets) idx = buckets - 1;
+                bucketsCounts[idx]++;
+            }
+
+            var kpsList = new List<double>(buckets);
+            double intervalMs = duration / buckets;
+            for (int i = 0; i < buckets; i++)
+                kpsList.Add(bucketsCounts[i] / (intervalMs / 1000.0));
+
+            double avg = kpsList.Sum() / kpsList.Count;
+            double max = kpsList.Max();
+
+            return (avg, max, kpsList);
         }
 
         /// <summary>
