@@ -26,7 +26,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private SettingsDropdown<string> dropdown = null!;
 
-        private SettingsDropdown<int> sampleRateDropdown = null!;
+        private SettingsDropdown<int>? sampleRateDropdown;
 
         private SettingsCheckbox? wasapiExperimental;
 
