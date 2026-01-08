@@ -115,11 +115,6 @@ namespace osu.Game.Localisation
         public static LocalisableString DisableWinKey => new TranslatableString(getKey(@"disable_win_key"), @"Disable Windows key during gameplay");
 
         /// <summary>
-        /// "Disable Cmd+Space (Spotlight) during gameplay"
-        /// </summary>
-        public static LocalisableString DisableCmdSpace => new TranslatableString(getKey(@"disable_cmd_space"), @"Disable Cmd+Space (Spotlight) during gameplay");
-
-        /// <summary>
         /// "Mods"
         /// </summary>
         public static LocalisableString ModsHeader => new TranslatableString(getKey(@"mods_header"), @"Mods");

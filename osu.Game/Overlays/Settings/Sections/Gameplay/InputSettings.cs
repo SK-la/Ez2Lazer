@@ -6,6 +6,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.Gameplay
@@ -15,7 +16,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
         protected override LocalisableString Header => GameplaySettingsStrings.InputHeader;
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             Children = new Drawable[]
             {
@@ -51,8 +52,8 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
             {
                 Add(new SettingsCheckbox
                 {
-                    LabelText = GameplaySettingsStrings.DisableCmdSpace,
-                    Current = config.GetBindable<bool>(OsuSetting.GameplayDisableCmdSpace)
+                    LabelText = "DisableCmdSpace".Localize(),
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDisableCmdSpace)
                 });
             }
         }
