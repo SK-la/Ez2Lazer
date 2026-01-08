@@ -116,6 +116,7 @@ namespace osu.Game.Screens.Ranking.Statistics
             // Todo: The placement of this is temporary. Eventually we'll both generate the playable beatmap _and_ run through it in a background task to generate the hit events.
             Task.Run(() =>
             {
+                // 结算后加载一次分数，后台计算
                 var playable = workingBeatmap.GetPlayableBeatmap(newScore.Ruleset, newScore.Mods);
 
                 List<Rulesets.Scoring.HitEvent>? generatedHitEvents = null;

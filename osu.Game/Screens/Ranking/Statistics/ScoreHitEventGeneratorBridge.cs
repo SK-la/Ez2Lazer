@@ -12,6 +12,10 @@ using osu.Game.Scoring;
 
 namespace osu.Game.Screens.Ranking.Statistics
 {
+    /// <summary>
+    /// 本地解析成绩结算的桥接
+    /// 通过反射mania规则集和特定组件实现
+    /// </summary>
     internal static class ScoreHitEventGeneratorBridge
     {
         private const string logger_name = "hit_events";

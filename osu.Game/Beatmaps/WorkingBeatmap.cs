@@ -294,11 +294,8 @@ namespace osu.Game.Beatmaps
             // Convert
             IBeatmap converted = converter.Convert(token);
 
-            // Apply conversion mods to the result. If mods implement IHasApplyOrder,
-            // respect their order (lower values first). Mods without the interface
-            // default to order 0 to preserve existing behaviour.
-            foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>()
-                                     .OrderBy(m => (m as osu.Game.Rulesets.Mods.IHasApplyOrder)?.ApplyOrder ?? 0))
+            // Apply conversion mods to the result
+            foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>())
             {
                 token.ThrowIfCancellationRequested();
                 mod.ApplyToBeatmap(converted);
