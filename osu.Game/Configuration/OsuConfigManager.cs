@@ -161,6 +161,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.IncreaseFirstObjectVisibility, true);
             SetDefault(OsuSetting.GameplayDisableWinKey, true);
+            SetDefault(OsuSetting.GameplayDisableCmdSpace, true);
 
             // Update
             SetDefault(OsuSetting.ReleaseStream, ReleaseStream.Lazer);
@@ -435,6 +436,7 @@ namespace osu.Game.Configuration
         StarFountains,
         MenuBackgroundSource,
         GameplayDisableWinKey,
+        GameplayDisableCmdSpace,
         SeasonalBackgroundMode,
         EditorWaveformOpacity,
         EditorShowHitMarkers,

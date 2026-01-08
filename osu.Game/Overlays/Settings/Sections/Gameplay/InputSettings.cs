@@ -46,6 +46,15 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = config.GetBindable<bool>(OsuSetting.GameplayDisableWinKey)
                 });
             }
+
+            if (RuntimeInfo.OS == RuntimeInfo.Platform.macOS)
+            {
+                Add(new SettingsCheckbox
+                {
+                    LabelText = GameplaySettingsStrings.DisableCmdSpace,
+                    Current = config.GetBindable<bool>(OsuSetting.GameplayDisableCmdSpace)
+                });
+            }
         }
     }
 }
