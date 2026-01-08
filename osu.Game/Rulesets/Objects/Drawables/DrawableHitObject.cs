@@ -614,6 +614,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (Samples != null)
             {
                 Samples.Balance.Value = CalculateSamplePlaybackBalance(SamplePlaybackPosition);
+                InputAudioLatencyTracker.GlobalTracker?.RecordAudioPlay();
                 Samples.Play();
             }
         }

@@ -11,6 +11,9 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
+using osu.Framework.Input;
+using osu.Framework.Input.Events;
+using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
@@ -48,6 +51,8 @@ namespace osu.Game.Screens.Play
         [CanBeNull]
         private UserStatisticsWatcher userStatisticsWatcher { get; set; }
 
+        private InputAudioLatencyTracker? latencyTracker;
+
         private readonly object scoreSubmissionLock = new object();
         private TaskCompletionSource<bool> scoreSubmissionSource;
 
@@ -75,6 +80,12 @@ namespace osu.Game.Screens.Play
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
             });
+
+            // Initialize latency tracker
+            latencyTracker = new InputAudioLatencyTracker();
+            latencyTracker.Initialize(GameplayState.ScoreProcessor);
+
+            // Key input recording is handled in OnKeyDown override
         }
 
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)
@@ -360,5 +371,18 @@ namespace osu.Game.Screens.Play
             AllowRetry = true,
             IsLocalPlay = true,
         };
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+            latencyTracker?.OnGameExit();
+            latencyTracker?.Dispose();
+        }
+
+        protected override bool OnKeyDown(KeyDownEvent e)
+        {
+            latencyTracker?.RecordKeyPress(e.Key);
+            return base.OnKeyDown(e);
+        }
     }
 }
