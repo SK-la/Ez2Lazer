@@ -16,22 +16,23 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
         protected override LocalisableString Header => CommonStrings.General;
 
         private SettingsEnumDropdown<EzMUGHitMode> hitMode = null!;
-        private SettingsCheckbox o2JamCheckbox = null!;
+        private SettingsEnumDropdown<EnumHealthMode> healthMode = null!;
         private SettingsCheckbox poorHitResultCheckbox = null!;
 
         [BackgroundDependencyLoader]
         private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
-            o2JamCheckbox = new SettingsCheckbox
+            healthMode = new SettingsEnumDropdown<EnumHealthMode>
             {
+                ClassicDefault = EnumHealthMode.Lazer,
+                Current = ezConfig.GetBindable<EnumHealthMode>(Ez2Setting.CustomHealthMode),
                 LabelText = "O2Jam Health System",
-                Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomHealthFormHitMode),
                 TooltipText = "Only for O2Jam HitMode. 只用于O2Jam模式。"
             };
             poorHitResultCheckbox = new SettingsCheckbox
             {
-                LabelText = "Poor HitResult System",
                 Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResult),
+                LabelText = "Poor HitResult System",
                 TooltipText = "Added a strict penalty for wrong presses outside the Miss range. "
                               + "will significantly increase the difficulty. Recommended for Ez2Ac and IIDX modes"
             };
@@ -52,7 +53,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode),
                     Keywords = new[] { "scoring" }
                 },
-                o2JamCheckbox,
+                healthMode,
                 poorHitResultCheckbox,
                 new SettingsSlider<double>
                 {
@@ -86,7 +87,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
             base.LoadComplete();
 
             hitMode.Current.BindValueChanged(mode =>
-                o2JamCheckbox.Alpha = mode.NewValue == EzMUGHitMode.O2Jam ? 1 : 0, true);
+                healthMode.Alpha = mode.NewValue == EzMUGHitMode.O2Jam ? 1 : 0, true);
         }
     }
 }

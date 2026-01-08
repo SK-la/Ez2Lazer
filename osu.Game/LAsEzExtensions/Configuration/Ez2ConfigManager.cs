@@ -117,7 +117,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.EzSelectCsMode, CsItemIds.ALL.First().Id);
 
             SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
-            SetDefault(Ez2Setting.CustomHealthFormHitMode, true);
+            SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.Lazer);
             SetDefault(Ez2Setting.CustomPoorHitResult, true);
 
             SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
@@ -482,7 +482,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         AccuracyCutoffS,
         AccuracyCutoffA,
         HitMode,
-        CustomHealthFormHitMode,
+        CustomHealthMode,
         CustomPoorHitResult,
         XxySRFilter,
         KpcDisplayMode,

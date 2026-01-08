@@ -4,13 +4,15 @@
 using System;
 using System.Threading;
 using osu.Framework.Bindables;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     // 代码改编自YuLiangSSS提供的ManiaModO2Judgement
-    public static class O2HitModeExtension
+    public static partial class O2HitModeExtension
     {
         public const double COOL = 7500.0;
         public const double GOOD = 22500.0;
@@ -73,6 +75,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             else if (offset > GoodRange && offset <= BadRange)
             {
                 CoolCombo = 0;
+
                 if (PillCount.Value > 0)
                 {
                     // 有 Pill 时：消耗 1 个，并将该次判定提升为 Perfect（不应断连）。
