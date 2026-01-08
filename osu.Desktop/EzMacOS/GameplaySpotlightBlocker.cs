@@ -8,10 +8,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osuTK.Input;
-using osu.Game.Configuration;
 using osu.Game.Screens.Play;
+using osu.Game.LAsEzExtensions.Configuration;
 
-namespace osu.Desktop.macOS
+namespace osu.Desktop.EzMacOS
 {
     [SupportedOSPlatform("macos")]
     public partial class GameplaySpotlightBlocker : Drawable
@@ -24,7 +24,7 @@ namespace osu.Desktop.macOS
         private GameHost host { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(ILocalUserPlayInfo localUserInfo, OsuConfigManager config)
+        private void load(ILocalUserPlayInfo localUserInfo, Ez2ConfigManager ezConfig)
         {
             RelativeSizeAxes = osu.Framework.Graphics.Axes.Both;
             AlwaysPresent = true;
@@ -35,7 +35,7 @@ namespace osu.Desktop.macOS
             isActive = host.IsActive.GetBoundCopy();
             isActive.BindValueChanged(_ => updateBlocking());
 
-            disableCmdSpace = config.GetBindable<bool>(OsuSetting.GameplayDisableCmdSpace);
+            disableCmdSpace = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDisableCmdSpace);
             disableCmdSpace.BindValueChanged(_ => updateBlocking(), true);
         }
 

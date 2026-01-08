@@ -124,6 +124,9 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
             SetDefault(Ez2Setting.ScalingGameMode, ScalingGameMode.Mania);
+
+            SetDefault(Ez2Setting.GameplayDisableCmdSpace, true);
+
         }
 
         #region 列类型管理
@@ -486,6 +489,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
         CustomPoorHitResult,
         XxySRFilter,
         KpcDisplayMode,
+        GameplayDisableCmdSpace
+
     }
 
     public enum EzColumnType

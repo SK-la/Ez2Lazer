@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using osu.Framework.Logging;
 
-namespace osu.Desktop.macOS
+namespace osu.Desktop.EzMacOS
 {
     [SupportedOSPlatform("macos")]
     public static class SpotlightKey
