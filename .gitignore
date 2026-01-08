@@ -344,3 +344,8 @@ FodyWeavers.xsd
 
 .idea/.idea.osu.Desktop/.idea/misc.xml
 .idea/.idea.osu.Android/.idea/deploymentTargetDropDown.xml
+
+# MacOS literally shits anywhere lmao
+*.DS_Store
+
+.github/
