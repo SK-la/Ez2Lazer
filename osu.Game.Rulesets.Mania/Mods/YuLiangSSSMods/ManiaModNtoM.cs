@@ -241,7 +241,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     {
                         newColumnObjects.Add(new HoldNote
                         {
-                            Column = columnNum,
+                            Column = Math.Clamp(columnNum, 0, Key.Value - 1),
                             StartTime = locations[i].startTime,
                             Duration = locations[i].endTime - locations[i].startTime,
                             NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
@@ -251,7 +251,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     {
                         newColumnObjects.Add(new Note
                         {
-                            Column = columnNum,
+                            Column = Math.Clamp(columnNum, 0, Key.Value - 1),
                             StartTime = locations[i].startTime,
                             Samples = locations[i].samples
                         });

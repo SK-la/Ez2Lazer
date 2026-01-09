@@ -402,7 +402,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     {
                         if (column == copyColumn[j].column && !copyColumn[j].isBlank)
                         {
-                            tempObjects.AddNote(locations[i].samples, insertColumn[j], locations[i].startTime, locations[i].endTime);
+                            int clampedColumn = Math.Clamp(insertColumn[j], 0, toKeys - 1);
+                            tempObjects.AddNote(locations[i].samples, clampedColumn, locations[i].startTime, locations[i].endTime);
                         }
 
                         if (locations[i].column >= insertColumn[j])
@@ -410,7 +411,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             locations[i] = (locations[i].column + 1, locations[i].startTime, locations[i].endTime, locations[i].samples);
                         }
                     }
-                    tempObjects.AddNote(locations[i].samples, locations[i].column, locations[i].startTime, locations[i].endTime);
+                    int finalColumn = Math.Clamp(locations[i].column, 0, toKeys - 1);
+                    tempObjects.AddNote(locations[i].samples, finalColumn, locations[i].startTime, locations[i].endTime);
                 }
 
                 if (isFirst && checkList is not null && checkList.Count > 0 && clean > 0)

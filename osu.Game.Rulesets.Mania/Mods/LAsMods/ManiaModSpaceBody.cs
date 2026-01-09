@@ -83,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                     newColumnObjects.Add(new HoldNote
                     {
-                        Column = column.Key,
+                        Column = Math.Clamp(column.Key, 0, (int)maniaBeatmap.TotalColumns - 1),
                         StartTime = locations[i].startTime,
                         Duration = duration,
                         NodeSamples = new List<IList<HitSampleInfo>> { locations[i].samples, Array.Empty<HitSampleInfo>() }

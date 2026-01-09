@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -13,13 +14,16 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Lists;
+using osu.Framework.Logging;
 using osu.Framework.Threading;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.LAsEzExtensions.Analysis.Persistence;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Screens.SelectV2;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
@@ -35,6 +39,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
     /// </summary>
     public partial class EzBeatmapManiaAnalysisCache : MemoryCachingComponent<EzBeatmapManiaAnalysisCache.ManiaAnalysisCacheLookup, ManiaBeatmapAnalysisResult?>
     {
+        private static int mod_snapshot_fail_count;
+        private static int compute_fail_count;
+
         // (Removed runtime instrumentation counters)
         // 太多同时更新会导致卡顿；官方 star cache 使用 1 线程，但我们可以尝试略微提高并发以加快可见项响应。
         // 这里将高优先级并发从 1 增加到 2 来观察是否能减少感知延迟，同时保留低优先级为 1。
@@ -176,7 +183,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                             if (persistentStore.TryGet(lookup.BeatmapInfo, requireXxySr: lookup.RequireXxySr, out var persisted, out bool missingRequiredXxy))
                             {
-                                if (!missingRequiredXxy && persisted != null)
+                                if (!missingRequiredXxy)
                                     persistedExists = true;
                             }
                         }
@@ -259,9 +266,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private async Task<ManiaBeatmapAnalysisResult?> getAndMaybeEvictAsync(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
         {
-            var result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
+            ManiaBeatmapAnalysisResult? result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
 
-            if (result != null)
+            if (result.HasValue)
             {
                 cacheInsertionOrder.Enqueue(lookup);
 
@@ -293,21 +300,31 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private async Task<ManiaBeatmapAnalysisResult?> computeValueWithDedupAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token)
         {
             // If a computation for this lookup is already in-flight, reuse it.
-            var existing = inflightComputations.GetOrAdd(lookup, _ => computeValueInternalCore(lookup, token));
-
-            if (!existing.IsCompleted)
+            // Important: the computation itself should not be cancelled by any single requester.
+            // Panels get recycled and cancel their tokens aggressively (eg. when off-screen), but we still
+            // want shared computations to complete so results can be reused.
+            var existing = inflightComputations.GetOrAdd(lookup, _lookupKey =>
             {
-                // Reusing an in-flight computation; no instrumentation logging.
-            }
+                var task = computeValueInternalCore(lookup, CancellationToken.None);
 
+                // Remove the entry when the task completes (best-effort), but only if the value matches.
+                task.ContinueWith(
+                    _completedTask => inflightComputations.TryRemove(new KeyValuePair<ManiaAnalysisCacheLookup, Task<ManiaBeatmapAnalysisResult?>>(lookup, task)),
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+
+                return task;
+            });
+
+            // Allow individual callers to cancel waiting without cancelling the shared computation.
             try
             {
-                return await existing.ConfigureAwait(false);
+                return await existing.WaitAsync(token).ConfigureAwait(false);
             }
-            finally
+            catch (OperationCanceledException)
             {
-                // Remove when completed (best-effort). If another request re-added concurrently, leave it.
-                inflightComputations.TryRemove(new KeyValuePair<ManiaAnalysisCacheLookup, Task<ManiaBeatmapAnalysisResult?>>(lookup, existing));
+                return null;
             }
         }
 
@@ -451,18 +468,53 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 }
 
                 var rulesetInstance = lookup.Ruleset.CreateInstance();
+
                 if (!(rulesetInstance is ILegacyRuleset))
                     return null;
 
                 var legacyRuleset = (ILegacyRuleset)rulesetInstance;
-                int keyCount = legacyRuleset.GetKeyCount(lookup.BeatmapInfo, lookup.OrderedMods);
+                int keyCount = 0;
+
+                try
+                {
+                    keyCount = legacyRuleset.GetKeyCount(lookup.BeatmapInfo, lookup.OrderedMods);
+                }
+                catch
+                {
+                    // Some mod combinations may cause key count derivation to fail.
+                    // We'll fall back to inferring key count from the playable beatmap.
+                    keyCount = 0;
+                }
 
                 PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
                 var playableBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
+                int inferredKeyCount = getKeyCountFromBeatmap(playableBeatmap);
+                if (keyCount <= 0)
+                    keyCount = inferredKeyCount;
+                else if (inferredKeyCount > keyCount)
+                    keyCount = inferredKeyCount;
+
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
+
+                // Some call chains may be nullable-oblivious; ensure we never pass null to downstream helpers.
+                kpsList ??= new List<double>();
+                columnCounts ??= new Dictionary<int, int>();
+                holdNoteCounts ??= new Dictionary<int, int>();
+
+                // Apply rate-adjust mods (DT/HT etc.) to KPS values.
+                // These mods affect effective time progression, so KPS should scale with rate.
+                double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+                if (!Precision.AlmostEquals(rate, 1.0))
+                {
+                    averageKps *= rate;
+                    maxKps *= rate;
+
+                    for (int i = 0; i < kpsList.Count; i++)
+                        kpsList[i] *= rate;
+                }
 
                 double? xxySr = null;
 
@@ -498,9 +550,42 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 return null;
             }
+            catch (Exception ex)
+            {
+                if (Interlocked.Increment(ref compute_fail_count) <= 10)
+                {
+                    string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
+                    Logger.Error(ex, $"[EzBeatmapManiaAnalysisCache] computeAnalysis failed. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}");
+                }
+
+                return null;
+            }
+        }
+
+        private static double getRateAdjustMultiplier(Mod[] mods)
+        {
+            // Only one rate adjust mod should be active (compat checks enforce this), but be defensive.
+            try
+            {
+                var rate = mods.OfType<ModRateAdjust>().FirstOrDefault();
+                return rate?.SpeedChange.Value ?? 1.0;
+            }
             catch
             {
-                return null;
+                return 1.0;
+            }
+        }
+
+        private static int getKeyCountFromBeatmap(IBeatmap beatmap)
+        {
+            try
+            {
+                int maxColumn = beatmap.HitObjects.OfType<IHasColumn>().Select(h => h.Column).DefaultIfEmpty(-1).Max();
+                return maxColumn + 1;
+            }
+            catch
+            {
+                return 0;
             }
         }
 
@@ -614,9 +699,43 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 BeatmapInfo = beatmapInfo;
                 Ruleset = ruleset;
-                OrderedMods = mods?.OrderBy(m => m.Acronym).Select(mod => mod.DeepClone()).ToArray() ?? Array.Empty<Mod>();
+                // IMPORTANT: mod application order matters for beatmap conversion.
+                // WorkingBeatmap.GetPlayableBeatmap() applies mods in the order provided.
+                // Do not reorder here (eg. by Acronym), otherwise analysis may run on a different
+                // playable beatmap than gameplay, which can cause incorrect results or crashes.
+                OrderedMods = createModSnapshot(mods);
                 RequireXxySr = requireXxySr;
                 modSignatures = OrderedMods.Select(createModSignature).ToArray();
+            }
+
+            private static Mod[] createModSnapshot(IEnumerable<Mod>? mods)
+            {
+                if (mods == null)
+                    return Array.Empty<Mod>();
+
+                var list = new List<Mod>();
+
+                foreach (var mod in mods)
+                {
+                    if (mod == null)
+                        continue;
+
+                    try
+                    {
+                        list.Add(mod.DeepClone());
+                    }
+                    catch
+                    {
+                        // If cloning fails, fall back to using the original instance.
+                        // This is not ideal for caching, but is better than breaking analysis entirely.
+                        if (Interlocked.Increment(ref mod_snapshot_fail_count) <= 10)
+                            Logger.Log($"[EzBeatmapManiaAnalysisCache] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.", LoggingTarget.Runtime, LogLevel.Important);
+
+                        list.Add(mod);
+                    }
+                }
+
+                return list.ToArray();
             }
 
             public bool Equals(ManiaAnalysisCacheLookup other) => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
@@ -644,18 +763,43 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 // Signature = TypeFullName + sorted list of setting_name=setting_value
                 string type = m.GetType().FullName ?? m.GetType().Name;
-                var settings = m.GetSettingsSourceProperties().Select(p => p.Item2).ToArray();
-                if (settings.Length == 0)
-                    return type;
 
-                var pairs = settings.Select(prop =>
+                try
                 {
-                    var bindable = (IBindable)prop.GetValue(m)!;
-                    object val = bindable.GetUnderlyingSettingValue();
-                    return prop.Name + "=" + (val.ToString() ?? "");
-                }).OrderBy(x => x);
+                    var settings = m.GetSettingsSourceProperties().Select(p => p.Item2).ToArray();
+                    if (settings.Length == 0)
+                        return type;
 
-                return type + ":" + string.Join(";", pairs);
+                    var pairs = settings.Select(prop =>
+                    {
+                        try
+                        {
+                            if (prop.GetValue(m) is not IBindable bindable)
+                                return prop.Name + "=<non-bindable>";
+
+                            object val = bindable.GetUnderlyingSettingValue();
+                            string text = val switch
+                            {
+                                null => "",
+                                IFormattable f => f.ToString(null, CultureInfo.InvariantCulture) ?? "",
+                                _ => val.ToString() ?? ""
+                            };
+
+                            return prop.Name + "=" + text;
+                        }
+                        catch
+                        {
+                            return prop.Name + "=<error>";
+                        }
+                    }).OrderBy(x => x);
+
+                    return type + ":" + string.Join(";", pairs);
+                }
+                catch
+                {
+                    // Fall back to type-only signature if settings reflection fails.
+                    return type;
+                }
             }
         }
 

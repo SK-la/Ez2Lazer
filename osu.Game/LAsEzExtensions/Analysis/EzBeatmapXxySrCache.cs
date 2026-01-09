@@ -270,7 +270,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 Ruleset = ruleset;
 
                 // DeepClone 用于冻结 mod 设置快照，保证缓存 key 与显示一致。
-                OrderedMods = mods?.OrderBy(m => m.Acronym).Select(mod => mod.DeepClone()).ToArray() ?? Array.Empty<Mod>();
+                // IMPORTANT: mod application order matters for beatmap conversion.
+                // WorkingBeatmap.GetPlayableBeatmap() applies mods in the order provided.
+                // Do not reorder here (eg. by Acronym).
+                OrderedMods = mods?.Select(mod => mod.DeepClone()).ToArray() ?? Array.Empty<Mod>();
             }
 
             public bool Equals(XxySrCacheLookup other)
