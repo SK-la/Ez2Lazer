@@ -7,7 +7,6 @@ using osu.Framework.Graphics;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
-using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Framework.Localisation;
@@ -28,9 +27,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private SettingsDropdown<string> dropdown = null!;
-
         private SettingsDropdown<int>? sampleRateDropdown;
+        private SettingsDropdown<string> dropdown = null!;
 
         private SettingsCheckbox? wasapiExperimental;
 
@@ -70,15 +68,22 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     Keywords = new[] { "wasapi", "latency", "exclusive" }
                 });
 
-                wasapiExperimental.Current.ValueChanged += _ => onDeviceChanged(string.Empty);
-                sampleRateDropdown.Current.ValueChanged += e => audio.SetSampleRate(e.NewValue);
-
                 // Setup ASIO sample rate synchronization
                 audio.SetupAsioSampleRateSync(actualSampleRate =>
                 {
-                    // Update the sample rate dropdown to reflect the actual rate used by ASIO device
-                    Schedule(() => sampleRateDropdown.Current.Value = actualSampleRate);
+                    Schedule(() =>
+                    {
+                        // Logger.Log($"ASIO sync: actualSampleRate={actualSampleRate}", LoggingTarget.Runtime, LogLevel.Debug);
+                        sampleRateDropdown.Current.Value = actualSampleRate;
+                    });
                 });
+
+                wasapiExperimental.Current.ValueChanged += _ => onDeviceChanged(string.Empty);
+                sampleRateDropdown.Current.ValueChanged += e =>
+                {
+                    Logger.Log($"User set sample rate to {e.NewValue}Hz", LoggingTarget.Runtime, LogLevel.Debug);
+                    audio.SetSampleRate(e.NewValue);
+                };
 
                 // 根据初始设备类型显示或隐藏采样率设置
                 dropdown.Current.ValueChanged += e =>
@@ -91,34 +96,17 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             onDeviceChanged(string.Empty);
         }
 
-        private void onDeviceChanged(string deviceName)
+        private void onDeviceChanged(string _)
         {
-            // Audio device notifications may arrive from the audio thread.
-            // Ensure UI mutations happen on the update thread.
-            Schedule(() =>
+            updateItems();
+
+            if (wasapiExperimental != null)
             {
-                updateItems();
-                updateSampleRates(!string.IsNullOrEmpty(deviceName));
-
-                if (sampleRateDropdown != null)
-                {
-                    // 重新应用当前统一的采样率设置
-                    int currentSampleRate = audio.GetSampleRate();
-                    sampleRateDropdown.Current.Value = currentSampleRate;
-
-                    // 根据设备类型显示或隐藏采样率设置
-                    string selectedDevice = audio.AudioDevice.Value;
-                    sampleRateDropdown.FadeTo(selectedDevice.Contains("(ASIO)") ? 1 : 0);
-                }
-
-                if (wasapiExperimental != null)
-                {
-                    if (wasapiExperimental.Current.Value)
-                        wasapiExperimental.SetNoticeText(AudioSettingsStrings.WasapiNotice, true);
-                    else
-                        wasapiExperimental.ClearNoticeText();
-                }
-            });
+                if (wasapiExperimental.Current.Value)
+                    wasapiExperimental.SetNoticeText(AudioSettingsStrings.WasapiNotice, true);
+                else
+                    wasapiExperimental.ClearNoticeText();
+            }
         }
 
         private void updateItems()
@@ -141,36 +129,6 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                              .Where(i => i.IsNotNull())
                              .Distinct()
                              .ToList();
-        }
-
-        private void updateSampleRates(bool forceSetCurrent = false)
-        {
-            if (sampleRateDropdown == null)
-                return;
-
-            string selectedDevice = audio.AudioDevice.Value;
-
-            Logger.Log($"[AudioDevicesSettings] updateSampleRates called with selectedDevice: '{selectedDevice}', forceSetCurrent: {forceSetCurrent}", LoggingTarget.Runtime, LogLevel.Debug);
-
-            // Check if the selected device is an ASIO device
-            if (selectedDevice.Contains("(ASIO)"))
-            {
-                Logger.Log($"[AudioDevicesSettings] Detected ASIO device: '{selectedDevice}'", LoggingTarget.Runtime, LogLevel.Debug);
-
-                // For ASIO devices, ensure current sample rate is valid for the fixed list
-                int currentRate = audio.GetSampleRate();
-
-                if (forceSetCurrent && !AudioExtensions.COMMON_SAMPLE_RATES.Contains(currentRate))
-                {
-                    // Set to first available rate if current rate is not supported
-                    sampleRateDropdown.Current.Value = AudioExtensions.COMMON_SAMPLE_RATES[0];
-                }
-            }
-            else
-            {
-                // For non-ASIO devices, no sample rate options
-                // Items is already set to COMMON_SAMPLE_RATES, but since hidden, no issue
-            }
         }
 
         protected override void Dispose(bool isDisposing)

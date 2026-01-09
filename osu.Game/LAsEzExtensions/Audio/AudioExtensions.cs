@@ -7,6 +7,7 @@ using System.Linq;
 using System.Reflection;
 using osu.Framework;
 using osu.Framework.Audio;
+using osu.Framework.Logging;
 
 namespace osu.Game.LAsEzExtensions.Audio
 {
@@ -25,39 +26,11 @@ namespace osu.Game.LAsEzExtensions.Audio
         // 扩展方法：设置采样率
         public static void SetSampleRate(this AudioManager audioManager, int sampleRate)
         {
-            // Set both the unified sample rate and ASIO-specific sample rate
+            Logger.Log($"Setting sample rate to {sampleRate}Hz", LoggingTarget.Runtime, LogLevel.Debug);
+            // 使用静态 preferred 采样率，避免触发 ValueChanged
+            AudioManager.SetPreferredAsioSampleRate(sampleRate);
+            // 设置 unified sample rate
             audioManager.SampleRate.Value = sampleRate;
-        }
-
-        // 扩展方法：获取支持的采样率列表
-        public static IEnumerable<int> GetSupportedSampleRates(this AudioManager audioManager, string deviceName)
-        {
-            // 解析设备名称来确定输出模式
-            (var mode, string parsedDeviceName, int? asioIndex) = parseSelection(deviceName, audioManager.UseExperimentalWasapi.Value);
-
-            System.Diagnostics.Debug.WriteLine($"GetSupportedSampleRates: deviceName='{deviceName}', mode={mode}, parsedDeviceName='{parsedDeviceName}', asioIndex={asioIndex}");
-
-            try
-            {
-                switch (mode)
-                {
-                    case AudioOutputMode.Asio:
-                        // 对于ASIO设备，返回固定的常见采样率列表，因为实际支持的采样率是从这些中选择的
-                        return COMMON_SAMPLE_RATES;
-
-                    case AudioOutputMode.WasapiExclusive:
-                    case AudioOutputMode.WasapiShared:
-                    case AudioOutputMode.Default:
-                    default:
-                        // 对于其他设备，不需要采样率设置，返回空列表
-                        return Enumerable.Empty<int>();
-                }
-            }
-            catch
-            {
-                // 如果获取失败，返回默认列表
-                return COMMON_SAMPLE_RATES;
-            }
         }
 
         // 扩展方法：设置ASIO设备初始化事件监听器
@@ -66,10 +39,11 @@ namespace osu.Game.LAsEzExtensions.Audio
             audioManager.OnAsioDeviceInitialized += sampleRate =>
             {
                 int intSampleRate = (int)sampleRate;
+                Logger.Log($"ASIO device initialized with sample rate {intSampleRate}Hz", LoggingTarget.Runtime, LogLevel.Debug);
                 onSampleRateChanged(intSampleRate);
 
-                // 更新统一的采样率设置和ASIO特定设置以反映实际使用的采样率
-                audioManager.SampleRate.Value = intSampleRate;
+                // 不要更新统一的采样率设置，避免覆盖用户设置导致循环
+                // audioManager.SampleRate.Value = intSampleRate;
             };
         }
 
