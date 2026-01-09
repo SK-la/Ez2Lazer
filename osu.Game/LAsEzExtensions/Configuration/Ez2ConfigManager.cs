@@ -126,7 +126,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.ScalingGameMode, ScalingGameMode.Mania);
 
             SetDefault(Ez2Setting.GameplayDisableCmdSpace, true);
-
+            SetDefault(Ez2Setting.AsioSampleRate, 48000);
         }
 
         #region 列类型管理
@@ -489,6 +489,9 @@ namespace osu.Game.LAsEzExtensions.Configuration
         CustomPoorHitResult,
         XxySRFilter,
         KpcDisplayMode,
+
+        // 音频相关
+        AsioSampleRate,
 
         // 来自拉取
         GameplayDisableCmdSpace,
