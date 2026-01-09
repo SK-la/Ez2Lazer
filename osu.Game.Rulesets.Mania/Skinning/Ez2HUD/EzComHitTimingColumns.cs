@@ -8,9 +8,10 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
@@ -20,6 +21,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
     public partial class EzComHitTimingColumns : HitErrorMeter
     {
+        [SettingSource("Minimum Hit Result", "Filter out judgments worse than this")]
+        public Bindable<HitResult> MinimumHitResult { get; } = new Bindable<HitResult>(HitResult.Good);
+
         [SettingSource("Markers Height", "Markers Height")]
         public BindableNumber<float> MarkerHeight { get; } = new BindableNumber<float>(2)
         {
@@ -29,10 +33,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         };
 
         [SettingSource("Move Height", "Move Height")]
-        public BindableNumber<float> MoveHeight { get; } = new BindableNumber<float>(10)
+        public BindableNumber<float> MoveHeight { get; } = new BindableNumber<float>(20)
         {
             MinValue = 1,
-            MaxValue = 50,
+            MaxValue = 200,
             Precision = 1f,
         };
 
@@ -44,8 +48,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.1f,
         };
 
+        [SettingSource("Background Colour", "Background Colour")]
+        public BindableColour4 BackgroundColour { get; } = new BindableColour4(Colour4.Gray);
+
         private double[] floatingAverages = null!;
         private Box[] judgementMarkers = null!;
+        private Box backgroundBox = null!;
         private Container[] columns = null!;
 
         private int keyCount;
@@ -59,32 +67,37 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [Resolved]
         private ISkinSource skin { get; set; } = null!;
 
-        public EzComHitTimingColumns()
-        {
-            AutoSizeAxes = Axes.None;
-        }
-
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezSkinConfig)
         {
-            keyCount = controller.Triggers.Count;
-            floatingAverages = new double[keyCount];
-            judgementMarkers = new Box[keyCount];
-            recreateComponents();
             columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            recreateComponents();
         }
 
         private void recreateComponents()
         {
+            ClearInternal();
+            keyCount = controller.Triggers.Count;
+            floatingAverages = new double[keyCount];
+            judgementMarkers = new Box[keyCount];
             InternalChild = new Container
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 RelativePositionAxes = Axes.Both,
+                RelativeSizeAxes = Axes.Both,
                 Margin = new MarginPadding(2),
                 Children = new Drawable[]
                 {
+                    backgroundBox = new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Colour = BackgroundColour.Value,
+                        Alpha = BackgroundAlpha.Value,
+                    },
                     new FillFlowContainer
                     {
                         Anchor = Anchor.Centre,
@@ -93,12 +106,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                         Spacing = new Vector2(0, 0),
                         Children = columns = Enumerable.Range(0, keyCount).Select(index =>
                         {
-                            var column = createColumn();
+                            var column = new Container
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Children = new Drawable[]
+                                {
+                                    new Box
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                        Alpha = 0
+                                    }
+                                }
+                            };
                             var marker = new Box
                             {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
-                                RelativePositionAxes = Axes.Y,
                                 RelativeSizeAxes = Axes.X,
                                 Width = 1,
                                 Height = MarkerHeight.Value,
@@ -114,6 +138,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                     }
                 }
             };
+            Height = MoveHeight.Value;
         }
 
         protected override void LoadComplete()
@@ -124,6 +149,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             columnWidth.BindValueChanged(_ => updateWidth(), true);
             specialFactor.BindValueChanged(_ => updateWidth(), true);
+
             // 更新标识块高度
             MarkerHeight.BindValueChanged(height =>
             {
@@ -134,26 +160,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             // 更新背景柱状列高度和标识块移动范围
             MoveHeight.BindValueChanged(height =>
             {
-                foreach (var column in columns)
-                {
-                    var backgroundBox = column.Children.OfType<Box>().FirstOrDefault();
-
-                    if (backgroundBox != null)
-                    {
-                        backgroundBox.Height = height.NewValue;
-                    }
-                }
+                Height = height.NewValue;
 
                 foreach (var marker in judgementMarkers)
                 {
+                    // 按比例调整marker的Y位置
+                    marker.Y = marker.Y * (height.NewValue / height.OldValue);
                     marker.Y = Math.Clamp(marker.Y, -height.NewValue / 2, height.NewValue / 2);
-                    // 重新计算标识块的相对位置
-                    float currentAbsoluteY = marker.Y * height.OldValue;
-                    float newRelativeY = currentAbsoluteY / height.NewValue;
-
-                    marker.Y = newRelativeY;
-
-                    marker.MoveToY(newRelativeY, 800, Easing.OutQuint);
                 }
 
                 Invalidate(Invalidation.DrawSize);
@@ -162,34 +175,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             // 更新背景透明度
             BackgroundAlpha.BindValueChanged(alpha =>
             {
-                foreach (var column in columns)
-                {
-                    var backgroundBox = column.Children.OfType<Box>().FirstOrDefault();
-                    if (backgroundBox != null)
-                        backgroundBox.Alpha = alpha.NewValue;
-                }
+                backgroundBox.Alpha = alpha.NewValue;
             }, true);
-        }
 
-        private Container createColumn()
-        {
-            return new Container
+            // 更新背景颜色
+            BackgroundColour.BindValueChanged(colour =>
             {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                AutoSizeAxes = Axes.Y,
-                Children = new Drawable[]
-                {
-                    new Box
-                    {
-                        RelativeSizeAxes = Axes.Both, // 改为相对尺寸
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Colour = Colour4.Gray,
-                        Alpha = BackgroundAlpha.Value
-                    }
-                }
-            };
+                backgroundBox.Colour = colour.NewValue;
+            }, true);
         }
 
         private void updateWidth()
@@ -219,6 +212,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             if (!judgement.IsHit || !judgement.Type.IsScorable())
                 return;
 
+            if (judgement.Type > MinimumHitResult.Value)
+                return;
+
             int columnIndex = -1;
 
             if (judgement.HitObject is IHasColumn hasColumn)
@@ -243,14 +239,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         private float getRelativeJudgementPosition(double value)
         {
-            float moveRange = MoveHeight.Value;
             double missWindow = HitWindows.WindowFor(HitResult.Miss);
 
-            if (moveRange == 0 || missWindow == 0)
+            if (missWindow == 0)
                 return 0;
 
-            float pos = (float)(value / (missWindow * moveRange));
-            return Math.Clamp(pos, -moveRange, moveRange);
+            float pos = (float)(value / missWindow) * (MoveHeight.Value / 2);
+            return Math.Clamp(pos, -MoveHeight.Value / 2, MoveHeight.Value / 2);
         }
 
         public override void Clear()

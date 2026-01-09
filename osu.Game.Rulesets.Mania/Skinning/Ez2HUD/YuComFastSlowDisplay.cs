@@ -45,10 +45,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.ShowJudgement), nameof(FastSlowDisplayStrings.ShowStyleDescription))]
-        public Bindable<Judgements> Judgement { get; } = new Bindable<Judgements>(Judgements.Perfect);
+        public Bindable<ManiaHitResult> Judgement { get; } = new Bindable<ManiaHitResult>(ManiaHitResult.Perfect);
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Gap), nameof(FastSlowDisplayStrings.GapDescription))]
-        public BindableNumber<float> Gap { get; } = new BindableNumber<float>
+        public BindableNumber<float> Gap { get; } = new BindableNumber<float>(50)
         {
             MinValue = -200,
             MaxValue = 200,
@@ -56,7 +56,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         };
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FadeDuration), nameof(FastSlowDisplayStrings.FadeDurationDescription))]
-        public BindableNumber<double> FadeDuration { get; } = new BindableNumber<double>(100)
+        public BindableNumber<double> FadeDuration { get; } = new BindableNumber<double>(430)
         {
             MinValue = 0,
             MaxValue = 2000,
@@ -627,27 +627,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             }
 
             return false;
-        }
-
-        public enum Judgements
-        {
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Miss))]
-            Miss,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Meh))]
-            Meh,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Ok))]
-            Ok,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Good))]
-            Good,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Great))]
-            Great,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Perfect))]
-            Perfect
         }
 
         public enum Column

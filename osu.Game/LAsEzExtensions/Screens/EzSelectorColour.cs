@@ -20,7 +20,7 @@ namespace osu.Game.LAsEzExtensions.Screens
     {
         private readonly FillFlowContainer buttonsContainer;
         private readonly Dictionary<string, Color4> colorMap = new Dictionary<string, Color4>();
-        private readonly Dictionary<string, ColorButton> buttonsByName = new Dictionary<string, ColorButton>();
+        private readonly Dictionary<string, EzSkinColorButton> buttonsByName = new Dictionary<string, EzSkinColorButton>();
         private readonly Lazy<Dictionary<string, Color4>> defaultColors;
         private readonly Box backgroundBox;
         public Bindable<string> Current { get; }
@@ -128,7 +128,7 @@ namespace osu.Game.LAsEzExtensions.Screens
                     ? customColor
                     : getColorForName(name);
 
-                var button = new ColorButton(name, color, ButtonHeight)
+                var button = new EzSkinColorButton(name, color, ButtonHeight)
                 {
                     Selected = Current.Value == name,
                     Action = () => Current.Value = name
@@ -148,7 +148,7 @@ namespace osu.Game.LAsEzExtensions.Screens
 
             float width = 1f / buttonCount;
 
-            foreach (var child in buttonsContainer.Children.OfType<ColorButton>())
+            foreach (var child in buttonsContainer.Children.OfType<EzSkinColorButton>())
             {
                 child.Width = width - 0.03f;
             }
@@ -185,194 +185,5 @@ namespace osu.Game.LAsEzExtensions.Screens
 
             base.Dispose(isDisposing);
         }
-    }
-
-    public partial class ColorButton : CompositeDrawable
-    {
-        private readonly Box background;
-        private readonly Box colorBox;
-        private readonly Container content;
-        private readonly OsuSpriteText label;
-
-        public Action? Action;
-        private bool selected;
-        private bool isHovered;
-
-        public bool Selected
-        {
-            get => selected;
-            set
-            {
-                if (selected == value)
-                    return;
-
-                selected = value;
-                updateVisualState();
-            }
-        }
-
-        public ColorButton(string colorName, Color4 color, float height)
-        {
-            RelativeSizeAxes = Axes.X;
-            Height = height;
-            Masking = true;
-            CornerRadius = 6;
-
-            EdgeEffect = new EdgeEffectParameters
-            {
-                Type = EdgeEffectType.Shadow,
-                Radius = 3f,
-                Colour = Color4.Black.Opacity(0.2f),
-                Offset = new Vector2(0, 1),
-            };
-
-            InternalChildren = new Drawable[]
-            {
-                background = new Box
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Colour = Color4.White.Opacity(0.2f),
-                    Alpha = 0.3f
-                },
-                content = new Container
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Padding = new MarginPadding(2),
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Child = new Container
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Masking = true,
-                        CornerRadius = 3,
-                        Children = new Drawable[]
-                        {
-                            colorBox = new Box
-                            {
-                                RelativeSizeAxes = Axes.Both,
-                                Colour = color
-                            },
-                            label = new OsuSpriteText
-                            {
-                                Text = colorName,
-                                Font = OsuFont.GetFont(size: 16, weight: FontWeight.Bold),
-                                Colour = getContrastColor(color),
-                                Anchor = Anchor.Centre,
-                                Origin = Anchor.Centre,
-                                Shadow = true,
-                                ShadowColour = getContrastColor(color).Opacity(0.3f)
-                            }
-                        }
-                    }
-                }
-            };
-        }
-
-        public void UpdateColor(Color4 newColor)
-        {
-            colorBox.Colour = newColor;
-            label.Colour = getContrastColor(newColor);
-            label.ShadowColour = getContrastColor(newColor).Opacity(0.3f);
-        }
-
-        private void updateVisualState()
-        {
-            // 根据状态设置背景效果
-            if (selected)
-            {
-                background.Alpha = 1;
-                background.Colour = Color4.CornflowerBlue; // 选中状态颜色更亮DeepSkyBlue
-            }
-            else if (isHovered)
-            {
-                background.Alpha = 0.8f;
-                background.FadeColour(Color4.White.Opacity(0.3f), 200, Easing.OutQuint); // 悬浮高亮效果
-            }
-            else
-            {
-                background.Alpha = 0.3f;
-                background.FadeColour(Color4.White.Opacity(0.2f), 200, Easing.OutQuint); // 恢复默认
-            }
-
-            if (selected)
-            {
-                EdgeEffect = new EdgeEffectParameters
-                {
-                    Type = EdgeEffectType.Glow,
-                    Radius = 10f,
-                    Colour = colorBox.Colour,
-                    Roundness = 3f
-                };
-
-                label.Shadow = true;
-                label.ShadowColour = getContrastColor(colorBox.Colour).Opacity(0.7f);
-                label.ShadowOffset = new Vector2(0.02f, 0.02f);
-
-                this.MoveToY(-2, 200, Easing.OutQuint);
-            }
-            else if (isHovered)
-            {
-                EdgeEffect = new EdgeEffectParameters
-                {
-                    Type = EdgeEffectType.Shadow,
-                    Radius = 10f,
-                    Colour = Color4.Black.Opacity(0.3f),
-                    Roundness = 8f
-                };
-
-                label.Shadow = true;
-                label.ShadowColour = getContrastColor(colorBox.Colour).Opacity(0.5f);
-                label.ShadowOffset = new Vector2(0.02f, 0.02f);
-
-                this.MoveToY(-1, 200, Easing.OutQuint);
-            }
-            else
-            {
-                EdgeEffect = new EdgeEffectParameters
-                {
-                    Type = EdgeEffectType.Shadow,
-                    Radius = 3f,
-                    Colour = Color4.Black.Opacity(0.2f),
-                    Offset = new Vector2(0, 1),
-                };
-
-                label.Shadow = true;
-                label.ShadowColour = getContrastColor(colorBox.Colour).Opacity(0.3f);
-                label.ShadowOffset = new Vector2(0.02f, 0.02f);
-
-                this.MoveToY(0, 200, Easing.OutQuint);
-            }
-
-            this.ScaleTo(1.0f, 200, Easing.OutQuint); // 保持原始大小
-            content.Scale = Vector2.One;
-        }
-
-        //对比色
-        private Color4 getContrastColor(Color4 background)
-        {
-            float brightness = 0.299f * background.R + 0.587f * background.G + 0.114f * background.B;
-            return brightness > 0.5f ? Color4.Black : Color4.White;
-        }
-
-        protected override bool OnClick(ClickEvent e)
-        {
-            Action?.Invoke();
-            return true;
-        }
-
-        protected override bool OnHover(HoverEvent e)
-        {
-            isHovered = true;
-            updateVisualState();
-            return true;
-        }
-
-        protected override void OnHoverLost(HoverLostEvent e)
-        {
-            isHovered = false;
-            updateVisualState();
-        }
-
-        public override bool HandlePositionalInput => Action != null;
     }
 }

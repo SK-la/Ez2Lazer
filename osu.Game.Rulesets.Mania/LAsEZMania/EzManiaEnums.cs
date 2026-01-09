@@ -3,6 +3,7 @@
 
 using System;
 using System.ComponentModel;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
@@ -27,5 +28,29 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         //
         // [Obsolete("Renamed to ScrollTimeStyleFixed. Kept for backward compatibility with stored settings.")]
         // ScrollTimeStyleFixed = ScrollTimeStyleFixed,
+    }
+
+    public enum ManiaHitResult
+    {
+        [Description("Pool")]
+        Pool,
+
+        [Description("Miss")]
+        Miss,
+
+        [Description("50")]
+        Meh,
+
+        [Description("100")]
+        Ok,
+
+        [Description("200")]
+        Good,
+
+        [Description("300")]
+        Great,
+
+        [Description("Perfect")]
+        Perfect
     }
 }
