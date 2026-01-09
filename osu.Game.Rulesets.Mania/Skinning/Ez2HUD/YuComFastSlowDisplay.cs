@@ -31,12 +31,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
     /// 判定快慢显示 HUD 组件。可以自定义 表示Early/Late的字符
     /// 代码文件来自于 YuLiangSSS。
     /// </summary>
-    // [Cached]
     public partial class YuComFastSlowDisplay : HitErrorMeter
     {
         public const float DEFAULT_FONT_SIZE = 25f;
-        public double FadeInTime { get; set; } = 20;
-        public double FadeOutTime { get; set; } = 100;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -499,28 +496,26 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             }
         }
 
-        private void checkColumn(JudgementResult judgement, IHasColumn originalColumn)
+        private void checkColumn(JudgementResult judgement, IHasColumn? originalColumn)
         {
-            // if (originalColumn is null)
-            // {
-            //     return;
-            // }
-// #if DEBUG
-//             Logger.Log($"Column: {originalColumn.Column + 1}; Judgement: {judgement.Type}; TimeOffset: {judgement.TimeOffset}");
-// #endif
+            if (originalColumn is null)
+            {
+                return;
+            }
+
             try
             {
                 int column = originalColumn.Column + 1;
                 var legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keys = legacyRuleset.GetKeyCount(beatmap.Value.BeatmapInfo, mods.Value);
 
-                if (SelectColumn.Value == Column.Middle && keys / 2.0 != Math.Truncate(keys / 2.0) && column == keys / 2 + 1)
+                if (SelectColumn.Value == Column.Middle && keys / 2.0 != Math.Truncate(keys / 2.0) && column == (keys / 2) + 1)
                 {
                     displayResult(judgement);
                 }
                 else if (SelectColumn.Value == Column.RightHalf && column > keys / 2.0)
                 {
-                    if (keys % 2 != 0 && column > keys / 2 + 1)
+                    if (keys % 2 != 0 && column > (keys / 2) + 1)
                     {
                         displayResult(judgement);
                     }
@@ -548,9 +543,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             if (Test.Value)
             {
-                displayFastText.FadeIn(FadeInTime).Then().Delay(FadeDuration.Value).FadeOut(FadeOutTime, Easing.OutQuint);
-                displaySlowText.FadeIn(FadeInTime).Then().Delay(FadeDuration.Value).FadeOut(FadeOutTime, Easing.OutQuint);
-                testText.FadeIn(FadeInTime).Then().Delay(FadeDuration.Value).FadeOut(FadeOutTime, Easing.OutQuint);
+                displayFastText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
+                displaySlowText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
+                testText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
 
                 if (LNSwitch.Value)
                 {
@@ -587,7 +582,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                     }
                 }
 
-                displayFastText.FadeIn(FadeInTime).Then().Delay(FadeDuration.Value).FadeOut(FadeOutTime, Easing.OutQuint);
+                displayFastText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
 
                 if (OnlyDisplayOne.Value)
                 {
@@ -613,7 +608,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                     }
                 }
 
-                displaySlowText.FadeIn(FadeInTime).Then().Delay(FadeDuration.Value).FadeOut(FadeOutTime, Easing.OutQuint);
+                displaySlowText.FadeOutFromOne(FadeDuration.Value, Easing.OutQuint);
 
                 if (OnlyDisplayOne.Value)
                 {
