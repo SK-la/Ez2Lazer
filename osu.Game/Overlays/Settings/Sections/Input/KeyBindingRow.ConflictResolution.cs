@@ -26,9 +26,11 @@ namespace osu.Game.Overlays.Settings.Sections.Input
 
         private void showBindingConflictPopover(KeyBindingConflictInfo conflictInfo)
         {
+            // TODO: 未来需要改为更安全的方式处理，使用OnlineID
             // Auto-override conflicted bindings in Mania key binding settings.
             var actionType = Action.GetType();
-            var ns = actionType.Namespace ?? string.Empty;
+            string ns = actionType.Namespace ?? string.Empty;
+
             if (ns.Contains("osu.Game.Rulesets.Mania"))
             {
                 // Apply the same changes as choosing "Apply New" in the popover.

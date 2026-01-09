@@ -489,8 +489,9 @@ namespace osu.Game.LAsEzExtensions.Configuration
         CustomPoorHitResult,
         XxySRFilter,
         KpcDisplayMode,
-        GameplayDisableCmdSpace
 
+        // 来自拉取
+        GameplayDisableCmdSpace,
     }
 
     public enum EzColumnType

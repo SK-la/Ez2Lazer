@@ -161,6 +161,7 @@ namespace osu.Game.Configuration
 
             SetDefault(OsuSetting.IncreaseFirstObjectVisibility, true);
             SetDefault(OsuSetting.GameplayDisableWinKey, true);
+
             // Update
             SetDefault(OsuSetting.ReleaseStream, ReleaseStream.Lazer);
 
