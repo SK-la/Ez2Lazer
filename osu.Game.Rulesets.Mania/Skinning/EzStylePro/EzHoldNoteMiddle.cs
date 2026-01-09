@@ -197,16 +197,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void UpdateSize()
         {
             base.UpdateSize();
-            tailHeight = tailMaskHeight.Value > 0
-                ? (float)tailMaskHeight.Value
-                : NoteSize.Value.Y * 0.5f;
+            tailHeight = NoteSize.Value.Y * 0.5f;
 
             if (topContainer?.Child is Container topInner)
             {
                 topContainer.Height = tailHeight;
                 topInner.Height = tailHeight * 2;
-                topInner.Y = tailMaskHeight.Value > 0
-                    ? tailHeight
+                topContainer.Y = tailMaskHeight.Value > 0
+                    ? (float)tailMaskHeight.Value
                     : 0;
             }
 
@@ -215,18 +213,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 bodyInnerContainer.Height = tailHeight * 2;
                 bodyInnerContainer.Y = -tailHeight;
             }
-        }
 
-        protected override void UpdateColor()
-        {
-            if (topContainer?.Child is Container topInner)
-            {
-                topInner.Colour = tailMaskHeight.Value > 0
-                    ? ColourInfo.GradientVertical(NoteColor.Opacity((float)tailAlpha.Value), NoteColor.Opacity(1))
-                    : NoteColor;
-            }
-
-            base.UpdateColor();
+            // TODO: V3版应该增加一个顶部Dot标识，以免常规图无法分辨正确的面尾
         }
 
         protected override void Update()
@@ -238,7 +226,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 float drawHeightMinusHalf = DrawHeight - tailHeight;
                 float middleHeight = Math.Max(drawHeightMinusHalf, tailHeight);
 
-                bodyContainer.Height = middleHeight + 2;
+                bodyContainer.Height = tailMaskHeight.Value > 0
+                    ? middleHeight - (float)tailMaskHeight.Value + 1
+                    : middleHeight + 2;
 
                 if (bodyScaleContainer != null)
                     bodyScaleContainer.Scale = new Vector2(1, drawHeightMinusHalf);

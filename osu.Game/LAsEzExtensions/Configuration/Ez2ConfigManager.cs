@@ -107,7 +107,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             // Mania 长按尾部相关（皮肤编辑器用，暂时只作为占位设置项）。
             SetDefault(Ez2Setting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 200.0, 1.0);
+            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
 
             #endregion
 
