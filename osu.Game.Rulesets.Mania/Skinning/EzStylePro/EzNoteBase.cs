@@ -106,13 +106,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             EzSkinConfig.OnNoteColourChanged += UpdateColor;
             EzSkinConfig.OnNoteSizeChanged += (() =>
             {
-                updatedColor = false;
+                UpdatedColor = false;
                 UpdateSize();
             });
             // columnColorBindable.BindValueChanged(_ => UpdateColor(), true);
         }
 
-        private bool updatedColor;
+        protected bool UpdatedColor;
 
         private void OnNoteChanged(ValueChangedEvent<string> obj)
         {
@@ -128,7 +128,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.Update();
 
-            if (!updatedColor)
+            if (!UpdatedColor)
                 UpdateColor();
         }
 
@@ -138,7 +138,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             UpdateColor();
         }
 
-        protected void UpdateColor()
+        protected virtual void UpdateColor()
         {
             if (BoolUpdateColor)
             {
@@ -157,7 +157,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     }
                 }
 
-                updatedColor = true;
+                UpdatedColor = true;
             }
         }
 

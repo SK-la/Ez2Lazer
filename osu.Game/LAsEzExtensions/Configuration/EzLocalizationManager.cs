@@ -54,6 +54,12 @@ namespace osu.Game.LAsEzExtensions.Configuration
             addResource("NoteHeightScale", "note 高度比例", "Note Height Scale");
             addResource("NoteHeightScaleTooltip", "统一修改note的高度的比例", "Fixed Height for square notes");
 
+            addResource("ManiaHoldTailAlpha", "Tail面尾透明度", "Mania Hold Tail Alpha");
+            addResource("ManiaHoldTailAlphaTooltip", "Mania Tail面尾的透明度", "Modify the transparency of the Mania hold tail");
+
+            addResource("ManiaHoldTailMaskGradientHeight", "面尾遮罩渐变高度(投)", "Mania Hold Tail Mask Gradient Height");
+            addResource("ManiaHoldTailMaskGradientHeightTooltip", "Mania面尾的遮罩渐变高度(投)", "Modify the gradient height of the Mania hold tail mask");
+
             addResource("NoteTrackLine", "Note辅助线", "Note Track Line");
             addResource("NoteTrackLineTooltip", "note两侧辅助轨道线的高度", "note side auxiliary track line height");
 

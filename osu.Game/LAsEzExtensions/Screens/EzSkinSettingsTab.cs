@@ -45,6 +45,7 @@ namespace osu.Game.LAsEzExtensions.Screens
             ["Stage"] = Path.Combine("EzResources", "Stage"),
             ["GameTheme"] = Path.Combine("EzResources", "GameTheme")
         };
+
         private static readonly Dictionary<bool, (Color4 Color, string TopText, string BottomText)> position_mode_config = new Dictionary<bool, (Color4 Color, string TopText, string BottomText)>
         {
             [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), "SwitchToAbsolute".Localize(), "SwitchToAbsolute".Localize()),
@@ -177,6 +178,20 @@ namespace osu.Game.LAsEzExtensions.Screens
                             LabelText = "NoteHeightScale".Localize(),
                             TooltipText = "NoteHeightScaleTooltip".Localize(),
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth),
+                            KeyboardStep = 0.1f,
+                        },
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "ManiaHoldTailMaskGradientHeight".Localize(),
+                            TooltipText = "ManiaHoldTailMaskGradientHeightTooltip".Localize(),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight),
+                            KeyboardStep = 1.0f,
+                        },
+                        new SettingsSlider<double>
+                        {
+                            LabelText = "ManiaHoldTailAlpha".Localize(),
+                            TooltipText = "ManiaHoldTailAlphaTooltip".Localize(),
+                            Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>

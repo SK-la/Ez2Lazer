@@ -5,6 +5,7 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -27,11 +28,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Container? bodyScaleContainer;
         private Container? bodyInnerContainer;
 
+        private Bindable<double> tailAlpha = null!;
+        private Bindable<double> tailMaskHeight = new Bindable<double>();
         private IBindable<double> hitPosition = new Bindable<double>();
         private EzHoldNoteHittingLayer? hittingLayer;
         private Drawable? lightContainer;
 
-        private float halfNoteHeight;
+        private float tailHeight;
 
         public EzHoldNoteMiddle()
         {
@@ -45,6 +48,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             isHitting.BindTo(holdNote.IsHolding);
 
             hitPosition = EzSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            tailMaskHeight = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
+            tailAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
         }
 
         protected override void LoadComplete()
@@ -52,6 +57,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             isHitting.BindValueChanged(onIsHittingChanged, true);
 
+            tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
+            tailAlpha.BindValueChanged(_ => UpdateSize(), true);
             // 确保光效层被正确初始化
             if (lightContainer == null)
                 OnLightChanged();
@@ -190,29 +197,46 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void UpdateSize()
         {
             base.UpdateSize();
-            halfNoteHeight = NoteSize.Value.Y * 0.5f;
+            tailHeight = tailMaskHeight.Value > 0
+                ? (float)tailMaskHeight.Value
+                : NoteSize.Value.Y * 0.5f;
 
             if (topContainer?.Child is Container topInner)
             {
-                topContainer.Height = halfNoteHeight;
-                topInner.Height = NoteSize.Value.Y;
+                topContainer.Height = tailHeight;
+                topInner.Height = tailHeight * 2;
+                topInner.Y = tailMaskHeight.Value > 0
+                    ? tailHeight
+                    : 0;
             }
 
             if (bodyInnerContainer != null)
             {
-                bodyInnerContainer.Height = halfNoteHeight * 2;
-                bodyInnerContainer.Y = -halfNoteHeight;
+                bodyInnerContainer.Height = tailHeight * 2;
+                bodyInnerContainer.Y = -tailHeight;
             }
+        }
+
+        protected override void UpdateColor()
+        {
+            if (topContainer?.Child is Container topInner)
+            {
+                topInner.Colour = tailMaskHeight.Value > 0
+                    ? ColourInfo.GradientVertical(NoteColor.Opacity((float)tailAlpha.Value), NoteColor.Opacity(1))
+                    : NoteColor;
+            }
+
+            base.UpdateColor();
         }
 
         protected override void Update()
         {
             base.Update();
 
-            if (MainContainer?.Children.Count > 0 && bodyContainer != null && halfNoteHeight > 0)
+            if (MainContainer?.Children.Count > 0 && bodyContainer != null && tailHeight > 0)
             {
-                float drawHeightMinusHalf = DrawHeight - halfNoteHeight;
-                float middleHeight = Math.Max(drawHeightMinusHalf, halfNoteHeight);
+                float drawHeightMinusHalf = DrawHeight - tailHeight;
+                float middleHeight = Math.Max(drawHeightMinusHalf, tailHeight);
 
                 bodyContainer.Height = middleHeight + 2;
 

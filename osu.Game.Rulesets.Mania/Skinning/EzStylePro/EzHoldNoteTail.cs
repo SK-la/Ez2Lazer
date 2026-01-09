@@ -25,6 +25,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Container container = null!;
 
         private Bindable<bool> enabledColor = null!;
+        private Bindable<double> tailAlpha = null!;
 
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }
@@ -44,6 +45,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
 
             enabledColor = EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            tailAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
+            tailAlpha.BindValueChanged(alpha =>
+            {
+                Alpha = (float)alpha.NewValue;
+            }, true);
         }
 
         protected override void Dispose(bool isDisposing)
