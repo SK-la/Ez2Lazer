@@ -60,6 +60,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
             addResource("RefreshSaveSkin", "强制刷新、保存皮肤", "Refresh & Save Skin");
             addResource("SwitchToAbsolute", "强制刷新, 并切换至 绝对位置（不稳定）", "Refresh, Switch to Absolute(Unstable)");
             addResource("SwitchToRelative", "强制刷新, 并切换至 相对位置（不稳定）", "Refresh, Switch to Relative(Unstable)");
+
+            addResource("DisableCmdSpace", "游戏时禁用 Cmd+Space（聚焦搜索）", "Disable Cmd+Space (Spotlight) during gameplay");
         }
 
         private static void addResource(string key, string chinese, string english)
