@@ -67,12 +67,54 @@ namespace osu.Game.Screens.SelectV2
         {
             AutoSizeAxes = Axes.Both;
 
-            InternalChild = columnNotesContainer = new FillFlowContainer
+            InternalChild = new CircularContainer
             {
-                Direction = FillDirection.Horizontal,
+                Masking = true,
                 AutoSizeAxes = Axes.Both,
-                Anchor = Anchor.CentreLeft,
-                Origin = Anchor.CentreLeft,
+                Children = new Drawable[]
+                {
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Colour4.Black.Opacity(0.6f),
+                    },
+                    new GridContainer
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        AutoSizeAxes = Axes.Both,
+                        Margin = new MarginPadding { Horizontal = 8f },
+                        ColumnDimensions = new[]
+                        {
+                            new Dimension(GridSizeMode.AutoSize),
+                            new Dimension(GridSizeMode.Absolute, 3f),
+                            new Dimension(GridSizeMode.AutoSize),
+                        },
+                        RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                        Content = new[]
+                        {
+                            new Drawable[]
+                            {
+                                new OsuSpriteText
+                                {
+                                    Text = "[Notes]",
+                                    Font = OsuFont.GetFont(size: 14),
+                                    Colour = Colour4.GhostWhite,
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft
+                                },
+                                Empty(),
+                                columnNotesContainer = new FillFlowContainer
+                                {
+                                    Direction = FillDirection.Horizontal,
+                                    AutoSizeAxes = Axes.Both,
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                },
+                            }
+                        }
+                    }
+                }
             };
         }
 

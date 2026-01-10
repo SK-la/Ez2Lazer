@@ -22,7 +22,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Overlays;
@@ -39,8 +38,8 @@ namespace osu.Game.Screens.SelectV2
         public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT * 1.6f;
 
         private const int mania_ui_update_throttle_ms = 100;
-        private const int background_load_delay_ms = 200;
-        private const int metadata_text_delay_ms = 150;
+        private const int background_load_delay_ms = 50;
+        private const int metadata_text_delay_ms = 30;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -76,14 +75,11 @@ namespace osu.Game.Screens.SelectV2
         private EzKpsDisplay ezKpsDisplay = null!;
         private EzLineGraph maniaKpsGraph = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
-        private OsuSpriteText notesLabel = null!;
 
         private EzXxySrDisplay xxySrDisplay = null!;
 
         private IBindable<StarDifficulty>? starDifficultyBindable;
         private CancellationTokenSource? starDifficultyCancellationSource;
-
-        private double? lastStarRatingStars;
 
         private int cachedKpcKeyCount = -1;
         private Guid cachedKpcBeatmapId;
@@ -101,8 +97,6 @@ namespace osu.Game.Screens.SelectV2
         private ScheduledDelegate? scheduledBackgroundRetrieval;
 
         private ScheduledDelegate? scheduledMetadataTextUpdate;
-        private Guid scheduledMetadataBeatmapId;
-        private bool metadataTextApplied;
 
         private ScheduledDelegate? scheduledManiaUiUpdate;
         private (double averageKps, double maxKps, List<double> kpsList) pendingKpsResult;
@@ -272,14 +266,6 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Enabled = { BindTarget = Selected }
                                         },
-                                        notesLabel = new OsuSpriteText
-                                        {
-                                            Text = "[Notes] ",
-                                            Font = OsuFont.GetFont(size: 14),
-                                            Colour = Colour4.GhostWhite,
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft
-                                        },
                                         ezKpcDisplay = new EzKpcDisplay(),
                                     },
                                 }
@@ -329,18 +315,16 @@ namespace osu.Game.Screens.SelectV2
 
             // Background/texture uploads are a major draw FPS limiter during fast scrolling.
             // Delay background retrieval and only load if still visible and not pooled/reused.
-            scheduledBackgroundRetrieval?.Cancel();
-            scheduledBackgroundRetrieval = null;
             beatmapBackground.Beatmap = null;
             scheduleBackgroundLoad();
 
             // Delay high-variance metadata text assignment to reduce glyph/atlas churn during fast scrolling.
             scheduledMetadataTextUpdate?.Cancel();
             scheduledMetadataTextUpdate = null;
-            scheduledMetadataBeatmapId = beatmap.ID;
-            metadataTextApplied = false;
-            titleText.Text = string.Empty;
-            artistText.Text = string.Empty;
+            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
+
+            titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
+            artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
             updateButton.BeatmapSet = beatmapSet;
             statusPill.Status = beatmap.Status;
 
@@ -348,58 +332,16 @@ namespace osu.Game.Screens.SelectV2
             difficultyIcon.Show();
 
             localRank.Beatmap = beatmap;
-            difficultyText.Text = string.Empty;
-            authorText.Text = string.Empty;
-            scheduleMetadataTextUpdate();
+            difficultyText.Text = beatmap.DifficultyName;
+            authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             cachedScratchText = null;
-
-            lastStarRatingStars = null;
 
             resetManiaAnalysisDisplay();
             bindManiaAnalysis();
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
-        }
-
-        private void scheduleMetadataTextUpdate()
-        {
-            if (metadataTextApplied)
-                return;
-
-            if (Item == null)
-                return;
-
-            if (Item.IsVisible != true)
-                return;
-
-            if (scheduledMetadataTextUpdate != null)
-                return;
-
-            Guid expectedBeatmapId = scheduledMetadataBeatmapId;
-
-            scheduledMetadataTextUpdate = Scheduler.AddDelayed(() =>
-            {
-                scheduledMetadataTextUpdate = null;
-
-                if (Item == null)
-                    return;
-
-                if (Item.IsVisible != true)
-                    return;
-
-                // Guard against pooled reuse.
-                if (beatmap.ID != expectedBeatmapId)
-                    return;
-
-                var beatmapSet = beatmap.BeatmapSet!;
-                titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
-                artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
-                difficultyText.Text = beatmap.DifficultyName;
-                authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
-                metadataTextApplied = true;
-            }, metadata_text_delay_ms, false);
         }
 
         private void scheduleBackgroundLoad()
@@ -516,9 +458,9 @@ namespace osu.Game.Screens.SelectV2
         private static bool isPlaceholderAnalysisResult(ManiaBeatmapAnalysisResult result)
             => result.AverageKps == 0
                && result.MaxKps == 0
-               && (result.KpsList?.Count ?? 0) == 0
-               && (result.ColumnCounts?.Count ?? 0) == 0
-               && (result.HoldNoteCounts?.Count ?? 0) == 0
+               && (result.KpsList.Count) == 0
+               && (result.ColumnCounts.Count) == 0
+               && (result.HoldNoteCounts.Count) == 0
                && string.IsNullOrEmpty(result.ScratchText)
                && result.XxySr == null;
 
@@ -583,7 +525,6 @@ namespace osu.Game.Screens.SelectV2
                 ezKpsDisplay.SetKps(0, 0);
                 maniaKpsGraph.Show();
 
-                notesLabel.Show();
                 ezKpcDisplay.Show();
                 xxySrDisplay.Show();
             }
@@ -593,7 +534,6 @@ namespace osu.Game.Screens.SelectV2
                 maniaKpsGraph.Hide();
 
                 // 非 mania：隐藏 mania 专属 UI。
-                notesLabel.Hide();
                 ezKpcDisplay.Hide();
                 xxySrDisplay.Hide();
             }
@@ -658,7 +598,6 @@ namespace osu.Game.Screens.SelectV2
 
             scheduledMetadataTextUpdate?.Cancel();
             scheduledMetadataTextUpdate = null;
-            metadataTextApplied = false;
 
             scheduledManiaUiUpdate?.Cancel();
             scheduledManiaUiUpdate = null;
@@ -677,8 +616,6 @@ namespace osu.Game.Screens.SelectV2
             cachedScratchText = null;
 
             xxySrDisplay.Current.Value = null;
-
-            lastStarRatingStars = null;
 
             cachedKpcKeyCount = -1;
             cachedKpcRulesetId = -1;
@@ -744,6 +681,7 @@ namespace osu.Game.Screens.SelectV2
             unchecked
             {
                 int hash = 17;
+
                 for (int i = 0; i < keyCount; i++)
                 {
                     hash = hash * 31 + columnCounts.GetValueOrDefault(i);
@@ -769,8 +707,6 @@ namespace osu.Game.Screens.SelectV2
                 // Logger.Log($"[PanelBeatmapStandalone] starDifficulty changed for beatmap {beatmap.OnlineID}/{beatmap.ID} stars={starDifficulty.NewValue.Stars}", LoggingTarget.Runtime, LogLevel.Debug);
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 spreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
-
-                lastStarRatingStars = starDifficulty.NewValue.Stars;
             }, true);
         }
 
@@ -797,9 +733,6 @@ namespace osu.Game.Screens.SelectV2
             {
                 if (beatmapBackground.Beatmap == null)
                     scheduleBackgroundLoad();
-
-                if (!metadataTextApplied)
-                    scheduleMetadataTextUpdate();
 
                 // 重新可见时再触发一次绑定/计算。
                 if (maniaAnalysisCancellationSource == null && Item != null && ruleset.Value.OnlineID == 3)
@@ -851,9 +784,9 @@ namespace osu.Game.Screens.SelectV2
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
 
-                keyCountText.Text = cachedScratchText ?? $"[{keyCount}K] ";
-
                 keyCountText.Alpha = 1;
+                keyCountText.Text = cachedScratchText ?? $"[{keyCount}K] ";
+                keyCountText.Colour = Colour4.LightPink.ToLinear();
             }
             else
                 keyCountText.Alpha = 0;

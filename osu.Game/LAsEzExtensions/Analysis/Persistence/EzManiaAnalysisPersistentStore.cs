@@ -30,9 +30,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
     public class EzManiaAnalysisPersistentStore
     {
         /// <summary>
-        /// 持久化总开关（默认关闭）：
-        /// - 你在调试 xxySR 算法时建议保持 false，确保每次都走实时计算，不会被旧的持久化结果“遮住”。
-        /// - 等算法稳定后再改成 true，即可启用 SQLite 持久化 + 版本号增量预热。
+        /// 持久化总开关（默认关闭）：未来考虑是否允许用户通过配置关闭此功能以避免额外的磁盘读写。
         /// </summary>
         public static bool Enabled = true;
 
@@ -44,7 +42,8 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         // v2: 初始版本，包含 kps_list_json, column_counts_json
         // v3: 添加 hold_note_counts_json 字段，分离普通note和长按note统计
         // v4: 添加 beatmap_md5 校验字段；kps_list_json 仅保存用于 UI 的下采样曲线（<=256 点）。
-        public const int ANALYSIS_VERSION = 4;
+        // v5: 删除scratchText存储，改为动态计算。数据库可兼容，不升版。
+        public const int ANALYSIS_VERSION = 5;
 
         private readonly Storage storage;
         private readonly object initLock = new object();
@@ -54,7 +53,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
 
         // Old versions earlier than v3 may not have sufficient data to safely upgrade without recomputation.
         // v3 introduced hold note counts, which are relied upon by parts of the UI.
-        private const int MIN_INPLACE_UPGRADE_VERSION = 3;
+        private const int min_inplace_upgrade_version = 3;
 
         public EzManiaAnalysisPersistentStore(Storage storage)
         {
@@ -111,7 +110,6 @@ CREATE TABLE IF NOT EXISTS mania_analysis (
     average_kps REAL NOT NULL,
     max_kps REAL NOT NULL,
     kps_list_json TEXT NOT NULL,
-    scratch_text TEXT NOT NULL,
     xxy_sr REAL NULL,
     column_counts_json TEXT NOT NULL,
     hold_note_counts_json TEXT NOT NULL
@@ -195,7 +193,6 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
                 double averageKps;
                 double maxKps;
                 string kpsListJson;
-                string scratchText;
                 double? xxySr;
                 string columnCountsJson;
                 string holdNoteCountsJson;
@@ -203,7 +200,7 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = @"
-SELECT beatmap_hash, beatmap_md5, analysis_version, average_kps, max_kps, kps_list_json, scratch_text, xxy_sr, column_counts_json, hold_note_counts_json
+SELECT beatmap_hash, beatmap_md5, analysis_version, average_kps, max_kps, kps_list_json, xxy_sr, column_counts_json, hold_note_counts_json
 FROM mania_analysis
 WHERE beatmap_id = $id
 LIMIT 1;
@@ -221,10 +218,9 @@ LIMIT 1;
                     averageKps = reader.GetDouble(3);
                     maxKps = reader.GetDouble(4);
                     kpsListJson = reader.GetString(5);
-                    scratchText = reader.GetString(6);
-                    xxySr = reader.IsDBNull(7) ? null : reader.GetDouble(7);
-                    columnCountsJson = reader.GetString(8);
-                    holdNoteCountsJson = reader.GetString(9);
+                    xxySr = reader.IsDBNull(6) ? null : reader.GetDouble(6);
+                    columnCountsJson = reader.GetString(7);
+                    holdNoteCountsJson = reader.GetString(8);
                 }
 
                 if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
@@ -249,6 +245,7 @@ LIMIT 1;
                 var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                 var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
                 var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
+
                 // Allow in-place upgrade of compatible older entries to avoid full recompute.
                 // If an older version is not compatible, treat it as a miss.
                 if (storedVersion != ANALYSIS_VERSION)
@@ -256,11 +253,9 @@ LIMIT 1;
                     if (!canUpgradeInPlace(storedVersion))
                         return false;
 
-                    bool mutated = false;
+                    bool mutated = string.IsNullOrEmpty(storedMd5);
 
                     // v4: store md5 for extra safety (hash already guards real content).
-                    if (string.IsNullOrEmpty(storedMd5))
-                        mutated = true;
 
                     // v4: kps_list_json is UI graph only; keep it capped for perf.
                     if (kpsList.Count > OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS)
@@ -272,9 +267,13 @@ LIMIT 1;
                     if (mutated || storedVersion < ANALYSIS_VERSION)
                     {
                         // Persist the upgraded row (without recomputing analysis).
-                        writeUpgradedRow(connection, beatmap, averageKps, maxKps, kpsList, scratchText, xxySr, columnCounts, holdNoteCounts);
+                        writeUpgradedRow(connection, beatmap, averageKps, maxKps, kpsList, xxySr, columnCounts, holdNoteCounts);
                     }
                 }
+
+                // Compute scratchText since it's not stored
+                int keyCount = columnCounts.Count;
+                string computedScratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
 
                 result = new ManiaBeatmapAnalysisResult(
                     averageKps,
@@ -282,7 +281,7 @@ LIMIT 1;
                     kpsList,
                     columnCounts,
                     holdNoteCounts,
-                    scratchText,
+                    computedScratchText,
                     xxySr);
 
                 missingRequiredXxySr = requireXxySr && xxySr == null;
@@ -321,7 +320,6 @@ INSERT INTO mania_analysis(
     average_kps,
     max_kps,
     kps_list_json,
-    scratch_text,
     xxy_sr,
     column_counts_json,
     hold_note_counts_json
@@ -334,7 +332,6 @@ VALUES(
     $avg,
     $max,
     $kps,
-    $scratch,
     $xxy,
     $cols,
     $holds
@@ -346,7 +343,6 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
     average_kps = excluded.average_kps,
     max_kps = excluded.max_kps,
     kps_list_json = excluded.kps_list_json,
-    scratch_text = excluded.scratch_text,
     xxy_sr = excluded.xxy_sr,
     column_counts_json = excluded.column_counts_json,
     hold_note_counts_json = excluded.hold_note_counts_json;
@@ -354,12 +350,11 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
 
                 cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
                 cmd.Parameters.AddWithValue("$hash", beatmap.Hash);
-                cmd.Parameters.AddWithValue("$md5", beatmap.MD5Hash ?? string.Empty);
+                cmd.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
                 cmd.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
                 cmd.Parameters.AddWithValue("$avg", analysis.AverageKps);
                 cmd.Parameters.AddWithValue("$max", analysis.MaxKps);
                 cmd.Parameters.AddWithValue("$kps", kpsListJson);
-                cmd.Parameters.AddWithValue("$scratch", analysis.ScratchText ?? string.Empty);
 
                 if (analysis.XxySr.HasValue)
                     cmd.Parameters.AddWithValue("$xxy", analysis.XxySr.Value);
@@ -400,6 +395,7 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
                     cmd.CommandText = @"SELECT beatmap_id, beatmap_hash, analysis_version FROM mania_analysis;";
 
                     using var reader = cmd.ExecuteReader();
+
                     while (reader.Read())
                     {
                         if (!Guid.TryParse(reader.GetString(0), out var id))
@@ -497,7 +493,7 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
         }
 
         private static bool canUpgradeInPlace(int storedVersion)
-            => storedVersion >= MIN_INPLACE_UPGRADE_VERSION && storedVersion <= ANALYSIS_VERSION;
+            => storedVersion >= min_inplace_upgrade_version && storedVersion <= ANALYSIS_VERSION;
 
         private void tryClonePreviousDatabaseIfMissing()
         {
@@ -564,16 +560,14 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             return int.TryParse(number, NumberStyles.Integer, CultureInfo.InvariantCulture, out version);
         }
 
-        private static void writeUpgradedRow(
-            SqliteConnection connection,
-            BeatmapInfo beatmap,
-            double averageKps,
-            double maxKps,
-            IReadOnlyList<double> kpsList,
-            string scratchText,
-            double? xxySr,
-            IReadOnlyDictionary<int, int> columnCounts,
-            IReadOnlyDictionary<int, int> holdNoteCounts)
+        private static void writeUpgradedRow(SqliteConnection connection,
+                                             BeatmapInfo beatmap,
+                                             double averageKps,
+                                             double maxKps,
+                                             IReadOnlyList<double> kpsList,
+                                             double? xxySr,
+                                             IReadOnlyDictionary<int, int> columnCounts,
+                                             IReadOnlyDictionary<int, int> holdNoteCounts)
         {
             string kpsListJson = JsonSerializer.Serialize(kpsList);
             string columnCountsJson = JsonSerializer.Serialize(columnCounts);
@@ -585,7 +579,6 @@ UPDATE mania_analysis
 SET beatmap_md5 = $md5,
     analysis_version = $version,
     kps_list_json = $kps_list_json,
-    scratch_text = $scratch_text,
     xxy_sr = $xxy_sr,
     column_counts_json = $column_counts_json,
     hold_note_counts_json = $hold_note_counts_json
@@ -595,7 +588,6 @@ WHERE beatmap_id = $id;
             update.Parameters.AddWithValue("$md5", beatmap.MD5Hash ?? string.Empty);
             update.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
             update.Parameters.AddWithValue("$kps_list_json", kpsListJson);
-            update.Parameters.AddWithValue("$scratch_text", scratchText);
             update.Parameters.AddWithValue("$xxy_sr", xxySr is null ? DBNull.Value : xxySr.Value);
             update.Parameters.AddWithValue("$column_counts_json", columnCountsJson);
             update.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
@@ -609,6 +601,7 @@ WHERE beatmap_id = $id;
             cmd.CommandText = $"PRAGMA table_info({tableName});";
 
             using var reader = cmd.ExecuteReader();
+
             while (reader.Read())
             {
                 // PRAGMA table_info: cid, name, type, notnull, dflt_value, pk

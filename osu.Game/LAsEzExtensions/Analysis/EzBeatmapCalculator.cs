@@ -71,16 +71,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return counts;
         }
 
-        public static string GetScratch(IBeatmap beatmap, int keyCount)
-        {
-            // 旧路径：直接从 IBeatmap 现算。
-            // 注意：选歌面板快速滚动时这个路径非常重（会再次算 KPS/列统计），
-            // 新代码优先走 GetScratchFromPrecomputed()。
-            var columnCounts = GetColumnNoteCounts(beatmap);
-            var (_, maxKps, kpsList) = GetKps(beatmap);
-            return GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
-        }
-
         /// <summary>
         /// 复用外部已经计算好的 列统计与 KPS 数据，生成 Scratch 标签。
         /// 用于选歌面板：避免重复遍历 HitObjects / 重复计算 KPS。
@@ -88,8 +78,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
         // TODO: 计算比较粗糙，后续可优化。
         public static string GetScratchFromPrecomputed(Dictionary<int, int> columnCounts, double maxKps, List<double> kpsList, int keyCount)
         {
-            if (keyCount <= 0)
-                return "[?K]";
+            if (keyCount <= 0) return "[?K]";
+
+            if (maxKps == 0) return $"[{keyCount}K]";
 
             // 将列统计映射为固定长度数组，方便计算 empty 列。
             int[] countsByColumn = new int[keyCount];
@@ -100,23 +91,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     countsByColumn[column] = count;
             }
 
-            int totalNotes = countsByColumn.Sum();
-            if (totalNotes == 0)
-                return $"[{keyCount}K]";
-
-            int firstCount = countsByColumn[0];
-            int lastCount = countsByColumn[^1];
-
-            bool isFirstHigh = checkHighSpeed(maxKps, kpsList);
-            bool isLastHigh = isFirstHigh;
+            var (isFirstLow, isFirstHigh, isLastLow, isLastHigh) = checkNotes(countsByColumn, keyCount);
 
             // 去掉两侧列，计算“中间列”平均/最大。
-            int[] middleCounts = keyCount > 2 ? countsByColumn.Skip(1).Take(keyCount - 2).ToArray() : Array.Empty<int>();
-            double averageNotes = middleCounts.Length > 0 ? middleCounts.Average() : 0;
-            int maxNotesInMiddle = middleCounts.Length > 0 ? middleCounts.Max() : 0;
-
-            bool isFirstColumnLow = averageNotes > 0 && (firstCount < averageNotes * 0.3 || (maxNotesInMiddle > 0 && firstCount < maxNotesInMiddle / 3.0));
-            bool isLastColumnLow = averageNotes > 0 && (lastCount < averageNotes * 0.3 || (maxNotesInMiddle > 0 && lastCount < maxNotesInMiddle / 3.0));
+            // int[] middleCounts = keyCount > 2 ? countsByColumn.Skip(1).Take(keyCount - 2).ToArray() : Array.Empty<int>();
+            // double averageNotes = middleCounts.Length > 0 ? middleCounts.Average() : 0;
+            // int maxNotesInMiddle = middleCounts.Length > 0 ? middleCounts.Max() : 0;
 
             string result = $"[{keyCount}K]";
 
@@ -124,35 +104,58 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 if (isFirstHigh || isLastHigh)
                     result = $"[{keyCount - 1}K1S]";
-                else if (isFirstColumnLow || isLastColumnLow)
+                else if (isFirstLow || isLastLow)
                     result = $"[{keyCount - 1}+1K]";
             }
             else if (keyCount >= 7)
             {
                 if (isFirstHigh || isLastHigh)
                     result = $"[{keyCount - 2}K2S]";
-                else if (isFirstColumnLow || isLastColumnLow)
+                else if (isFirstLow || isLastLow)
                     result = $"[{keyCount - 2}+2K]";
             }
 
             int emptyColumns = countsByColumn.Count(c => c == 0);
             if (emptyColumns > 0)
-                result = $"[{keyCount - 1}K_{emptyColumns}Empty]";
+                result = $"[{keyCount - emptyColumns}K_{emptyColumns}Empty]";
 
             return result;
         }
 
-        private static bool checkHighSpeed(double maxKps, List<double> kpsList)
+        private static (bool isFirstLow, bool isFirstHigh, bool isLastLow, bool isLastHigh) checkNotes(int[] countsByColumn, int keyCount)
         {
-            double threshold = maxKps / 4;
+            bool isFirstLow = false;
+            bool isFirstHigh = false;
+            bool isLastLow = false;
+            bool isLastHigh = false;
 
-            foreach (double kps in kpsList)
+            if (keyCount >= 2)
             {
-                if (kps > threshold)
-                    return true;
+                int firstCount = countsByColumn[0];
+                int secondCount = countsByColumn[1];
+                isFirstLow = (firstCount > 0 && firstCount < secondCount / 2.0);
+                isFirstHigh = firstCount > secondCount * 2;
+
+                int lastCount = countsByColumn[^1];
+                int secondLastCount = countsByColumn[^2];
+                isLastLow = (lastCount > 0 && lastCount < secondLastCount / 2.0);
+                isLastHigh = lastCount > secondLastCount * 2;
             }
 
-            return false;
+            return (isFirstLow, isFirstHigh, isLastLow, isLastHigh);
         }
+
+        // private static bool checkHighSpeed(double maxKps, List<double> kpsList)
+        // {
+        //     double threshold = maxKps / 4;
+
+        //     foreach (double kps in kpsList)
+        //     {
+        //         if (kps > threshold)
+        //             return true;
+        //     }
+
+        //     return false;
+        // }
     }
 }

@@ -40,7 +40,7 @@ namespace osu.Game.Screens.SelectV2
     {
         public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT;
 
-        private const int mania_ui_update_throttle_ms = 50;
+        private const int mania_ui_update_throttle_ms = 15;
 
         private StarCounter starCounter = null!;
         private ConstrainedIconContainer difficultyIcon = null!;
@@ -63,7 +63,6 @@ namespace osu.Game.Screens.SelectV2
         private EzKpsDisplay kpsDisplay = null!;
         private EzKpcDisplay kpcDisplay = null!;
         private EzXxySrDisplay xxySrDisplay = null!;
-        private OsuSpriteText notesLabel = null!;
         private Bindable<bool> xxySrFilterSetting = null!;
 
         [Resolved]
@@ -109,7 +108,6 @@ namespace osu.Game.Screens.SelectV2
         private Dictionary<int, int>? pendingHoldNoteCounts;
         private bool hasPendingUiUpdate;
 
-        private double? lastStarRatingStars;
         private Bindable<EzKpcDisplay.KpcDisplayMode> kpcDisplayMode = null!;
 
         private int cachedKpcKeyCount = -1;
@@ -259,14 +257,6 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
-                                        notesLabel = new OsuSpriteText
-                                        {
-                                            Text = "[Notes] ",
-                                            Font = OsuFont.GetFont(size: 14),
-                                            Colour = Colour4.GhostWhite,
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft
-                                        },
                                         kpcDisplay = new EzKpcDisplay(),
                                     },
                                 }
@@ -331,8 +321,6 @@ namespace osu.Game.Screens.SelectV2
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             cachedScratchText = null;
-
-            lastStarRatingStars = null;
 
             bindManiaAnalysis();
             resetManiaAnalysisDisplay();
@@ -434,9 +422,9 @@ namespace osu.Game.Screens.SelectV2
         private static bool isPlaceholderAnalysisResult(ManiaBeatmapAnalysisResult result)
             => result.AverageKps == 0
                && result.MaxKps == 0
-               && (result.KpsList?.Count ?? 0) == 0
-               && (result.ColumnCounts?.Count ?? 0) == 0
-               && (result.HoldNoteCounts?.Count ?? 0) == 0
+               && (result.KpsList.Count) == 0
+               && (result.ColumnCounts.Count) == 0
+               && (result.HoldNoteCounts.Count) == 0
                && string.IsNullOrEmpty(result.ScratchText)
                && result.XxySr == null;
 
@@ -499,16 +487,11 @@ namespace osu.Game.Screens.SelectV2
 
             if (ruleset.Value.OnlineID == 3)
             {
-                notesLabel.Show();
                 xxySrDisplay.Show();
             }
             else
             {
-                // kpsDisplay.Hide();
-                // kpcDisplay.Hide();
-
                 // 非 mania：隐藏 mania 专属 UI。
-                notesLabel.Hide();
                 xxySrDisplay.Hide();
             }
         }
@@ -586,8 +569,6 @@ namespace osu.Game.Screens.SelectV2
 
             xxySrDisplay.Current.Value = null;
 
-            lastStarRatingStars = null;
-
             cachedKpcKeyCount = -1;
             cachedKpcRulesetId = -1;
             cachedKpcModsHash = 0;
@@ -652,6 +633,7 @@ namespace osu.Game.Screens.SelectV2
             unchecked
             {
                 int hash = 17;
+
                 for (int i = 0; i < keyCount; i++)
                 {
                     hash = hash * 31 + columnCounts.GetValueOrDefault(i);
@@ -681,8 +663,6 @@ namespace osu.Game.Screens.SelectV2
                 // Logger.Log($"[PanelBeatmap] starDifficulty changed for beatmap {beatmap.OnlineID}/{beatmap.ID} stars={starDifficulty.NewValue.Stars}", LoggingTarget.Runtime, LogLevel.Debug);
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 starCounter.Current = (float)starDifficulty.NewValue.Stars;
-
-                lastStarRatingStars = starDifficulty.NewValue.Stars;
             }, true);
         }
 

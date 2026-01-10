@@ -498,14 +498,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
-                // Some call chains may be nullable-oblivious; ensure we never pass null to downstream helpers.
-                kpsList ??= new List<double>();
-                columnCounts ??= new Dictionary<int, int>();
-                holdNoteCounts ??= new Dictionary<int, int>();
-
                 // Apply rate-adjust mods (DT/HT etc.) to KPS values.
                 // These mods affect effective time progression, so KPS should scale with rate.
                 double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+
                 if (!Precision.AlmostEquals(rate, 1.0))
                 {
                     averageKps *= rate;
