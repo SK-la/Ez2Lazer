@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         // LAsMods - Mod Descriptions
         // ====================================================================================================
 
-        public static readonly LocalisableString Ez2Settings_Description = new EzLocalisableString("移除盘子和踏板", "Remove Scratch, Panel.");
+        public static readonly LocalisableString Ez2Settings_Description = new EzLocalisableString("按固定模版，移除盘子和踏板", "Remove Scratch, Panel.");
         public static readonly LocalisableString NiceBPM_Description = new EzLocalisableString("自由调整BPM或速度", "Free BPM or Speed");
         public static readonly LocalisableString SpaceBody_Description = new EzLocalisableString("全LN面海，可调面缝", "Full LN, adjustable gaps");
 
@@ -53,29 +53,29 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         // ====================================================================================================
 
         // Ez2Settings
-        public static readonly LocalisableString NoScratch_Label = new EzLocalisableString("免盘", "No Scratch");
-        public static readonly LocalisableString NoScratch_Description = new EzLocalisableString("免盘. 用于: 6-9k L-S; 12\\14\\16k LR-S", "No (EZ)Scratch. For: 6-9k L-S; 12\\14\\16k LR-S");
-        public static readonly LocalisableString NoPanel_Label = new EzLocalisableString("免面板", "No Panel");
-        public static readonly LocalisableString NoPanel_Description = new EzLocalisableString("免Ez街机谱脚踏. 用于: 7\\14\\18k", "No (EZ)Panel. For: 7\\14\\18k");
+        public static readonly LocalisableString NoScratch_Label = new EzLocalisableString("无盘", "No Scratch");
+        public static readonly LocalisableString NoScratch_Description = new EzLocalisableString("按固定模版，去除Ez街机谱面中的盘子. 用于: 6-9k L-S; 12\\14\\16k LR-S", "No (EZ)Scratch. For: 6-9k L-S; 12\\14\\16k LR-S");
+        public static readonly LocalisableString NoPanel_Label = new EzLocalisableString("无踏板", "No Panel");
+        public static readonly LocalisableString NoPanel_Description = new EzLocalisableString("按固定模版，去除Ez街机谱面中的脚踏. 用于: 7\\14\\18k", "No (EZ)Panel. For: 7\\14\\18k");
         public static readonly LocalisableString HealthyScratch_Label = new EzLocalisableString("健康盘子", "Healthy Scratch");
-        public static readonly LocalisableString HealthyScratch_Description = new EzLocalisableString("优化盘子密度，将过快的盘子移动到其他列", "Healthy (EZ)Scratch. Move the fast Scratch to the other columns");
-        public static readonly LocalisableString MaxBeat_Label = new EzLocalisableString("最大拍间隔", "Max Beat");
-        public static readonly LocalisableString MaxBeat_Description = new EzLocalisableString("盘子最大间隔, 1/? 拍", "Scratch MAX Beat Space, MAX 1/? Beat");
+        public static readonly LocalisableString HealthyScratch_Description = new EzLocalisableString("优化盘子密度，通过特定模版将过快的盘子移动到其他列", "Healthy (EZ)Scratch. Move the fast Scratch to the other columns");
+        public static readonly LocalisableString MaxBeat_Label = new EzLocalisableString("最大节拍", "Max Beat");
+        public static readonly LocalisableString MaxBeat_Description = new EzLocalisableString("盘子密度的最大节拍间隔, 1/? 拍", "Scratch MAX Beat Space, MAX 1/? Beat");
 
         // SpaceBody
-        public static readonly LocalisableString SpaceBody_Label = new EzLocalisableString("面海缝隙", "Space Body");
-        public static readonly LocalisableString SpaceBodyGap_Description = new EzLocalisableString("全LN面海，可调面缝", "Full LN, adjustable gaps");
-        public static readonly LocalisableString AddShield_Label = new EzLocalisableString("添加护盾", "Add Shield");
-        public static readonly LocalisableString AddShield_Description = new EzLocalisableString("在面海中添加护盾音符", "Add shield notes in the sea");
+        public static readonly LocalisableString SpaceBody_Label = new EzLocalisableString("全反键缝隙", "Space Body");
+        public static readonly LocalisableString SpaceBodyGap_Description = new EzLocalisableString("调整前后两个面之间的间隔缝隙", "Full LN, adjustable gaps");
+        public static readonly LocalisableString AddShield_Label = new EzLocalisableString("添加盾型", "Add Shield");
+        public static readonly LocalisableString AddShield_Description = new EzLocalisableString("将每个面尾添加盾牌键型", "Add shield notes in the sea");
 
         // LoopPlayClip
         public static readonly LocalisableString LoopCount_Label = new EzLocalisableString("循环次数", "Loop Count");
         public static readonly LocalisableString LoopCount_Description = new EzLocalisableString("切片循环次数", "Loop Clip Count.");
-        public static readonly LocalisableString SpeedChange_Label = new EzLocalisableString("速度改变", "Speed Change");
+        public static readonly LocalisableString SpeedChange_Label = new EzLocalisableString("改变倍速", "Speed Change");
         public static readonly LocalisableString SpeedChange_Description = new EzLocalisableString("改变倍速。不允许叠加其他变速mod。", "Speed Change. The actual decrease to apply. Don't add other rate-mod.");
         public static readonly LocalisableString AdjustPitch_Label = new EzLocalisableString("调整音调", "Adjust pitch");
         public static readonly LocalisableString AdjustPitch_Description = new EzLocalisableString("速度改变时是否调整音调。（变速又变调）", "Adjust pitch. Should pitch be adjusted with speed.(变速又变调)");
-        public static readonly LocalisableString ConstantSpeed_Label = new EzLocalisableString("恒定速度", "Constant Speed");
+        public static readonly LocalisableString ConstantSpeed_Label = new EzLocalisableString("无SV变速", "Constant Speed");
         public static readonly LocalisableString ConstantSpeed_Description = new EzLocalisableString("去除SV变速。（恒定速度/忽略谱面中的变速）", "Constant Speed. No more tricky speed changes.(恒定速度/忽略谱面中的变速)");
         public static readonly LocalisableString CutStartTime_Label = new EzLocalisableString("切片开始时间", "Cut Start Time");
         public static readonly LocalisableString CutStartTime_Description = new EzLocalisableString("切片开始时间, 默认是秒。推荐通过谱面编辑器A-B控件设置，可自动输入", "Cut StartTime. Default is second.");
