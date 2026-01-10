@@ -70,16 +70,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var newColumnObjects = new List<ManiaHitObject>();
 
-            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n =>
-                                        (
+            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n => (
                                             startTime: n.StartTime,
                                             samples: n.Samples,
                                             column: n.Column,
                                             endTime: n.StartTime,
                                             duration: n.StartTime - n.StartTime
                                         ))
-                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
-                                        (
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h => (
                                             startTime: h.StartTime,
                                             samples: h.Samples,
                                             column: h.Column,

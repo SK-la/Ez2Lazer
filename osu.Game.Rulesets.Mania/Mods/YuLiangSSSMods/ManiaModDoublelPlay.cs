@@ -11,6 +11,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
@@ -26,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
-        public override LocalisableString Description => "Convert 4k to 8k (Double 4k).";// "From YuLiangSSS' DP Tool";
+        public override LocalisableString Description => "Convert 4k to 8k (Double 4k).";
 
         public override double ScoreMultiplier => 1;
 
@@ -40,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Style", "1: NM+NM   2: MR+MR   3: NM+MR   4: MR+NM   5: Bracket NM+NM   6: Bracket MR   7: Wide Bracket   8: Wide Bracket MR")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.DoublePlayStyle_Label), nameof(EzManiaModStrings.DoublePlayStyle_Description))]
         public BindableNumber<int> Style { get; } = new BindableInt(1)
         {
             MinValue = 1,
@@ -77,58 +78,63 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var newColumnObjects = new List<ManiaHitObject>();
 
-            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n =>
-            (
-                startTime: n.StartTime,
-                samples: n.Samples,
-                column: n.Column,
-                endTime: n.StartTime
-            ))
-            .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
-            (
-                startTime: h.StartTime,
-                samples: h.Samples,
-                column: h.Column,
-                endTime: h.EndTime
-            ))).OrderBy(h => h.startTime).ToList();
+            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n => (
+                                            startTime: n.StartTime,
+                                            samples: n.Samples,
+                                            column: n.Column,
+                                            endTime: n.StartTime
+                                        ))
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h => (
+                                            startTime: h.StartTime,
+                                            samples: h.Samples,
+                                            column: h.Column,
+                                            endTime: h.EndTime
+                                        ))).OrderBy(h => h.startTime).ToList();
 
             for (int i = 0; i < locations.Count; i++)
             {
                 bool isLN = false;
                 var note = new Note();
                 var hold = new HoldNote();
-                int columnnum = locations[i].column;
-                switch (columnnum)
+                int columnIndex = locations[i].column;
+
+                switch (columnIndex)
                 {
                     case 1:
                     {
-                        columnnum = 0;
+                        columnIndex = 0;
                     }
-                    break;
+                        break;
+
                     case 3:
                     {
-                        columnnum = 1;
+                        columnIndex = 1;
                     }
-                    break;
+                        break;
+
                     case 5:
                     {
-                        columnnum = 2;
+                        columnIndex = 2;
+
                         if (Style.Value >= 5 && Style.Value <= 8)
                         {
-                            columnnum = 4;
+                            columnIndex = 4;
                         }
                     }
-                    break;
+                        break;
+
                     case 7:
                     {
-                        columnnum = 3;
+                        columnIndex = 3;
+
                         if (Style.Value >= 5 && Style.Value <= 8)
                         {
-                            columnnum = 5;
+                            columnIndex = 5;
                         }
                     }
-                    break;
+                        break;
                 }
+
                 if (locations[i].startTime == locations[i].endTime)
                 {
                     note.StartTime = locations[i].startTime;
@@ -150,169 +156,178 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         {
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = columnnum,
+                                Column = columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = 4 + columnnum,
+                                Column = 4 + columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                         }
-                        break;
+                            break;
+
                         case 2:
                         {
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = 3 - columnnum,
+                                Column = 3 - columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = 7 - columnnum,
+                                Column = 7 - columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                         }
-                        break;
+                            break;
+
                         case 3:
                         {
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = columnnum,
+                                Column = columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = 7 - columnnum,
+                                Column = 7 - columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                         }
-                        break;
+                            break;
+
                         case 4:
                         {
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = 3 - columnnum,
+                                Column = 3 - columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = 4 + columnnum,
+                                Column = 4 + columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                         }
-                        break;
+                            break;
+
                         case 5:
                         {
-                            int bcolumn = columnnum;
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = bcolumn,
+                                Column = columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = 2 + bcolumn,
+                                Column = 2 + columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                         }
-                        break;
+                            break;
+
                         case 6:
                         {
-                            if (columnnum <= 1)
+                            if (columnIndex <= 1)
                             {
-                                columnnum = 3 - columnnum;
+                                columnIndex = 3 - columnIndex;
                             }
-                            if (columnnum >= 4)
+
+                            if (columnIndex >= 4)
                             {
-                                columnnum = 7 - columnnum + 4;
+                                columnIndex = 7 - columnIndex + 4;
                             }
+
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = columnnum,
+                                Column = columnIndex,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                             newColumnObjects.Add(new HoldNote
                             {
-                                Column = columnnum - 2,
+                                Column = columnIndex - 2,
                                 StartTime = locations[i].startTime,
                                 Duration = locations[i].endTime - locations[i].startTime,
                                 NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                             });
                         }
-                        break;
+                            break;
+
                         case 7:
                         case 8:
                         {
                             if (Style.Value == 8)
                             {
-                                if (columnnum == 0 || columnnum == 4)
+                                if (columnIndex == 0 || columnIndex == 4)
                                 {
-                                    columnnum++;
+                                    columnIndex++;
                                 }
-                                else if (columnnum == 1 || columnnum == 5)
+                                else if (columnIndex == 1 || columnIndex == 5)
                                 {
-                                    columnnum--;
+                                    columnIndex--;
                                 }
                             }
-                            if (columnnum < 4)
+
+                            if (columnIndex < 4)
                             {
                                 newColumnObjects.Add(new HoldNote
                                 {
-                                    Column = columnnum,
+                                    Column = columnIndex,
                                     StartTime = locations[i].startTime,
                                     Duration = locations[i].endTime - locations[i].startTime,
                                     NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                                 });
                                 newColumnObjects.Add(new HoldNote
                                 {
-                                    Column = 3 - columnnum,
+                                    Column = 3 - columnIndex,
                                     StartTime = locations[i].startTime,
                                     Duration = locations[i].endTime - locations[i].startTime,
                                     NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                                 });
                             }
-                            if (columnnum > 3)
+
+                            if (columnIndex > 3)
                             {
                                 newColumnObjects.Add(new HoldNote
                                 {
-                                    Column = columnnum,
+                                    Column = columnIndex,
                                     StartTime = locations[i].startTime,
                                     Duration = locations[i].endTime - locations[i].startTime,
                                     NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                                 });
                                 newColumnObjects.Add(new HoldNote
                                 {
-                                    Column = 7 - (columnnum - 4),
+                                    Column = 7 - (columnIndex - 4),
                                     StartTime = locations[i].startTime,
                                     Duration = locations[i].endTime - locations[i].startTime,
                                     NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                                 });
                             }
                         }
-                        break;
+                            break;
                     }
                 }
                 else
@@ -323,157 +338,168 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         {
                             newColumnObjects.Add(new Note
                             {
-                                Column = columnnum,
+                                Column = columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                             newColumnObjects.Add(new Note
                             {
-                                Column = columnnum + 4,
+                                Column = columnIndex + 4,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                         }
-                        break;
+                            break;
+
                         case 2:
                         {
                             newColumnObjects.Add(new Note
                             {
-                                Column = 3 - columnnum,
+                                Column = 3 - columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                             newColumnObjects.Add(new Note
                             {
-                                Column = 7 - columnnum,
+                                Column = 7 - columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                         }
-                        break;
+                            break;
+
                         case 3:
                         {
                             newColumnObjects.Add(new Note
                             {
-                                Column = columnnum,
+                                Column = columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                             newColumnObjects.Add(new Note
                             {
-                                Column = 7 - columnnum,
+                                Column = 7 - columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                         }
-                        break;
+                            break;
+
                         case 4:
                         {
                             newColumnObjects.Add(new Note
                             {
-                                Column = 3 - columnnum,
+                                Column = 3 - columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                             newColumnObjects.Add(new Note
                             {
-                                Column = 4 + columnnum,
+                                Column = 4 + columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                         }
-                        break;
+                            break;
+
                         case 5:
                         {
                             newColumnObjects.Add(new Note
                             {
-                                Column = columnnum,
+                                Column = columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                             newColumnObjects.Add(new Note
                             {
-                                Column = 2 + columnnum,
+                                Column = 2 + columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                         }
-                        break;
+                            break;
+
                         case 6:
                         {
-                            if (columnnum <= 1)
+                            if (columnIndex <= 1)
                             {
-                                columnnum = 3 - columnnum;
+                                columnIndex = 3 - columnIndex;
                             }
-                            if (columnnum >= 4)
+
+                            if (columnIndex >= 4)
                             {
-                                columnnum = 7 - columnnum + 4;
+                                columnIndex = 7 - columnIndex + 4;
                             }
+
                             newColumnObjects.Add(new Note
                             {
-                                Column = columnnum,
+                                Column = columnIndex,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                             newColumnObjects.Add(new Note
                             {
-                                Column = columnnum - 2,
+                                Column = columnIndex - 2,
                                 StartTime = locations[i].startTime,
                                 Samples = locations[i].samples
                             });
                         }
-                        break;
+                            break;
+
                         case 7:
                         case 8:
                         {
                             if (Style.Value == 8)
                             {
-                                if (columnnum == 0 || columnnum == 4)
+                                if (columnIndex == 0 || columnIndex == 4)
                                 {
-                                    columnnum++;
+                                    columnIndex++;
                                 }
-                                else if (columnnum == 1 || columnnum == 5)
+                                else if (columnIndex == 1 || columnIndex == 5)
                                 {
-                                    columnnum--;
+                                    columnIndex--;
                                 }
                             }
-                            if (columnnum < 4)
+
+                            if (columnIndex < 4)
                             {
                                 newColumnObjects.Add(new Note
                                 {
-                                    Column = columnnum,
+                                    Column = columnIndex,
                                     StartTime = locations[i].startTime,
                                     Samples = locations[i].samples
                                 });
                                 newColumnObjects.Add(new Note
                                 {
-                                    Column = 3 - columnnum,
+                                    Column = 3 - columnIndex,
                                     StartTime = locations[i].startTime,
                                     Samples = locations[i].samples
                                 });
                             }
-                            if (columnnum > 3)
+
+                            if (columnIndex > 3)
                             {
                                 newColumnObjects.Add(new HoldNote
                                 {
-                                    Column = columnnum,
+                                    Column = columnIndex,
                                     StartTime = locations[i].startTime,
                                     Duration = locations[i].endTime - locations[i].startTime,
                                     NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                                 });
                                 newColumnObjects.Add(new HoldNote
                                 {
-                                    Column = 7 - (columnnum - 4),
+                                    Column = 7 - (columnIndex - 4),
                                     StartTime = locations[i].startTime,
                                     Duration = locations[i].endTime - locations[i].startTime,
                                     NodeSamples = [locations[i].samples, Array.Empty<HitSampleInfo>()]
                                 });
                             }
                         }
-                        break;
+                            break;
                     }
                 }
             }
+
             newObjects.AddRange(newColumnObjects);
             maniaBeatmap.HitObjects = newObjects;
         }

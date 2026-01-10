@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "SA";
 
-        public override LocalisableString Description => "Adapt the speed of the game based on the accuracy.";
+        public override LocalisableString Description => EzManiaModStrings.ChangeSpeedByAccuracy_Description;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override Type[] IncompatibleMods => new Type[] { typeof(ModTimeRamp) };
+        public override Type[] IncompatibleMods => new[] { typeof(ModTimeRamp) };
 
         private readonly BindableDouble accuracy = new BindableDouble();
 
@@ -76,8 +76,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
             rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
-
-
         }
 
         public void Update(Playfield playfield)

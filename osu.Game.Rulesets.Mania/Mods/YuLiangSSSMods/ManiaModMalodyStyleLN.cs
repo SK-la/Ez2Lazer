@@ -132,7 +132,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     StartTime = EndTime,
                     Column = Column,
-                    Samples = GetNodeSamples((NodeSamples?.Count - 1) ?? 1),
+                    Samples = GetNodeSamples(NodeSamples?.Count - 1 ?? 1),
                 });
 
                 AddNested(Body = new NoLNBodyNote

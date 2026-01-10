@@ -330,9 +330,9 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModAdjust(),
                         new ManiaModNtoM(),
                         new ManiaModNtoMAnother(),
-                        // new ManiaModChangeSpeedByAccuracy(),
-                        // new ManiaModCleaner(),
-                        // new ManiaModDeleteColumn(),
+                        // new ManiaModChangeSpeedByAccuracy(), // 无法使用
+                        new ManiaModCleaner(),
+                        new ManiaModDeleteColumn(), // 待调试
                         new ManiaModDoublePlay(),
                         new ManiaModGracer(),
                         new ManiaModJackAdjust(),

@@ -17,7 +17,6 @@ using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
-using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
@@ -98,16 +97,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var fixedColumnObjects = new List<ManiaHitObject>();
 
-            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n =>
-                                        (
+            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n => (
                                             startTime: n.StartTime,
                                             samples: n.Samples,
                                             column: n.Column,
                                             endTime: n.StartTime,
                                             duration: n.StartTime - n.StartTime
                                         ))
-                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
-                                        (
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h => (
                                             startTime: h.StartTime,
                                             samples: h.Samples,
                                             column: h.Column,
@@ -306,16 +303,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     keys++;
                     keyValue = keys + 1;
 
-                    locations = fixedColumnObjects.OfType<Note>().Select(n =>
-                                                  (
+                    locations = fixedColumnObjects.OfType<Note>().Select(n => (
                                                       startTime: n.StartTime,
                                                       samples: n.Samples,
                                                       column: n.Column,
                                                       endTime: n.StartTime,
                                                       duration: n.StartTime - n.StartTime
                                                   ))
-                                                  .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h =>
-                                                  (
+                                                  .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h => (
                                                       startTime: h.StartTime,
                                                       samples: h.Samples,
                                                       column: h.Column,

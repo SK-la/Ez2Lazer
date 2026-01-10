@@ -11,8 +11,8 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
@@ -83,11 +83,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
                 var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                    .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                    {
-                        (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
-                    }))
-                    .OrderBy(h => h.startTime).ToList();
+                                      .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
+                                      {
+                                          (startTime: h.StartTime, endTime: h.EndTime, samples: h.GetNodeSamples(0))
+                                      }))
+                                      .OrderBy(h => h.startTime).ToList();
 
                 var newColumnObjects = new List<ManiaHitObject>();
 
@@ -103,6 +103,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         });
                         continue;
                     }
+
                     double beatLength = beatmap.ControlPointInfo.TimingPointAt(locations[i].startTime).BeatLength;
 
                     double gap = locations[i + 1].startTime - locations[i].endTime;
@@ -117,6 +118,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     {
                         duration = easierDivide;
                         gap = locations[i + 1].startTime - (locations[i].startTime + duration);
+
                         if (gap < timeDivide + ERROR)
                         {
                             duration = locations[i + 1].startTime - locations[i].startTime - easierDivide;

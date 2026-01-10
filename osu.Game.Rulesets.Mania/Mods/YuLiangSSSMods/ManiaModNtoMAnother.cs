@@ -19,7 +19,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModNtoMAnother : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, osu.Game.Rulesets.Mods.IHasApplyOrder
+    public class ManiaModNtoMAnother : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
     {
         public const double INTERVAL = 50;
 
@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Name => "Nk to Mk Converter Another";
 
-        public override string Acronym => "NTMA";
+        public override string Acronym => "NtMA";
 
         public override double ScoreMultiplier => 1;
 
@@ -54,19 +54,22 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     yield return ("Clean", Clean.Value ? "On" : "Off");
                     yield return ("Clean Divide", $"1/{CleanDivide.Value}");
                 }
+
                 if (Adjust4Jack.Value)
                 {
                     yield return ("1/4 Jack", Adjust4Jack.Value ? "On" : "Off");
                 }
+
                 if (Adjust4Speed.Value)
                 {
                     yield return ("1/4 Speed", Adjust4Speed.Value ? "On" : "Off");
                 }
+
                 yield return ("Seed", $"Seed {(Seed.Value is null ? "Null" : Seed.Value)}");
             }
         }
 
-        [SettingSource("Key", "To Keys(Can only convert lower keys to higher keys.)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Key_Label), nameof(EzManiaModStrings.Key_Description))]
         public BindableNumber<int> Key { get; set; } = new BindableInt(8)
         {
             MinValue = 2,
@@ -74,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Blank Column", "Number of blank columns to add. (Notice: If the number of Key - CircleSize is less than the number of blank columns, it won't be added.)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.BlankColumn_Label), nameof(EzManiaModStrings.BlankColumn_Description))]
         public BindableNumber<int> BlankColumn { get; set; } = new BindableInt(0)
         {
             MinValue = 0,
@@ -82,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Gap", "Rearrange the notes in every area. (If Gap is bigger, the notes will be more spread out.)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NtoMGap_Label), nameof(EzManiaModStrings.NtoMGap_Description))]
         public BindableInt Gap { get; set; } = new BindableInt(10)
         {
             MinValue = 0,
@@ -90,10 +93,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Clean", "Try to clean some notes in the map.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Clean_Label), nameof(EzManiaModStrings.Clean_Description))]
         public BindableBool Clean { get; set; } = new BindableBool(true);
 
-        [SettingSource("Clean Divide", "Choose the divide(0 For no Divide Clean, 4 is Recommended for Stream, 8 is Recommended for Jack) of cleaning. (If Clean is false, this setting won't be used.)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CleanDivide_Label), nameof(EzManiaModStrings.CleanDivide_Description))]
         public BindableInt CleanDivide { get; set; } = new BindableInt(4)
         {
             MinValue = 0,
@@ -101,10 +104,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("1/4 Jack", "(Like 100+ BPM 1/4 Jack)Clean Divide * 1/2, for 1/4 Jack, avoiding cleaning 1/4 Jack.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Adjust4Jack_Label), nameof(EzManiaModStrings.Adjust4Jack_Description))]
         public BindableBool Adjust4Jack { get; set; } = new BindableBool(false);
 
-        [SettingSource("1/4 Speed", "(Like 300+ BPM 1/4 Speed)Clean Divide * 2, for 1/4 Speed, avoiding additional 1/2 Jack.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Adjust4Speed_Label), nameof(EzManiaModStrings.Adjust4Speed_Description))]
         public BindableBool Adjust4Speed { get; set; } = new BindableBool(false);
 
         [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
@@ -129,9 +132,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            Random? Rng;
             Seed.Value ??= RNG.Next();
-            Rng = new Random((int)Seed.Value);
+            var rng = new Random((int)Seed.Value);
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
@@ -151,20 +153,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var newObjects = new List<ManiaHitObject>();
 
-            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n =>
-            (
-                column: n.Column,
-                startTime: n.StartTime,
-                endTime: n.StartTime,
-                samples: n.Samples
-            ))
-            .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
-            (
-                column: h.Column,
-                startTime: h.StartTime,
-                endTime: h.EndTime,
-                samples: h.Samples
-            ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n => (
+                                            column: n.Column,
+                                            startTime: n.StartTime,
+                                            endTime: n.StartTime,
+                                            samples: n.Samples
+                                        ))
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h => (
+                                            column: h.Column,
+                                            startTime: h.StartTime,
+                                            endTime: h.EndTime,
+                                            samples: h.Samples
+                                        ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
 
             var confirmNull = new List<bool>();
             var nullColumnList = new List<int>();
@@ -177,6 +177,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
                 int count = column.Count();
+
                 if (!confirmNull[column.Key] && count != 0)
                 {
                     confirmNull[column.Key] = true;
@@ -194,6 +195,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             for (int i = 0; i < locations.Count; i++)
             {
                 int minusColumn = 0;
+
                 foreach (int nul in nullColumnList)
                 {
                     if (locations[i].column > nul)
@@ -201,6 +203,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         minusColumn++;
                     }
                 }
+
                 var thisLocations = locations[i];
                 thisLocations.column -= minusColumn;
                 locations[i] = thisLocations;
@@ -216,7 +219,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             foreach (var timingPoint in tempObjects.GroupBy(h => h.startTime))
             {
-                var newLocations = timingPoint.OfType<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>().Select(n => (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
+                var newLocations = timingPoint.OfType<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>()
+                                              .Select(n => (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
 
                 List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
 
@@ -245,15 +249,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     sumTime = 0;
                     // Process area
                     int cleanDivide = CleanDivide.Value;
+
                     if (Adjust4Jack.Value)
                     {
                         cleanDivide *= 2;
                     }
+
                     if (Adjust4Speed.Value)
                     {
                         cleanDivide /= 2;
                     }
-                    var processed = ProcessArea(maniaBeatmap, Rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
+
+                    var processed = ProcessArea(maniaBeatmap, rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
                     newObjects.AddRange(processed.result);
                     checkList = processed.checkList.ToList();
                     area.Clear();
@@ -263,15 +270,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             if (area.Count > 0)
             {
                 int cleanDivide = CleanDivide.Value;
+
                 if (Adjust4Jack.Value)
                 {
                     cleanDivide *= 2;
                 }
+
                 if (Adjust4Speed.Value)
                 {
                     cleanDivide /= 2;
                 }
-                var processed = ProcessArea(maniaBeatmap, Rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
+
+                var processed = ProcessArea(maniaBeatmap, rng, area, keys, Key.Value, blank, cleanDivide, ERROR, checkList);
                 newObjects.AddRange(processed.result);
             }
 
@@ -284,11 +294,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 var newColumnObjects = new List<ManiaHitObject>();
 
                 var cleanLocations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
-                                          (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                  }))
-                                  .OrderBy(h => h.startTime).ToList();
+                                           .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
+                                           {
+                                               (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
+                                           }))
+                                           .OrderBy(h => h.startTime).ToList();
 
                 double lastStartTime = cleanLocations[0].startTime;
                 double lastEndTime = cleanLocations[0].endTime;
@@ -352,7 +362,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        public (List<ManiaHitObject> result, List<ManiaHitObject> checkList) ProcessArea(ManiaBeatmap beatmap, Random Rng, List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> hitObjects, int fromKeys, int toKeys, int blankNum = 0, int clean = 0, double error = 0, List<ManiaHitObject>? checkList = null)
+        public (List<ManiaHitObject> result, List<ManiaHitObject> checkList) ProcessArea(ManiaBeatmap beatmap,
+                                                                                         Random rng,
+                                                                                         List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> hitObjects,
+                                                                                         int fromKeys,
+                                                                                         int toKeys,
+                                                                                         int blankNum = 0,
+                                                                                         int clean = 0,
+                                                                                         double error = 0,
+                                                                                         List<ManiaHitObject>? checkList = null)
         {
             List<ManiaHitObject> newObjects = new List<ManiaHitObject>();
             List<(int column, bool isBlank)> copyColumn = [];
@@ -361,9 +379,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             bool isFirst = true;
 
             int num = toKeys - fromKeys - blankNum;
+
             while (num > 0)
             {
-                int copy = Rng.Next(fromKeys);
+                int copy = rng.Next(fromKeys);
+
                 if (!copyColumn.Contains((copy, false)))
                 {
                     copyColumn.Add((copy, false));
@@ -372,6 +392,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
 
             num = blankNum;
+
             while (num > 0)
             {
                 int copy = -1;
@@ -380,15 +401,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
 
             num = toKeys - fromKeys;
+
             while (num > 0)
             {
-                int insert = Rng.Next(toKeys);
+                int insert = rng.Next(toKeys);
+
                 if (!insertColumn.Contains(insert))
                 {
                     insertColumn.Add(insert);
                     num--;
                 }
             }
+
             insertColumn = insertColumn.OrderBy(c => c).ToList();
 
             foreach (var timingPoint in hitObjects.GroupBy(h => h.startTime))
@@ -400,6 +424,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 for (int i = 0; i < locations.Count; i++)
                 {
                     int column = locations[i].column;
+
                     for (int j = 0; j < length; j++)
                     {
                         if (column == copyColumn[j].column && !copyColumn[j].isBlank)
@@ -413,6 +438,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             locations[i] = (locations[i].column + 1, locations[i].startTime, locations[i].endTime, locations[i].samples);
                         }
                     }
+
                     int finalColumn = Math.Clamp(locations[i].column, 0, toKeys - 1);
                     tempObjects.AddNote(locations[i].samples, finalColumn, locations[i].startTime, locations[i].endTime);
                 }
@@ -421,6 +447,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     var checkC = checkList.Select(h => h.Column).ToList();
                     var checkS = checkList.Select(h => h.StartTime).ToList();
+
                     for (int i = 0; i < tempObjects.Count; i++)
                     {
                         if (checkC.Contains(tempObjects[i].Column))
@@ -444,6 +471,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
+
                     isFirst = false;
                 }
 

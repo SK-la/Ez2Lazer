@@ -13,12 +13,11 @@ using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
-using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
@@ -46,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Pill Switch", "Use O2JAM pill function.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PillSwitch_Label), nameof(EzManiaModStrings.PillSwitch_Description))]
         public BindableBool PillMode { get; set; } = new BindableBool(true);
 
         public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
@@ -85,7 +84,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            HitWindows.SetSpecialDifficultyRange(O2HitModeExtension.CoolRange, O2HitModeExtension.CoolRange, O2HitModeExtension.GoodRange, O2HitModeExtension.GoodRange, O2HitModeExtension.BadRange, O2HitModeExtension.BadRange);
+            HitWindows.SetSpecialDifficultyRange(O2HitModeExtension.CoolRange, O2HitModeExtension.CoolRange, O2HitModeExtension.GoodRange, O2HitModeExtension.GoodRange, O2HitModeExtension.BadRange,
+                O2HitModeExtension.BadRange);
             O2HitModeExtension.PillCount.Value = 0;
             O2HitModeExtension.PillActivated = PillMode.Value;
             Windows = HitWindows;

@@ -117,7 +117,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Seed_Label), nameof(EzManiaModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
-
         // Column Number: 0 to n - 1
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -126,9 +125,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 return;
             }
 
-            Random? Rng;
             Seed.Value ??= RNG.Next();
-            Rng = new Random((int)Seed.Value);
+            var rng = new Random((int)Seed.Value);
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
@@ -144,73 +142,75 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     if (Probability.Value > 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 0, keys, 1, keys, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 0, keys, 1, keys, -1);
                     }
                     else if (Probability.Value < 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 0, keys, 1, 1, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 0, keys, 1, 1, -1);
                     }
                 }
-                break;
+                    break;
 
                 case 2:
                 {
                     if (Probability.Value > 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 1, keys, 1, keys, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 1, keys, 1, keys, -1);
                     }
                     else if (Probability.Value < 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 1, keys, 1, 1, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 1, keys, 1, 1, -1);
                     }
                 }
-                break;
+                    break;
 
                 case 3:
                 {
                     if (Probability.Value > 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 1, keys, 2, keys, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 1, keys, 2, keys, -1);
                     }
                     else if (Probability.Value < 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 1, keys, 2, 1, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 1, keys, 2, 1, -1);
                     }
                 }
-                break;
+                    break;
 
                 case 4:
                 {
                     if (Probability.Value > 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 2, keys, 1, keys, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 2, keys, 1, keys, -1);
                     }
                     else if (Probability.Value < 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 2, keys, 1, 1, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 2, keys, 1, 1, -1);
                     }
                 }
-                break;
+                    break;
 
                 case 5:
                 {
                     if (Probability.Value > 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 2, keys, 2, keys, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 2, keys, 2, keys, -1);
                     }
                     else if (Probability.Value < 0)
                     {
-                        Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, 2, keys, 2, 1, -1);
+                        Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, 2, keys, 2, 1, -1);
                     }
                 }
-                break;
+                    break;
 
                 case 6:
                 {
-                    Transform(newColumnObjects, maniaBeatmap, Rng, Probability.Value, Line.Value, keys, ComparisonStyle.Value, Extremum.Value, Step.Value, IgnoreComparison.Value, IgnoreInterval.Value);
+                    Transform(newColumnObjects, maniaBeatmap, rng, Probability.Value, Line.Value, keys, ComparisonStyle.Value, Extremum.Value, Step.Value, IgnoreComparison.Value,
+                        IgnoreInterval.Value);
                 }
-                break;
+                    break;
             }
+
             newObjects.AddRange(newColumnObjects);
 
             maniaBeatmap.HitObjects = [.. newObjects.OrderBy(h => h.StartTime)];
@@ -221,7 +221,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         /// </summary>
         /// <param name="obj"></param>
         /// <param name="beatmap"></param>
-        /// <param name="Rng"></param>
+        /// <param name="rng"></param>
         /// <param name="probability"></param>
         /// <param name="interval"></param>
         /// <param name="keys"></param>
@@ -230,7 +230,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         /// <param name="skipStep">Skip line when converting successfully.</param>
         /// <param name="ignoreComparison"></param>
         /// <param name="ignoreInterval"></param>
-        public void Transform(List<ManiaHitObject> obj, ManiaBeatmap beatmap, Random Rng, double probability, int interval, int keys, int compare, int extremum, int skipStep, bool ignoreComparison = false, bool ignoreInterval = false)
+        public void Transform(List<ManiaHitObject> obj,
+                              ManiaBeatmap beatmap,
+                              Random rng,
+                              double probability,
+                              int interval,
+                              int keys,
+                              int compare,
+                              int extremum,
+                              int skipStep,
+                              bool ignoreComparison = false,
+                              bool ignoreInterval = false)
         {
             List<int> columnWithNoNote = new List<int>(Enumerable.Range(0, keys));
             List<int> columnWithNote = new List<int>();
@@ -240,14 +250,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 foreach (var timingPoint in beatmap.HitObjects.GroupBy(h => h.StartTime))
                 {
                     var locations = timingPoint.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                              .Concat(timingPoint.OfType<HoldNote>().SelectMany(h => new[]
-                              {(
-                                        column: h.Column,
-                                        startTime: h.StartTime,
-                                        endTime: h.EndTime,
-                                        samples: h.GetNodeSamples(0)
-                                  )}))
-                              .OrderBy(h => h.startTime).ToList();
+                                               .Concat(timingPoint.OfType<HoldNote>().SelectMany(h => new[]
+                                               {
+                                                   (
+                                                       column: h.Column,
+                                                       startTime: h.StartTime,
+                                                       endTime: h.EndTime,
+                                                       samples: h.GetNodeSamples(0)
+                                                   )
+                                               }))
+                                               .OrderBy(h => h.startTime).ToList();
 
                     int quantity = timingPoint.Count();
 
@@ -258,14 +270,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         columnWithNote.Add(note.column);
                     }
 
-                    columnWithNoNote = columnWithNoNote.ShuffleIndex(Rng).ToList();
-                    columnWithNote = columnWithNote.ShuffleIndex(Rng).ToList();
+                    columnWithNoNote = columnWithNoNote.ShuffleIndex(rng).ToList();
+                    columnWithNote = columnWithNote.ShuffleIndex(rng).ToList();
 
                     if (probability > 0)
                     {
                         foreach (int column in columnWithNoNote)
                         {
-                            if (quantity < Extremum.Value && Rng.Next(100) < probability)
+                            if (quantity < Extremum.Value && rng.Next(100) < probability)
                             {
                                 if (!InLN(obj, column, timingPoint.Key))
                                 {
@@ -279,23 +291,24 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     {
                         foreach (int column in columnWithNote)
                         {
-                            if (quantity > Extremum.Value && Rng.Next(100) < probability)
+                            if (quantity > Extremum.Value && rng.Next(100) < probability)
                             {
                                 obj.RemoveNote(column, timingPoint.Key);
                                 quantity--;
                             }
                         }
                     }
+
                     columnWithNoNote = new List<int>(Enumerable.Range(0, keys));
                     columnWithNote = new List<int>();
                 }
+
                 return;
             }
 
-
-
             List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
-            List<List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>> manyLine = new List<List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>>();
+            List<List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>> manyLine =
+                new List<List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>>();
 
             var middleLine = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
             var lastLine = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
@@ -309,14 +322,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             foreach (var timingPoint in beatmap.HitObjects.GroupBy(h => h.StartTime))
             {
                 var locations = timingPoint.OfType<Note>().Select(n => (column: n.Column, startTime: n.StartTime, endTime: n.StartTime, samples: n.Samples))
-                          .Concat(timingPoint.OfType<HoldNote>().SelectMany(h => new[]
-                          {(
-                                        column: h.Column,
-                                        startTime: h.StartTime,
-                                        endTime: h.EndTime,
-                                        samples: h.GetNodeSamples(0)
-                                  )}))
-                          .OrderBy(h => h.startTime).ToList();
+                                           .Concat(timingPoint.OfType<HoldNote>().SelectMany(h => new[]
+                                           {
+                                               (
+                                                   column: h.Column,
+                                                   startTime: h.StartTime,
+                                                   endTime: h.EndTime,
+                                                   samples: h.GetNodeSamples(0)
+                                               )
+                                           }))
+                                           .OrderBy(h => h.startTime).ToList();
 
                 if (i < 1 + interval * 2)
                 {
@@ -337,12 +352,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                 columnWithNoNote.Remove(note.column);
                             }
                         }
+
                         middleLine = manyLine[i - interval];
                         nextLine = manyLine[i - interval + 1];
+
                         foreach (var note in middleLine)
                         {
                             columnWithNote.Add(note.column);
                         }
+
                         middleQuantity = columnWithNote.Count;
                         nextQuantity = nextLine.Count;
                         middleTime = middleLine[^1].startTime;
@@ -351,22 +369,23 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         if (ignoreInterval)
                         {
                             columnWithNoNote = new List<int>(Enumerable.Range(0, keys));
+
                             foreach (var note in middleLine)
                             {
                                 columnWithNoNote.Remove(note.column);
                             }
                         }
 
-                        columnWithNoNote = columnWithNoNote.ShuffleIndex(Rng).ToList();
-                        columnWithNote = columnWithNote.ShuffleIndex(Rng).ToList();
+                        columnWithNoNote = columnWithNoNote.ShuffleIndex(rng).ToList();
+                        columnWithNote = columnWithNote.ShuffleIndex(rng).ToList();
 
                         if (compare == 1)
                         {
-                            if (probability > 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                            if (probability > 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                             {
                                 foreach (int column in columnWithNoNote)
                                 {
-                                    if (middleQuantity < extremum && Rng.Next(100) < probability && middleTime is not null && samples is not null)
+                                    if (middleQuantity < extremum && rng.Next(100) < probability && middleTime is not null && samples is not null)
                                     {
                                         if (!InLN(obj, column, (double)middleTime))
                                         {
@@ -378,11 +397,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                     }
                                 }
                             }
-                            else if (probability < 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                            else if (probability < 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                             {
                                 foreach (int column in columnWithNote)
                                 {
-                                    if (middleQuantity > extremum && Rng.Next(100) < -probability && middleTime is not null)
+                                    if (middleQuantity > extremum && rng.Next(100) < -probability && middleTime is not null)
                                     {
                                         middleLine = middleLine.Where(s => s.column != column).ToList();
                                         middleQuantity--;
@@ -394,11 +413,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         }
                         else if (compare == 2)
                         {
-                            if (probability > 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                            if (probability > 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                             {
                                 foreach (int column in columnWithNoNote)
                                 {
-                                    if (middleQuantity < extremum && Rng.Next(100) < probability && middleTime is not null && samples is not null)
+                                    if (middleQuantity < extremum && rng.Next(100) < probability && middleTime is not null && samples is not null)
                                     {
                                         if (!InLN(obj, column, (double)middleTime))
                                         {
@@ -410,11 +429,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                     }
                                 }
                             }
-                            else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                            else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                             {
                                 foreach (int column in columnWithNote)
                                 {
-                                    if (middleQuantity > extremum && Rng.Next(100) < -probability && middleTime is not null)
+                                    if (middleQuantity > extremum && rng.Next(100) < -probability && middleTime is not null)
                                     {
                                         middleLine = middleLine.Where(s => s.column != column).ToList();
                                         middleQuantity--;
@@ -425,6 +444,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
+
                     line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
                     lastLine = middleLine;
                     middleLine = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
@@ -435,10 +455,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     columnWithNoNote = new List<int>(Enumerable.Range(0, keys));
                     columnWithNote = new List<int>();
                     i++;
+
                     if (i == 1 + interval * 2)
                     {
                         manyLine.RemoveAt(0);
                     }
+
                     continue;
                 }
 
@@ -447,6 +469,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     line.Add((note.column, note.startTime, note.endTime, note.samples));
                     obj.AddNote(note.samples, note.column, note.startTime, note.endTime);
                 }
+
                 manyLine.Add(line);
 
                 foreach (var inLine in manyLine)
@@ -456,12 +479,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         columnWithNoNote.Remove(note.column);
                     }
                 }
+
                 middleLine = manyLine[interval];
                 nextLine = manyLine[interval + 1];
+
                 foreach (var note in middleLine)
                 {
                     columnWithNote.Add(note.column);
                 }
+
                 middleQuantity = columnWithNote.Count;
                 nextQuantity = nextLine.Count;
                 middleTime = middleLine[^1].startTime;
@@ -470,6 +496,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 if (ignoreInterval)
                 {
                     columnWithNoNote = new List<int>(Enumerable.Range(0, keys));
+
                     foreach (var note in middleLine)
                     {
                         columnWithNoNote.Remove(note.column);
@@ -481,16 +508,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     goto skip;
                 }
 
-                columnWithNoNote = columnWithNoNote.ShuffleIndex(Rng).ToList();
-                columnWithNote = columnWithNote.ShuffleIndex(Rng).ToList();
+                columnWithNoNote = columnWithNoNote.ShuffleIndex(rng).ToList();
+                columnWithNote = columnWithNote.ShuffleIndex(rng).ToList();
 
                 if (compare == 1)
                 {
-                    if (probability > 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                    if (probability > 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNoNote)
                         {
-                            if (middleQuantity < extremum && Rng.Next(100) < probability && middleTime is not null && samples is not null)
+                            if (middleQuantity < extremum && rng.Next(100) < probability && middleTime is not null && samples is not null)
                             {
                                 if (!InLN(obj, column, (double)middleTime))
                                 {
@@ -502,11 +529,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
-                    else if (probability < 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                    else if (probability < 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
-                            if (middleQuantity > extremum && Rng.Next(100) < -probability && middleTime is not null)
+                            if (middleQuantity > extremum && rng.Next(100) < -probability && middleTime is not null)
                             {
                                 middleLine = middleLine.Where(s => s.column != column).ToList();
                                 middleQuantity--;
@@ -518,11 +545,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
                 else if (compare == 2)
                 {
-                    if (probability > 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                    if (probability > 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNoNote)
                         {
-                            if (middleQuantity < extremum && Rng.Next(100) < probability && middleTime is not null && samples is not null)
+                            if (middleQuantity < extremum && rng.Next(100) < probability && middleTime is not null && samples is not null)
                             {
                                 if (!InLN(obj, column, (double)middleTime))
                                 {
@@ -534,11 +561,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
-                    else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                    else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
-                            if (middleQuantity > extremum && Rng.Next(100) < -probability && middleTime is not null)
+                            if (middleQuantity > extremum && rng.Next(100) < -probability && middleTime is not null)
                             {
                                 middleLine = middleLine.Where(s => s.column != column).ToList();
                                 middleQuantity--;
@@ -550,10 +577,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
 
             skip:
+
                 if (skip > 0)
                 {
                     skip--;
                 }
+
                 line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
                 lastLine = middleLine;
                 middleLine = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
@@ -577,15 +606,19 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         columnWithNoNote.Remove(note.column);
                     }
                 }
+
                 middleLine = manyLine[i];
+
                 if (i + 1 < manyLine.Count)
                 {
                     nextLine = manyLine[i + 1];
                 }
+
                 foreach (var note in middleLine)
                 {
                     columnWithNote.Add(note.column);
                 }
+
                 middleQuantity = columnWithNote.Count;
                 nextQuantity = nextLine.Count;
                 middleTime = middleLine[^1].startTime;
@@ -594,22 +627,23 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 if (ignoreInterval)
                 {
                     columnWithNoNote = new List<int>(Enumerable.Range(0, keys));
+
                     foreach (var note in middleLine)
                     {
                         columnWithNoNote.Remove(note.column);
                     }
                 }
 
-                columnWithNoNote = columnWithNoNote.ShuffleIndex(Rng).ToList();
-                columnWithNote = columnWithNote.ShuffleIndex(Rng).ToList();
+                columnWithNoNote = columnWithNoNote.ShuffleIndex(rng).ToList();
+                columnWithNote = columnWithNote.ShuffleIndex(rng).ToList();
 
                 if (compare == 1)
                 {
-                    if (probability > 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                    if (probability > 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNoNote)
                         {
-                            if (middleQuantity < extremum && Rng.Next(100) < probability && middleTime is not null && samples is not null)
+                            if (middleQuantity < extremum && rng.Next(100) < probability && middleTime is not null && samples is not null)
                             {
                                 if (!InLN(obj, column, (double)middleTime))
                                 {
@@ -620,11 +654,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
-                    else if (probability < 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
+                    else if (probability < 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
-                            if (middleQuantity > extremum && Rng.Next(100) < -probability && middleTime is not null)
+                            if (middleQuantity > extremum && rng.Next(100) < -probability && middleTime is not null)
                             {
                                 middleLine = middleLine.Where(s => s.column != column).ToList();
                                 middleQuantity--;
@@ -635,11 +669,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
                 else if (compare == 2)
                 {
-                    if (probability > 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                    if (probability > 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNoNote)
                         {
-                            if (middleQuantity < extremum && Rng.Next(100) < probability && middleTime is not null && samples is not null)
+                            if (middleQuantity < extremum && rng.Next(100) < probability && middleTime is not null && samples is not null)
                             {
                                 if (!InLN(obj, column, (double)middleTime))
                                 {
@@ -650,11 +684,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
-                    else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
+                    else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
-                            if (middleQuantity > extremum && Rng.Next(100) < -probability && middleTime is not null)
+                            if (middleQuantity > extremum && rng.Next(100) < -probability && middleTime is not null)
                             {
                                 middleLine = middleLine.Where(s => s.column != column).ToList();
                                 middleQuantity--;

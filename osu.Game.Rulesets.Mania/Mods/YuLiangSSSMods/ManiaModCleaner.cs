@@ -22,8 +22,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "CL";
 
-        public override LocalisableString Description => //"Clean shit or bullet on map or eliminate impacts between mods(e.g. Overlap note).";
-            "Clean bullet or other notes on map(e.g. Overlap note).";
+        public override LocalisableString Description => EzManiaModStrings.Cleaner_Description;
 
         public override IconUsage? Icon => FontAwesome.Solid.Broom;
 
@@ -99,16 +98,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 var newColumnObjects = new List<ManiaHitObject>();
 
                 var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
+                                      .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
+                                      {
                                           (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                  }))
-                                  .OrderBy(h => h.startTime).ToList();
+                                      }))
+                                      .OrderBy(h => h.startTime).ToList();
 
                 double lastStartTime = locations[0].startTime;
                 double lastEndTime = locations[0].endTime;
                 var lastSample = locations[0].samples;
-
 
                 // Zero
                 //if (lastStartTime != lastEndTime)
@@ -131,8 +129,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 //    });
                 //}
 
-
-
                 for (int i = 0; i < locations.Count; i++)
                 {
                     if (i == 0)
@@ -142,6 +138,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         lastSample = locations[0].samples;
                         continue;
                     }
+
                     if (locations[i].startTime >= lastStartTime && locations[i].startTime <= lastEndTime)
                     {
                         locations.RemoveAt(i);
@@ -157,6 +154,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             lastEndTime = locations[i].endTime;
                             lastSample = locations[i].samples;
                         }
+
                         locations.RemoveAt(i);
                         i--;
                         continue;
@@ -170,6 +168,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             lastEndTime = locations[i].endTime;
                             lastSample = locations[i].samples;
                         }
+
                         locations.RemoveAt(i);
                         i--;
                         continue;
@@ -183,7 +182,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
 
                 newColumnObjects.AddNote(lastSample, column.Key, lastStartTime, lastEndTime);
-
 
                 // Last
                 //if (lastStartTime != lastEndTime)
@@ -205,8 +203,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 //        Samples = locations[locations.Count - 1].samples
                 //    });
                 //}
-
-
 
                 newObjects.AddRange(newColumnObjects);
             }

@@ -144,7 +144,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     RemedyMeh--;
                     ApplyResult(GetCappedResult(HitResult.Ok));
                 }
-                else if (userTriggered && RemedyMiss > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Meh)) && Math.Abs(timeOffset) <= Math.Abs(HitWindows.WindowFor(HitResult.Miss)))
+                else if (userTriggered && RemedyMiss > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Meh))
+                         && Math.Abs(timeOffset) <= Math.Abs(HitWindows.WindowFor(HitResult.Miss)))
                 {
                     RemedyMiss--;
                     ApplyResult(GetCappedResult(HitResult.Meh));
@@ -183,8 +184,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             ApplyMinResult();
                         }
                     }
-
-                    return;
                 }
                 else
                 {
@@ -219,7 +218,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     RemedyMeh--;
                     ApplyResult(GetCappedResult(HitResult.Ok));
                 }
-                else if (userTriggered && RemedyMiss > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Meh)) && Math.Abs(timeOffset) <= Math.Abs(HitWindows.WindowFor(HitResult.Miss)))
+                else if (userTriggered && RemedyMiss > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Meh))
+                         && Math.Abs(timeOffset) <= Math.Abs(HitWindows.WindowFor(HitResult.Miss)))
                 {
                     RemedyMiss--;
                     ApplyResult(GetCappedResult(HitResult.Meh));
@@ -258,8 +258,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             ApplyMinResult();
                         }
                     }
-
-                    return;
                 }
                 else
                 {
@@ -294,7 +292,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     RemedyMeh--;
                     ApplyResult(GetCappedResult(HitResult.Ok));
                 }
-                else if (HoldNote.IsHolding.Value && userTriggered && RemedyMiss > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Meh)) && Math.Abs(timeOffset) <= Math.Abs(HitWindows.WindowFor(HitResult.Miss)))
+                else if (HoldNote.IsHolding.Value && userTriggered && RemedyMiss > 0 && Math.Abs(timeOffset) > Math.Abs(HitWindows.WindowFor(HitResult.Meh))
+                         && Math.Abs(timeOffset) <= Math.Abs(HitWindows.WindowFor(HitResult.Miss)))
                 {
                     RemedyMiss--;
                     ApplyResult(GetCappedResult(HitResult.Meh));
@@ -333,8 +332,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             ApplyMinResult();
                         }
                     }
-
-                    return;
                 }
                 else
                 {
@@ -388,7 +385,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     StartTime = EndTime,
                     Column = Column,
-                    Samples = GetNodeSamples((NodeSamples?.Count - 1) ?? 1),
+                    Samples = GetNodeSamples(NodeSamples?.Count - 1 ?? 1),
                 });
 
                 AddNested(Body = new HoldNoteBody

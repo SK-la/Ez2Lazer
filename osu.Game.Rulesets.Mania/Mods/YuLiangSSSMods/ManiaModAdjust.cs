@@ -30,13 +30,22 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public partial class ManiaModAdjust : ModRateAdjust, IApplicableAfterConversion, IApplicableToDifficulty, IApplicableToBeatmap, IManiaRateAdjustmentMod,
-                                          IApplicableToDrawableRuleset<ManiaHitObject>, IApplicableFailOverride, IApplicableToHUD, IReadFromConfig, IApplicableToHealthProcessor,
-                                          IApplicableToScoreProcessor, IHasSeed //, IUpdatableByPlayfield
+    public partial class ManiaModAdjust : ModRateAdjust,
+                                          IApplicableAfterConversion,
+                                          IApplicableToDifficulty,
+                                          IApplicableToBeatmap,
+                                          IManiaRateAdjustmentMod,
+                                          IApplicableToDrawableRuleset<ManiaHitObject>,
+                                          IApplicableFailOverride,
+                                          IApplicableToHUD,
+                                          IReadFromConfig,
+                                          IApplicableToHealthProcessor,
+                                          IApplicableToScoreProcessor,
+                                          IHasSeed //, IUpdatableByPlayfield
     {
         public override string Name => @"Adjust";
 
-        public override LocalisableString Description => @"Set your settings.";
+        public override LocalisableString Description => EzManiaModStrings.Adjust_Description;
 
         public override string Acronym => "AJ";
 
@@ -84,7 +93,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.DrainRate
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustAccuracy_Label), nameof(EzManiaModStrings.AdjustAccuracy_Description), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustAccuracy_Label), nameof(EzManiaModStrings.AdjustAccuracy_Description),
+            SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable(0)
         {
             Precision = 0.1f,
@@ -173,7 +183,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string ExtendedIconInformation => "";
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SpeedChange_Label), nameof(EzManiaModStrings.SpeedChange_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SpeedChange_Label), nameof(EzManiaModStrings.SpeedChange_Description),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.1,

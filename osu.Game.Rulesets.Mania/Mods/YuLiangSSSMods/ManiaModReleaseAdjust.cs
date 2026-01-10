@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 
-namespace osu.Game.Rulesets.Mania.Mods
+namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModReleaseAdjust : Mod, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
@@ -112,7 +112,7 @@ namespace osu.Game.Rulesets.Mania.Mods
                 {
                     StartTime = EndTime,
                     Column = Column,
-                    Samples = GetNodeSamples((NodeSamples?.Count - 1) ?? 1),
+                    Samples = GetNodeSamples(NodeSamples?.Count - 1 ?? 1),
                 });
 
                 AddNested(Body = new HoldNoteBody

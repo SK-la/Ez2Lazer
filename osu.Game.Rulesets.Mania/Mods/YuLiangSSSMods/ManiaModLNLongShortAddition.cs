@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LS";
 
-        public override LocalisableString Description => EzManiaModStrings.LNLongShortAddition_Description;// "From YuLiangSSS' LN Transformer.";
+        public override LocalisableString Description => EzManiaModStrings.LNLongShortAddition_Description;
 
         public readonly int[] DivideNumber = [2, 4, 8, 3, 6, 9, 5, 7, 12, 16, 48, 35, 64];
 
@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Long / Short %", "The Shape", 0)]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LongShortPercent_Label), nameof(EzManiaModStrings.LongShortPercent_Description), 0)]
         public BindableNumber<int> LongShort { get; set; } = new BindableInt(40)
         {
             MinValue = 0,
@@ -52,9 +52,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var newObjects = new List<ManiaHitObject>();
             var originalLNObjects = new List<ManiaHitObject>();
 
-            Random? Rng;
             Seed.Value ??= RNG.Next();
-            Rng = new Random((int)Seed.Value);
+            var rng = new Random((int)Seed.Value);
 
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
@@ -72,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     double beatLength = beatmap.ControlPointInfo.TimingPointAt(locations[i + 1].startTime).BeatLength;
                     double beatBPM = beatmap.ControlPointInfo.TimingPointAt(locations[i + 1].startTime).BPM;
                     double timeDivide = beatLength / Divide.Value; //beatBPM / 60 * 100 / Divide.Value;
-                    double duration = Rng.Next(100) < LongShort.Value ? fullDuration - timeDivide : timeDivide;
+                    double duration = rng.Next(100) < LongShort.Value ? fullDuration - timeDivide : timeDivide;
                     bool flag = true; // Can be transformed to LN
 
                     if (duration < timeDivide)
@@ -96,7 +95,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         });
                         originalLNObjects.AddNote(locations[i].samples, column.Key, locations[i].startTime, locations[i].endTime);
                     }
-                    else if (Rng.Next(100) < Percentage.Value && flag)
+                    else if (rng.Next(100) < Percentage.Value && flag)
                     {
                         newColumnObjects.Add(new HoldNote
                         {
@@ -117,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     }
                 }
 
-                if (Math.Abs(locations[locations.Count - 1].startTime - locations[locations.Count - 1].endTime) <= 2 || Rng.Next(100) >= Percentage.Value)
+                if (Math.Abs(locations[locations.Count - 1].startTime - locations[locations.Count - 1].endTime) <= 2 || rng.Next(100) >= Percentage.Value)
                 {
                     newColumnObjects.Add(new Note
                     {
@@ -140,7 +139,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 newObjects.AddRange(newColumnObjects);
             }
 
-            ManiaModHelper.AfterTransform(newObjects, originalLNObjects, maniaBeatmap, Rng, OriginalLN.Value, Gap.Value, SelectColumn.Value, DurationLimit.Value, LineSpacing.Value, InvertLineSpacing.Value);
+            ManiaModHelper.AfterTransform(newObjects, originalLNObjects, maniaBeatmap, rng, OriginalLN.Value, Gap.Value, SelectColumn.Value, DurationLimit.Value, LineSpacing.Value,
+                InvertLineSpacing.Value);
 
             maniaBeatmap.Breaks.Clear();
         }

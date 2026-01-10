@@ -6,10 +6,9 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.SelectV2;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {

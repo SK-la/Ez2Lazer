@@ -1,21 +1,13 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Framework.Utils;
-using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
@@ -26,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LN";
 
-        public override LocalisableString Description => "LN";
+        public override LocalisableString Description => EzManiaModStrings.LN_Description;
 
         public override double ScoreMultiplier => 1;
 

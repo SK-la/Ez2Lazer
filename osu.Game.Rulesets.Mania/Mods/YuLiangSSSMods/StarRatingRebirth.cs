@@ -104,45 +104,45 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var hit = EasyObject.FromManiaObjects(objects);
             if (rate != 1) hit = EasyObject.FromRate(hit, rate);
 
-            PreProcess(hit, keys, od, out double x, out int K, out int T,
+            PreProcess(hit, keys, od, out double x, out int key, out int time,
                 out var noteSeq, out var noteSeqByCol,
                 out var lnSeq, out var tailSeq, out var lnSeqByColumn);
 
-            GetCorners(noteSeq, T, out int[] baseCorners, out int[] aCorners, out int[] allCorners);
+            GetCorners(noteSeq, time, out int[] baseCorners, out int[] aCorners, out int[] allCorners);
 
             // 对于每一列，存储其使用情况（在150ms内是否非空）。例如：keyUsage[k, i]
-            bool[,] keyUsage = GetKeyUsage(noteSeq, K, T, baseCorners);
+            bool[,] keyUsage = GetKeyUsage(noteSeq, key, time, baseCorners);
 
             // 在base_corners的每个时间点，构建活跃列的列表
             int[][] activeColumns = Enumerable.Range(0, baseCorners.Length)
-                                              .Select(i => Enumerable.Range(0, K)
+                                              .Select(i => Enumerable.Range(0, key)
                                                                      .Where(k => keyUsage[k, i])
                                                                      .ToArray())
                                               .ToArray();
 
-            double[,] keyUsage400 = GetKeyUsage400(noteSeq, K, T, baseCorners);
+            double[,] keyUsage400 = GetKeyUsage400(noteSeq, key, time, baseCorners);
 
-            double[] anchor = ComputeAnchor(K, keyUsage400, baseCorners);
+            double[] anchor = ComputeAnchor(key, keyUsage400, baseCorners);
 
-            ComputeJbar(K, T, x, noteSeqByCol, baseCorners, out double[,] deltaKs, out double[] jBar);
+            ComputeJbar(key, time, x, noteSeqByCol, baseCorners, out double[,] deltaKs, out double[] jBar);
             double[] jBarInterp = Utils.InterpValues(allCorners, baseCorners, jBar);
 
-            double[] xBar = ComputeXbar(K, T, x, noteSeqByCol, activeColumns, baseCorners);
+            double[] xBar = ComputeXbar(key, time, x, noteSeqByCol, activeColumns, baseCorners);
             double[] xBarInterp = Utils.InterpValues(allCorners, baseCorners, xBar);
 
             // 构建LN主体的稀疏表示
-            LNBodiesCountSparseRepresentation(lnSeq, T, out int[] points, out double[] cumsum, out double[] values);
+            LNBodiesCountSparseRepresentation(lnSeq, time, out int[] points, out double[] cumsum, out double[] values);
 
-            double[] pBar = ComputePbar(K, T, x, noteSeq, points, cumsum, values, anchor, baseCorners);
+            double[] pBar = ComputePbar(key, time, x, noteSeq, points, cumsum, values, anchor, baseCorners);
             double[] pBarInterp = Utils.InterpValues(allCorners, baseCorners, pBar);
 
-            double[] aBar = ComputeAbar(K, T, x, noteSeqByCol, activeColumns, deltaKs, aCorners, baseCorners);
+            double[] aBar = ComputeAbar(key, time, x, noteSeqByCol, activeColumns, deltaKs, aCorners, baseCorners);
             double[] aBarInterp = Utils.InterpValues(allCorners, aCorners, aBar);
 
-            double[] rBar = ComputeRbar(K, T, x, noteSeqByCol, tailSeq, baseCorners);
+            double[] rBar = ComputeRbar(key, time, x, noteSeqByCol, tailSeq, baseCorners);
             double[] rBarInterp = Utils.InterpValues(allCorners, baseCorners, rBar);
 
-            ComputeCAndKs(K, T, noteSeq, keyUsage, baseCorners, out double[] cStep, out double[] ksStep);
+            ComputeCAndKs(key, time, noteSeq, keyUsage, baseCorners, out double[] cStep, out double[] ksStep);
             double[] cArr = Utils.StepInterp(allCorners, baseCorners, cStep);
             double[] ksArr = Utils.StepInterp(allCorners, baseCorners, ksStep);
 
@@ -226,8 +226,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return sr;
         }
 
-        internal static void ComputeCAndKs(int K, int T, EasyObject[] noteSeq, bool[,] keyUsage, int[] baseCorners,
-                                           out double[] cStep, out double[] ksStep)
+        internal static void ComputeCAndKs(int K,
+                                           int T,
+                                           EasyObject[] noteSeq,
+                                           bool[,] keyUsage,
+                                           int[] baseCorners,
+                                           out double[] cStep,
+                                           out double[] ksStep)
         {
             int cornersLength = baseCorners.Length;
 
@@ -430,8 +435,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return rBar;
         }
 
-        internal static void LNBodiesCountSparseRepresentation(EasyObject[] lnSeq, int T,
-                                                               out int[] points, out double[] cumsum, out double[] values)
+        internal static void LNBodiesCountSparseRepresentation(EasyObject[] lnSeq,
+                                                               int T,
+                                                               out int[] points,
+                                                               out double[] cumsum,
+                                                               out double[] values)
         {
             // 字典：索引 -> 长音符体变化量（转换前）
             var diff = new Dictionary<int, double>();
@@ -578,8 +586,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return xBar;
         }
 
-        internal static void ComputeJbar(int K, int T, double x, EasyObject[][] noteSeqByColumn, int[] baseCorners,
-                                         out double[,] deltaKs, out double[] jBar)
+        internal static void ComputeJbar(int K,
+                                         int T,
+                                         double x,
+                                         EasyObject[][] noteSeqByColumn,
+                                         int[] baseCorners,
+                                         out double[,] deltaKs,
+                                         out double[] jBar)
         {
             int cornersLength = baseCorners.Length;
 
@@ -810,8 +823,17 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                     .ToArray();
         }
 
-        internal static void PreProcess(EasyObject[] objects, int keys, double od, out double x, out int K, out int T,
-                                        out EasyObject[] noteSeq, out EasyObject[][] noteSeqByCol, out EasyObject[] lnSeq, out EasyObject[] tailSeq, out EasyObject[][] lnSeqByCol)
+        internal static void PreProcess(EasyObject[] objects,
+                                        int keys,
+                                        double od,
+                                        out double x,
+                                        out int K,
+                                        out int T,
+                                        out EasyObject[] noteSeq,
+                                        out EasyObject[][] noteSeqByCol,
+                                        out EasyObject[] lnSeq,
+                                        out EasyObject[] tailSeq,
+                                        out EasyObject[][] lnSeqByCol)
         {
             K = keys;
             x = 0.3 * Math.Pow((64.5 - Math.Ceiling(od * 3)) / 500, 0.5);
@@ -887,16 +909,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var fixedColumnObjects = new List<ManiaHitObject>();
 
-            var locations = objects.OfType<Note>().Select(n =>
-                                   (
+            var locations = objects.OfType<Note>().Select(n => (
                                        startTime: n.StartTime,
                                        samples: n.Samples,
                                        column: n.Column,
                                        endTime: n.StartTime,
                                        duration: n.StartTime - n.StartTime
                                    ))
-                                   .Concat(objects.OfType<HoldNote>().Select(h =>
-                                   (
+                                   .Concat(objects.OfType<HoldNote>().Select(h => (
                                        startTime: h.StartTime,
                                        samples: h.Samples,
                                        column: h.Column,
@@ -1091,23 +1111,21 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     keys++;
                     keyvalue = keys + 1;
 
-                    locations = fixedColumnObjects.OfType<Note>().Select(n =>
-                                                  (
+                    locations = fixedColumnObjects.OfType<Note>().Select(n => (
                                                       startTime: n.StartTime,
                                                       samples: n.Samples,
                                                       column: n.Column,
                                                       endTime: n.StartTime,
                                                       duration: n.StartTime - n.StartTime
                                                   ))
-                                                  .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h =>
-                                                  (
+                                                  .Concat(fixedColumnObjects.OfType<HoldNote>().Select(h => (
                                                       startTime: h.StartTime,
                                                       samples: h.Samples,
                                                       column: h.Column,
                                                       endTime: h.EndTime,
                                                       duration: h.EndTime - h.StartTime
                                                   ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
-                    ;
+                    
                     nullColumn = -1;
                     fixedColumnObjects.Clear();
                     newColumnObjects.Clear();
@@ -1205,15 +1223,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var newColumnObjects = new List<ManiaHitObject>();
 
-            var locations = objects.OfType<Note>().Select(n =>
-                                   (
+            var locations = objects.OfType<Note>().Select(n => (
                                        startTime: n.StartTime,
                                        samples: n.Samples,
                                        column: n.Column,
                                        endTime: n.StartTime
                                    ))
-                                   .Concat(objects.OfType<HoldNote>().Select(h =>
-                                   (
+                                   .Concat(objects.OfType<HoldNote>().Select(h => (
                                        startTime: h.StartTime,
                                        samples: h.Samples,
                                        column: h.Column,
@@ -1361,15 +1377,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var newObjects = new List<ManiaHitObject>();
 
-            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n =>
-                                        (
+            var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n => (
                                             column: n.Column,
                                             startTime: n.StartTime,
                                             endTime: n.StartTime,
                                             samples: n.Samples
                                         ))
-                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
-                                        (
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h => (
                                             column: h.Column,
                                             startTime: h.StartTime,
                                             endTime: h.EndTime,
@@ -1536,9 +1550,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return cleanObjects.OrderBy(h => h.StartTime).ToList();
         }
 
-        public static (List<ManiaHitObject> result, List<ManiaHitObject> checkList) ProcessArea(ManiaBeatmap beatmap, Random Rng,
+        public static (List<ManiaHitObject> result, List<ManiaHitObject> checkList) ProcessArea(ManiaBeatmap beatmap,
+                                                                                                Random Rng,
                                                                                                 List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> hitObjects,
-                                                                                                int fromKeys, int toKeys, int blankNum = 0, int clean = 0, double error = 0,
+                                                                                                int fromKeys,
+                                                                                                int toKeys,
+                                                                                                int blankNum = 0,
+                                                                                                int clean = 0,
+                                                                                                double error = 0,
                                                                                                 List<ManiaHitObject>? checkList = null)
         {
             var newObjects = new List<ManiaHitObject>();
