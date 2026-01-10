@@ -332,7 +332,6 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModNtoMAnother(),
                         // new ManiaModChangeSpeedByAccuracy(), // 无法使用
                         new ManiaModCleaner(),
-                        new ManiaModDeleteColumn(), // 待调试
                         new ManiaModDoublePlay(),
                         new ManiaModGracer(),
                         new ManiaModJackAdjust(),
@@ -351,13 +350,14 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModPlayfieldTransformation(), //加载有问题
                         new ManiaModReleaseAdjust(),
                         new ManiaModRemedy(),
-                        new StarRatingRebirth(),
+                        new ModStarRatingRebirth(),
                     };
 
                 case ModType.LA_Mod:
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
+                        new ManiaModCleanColumn(), // 待调试
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         new ManiaModLoopPlayClip(),

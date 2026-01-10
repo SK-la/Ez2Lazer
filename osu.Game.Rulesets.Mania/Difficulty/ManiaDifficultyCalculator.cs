@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         {
             double sr = originalValue;
 
-            if (mods.Any(m => m is StarRatingRebirth))
+            if (mods.Any(m => m is ModStarRatingRebirth))
             {
                 try
                 {

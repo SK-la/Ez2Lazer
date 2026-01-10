@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class StarRatingRebirth : Mod, IApplicableAfterBeatmapConversion
+    public class ModStarRatingRebirth : Mod, IApplicableAfterBeatmapConversion
     {
         public override string Name => "Star Rating Rebirth";
 
@@ -1125,7 +1125,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                                       endTime: h.EndTime,
                                                       duration: h.EndTime - h.StartTime
                                                   ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
-                    
+
                     nullColumn = -1;
                     fixedColumnObjects.Clear();
                     newColumnObjects.Clear();

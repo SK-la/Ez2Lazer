@@ -81,8 +81,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         public static readonly LocalisableString CutStartTime_Description = new EzLocalisableString("切片开始时间, 默认是秒。推荐通过谱面编辑器A-B控件设置，可自动输入", "Cut StartTime. Default is second.");
         public static readonly LocalisableString CutEndTime_Label = new EzLocalisableString("切片结束时间", "Cut End Time");
         public static readonly LocalisableString CutEndTime_Description = new EzLocalisableString("切片结束时间, 默认是秒。推荐通过谱面编辑器A-B控件设置，可自动输入", "Cut EndTime. Default is second.");
-        public static readonly LocalisableString CutTimeEnd_Label = new EzLocalisableString("切片结束时间", "Cut Time End");
-        public static readonly LocalisableString CutTimeEnd_Description = new EzLocalisableString("切片结束时间, 默认是秒。推荐通过谱面编辑器A-B控件设置，可自动输入", "Cut Time End. Default is second.");
         public static readonly LocalisableString UseMillisecond_Label = new EzLocalisableString("使用毫秒", "Use Millisecond");
         public static readonly LocalisableString UseMillisecond_Description = new EzLocalisableString("改为使用ms单位", "Use millisecond(ms).");
         public static readonly LocalisableString UseGlobalABRange_Label = new EzLocalisableString("使用全局A-B范围", "Use Global A-B Range");
@@ -125,7 +123,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         // ====================================================================================================
 
         public static readonly LocalisableString ChangeSpeedByAccuracy_Description = new EzLocalisableString("根据准确度调整游戏速度", "Adapt the speed of the game based on the accuracy.");
-        public static readonly LocalisableString Adjust_Description = new EzLocalisableString("设置你的设置", "Set your settings.");
+        public static readonly LocalisableString Adjust_Description = new EzLocalisableString("凉雨Mod一卡通", "Set your settings.");
         public static readonly LocalisableString LN_Description = new EzLocalisableString("LN转换器", "LN Transformer");
         public static readonly LocalisableString Cleaner_Description = new EzLocalisableString("清理谱面中的子弹或其他音符（例如重叠音符）", "Clean bullet or other notes on map(e.g. Overlap note).");
         public static readonly LocalisableString LNJudgementAdjust_Description = new EzLocalisableString("调整LN的判定", "Adjust the judgement of LN.");
@@ -142,8 +140,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         public static readonly LocalisableString PlayfieldTransformation_Description = new EzLocalisableString("根据连击数调整游戏区域缩放", "Adjusts playfield scale based on combo.");
         public static readonly LocalisableString O2Health_Description = new EzLocalisableString("为O2JAM玩家设计的生命值系统", "Health system for O2JAM players.");
         public static readonly LocalisableString Remedy_Description = new EzLocalisableString("修复较低的判定", "Remedy lower judgement.");
-        public static readonly LocalisableString StarRatingRebirth_Description = new EzLocalisableString("sunnyxxy的新算法", "New algorithm by sunnyxxy.");
-        public static readonly LocalisableString StarRatingRebirthNoTask_Description = new EzLocalisableString("新算法", "New algorithm.");
+        public static readonly LocalisableString StarRatingRebirth_Description = new EzLocalisableString("sunnyxxy的星级算法，替换官方星级标记", "New algorithm by sunnyxxy.");
         public static readonly LocalisableString ReleaseAdjust_Description = new EzLocalisableString("不再需要计时长按音符的结尾", "No more timing the end of hold notes.");
         public static readonly LocalisableString NoteAdjust_Description = new EzLocalisableString("制作更多或更少的音符", "To make more or less note.");
         public static readonly LocalisableString LNLongShortAddition_Description = new EzLocalisableString("LN转换器附加版本", "LN Transformer additional version.");
@@ -152,8 +149,20 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         public static readonly LocalisableString JudgmentsAdjust_Description = new EzLocalisableString("修改你的判定", "Modify your judgement.");
         public static readonly LocalisableString JackAdjust_Description = new EzLocalisableString("Jack的模式", "Pattern of Jack");
 
-        public static readonly LocalisableString DeleteSpace_Description = new EzLocalisableString("让6k玩家使用7k谱面。（但我不知道如何移除中间列）",
-            "For 6k Player to use 7k maps. (But I don't know how to remove middle column.)");
+        public static readonly LocalisableString CleanColumn_Description = new EzLocalisableString("清理Column, 推荐搭配Column Type使用",
+            "Clean Column, use with Column Type.");
+
+        // CleanColumn
+        public static readonly LocalisableString DeleteSColumn_Label = new EzLocalisableString("删除S列", "Delete S Column Type");
+        public static readonly LocalisableString DeleteSColumn_Description = new EzLocalisableString("开启时删除标记了S Column Type的列", "Delete columns marked with S column type when enabled");
+        public static readonly LocalisableString DeletePColumn_Label = new EzLocalisableString("删除P列", "Delete P Column Type");
+        public static readonly LocalisableString DeletePColumn_Description = new EzLocalisableString("开启时删除标记了P Column Type的列", "Delete columns marked with P column type when enabled");
+        public static readonly LocalisableString DeleteEColumn_Label = new EzLocalisableString("删除E列", "Delete E Column Type");
+        public static readonly LocalisableString DeleteEColumn_Description = new EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
+        public static readonly LocalisableString EnableCustomDelete_Label = new EzLocalisableString("自定义删除列", "Enable Custom Delete");
+        public static readonly LocalisableString EnableCustomDelete_Description = new EzLocalisableString("开启后启用自定义删除列功能", "Enable custom column deletion when enabled");
+        public static readonly LocalisableString CustomDeleteColumn_Label = new EzLocalisableString("自定义删除列序号", "Custom Delete Column Index");
+        public static readonly LocalisableString CustomDeleteColumn_Description = new EzLocalisableString("按照输入的序号，删除谱面中对应编号的列", "Delete the column with the specified index");
 
         // ====================================================================================================
         // YuLiangSSSMods - SettingSource Labels & Descriptions
@@ -293,7 +302,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         public static readonly LocalisableString MinimumScale_Label = new EzLocalisableString("最小缩放", "Minimum scale");
         public static readonly LocalisableString MinimumScale_Description = new EzLocalisableString("游戏区域的最小缩放", "The minimum scale of the playfield.");
 
-        // StarRatingRebirth
+        // ModStarRatingRebirth
         public static readonly LocalisableString UseOriginalOD_Label = new EzLocalisableString("使用原始OD", "Use original OD");
         public static readonly LocalisableString UseOriginalOD_Description = new EzLocalisableString("高优先级", "High Priority");
         public static readonly LocalisableString UseCustomOD_Label = new EzLocalisableString("使用自定义OD", "Use custom OD");

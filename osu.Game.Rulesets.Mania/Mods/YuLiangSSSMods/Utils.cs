@@ -2,7 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using static osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods.StarRatingRebirth;
+using static osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods.ModStarRatingRebirth;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
