@@ -9,7 +9,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 {
     public class EzLocalizationManager
     {
-        private static readonly Dictionary<string, Dictionary<string, string>> resources
+        protected static readonly Dictionary<string, Dictionary<string, string>> resources
             = new Dictionary<string, Dictionary<string, string>>();
 
         static EzLocalizationManager()
@@ -70,12 +70,12 @@ namespace osu.Game.LAsEzExtensions.Configuration
             addResource("DisableCmdSpace", "游戏时禁用 Cmd+Space（聚焦搜索）", "Disable Cmd+Space (Spotlight) during gameplay");
         }
 
-        private static void addResource(string key, string chinese, string english)
+        protected static void addResource(string key, string chinese, string? english = null)
         {
             resources[key] = new Dictionary<string, string>
             {
                 ["zh"] = chinese,
-                ["en"] = english
+                ["en"] = english ?? key
             };
         }
 
