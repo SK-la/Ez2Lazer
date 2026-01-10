@@ -282,17 +282,17 @@ namespace osu.Game.Screens.SelectV2
                         new OsuSpriteText
                         {
                             Text = $"{index + 1}/",
-                            Font = OsuFont.GetFont(size: 14),
+                            Font = OsuFont.GetFont(size: 12),
                             Colour = Color4.Gray,
                         },
                         valueText = new OsuSpriteText
                         {
-                            Font = OsuFont.GetFont(size: 16),
+                            Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.LightCoral,
                         },
                         holdText = new OsuSpriteText
                         {
-                            Font = OsuFont.GetFont(size: 14),
+                            Font = OsuFont.GetFont(size: 12),
                             Colour = Color4.LightGoldenrodYellow.Darken(0.2f),
                             Anchor = Anchor.BottomLeft,
                             Origin = Anchor.BottomLeft,

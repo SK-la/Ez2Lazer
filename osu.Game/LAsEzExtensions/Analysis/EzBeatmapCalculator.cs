@@ -78,9 +78,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
         // TODO: 计算比较粗糙，后续可优化。
         public static string GetScratchFromPrecomputed(Dictionary<int, int> columnCounts, double maxKps, List<double> kpsList, int keyCount)
         {
-            if (keyCount <= 0) return "[?K]";
+            if (keyCount <= 0) return "[?K] ";
 
-            if (maxKps == 0) return $"[{keyCount}K]";
+            if (maxKps == 0) return $"[{keyCount}K] ";
 
             // 将列统计映射为固定长度数组，方便计算 empty 列。
             int[] countsByColumn = new int[keyCount];
@@ -98,26 +98,26 @@ namespace osu.Game.LAsEzExtensions.Analysis
             // double averageNotes = middleCounts.Length > 0 ? middleCounts.Average() : 0;
             // int maxNotesInMiddle = middleCounts.Length > 0 ? middleCounts.Max() : 0;
 
-            string result = $"[{keyCount}K]";
+            string result = $"[{keyCount}K] ";
 
             if (keyCount == 6 || keyCount == 8)
             {
                 if (isFirstHigh || isLastHigh)
-                    result = $"[{keyCount - 1}K1S]";
+                    result = $"[{keyCount - 1}K1S] ";
                 else if (isFirstLow || isLastLow)
-                    result = $"[{keyCount - 1}+1K]";
+                    result = $"[{keyCount - 1}+1K] ";
             }
             else if (keyCount >= 7)
             {
                 if (isFirstHigh || isLastHigh)
-                    result = $"[{keyCount - 2}K2S]";
+                    result = $"[{keyCount - 2}K2S] ";
                 else if (isFirstLow || isLastLow)
-                    result = $"[{keyCount - 2}+2K]";
+                    result = $"[{keyCount - 2}+2K] ";
             }
 
             int emptyColumns = countsByColumn.Count(c => c == 0);
             if (emptyColumns > 0)
-                result = $"[{keyCount - emptyColumns}K_{emptyColumns}Empty]";
+                result = $"[{keyCount - emptyColumns}K_{emptyColumns}Empty] ";
 
             return result;
         }
