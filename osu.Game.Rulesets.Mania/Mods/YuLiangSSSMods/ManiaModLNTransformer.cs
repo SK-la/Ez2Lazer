@@ -15,6 +15,7 @@ using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 // using osu.Framework.Logging;
 
@@ -26,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LT";
 
-        public override LocalisableString Description => "From YuLiangSSS' Tool";// "From YuLiangSSS' LN Transformer.";
+        public override LocalisableString Description => EzManiaModStrings.LNTransformer_Description;// "From YuLiangSSS' LN Transformer.";
 
         public readonly double ERROR = 2;
 

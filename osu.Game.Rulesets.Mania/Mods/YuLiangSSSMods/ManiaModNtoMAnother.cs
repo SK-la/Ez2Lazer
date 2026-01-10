@@ -13,6 +13,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
@@ -32,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "From krrcream's Tool (It has some bugs, please use Clean settings to clean it.)";
+        public override LocalisableString Description => EzManiaModStrings.NtoMAnother_Description;
 
         public override IconUsage? Icon => FontAwesome.Solid.CloudRain;
 
@@ -47,6 +48,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 yield return ("Key", $"{Key.Value}");
                 yield return ("Blank Column", $"{BlankColumn.Value}");
                 yield return ("Gap", $"{Gap.Value}");
+
                 if (Clean.Value)
                 {
                     yield return ("Clean", Clean.Value ? "On" : "Off");

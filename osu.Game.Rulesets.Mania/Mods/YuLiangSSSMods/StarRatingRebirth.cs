@@ -10,6 +10,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -22,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "SR";
 
-        public override LocalisableString Description => "New algorithm by sunnyxxy.";
+        public override LocalisableString Description => EzManiaModStrings.StarRatingRebirth_Description;
 
         public override double ScoreMultiplier => 1;
 
@@ -44,13 +45,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Use original OD", "High Priority")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseOriginalOD_Label), nameof(EzManiaModStrings.UseOriginalOD_Description))]
         public BindableBool Original { get; set; } = new BindableBool(false);
 
-        [SettingSource("Use custom OD", "Low Priority")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseCustomOD_Label), nameof(EzManiaModStrings.UseCustomOD_Description))]
         public BindableBool Custom { get; set; } = new BindableBool();
 
-        [SettingSource("OD", "Choose the OD you want to recalculate.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.OD_Label), nameof(EzManiaModStrings.OD_Description))]
         public BindableDouble OD { get; set; } = new BindableDouble(0)
         {
             Precision = 0.1,

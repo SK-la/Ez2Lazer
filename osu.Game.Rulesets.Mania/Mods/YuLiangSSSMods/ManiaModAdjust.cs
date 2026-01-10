@@ -16,6 +16,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -73,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
-        [SettingSource("HP Drain", "Override a beatmap's set HP.", SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.HPDrain_Label), nameof(EzManiaModStrings.HPDrain_Description), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable DrainRate { get; } = new DifficultyBindable(0)
         {
             Precision = 0.1f,
@@ -83,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.DrainRate
         };
 
-        [SettingSource("Accuracy", "Override a beatmap's set OD.", SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustAccuracy_Label), nameof(EzManiaModStrings.AdjustAccuracy_Description), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable(0)
         {
             Precision = 0.1f,
@@ -93,7 +94,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.OverallDifficulty
         };
 
-        [SettingSource("Release Lenience", "Adjust LN tail release window lenience.(Tail in Score v2 has default 1.5x hit window)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ReleaseLenience_Label), nameof(EzManiaModStrings.ReleaseLenience_Description))]
         public BindableDouble ReleaseLenience { get; } = new BindableDouble(2)
         {
             MaxValue = 4,
@@ -110,10 +111,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         [SettingSource("Custom Release")]
         public BindableBool CustomRelease { get; } = new BindableBool();
 
-        [SettingSource("Extended Limits", "Adjust difficulty beyond sane limits.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ExtendedLimits_Label), nameof(EzManiaModStrings.ExtendedLimits_Description))]
         public BindableBool ExtendedLimits { get; } = new BindableBool();
 
-        [SettingSource("Constant Speed", "No more tricky speed changes.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustConstantSpeed_Label), nameof(EzManiaModStrings.AdjustConstantSpeed_Description))]
         public BindableBool ConstantSpeed { get; } = new BindableBool(true);
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
@@ -172,7 +173,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string ExtendedIconInformation => "";
 
-        [SettingSource("Speed rate", "The actual increase to apply.", SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SpeedChange_Label), nameof(EzManiaModStrings.SpeedChange_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
         public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.1,
@@ -212,7 +213,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return base.ApplyToRate(time, rate);
         }
 
-        [SettingSource("Adjust pitch", "Should pitch be adjusted with speed.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustPitch_Label), nameof(EzManiaModStrings.AdjustPitch_Description))]
         public virtual BindableBool AdjustPitch { get; } = new BindableBool();
 
         private readonly RateAdjustModHelper rateAdjustHelper;
@@ -344,25 +345,25 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Mirror", "Notes are flipped horizontally.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Mirror_Label), nameof(EzManiaModStrings.Mirror_Description))]
         public BindableBool Mirror { get; } = new BindableBool();
 
-        [SettingSource("Random Mirror", "Mirror or not mirror notes by random.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.RandomMirror_Label), nameof(EzManiaModStrings.RandomMirror_Description))]
         public BindableBool RandomMirror { get; } = new BindableBool(true);
 
-        [SettingSource("No Fail", "You can't fail, no matter what.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoFail_Label), nameof(EzManiaModStrings.NoFail_Description))]
         public BindableBool NoFail { get; } = new BindableBool(true);
 
-        [SettingSource("Restart on fail", "Automatically restarts when failed.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Restart_Label), nameof(EzManiaModStrings.Restart_Description))]
         public BindableBool Restart { get; } = new BindableBool();
 
-        [SettingSource("Random", "Shuffle around the keys.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.RandomSelect_Label), nameof(EzManiaModStrings.RandomSelect_Description))]
         public BindableBool RandomSelect { get; } = new BindableBool();
 
-        [SettingSource("True Random", "Shuffle all notes(Use NoLN(LN Transformer Level -3), or you will get overlapping notes otherwise).")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.TrueRandom_Label), nameof(EzManiaModStrings.TrueRandom_Description))]
         public BindableBool TrueRandom { get; } = new BindableBool();
 
-        [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Seed_Label), nameof(EzManiaModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         public void ApplyToBeatmap(IBeatmap beatmap)
@@ -477,7 +478,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             triggerFailureDelegate?.Invoke();
         }
 
-        [SettingSource("Custom Hit Range", "Adjust the hit range of notes.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomHitRange_Label), nameof(EzManiaModStrings.CustomHitRange_Description))]
         public BindableBool CustomHitRange { get; } = new BindableBool();
 
         [SettingSource("Perfect")]

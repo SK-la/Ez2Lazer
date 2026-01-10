@@ -13,6 +13,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
@@ -24,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "NA";
 
-        public override LocalisableString Description => "To make more or less note.";
+        public override LocalisableString Description => EzManiaModStrings.NoteAdjust_Description;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -59,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Style", "1: Applicable to Jack Pattern.  2&3: Applicable to Stream Pattern.  4&5: Applicable to Speed Pattern(No Jack).  6: DIY(Will use ↓↓↓ all options) (1~5 will only use ↓ seed option).")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoteAdjustStyle_Label), nameof(EzManiaModStrings.NoteAdjustStyle_Description))]
         public BindableInt Style { get; set; } = new BindableInt(1)
         {
             Precision = 1,
@@ -67,7 +68,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 6
         };
 
-        [SettingSource("Probability", "The Probability of increasing note.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoteAdjustProbability_Label), nameof(EzManiaModStrings.NoteAdjustProbability_Description))]
         public BindableDouble Probability { get; set; } = new BindableDouble(100)
         {
             Precision = 2.5,
@@ -75,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 100,
         };
 
-        [SettingSource("Extremum", "Depending on how many notes on one line you keep(Available maximum note or minimum note).")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Extremum_Label), nameof(EzManiaModStrings.Extremum_Description))]
         public BindableInt Extremum { get; set; } = new BindableInt(10)
         {
             Precision = 1,
@@ -83,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 10
         };
 
-        [SettingSource("Comparison Style", "1: Dispose a line when this line's note quantity >= Last&Next line. 2: Dispose a line when this line's note quantity <= Last&Next line.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ComparisonStyle_Label), nameof(EzManiaModStrings.ComparisonStyle_Description))]
         public BindableInt ComparisonStyle { get; set; } = new BindableInt(1)
         {
             Precision = 1,
@@ -91,7 +92,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 2
         };
 
-        [SettingSource("Line", "Depending on how heavy about this map(0 is recommended for Jack,  1 is recommended for (Jump/Hand/Etc.)Stream, 2 is recommended for Speed).")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoteAdjustLine_Label), nameof(EzManiaModStrings.NoteAdjustLine_Description))]
         public BindableInt Line { get; set; } = new BindableInt(1)
         {
             Precision = 1,
@@ -99,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 10
         };
 
-        [SettingSource("Step", "Skip \"Step\" line when converting successfully on a line.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Step_Label), nameof(EzManiaModStrings.Step_Description))]
         public BindableInt Step { get; set; } = new BindableInt(-1)
         {
             Precision = 1,
@@ -107,13 +108,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 10
         };
 
-        [SettingSource("Ignore Comparison", "Ignore condition of Comparison.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.IgnoreComparison_Label), nameof(EzManiaModStrings.IgnoreComparison_Description))]
         public BindableBool IgnoreComparison { get; set; } = new BindableBool(false);
 
-        [SettingSource("Ignore Interval", "Ignore interval of note.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.IgnoreInterval_Label), nameof(EzManiaModStrings.IgnoreInterval_Description))]
         public BindableBool IgnoreInterval { get; set; } = new BindableBool(false);
 
-        [SettingSource("Seed", "Use a custom seed instead of a random one", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Seed_Label), nameof(EzManiaModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
 

@@ -12,6 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
@@ -24,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "Simplifies rhythms by converting.";
+        public override LocalisableString Description => EzManiaModStrings.LNSimplify_Description;
 
         public override IconUsage? Icon => FontAwesome.Solid.YinYang;
 
@@ -45,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Limit Divide", "Select limit.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LimitDivide_Label), nameof(EzManiaModStrings.LimitDivide_Description))]
         public BindableInt LimitDivide { get; set; } = new BindableInt(4)
         {
             MinValue = 1,
@@ -53,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1,
         };
 
-        [SettingSource("Easier Divide", "Select complexity.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.EasierDivide_Label), nameof(EzManiaModStrings.EasierDivide_Description))]
         public BindableInt EasierDivide { get; set; } = new BindableInt(4)
         {
             MinValue = 1,
@@ -61,10 +62,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1,
         };
 
-        [SettingSource("Gap", "Longest LN.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LongestLN_Label), nameof(EzManiaModStrings.LongestLN_Description))]
         public BindableBool Gap { get; set; } = new BindableBool(true);
 
-        [SettingSource("Len", "Shortest LN.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ShortestLN_Label), nameof(EzManiaModStrings.ShortestLN_Description))]
         public BindableBool Len { get; set; } = new BindableBool(true);
 
         //[SettingSource("Allowable ms", "Minimum ms.")]

@@ -4,6 +4,7 @@
 using System;
 using System.Globalization;
 using System.Reflection;
+using osu.Framework.Localisation;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
@@ -42,7 +43,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         /// public static readonly EzLocalisableString My_Button = new EzLocalisableString("我的按钮", "Custom English");
         /// </code>
         /// </example>
-        public class EzLocalisableString
+        public class EzLocalisableString : ILocalisableStringData
         {
             public string Chinese { get; }
 
@@ -81,7 +82,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             /// </summary>
             /// <param name="s">本地化字符串实例。</param>
             /// <returns>LocalisableString 实例。</returns>
-            public static implicit operator osu.Framework.Localisation.LocalisableString(EzLocalisableString s) => s.getString();
+            public static implicit operator LocalisableString(EzLocalisableString s) => new LocalisableString((ILocalisableStringData)s);
 
             /// <summary>
             /// 支持格式化，返回格式化后的字符串。
@@ -100,6 +101,22 @@ namespace osu.Game.LAsEzExtensions.Configuration
             {
                 string lang = CultureInfo.CurrentUICulture.Name.StartsWith("zh", StringComparison.Ordinal) ? "zh" : "en";
                 return lang == "zh" ? Chinese : (English ?? Chinese);
+            }
+
+            /// <summary>
+            /// 实现ILocalisableStringData接口的方法。
+            /// </summary>
+            public string GetLocalised(LocalisationParameters parameters) => getString();
+
+            /// <summary>
+            /// 实现ILocalisableStringData接口的Equals方法。
+            /// </summary>
+            public bool Equals(ILocalisableStringData? other)
+            {
+                if (other is not EzLocalisableString ezOther)
+                    return false;
+
+                return Chinese == ezOther.Chinese && English == ezOther.English;
             }
         }
 

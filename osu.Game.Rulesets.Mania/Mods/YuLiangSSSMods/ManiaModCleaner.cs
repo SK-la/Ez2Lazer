@@ -10,6 +10,7 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
@@ -42,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Style", "Choose your style.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Style_Label), nameof(EzManiaModStrings.Style_Description))]
         public BindableNumber<int> Style { get; set; } = new BindableInt(2)
         {
             MinValue = 1,
@@ -71,7 +72,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         // 250BPM - 60.00ms    260BPM - 57.69ms    270BPM - 55.55ms
         // 280BPM - 53.57ms    290BPM - 51.72ms    300BPM - 50.00ms
         //
-        [SettingSource("Interval", "The speed you deside.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Interval_Label), nameof(EzManiaModStrings.Interval_Description))]
         public BindableNumber<int> Interval { get; set; } = new BindableInt(80)
         {
             MinValue = 1,
@@ -79,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1,
         };
 
-        [SettingSource("LN Interval", "The release & press speed you deside.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LNInterval_Label), nameof(EzManiaModStrings.LNInterval_Description))]
         public BindableNumber<int> LNInterval { get; set; } = new BindableInt(30)
         {
             MinValue = 1,

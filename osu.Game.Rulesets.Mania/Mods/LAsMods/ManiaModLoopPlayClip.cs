@@ -18,6 +18,7 @@ using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.UI;
@@ -43,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "Cut the beatmap into a clip for loop practice. (The original is YuLiangSSS's Duplicate Mod)";
+        public override LocalisableString Description => EzManiaModStrings.LoopPlayClip_Description;
 
         public override IconUsage? Icon => FontAwesome.Solid.ArrowCircleDown;
 
@@ -74,7 +75,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        [SettingSource("Loop Count", "Loop Clip Count.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LoopCount_Label), nameof(EzManiaModStrings.LoopCount_Description))]
         public BindableInt LoopCount { get; set; } = new BindableInt(20)
         {
             MinValue = 1,
@@ -82,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource("Speed Change", "The actual decrease to apply. Don't add other rate-mod.", SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SpeedChange_Label), nameof(EzManiaModStrings.SpeedChange_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.5,
@@ -90,10 +91,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 0.01,
         };
 
-        [SettingSource("Adjust pitch", "Should pitch be adjusted with speed.(变速又变调)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustPitch_Label), nameof(EzManiaModStrings.AdjustPitch_Description))]
         public BindableBool AdjustPitch { get; } = new BindableBool();
 
-        [SettingSource("Constant Speed", "No more tricky speed changes.(恒定速度/忽略谱面中的变速)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ConstantSpeed_Label), nameof(EzManiaModStrings.ConstantSpeed_Description))]
         public BindableBool ConstantSpeed { get; } = new BindableBool(true);
 
         /*[SettingSource("Cut Time Start", "Select your part(second).", SettingControlType = typeof(SettingsSlider<int, CutStart>))]
@@ -104,7 +105,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource("Cut Time End", "Select your part(second).", SettingControlType = typeof(SettingsSlider<int, CutEnd>))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CutTimeEnd_Label), nameof(EzManiaModStrings.CutTimeEnd_Description), SettingControlType = typeof(SettingsSlider<int, CutEnd>))]
         public BindableInt CutTimeEnd { get; set; } = new BindableInt(1800)
         {
             MinValue = -10,
@@ -112,16 +113,16 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };*/
 
-        [SettingSource("Cut StartTime", "Default is second.", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CutStartTime_Label), nameof(EzManiaModStrings.CutStartTime_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> CutTimeStart { get; set; } = new Bindable<int?>();
 
-        [SettingSource("Cut EndTime", "Default is second.", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CutEndTime_Label), nameof(EzManiaModStrings.CutEndTime_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> CutTimeEnd { get; set; } = new Bindable<int?>();
 
-        [SettingSource("Use millisecond(ms)", "More detailed.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseMillisecond_Label), nameof(EzManiaModStrings.UseMillisecond_Description))]
         public BindableBool Millisecond { get; set; } = new BindableBool(true);
 
-        [SettingSource("Use global A-B range", "Always use the editor A/B range stored for this session (ms).")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseGlobalABRange_Label), nameof(EzManiaModStrings.UseGlobalABRange_Description))]
         public BindableBool UseGlobalAbRange { get; set; } = new BindableBool(true);
 
         private readonly RateAdjustModHelper rateAdjustHelper;
@@ -182,7 +183,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 applyRangeFromStore();
         }
 
-        [SettingSource("Break Time", "If you need break(second).")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.BreakTime_Label), nameof(EzManiaModStrings.BreakTime_Description))]
         public BindableDouble BreakTime { get; set; } = new BindableDouble(0)
         {
             MinValue = 0,
@@ -190,16 +191,16 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 0.1
         };
 
-        [SettingSource("Random", "Do a Random on every duplicate.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Random_Label), nameof(EzManiaModStrings.Random_Description))]
         public BindableBool Rand { get; set; } = new BindableBool(false);
 
-        [SettingSource("Mirror", "Mirror next part.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Mirror_Label), nameof(EzManiaModStrings.Mirror_Description))]
         public BindableBool Mirror { get; set; } = new BindableBool(true);
 
-        [SettingSource("Infinite Loop", "Enable infinite loop playback.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.InfiniteLoop_Label), nameof(EzManiaModStrings.InfiniteLoop_Description))]
         public BindableBool InfiniteLoop { get; set; } = new BindableBool(false);
 
-        [SettingSource("Mirror Time", "Every next time part will be mirrored.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MirrorTime_Label), nameof(EzManiaModStrings.MirrorTime_Description))]
         public BindableInt MirrorTime { get; set; } = new BindableInt(1)
         {
             MinValue = 1,
@@ -218,7 +219,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         //    Precision = 1
         //};
 
-        [SettingSource("Seed", "Use a custom seed instead of a random one", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Seed_Label), nameof(EzManiaModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         // 提供切片时间点给 DuplicateVirtualTrack 使用

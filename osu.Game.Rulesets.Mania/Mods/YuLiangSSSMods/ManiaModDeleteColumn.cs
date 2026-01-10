@@ -9,20 +9,21 @@ using osu.Framework.Localisation;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModDeleteSpace : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion
+    public class ManiaModDeleteColumn : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion
     {
-        public override string Name => "Delete Space";
+        public override string Name => "Delete Column";
 
-        public override string Acronym => "DS";
+        public override string Acronym => "DC";
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "For 6k Player to use 7k maps. (But I don't know how to remove middle column.)";
+        public override LocalisableString Description => EzManiaModStrings.DeleteSpace_Description;
 
         public override IconUsage? Icon => FontAwesome.Solid.Backspace;
 
@@ -70,25 +71,26 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var newColumnObjects = new List<ManiaHitObject>();
 
             var locations = maniaBeatmap.HitObjects.OfType<Note>().Select(n =>
-            (
-                startTime: n.StartTime,
-                samples: n.Samples,
-                column: n.Column,
-                endTime: n.StartTime,
-                duration: n.StartTime - n.StartTime
-            ))
-            .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
-            (
-                startTime: h.StartTime,
-                samples: h.Samples,
-                column: h.Column,
-                endTime: h.EndTime,
-                duration: h.EndTime - h.StartTime
-            ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
+                                        (
+                                            startTime: n.StartTime,
+                                            samples: n.Samples,
+                                            column: n.Column,
+                                            endTime: n.StartTime,
+                                            duration: n.StartTime - n.StartTime
+                                        ))
+                                        .Concat(maniaBeatmap.HitObjects.OfType<HoldNote>().Select(h =>
+                                        (
+                                            startTime: h.StartTime,
+                                            samples: h.Samples,
+                                            column: h.Column,
+                                            endTime: h.EndTime,
+                                            duration: h.EndTime - h.StartTime
+                                        ))).OrderBy(h => h.startTime).ThenBy(n => n.column).ToList();
 
             foreach (var note in locations)
             {
                 int column = note.column;
+
                 if (column == 3)
                 {
                     continue;

@@ -12,6 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
@@ -25,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "LN Transformer another version.";// "From YuLiangSSS' LN Transformer.";
+        public override LocalisableString Description => EzManiaModStrings.LNDoubleDistribution_Description; // "From YuLiangSSS' LN Transformer.";
 
         public override IconUsage? Icon => FontAwesome.Solid.YinYang;
 

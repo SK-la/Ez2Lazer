@@ -13,6 +13,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
@@ -34,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override bool Ranked => false;
 
-        public override LocalisableString Description => "Convert to grace.";
+        public override LocalisableString Description => EzManiaModStrings.Gracer_Description;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -49,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Bias", "The bias of original timing.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Bias_Label), nameof(EzManiaModStrings.Bias_Description))]
         public BindableNumber<int> Bias { get; set; } = new BindableInt(16)
         {
             MinValue = 1,
@@ -58,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         };
 
         // If interval is too high which will have bug taken place.
-        [SettingSource("Interval", "The minimum interval of note(To prevent overlap).")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Interval_Label), nameof(EzManiaModStrings.Interval_Description))]
         public BindableNumber<double> Interval { get; set; } = new BindableNumber<double>(20)
         {
             MinValue = 1,
@@ -66,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Probability", "Needed to convert probability.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Probability_Label), nameof(EzManiaModStrings.Probability_Description))]
         public BindableNumber<int> Probability { get; set; } = new BindableInt(100)
         {
             MinValue = 0,
@@ -74,7 +75,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 5
         };
 
-        [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Seed_Label), nameof(EzManiaModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         public void ApplyToBeatmap(IBeatmap beatmap)
@@ -83,20 +84,19 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             var newObjects = new List<ManiaHitObject>();
 
-            Random? Rng;
             Seed.Value ??= RNG.Next();
-            Rng = new Random((int)Seed.Value);
+            var rng = new Random((int)Seed.Value);
 
             var newColumnObjects = new List<ManiaHitObject>();
 
             foreach (var column in maniaBeatmap.HitObjects.GroupBy(h => h.Column))
             {
                 var locations = column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples, endTime: n.StartTime))
-                                  .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                                  {
+                                      .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
+                                      {
                                           (startTime: h.StartTime, samples: h.GetNodeSamples(0), endTime: h.EndTime)
-                                  }))
-                                  .OrderBy(h => h.startTime).ToList();
+                                      }))
+                                      .OrderBy(h => h.startTime).ToList();
 
                 double lastStartTime = int.MinValue;
                 double lastEndTime = int.MaxValue;
@@ -105,8 +105,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 for (int i = 0; i < locations.Count; i++)
                 {
                     bool isLN = locations[i].startTime != locations[i].endTime;
-                    double startTime = locations[i].startTime + Rng.Next(-Bias.Value, Bias.Value) + Rng.NextDouble();
-                    double endTime = locations[i].endTime + Rng.Next(-Bias.Value, Bias.Value) + Rng.NextDouble();
+                    double startTime = locations[i].startTime + rng.Next(-Bias.Value, Bias.Value) + rng.NextDouble();
+                    double endTime = locations[i].endTime + rng.Next(-Bias.Value, Bias.Value) + rng.NextDouble();
 
                     if (lastStartTime != int.MinValue && lastEndTime != int.MaxValue)
                     {
@@ -116,7 +116,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             {
                                 startTime += PLUS_INTERVAL;
                             }
-                            while (endTime <= startTime/* + Interval.Value*/)
+
+                            while (endTime <= startTime /* + Interval.Value*/)
                             {
                                 endTime += PLUS_INTERVAL;
                             }
@@ -127,14 +128,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             {
                                 startTime += PLUS_INTERVAL;
                             }
-                            while (endTime <= startTime/* + Interval.Value */)
+
+                            while (endTime <= startTime /* + Interval.Value */)
                             {
                                 endTime += PLUS_INTERVAL;
                             }
                         }
                     }
 
-                    if (Rng.Next(100) < Probability.Value)
+                    if (rng.Next(100) < Probability.Value)
                     {
                         if (locations[i].startTime != locations[i].endTime)
                         {
@@ -184,6 +186,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     lastIsLN = isLN;
                 }
             }
+
             newObjects.AddRange(newColumnObjects);
             maniaBeatmap.HitObjects = [.. newObjects.OrderBy(h => h.StartTime)];
         }

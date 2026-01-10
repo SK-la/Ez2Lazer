@@ -11,6 +11,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -27,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "RY";
 
-        public override LocalisableString Description => "Remedy lower judgement.";
+        public override LocalisableString Description => EzManiaModStrings.Remedy_Description;
 
         public override double ScoreMultiplier => 1;
 

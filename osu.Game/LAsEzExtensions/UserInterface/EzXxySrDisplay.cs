@@ -21,7 +21,6 @@ namespace osu.Game.LAsEzExtensions.UserInterface
 {
     /// <summary>
     /// A pill that displays xxy_SR (mania).
-    /// Designed to visually match <see cref="StarRatingDisplay"/>, but uses a moon icon.
     /// </summary>
     public partial class EzXxySrDisplay : CompositeDrawable, IHasCurrentValue<double?>
     {

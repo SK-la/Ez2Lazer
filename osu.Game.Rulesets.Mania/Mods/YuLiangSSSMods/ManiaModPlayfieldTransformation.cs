@@ -13,6 +13,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Framework.Graphics;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Scoring;
 using osu.Game.Rulesets.Mania.Objects;
 using osuTK;
@@ -25,13 +26,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "PS";
 
-        public override LocalisableString Description => "Adjusts playfield scale based on combo.";
+        public override LocalisableString Description => EzManiaModStrings.PlayfieldTransformation_Description;
 
         public override double ScoreMultiplier => 1.0;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
-        [SettingSource("Minimum scale", "The minimum scale of the playfield.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MinimumScale_Label), nameof(EzManiaModStrings.MinimumScale_Description))]
         public BindableFloat MinScale { get; } = new BindableFloat(0.3f)
         {
             MinValue = 0.3f,

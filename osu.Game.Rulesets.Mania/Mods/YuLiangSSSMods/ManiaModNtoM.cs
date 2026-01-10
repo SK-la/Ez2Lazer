@@ -13,6 +13,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -28,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "Convert to upper Keys mode.";
+        public override LocalisableString Description => EzManiaModStrings.NtoM_Description;
 
         public override IconUsage? Icon => FontAwesome.Solid.Moon;
 
@@ -46,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Probability", "Needed convert column movement probability")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Probability_Label), nameof(EzManiaModStrings.Probability_Description))]
         public BindableNumber<int> Probability { get; set; } = new BindableInt(70)
         {
             MinValue = 0,
@@ -54,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 5
         };
 
-        [SettingSource("Key", "To Keys")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Key_Label), nameof(EzManiaModStrings.Key_Description))]
         public BindableNumber<int> Key { get; set; } = new BindableInt(8)
         {
             MinValue = 2,
@@ -62,10 +63,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Seed_Label), nameof(EzManiaModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
-        [SettingSource("Apply Order", "Order in which this mod is applied after beatmap conversion. Lower runs earlier.", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> ApplyOrderSetting { get; } = new Bindable<int?>(0);
 
         public void ApplyToBeatmapConverter(IBeatmapConverter converter)

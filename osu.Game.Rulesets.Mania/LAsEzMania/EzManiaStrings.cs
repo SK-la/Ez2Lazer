@@ -7,12 +7,12 @@ using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
-    public class EzManiaLocalizationManager : EzLocalizationManager
+    public class EzManiaStrings : EzLocalizationManager
     {
-        static EzManiaLocalizationManager()
+        static EzManiaStrings()
         {
             // 使用反射为未设置英文的属性自动生成英文（属性名替换_为空格）
-            var fields = typeof(EzManiaLocalizationManager).GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+            var fields = typeof(EzManiaStrings).GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
 
             foreach (var field in fields)
             {

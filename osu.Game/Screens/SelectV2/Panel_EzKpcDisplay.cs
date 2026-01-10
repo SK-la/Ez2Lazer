@@ -80,6 +80,7 @@ namespace osu.Game.Screens.SelectV2
         /// 更新列音符数量显示
         /// </summary>
         /// <param name="columnNoteCounts">每列的音符数量</param>
+        /// <param name="holdNoteCounts">面条数量</param>
         public void UpdateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             currentColumnCounts = columnNoteCounts;
@@ -90,6 +91,7 @@ namespace osu.Game.Screens.SelectV2
         private void updateDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             int columns = columnNoteCounts.Count;
+
             if (columns == 0)
             {
                 currentColumnCount = 0;
@@ -162,6 +164,7 @@ namespace osu.Game.Screens.SelectV2
             else
             {
                 int idx = 0;
+
                 foreach (var kvp in columnNoteCounts.OrderBy(k => k.Key))
                 {
                     if (idx >= numberEntries.Count)
@@ -179,6 +182,7 @@ namespace osu.Game.Screens.SelectV2
             rebuildForModeIfNeeded(columnNoteCounts.Count);
 
             int maxCount = 0;
+
             for (int i = 0; i < currentColumnCount; i++)
             {
                 int total = columnNoteCounts.GetValueOrDefault(i);

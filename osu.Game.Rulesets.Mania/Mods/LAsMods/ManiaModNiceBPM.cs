@@ -12,6 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -26,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override string Acronym => "NB";
 
-        public override LocalisableString Description => "LaMod: Free BPM or Speed";
+        public override LocalisableString Description => EzManiaModStrings.NiceBPM_Description;
 
         public override ModType Type => ModType.LA_Mod;
 
@@ -34,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         // public override Type[] IncompatibleMods => new[] { typeof(ModRateAdjust), typeof(ModTimeRamp), typeof(ModAutoplay) };
 
-        [SettingSource("Initial rate", "The starting speed of the track", SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.InitialRate_Label), nameof(EzManiaModStrings.InitialRate_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> InitialRate { get; } = new BindableDouble(1)
         {
             MinValue = 0.2,
@@ -45,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         // [SettingSource("Free BPM", "BPM to speed", SettingControlType = typeof(SettingsNumberBox))]
         // public Bindable<double?> FreeBPM { get; } = new Bindable<double?>();
 
-        [SettingSource("Adjust pitch", "Should pitch be adjusted with speed")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustPitch_Label), nameof(EzManiaModStrings.AdjustPitch_Description))]
         public BindableBool AdjustPitch { get; } = new BindableBool(false);
 
         public BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)

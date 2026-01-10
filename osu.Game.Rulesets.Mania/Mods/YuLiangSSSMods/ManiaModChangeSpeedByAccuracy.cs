@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Configuration;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -44,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         private double targetSpeed = 1;
 
-        [SettingSource("Accuracy", "Accuracy for speed change to be applied.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ChangeSpeedAccuracy_Label), nameof(EzManiaModStrings.ChangeSpeedAccuracy_Description))]
         public BindableDouble Accuracy { get; } = new BindableDouble(95)
         {
             MinValue = 0,
@@ -52,7 +53,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.5,
         };
 
-        [SettingSource("Max Speed")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MaxSpeed_Label), nameof(EzManiaModStrings.MaxSpeed_Description))]
         public BindableDouble MaxSpeed { get; } = new BindableDouble(1.5)
         {
             MinValue = 1,
@@ -60,7 +61,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.1,
         };
 
-        [SettingSource("Min Speed")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MinSpeed_Label), nameof(EzManiaModStrings.MinSpeed_Description))]
         public BindableDouble MinSpeed { get; } = new BindableDouble(0.5)
         {
             MinValue = 0.5,
@@ -68,7 +69,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.1,
         };
 
-        [SettingSource("Adjust pitch", "Should pitch be adjusted with speed.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustPitch_Label), nameof(EzManiaModStrings.AdjustPitch_Description))]
         public virtual BindableBool AdjustPitch { get; } = new BindableBool();
 
         public ManiaModChangeSpeedByAccuracy()

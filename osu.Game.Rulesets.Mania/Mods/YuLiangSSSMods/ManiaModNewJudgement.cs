@@ -7,6 +7,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.SelectV2;
 
@@ -18,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "NJ";
 
-        public override LocalisableString Description => "New judgement set by BPM of the song.";
+        public override LocalisableString Description => EzManiaModStrings.NewJudgement_Description;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 

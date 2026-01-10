@@ -11,6 +11,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
@@ -22,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LS";
 
-        public override LocalisableString Description => "LN Transformer additional version.";// "From YuLiangSSS' LN Transformer.";
+        public override LocalisableString Description => EzManiaModStrings.LNLongShortAddition_Description;// "From YuLiangSSS' LN Transformer.";
 
         public readonly int[] DivideNumber = [2, 4, 8, 3, 6, 9, 5, 7, 12, 16, 48, 35, 64];
 

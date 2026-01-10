@@ -12,6 +12,7 @@ using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
@@ -23,13 +24,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override string Acronym => "SB";
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => "LaMod: Full LN 面海, 可调面缝";
+        public override LocalisableString Description => EzManiaModStrings.SpaceBody_Description;
 
         public override ModType Type => ModType.LA_Mod;
 
         public override Type[] IncompatibleMods => new[] { typeof(ManiaModHoldOff) };
 
-        [SettingSource("Space Body", "面海缝隙的最大间隔, 1/?拍", SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SpaceBody_Label), nameof(EzManiaModStrings.SpaceBodyGap_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> SpaceBeat { get; } = new BindableDouble(4)
         {
             MinValue = 1,
@@ -37,10 +38,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource("Add Shield", "原始面条转盾牌，超难。Convert original LN to Shield. Very Hard.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AddShield_Label), nameof(EzManiaModStrings.AddShield_Description))]
         public BindableBool Shield { get; } = new BindableBool();
 
-        [SettingSource("Apply Order", "Order in which this mod is applied after beatmap conversion. Lower runs earlier.", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> ApplyOrderSetting { get; } = new Bindable<int?>(100);
 
         public void ApplyToBeatmap(IBeatmap beatmap)

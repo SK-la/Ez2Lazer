@@ -15,6 +15,7 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -27,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LA";
 
-        public override LocalisableString Description => "Adjust the judgement of LN.";
+        public override LocalisableString Description => EzManiaModStrings.LNJudgementAdjust_Description;
 
         public override double ScoreMultiplier => 1;
 
@@ -37,10 +38,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
-        [SettingSource("Body Judgement Switch", "Turn on/off body judgement.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.BodyJudgementSwitch_Label), nameof(EzManiaModStrings.BodyJudgementSwitch_Description))]
         public BindableBool BodyJudgementSwitch { get; } = new BindableBool();
 
-        [SettingSource("Tail Judgement Switch", "Turn on/off tail judgement.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.TailJudgementSwitch_Label), nameof(EzManiaModStrings.TailJudgementSwitch_Description))]
         public BindableBool TailJudgementSwitch { get; } = new BindableBool();
 
         public void ApplyToBeatmap(IBeatmap beatmap)

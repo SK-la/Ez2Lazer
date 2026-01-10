@@ -14,6 +14,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
@@ -34,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override ModType Type => ModType.YuLiangSSS_Mod;
         public override bool Ranked => false;
 
-        [SettingSource("Divide", "Use 1/?")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Divide_Label), nameof(EzManiaModStrings.Divide_Description))]
         public BindableNumber<int> Divide { get; set; } = new BindableInt(4)
         {
             MinValue = 1,
@@ -42,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Percentage", "LN Content")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Percentage_Label), nameof(EzManiaModStrings.Percentage_Description))]
         public BindableNumber<int> Percentage { get; set; } = new BindableInt(100)
         {
             MinValue = 5,
@@ -50,10 +51,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 5
         };
 
-        [SettingSource("Original LN", "Original LN won't be converted.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.OriginalLN_Label), nameof(EzManiaModStrings.OriginalLN_Description))]
         public BindableBool OriginalLN { get; set; } = new BindableBool(false);
 
-        [SettingSource("Column Num", "Select the number of column to transform.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ColumnNum_Label), nameof(EzManiaModStrings.ColumnNum_Description))]
         public BindableInt SelectColumn { get; set; } = new BindableInt(10)
         {
             MinValue = 1,
@@ -61,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Gap", "For changing random columns after transforming the gap's number of notes.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Gap_Label), nameof(EzManiaModStrings.Gap_Description))]
         public BindableInt Gap { get; set; } = new BindableInt(12)
         {
             MinValue = 0,
@@ -69,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Line Spacing", "Transform every line when set to 0.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LineSpacing_Label), nameof(EzManiaModStrings.LineSpacing_Description))]
         public BindableInt LineSpacing { get; set; } = new BindableInt(0)
         {
             MinValue = 0,
@@ -77,10 +78,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource("Invert Line Spacing", "Invert the Line Spacing.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.InvertLineSpacing_Label), nameof(EzManiaModStrings.InvertLineSpacing_Description))]
         public BindableBool InvertLineSpacing { get; set; } = new BindableBool(false);
 
-        [SettingSource("Duration Limit", "The max duration(second) of a LN.(No limit when set to 0)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.DurationLimit_Label), nameof(EzManiaModStrings.DurationLimit_Description))]
         public BindableDouble DurationLimit { get; set; } = new BindableDouble(5)
         {
             MinValue = 0,
@@ -88,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.5
         };
 
-        [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Seed_Label), nameof(EzManiaModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription

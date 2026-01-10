@@ -10,6 +10,7 @@ using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
@@ -20,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "JU";
 
-        public override LocalisableString Description => "Modify your judgement.";
+        public override LocalisableString Description => EzManiaModStrings.JudgmentsAdjust_Description;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -58,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource("Custom Hit Range", "Adjust the hit range of notes.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomHitRange_Label), nameof(EzManiaModStrings.CustomHitRange_Description))]
         public BindableBool CustomHitRange { get; set; } = new BindableBool(true);
 
         [SettingSource("Perfect")]
@@ -109,7 +110,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 250
         };
 
-        [SettingSource("Custom Proportion Score")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomProportionScore_Label), nameof(EzManiaModStrings.CustomProportionScore_Description))]
         public BindableBool CustomProportionScore { get; set; } = new BindableBool(true);
 
         [SettingSource("Perfect")]

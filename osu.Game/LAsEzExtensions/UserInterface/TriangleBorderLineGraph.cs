@@ -29,6 +29,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             set
             {
                 if (thickness == value) return;
+
                 thickness = value;
                 Invalidate(Invalidation.DrawNode);
             }
@@ -45,6 +46,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             set
             {
                 if (texelSize == value) return;
+
                 texelSize = value;
                 Invalidate(Invalidation.DrawNode);
             }
@@ -72,7 +74,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         /// <summary>
         /// The colour of the border (for compatibility, not used in shader version).
         /// </summary>
-        public Color4 BorderColour { get; set; }
+        public new Color4 BorderColour { get; set; }
 
         public TriangleBorderLineGraph()
         {
@@ -85,10 +87,10 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         {
             // Modify the path's shader to use TriangleBorder for the triangle effect
             var pathField = typeof(LineGraph).GetField("path", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
             if (pathField != null)
             {
-                var path = pathField.GetValue(this) as Path;
-                if (path != null)
+                if (pathField.GetValue(this) is Path path)
                 {
                     // Replace the path with our custom TriangleBorderPath
                     var triangleBorderPath = new TriangleBorderPath(thickness, texelSize)
@@ -105,10 +107,10 @@ namespace osu.Game.LAsEzExtensions.UserInterface
 
                     // Replace in the masking container
                     var maskingContainerField = typeof(LineGraph).GetField("maskingContainer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
                     if (maskingContainerField != null)
                     {
-                        var maskingContainer = maskingContainerField.GetValue(this) as Container<Path>;
-                        if (maskingContainer != null)
+                        if (maskingContainerField.GetValue(this) is Container<Path> maskingContainer)
                         {
                             maskingContainer.Child = triangleBorderPath;
                             pathField.SetValue(this, triangleBorderPath);
@@ -135,6 +137,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         {
             // Use reflection to set the TriangleBorder shader
             var shaderField = typeof(Path).GetField("TextureShader", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
             if (shaderField != null)
             {
                 var triangleBorderShader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, "TriangleBorder");

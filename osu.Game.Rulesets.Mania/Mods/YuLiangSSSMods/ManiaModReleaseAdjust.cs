@@ -9,6 +9,7 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.UI;
@@ -24,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods
 
         public override string Acronym => "RA";
 
-        public override LocalisableString Description => "No more timing the end of hold notes.";
+        public override LocalisableString Description => EzManiaModStrings.ReleaseAdjust_Description;
 
         public override double ScoreMultiplier => 1;
 

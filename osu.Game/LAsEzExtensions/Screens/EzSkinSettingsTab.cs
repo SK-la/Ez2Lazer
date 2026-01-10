@@ -16,7 +16,6 @@ using osu.Framework.Testing;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Skinning;

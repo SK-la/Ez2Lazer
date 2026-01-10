@@ -10,6 +10,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -22,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "SRR";
 
-        public override LocalisableString Description => "New algorithm.";
+        public override LocalisableString Description => EzManiaModStrings.StarRatingRebirthNoTask_Description;
 
         public override double ScoreMultiplier => 1;
 

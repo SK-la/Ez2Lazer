@@ -7,6 +7,7 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 
@@ -31,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "OH";
 
-        public override LocalisableString Description => "Health system for O2JAM players.";
+        public override LocalisableString Description => EzManiaModStrings.O2Health_Description;
 
         public override double ScoreMultiplier => 1.0;
 
@@ -52,7 +53,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
-        [SettingSource("Difficulty", "1: Easy  2: Normal  3: Hard")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Difficulty_Label), nameof(EzManiaModStrings.Difficulty_Description))]
         public BindableInt Difficulty { get; set; } = new BindableInt(1)
         {
             MinValue = 1,

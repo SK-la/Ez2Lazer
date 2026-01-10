@@ -9,6 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Judgements;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -25,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "NL";
 
-        public override LocalisableString Description => "Play LN like Malody!";
+        public override LocalisableString Description => EzManiaModStrings.MalodyStyleLN_Description;
 
         public override double ScoreMultiplier => 1;
 

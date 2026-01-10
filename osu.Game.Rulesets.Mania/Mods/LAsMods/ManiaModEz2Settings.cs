@@ -17,6 +17,7 @@ using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
@@ -27,23 +28,23 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     {
         public override string Name => "Ez2 Settings";
         public override string Acronym => "ES";
-        public override LocalisableString Description => "LaMod: Remove Scratch, Panel.";
+        public override LocalisableString Description => EzManiaModStrings.Ez2Settings_Description;
         public override ModType Type => ModType.LA_Mod;
         public override IconUsage? Icon => FontAwesome.Solid.Tools;
 
         public override bool Ranked => false;
         public override double ScoreMultiplier => 1;
 
-        [SettingSource("No (EZ)Scratch", "免盘. For: 6-9k L-S; 12\\14\\16k LR-S ")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoScratch_Label), nameof(EzManiaModStrings.NoScratch_Description))]
         public BindableBool NoScratch { get; } = new BindableBool();
 
-        [SettingSource("No (EZ)Panel", "免脚踏. For: 7\\14\\18k")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoPanel_Label), nameof(EzManiaModStrings.NoPanel_Description))]
         public BindableBool NoPanel { get; } = new BindableBool();
 
-        [SettingSource("Healthy (EZ)Scratch", "优化盘子密度 Move the fast Scratch to the other columns")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.HealthyScratch_Label), nameof(EzManiaModStrings.HealthyScratch_Description))]
         public BindableBool HealthScratch { get; } = new BindableBool(true);
 
-        [SettingSource("Scratch MAX Beat Space", "盘子最大间隔, MAX 1/? Beat", SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MaxBeat_Label), nameof(EzManiaModStrings.MaxBeat_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> MaxBeat { get; } = new BindableDouble(3)
         {
             MinValue = 1,
