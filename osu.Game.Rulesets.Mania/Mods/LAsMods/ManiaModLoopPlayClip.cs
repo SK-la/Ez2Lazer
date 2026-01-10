@@ -277,13 +277,17 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var (cutTimeStart, cutTimeEnd) = getEffectiveCutTimeMs();
 
             double breakTime = BreakTime.Value * 1000;
-            double? length = cutTimeEnd - cutTimeStart;
 
             // 改为最少一个非空设置
             var minTimeBeatmap = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
             var maxTimeBeatmap = maniaBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
             cutTimeStart ??= minTimeBeatmap?.StartTime;
             cutTimeEnd ??= maxTimeBeatmap?.GetEndTime();
+
+            // IMPORTANT: compute length only after null defaults have been applied.
+            // Otherwise, when both cut times are null (default settings and no global A/B range),
+            // this mod would early-return and appear to have no effect (and thus no analysis change).
+            double? length = cutTimeEnd - cutTimeStart;
 
             var selectedPart = maniaBeatmap.HitObjects.Where(h => h.StartTime > cutTimeStart && h.GetEndTime() < cutTimeEnd).ToList();
 
