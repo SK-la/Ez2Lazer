@@ -59,7 +59,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         public void SetValues(IReadOnlyList<double> source)
         {
             if (source == null)
-                throw new ArgumentNullException(nameof(source));
+                return;
 
             int count = source.Count;
             valuesCount = count;

@@ -118,7 +118,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     }
 
                     if (EnableCustomDelete.Value && CustomDeleteColumn.Value.HasValue && CustomDeleteColumn.Value.Value >= 0 && CustomDeleteColumn.Value.Value < keys)
-                    columnsToDelete.Add(CustomDeleteColumn.Value.Value);
+                        columnsToDelete.Add(CustomDeleteColumn.Value.Value);
 
                     if (!columnsToDelete.Any())
                         return; // 没有要删除的列

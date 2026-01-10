@@ -17,19 +17,20 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private const string calculator_method_name = "CalculateSR";
         private const string mania_assembly_name = "osu.Game.Rulesets.Mania";
 
-        private static readonly Lazy<MethodInfo?> calculateMethod = new Lazy<MethodInfo?>(resolveCalculateMethod, LazyThreadSafetyMode.ExecutionAndPublication);
+        private static readonly Lazy<MethodInfo?> calculate_method = new Lazy<MethodInfo?>(resolveCalculateMethod, LazyThreadSafetyMode.ExecutionAndPublication);
 
-        private static int resolve_fail_logged;
-        private static int invoke_fail_count;
+        private static int resolveFailLogged;
+        private static int invokeFailCount;
 
         public static bool TryCalculate(IBeatmap beatmap, out double sr)
         {
             sr = 0;
 
-            var method = calculateMethod.Value;
+            var method = calculate_method.Value;
+
             if (method == null)
             {
-                if (Interlocked.Exchange(ref resolve_fail_logged, 1) == 0)
+                if (Interlocked.Exchange(ref resolveFailLogged, 1) == 0)
                     Logger.Log($"xxy_SR bridge failed to resolve {calculator_type_name}.{calculator_method_name}(IBeatmap).", logger_name, LogLevel.Error);
 
                 return false;
@@ -50,7 +51,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             catch (Exception ex)
             {
                 // Avoid spamming logs if something is systematically broken.
-                if (Interlocked.Increment(ref invoke_fail_count) <= 10)
+                if (Interlocked.Increment(ref invokeFailCount) <= 10)
                     Logger.Error(ex, $"xxy_SR bridge invoke exception. beatmapType={beatmap.GetType().FullName}", logger_name);
 
                 return false;
@@ -62,14 +63,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
             try
             {
                 var type = findType(calculator_type_name);
-                if (type == null)
-                    return null;
 
-                return type.GetMethod(calculator_method_name, BindingFlags.Public | BindingFlags.Static, binder: null, types: new[] { typeof(IBeatmap) }, modifiers: null);
+                return type?.GetMethod(calculator_method_name, BindingFlags.Public | BindingFlags.Static, binder: null, types: new[] { typeof(IBeatmap) }, modifiers: null);
             }
             catch (Exception ex)
             {
-                if (Interlocked.Exchange(ref resolve_fail_logged, 1) == 0)
+                if (Interlocked.Exchange(ref resolveFailLogged, 1) == 0)
                     Logger.Error(ex, $"xxy_SR bridge resolve exception for {calculator_type_name}.{calculator_method_name}(IBeatmap).", logger_name);
 
                 return null;

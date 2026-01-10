@@ -196,7 +196,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             double[][] keyUsage400 = buildKeyUsage400(keyCount, totalTime, notes, baseCorners);
             double[] anchorBase = computeAnchor(keyCount, keyUsage400, baseCorners);
 
-            LNRepStruct? lnRep = longNotes.Count > 0 ? buildLnRepresentation(longNotes, totalTime) : null;
+            LNRepStruct? lnRep = longNotes.Count > 0 ? buildLNRepresentation(longNotes, totalTime) : null;
 
             (double[][] deltaKs, double[] jBarBase) = computeJBar(keyCount, totalTime, x, notesByColumn, baseCorners);
             double[] jBar = interpValues(allCorners, baseCorners, jBarBase);
@@ -417,6 +417,80 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return usage;
         }
 
+                #region LN计算
+
+        private static LNRepStruct buildLNRepresentation(List<NoteStruct> longNotes, int totalTime)
+        {
+            var diff = new Dictionary<int, double>();
+
+            foreach (var note in longNotes)
+            {
+                int t0 = Math.Min(note.HeadTime + 60, note.TailTime);
+                int t1 = Math.Min(note.HeadTime + 120, note.TailTime);
+
+                addToMap(diff, t0, 1.3);
+                addToMap(diff, t1, -0.3);
+                addToMap(diff, note.TailTime, -1);
+            }
+
+            var pointsSet = new SortedSet<int> { 0, totalTime };
+            foreach (int key in diff.Keys)
+                pointsSet.Add(key);
+
+            int[] points = pointsSet.ToArray();
+            double[] cumulative = new double[points.Length];
+            double[] values = new double[points.Length - 1];
+
+            double current = 0;
+
+            for (int i = 0; i < points.Length - 1; i++)
+            {
+                if (diff.TryGetValue(points[i], out double delta))
+                    current += delta;
+
+                double fallbackOffset = 0.5 * current;
+                double fallback = 2.5 + fallbackOffset;
+                double transformed = Math.Min(current, fallback);
+                values[i] = transformed;
+
+                int length = points[i + 1] - points[i];
+                double segment = length * transformed;
+                cumulative[i + 1] = cumulative[i] + segment;
+            }
+
+            return new LNRepStruct(points, cumulative, values);
+        }
+
+        private static double lnIntegral(LNRepStruct repStruct, int a, int b)
+        {
+            int[] points = repStruct.Points;
+            double[] cumulative = repStruct.Cumulative;
+            double[] values = repStruct.Values;
+
+            int startIndex = upperBound(points, a) - 1;
+            int endIndex = upperBound(points, b) - 1;
+
+            if (startIndex < 0) startIndex = 0;
+            if (endIndex < startIndex) endIndex = startIndex;
+
+            double total = 0;
+
+            if (startIndex == endIndex)
+                total = (b - a) * values[startIndex];
+            else
+            {
+                total += (points[startIndex + 1] - a) * values[startIndex];
+                total += cumulative[endIndex] - cumulative[startIndex + 1];
+                total += (b - points[endIndex]) * values[endIndex];
+            }
+
+            return total;
+        }
+
+        #endregion
+
+        #region 计算核心
+
         private static double[] computeAnchor(int keyCount, double[][] keyUsage400, double[] baseCorners)
         {
             double[] anchor = new double[baseCorners.Length];
@@ -458,48 +532,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             }
 
             return anchor;
-        }
-
-        private static LNRepStruct buildLnRepresentation(List<NoteStruct> longNotes, int totalTime)
-        {
-            var diff = new Dictionary<int, double>();
-
-            foreach (var note in longNotes)
-            {
-                int t0 = Math.Min(note.HeadTime + 60, note.TailTime);
-                int t1 = Math.Min(note.HeadTime + 120, note.TailTime);
-
-                addToMap(diff, t0, 1.3);
-                addToMap(diff, t1, -0.3);
-                addToMap(diff, note.TailTime, -1);
-            }
-
-            var pointsSet = new SortedSet<int> { 0, totalTime };
-            foreach (int key in diff.Keys)
-                pointsSet.Add(key);
-
-            int[] points = pointsSet.ToArray();
-            double[] cumulative = new double[points.Length];
-            double[] values = new double[points.Length - 1];
-
-            double current = 0;
-
-            for (int i = 0; i < points.Length - 1; i++)
-            {
-                if (diff.TryGetValue(points[i], out double delta))
-                    current += delta;
-
-                double fallbackOffset = 0.5 * current;
-                double fallback = 2.5 + fallbackOffset;
-                double transformed = Math.Min(current, fallback);
-                values[i] = transformed;
-
-                int length = points[i + 1] - points[i];
-                double segment = length * transformed;
-                cumulative[i + 1] = cumulative[i] + segment;
-            }
-
-            return new LNRepStruct(points, cumulative, values);
         }
 
         private static (double[][] deltaKs, double[] jBar) computeJBar(int keyCount, int totalTime, double x, List<NoteStruct>[] notesByColumn, double[] baseCorners)
@@ -739,7 +771,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
             for (int i = 0; i < aCorners.Length; i++)
             {
-                int idx = LowerBound(baseCorners, aCorners[i]);
+                int idx = lowerBound(baseCorners, aCorners[i]);
                 idx = Math.Min(idx, baseCorners.Length - 1);
                 int[] cols = activeColumns[idx];
                 if (cols.Length < 2) continue;
@@ -820,6 +852,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return SmoothOnCorners(baseCorners, rStep, 500, 0.001, SmoothMode.Sum);
         }
 
+        #endregion
+
         private static (double[] cStep, double[] ksStep) computeCAndKs(int keyCount, List<NoteStruct> notes, bool[][] keyUsage, double[] baseCorners)
         {
             double[] cStep = new double[baseCorners.Length];
@@ -836,8 +870,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
                 double left = baseCorners[idx] - 500;
                 double right = baseCorners[idx] + 500;
 
-                int leftIndex = LowerBound(noteTimes, left);
-                int rightIndex = LowerBound(noteTimes, right);
+                int leftIndex = lowerBound(noteTimes, left);
+                int rightIndex = lowerBound(noteTimes, right);
                 cStep[idx] = Math.Max(rightIndex - leftIndex, 0);
 
                 int activeCount = 0;
@@ -875,7 +909,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return gaps;
         }
 
-        private static double FinaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
+        private static double finaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
         {
             var combined = difficulties.Zip(weights, (d, w) => (d, w)).OrderBy(pair => pair.d).ToList();
             if (combined.Count == 0)
@@ -951,7 +985,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
         private static double finaliseDifficulty(double[] difficulties, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
         {
-            return FinaliseDifficulty(difficulties.ToList(), weights.ToList(), notes, longNotes);
+            return finaliseDifficulty(difficulties.ToList(), weights.ToList(), notes, longNotes);
         }
 
         private static NoteStruct? findNextColumnNote(NoteStruct note, List<NoteStruct>[] notesByColumn)
@@ -984,7 +1018,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
                     continue;
                 }
 
-                int idx = LowerBound(oldX, x);
+                int idx = lowerBound(oldX, x);
 
                 if (idx < oldX.Length && nearlyEquals(oldX[idx], x))
                 {
@@ -1074,7 +1108,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             if (point >= positions[^1])
                 return cumulative[^1];
 
-            int idx = LowerBound(positions, point);
+            int idx = lowerBound(positions, point);
             if (idx < positions.Length && nearlyEquals(positions[idx], point))
                 return cumulative[idx];
 
@@ -1083,32 +1117,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             double contribution = values[prev] * delta;
 
             return cumulative[prev] + contribution;
-        }
-
-        private static double lnIntegral(LNRepStruct repStruct, int a, int b)
-        {
-            int[] points = repStruct.Points;
-            double[] cumulative = repStruct.Cumulative;
-            double[] values = repStruct.Values;
-
-            int startIndex = UpperBound(points, a) - 1;
-            int endIndex = UpperBound(points, b) - 1;
-
-            if (startIndex < 0) startIndex = 0;
-            if (endIndex < startIndex) endIndex = startIndex;
-
-            double total = 0;
-
-            if (startIndex == endIndex)
-                total = (b - a) * values[startIndex];
-            else
-            {
-                total += (points[startIndex + 1] - a) * values[startIndex];
-                total += cumulative[endIndex] - cumulative[startIndex + 1];
-                total += (b - points[endIndex]) * values[endIndex];
-            }
-
-            return total;
         }
 
         private static double streamBooster(double delta)
@@ -1138,7 +1146,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return false;
         }
 
-        private static int LowerBound(double[] array, double value)
+        private static int lowerBound(double[] array, double value)
         {
             int left = 0;
             int right = array.Length;
@@ -1158,7 +1166,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
         private static int lowerBound(double[] array, int value)
         {
-            return LowerBound(array, value);
+            return lowerBound(array, (double)value);
         }
 
         private static int lowerBound(int[] array, double value)
@@ -1179,7 +1187,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return left;
         }
 
-        private static int UpperBound(int[] array, int value)
+        private static int upperBound(int[] array, int value)
         {
             int left = 0;
             int right = array.Length;

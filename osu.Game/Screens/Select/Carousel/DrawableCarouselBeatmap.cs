@@ -31,7 +31,6 @@ using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.UI;
 using osuTK;
 using osuTK.Graphics;
 using CommonStrings = osu.Game.Localisation.CommonStrings;
@@ -48,7 +47,7 @@ namespace osu.Game.Screens.Select.Carousel
         /// </summary>
         public const float HEIGHT = height + CAROUSEL_BEATMAP_SPACING;
 
-        private const float height = MAX_HEIGHT * 0.8f;
+        private const float height = MAX_HEIGHT * 0.6f;
 
         private readonly BeatmapInfo beatmapInfo;
 
@@ -150,8 +149,7 @@ namespace osu.Game.Screens.Select.Carousel
                     TriangleScale = 2,
                     RelativeSizeAxes = Axes.Both,
                     ColourLight = Color4Extensions.FromHex(@"3a7285"),
-                    ColourDark = Color4Extensions.FromHex(@"123744"),
-                    Alpha = 0.8f,
+                    ColourDark = Color4Extensions.FromHex(@"123744")
                 },
                 kpsGraph = new LineGraph
                 {
@@ -162,7 +160,7 @@ namespace osu.Game.Screens.Select.Carousel
                 },
                 new FillFlowContainer
                 {
-                    Padding = new MarginPadding(2),
+                    Padding = new MarginPadding(5),
                     Direction = FillDirection.Horizontal,
                     AutoSizeAxes = Axes.Both,
                     Anchor = Anchor.CentreLeft,
@@ -195,7 +193,7 @@ namespace osu.Game.Screens.Select.Carousel
                         },
                         new FillFlowContainer
                         {
-                            Padding = new MarginPadding { Left = 2 },
+                            Padding = new MarginPadding { Left = 5 },
                             Direction = FillDirection.Vertical,
                             AutoSizeAxes = Axes.Both,
                             Children = new Drawable[]
@@ -205,7 +203,7 @@ namespace osu.Game.Screens.Select.Carousel
                                     Direction = FillDirection.Horizontal,
                                     Spacing = new Vector2(4, 0),
                                     AutoSizeAxes = Axes.Both,
-                                    Children = new Drawable[]
+                                    Children = new[]
                                     {
                                         keyCountText = new OsuSpriteText
                                         {
@@ -289,7 +287,6 @@ namespace osu.Game.Screens.Select.Carousel
                     }
                 },
             };
-            // });
         }
 
         protected override void LoadComplete()
@@ -318,7 +315,7 @@ namespace osu.Game.Screens.Select.Carousel
             var localCancellationSource = maniaAnalysisCancellationSource;
 
             // 旧选歌界面与 V2 统一：通过 EzBeatmapManiaAnalysisCache 获取分析结果（会优先走 SQLite 持久化）。
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 0, requireXxySr: false);
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 0);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
                 if (localCancellationSource != maniaAnalysisCancellationSource)
@@ -397,26 +394,17 @@ namespace osu.Game.Screens.Select.Carousel
 
             starDifficultyCancellationSource?.Cancel();
 
-            // Only compute mania analysis when the item is visible.
-            if (Item?.State.Value == CarouselItemState.Collapsed)
-            {
-                maniaAnalysisCancellationSource?.Cancel();
-                maniaAnalysisCancellationSource = null;
-            }
-
             // Only compute difficulty when the item is visible.
             if (Item?.State.Value != CarouselItemState.Collapsed)
             {
                 // We've potentially cancelled the computation above so a new bindable is required.
                 starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmapInfo, (starDifficultyCancellationSource = new CancellationTokenSource()).Token, 200);
                 starDifficultyBindable.BindValueChanged(d =>
-                    {
-                        starCounter.Current = (float)(d.NewValue.Stars);
-                        difficultyIcon.Current.Value = d.NewValue;
-                    },
-                    true);
+                {
+                    starCounter.Current = (float)(d.NewValue.Stars);
+                    difficultyIcon.Current.Value = d.NewValue;
+                }, true);
 
-                updateCalculations();
                 updateKeyCount();
             }
 
@@ -434,12 +422,8 @@ namespace osu.Game.Screens.Select.Carousel
                 // Eventually this should be handled in a more modular way, allowing rulesets to add more information to the panel.
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
 
-                int keyCount = legacyRuleset.GetKeyCount(beatmapInfo, mods.Value);
-
-                string keyCountTextValue = EzBeatmapCalculator.GetScratch(playableBeatmap, keyCount);
-
                 keyCountText.Alpha = 1;
-                keyCountText.Text = keyCountTextValue;
+                keyCountText.Text = $"[{legacyRuleset.GetKeyCount(beatmapInfo, mods.Value)}K]";
             }
             else
                 keyCountText.Alpha = 0;
