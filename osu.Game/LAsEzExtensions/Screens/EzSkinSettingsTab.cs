@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.LAsEzExtensions.Configuration;
@@ -48,8 +49,8 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private static readonly Dictionary<bool, (Color4 Color, string TopText, string BottomText)> position_mode_config = new Dictionary<bool, (Color4 Color, string TopText, string BottomText)>
         {
-            [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), "SwitchToAbsolute".Localize(), "SwitchToAbsolute".Localize()),
-            [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), "SwitchToRelative".Localize(), "SwitchToRelative".Localize())
+            [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), EzLocalizationManager.SwitchToAbsolute, EzLocalizationManager.SwitchToAbsolute),
+            [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), EzLocalizationManager.SwitchToRelative, EzLocalizationManager.SwitchToRelative)
         };
 
         // TODO: 优化为动态枚举, 不能用Bindable<string>，这不是列表/枚举，会导致控件下拉栏无选项
@@ -108,103 +109,103 @@ namespace osu.Game.LAsEzExtensions.Screens
                     {
                         new SettingsEnumDropdown<EzEnumGameThemeName>
                         {
-                            LabelText = "GlobalTextureName".Localize(),
-                            TooltipText = "GlobalTextureNameTooltip".Localize(),
+                            LabelText = EzLocalizationManager.GlobalTextureName,
+                            TooltipText = EzLocalizationManager.GlobalTextureNameTooltip,
                             Current = nameOfGameTheme,
                         },
                         new SettingsDropdown<string>
                         {
-                            LabelText = "StageSet".Localize(),
-                            TooltipText = "StageSetTooltip".Localize(),
+                            LabelText = EzLocalizationManager.StageSet,
+                            TooltipText = EzLocalizationManager.StageSetTooltip,
                             Current = nameOfStage,
                             Items = availableStageSets,
                         },
                         new SettingsDropdown<string>
                         {
-                            LabelText = "NoteSet".Localize(),
-                            TooltipText = "NoteSetTooltip".Localize(),
+                            LabelText = EzLocalizationManager.NoteSet,
+                            TooltipText = EzLocalizationManager.NoteSetTooltip,
                             Current = nameOfNote,
                             Items = availableNoteSets,
                         },
                         new SettingsEnumDropdown<EzColumnWidthStyle>
                         {
-                            LabelText = "ColumnWidthStyle".Localize(),
-                            TooltipText = "ColumnWidthStyleTooltip".Localize(),
+                            LabelText = EzLocalizationManager.ColumnWidthStyle,
+                            TooltipText = EzLocalizationManager.ColumnWidthStyleTooltip,
                             Current = ezSkinConfig.GetBindable<EzColumnWidthStyle>(Ez2Setting.ColumnWidthStyle),
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "ColumnWidth".Localize(),
-                            TooltipText = "ColumnWidthTooltip".Localize(),
+                            LabelText = EzLocalizationManager.ColumnWidth,
+                            TooltipText = EzLocalizationManager.ColumnWidthTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth),
                             KeyboardStep = 1.0f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "SpecialFactor".Localize(),
-                            TooltipText = "SpecialFactorTooltip".Localize(),
+                            LabelText = EzLocalizationManager.SpecialFactor,
+                            TooltipText = EzLocalizationManager.SpecialFactorTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsCheckbox
                         {
-                            LabelText = "GlobalHitPosition".Localize(),
-                            TooltipText = "GlobalHitPositionTooltip".Localize(),
+                            LabelText = EzLocalizationManager.GlobalHitPosition,
+                            TooltipText = EzLocalizationManager.GlobalHitPositionTooltip,
                             Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition),
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "HitPosition".Localize(),
-                            TooltipText = "HitPositionTooltip".Localize(),
+                            LabelText = EzLocalizationManager.HitPosition,
+                            TooltipText = EzLocalizationManager.HitPositionTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition),
                             KeyboardStep = 1f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "HitTargetFloatFixed".Localize(),
-                            TooltipText = "HitTargetFloatFixedTooltip".Localize(),
+                            LabelText = EzLocalizationManager.HitTargetFloatFixed,
+                            TooltipText = EzLocalizationManager.HitTargetFloatFixedTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "HitTargetAlpha".Localize(),
-                            TooltipText = "HitTargetAlphaTooltip".Localize(),
+                            LabelText = EzLocalizationManager.HitTargetAlpha,
+                            TooltipText = EzLocalizationManager.HitTargetAlphaTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha),
                             KeyboardStep = 0.01f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "NoteHeightScale".Localize(),
-                            TooltipText = "NoteHeightScaleTooltip".Localize(),
+                            LabelText = EzLocalizationManager.NoteHeightScale,
+                            TooltipText = EzLocalizationManager.NoteHeightScaleTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "ManiaHoldTailMaskGradientHeight".Localize(),
-                            TooltipText = "ManiaHoldTailMaskGradientHeightTooltip".Localize(),
+                            LabelText = EzLocalizationManager.ManiaHoldTailMaskGradientHeight,
+                            TooltipText = EzLocalizationManager.ManiaHoldTailMaskGradientHeightTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight),
                             KeyboardStep = 1.0f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "ManiaHoldTailAlpha".Localize(),
-                            TooltipText = "ManiaHoldTailAlphaTooltip".Localize(),
+                            LabelText = EzLocalizationManager.ManiaHoldTailAlpha,
+                            TooltipText = EzLocalizationManager.ManiaHoldTailAlphaTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha),
                             KeyboardStep = 0.1f,
                         },
                         new SettingsSlider<double>
                         {
-                            LabelText = "NoteTrackLine".Localize(),
-                            TooltipText = "NoteTrackLineTooltip".Localize(),
+                            LabelText = EzLocalizationManager.NoteTrackLine,
+                            TooltipText = EzLocalizationManager.NoteTrackLineTooltip,
                             Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight),
                         },
                         refreshSkinButton = new SettingsButton
                         {
                             Action = refreshSkin,
-                            Text = "RefreshSaveSkin".Localize(),
-                            TooltipText = "RefreshSaveSkin".Localize()
+                            Text = EzLocalizationManager.RefreshSaveSkin,
+                            TooltipText = EzLocalizationManager.RefreshSaveSkin
                         }
                     }
                 }
@@ -244,11 +245,9 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private void updateAllEzTextureNames(EzEnumGameThemeName textureGameTheme)
         {
-            var root = findRootDrawable();
-
-            var scoreTexts = root.ChildrenOfType<EzScoreText>();
-            var comboTexts = root.ChildrenOfType<EzComboText>();
-            var hitResultScores = root.ChildrenOfType<EzComHitResultScore>();
+            var scoreTexts = this.ChildrenOfType<EzScoreText>();
+            var comboTexts = this.ChildrenOfType<EzComboText>();
+            var hitResultScores = this.ChildrenOfType<EzComHitResultScore>();
 
             foreach (var scoreText in scoreTexts)
                 scoreText.FontName.Value = textureGameTheme;
@@ -258,14 +257,6 @@ namespace osu.Game.LAsEzExtensions.Screens
 
             foreach (var hitResultScore in hitResultScores)
                 hitResultScore.NameDropdown.Value = textureGameTheme;
-        }
-
-        private Drawable findRootDrawable()
-        {
-            var root = this as Drawable;
-            while (root.Parent != null)
-                root = root.Parent;
-            return root;
         }
 
         #endregion

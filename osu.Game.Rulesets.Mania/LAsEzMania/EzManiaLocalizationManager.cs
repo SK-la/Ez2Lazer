@@ -2,65 +2,43 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
-using osu.Framework.Bindables;
+using System.Reflection;
 using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.Rulesets.Mania.LAsEZMania
 {
     public class EzManiaLocalizationManager : EzLocalizationManager
     {
-        private static readonly Dictionary<string, Dictionary<string, string>> maniaResources
-            = new Dictionary<string, Dictionary<string, string>>();
-
-        // 用于热重载的事件，当添加条目时触发
-        public static event Action? OnResourcesChanged;
-
         static EzManiaLocalizationManager()
         {
-            initializeManiaResources();
-        }
+            // 使用反射为未设置英文的属性自动生成英文（属性名替换_为空格）
+            var fields = typeof(EzManiaLocalizationManager).GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
 
-        private static void initializeManiaResources()
-        {
-            // 添加Mania特定的本地化条目
-            addManiaResource("Mania Specific Key", "Mania特定中文");
-            // 添加更多条目...
-        }
-
-        private static void addManiaResource(string key, string chinese, string? english = null)
-        {
-            maniaResources[key] = new Dictionary<string, string>
+            foreach (var field in fields)
             {
-                ["zh"] = chinese,
-                ["en"] = english ?? key
-            };
-            OnResourcesChanged?.Invoke(); // 触发热重载事件
-        }
-
-        public new static string GetString(string key)
-        {
-            // 先检查Mania自己的资源
-            if (maniaResources.TryGetValue(key, out var maniaValue))
-            {
-                string lang = System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh", System.StringComparison.Ordinal) ? "zh" : "en";
-                return maniaValue[lang];
+                if (field.FieldType == typeof(EzLocalisableString))
+                {
+                    if (field.GetValue(null) is EzLocalisableString instance && instance.English == null)
+                    {
+                        instance.English = field.Name.Replace("_", " ");
+                    }
+                }
             }
-
-            // 然后检查基类的资源
-            return EzLocalizationManager.GetString(key);
         }
 
-        public new static string GetString(string key, params object[] args)
+        // 本地化字符串类，直接持有中文和英文
+        public new class EzLocalisableString : EzLocalizationManager.EzLocalisableString
         {
-            string format = GetString(key);
-            return string.Format(format, args);
+            public EzLocalisableString(string chinese, string? english = null)
+                : base(chinese, english) { }
+
+            // 便捷构造函数：如果不提供英文，则稍后通过反射从属性名生成
+            public EzLocalisableString(string chinese)
+                : base(chinese) { }
         }
 
-        // 运行时添加条目的方法
-        public static void AddResource(string key, string chinese, string? english = null)
-        {
-            addManiaResource(key, chinese, english);
-        }
+        // 公共属性定义本地化字符串，直接指定中文和英文
+        public static readonly EzLocalisableString Mania_Specific_Key = new EzLocalisableString("Mania特定中文");
+        // 添加更多属性...
     }
 }

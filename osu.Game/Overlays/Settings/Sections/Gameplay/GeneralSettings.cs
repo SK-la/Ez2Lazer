@@ -26,15 +26,16 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
             {
                 ClassicDefault = EnumHealthMode.Lazer,
                 Current = ezConfig.GetBindable<EnumHealthMode>(Ez2Setting.CustomHealthMode),
-                LabelText = "O2Jam Health System",
-                TooltipText = "Only for O2Jam HitMode. 只用于O2Jam模式。"
+                LabelText = EzLocalizationManager.HealthMode,
+                TooltipText = EzLocalizationManager.HealthModeTooltip,
+                Keywords = new[] { "mania" }
             };
             poorHitResultCheckbox = new SettingsCheckbox
             {
                 Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResult),
-                LabelText = "Poor HitResult System",
-                TooltipText = "Added a strict penalty for wrong presses outside the Miss range. "
-                              + "will significantly increase the difficulty. Recommended for Ez2Ac and IIDX modes"
+                LabelText = EzLocalizationManager.PoorHitResult,
+                TooltipText = EzLocalizationManager.PoorHitResultTooltip,
+                Keywords = new[] { "mania" }
             };
 
             Children = new Drawable[]
@@ -49,25 +50,28 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 hitMode = new SettingsEnumDropdown<EzMUGHitMode>
                 {
                     ClassicDefault = EzMUGHitMode.EZ2AC,
-                    LabelText = "Hit Mode",
+                    LabelText = EzLocalizationManager.HitMode,
+                    TooltipText = EzLocalizationManager.HitModeTooltip,
                     Current = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode),
-                    Keywords = new[] { "scoring" }
+                    Keywords = new[] { "mania" }
                 },
                 healthMode,
                 poorHitResultCheckbox,
                 new SettingsSlider<double>
                 {
-                    LabelText = "Accuracy Cutoff S",
+                    LabelText = EzLocalizationManager.AccuracyCutoffS,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS),
                     KeyboardStep = 0.01f,
-                    DisplayAsPercentage = true
+                    DisplayAsPercentage = true,
+                    Keywords = new[] { "mania" }
                 },
                 new SettingsSlider<double>
                 {
-                    LabelText = "Accuracy Cutoff A",
+                    LabelText = EzLocalizationManager.AccuracyCutoffA,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA),
                     KeyboardStep = 0.01f,
-                    DisplayAsPercentage = true
+                    DisplayAsPercentage = true,
+                    Keywords = new[] { "mania" }
                 },
                 new SettingsCheckbox
                 {
