@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -564,11 +563,22 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private static double getRateAdjustMultiplier(Mod[] mods)
         {
-            // Only one rate adjust mod should be active (compat checks enforce this), but be defensive.
+            // Prefer the generic ruleset mechanism: any mod implementing IApplicableToRate should contribute.
+            // Apply in mod order to match beatmap conversion / gameplay application semantics.
             try
             {
-                var rate = mods.OfType<ModRateAdjust>().FirstOrDefault();
-                return rate?.SpeedChange.Value ?? 1.0;
+                double rate = 1.0;
+
+                for (int i = 0; i < mods.Length; i++)
+                {
+                    if (mods[i] is IApplicableToRate applicableToRate)
+                        rate = applicableToRate.ApplyToRate(0, rate);
+                }
+
+                if (double.IsNaN(rate) || double.IsInfinity(rate) || rate <= 0)
+                    return 1.0;
+
+                return rate;
             }
             catch
             {
@@ -693,7 +703,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             public readonly RulesetInfo Ruleset;
             public readonly Mod[] OrderedMods;
             public readonly bool RequireXxySr;
-            private readonly string[] modSignatures;
+            public readonly int ModsSignature;
 
             public ManiaAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IEnumerable<Mod>? mods, bool requireXxySr)
             {
@@ -704,8 +714,69 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 // Do not reorder here (eg. by Acronym), otherwise analysis may run on a different
                 // playable beatmap than gameplay, which can cause incorrect results or crashes.
                 OrderedMods = createModSnapshot(mods);
+                // IMPORTANT: some custom mods (notably many YuLiangSSS mods) lazily assign a random seed during ApplyToBeatmap
+                // (eg. Seed.Value ??= RNG.Next()). Because our cache key includes mod settings, such mutation would change
+                // Mod.GetHashCode()/Equals() during computation and corrupt dictionary usage.
+                // Pre-fill missing seeds deterministically on the cloned snapshot to keep cache keys stable.
+                initialiseDeterministicSeedsIfRequired(OrderedMods, beatmapInfo);
+                ModsSignature = computeModsSignature(OrderedMods);
                 RequireXxySr = requireXxySr;
-                modSignatures = OrderedMods.Select(createModSignature).ToArray();
+            }
+
+            private static int computeModsSignature(Mod[] orderedMods)
+            {
+                unchecked
+                {
+                    var hash = new HashCode();
+
+                    // Include order. Order matters for conversion & gameplay.
+                    for (int i = 0; i < orderedMods.Length; i++)
+                    {
+                        var mod = orderedMods[i];
+                        hash.Add(mod.GetType());
+
+                        // Mirror Mod.GetHashCode() semantics but decouple from mod instance mutation after signature is computed.
+                        // Only settings exposed via [SettingSource] are included.
+                        foreach (var setting in mod.SettingsBindables)
+                            hash.Add(setting.GetUnderlyingSettingValue());
+                    }
+
+                    return hash.ToHashCode();
+                }
+            }
+
+            private static void initialiseDeterministicSeedsIfRequired(Mod[] orderedMods, BeatmapInfo beatmapInfo)
+            {
+                if (orderedMods.Length == 0)
+                    return;
+
+                unchecked
+                {
+                    // Base seed derived from beatmap identity.
+                    int baseSeed = 17;
+                    baseSeed = baseSeed * 31 + beatmapInfo.ID.GetHashCode();
+                    baseSeed = baseSeed * 31 + (beatmapInfo.Hash?.GetHashCode(StringComparison.Ordinal) ?? 0);
+
+                    for (int i = 0; i < orderedMods.Length; i++)
+                    {
+                        if (orderedMods[i] is not IHasSeed hasSeed)
+                            continue;
+
+                        if (hasSeed.Seed.Value != null)
+                            continue;
+
+                        // Mix in the mod type to avoid all seeded mods sharing the same seed.
+                        int seed = baseSeed;
+                        seed = seed * 31 + orderedMods[i].GetType().FullName!.GetHashCode(StringComparison.Ordinal);
+                        seed = seed * 31 + i;
+
+                        // Ensure non-null.
+                        if (seed == 0)
+                            seed = 1;
+
+                        hasSeed.Seed.Value = seed;
+                    }
+                }
             }
 
             private static Mod[] createModSnapshot(IEnumerable<Mod>? mods)
@@ -742,7 +813,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                                                   && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
                                                                   && Ruleset.Equals(other.Ruleset)
                                                                   && RequireXxySr == other.RequireXxySr
-                                                                  && modSignatures.SequenceEqual(other.modSignatures);
+                                                                  && ModsSignature == other.ModsSignature;
 
             public override int GetHashCode()
             {
@@ -753,53 +824,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 hashCode.Add(Ruleset.ShortName);
                 hashCode.Add(RequireXxySr);
 
-                foreach (string s in modSignatures)
-                    hashCode.Add(s);
+                // Use precomputed signature rather than mod instances to avoid key mutation during analysis.
+                hashCode.Add(ModsSignature);
 
                 return hashCode.ToHashCode();
-            }
-
-            private static string createModSignature(Mod m)
-            {
-                // Signature = TypeFullName + sorted list of setting_name=setting_value
-                string type = m.GetType().FullName ?? m.GetType().Name;
-
-                try
-                {
-                    var settings = m.GetSettingsSourceProperties().Select(p => p.Item2).ToArray();
-                    if (settings.Length == 0)
-                        return type;
-
-                    var pairs = settings.Select(prop =>
-                    {
-                        try
-                        {
-                            if (prop.GetValue(m) is not IBindable bindable)
-                                return prop.Name + "=<non-bindable>";
-
-                            object val = bindable.GetUnderlyingSettingValue();
-                            string text = val switch
-                            {
-                                null => "",
-                                IFormattable f => f.ToString(null, CultureInfo.InvariantCulture) ?? "",
-                                _ => val.ToString() ?? ""
-                            };
-
-                            return prop.Name + "=" + text;
-                        }
-                        catch
-                        {
-                            return prop.Name + "=<error>";
-                        }
-                    }).OrderBy(x => x);
-
-                    return type + ":" + string.Join(";", pairs);
-                }
-                catch
-                {
-                    // Fall back to type-only signature if settings reflection fails.
-                    return type;
-                }
             }
         }
 

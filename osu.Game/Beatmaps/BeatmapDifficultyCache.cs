@@ -318,29 +318,125 @@ namespace osu.Game.Beatmaps
             public readonly BeatmapInfo BeatmapInfo;
             public readonly RulesetInfo Ruleset;
             public readonly Mod[] OrderedMods;
+            public readonly int ModsSignature;
 
             public DifficultyCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo? ruleset, IEnumerable<Mod>? mods)
             {
                 BeatmapInfo = beatmapInfo;
                 // In the case that the user hasn't given us a ruleset, use the beatmap's default ruleset.
                 Ruleset = ruleset ?? BeatmapInfo.Ruleset;
-                OrderedMods = mods?.OrderBy(m => m.Acronym).Select(mod => mod.DeepClone()).ToArray() ?? Array.Empty<Mod>();
+
+                // IMPORTANT: mod application order matters for beatmap conversion.
+                // WorkingBeatmap.GetPlayableBeatmap() applies mods in the order provided.
+                // Do not reorder here (eg. by Acronym), otherwise difficulty may be computed against a
+                // different playable beatmap than gameplay (especially for custom conversion mods).
+                OrderedMods = createModSnapshot(mods);
+
+                // Some custom mods lazily assign random values during application (eg. Seed.Value ??= RNG.Next()).
+                // Because the cache key historically depended on mod hash/equality, such mutation can lead to
+                // unstable lookups. Pre-fill missing seeds deterministically on the cloned snapshot.
+                initialiseDeterministicSeedsIfRequired(OrderedMods, beatmapInfo);
+                ModsSignature = computeModsSignature(OrderedMods);
+            }
+
+            private static Mod[] createModSnapshot(IEnumerable<Mod>? mods)
+            {
+                if (mods == null)
+                    return Array.Empty<Mod>();
+
+                var list = new List<Mod>();
+
+                foreach (var mod in mods)
+                {
+                    if (mod == null)
+                        continue;
+
+                    try
+                    {
+                        list.Add(mod.DeepClone());
+                    }
+                    catch
+                    {
+                        // If cloning fails, fall back to using the original instance.
+                        // This is not ideal for caching, but is better than breaking difficulty entirely.
+                        list.Add(mod);
+                    }
+                }
+
+                return list.ToArray();
+            }
+
+            private static int computeModsSignature(Mod[] orderedMods)
+            {
+                unchecked
+                {
+                    var hash = new HashCode();
+
+                    // Include order. Order matters for conversion & gameplay.
+                    for (int i = 0; i < orderedMods.Length; i++)
+                    {
+                        var mod = orderedMods[i];
+                        hash.Add(mod.GetType());
+
+                        // Mirror Mod.GetHashCode() semantics but decouple from mod instance mutation after signature is computed.
+                        foreach (var setting in mod.SettingsBindables)
+                            hash.Add(setting.GetUnderlyingSettingValue());
+                    }
+
+                    return hash.ToHashCode();
+                }
+            }
+
+            private static void initialiseDeterministicSeedsIfRequired(Mod[] orderedMods, BeatmapInfo beatmapInfo)
+            {
+                if (orderedMods.Length == 0)
+                    return;
+
+                unchecked
+                {
+                    // Base seed derived from beatmap identity.
+                    int baseSeed = 17;
+                    baseSeed = baseSeed * 31 + beatmapInfo.ID.GetHashCode();
+                    baseSeed = baseSeed * 31 + (beatmapInfo.Hash?.GetHashCode(StringComparison.Ordinal) ?? 0);
+
+                    for (int i = 0; i < orderedMods.Length; i++)
+                    {
+                        if (orderedMods[i] is not IHasSeed hasSeed)
+                            continue;
+
+                        if (hasSeed.Seed.Value != null)
+                            continue;
+
+                        // Mix in the mod type to avoid all seeded mods sharing the same seed.
+                        int seed = baseSeed;
+                        seed = seed * 31 + orderedMods[i].GetType().FullName!.GetHashCode(StringComparison.Ordinal);
+                        seed = seed * 31 + i;
+
+                        // Ensure non-null.
+                        if (seed == 0)
+                            seed = 1;
+
+                        hasSeed.Seed.Value = seed;
+                    }
+                }
             }
 
             public bool Equals(DifficultyCacheLookup other)
-                => BeatmapInfo.Equals(other.BeatmapInfo)
+                => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
+                   && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
                    && Ruleset.Equals(other.Ruleset)
-                   && OrderedMods.SequenceEqual(other.OrderedMods);
+                   && ModsSignature == other.ModsSignature;
 
             public override int GetHashCode()
             {
                 var hashCode = new HashCode();
 
                 hashCode.Add(BeatmapInfo.ID);
+                hashCode.Add(BeatmapInfo.Hash);
                 hashCode.Add(Ruleset.ShortName);
 
-                foreach (var mod in OrderedMods)
-                    hashCode.Add(mod);
+                // Use precomputed signature rather than mod instances to avoid key mutation during computation.
+                hashCode.Add(ModsSignature);
 
                 return hashCode.ToHashCode();
             }

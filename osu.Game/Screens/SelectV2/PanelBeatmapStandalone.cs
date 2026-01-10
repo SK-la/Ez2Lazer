@@ -71,6 +71,7 @@ namespace osu.Game.Screens.SelectV2
 
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
+        private bool applyNextManiaUiUpdateImmediately;
         private string? cachedScratchText;
         private EzKpsDisplay ezKpsDisplay = null!;
         private EzLineGraph maniaKpsGraph = null!;
@@ -296,16 +297,24 @@ namespace osu.Game.Screens.SelectV2
             ruleset.BindValueChanged(_ =>
             {
                 cachedScratchText = null;
-                bindManiaAnalysis();
-                resetManiaAnalysisDisplay();
+                invalidateManiaAnalysisBinding();
+                applyNextManiaUiUpdateImmediately = true;
+
+                // Only bind/compute when visible; off-screen panels will rebind in Update().
+                if (Item?.IsVisible == true)
+                    bindManiaAnalysis();
                 updateKeyCount();
             });
 
             mods.BindValueChanged(_ =>
             {
                 cachedScratchText = null;
-                bindManiaAnalysis();
-                resetManiaAnalysisDisplay();
+                invalidateManiaAnalysisBinding();
+                applyNextManiaUiUpdateImmediately = true;
+
+                // Only bind/compute when visible; off-screen panels will rebind in Update().
+                if (Item?.IsVisible == true)
+                    bindManiaAnalysis();
                 updateKeyCount();
             }, true);
 
@@ -347,8 +356,8 @@ namespace osu.Game.Screens.SelectV2
 
             lastStarRatingStars = null;
 
-            bindManiaAnalysis();
             resetManiaAnalysisDisplay();
+            bindManiaAnalysis();
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
@@ -458,6 +467,12 @@ namespace osu.Game.Screens.SelectV2
                 if (Item == null)
                     return;
 
+                // The bindable starts with ManiaBeatmapAnalysisDefaults.EMPTY as a placeholder.
+                // Applying it would normalize to 0..N-1 and cause the per-column notes display to flicker to zero.
+                // Ignore this placeholder update and wait for a real computed/persisted result.
+                if (isPlaceholderAnalysisResult(result.NewValue))
+                    return;
+
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
 
@@ -498,8 +513,42 @@ namespace osu.Game.Screens.SelectV2
             }, true);
         }
 
+        private static bool isPlaceholderAnalysisResult(ManiaBeatmapAnalysisResult result)
+            => result.AverageKps == 0
+               && result.MaxKps == 0
+               && (result.KpsList?.Count ?? 0) == 0
+               && (result.ColumnCounts?.Count ?? 0) == 0
+               && (result.HoldNoteCounts?.Count ?? 0) == 0
+               && string.IsNullOrEmpty(result.ScratchText)
+               && result.XxySr == null;
+
+        private void invalidateManiaAnalysisBinding()
+        {
+            // Always invalidate current binding so that Update() can rebind when the panel becomes visible.
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = null;
+            maniaAnalysisBindable = null;
+
+            scheduledManiaUiUpdate?.Cancel();
+            scheduledManiaUiUpdate = null;
+            hasPendingUiUpdate = false;
+            pendingColumnCounts = null;
+            pendingHoldNoteCounts = null;
+        }
+
         private void queueManiaUiUpdate((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
+            // After a mod/ruleset change, apply the first incoming result immediately to avoid a visible blank window.
+            if (applyNextManiaUiUpdateImmediately && Item?.IsVisible == true)
+            {
+                applyNextManiaUiUpdateImmediately = false;
+                scheduledManiaUiUpdate?.Cancel();
+                scheduledManiaUiUpdate = null;
+                hasPendingUiUpdate = false;
+                updateUI(result, columnCounts, holdNoteCounts);
+                return;
+            }
+
             pendingKpsResult = result;
             pendingColumnCounts = columnCounts;
             pendingHoldNoteCounts = holdNoteCounts;
@@ -555,8 +604,16 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
+            // 滚动过程中会有大量不可见/刚离屏的面板仍收到分析回调。
+            // 这些面板的 UI 更新会造成明显 GC 压力与 Draw FPS 下降，因此先缓存为 pending，等再次可见时再应用。
             if (Item.IsVisible != true)
+            {
+                pendingKpsResult = result;
+                pendingColumnCounts = columnCounts;
+                pendingHoldNoteCounts = holdNoteCounts;
+                hasPendingUiUpdate = true;
                 return;
+            }
 
             var (averageKps, maxKps, kpsList) = result;
 
@@ -751,6 +808,21 @@ namespace osu.Game.Screens.SelectV2
                     // 重新变为可见时，必须先清空旧显示值，否则会短暂显示上一次谱面的结果（表现为 xxySR 跳变）。
                     resetManiaAnalysisDisplay();
                     bindManiaAnalysis();
+                }
+
+                // 如果离屏期间收到过分析结果（或刚好在离屏时更新被跳过），这里补一次 UI 应用。
+                if (hasPendingUiUpdate && scheduledManiaUiUpdate == null)
+                {
+                    scheduledManiaUiUpdate = Scheduler.AddDelayed(() =>
+                    {
+                        scheduledManiaUiUpdate = null;
+
+                        if (!hasPendingUiUpdate)
+                            return;
+
+                        hasPendingUiUpdate = false;
+                        updateUI(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
+                    }, 0, false);
                 }
             }
 
