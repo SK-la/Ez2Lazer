@@ -27,6 +27,7 @@ using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
+using osu.Game.Rulesets.Mania.LAsEzMania.Analysis;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;

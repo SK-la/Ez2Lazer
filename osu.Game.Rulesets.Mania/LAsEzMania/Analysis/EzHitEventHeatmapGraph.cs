@@ -2,22 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Lines;
-using osu.Game.Configuration;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.Scoring;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Analysis
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 {
     /// <summary>
     /// 结算成绩分析。显示命中时间偏移的热力图。带有血量折线和命中结果边界线。
@@ -25,7 +24,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
     public partial class EzHitEventHeatmapGraph : CompositeDrawable
     {
         private readonly IReadOnlyList<HitEvent> hitEvents;
-        private readonly HitWindows hitWindows;
+        private readonly ManiaHitWindows hitWindows;
         private readonly ScoreInfo score;
 
         private double binSize;
@@ -49,12 +48,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
         // [Resolved]
         // private OsuConfigManager config { get; set; } = null!;
 
-        public EzHitEventHeatmapGraph(ScoreInfo score, HitWindows hitWindows)
+        public EzHitEventHeatmapGraph(ScoreInfo score, ManiaHitWindows hitWindows)
         {
             this.score = score;
             this.hitEvents = score.HitEvents;
-            this.hitWindows = hitWindows;
             this.hitEvents = hitEvents.Where(e => e.HitObject.HitWindows != HitWindows.Empty && e.Result.IsBasic()).ToList();
+            this.hitWindows = hitWindows;
 
             drainRate = score.BeatmapInfo is not null
                 ? score.BeatmapInfo.Difficulty.DrainRate
@@ -83,7 +82,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             // offsetBindable.BindValueChanged(updateOffset);
         }
 
-        // public double TotalMultiplier => hitWindows.SpeedMultiplier / hitWindows.DifficultyMultiplier;
+        public double TotalMultiplier => hitWindows.SpeedMultiplier / hitWindows.DifficultyMultiplier;
 
         // private void updateOffset(ValueChangedEvent<int> obj)
         // {
@@ -97,7 +96,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
             double invertedOd = 10 - od;
 
             // Calculate total multiplier from mods
-            double totalMultiplier = score.Mods.Aggregate(1.0, (current, mod) => current * mod.ScoreMultiplier);
+            // double totalMultiplier = score.Mods.Aggregate(1.0, (current, mod) => current * mod.ScoreMultiplier);
+            double totalMultiplier = TotalMultiplier;
 
             double perfectRange = Math.Floor(16 * totalMultiplier) + 0.5;
             double greatRange = Math.Floor((34 + 3 * invertedOd) * totalMultiplier) + 0.5;
@@ -129,7 +129,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             ClearInternal();
 
             double v1Acc = calculateV1Accuracy();
-            double v2Acc = score.Accuracy * 100;
+            double v2Acc = score.Accuracy * 100; // 目前只能获得标准acc，无法区分不同模式的acc计算方式
 
             // Add overlay text box in top-left corner
             AddInternal(new GridContainer
@@ -198,20 +198,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 }
             });
 
-            // var allAvailableWindows = hitWindows.GetAllAvailableWindows();
-
             // 遍历所有有效的 HitResult，绘制边界线
-            foreach (HitResult result in Enum.GetValues(typeof(HitResult)).Cast<HitResult>())
+            foreach (HitResult result in Enum.GetValues(typeof(HitResult)).Cast<HitResult>().Where(r => r <= HitResult.Perfect && r >= HitResult.Meh))
             {
-                if (!result.IsBasic() || !result.IsHit())
-                    continue;
-
-                double boundary = result == HitResult.Pool
-                    ? 0
-                    : hitWindows.WindowFor(result);
-
-                if (boundary <= 0)
-                    continue;
+                double boundary = hitWindows.WindowFor(result);
 
                 drawBoundaryLine(boundary, result);
                 drawBoundaryLine(-boundary, result);
@@ -285,33 +275,31 @@ namespace osu.Game.LAsEzExtensions.Analysis
             //
             // // 根据 noteRatio 动态调整透明度，noteRatio 越大透明度越低
             // float adjustedAlpha = 0.1f + (1 - noteRatio) * 0.3f; // 最低透明度为 0.2f，最高为 0.5f
-            float availableWidth = DrawWidth - leftMarginConst - rightMarginConst;
-            float centerOffset = (leftMarginConst - rightMarginConst) / 2;
+            float availableWidth = DrawWidth - leftMarginConst - rightMarginConst + 20;
             float relativeWidth = availableWidth / DrawWidth;
             // 绘制中心轴 (0ms)
             AddInternal(new Box
             {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
+                Anchor = Anchor.CentreRight,
+                Origin = Anchor.CentreRight,
                 RelativeSizeAxes = Axes.X,
-                Height = 2,
+                Height = 1,
                 Width = relativeWidth,
-                X = centerOffset,
+                // X = centerOffset,
                 Alpha = 0.1f,
                 Colour = Color4.Gray,
             });
 
             AddInternal(new Box
             {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
+                Anchor = Anchor.CentreRight,
+                Origin = Anchor.CentreRight,
                 RelativeSizeAxes = Axes.X,
-                Height = 2,
+                Height = 1,
                 Width = relativeWidth,
-                X = centerOffset,
                 Alpha = 0.1f,
                 Colour = colours.ForHitResult(result),
-                Y = (float)(boundary),
+                Y = (float)(boundary + currentOffset),
             });
 
             AddInternal(new OsuSpriteText
@@ -319,10 +307,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 Text = $"{boundary:+0.##;-0.##}",
                 Anchor = Anchor.CentreLeft,
                 Origin = Anchor.CentreRight,
-                Font = OsuFont.GetFont(size: 14),
+                Font = OsuFont.GetFont(size: 12),
                 Colour = Color4.White,
-                X = 25,
-                Y = (float)(boundary),
+                X = leftMarginConst - 25,
+                Y = (float)(boundary + currentOffset),
             });
         }
     }
