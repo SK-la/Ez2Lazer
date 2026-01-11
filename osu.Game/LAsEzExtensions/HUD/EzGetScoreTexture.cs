@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Rendering;
@@ -15,19 +14,20 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Framework.Text;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Skinning.Components;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.HUD
 {
-    public partial class EzGetComboTexture : OsuSpriteText
+    public partial class EzGetScoreTexture : OsuSpriteText
     {
         public Bindable<EzEnumGameThemeName> FontName { get; }
 
         private readonly Func<char, string> getLookup;
         private GlyphStore glyphStore = null!;
 
-        protected override char FixedWidthReferenceCharacter => '6';
+        protected override char FixedWidthReferenceCharacter => '5';
 
-        public EzGetComboTexture(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> fontName)
+        public EzGetScoreTexture(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> fontName)
         {
             this.getLookup = getLookup;
             FontName = fontName;
@@ -39,19 +39,18 @@ namespace osu.Game.Skinning.Components
         [BackgroundDependencyLoader]
         private void load(GameHost host, IRenderer renderer)
         {
-            // TODO: 需要测试资源管理，以及退回方案
             Storage gameStorage = host.Storage;
 
             var userResourceStore = new StorageBackedResourceStore(gameStorage);
             var textureLoader = new TextureLoaderStore(userResourceStore);
             var localSkinStore = new TextureStore(renderer, textureLoader);
-
+            // Spacing = new Vector2(-2f, 0f);
             FontName.BindValueChanged(e =>
             {
                 Font = new FontUsage(FontName.Value.ToString(), 1);
                 glyphStore = new GlyphStore(localSkinStore, getLookup);
 
-                foreach (char c in new[] { '.', '%', 'c', 'e', 'l', 'j' })
+                foreach (char c in new[] { '.', '%' })
                     glyphStore.Get(FontName.Value.ToString(), c);
                 for (int i = 0; i < 10; i++)
                     glyphStore.Get(FontName.Value.ToString(), (char)('0' + i));
@@ -88,39 +87,24 @@ namespace osu.Game.Skinning.Components
                     string textureNameReplace = textureName.Replace(" ", "_");
 
                     string[] possiblePaths;
+
                     string themeRoot = Path.Combine("EzResources", "GameTheme", textureNameReplace);
 
                     switch (character)
                     {
                         case '.':
                         case '%':
-                        case 'e':
-                        case 'l':
-                            possiblePaths = new[]
-                            {
-                                Path.Combine(themeRoot, lookup)
-                            };
-                            break;
-
-                        case 'c':
-                            possiblePaths = new[]
-                            {
-                                Path.Combine(themeRoot, "combo", lookup)
-                            };
-                            break;
-
-                        case 'j':
-                            possiblePaths = new[]
-                            {
-                                Path.Combine(themeRoot, "judgement")
-                            };
-                            break;
-
                         default:
                             possiblePaths = new[]
                             {
-                                Path.Combine(themeRoot, "combo", "number", lookup),
-                                Path.Combine(themeRoot, "judgement", lookup)
+                                // 对应：.../number/score/{lookup}
+                                Path.Combine(themeRoot, "number", "score", lookup),
+
+                                // 对应：.../number/combo/{lookup}
+                                Path.Combine(themeRoot, "number", "combo", lookup),
+
+                                // 对应：.../number/{lookup}
+                                Path.Combine(themeRoot, "number", lookup),
                             };
                             break;
                     }

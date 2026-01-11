@@ -1,10 +1,12 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Scoring
 {
+    [Obsolete("过时接口，但在未来可能重新启用。")]
     public interface IHitWindows : IApplicableMod
     {
         bool IsHitResultAllowed(HitResult result);

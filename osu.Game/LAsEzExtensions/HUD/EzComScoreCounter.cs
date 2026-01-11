@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
@@ -9,8 +8,10 @@ using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Screens.Play.HUD;
+using osu.Game.Skinning;
+using osu.Game.Skinning.Components;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.HUD
 {
     public partial class EzComScoreCounter : GameplayScoreCounter, ISerialisableDrawable
     {

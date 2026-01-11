@@ -12,6 +12,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Extensions;
 using osu.Game.IO;
+using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning.Components;

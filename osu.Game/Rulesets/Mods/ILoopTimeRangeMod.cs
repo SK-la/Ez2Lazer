@@ -4,8 +4,9 @@
 namespace osu.Game.Rulesets.Mods
 {
     /// <summary>
-    /// 用于链接循环时间范围的Mod接口。
-    /// 单位是ms。
+    /// 用于链接循环时间范围的Mod接口。 单位是ms。
+    /// <para></para>
+    /// 目前主要用于 SummaryTimeline 将时间设置传递到 ManiaModLoopPlayClip。
     /// </summary>
     public interface ILoopTimeRangeMod
     {

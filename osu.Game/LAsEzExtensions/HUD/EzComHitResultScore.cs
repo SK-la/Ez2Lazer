@@ -12,15 +12,16 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
+using osu.Game.Skinning;
+using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.HUD
 {
     public partial class EzComHitResultScore : CompositeDrawable, ISerialisableDrawable //, IPreviewable //, IAnimatableJudgement
     {

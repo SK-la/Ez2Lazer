@@ -1,6 +1,6 @@
 using osu.Framework.Bindables;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.Screens
 {
     public interface IPreviewable
     {

@@ -10,7 +10,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
-using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;

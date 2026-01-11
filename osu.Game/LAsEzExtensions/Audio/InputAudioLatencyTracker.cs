@@ -7,16 +7,14 @@ using System.Diagnostics;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Input;
 using osu.Framework.Logging;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens.Play;
 using osuTK.Input;
 
-namespace osu.Game.Audio
+namespace osu.Game.LAsEzExtensions.Audio
 {
     /// <summary>
     /// Tracks latency between physical input, judgement, and audio playback for hit notes.

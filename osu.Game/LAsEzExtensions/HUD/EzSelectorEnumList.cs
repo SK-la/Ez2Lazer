@@ -11,7 +11,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Overlays.Settings;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.HUD
 {
     public partial class EzSelectorEnumList : SettingsDropdown<EzEnumGameThemeName>
     {

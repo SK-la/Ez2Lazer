@@ -1,24 +1,19 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Screens;
+using osu.Game.Skinning.Components;
 using osuTK;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.HUD
 {
-    public partial class EzScoreText : CompositeDrawable, IHasText
+    public partial class EzComboText : CompositeDrawable, IHasText
     {
-        [Resolved]
-        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
-
-        public readonly EzGetScoreTexture TextPart;
+        public readonly EzGetComboTexture TextPart;
         public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         public FillFlowContainer TextContainer { get; private set; }
@@ -33,13 +28,16 @@ namespace osu.Game.Skinning.Components
 
         // public object Spacing { get; set; }
 
-        public EzScoreText()
+        public EzComboText(Bindable<EzEnumGameThemeName>? externalFontName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            TextPart = new EzGetScoreTexture(textLookup, FontName);
+            if (externalFontName is not null)
+                FontName.BindTo(externalFontName);
+
+            TextPart = new EzGetComboTexture(textLookup, FontName);
 
             InternalChildren = new Drawable[]
             {
@@ -67,6 +65,14 @@ namespace osu.Game.Skinning.Components
 
                 case '%': return @"percentage";
 
+                case 'c': return @"Title";
+
+                case 'e': return @"Early";
+
+                case 'l': return @"Late";
+
+                case 'j': return @"judgement";
+
                 default: return c.ToString();
             }
         }
@@ -74,7 +80,6 @@ namespace osu.Game.Skinning.Components
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            FontName.BindTo(ezSkinConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName));
 
             float scale = calculateScale(TextPart.Height);
             TextPart.Scale = new Vector2(scale);
@@ -89,7 +94,7 @@ namespace osu.Game.Skinning.Components
             }, true);
         }
 
-        private float calculateScale(float textureHeight, float targetHeight = 35f)
+        private float calculateScale(float textureHeight, float targetHeight = 25f)
         {
             if (textureHeight <= 0)
                 return 1;

@@ -19,6 +19,7 @@ using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
+using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Pooling;
 using osu.Game.Rulesets.Objects.Types;

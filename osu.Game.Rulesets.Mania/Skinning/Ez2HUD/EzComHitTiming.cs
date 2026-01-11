@@ -6,6 +6,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Threading;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;

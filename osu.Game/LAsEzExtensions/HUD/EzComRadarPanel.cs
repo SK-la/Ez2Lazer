@@ -15,13 +15,14 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Triangle = osu.Framework.Graphics.Primitives.Triangle;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.HUD
 {
     public partial class EzComRadarPanel : CompositeDrawable, ISerialisableDrawable
     {

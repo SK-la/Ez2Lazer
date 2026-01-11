@@ -3,8 +3,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -19,7 +19,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
 using osuTK.Graphics;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.HUD
 {
     //TODO 代码不对, 无法加载, 用于缩略图选择纹理
     public partial class EzSelectorTextures : SettingsItem<string>

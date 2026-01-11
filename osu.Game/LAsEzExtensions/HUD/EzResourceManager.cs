@@ -9,7 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 
-namespace osu.Game.Skinning.Components
+namespace osu.Game.LAsEzExtensions.HUD
 {
     /// <summary>
     /// 全局EZ GameTheme 资源管理器，负责加载和管理EZ皮肤 GameTheme 资源文件夹
