@@ -661,7 +661,7 @@ namespace osu.Game.Screens.SelectV2
 
             // Logger.Log($"[PanelBeatmap] computeStarRating called for beatmap {beatmap.OnlineID}/{beatmap.ID}", LoggingTarget.Runtime, LogLevel.Debug);
 
-            starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, computationDelay: 0);
+            starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
                 // Logger.Log($"[PanelBeatmap] starDifficulty changed for beatmap {beatmap.OnlineID}/{beatmap.ID} stars={starDifficulty.NewValue.Stars}", LoggingTarget.Runtime, LogLevel.Debug);
@@ -723,9 +723,12 @@ namespace osu.Game.Screens.SelectV2
                 backgroundBorder.Colour = diffColour;
                 backgroundDifficultyTint.Colour = ColourInfo.GradientHorizontal(diffColour.Opacity(0.25f), diffColour.Opacity(0f));
 
-                difficultyIcon.Colour = starRatingDisplay.DisplayedStars.Value > OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF ? colours.Orange1 : colourProvider.Background5;
-
                 triangles.Colour = ColourInfo.GradientVertical(diffColour.Opacity(0.25f), diffColour.Opacity(0f));
+            }
+
+            if (difficultyIcon.Colour != starRatingDisplay.DisplayedDifficultyTextColour)
+            {
+                difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
             }
         }
 
@@ -741,10 +744,9 @@ namespace osu.Game.Screens.SelectV2
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
 
-                // 选歌快速滚动/拖动时：优先显示基础 keyCount，等异步分析完成后再替换为 scratch 文本。
-                keyCountText.Text = cachedScratchText ?? $"[{keyCount}K] ";
-
                 keyCountText.Alpha = 1;
+                keyCountText.Text = cachedScratchText ?? $"[{keyCount}K] ";
+                keyCountText.Colour = Colour4.LightPink.ToLinear();
             }
             else
                 keyCountText.Alpha = 0;

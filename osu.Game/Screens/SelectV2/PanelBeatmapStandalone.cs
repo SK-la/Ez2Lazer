@@ -705,7 +705,7 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
-            starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, computationDelay: 0);
+            starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
                 // Logger.Log($"[PanelBeatmapStandalone] starDifficulty changed for beatmap {beatmap.OnlineID}/{beatmap.ID} stars={starDifficulty.NewValue.Stars}", LoggingTarget.Runtime, LogLevel.Debug);
@@ -773,7 +773,7 @@ namespace osu.Game.Screens.SelectV2
             spreadDisplay.Current.Colour = diffColour;
 
             backgroundBorder.Colour = diffColour;
-            difficultyIcon.Colour = starRatingDisplay.DisplayedStars.Value > OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF ? colours.Orange1 : colourProvider.Background5;
+            difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
         }
 
         private void updateKeyCount()
