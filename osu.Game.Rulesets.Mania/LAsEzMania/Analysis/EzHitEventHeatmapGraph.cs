@@ -85,8 +85,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             // offsetBindable.BindValueChanged(updateOffset);
         }
 
-        public double TotalMultiplier => hitWindows.SpeedMultiplier / hitWindows.DifficultyMultiplier;
-
         // private void updateOffset(ValueChangedEvent<int> obj)
         // {
         //     currentOffset = obj.NewValue;

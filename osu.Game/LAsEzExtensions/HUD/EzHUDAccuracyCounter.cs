@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -18,6 +19,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation.HUD;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osuTK;
@@ -58,8 +60,8 @@ namespace osu.Game.LAsEzExtensions.HUD
         [SettingSource("Accuracy4 display mode")]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay4 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.None);
 
-        [Resolved]
-        private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
+        // [Resolved]
+        // private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         [Resolved]
         private ScoreProcessor scoreProcessor { get; set; } = null!;
@@ -69,19 +71,9 @@ namespace osu.Game.LAsEzExtensions.HUD
         private FillFlowContainer counterFlow = null!;
         private readonly PercentageCounter[] accuracyCounters = new PercentageCounter[4];
         private readonly Bindable<EzAccuracyDisplayMode>[] accuracyDisplays;
-        private readonly Bindable<double> v1Accuracy = new Bindable<double>();
-
-        // public EzScoreText[] Text = new EzScoreText[4];
         private readonly OsuSpriteText[] text = new OsuSpriteText[4];
 
-        private long v1MaxScore;
-        private long v1TotalScore;
-        private bool hasClassicMode;
-
-        private void updateHasClassicMode()
-        {
-            hasClassicMode = accuracyDisplays.Any(d => d.Value == EzAccuracyDisplayMode.Classic);
-        }
+        // public EzScoreText[] Text = new EzScoreText[4];
 
         public EzHUDAccuracyCounter()
         {
@@ -92,10 +84,6 @@ namespace osu.Game.LAsEzExtensions.HUD
         [BackgroundDependencyLoader]
         private void load()
         {
-            v1MaxScore = beatmap.Value.Beatmap.HitObjects.Count * 300;
-            float od = beatmap.Value.Beatmap.Difficulty.OverallDifficulty;
-            CalculateV1Range(od);
-
             InternalChild = counterFlow = new FillFlowContainer
             {
                 Spacing = new Vector2(16),
@@ -190,8 +178,9 @@ namespace osu.Game.LAsEzExtensions.HUD
                             break;
 
                         case EzAccuracyDisplayMode.Classic:
+                            scoreProcessor.IsLegacyScore = true;
                             accuracyCounters[index].Current.UnbindBindings();
-                            accuracyCounters[index].Current.BindTo(v1Accuracy);
+                            accuracyCounters[index].Current.BindTo(scoreProcessor.AccuracyClassic);
                             accuracyCounters[index].Show();
                             text[index].Text = mode.NewValue.GetLocalisableDescription();
                             text[index].Show();
@@ -203,78 +192,17 @@ namespace osu.Game.LAsEzExtensions.HUD
                             text[index].Hide();
                             break;
                     }
-
-                    updateHasClassicMode();
                 }, true);
             }
-
-            updateHasClassicMode();
         }
 
         protected override void OnNewJudgement(JudgementResult judgement)
         {
-            if (!hasClassicMode)
-                return;
-
-            double offset = Math.Abs(judgement.TimeOffset);
-
-            HitResult result;
-            if (offset <= PerfectRange)
-                result = HitResult.Perfect;
-            else if (offset <= GreatRange)
-                result = HitResult.Great;
-            else if (offset <= GoodRange)
-                result = HitResult.Good;
-            else if (offset <= OkRange)
-                result = HitResult.Ok;
-            else if (offset <= MehRange)
-                result = HitResult.Meh;
-            else if (offset <= MissRange)
-                result = HitResult.Miss;
-            else
-                return;
-
-            v1TotalScore += scoreProcessor.GetBaseScoreForResult(result);
-
-            double accuracy = v1MaxScore > 0 ? v1TotalScore / (double)v1MaxScore : 0;
-            v1Accuracy.Value = accuracy;
         }
 
         public override void Clear()
         {
-            v1TotalScore = 0;
-            v1Accuracy.Value = 0;
-
-            for (int i = 0; i < 4; i++)
-            {
-                if (accuracyDisplays[i].Value == EzAccuracyDisplayMode.Classic)
-                {
-                    accuracyCounters[i].Current.Value = 0;
-                }
-
-                // text[i].Text = string.Empty;
-            }
         }
-
-        public void CalculateV1Range(double od)
-        {
-            double invertedOd = 10 - od;
-            const double total_multiplier = 1.0;
-
-            PerfectRange = Math.Floor(16 * total_multiplier) + 0.5;
-            GreatRange = Math.Floor((34 + 3 * invertedOd)) * total_multiplier + 0.5;
-            GoodRange = Math.Floor((67 + 3 * invertedOd)) * total_multiplier + 0.5;
-            OkRange = Math.Floor((97 + 3 * invertedOd)) * total_multiplier + 0.5;
-            MehRange = Math.Floor((121 + 3 * invertedOd)) * total_multiplier + 0.5;
-            MissRange = Math.Floor((158 + 3 * invertedOd)) * total_multiplier + 0.5;
-        }
-
-        public double PerfectRange = 16 + 0.5;
-        public double GreatRange = 34 + 0.5;
-        public double GoodRange = 67 + 0.5;
-        public double OkRange = 97 + 0.5;
-        public double MehRange = 121 + 0.5;
-        public double MissRange = 158 + 0.5;
 
         private FillDirection getFillDirection(Direction flow)
         {

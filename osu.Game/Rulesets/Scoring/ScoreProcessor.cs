@@ -72,6 +72,11 @@ namespace osu.Game.Rulesets.Scoring
         public readonly BindableDouble Accuracy = new BindableDouble(1) { MinValue = 0, MaxValue = 1 };
 
         /// <summary>
+        /// The current accuracy in legacy (Classic) mode.
+        /// </summary>
+        public readonly BindableDouble AccuracyClassic = new BindableDouble(1) { MinValue = 0, MaxValue = 1 };
+
+        /// <summary>
         /// The minimum achievable accuracy for the whole beatmap at this stage of gameplay.
         /// Assumes that all objects that have not been judged yet will receive the minimum hit result.
         /// </summary>
@@ -200,6 +205,19 @@ namespace osu.Game.Rulesets.Scoring
 
         public bool ApplyNewJudgementsWhenFailed { get; set; }
 
+        protected double ClassicBaseScore { get; set; }
+        protected double ClassicMaxBaseScore { get; set; }
+
+        public virtual bool IsLegacyScore { get; protected internal set; }
+
+        protected virtual void UpdateClassicBaseScore(JudgementResult result)
+        {
+        }
+
+        protected virtual void RevertClassicBaseScore(JudgementResult result)
+        {
+        }
+
         private static double accS;
 
         private static double accA;
@@ -276,6 +294,8 @@ namespace osu.Game.Rulesets.Scoring
 
             ApplyScoreChange(result);
 
+            UpdateClassicBaseScore(result);
+
             if (!IsSimulating)
             {
                 if (TrackHitEvents)
@@ -327,6 +347,8 @@ namespace osu.Game.Rulesets.Scoring
                 currentComboPortion -= GetComboScoreChange(result);
 
             RemoveScoreChange(result);
+
+            RevertClassicBaseScore(result);
 
             Debug.Assert(hitEvents.Count > 0);
             lastHitObject = hitEvents[^1].LastHitObject;
@@ -395,6 +417,9 @@ namespace osu.Game.Rulesets.Scoring
         private void updateScore()
         {
             Accuracy.Value = currentMaximumBaseScore > 0 ? currentBaseScore / currentMaximumBaseScore : 1;
+
+            AccuracyClassic.Value = ClassicMaxBaseScore > 0 ? ClassicBaseScore / ClassicMaxBaseScore : 1;
+
             MinimumAccuracy.Value = maximumBaseScore > 0 ? currentBaseScore / maximumBaseScore : 0;
             MaximumAccuracy.Value = maximumBaseScore > 0 ? (currentBaseScore + (maximumBaseScore - currentMaximumBaseScore)) / maximumBaseScore : 1;
 

@@ -100,5 +100,142 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     : 0;
             }
         }
+
+        protected override void UpdateClassicBaseScore(JudgementResult judgement)
+        {
+            if (!IsLegacyScore) return;
+
+            var hitWindows = new ManiaHitWindows
+            {
+                ClassicModActive = true,
+                IsConvert = false,
+                ScoreV2Active = false
+            };
+
+            perfectRange = hitWindows.WindowFor(HitResult.Perfect);
+            greatRange = hitWindows.WindowFor(HitResult.Great);
+            goodRange = hitWindows.WindowFor(HitResult.Good);
+            okRange = hitWindows.WindowFor(HitResult.Ok);
+            mehRange = hitWindows.WindowFor(HitResult.Meh);
+            missRange = hitWindows.WindowFor(HitResult.Miss);
+
+            double offset = Math.Abs(judgement.TimeOffset);
+            var hitObject = (ManiaHitObject)judgement.HitObject;
+
+            if (hitObject is HeadNote)
+            {
+                headOffsets[hitObject.Column] = offset;
+            }
+            else if (hitObject is TailNote)
+            {
+                ClassicMaxBaseScore += 300;
+                ClassicBaseScore += getLNScore(headOffsets[hitObject.Column], offset);
+                headOffsets[hitObject.Column] = 0;
+            }
+            else if (hitObject is Note)
+            {
+                ClassicMaxBaseScore += 300;
+                HitResult legacyHitResult = offset <= perfectRange ? HitResult.Perfect :
+                                            offset <= greatRange ? HitResult.Great :
+                                            offset <= goodRange ? HitResult.Good :
+                                            offset <= okRange ? HitResult.Ok :
+                                            offset <= mehRange ? HitResult.Meh :
+                                            HitResult.Miss;
+
+                ClassicBaseScore += legacyHitResult switch
+                {
+                    HitResult.Perfect => 300,
+                    HitResult.Great => 300,
+                    HitResult.Good => 200,
+                    HitResult.Ok => 100,
+                    HitResult.Meh => 50,
+                    _ => 0
+                };
+            }
+        }
+
+        private double getLNScore(double head, double tail)
+        {
+            double combined = head + tail;
+
+            (double range, double headFactor, double combinedFactor, double score)[] rules = new[]
+            {
+                (PerfectRange: perfectRange, 1.2, 2.4, 300.0),
+                (greatRange, 1.1, 2.2, 300),
+                (goodRange, 1.0, 2.0, 200),
+                (okRange, 1.0, 2.0, 100),
+                (mehRange, 1.0, 2.0, 50),
+            };
+
+            foreach (var (range, headFactor, combinedFactor, score) in rules)
+            {
+                if (head <= range * headFactor && combined < range * combinedFactor)
+                    return score;
+            }
+
+            return 0;
+        }
+
+        private readonly double[] headOffsets = new double[18];
+
+        private double perfectRange;
+        private double greatRange;
+        private double goodRange;
+        private double okRange;
+        private double mehRange;
+        private double missRange;
+
+        protected override void RevertClassicBaseScore(JudgementResult judgement)
+        {
+            if (!IsLegacyScore) return;
+
+            var hitWindows = new ManiaHitWindows
+            {
+                ClassicModActive = true,
+                IsConvert = false,
+                ScoreV2Active = false
+            };
+
+            perfectRange = hitWindows.WindowFor(HitResult.Perfect);
+            greatRange = hitWindows.WindowFor(HitResult.Great);
+            goodRange = hitWindows.WindowFor(HitResult.Good);
+            okRange = hitWindows.WindowFor(HitResult.Ok);
+            mehRange = hitWindows.WindowFor(HitResult.Meh);
+            missRange = hitWindows.WindowFor(HitResult.Miss);
+
+            double offset = Math.Abs(judgement.TimeOffset);
+            var hitObject = (ManiaHitObject)judgement.HitObject;
+
+            if (hitObject is HeadNote)
+            {
+                headOffsets[hitObject.Column] = offset;
+            }
+            else if (hitObject is TailNote)
+            {
+                ClassicMaxBaseScore -= 300;
+                ClassicBaseScore -= getLNScore(headOffsets[hitObject.Column], offset);
+                headOffsets[hitObject.Column] = 0;
+            }
+            else if (hitObject is Note)
+            {
+                ClassicMaxBaseScore -= 300;
+                HitResult legacyHitResult = offset <= perfectRange ? HitResult.Perfect :
+                    offset <= greatRange ? HitResult.Great :
+                    offset <= goodRange ? HitResult.Good :
+                    offset <= okRange ? HitResult.Ok :
+                    offset <= mehRange ? HitResult.Meh :
+                    HitResult.Miss;
+
+                ClassicBaseScore -= legacyHitResult switch
+                {
+                    HitResult.Perfect => 300,
+                    HitResult.Great => 300,
+                    HitResult.Good => 200,
+                    HitResult.Ok => 100,
+                    HitResult.Meh => 50,
+                    _ => 0
+                };
+            }
+        }
     }
 }
