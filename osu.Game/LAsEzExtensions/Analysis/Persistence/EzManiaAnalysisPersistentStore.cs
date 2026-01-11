@@ -45,6 +45,19 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         // v5: 删除scratchText存储，改为动态计算。数据库可兼容，不升版。
         public const int ANALYSIS_VERSION = 5;
 
+        private static readonly string[] ALLOWED_COLUMNS = {
+            "beatmap_id",
+            "beatmap_hash",
+            "beatmap_md5",
+            "analysis_version",
+            "average_kps",
+            "max_kps",
+            "kps_list_json",
+            "xxy_sr",
+            "column_counts_json",
+            "hold_note_counts_json"
+        };
+
         private readonly Storage storage;
         private readonly object initLock = new object();
 
@@ -144,6 +157,9 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
 
                     // Store the current analysis version as meta (informational).
                     setMeta(connection, "analysis_version", ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+
+                    // 检查并清理不需要的列（处理版本升级时删除的字段）
+                    cleanupUnrecognizedColumns(connection);
 
                     initialised = true;
                 }
@@ -593,6 +609,79 @@ WHERE beatmap_id = $id;
             update.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
 
             update.ExecuteNonQuery();
+        }
+
+        private void cleanupUnrecognizedColumns(SqliteConnection connection)
+        {
+            var existingColumns = getTableColumns(connection, "mania_analysis");
+            var unrecognizedColumns = existingColumns.Where(c => !ALLOWED_COLUMNS.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
+
+            if (unrecognizedColumns.Count == 0)
+                return;
+
+            // 重建表，删除不识别的列
+            Logger.Log($"[EzManiaAnalysisPersistentStore] Found unrecognized columns: {string.Join(", ", unrecognizedColumns)}; rebuilding table.", LoggingTarget.Database);
+
+            rebuildTableWithoutUnrecognizedColumns(connection, unrecognizedColumns);
+        }
+
+        private List<string> getTableColumns(SqliteConnection connection, string tableName)
+        {
+            var columns = new List<string>();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"PRAGMA table_info({tableName});";
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                columns.Add(reader.GetString(1)); // name
+            }
+            return columns;
+        }
+
+        private void rebuildTableWithoutUnrecognizedColumns(SqliteConnection connection, List<string> unrecognizedColumns)
+        {
+            // 创建临时表，只包含允许的列
+            using var createTempCmd = connection.CreateCommand();
+            createTempCmd.CommandText = @"
+CREATE TABLE mania_analysis_temp (
+    beatmap_id TEXT PRIMARY KEY,
+    beatmap_hash TEXT NOT NULL,
+    beatmap_md5 TEXT NOT NULL,
+    analysis_version INTEGER NOT NULL,
+    average_kps REAL NOT NULL,
+    max_kps REAL NOT NULL,
+    kps_list_json TEXT NOT NULL,
+    xxy_sr REAL NULL,
+    column_counts_json TEXT NOT NULL,
+    hold_note_counts_json TEXT NOT NULL
+);
+";
+            createTempCmd.ExecuteNonQuery();
+
+            // 复制数据，只复制允许的列
+            using var insertCmd = connection.CreateCommand();
+            insertCmd.CommandText = @"
+INSERT INTO mania_analysis_temp (beatmap_id, beatmap_hash, beatmap_md5, analysis_version, average_kps, max_kps, kps_list_json, xxy_sr, column_counts_json, hold_note_counts_json)
+SELECT beatmap_id, beatmap_hash, beatmap_md5, analysis_version, average_kps, max_kps, kps_list_json, xxy_sr, column_counts_json, hold_note_counts_json
+FROM mania_analysis;
+";
+            insertCmd.ExecuteNonQuery();
+
+            // 删除旧表
+            using var dropCmd = connection.CreateCommand();
+            dropCmd.CommandText = "DROP TABLE mania_analysis;";
+            dropCmd.ExecuteNonQuery();
+
+            // 重命名临时表
+            using var renameCmd = connection.CreateCommand();
+            renameCmd.CommandText = "ALTER TABLE mania_analysis_temp RENAME TO mania_analysis;";
+            renameCmd.ExecuteNonQuery();
+
+            // 重新创建索引
+            using var indexCmd = connection.CreateCommand();
+            indexCmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis_version);";
+            indexCmd.ExecuteNonQuery();
         }
 
         private bool hasColumn(SqliteConnection connection, string tableName, string columnName)
