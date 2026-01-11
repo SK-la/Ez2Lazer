@@ -531,18 +531,26 @@ namespace osu.Game.Screens.SelectV2
                 var provider = Mods.Value.OfType<IPreviewOverrideProvider>().FirstOrDefault();
                 var overrides = provider?.GetPreviewOverrides(beatmap);
 
-                ezPreviewManager.StopPreview();
-                RemoveInternal(ezPreviewManager, true);
-
-                var duplicate = new DuplicateVirtualTrack
+                if (overrides != null)
                 {
-                    OverrideProvider = provider,
-                    PendingOverrides = overrides
-                };
-                ezPreviewManager = duplicate;
-                AddInternal(duplicate);
+                    ezPreviewManager.StopPreview();
+                    RemoveInternal(ezPreviewManager, true);
 
-                duplicate.StartPreview(beatmap);
+                    var duplicate = new DuplicateVirtualTrack
+                    {
+                        OverrideProvider = provider,
+                        PendingOverrides = overrides
+                    };
+                    ezPreviewManager = duplicate;
+                    AddInternal(duplicate);
+
+                    duplicate.StartPreview(beatmap);
+                }
+                else
+                {
+                    // 如果没有 Loop mod，仅开启 keySoundPreview，使用正常的预览
+                    beatmap.PrepareTrackForPreview(true);
+                }
             }
             else
             {

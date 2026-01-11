@@ -79,11 +79,11 @@ namespace osu.Game.Screens.Play
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
             });
-
+#if DEBUG
             // Initialize latency tracker
             latencyTracker = new InputAudioLatencyTracker();
             latencyTracker.Initialize(GameplayState.ScoreProcessor);
-
+#endif
             // Key input recording is handled in OnKeyDown override
         }
 

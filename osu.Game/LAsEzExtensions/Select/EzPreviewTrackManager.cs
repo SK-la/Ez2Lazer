@@ -199,10 +199,10 @@ namespace osu.Game.LAsEzExtensions.Select
 
         public void StopPreview()
         {
-            stopPreviewInternal("manual");
+            StopPreviewInternal("manual");
         }
 
-        private void stopPreviewInternal(string reason)
+        protected virtual void StopPreviewInternal(string reason)
         {
             Logger.Log($"EzPreviewTrackManager: Stopping preview (reason={reason})", LoggingTarget.Runtime);
             playback.IsPlaying = false;
@@ -221,6 +221,14 @@ namespace osu.Game.LAsEzExtensions.Select
             currentBeatmap = null;
             currentTrack = null;
             playback.ResetPlaybackProgress();
+
+            // 清除所有 override 设置，确保不会影响后续使用
+            OverrideLooping = null;
+            OverrideLoopCount = null;
+            OverrideLoopInterval = null;
+            ExternalClock = null;
+            ExternalClockStartTime = null;
+            OverridePreviewStartTime = null;
         }
 
         [BackgroundDependencyLoader]
@@ -519,7 +527,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
             if (!tryGetLogicalTime(out double logicalTime, out bool inBreak))
             {
-                stopPreviewInternal("loop-end");
+                StopPreviewInternal("loop-end");
                 return;
             }
 

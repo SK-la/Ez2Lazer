@@ -208,7 +208,7 @@ namespace osu.Game.Rulesets.Scoring
         protected double ClassicBaseScore { get; set; }
         protected double ClassicMaxBaseScore { get; set; }
 
-        public virtual bool IsLegacyScore { get; protected internal set; }
+        public virtual bool IsLegacyScore { get; set; }
 
         protected virtual void UpdateClassicBaseScore(JudgementResult result)
         {

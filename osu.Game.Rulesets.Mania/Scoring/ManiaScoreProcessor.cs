@@ -136,11 +136,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
             {
                 ClassicMaxBaseScore += 300;
                 HitResult legacyHitResult = offset <= perfectRange ? HitResult.Perfect :
-                                            offset <= greatRange ? HitResult.Great :
-                                            offset <= goodRange ? HitResult.Good :
-                                            offset <= okRange ? HitResult.Ok :
-                                            offset <= mehRange ? HitResult.Meh :
-                                            HitResult.Miss;
+                    offset <= greatRange ? HitResult.Great :
+                    offset <= goodRange ? HitResult.Good :
+                    offset <= okRange ? HitResult.Ok :
+                    offset <= mehRange ? HitResult.Meh :
+                    offset <= missRange ? HitResult.Miss :
+                    HitResult.None;
 
                 ClassicBaseScore += legacyHitResult switch
                 {
@@ -224,7 +225,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     offset <= goodRange ? HitResult.Good :
                     offset <= okRange ? HitResult.Ok :
                     offset <= mehRange ? HitResult.Meh :
-                    HitResult.Miss;
+                    offset <= missRange ? HitResult.Miss :
+                    HitResult.None;
 
                 ClassicBaseScore -= legacyHitResult switch
                 {

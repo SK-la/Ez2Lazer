@@ -190,5 +190,15 @@ namespace osu.Game.LAsEzExtensions.Select
 
             return beatmap.Track;
         }
+
+        protected override void StopPreviewInternal(string reason)
+        {
+            base.StopPreviewInternal(reason);
+
+            // 重置 DuplicateVirtualTrack 特有的状态
+            startRequested = false;
+            started = false;
+            pendingBeatmap = null;
+        }
     }
 }
