@@ -257,7 +257,11 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
-                                        kpcDisplay = new EzKpcDisplay(),
+                                        kpcDisplay = new EzKpcDisplay()
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                        },
                                     },
                                 }
                             }

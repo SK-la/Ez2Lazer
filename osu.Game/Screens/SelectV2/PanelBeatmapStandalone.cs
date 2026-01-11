@@ -266,7 +266,11 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Enabled = { BindTarget = Selected }
                                         },
-                                        ezKpcDisplay = new EzKpcDisplay(),
+                                        ezKpcDisplay = new EzKpcDisplay()
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                        },
                                     },
                                 }
                             }
