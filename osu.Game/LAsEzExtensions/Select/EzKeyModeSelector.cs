@@ -24,10 +24,11 @@ namespace osu.Game.LAsEzExtensions.Select
 {
     public partial class EzKeyModeSelector : CompositeDrawable
     {
-        private Bindable<string> keyModeId = new Bindable<string>("All");
+        private Bindable<string> keyModeId = new Bindable<string>();
         private readonly BindableBool isMultiSelectMode = new BindableBool();
         private readonly Dictionary<int, HashSet<string>> modeSelections = new Dictionary<int, HashSet<string>>();
 
+        private ShearedButton labelButton = null!;
         private ShearedCsModeTabControl tabControl = null!;
         private ShearedToggleButton multiSelectButton = null!;
 
@@ -62,30 +63,39 @@ namespace osu.Game.LAsEzExtensions.Select
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
-                    // Shear = -OsuGame.SHEAR,
                     RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
                     ColumnDimensions = new[]
                     {
+                        new Dimension(GridSizeMode.AutoSize),
                         new Dimension(),
-                        new Dimension(GridSizeMode.Absolute),
                         new Dimension(GridSizeMode.AutoSize),
                     },
                     Content = new[]
                     {
                         new Drawable[]
                         {
+                            labelButton = new ShearedButton(50, 30)
+                            {
+                                Text = "Keys",
+                                TextSize = 16,
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Shear = new Vector2(0),
+                                TooltipText = "Clear selection",
+                            },
                             tabControl = new ShearedCsModeTabControl
                             {
                                 RelativeSizeAxes = Axes.X,
+                                Shear = new Vector2(0),
                             },
-                            Empty(),
                             multiSelectButton = new ShearedToggleButton
                             {
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
                                 Shear = new Vector2(0),
-                                Text = "Multi",
+                                Text = "K +",
                                 Height = 30f,
+                                TooltipText = "Enable multi-select",
                             }
                         }
                     }
@@ -93,6 +103,8 @@ namespace osu.Game.LAsEzExtensions.Select
             };
 
             multiSelectButton.Active.BindTo(isMultiSelectMode);
+
+            labelButton.Action = () => EzKeyModeFilter.SetSelection(new HashSet<string>());
 
             keyModeId = ezConfig.GetBindable<string>(Ez2Setting.EzSelectCsMode);
             keyModeId.BindValueChanged(onSelectorChanged, true);
@@ -114,6 +126,7 @@ namespace osu.Game.LAsEzExtensions.Select
         private void onRulesetChanged(ValueChangedEvent<RulesetInfo> e)
         {
             tabControl.UpdateForRuleset(e.NewValue.OnlineID);
+            labelButton.Text = e.NewValue.OnlineID == 3 ? "Keys" : "CS";
             updateValue();
         }
 
@@ -129,19 +142,24 @@ namespace osu.Game.LAsEzExtensions.Select
             int currentRulesetId = ruleset.Value.OnlineID;
 
             if (!modeSelections.ContainsKey(currentRulesetId))
-                modeSelections[currentRulesetId] = new HashSet<string> { "All" };
+                modeSelections[currentRulesetId] = new HashSet<string>();
 
-            HashSet<string> selectedModes;
+            HashSet<string> selectedModes = EzKeyModeFilter.SelectedModeIds;
 
-            if (isMultiSelectMode.Value)
+            if (selectedModes.Count == 0)
             {
-                selectedModes = EzKeyModeFilter.SelectedModeIds;
-                keyModeId.Value = string.Join(",", selectedModes.OrderBy(x => x));
+                keyModeId.Value = "";
             }
             else
             {
-                selectedModes = EzKeyModeFilter.SelectedModeIds;
-                keyModeId.Value = selectedModes.Count > 0 ? selectedModes.First() : "All";
+                if (isMultiSelectMode.Value)
+                {
+                    keyModeId.Value = string.Join(",", selectedModes.OrderBy(x => x));
+                }
+                else
+                {
+                    keyModeId.Value = selectedModes.First();
+                }
             }
 
             modeSelections[currentRulesetId] = selectedModes;
@@ -153,19 +171,16 @@ namespace osu.Game.LAsEzExtensions.Select
         private HashSet<string> parseModeIds(string value)
         {
             if (string.IsNullOrEmpty(value))
-                return new HashSet<string> { "All" };
+                return new HashSet<string>();
 
             return new HashSet<string>(value.Split(','));
         }
 
         public partial class ShearedCsModeTabControl : OsuTabControl<string>
         {
-            private readonly Box labelBox;
-            private readonly OsuSpriteText labelText;
-            private HashSet<string> currentSelection = new HashSet<string> { "All" };
+            private HashSet<string> currentSelection = new HashSet<string>();
             private int currentRulesetId = -1;
 
-            public Container LabelContainer;
             public bool IsMultiSelectMode { get; set; }
 
             public Action<HashSet<string>>? SetCurrentSelections;
@@ -177,52 +192,19 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
-                // Shear = OsuGame.SHEAR;
-                CornerRadius = ShearedButton.CORNER_RADIUS;
+                Shear = OsuGame.SHEAR;
                 Masking = true;
-                LabelContainer = new Container
-                {
-                    Depth = float.MaxValue,
-                    CornerRadius = ShearedButton.CORNER_RADIUS,
-                    Masking = true,
-                    AutoSizeAxes = Axes.Y,
-                    Width = 50,
-                    Children = new Drawable[]
-                    {
-                        labelBox = new Box
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                        },
-                        labelText = new OsuSpriteText
-                        {
-                            Text = "Keys",
-                            Margin = new MarginPadding
-                                { Horizontal = 8f, Vertical = 7f },
-                            Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                            Shear = -OsuGame.SHEAR,
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
-                        },
-                    }
-                };
-                AddInternal(LabelContainer);
             }
 
             [BackgroundDependencyLoader]
             private void load()
             {
-                labelBox.Colour = colourProvider.Background3;
-
                 TabContainer.Anchor = Anchor.CentreLeft;
                 TabContainer.Origin = Anchor.CentreLeft;
                 // TabContainer.Shear = OsuGame.SHEAR;
                 TabContainer.RelativeSizeAxes = Axes.X;
                 TabContainer.AutoSizeAxes = Axes.Y;
                 TabContainer.Spacing = new Vector2(0f);
-                TabContainer.Margin = new MarginPadding
-                {
-                    Left = LabelContainer.DrawWidth,
-                };
             }
 
             public void UpdateForRuleset(int rulesetId)
@@ -233,13 +215,25 @@ namespace osu.Game.LAsEzExtensions.Select
                 currentRulesetId = rulesetId;
 
                 var keyModes = CsItemIds.GetModesForRuleset(rulesetId)
-                                        .OrderBy(m => m.Id == "All" ? -1 : m.CsValue ?? 0)
                                         .Select(m => m.Id)
                                         .ToList();
 
                 TabContainer.Clear();
                 Items = keyModes;
-                labelText.Text = rulesetId == 3 ? "Keys" : "CS";
+
+                Schedule(() =>
+                {
+                    int count =  keyModes.Count;
+
+                    if (count > 0)
+                    {
+                        float totalWidth = DrawWidth;
+                        float spacing = 2f;
+                        float itemWidth = (totalWidth - (count * spacing)) / count;
+                        foreach (var tab in TabContainer.Children.Cast<ShearedCsModeTabItem>())
+                            tab.Width = itemWidth;
+                    }
+                });
 
                 UpdateTabItemUI(currentSelection);
             }
@@ -269,21 +263,7 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 var newSelection = new HashSet<string>(currentSelection);
 
-                if (mode == "All" || newSelection.Count == 0)
-                {
-                    newSelection.Clear();
-                    newSelection.Add("All");
-                }
-                else if (newSelection.Contains("All"))
-                {
-                    newSelection.Clear();
-                    newSelection.Add(mode);
-                }
-                else if (!newSelection.Add(mode))
-                {
-                    newSelection.Remove(mode);
-                }
-                else
+                if (!newSelection.Remove(mode))
                 {
                     if (IsMultiSelectMode)
                     {
@@ -297,7 +277,7 @@ namespace osu.Game.LAsEzExtensions.Select
                 }
 
                 currentSelection = newSelection;
-                Current.Value = string.Join(",", newSelection.OrderBy(x => x));
+                Current.Value = newSelection.Count == 0 ? "" : string.Join(",", newSelection.OrderBy(x => x));
                 UpdateTabItemUI(newSelection);
 
                 SetCurrentSelections?.Invoke(newSelection);
@@ -317,30 +297,30 @@ namespace osu.Game.LAsEzExtensions.Select
                     // Shear = OsuGame.SHEAR;
                     CornerRadius = ShearedButton.CORNER_RADIUS;
                     Masking = true;
-                    Width = 40;
+                    // Width = 40;
                     AutoSizeAxes = Axes.Y;
                     Margin = new MarginPadding { Left = 4 };
 
-                    background = new Box
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                    };
-
                     var modeInfo = CsItemIds.GetById(value);
-                    text = new OsuSpriteText
-                    {
-                        Text = modeInfo?.DisplayName ?? value,
-                        Margin = new MarginPadding
-                            { Horizontal = 10f, Vertical = 7f },
-                        Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Shear = -OsuGame.SHEAR,
-                        Colour = Colour4.White,
-                    };
 
-                    AddInternal(background);
-                    AddInternal(text);
+                    InternalChildren = new Drawable[]
+                    {
+                        background = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                        },
+                        text = new OsuSpriteText
+                        {
+                            Text = modeInfo?.DisplayName ?? value,
+                            Margin = new MarginPadding
+                                { Horizontal = 10f, Vertical = 7f },
+                            Font = OsuFont.Style.Body.With(weight: FontWeight.SemiBold),
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            Shear = -OsuGame.SHEAR,
+                            Colour = Colour4.White,
+                        },
+                    };
                 }
 
                 [BackgroundDependencyLoader]
@@ -348,6 +328,13 @@ namespace osu.Game.LAsEzExtensions.Select
                 {
                     this.colourProvider = colourProvider;
                     background.Colour = colourProvider.Background5;
+                }
+
+                protected override void LoadComplete()
+                {
+                    base.LoadComplete();
+                    if (Width > 40) Width = 40;
+                    // if (Width < 30) Width = 30;
                 }
 
                 public void UpdateButton(bool isSelected)

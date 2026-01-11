@@ -114,7 +114,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.KpcDisplayMode, EzKpcDisplay.KpcDisplayMode.Numbers);
             SetDefault(Ez2Setting.XxySRFilter, false);
             SetDefault(Ez2Setting.KeySoundPreview, false);
-            SetDefault(Ez2Setting.EzSelectCsMode, CsItemIds.ALL.First().Id);
+            SetDefault(Ez2Setting.EzSelectCsMode, "");
 
             SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.Lazer);

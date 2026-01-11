@@ -21,7 +21,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
         public static readonly List<CsItemInfo> ALL = new List<CsItemInfo>
         {
-            new CsItemInfo { Id = "All", DisplayName = "All", IsDefault = true },
+            // new CsItemInfo { Id = "All", DisplayName = "All", IsDefault = true },
             new CsItemInfo { Id = "CS1", DisplayName = "1", CsValue = 1 },
             new CsItemInfo { Id = "CS2", DisplayName = "2", CsValue = 2 },
             new CsItemInfo { Id = "CS3", DisplayName = "3", CsValue = 3 },
@@ -51,20 +51,14 @@ namespace osu.Game.LAsEzExtensions.Select
 
     public class EzKeyModeFilter
     {
-        public HashSet<string> SelectedModeIds { get; } = new HashSet<string> { "All" };
+        public HashSet<string> SelectedModeIds { get; } = new HashSet<string>();
 
         public event Action? SelectionChanged;
 
         public void SetSelection(HashSet<string> modeIds)
         {
-            var newSet = new HashSet<string>();
-            if (modeIds.Count == 0 || modeIds.Contains("All"))
-                newSet.Add("All");
-            else
-                newSet.UnionWith(modeIds);
-
             SelectedModeIds.Clear();
-            SelectedModeIds.UnionWith(newSet);
+            SelectedModeIds.UnionWith(modeIds);
             SelectionChanged?.Invoke();
         }
     }

@@ -29,6 +29,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
     /// </summary>
     public partial class EzManiaAnalysisWarmupProcessor : Component
     {
+        private const string logger_name = "mania_analysis";
+
         protected Task ProcessingTask { get; private set; } = null!;
 
         [Resolved]
@@ -58,12 +60,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             base.LoadComplete();
 
-            ProcessingTask = Task.Factory.StartNew(() =>
-            {
-                Logger.Log("Beginning background mania analysis warmup..");
-
-                populateManiaAnalysis();
-            }, TaskCreationOptions.LongRunning).ContinueWith(t =>
+            ProcessingTask = Task.Factory.StartNew(populateManiaAnalysis, TaskCreationOptions.LongRunning).ContinueWith(t =>
             {
                 if (t.Exception?.InnerException is ObjectDisposedException)
                 {
@@ -79,13 +76,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             if (!EzManiaAnalysisPersistentStore.Enabled)
             {
-                Logger.Log("Mania analysis persistence is disabled; skipping warmup.");
+                Logger.Log("Mania analysis persistence is disabled; skipping warmup.", logger_name, LogLevel.Important);
                 return;
             }
 
             List<(Guid id, string hash)> beatmaps = new List<(Guid id, string hash)>();
 
-            Logger.Log("Querying for mania beatmaps to warm up analysis cache...");
+            Logger.Log("Querying for mania beatmaps to warm up analysis cache...", logger_name, LogLevel.Important);
 
             realmAccess.Run(r =>
             {
@@ -104,6 +101,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     totalBeatmaps++;
 
                     bool isMania = b.Ruleset.OnlineID == 3 || string.Equals(b.Ruleset.ShortName, "mania", StringComparison.OrdinalIgnoreCase);
+
                     if (isMania)
                     {
                         maniaTotal++;
@@ -130,12 +128,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     beatmaps.Add((b.ID, b.Hash));
                 }
 
-                Logger.Log($"Warmup beatmap query summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}", "mania_analysis", LogLevel.Important);
+                Logger.Log($"Warmup beatmap query summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}", logger_name, LogLevel.Important);
 
                 if (maniaTotal == 0)
                 {
                     string dist = string.Join(", ", rulesetDistribution.OrderByDescending(kvp => kvp.Value).Take(10).Select(kvp => $"{kvp.Key}={kvp.Value}"));
-                    Logger.Log($"Warmup beatmap ruleset distribution (first 2000): {dist}", "mania_analysis", LogLevel.Important);
+                    Logger.Log($"Warmup beatmap ruleset distribution (first 2000): {dist}", logger_name, LogLevel.Important);
                 }
             });
 
@@ -148,13 +146,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             if (needingRecompute.Count == 0)
             {
-                Logger.Log("No beatmaps require mania analysis warmup.");
+                Logger.Log("No beatmaps require mania analysis warmup.", logger_name, LogLevel.Important);
                 return;
             }
 
-            Logger.Log($"Found {needingRecompute.Count} beatmaps which require mania analysis warmup.");
+            Logger.Log($"Found {needingRecompute.Count} beatmaps which require mania analysis warmup.", logger_name, LogLevel.Important);
 
-            Logger.Log($"Starting mania analysis warmup. total={needingRecompute.Count}");
+            Logger.Log($"Starting mania analysis warmup. total={needingRecompute.Count}", logger_name, LogLevel.Important);
 
             var notification = showProgressNotification(needingRecompute.Count, "Precomputing mania analysis for beatmaps", "beatmaps' mania analysis has been precomputed");
 
@@ -185,14 +183,14 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     // - 等待当前所有高优先级（可见项）计算完成后再启动 warmup。
                     // - 启用持久化时，仅预热 SQLite，不把所有结果长期留在内存缓存里。
                     maniaAnalysisCache.WarmupPersistentOnlyAsync(beatmap, CancellationToken.None)
-                                     .GetAwaiter()
-                                     .GetResult();
+                                      .GetAwaiter()
+                                      .GetResult();
 
                     ++processedCount;
                 }
                 catch (Exception e)
                 {
-                    Logger.Log($"Background mania analysis warmup failed on {beatmap}: {e}");
+                    Logger.Log($"Background mania analysis warmup failed on {beatmap}: {e}", logger_name, LogLevel.Important);
                     ++failedCount;
                 }
 
@@ -247,7 +245,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             if (notificationOverlay == null)
             {
-                Logger.Log("INotificationOverlay is null; mania analysis warmup progress notification will not be shown.", "mania_analysis", LogLevel.Important);
+                Logger.Log("INotificationOverlay is null; mania analysis warmup progress notification will not be shown.", logger_name, LogLevel.Important);
                 return null;
             }
 
@@ -266,7 +264,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 try
                 {
                     notificationOverlay?.Post(notification);
-                    Logger.Log("Posted mania analysis warmup progress notification.", "mania_analysis", LogLevel.Important);
+                    Logger.Log("Posted mania analysis warmup progress notification.", logger_name, LogLevel.Important);
                 }
                 catch (Exception e)
                 {
