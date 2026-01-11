@@ -222,15 +222,16 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,
                 Position = Vector2.Zero,
+                Padding = new MarginPadding { Top = 5, Bottom = 5 },
                 RowDimensions = new[]
                 {
-                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
-                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
-                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
-                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
-                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
-                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
-                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
                 },
                 ColumnDimensions = new[]
                 {
