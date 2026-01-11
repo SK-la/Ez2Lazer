@@ -294,8 +294,11 @@ namespace osu.Game.Beatmaps
             // Convert
             IBeatmap converted = converter.Convert(token);
 
-            // Apply conversion mods to the result
-            foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>())
+            // Apply conversion mods to the result.
+            // 应用转换后的Mod。如果Mod实现了IHasApplyOrder接口，则尊重它们的顺序（值较小的优先）。
+            // 没有该接口的Mod默认为顺序0，以保持现有行为。
+            foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>()
+                                     .OrderBy(m => (m as osu.Game.Rulesets.Mods.IHasApplyOrder)?.ApplyOrder ?? 0))
             {
                 token.ThrowIfCancellationRequested();
                 mod.ApplyToBeatmap(converted);
