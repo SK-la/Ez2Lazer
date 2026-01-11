@@ -6,9 +6,12 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -35,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
         private const int time_bins = 50; // 时间分段数
         private const float circle_size = 5f; // 圆形大小
-        private float leftMarginConst { get; set; } = 123; // 左侧预留空间
+        private float leftMarginConst { get; set; } = 138; // 左侧预留空间
         private float rightMarginConst { get; set; } = 7; // 右侧预留空间
 
         private double maxTime;
@@ -90,46 +93,128 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
         //     Scheduler.AddOnce(updateDisplay);
         // }
 
-        private double calculateV1Accuracy()
+        private (double accuracy, long score) calculateV1Accuracy()
         {
-            double od = score.BeatmapInfo?.Difficulty.OverallDifficulty ?? 5.0;
-            double invertedOd = 10 - od;
+            hitWindows.ClassicModActive = true;
+            hitWindows.IsConvert = false;
+            hitWindows.ScoreV2Active = false;
 
-            // Calculate total multiplier from mods
-            // double totalMultiplier = score.Mods.Aggregate(1.0, (current, mod) => current * mod.ScoreMultiplier);
-            double totalMultiplier = TotalMultiplier;
+            var ruleset = score.Ruleset.CreateInstance();
+            var scoreProcessor = ruleset.CreateScoreProcessor();
+            scoreProcessor.Mods.Value = new[] { new ManiaModClassic() }; // 设置 Classic mod for V1
 
-            double perfectRange = Math.Floor(16 * totalMultiplier) + 0.5;
-            double greatRange = Math.Floor((34 + 3 * invertedOd) * totalMultiplier) + 0.5;
-            double goodRange = Math.Floor((67 + 3 * invertedOd) * totalMultiplier) + 0.5;
-            double okRange = Math.Floor((97 + 3 * invertedOd) * totalMultiplier) + 0.5;
-            double mehRange = Math.Floor((121 + 3 * invertedOd) * totalMultiplier) + 0.5;
-            double missRange = Math.Floor((158 + 3 * invertedOd) * totalMultiplier) + 0.5;
+            // 创建一个简单的 beatmap
+            var beatmap = new Beatmap { BeatmapInfo = score.BeatmapInfo };
+            foreach (var hitEvent in hitEvents)
+                beatmap.HitObjects.Add(hitEvent.HitObject);
 
-            double totalScore = 0;
-            double maxScore = hitEvents.Count * 300;
+            scoreProcessor.ApplyBeatmap(beatmap);
 
-            foreach (var e in hitEvents)
+            // 应用所有结果
+            foreach (var hitEvent in hitEvents)
             {
-                double offset = Math.Abs(e.TimeOffset);
-                int scoreForHit = offset < perfectRange ? 300 :
-                                  offset < greatRange ? 300 :
-                                  offset < goodRange ? 200 :
-                                  offset < okRange ? 100 :
-                                  offset < mehRange ? 50 :
-                                  0;
-                totalScore += scoreForHit;
+                double offset = Math.Abs(hitEvent.TimeOffset);
+                HitResult result;
+                if (offset <= hitWindows.WindowFor(HitResult.Perfect))
+                    result = HitResult.Perfect;
+                else if (offset <= hitWindows.WindowFor(HitResult.Great))
+                    result = HitResult.Great;
+                else if (offset <= hitWindows.WindowFor(HitResult.Good))
+                    result = HitResult.Good;
+                else if (offset <= hitWindows.WindowFor(HitResult.Ok))
+                    result = HitResult.Ok;
+                else if (offset <= hitWindows.WindowFor(HitResult.Meh))
+                    result = HitResult.Meh;
+                else
+                    result = HitResult.Miss;
+
+                var judgement = hitEvent.HitObject.CreateJudgement();
+                scoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, judgement) { Type = result });
             }
 
-            return maxScore > 0 ? totalScore / maxScore * 100 : 0;
+            // V1 acc 手动计算，不受 mod 影响
+            var processor = new ManiaScoreProcessor();
+            long totalScoreForAcc = 0;
+            double maxScore = hitEvents.Count * 300.0;
+
+            foreach (var hitEvent in hitEvents)
+            {
+                double offset = Math.Abs(hitEvent.TimeOffset);
+                HitResult result;
+                if (offset <= hitWindows.WindowFor(HitResult.Perfect))
+                    result = HitResult.Perfect;
+                else if (offset <= hitWindows.WindowFor(HitResult.Great))
+                    result = HitResult.Great;
+                else if (offset <= hitWindows.WindowFor(HitResult.Good))
+                    result = HitResult.Good;
+                else if (offset <= hitWindows.WindowFor(HitResult.Ok))
+                    result = HitResult.Ok;
+                else if (offset <= hitWindows.WindowFor(HitResult.Meh))
+                    result = HitResult.Meh;
+                else
+                    result = HitResult.Miss;
+
+                totalScoreForAcc += processor.GetBaseScoreForResult(result);
+            }
+
+            double accuracy = maxScore > 0 ? totalScoreForAcc / maxScore : 0;
+
+            long totalScore = scoreProcessor.TotalScore.Value;
+            return (accuracy, totalScore);
+        }
+
+        private (double accuracy, long score) calculateV2Accuracy()
+        {
+            hitWindows.ClassicModActive = false;
+            hitWindows.IsConvert = false;
+            hitWindows.ScoreV2Active = true;
+
+            var ruleset = score.Ruleset.CreateInstance();
+            var scoreProcessor = ruleset.CreateScoreProcessor();
+            scoreProcessor.Mods.Value = score.Mods; // 使用原始 mods for V2
+
+            // 创建一个简单的 beatmap
+            var beatmap = new Beatmap { BeatmapInfo = score.BeatmapInfo };
+            foreach (var hitEvent in hitEvents)
+                beatmap.HitObjects.Add(hitEvent.HitObject);
+
+            scoreProcessor.ApplyBeatmap(beatmap);
+
+            // 应用所有结果
+            foreach (var hitEvent in hitEvents)
+            {
+                double offset = Math.Abs(hitEvent.TimeOffset);
+                HitResult result;
+                if (offset <= hitWindows.WindowFor(HitResult.Perfect))
+                    result = HitResult.Perfect;
+                else if (offset <= hitWindows.WindowFor(HitResult.Great))
+                    result = HitResult.Great;
+                else if (offset <= hitWindows.WindowFor(HitResult.Good))
+                    result = HitResult.Good;
+                else if (offset <= hitWindows.WindowFor(HitResult.Ok))
+                    result = HitResult.Ok;
+                else if (offset <= hitWindows.WindowFor(HitResult.Meh))
+                    result = HitResult.Meh;
+                else
+                    result = HitResult.Miss;
+
+                var judgement = hitEvent.HitObject.CreateJudgement();
+                scoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, judgement) { Type = result });
+            }
+
+            double accuracy = scoreProcessor.Accuracy.Value;
+            long totalScore = scoreProcessor.TotalScore.Value;
+            return (accuracy, totalScore);
         }
 
         private void updateDisplay()
         {
             ClearInternal();
 
-            double v1Acc = calculateV1Accuracy();
-            double v2Acc = score.Accuracy * 100; // 目前只能获得标准acc，无法区分不同模式的acc计算方式
+            double scAcc = score.Accuracy * 100;
+            var (v1Acc, v1Score) = calculateV1Accuracy();
+            var (v2Acc, v2Score) = calculateV2Accuracy();
+            long scScore = score.TotalScore;
 
             // Add overlay text box in top-left corner
             AddInternal(new GridContainer
@@ -139,9 +224,13 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 Position = Vector2.Zero,
                 RowDimensions = new[]
                 {
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
+                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
+                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
+                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
+                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
+                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
+                    new Dimension(GridSizeMode.AutoSize, minSize: 18),
                 },
                 ColumnDimensions = new[]
                 {
@@ -154,13 +243,13 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                     {
                         new OsuSpriteText
                         {
-                            Text = "Acc V1",
+                            Text = "Acc org",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },
                         new OsuSpriteText
                         {
-                            Text = $": {v1Acc:F2}%",
+                            Text = $" : {scAcc:F2}%",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },
@@ -169,13 +258,73 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                     {
                         new OsuSpriteText
                         {
-                            Text = "Acc V2",
+                            Text = "Acc v2",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },
                         new OsuSpriteText
                         {
-                            Text = $": {v2Acc:F2}%",
+                            Text = $" : {v2Acc * 100:F2}%",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Acc v1",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v1Acc * 100:F2}%",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Scr org",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {scScore / 1000.0:F0}k",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Scr v2",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v2Score / 1000.0:F0}k",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Scr v1",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v1Score / 1000.0:F0}k",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },
@@ -190,7 +339,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                         },
                         new OsuSpriteText
                         {
-                            Text = $": {score.Pauses.Count}",
+                            Text = $" : {score.Pauses.Count}",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },
