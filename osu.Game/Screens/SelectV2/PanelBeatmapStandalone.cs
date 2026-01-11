@@ -73,10 +73,10 @@ namespace osu.Game.Screens.SelectV2
         private bool applyNextManiaUiUpdateImmediately;
         private string? cachedScratchText;
         private EzKpsDisplay ezKpsDisplay = null!;
-        private EzLineGraph maniaKpsGraph = null!;
+        private EzDisplayLineGraph maniaKpsGraph = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
 
-        private EzXxySrDisplay xxySrDisplay = null!;
+        private EzDisplayXxySR displayXxySR = null!;
 
         private IBindable<StarDifficulty>? starDifficultyBindable;
         private CancellationTokenSource? starDifficultyCancellationSource;
@@ -230,7 +230,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.BottomLeft,
                                         },
                                         Empty(),
-                                        maniaKpsGraph = new EzLineGraph
+                                        maniaKpsGraph = new EzDisplayLineGraph
                                         {
                                             Size = new Vector2(300, 20),
                                             LineColour = Color4.CornflowerBlue.Opacity(0.8f),
@@ -254,7 +254,7 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        xxySrDisplay = new EzXxySrDisplay
+                                        displayXxySR = new EzDisplayXxySR
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
@@ -426,7 +426,7 @@ namespace osu.Game.Screens.SelectV2
 
                 // Only update if present.
                 if (result.NewValue.XxySr != null)
-                    xxySrDisplay.Current.Value = result.NewValue.XxySr;
+                    displayXxySR.Current.Value = result.NewValue.XxySr;
 
                 // If xxy is missing from the baseline, trigger an on-demand background request
                 // to compute and patch xxy without blocking the main UI updates.
@@ -441,7 +441,7 @@ namespace osu.Game.Screens.SelectV2
 
                             if (full?.XxySr != null)
                             {
-                                Schedule(() => xxySrDisplay.Current.Value = full.Value.XxySr);
+                                Schedule(() => displayXxySR.Current.Value = full.Value.XxySr);
                             }
                         }
                         catch (OperationCanceledException)
@@ -521,7 +521,7 @@ namespace osu.Game.Screens.SelectV2
             cachedScratchText = null;
             ezKpcDisplay.Clear();
 
-            xxySrDisplay.Current.Value = null;
+            displayXxySR.Current.Value = null;
 
             if (ruleset.Value.OnlineID == 3)
             {
@@ -530,7 +530,7 @@ namespace osu.Game.Screens.SelectV2
                 maniaKpsGraph.Show();
 
                 ezKpcDisplay.Show();
-                xxySrDisplay.Show();
+                displayXxySR.Show();
             }
             else
             {
@@ -539,7 +539,7 @@ namespace osu.Game.Screens.SelectV2
 
                 // 非 mania：隐藏 mania 专属 UI。
                 ezKpcDisplay.Hide();
-                xxySrDisplay.Hide();
+                displayXxySR.Hide();
             }
         }
 
@@ -619,7 +619,7 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisBindable = null;
             cachedScratchText = null;
 
-            xxySrDisplay.Current.Value = null;
+            displayXxySR.Current.Value = null;
 
             cachedKpcKeyCount = -1;
             cachedKpcRulesetId = -1;

@@ -59,10 +59,10 @@ namespace osu.Game.Screens.SelectV2
 
         private TrianglesV2 triangles = null!;
 
-        private EzLineGraph kpsGraph = null!;
+        private EzDisplayLineGraph kpsGraph = null!;
         private EzKpsDisplay kpsDisplay = null!;
         private EzKpcDisplay kpcDisplay = null!;
-        private EzXxySrDisplay xxySrDisplay = null!;
+        private EzDisplayXxySR displayXxySR = null!;
         private Bindable<bool> xxySrFilterSetting = null!;
 
         [Resolved]
@@ -221,7 +221,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.BottomLeft,
                                         },
                                         Empty(),
-                                        kpsGraph = new EzLineGraph
+                                        kpsGraph = new EzDisplayLineGraph
                                         {
                                             Size = new Vector2(300, 20),
                                             LineColour = Color4.CornflowerBlue.Opacity(0.8f),
@@ -245,7 +245,7 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        xxySrDisplay = new EzXxySrDisplay
+                                        displayXxySR = new EzDisplayXxySR
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
@@ -390,7 +390,7 @@ namespace osu.Game.Screens.SelectV2
 
                 // Xxy may be null in baseline results. Only update display if present.
                 if (result.NewValue.XxySr != null)
-                    xxySrDisplay.Current.Value = result.NewValue.XxySr;
+                    displayXxySR.Current.Value = result.NewValue.XxySr;
 
                 // If xxy is missing from the baseline, trigger an on-demand background request
                 // to compute and patch xxy without blocking the main UI updates.
@@ -405,7 +405,7 @@ namespace osu.Game.Screens.SelectV2
 
                             if (full?.XxySr != null)
                             {
-                                Schedule(() => xxySrDisplay.Current.Value = full.Value.XxySr);
+                                Schedule(() => displayXxySR.Current.Value = full.Value.XxySr);
                             }
                         }
                         catch (OperationCanceledException)
@@ -482,7 +482,7 @@ namespace osu.Game.Screens.SelectV2
             cachedScratchText = null;
             kpcDisplay.Clear();
 
-            xxySrDisplay.Current.Value = null;
+            displayXxySR.Current.Value = null;
 
             kpsGraph.Show();
             kpsDisplay.Show();
@@ -491,12 +491,12 @@ namespace osu.Game.Screens.SelectV2
 
             if (ruleset.Value.OnlineID == 3)
             {
-                xxySrDisplay.Show();
+                displayXxySR.Show();
             }
             else
             {
                 // 非 mania：隐藏 mania 专属 UI。
-                xxySrDisplay.Hide();
+                displayXxySR.Hide();
             }
         }
 
@@ -571,7 +571,7 @@ namespace osu.Game.Screens.SelectV2
             pendingColumnCounts = null;
             pendingHoldNoteCounts = null;
 
-            xxySrDisplay.Current.Value = null;
+            displayXxySR.Current.Value = null;
 
             cachedKpcKeyCount = -1;
             cachedKpcRulesetId = -1;

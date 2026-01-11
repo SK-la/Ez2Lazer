@@ -22,7 +22,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
     /// <summary>
     /// A pill that displays xxy_SR (mania).
     /// </summary>
-    public partial class EzXxySrDisplay : CompositeDrawable, IHasCurrentValue<double?>
+    public partial class EzDisplayXxySR : CompositeDrawable, IHasCurrentValue<double?>
     {
         private readonly Box background;
         private readonly SpriteIcon moonIcon;
@@ -42,7 +42,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         [Resolved]
         private OverlayColourProvider? colourProvider { get; set; }
 
-        public EzXxySrDisplay(double? initialValue = null)
+        public EzDisplayXxySR(double? initialValue = null)
         {
             Current.Value = initialValue;
 

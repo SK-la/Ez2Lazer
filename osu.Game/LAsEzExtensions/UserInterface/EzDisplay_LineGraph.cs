@@ -14,7 +14,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.LAsEzExtensions.UserInterface
 {
-    public partial class EzLineGraph : Container
+    public partial class EzDisplayLineGraph : Container
     {
         public float? MaxValue { get; set; }
 
@@ -39,7 +39,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             set => maskingContainer.Colour = value;
         }
 
-        public EzLineGraph()
+        public EzDisplayLineGraph()
         {
             Add(maskingContainer = new Container<Path>
             {
