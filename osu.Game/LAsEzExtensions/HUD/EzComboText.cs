@@ -16,6 +16,8 @@ namespace osu.Game.LAsEzExtensions.HUD
         public readonly EzGetComboTexture TextPart;
         public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
+        public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
+
         public FillFlowContainer TextContainer { get; private set; }
 
         // public float DefaultWidth { get; set; } = 100; // 默认宽度

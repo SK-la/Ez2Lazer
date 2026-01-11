@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
+using osu.Framework.Allocation;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -21,6 +22,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Skinning
 {
+    [Cached]
     public class EzStyleProSkin : Skin
     {
         public const int EZ_STYLE_PRO_SKIN_ID = 999;
@@ -105,7 +107,7 @@ namespace osu.Game.Skinning
                             {
                                 var health = container.OfType<HealthDisplay>().FirstOrDefault();
                                 var score = container.OfType<EzComScoreCounter>().FirstOrDefault();
-                                var acc = container.OfType<ArgonAccuracyCounter>().FirstOrDefault();
+                                var acc = container.OfType<EzHUDAccuracyCounter>().FirstOrDefault();
                                 var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
                                 var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
 
@@ -205,10 +207,7 @@ namespace osu.Game.Skinning
                                     new BeatmapAttributeText(),
 
                                     new DefaultHealthDisplay(),
-                                    new ArgonAccuracyCounter
-                                    {
-                                        WireframeOpacity = { Value = 0 },
-                                    },
+                                    new EzHUDAccuracyCounter(),
                                     new ArgonPerformancePointsCounter
                                     {
                                         WireframeOpacity = { Value = 0 },

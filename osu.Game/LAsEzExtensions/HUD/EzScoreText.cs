@@ -20,6 +20,7 @@ namespace osu.Game.LAsEzExtensions.HUD
 
         public readonly EzGetScoreTexture TextPart;
         public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
 
         public FillFlowContainer TextContainer { get; private set; }
 
