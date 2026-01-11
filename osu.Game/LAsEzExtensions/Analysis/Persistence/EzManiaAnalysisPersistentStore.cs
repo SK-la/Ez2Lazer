@@ -682,6 +682,11 @@ FROM mania_analysis;
             using var indexCmd = connection.CreateCommand();
             indexCmd.CommandText = "CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis_version);";
             indexCmd.ExecuteNonQuery();
+
+            // 清理数据库文件大小
+            using var vacuumCmd = connection.CreateCommand();
+            vacuumCmd.CommandText = "VACUUM;";
+            vacuumCmd.ExecuteNonQuery();
         }
 
         private bool hasColumn(SqliteConnection connection, string tableName, string columnName)
