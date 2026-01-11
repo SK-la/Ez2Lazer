@@ -7,11 +7,11 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
-using osu.Game.Database;
+using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -27,18 +27,21 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
     public partial class EzHitEventHeatmapGraph : CompositeDrawable
     {
         private readonly IReadOnlyList<HitEvent> hitEvents;
-        private readonly ManiaHitWindows hitWindows;
+
+        // 注意：这是从外部传入的，会跟随 HitMode 切换而变化
+        private readonly ManiaHitWindows hitWindows = new ManiaHitWindows();
         private readonly ScoreInfo score;
+        private readonly IBeatmap playableBeatmap;
 
         private double binSize;
         private double drainRate;
+        private double overallDifficulty;
 
         private int currentOffset = 0;
-        // private Bindable<int>? offsetBindable;
 
         private const int time_bins = 50; // 时间分段数
         private const float circle_size = 5f; // 圆形大小
-        private float leftMarginConst { get; set; } = 138; // 左侧预留空间
+        private float leftMarginConst { get; set; } = 158; // 左侧预留空间
         private float rightMarginConst { get; set; } = 7; // 右侧预留空间
 
         private double maxTime;
@@ -51,16 +54,16 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
         // [Resolved]
         // private OsuConfigManager config { get; set; } = null!;
 
-        public EzHitEventHeatmapGraph(ScoreInfo score, ManiaHitWindows hitWindows)
+        public EzHitEventHeatmapGraph(ScoreInfo score, IBeatmap playableBeatmap)
         {
             this.score = score;
-            this.hitEvents = score.HitEvents;
-            this.hitEvents = hitEvents.Where(e => e.HitObject.HitWindows != HitWindows.Empty && e.Result.IsBasic()).ToList();
-            this.hitWindows = hitWindows;
+            hitEvents = score.HitEvents;
+            // this.hitEvents = hitEvents.Where(e => e.HitObject.HitWindows != HitWindows.Empty && e.Result.IsBasic()).ToList();
+            // this.hitWindows = hitWindows;
+            this.playableBeatmap = playableBeatmap;
 
-            drainRate = score.BeatmapInfo is not null
-                ? score.BeatmapInfo.Difficulty.DrainRate
-                : 10.0;
+            drainRate = playableBeatmap.Difficulty.DrainRate;
+            overallDifficulty = playableBeatmap.Difficulty.OverallDifficulty;
         }
 
         [BackgroundDependencyLoader]
@@ -85,83 +88,115 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             // offsetBindable.BindValueChanged(updateOffset);
         }
 
-        // private void updateOffset(ValueChangedEvent<int> obj)
-        // {
-        //     currentOffset = obj.NewValue;
-        //     Scheduler.AddOnce(updateDisplay);
-        // }
-
-        private (double accuracy, long score) calculateV1Accuracy()
+        private (double accuracy, long score, Dictionary<HitResult, int> counts) calculateV1Accuracy()
         {
-            hitWindows.ClassicModActive = true;
-            hitWindows.IsConvert = false;
-            hitWindows.ScoreV2Active = false;
+            // var maniaHitWindows = new ManiaHitWindows
+            // {
+            //     CustomHitWindows = false,
+            //     ClassicModActive = true,
+            //     IsConvert = false,
+            //     ScoreV2Active = false,
+            //     SpeedMultiplier = hitWindows.SpeedMultiplier,
+            //     DifficultyMultiplier = hitWindows.DifficultyMultiplier
+            // };
+            //
+            // double PerfectRange = maniaHitWindows.WindowFor(HitResult.Perfect);
+            // double GreatRange = maniaHitWindows.WindowFor(HitResult.Great);
+            // double GoodRange = maniaHitWindows.WindowFor(HitResult.Good);
+            // double OkRange = maniaHitWindows.WindowFor(HitResult.Ok);
+            // double MehRange = maniaHitWindows.WindowFor(HitResult.Meh);
+            // double MissRange = maniaHitWindows.WindowFor(HitResult.Miss);
 
-            var ruleset = score.Ruleset.CreateInstance();
-            var scoreProcessor = ruleset.CreateScoreProcessor();
-            scoreProcessor.Mods.Value = new[] { new ManiaModClassic() }; // 设置 Classic mod for V1
+            // Logger.Log($"[EzHitEventHeatmapGraph] V1 HitWindows: P{PerfectRange} G{GreatRange} Go{GoodRange} O{OkRange} M{MehRange} Mi{MissRange}");
 
-            // 创建一个简单的 beatmap
-            var beatmap = new Beatmap { BeatmapInfo = score.BeatmapInfo };
-            foreach (var hitEvent in hitEvents)
-                beatmap.HitObjects.Add(hitEvent.HitObject);
+            double[] HeadOffsets = new double[18];
+            double MaxPoints = 0;
+            double TotalPoints = 0;
 
-            scoreProcessor.ApplyBeatmap(beatmap);
+            double TotalMultiplier = hitWindows.SpeedMultiplier / hitWindows.DifficultyMultiplier;
 
-            // 应用所有结果
-            foreach (var hitEvent in hitEvents)
+            double invertedOd = 10 - overallDifficulty;
+
+            double PerfectRange = Math.Floor(16 * TotalMultiplier) + 0;
+            double GreatRange = Math.Floor((34 + 3 * invertedOd)) * TotalMultiplier + 0;
+            double GoodRange = Math.Floor((67 + 3 * invertedOd)) * TotalMultiplier + 0;
+            double OkRange = Math.Floor((97 + 3 * invertedOd)) * TotalMultiplier + 0;
+            double MehRange = Math.Floor((121 + 3 * invertedOd)) * TotalMultiplier + 0;
+            double MissRange = Math.Floor((158 + 3 * invertedOd)) * TotalMultiplier + 0;
+
+            HitResult getResultByOffset(double offset) =>
+                offset < PerfectRange ? HitResult.Perfect :
+                offset < GreatRange ? HitResult.Great :
+                offset < GoodRange ? HitResult.Good :
+                offset < OkRange ? HitResult.Ok :
+                offset < MehRange ? HitResult.Meh :
+                offset < MissRange ? HitResult.Miss :
+                HitResult.None;
+
+            double getLNScore(double head, double tail)
             {
-                double offset = Math.Abs(hitEvent.TimeOffset);
-                HitResult result;
-                if (offset <= hitWindows.WindowFor(HitResult.Perfect))
-                    result = HitResult.Perfect;
-                else if (offset <= hitWindows.WindowFor(HitResult.Great))
-                    result = HitResult.Great;
-                else if (offset <= hitWindows.WindowFor(HitResult.Good))
-                    result = HitResult.Good;
-                else if (offset <= hitWindows.WindowFor(HitResult.Ok))
-                    result = HitResult.Ok;
-                else if (offset <= hitWindows.WindowFor(HitResult.Meh))
-                    result = HitResult.Meh;
-                else
-                    result = HitResult.Miss;
+                double combined = head + tail;
 
-                var judgement = hitEvent.HitObject.CreateJudgement();
-                scoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, judgement) { Type = result });
+                (double range, double headFactor, double combinedFactor, double score)[] rules = new[]
+                {
+                    (PerfectRange, 1.2, 2.4, 300.0),
+                    (GreatRange, 1.1, 2.2, 300),
+                    (GoodRange, 1.0, 2.0, 200),
+                    (OkRange, 1.0, 2.0, 100),
+                    (MehRange, 1.0, 2.0, 50),
+                };
+
+                foreach (var (range, headFactor, combinedFactor, lnScore) in rules)
+                {
+                    if (head < range * headFactor && combined < range * combinedFactor)
+                    {
+                        return lnScore;
+                    }
+                }
+
+                return 0;
             }
 
-            // V1 acc 手动计算，不受 mod 影响
-            var processor = new ManiaScoreProcessor();
-            long totalScoreForAcc = 0;
-            double maxScore = hitEvents.Count * 300.0;
+            Dictionary<HitResult, int> v1Counts = new Dictionary<HitResult, int>();
 
-            foreach (var hitEvent in hitEvents)
+            foreach (var hit in score.HitEvents.Where(e => e.Result.IsBasic()))
             {
-                double offset = Math.Abs(hitEvent.TimeOffset);
-                HitResult result;
-                if (offset <= hitWindows.WindowFor(HitResult.Perfect))
-                    result = HitResult.Perfect;
-                else if (offset <= hitWindows.WindowFor(HitResult.Great))
-                    result = HitResult.Great;
-                else if (offset <= hitWindows.WindowFor(HitResult.Good))
-                    result = HitResult.Good;
-                else if (offset <= hitWindows.WindowFor(HitResult.Ok))
-                    result = HitResult.Ok;
-                else if (offset <= hitWindows.WindowFor(HitResult.Meh))
-                    result = HitResult.Meh;
-                else
-                    result = HitResult.Miss;
+                double offset = Math.Abs(hit.TimeOffset);
+                var result = getResultByOffset(offset);
+                v1Counts[result] = v1Counts.GetValueOrDefault(result, 0) + 1;
+                var hitObject = (ManiaHitObject)hit.HitObject;
 
-                totalScoreForAcc += processor.GetBaseScoreForResult(result);
+                if (hitObject is HeadNote)
+                {
+                    HeadOffsets[hitObject.Column] = offset;
+                }
+                else if (hitObject is TailNote)
+                {
+                    MaxPoints += 300;
+                    TotalPoints += getLNScore(HeadOffsets[hitObject.Column], offset);
+                    HeadOffsets[hitObject.Column] = 0;
+                }
+                else if (hitObject is Note)
+                {
+                    MaxPoints += 300;
+                    TotalPoints += result switch
+                    {
+                        HitResult.Perfect => 300,
+                        HitResult.Great => 300,
+                        HitResult.Good => 200,
+                        HitResult.Ok => 100,
+                        HitResult.Meh => 50,
+                        _ => 0
+                    };
+                }
             }
 
-            double accuracy = maxScore > 0 ? totalScoreForAcc / maxScore : 0;
+            double accuracy = TotalPoints / MaxPoints;
 
-            long totalScore = scoreProcessor.TotalScore.Value;
-            return (accuracy, totalScore);
+            return (accuracy, (long)TotalPoints, v1Counts);
         }
 
-        private (double accuracy, long score) calculateV2Accuracy()
+        private (double accuracy, long score, Dictionary<HitResult, int> counts) calculateV2Accuracy()
         {
             hitWindows.ClassicModActive = false;
             hitWindows.IsConvert = false;
@@ -169,10 +204,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
             var ruleset = score.Ruleset.CreateInstance();
             var scoreProcessor = ruleset.CreateScoreProcessor();
-            scoreProcessor.Mods.Value = score.Mods; // 使用原始 mods for V2
+            scoreProcessor.Mods.Value = score.Mods;
 
             // 创建一个简单的 beatmap
-            var beatmap = new Beatmap { BeatmapInfo = score.BeatmapInfo };
+            var beatmap = new Beatmap
+            {
+                BeatmapInfo = score.BeatmapInfo ?? new BeatmapInfo(),
+                ControlPointInfo = new ControlPointInfo()
+            };
             foreach (var hitEvent in hitEvents)
                 beatmap.HitObjects.Add(hitEvent.HitObject);
 
@@ -181,28 +220,15 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             // 应用所有结果
             foreach (var hitEvent in hitEvents)
             {
-                double offset = Math.Abs(hitEvent.TimeOffset);
-                HitResult result;
-                if (offset <= hitWindows.WindowFor(HitResult.Perfect))
-                    result = HitResult.Perfect;
-                else if (offset <= hitWindows.WindowFor(HitResult.Great))
-                    result = HitResult.Great;
-                else if (offset <= hitWindows.WindowFor(HitResult.Good))
-                    result = HitResult.Good;
-                else if (offset <= hitWindows.WindowFor(HitResult.Ok))
-                    result = HitResult.Ok;
-                else if (offset <= hitWindows.WindowFor(HitResult.Meh))
-                    result = HitResult.Meh;
-                else
-                    result = HitResult.Miss;
-
                 var judgement = hitEvent.HitObject.CreateJudgement();
-                scoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, judgement) { Type = result });
+                scoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, judgement) { Type = hitEvent.Result });
             }
+
+            Dictionary<HitResult, int> v2Counts = hitEvents.GroupBy(e => e.Result).ToDictionary(g => g.Key, g => g.Count());
 
             double accuracy = scoreProcessor.Accuracy.Value;
             long totalScore = scoreProcessor.TotalScore.Value;
-            return (accuracy, totalScore);
+            return (accuracy, totalScore, v2Counts);
         }
 
         private void updateDisplay()
@@ -210,8 +236,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             ClearInternal();
 
             double scAcc = score.Accuracy * 100;
-            var (v1Acc, v1Score) = calculateV1Accuracy();
-            var (v2Acc, v2Score) = calculateV2Accuracy();
+            var (v1Acc, v1Score, v1Counts) = calculateV1Accuracy();
+            var (v2Acc, v2Score, v2Counts) = calculateV2Accuracy();
             long scScore = score.TotalScore;
 
             // Add overlay text box in top-left corner
@@ -220,9 +246,15 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 Anchor = Anchor.TopLeft,
                 Origin = Anchor.TopLeft,
                 Position = Vector2.Zero,
-                Padding = new MarginPadding { Top = 5, Bottom = 5 },
+                // Padding = new MarginPadding { Top = 5, Bottom = 5 },
                 RowDimensions = new[]
                 {
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
                     new Dimension(GridSizeMode.AutoSize),
                     new Dimension(GridSizeMode.AutoSize),
                     new Dimension(GridSizeMode.AutoSize),
@@ -248,7 +280,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                         },
                         new OsuSpriteText
                         {
-                            Text = $" : {scAcc:F2}%",
+                            Text = $" : {scAcc:F1}%",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },
@@ -263,7 +295,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                         },
                         new OsuSpriteText
                         {
-                            Text = $" : {v2Acc * 100:F2}%",
+                            Text = $" : {v2Acc * 100:F1}%",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },
@@ -278,7 +310,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                         },
                         new OsuSpriteText
                         {
-                            Text = $" : {v1Acc * 100:F2}%",
+                            Text = $" : {v1Acc * 100:F1}%",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },
@@ -339,6 +371,96 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                         new OsuSpriteText
                         {
                             Text = $" : {score.Pauses.Count}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "PERFECT",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v2Counts.GetValueOrDefault(HitResult.Perfect, 0)}\\{v1Counts.GetValueOrDefault(HitResult.Perfect, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "GREAT",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v2Counts.GetValueOrDefault(HitResult.Great, 0)}\\{v1Counts.GetValueOrDefault(HitResult.Great, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "GOOD",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v2Counts.GetValueOrDefault(HitResult.Good, 0)}\\{v1Counts.GetValueOrDefault(HitResult.Good, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "OK",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v2Counts.GetValueOrDefault(HitResult.Ok, 0)}\\{v1Counts.GetValueOrDefault(HitResult.Ok, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "MEH",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v2Counts.GetValueOrDefault(HitResult.Meh, 0)}\\{v1Counts.GetValueOrDefault(HitResult.Meh, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "MISS",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {v2Counts.GetValueOrDefault(HitResult.Miss, 0)}\\{v1Counts.GetValueOrDefault(HitResult.Miss, 0)}",
                             Font = OsuFont.GetFont(size: 14),
                             Colour = Color4.White,
                         },

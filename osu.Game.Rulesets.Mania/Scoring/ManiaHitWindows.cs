@@ -21,7 +21,17 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private double speedMultiplier = 1;
 
-        private static bool updateCustomHitWindows;
+        private bool updateCustomHitWindows;
+
+        public bool CustomHitWindows
+        {
+            get => updateCustomHitWindows;
+            set
+            {
+                updateCustomHitWindows = value;
+                updateWindows();
+            }
+        }
 
         public static double PerfectRange;
         public static double GreatRange;
@@ -175,6 +185,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public void SetHitMode(IBeatmap beatmap)
         {
+            if (!CustomHitWindows) return;
+
             EzMUGHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
 
             switch (hitMode)

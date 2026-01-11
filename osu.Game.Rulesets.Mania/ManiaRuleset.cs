@@ -68,7 +68,10 @@ namespace osu.Game.Rulesets.Mania
 
         public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap)
         {
-            var hitWindows = new ManiaHitWindows();
+            var hitWindows = new ManiaHitWindows
+            {
+                CustomHitWindows = true
+            };
             hitWindows.SetHitMode(beatmap);
 
             return new ManiaBeatmapConverter(beatmap, this);
@@ -475,7 +478,7 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score, new ManiaHitWindows()) //TODO:改成可实时变更
+                new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score, playableBeatmap) //TODO:改成可实时变更
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 200

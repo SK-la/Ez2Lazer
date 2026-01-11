@@ -210,11 +210,11 @@ namespace osu.Game.Rulesets.Scoring
 
         public virtual bool IsLegacyScore { get; set; }
 
-        protected virtual void UpdateClassicBaseScore(JudgementResult result)
+        protected virtual void ApplyScoreChangeClassic(JudgementResult result)
         {
         }
 
-        protected virtual void RevertClassicBaseScore(JudgementResult result)
+        protected virtual void RemoveScoreChangeClassic(JudgementResult result)
         {
         }
 
@@ -273,6 +273,8 @@ namespace osu.Game.Rulesets.Scoring
                     Combo.Value = 0;
             }
 
+            ApplyScoreChangeClassic(result);
+
             HighestCombo.Value = Math.Max(HighestCombo.Value, Combo.Value);
 
             result.ComboAfterJudgement = Combo.Value;
@@ -293,8 +295,6 @@ namespace osu.Game.Rulesets.Scoring
                 currentComboPortion += GetComboScoreChange(result);
 
             ApplyScoreChange(result);
-
-            UpdateClassicBaseScore(result);
 
             if (!IsSimulating)
             {
@@ -348,7 +348,7 @@ namespace osu.Game.Rulesets.Scoring
 
             RemoveScoreChange(result);
 
-            RevertClassicBaseScore(result);
+            RemoveScoreChangeClassic(result);
 
             Debug.Assert(hitEvents.Count > 0);
             lastHitObject = hitEvents[^1].LastHitObject;
@@ -480,6 +480,9 @@ namespace osu.Game.Rulesets.Scoring
             }
 
             ScoreResultCounts.Clear();
+
+            ClassicBaseScore = 0;
+            ClassicMaxBaseScore = 0;
 
             currentBaseScore = 0;
             currentMaximumBaseScore = 0;

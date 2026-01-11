@@ -101,25 +101,26 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        protected override void UpdateClassicBaseScore(JudgementResult judgement)
+        protected override void ApplyScoreChange(JudgementResult judgement)
         {
-            if (!IsLegacyScore) return;
+            // if (!IsLegacyScore) return;
 
             var hitWindows = new ManiaHitWindows
             {
                 ClassicModActive = true,
                 IsConvert = false,
-                ScoreV2Active = false
+                ScoreV2Active = false,
             };
 
-            perfectRange = hitWindows.WindowFor(HitResult.Perfect);
-            greatRange = hitWindows.WindowFor(HitResult.Great);
-            goodRange = hitWindows.WindowFor(HitResult.Good);
-            okRange = hitWindows.WindowFor(HitResult.Ok);
-            mehRange = hitWindows.WindowFor(HitResult.Meh);
-            missRange = hitWindows.WindowFor(HitResult.Miss);
+            PerfectRange = hitWindows.WindowFor(HitResult.Perfect);
+            GreatRange = hitWindows.WindowFor(HitResult.Great);
+            GoodRange = hitWindows.WindowFor(HitResult.Good);
+            OkRange = hitWindows.WindowFor(HitResult.Ok);
+            MehRange = hitWindows.WindowFor(HitResult.Meh);
+            MissRange = hitWindows.WindowFor(HitResult.Miss);
 
             double offset = Math.Abs(judgement.TimeOffset);
+            var result = GetResultByOffset(offset);
             var hitObject = (ManiaHitObject)judgement.HitObject;
 
             if (hitObject is HeadNote)
@@ -129,21 +130,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore += 300;
-                ClassicBaseScore += getLNScore(headOffsets[hitObject.Column], offset);
+                ClassicBaseScore += GetLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
             {
                 ClassicMaxBaseScore += 300;
-                HitResult legacyHitResult = offset <= perfectRange ? HitResult.Perfect :
-                    offset <= greatRange ? HitResult.Great :
-                    offset <= goodRange ? HitResult.Good :
-                    offset <= okRange ? HitResult.Ok :
-                    offset <= mehRange ? HitResult.Meh :
-                    offset <= missRange ? HitResult.Miss :
-                    HitResult.None;
-
-                ClassicBaseScore += legacyHitResult switch
+                ClassicBaseScore += result switch
                 {
                     HitResult.Perfect => 300,
                     HitResult.Great => 300,
@@ -155,22 +148,31 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        private double getLNScore(double head, double tail)
+        protected HitResult GetResultByOffset(double offset) =>
+            offset < PerfectRange ? HitResult.Perfect :
+            offset < GreatRange ? HitResult.Great :
+            offset < GoodRange ? HitResult.Good :
+            offset < OkRange ? HitResult.Ok :
+            offset < MehRange ? HitResult.Meh :
+            offset < MissRange ? HitResult.Miss :
+            HitResult.None;
+
+        public double GetLNScore(double head, double tail)
         {
             double combined = head + tail;
 
             (double range, double headFactor, double combinedFactor, double score)[] rules = new[]
             {
-                (PerfectRange: perfectRange, 1.2, 2.4, 300.0),
-                (greatRange, 1.1, 2.2, 300),
-                (goodRange, 1.0, 2.0, 200),
-                (okRange, 1.0, 2.0, 100),
-                (mehRange, 1.0, 2.0, 50),
+                (PerfectRange, 1.2, 2.4, 300.0),
+                (GreatRange, 1.1, 2.2, 300),
+                (GoodRange, 1.0, 2.0, 200),
+                (OkRange, 1.0, 2.0, 100),
+                (MehRange, 1.0, 2.0, 50),
             };
 
             foreach (var (range, headFactor, combinedFactor, score) in rules)
             {
-                if (head <= range * headFactor && combined < range * combinedFactor)
+                if (head < range * headFactor && combined < range * combinedFactor)
                     return score;
             }
 
@@ -179,16 +181,16 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private readonly double[] headOffsets = new double[18];
 
-        private double perfectRange;
-        private double greatRange;
-        private double goodRange;
-        private double okRange;
-        private double mehRange;
-        private double missRange;
+        public double PerfectRange = 16;
+        public double GreatRange = 34;
+        public double GoodRange = 67;
+        public double OkRange = 97;
+        public double MehRange = 121;
+        public double MissRange = 158;
 
-        protected override void RevertClassicBaseScore(JudgementResult judgement)
+        protected override void RemoveScoreChange(JudgementResult judgement)
         {
-            if (!IsLegacyScore) return;
+            // if (!IsLegacyScore) return;
 
             var hitWindows = new ManiaHitWindows
             {
@@ -197,14 +199,15 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ScoreV2Active = false
             };
 
-            perfectRange = hitWindows.WindowFor(HitResult.Perfect);
-            greatRange = hitWindows.WindowFor(HitResult.Great);
-            goodRange = hitWindows.WindowFor(HitResult.Good);
-            okRange = hitWindows.WindowFor(HitResult.Ok);
-            mehRange = hitWindows.WindowFor(HitResult.Meh);
-            missRange = hitWindows.WindowFor(HitResult.Miss);
+            PerfectRange = hitWindows.WindowFor(HitResult.Perfect);
+            GreatRange = hitWindows.WindowFor(HitResult.Great);
+            GoodRange = hitWindows.WindowFor(HitResult.Good);
+            OkRange = hitWindows.WindowFor(HitResult.Ok);
+            MehRange = hitWindows.WindowFor(HitResult.Meh);
+            MissRange = hitWindows.WindowFor(HitResult.Miss);
 
             double offset = Math.Abs(judgement.TimeOffset);
+            var result = GetResultByOffset(offset);
             var hitObject = (ManiaHitObject)judgement.HitObject;
 
             if (hitObject is HeadNote)
@@ -214,21 +217,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore -= 300;
-                ClassicBaseScore -= getLNScore(headOffsets[hitObject.Column], offset);
+                ClassicBaseScore -= GetLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
             {
                 ClassicMaxBaseScore -= 300;
-                HitResult legacyHitResult = offset <= perfectRange ? HitResult.Perfect :
-                    offset <= greatRange ? HitResult.Great :
-                    offset <= goodRange ? HitResult.Good :
-                    offset <= okRange ? HitResult.Ok :
-                    offset <= mehRange ? HitResult.Meh :
-                    offset <= missRange ? HitResult.Miss :
-                    HitResult.None;
-
-                ClassicBaseScore -= legacyHitResult switch
+                ClassicBaseScore -= result switch
                 {
                     HitResult.Perfect => 300,
                     HitResult.Great => 300,
