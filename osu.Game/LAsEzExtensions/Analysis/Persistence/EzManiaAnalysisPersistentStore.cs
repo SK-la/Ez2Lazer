@@ -312,9 +312,160 @@ LIMIT 1;
             }
         }
 
+        /// <summary>
+        /// 对比新计算结果和 SQLite 中的旧数据，如果有差异则更新。
+        /// 主要场景：
+        /// - xxysr 从 null 补算成有值（mania 模式的谱面被重新计算）
+        /// - KPS 数据有显著变化（算法修复等）
+        /// 工作机制：
+        /// - 如果 stored 数据不存在，直接存储新数据
+        /// - 如果 stored xxysr == null 而 computed 有值，说明需要补充 xxysr，更新
+        /// - 如果都是 xxysr == null，说明是非 mania 模式数据，比较 KPS 数据是否相同
+        /// </summary>
+        public void StoreIfDifferent(BeatmapInfo beatmap, ManiaBeatmapAnalysisResult analysis)
+        {
+            if (!Enabled)
+                return;
+
+            // 跳过空谱面（no notes）- 不需要存储和管理
+            if (analysis.ColumnCounts.Count == 0)
+                return;
+
+            try
+            {
+                Initialise();
+
+                using var connection = openConnection();
+
+                // 尝试从 SQLite 读取旧数据
+                if (!TryGetRawData(connection, beatmap, out var storedAnalysis))
+                {
+                    // 缓存不存在，直接存储
+                    Store(beatmap, analysis);
+                    return;
+                }
+
+                // 对比两个结果是否有差异
+                if (HasDifference(storedAnalysis, analysis))
+                {
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", "mania_analysis", LogLevel.Debug);
+                    Store(beatmap, analysis);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore StoreIfDifferent failed.");
+            }
+        }
+
+        /// <summary>
+        /// 从数据库读取原始数据（不验证 hash/version）。
+        /// </summary>
+        private bool TryGetRawData(SqliteConnection connection, BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
+        {
+            result = ManiaBeatmapAnalysisDefaults.EMPTY;
+
+            try
+            {
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT average_kps, max_kps, kps_list_json, xxy_sr, column_counts_json, hold_note_counts_json
+FROM mania_analysis
+WHERE beatmap_id = $id
+LIMIT 1;
+";
+                    cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+
+                    using var reader = cmd.ExecuteReader();
+
+                    if (!reader.Read())
+                        return false;
+
+                    double averageKps = reader.GetDouble(0);
+                    double maxKps = reader.GetDouble(1);
+                    string kpsListJson = reader.GetString(2);
+                    double? xxySr = reader.IsDBNull(3) ? null : reader.GetDouble(3);
+                    string columnCountsJson = reader.GetString(4);
+                    string holdNoteCountsJson = reader.GetString(5);
+
+                    var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
+                    var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
+                    var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
+
+                    int keyCount = columnCounts.Count;
+                    string scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+
+                    result = new ManiaBeatmapAnalysisResult(
+                        averageKps,
+                        maxKps,
+                        kpsList,
+                        columnCounts,
+                        holdNoteCounts,
+                        scratchText,
+                        xxySr);
+
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 比较两个分析结果是否有差异。
+        /// 关键字段：xxysr, averageKps, maxKps, ColumnCounts, HoldNoteCounts
+        /// </summary>
+        private bool HasDifference(ManiaBeatmapAnalysisResult stored, ManiaBeatmapAnalysisResult computed)
+        {
+            // 检查 xxysr 差异（最重要）
+            // 如果 stored 是 null 而 computed 有值，必须更新
+            if (!stored.XxySr.HasValue && computed.XxySr.HasValue)
+                return true;
+
+            // 如果都有值，比较数值是否相同
+            if (stored.XxySr.HasValue && computed.XxySr.HasValue)
+            {
+                if (!stored.XxySr.Value.Equals(computed.XxySr.Value))
+                    return true;
+            }
+
+            // 检查 KPS 相关数据
+            if (!stored.AverageKps.Equals(computed.AverageKps) || !stored.MaxKps.Equals(computed.MaxKps))
+                return true;
+
+            // 检查列统计
+            if (stored.ColumnCounts.Count != computed.ColumnCounts.Count)
+                return true;
+
+            foreach (var kvp in computed.ColumnCounts)
+            {
+                if (!stored.ColumnCounts.TryGetValue(kvp.Key, out var storedCount) || storedCount != kvp.Value)
+                    return true;
+            }
+
+            // 检查长按统计
+            if (stored.HoldNoteCounts.Count != computed.HoldNoteCounts.Count)
+                return true;
+
+            foreach (var kvp in computed.HoldNoteCounts)
+            {
+                if (!stored.HoldNoteCounts.TryGetValue(kvp.Key, out var storedCount) || storedCount != kvp.Value)
+                    return true;
+            }
+
+            return false;
+        }
+
         public void Store(BeatmapInfo beatmap, ManiaBeatmapAnalysisResult analysis)
         {
             if (!Enabled)
+                return;
+
+            // 跳过空谱面（no notes）- 不需要存储和管理
+            if (analysis.ColumnCounts.Count == 0)
                 return;
 
             try

@@ -73,7 +73,7 @@ namespace osu.Game.Screens.SelectV2
         private bool applyNextManiaUiUpdateImmediately;
         private string? cachedScratchText;
         private EzKpsDisplay ezKpsDisplay = null!;
-        private EzDisplayLineGraph maniaKpsGraph = null!;
+        private EzDisplayLineGraph ezKpsGraph = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
 
         private EzDisplayXxySR displayXxySR = null!;
@@ -230,7 +230,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.BottomLeft,
                                         },
                                         Empty(),
-                                        maniaKpsGraph = new EzDisplayLineGraph
+                                        ezKpsGraph = new EzDisplayLineGraph
                                         {
                                             Size = new Vector2(300, 20),
                                             LineColour = Color4.CornflowerBlue.Opacity(0.8f),
@@ -388,8 +388,8 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
-            if (ruleset.Value.OnlineID != 3)
-                return;
+            // if (ruleset.Value.OnlineID != 3)
+            //     return;
 
             maniaAnalysisCancellationSource = new CancellationTokenSource();
             var localCancellationSource = maniaAnalysisCancellationSource;
@@ -519,25 +519,15 @@ namespace osu.Game.Screens.SelectV2
         private void resetManiaAnalysisDisplay()
         {
             cachedScratchText = null;
-            ezKpcDisplay.Clear();
-
             displayXxySR.Current.Value = null;
 
             if (ruleset.Value.OnlineID == 3)
             {
-                ezKpsDisplay.Show();
-                ezKpsDisplay.SetKps(0, 0);
-                maniaKpsGraph.Show();
-
                 ezKpcDisplay.Show();
                 displayXxySR.Show();
             }
             else
             {
-                ezKpsDisplay.Hide();
-                maniaKpsGraph.Hide();
-
-                // 非 mania：隐藏 mania 专属 UI。
                 ezKpcDisplay.Hide();
                 displayXxySR.Hide();
             }
@@ -566,7 +556,7 @@ namespace osu.Game.Screens.SelectV2
             // Update KPS graph with the KPS list
             if (kpsList.Count > 0)
             {
-                maniaKpsGraph.SetValues(kpsList);
+                ezKpsGraph.SetValues(kpsList);
             }
 
             if (columnCounts != null)

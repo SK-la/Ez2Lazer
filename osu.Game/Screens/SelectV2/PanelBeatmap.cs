@@ -59,9 +59,9 @@ namespace osu.Game.Screens.SelectV2
 
         private TrianglesV2 triangles = null!;
 
-        private EzDisplayLineGraph kpsGraph = null!;
-        private EzKpsDisplay kpsDisplay = null!;
-        private EzKpcDisplay kpcDisplay = null!;
+        private EzDisplayLineGraph ezKpsGraph = null!;
+        private EzKpsDisplay ezKpsDisplay = null!;
+        private EzKpcDisplay ezKpcDisplay = null!;
         private EzDisplayXxySR displayXxySR = null!;
         private Bindable<bool> xxySrFilterSetting = null!;
 
@@ -215,13 +215,13 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
-                                        kpsDisplay = new EzKpsDisplay
+                                        ezKpsDisplay = new EzKpsDisplay
                                         {
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
                                         },
                                         Empty(),
-                                        kpsGraph = new EzDisplayLineGraph
+                                        ezKpsGraph = new EzDisplayLineGraph
                                         {
                                             Size = new Vector2(300, 20),
                                             LineColour = Color4.CornflowerBlue.Opacity(0.8f),
@@ -257,7 +257,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
-                                        kpcDisplay = new EzKpcDisplay()
+                                        ezKpcDisplay = new EzKpcDisplay()
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
@@ -310,7 +310,7 @@ namespace osu.Game.Screens.SelectV2
             kpcDisplayMode = ezConfig.GetBindable<EzKpcDisplay.KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
             kpcDisplayMode.BindValueChanged(mode =>
             {
-                kpcDisplay.CurrentKpcDisplayMode = mode.NewValue;
+                ezKpcDisplay.CurrentKpcDisplayMode = mode.NewValue;
             }, true);
         }
 
@@ -350,8 +350,9 @@ namespace osu.Game.Screens.SelectV2
             if (Item == null)
                 return;
 
-            if (ruleset.Value.OnlineID != 3)
-                return;
+            // Request analysis for all rulesets to get KPS data.
+            // Non-mania rulesets will have xxysr == null (which is normal).
+            // Only mania mode (OnlineID == 3) will display mania-specific UI (xxysr, column counts, etc).
 
             maniaAnalysisCancellationSource = new CancellationTokenSource();
             var localCancellationSource = maniaAnalysisCancellationSource;
@@ -359,7 +360,7 @@ namespace osu.Game.Screens.SelectV2
             // Request baseline (no xxy) first so UI can update quickly from persisted data.
             // Requesting `requireXxySr: true` would force a potentially expensive xxy calculation
             // if the persisted entry is missing xxy, which causes visible delays. We instead
-            // request the heavy xxy calculation separately in the background.
+            // request the heavy xxy calculation separately in the background (for mania only).
             // var requestTime = System.DateTimeOffset.UtcNow;
             // Logger.Log($"[PanelBeatmap] mania analysis requested for {beatmap.OnlineID}/{beatmap.ID} requireXxy=false at {requestTime:O}", LoggingTarget.Runtime, LogLevel.Debug);
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: 0, requireXxySr: false);
@@ -480,22 +481,16 @@ namespace osu.Game.Screens.SelectV2
         private void resetManiaAnalysisDisplay()
         {
             cachedScratchText = null;
-            kpcDisplay.Clear();
-
             displayXxySR.Current.Value = null;
-
-            kpsGraph.Show();
-            kpsDisplay.Show();
-            kpsDisplay.SetKps(0, 0);
-            kpcDisplay.Show();
 
             if (ruleset.Value.OnlineID == 3)
             {
+                ezKpcDisplay.Show();
                 displayXxySR.Show();
             }
             else
             {
-                // 非 mania：隐藏 mania 专属 UI。
+                ezKpcDisplay.Hide();
                 displayXxySR.Hide();
             }
         }
@@ -518,12 +513,12 @@ namespace osu.Game.Screens.SelectV2
 
             var (averageKps, maxKps, kpsList) = result;
 
-            kpsDisplay.SetKps(averageKps, maxKps);
+            ezKpsDisplay.SetKps(averageKps, maxKps);
 
             // Update KPS graph with the KPS list
             if (kpsList.Count > 0)
             {
-                kpsGraph.SetValues(kpsList);
+                ezKpsGraph.SetValues(kpsList);
             }
 
             if (columnCounts != null)
@@ -542,13 +537,13 @@ namespace osu.Game.Screens.SelectV2
                 }
 
                 int countsHash = computeCountsHash(normalizedColumnCounts!, normalizedHoldNoteCounts!, keyCount);
-                var mode = kpcDisplay.CurrentKpcDisplayMode;
+                var mode = ezKpcDisplay.CurrentKpcDisplayMode;
 
                 if (countsHash != lastKpcCountsHash || mode != lastKpcMode)
                 {
                     lastKpcCountsHash = countsHash;
                     lastKpcMode = mode;
-                    kpcDisplay.UpdateColumnCounts(normalizedColumnCounts!, normalizedHoldNoteCounts!);
+                    ezKpcDisplay.UpdateColumnCounts(normalizedColumnCounts!, normalizedHoldNoteCounts!);
                 }
             }
         }

@@ -73,7 +73,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 // Base seed derived from beatmap identity.
                 int baseSeed = 17;
                 baseSeed = baseSeed * 31 + beatmapInfo.ID.GetHashCode();
-                baseSeed = baseSeed * 31 + (beatmapInfo.Hash.GetHashCode(StringComparison.Ordinal));
+                baseSeed = baseSeed * 31 + (beatmapInfo.Hash?.GetHashCode(StringComparison.Ordinal) ?? 0);
 
                 for (int i = 0; i < orderedMods.Length; i++)
                 {

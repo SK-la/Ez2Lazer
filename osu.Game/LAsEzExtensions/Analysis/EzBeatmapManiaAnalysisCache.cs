@@ -428,9 +428,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             try
             {
-                if (lookup.Ruleset.OnlineID != 3)
-                    return null;
-
                 // Persistent fast-path for no-mod baseline.
                 if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                 {
@@ -485,8 +482,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
                         kpsList[i] *= rate;
                 }
 
-                // xxysr 补算机制已禁用，总是返回 null。
+                // Only calculate xxySr for mania mode (OnlineID == 3)
                 double? xxySr = null;
+
+                if (lookup.Ruleset.OnlineID == 3 && playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
+                    xxySr = sr;
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -505,7 +505,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 if (lookup.OrderedMods.Length == 0)
                 {
-                    persistentStore.Store(lookup.BeatmapInfo, analysis);
+                    // Skip storing empty beatmaps (no notes) to avoid unnecessary database entries
+                    if (analysis.ColumnCounts.Count > 0)
+                    {
+                        // For baseline (no-mod), compare with stored data and update if different
+                        // This ensures data completeness (e.g., xxySr gets patched when previously null)
+                        persistentStore.StoreIfDifferent(lookup.BeatmapInfo, analysis);
+                    }
                 }
 
                 return analysis;

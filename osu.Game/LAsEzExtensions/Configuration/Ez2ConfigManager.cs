@@ -118,7 +118,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.EzSelectCsMode, "");
 
             SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
-            SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.Lazer);
+            SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.O2JamNormal);
             SetDefault(Ez2Setting.CustomPoorHitResult, true);
 
             SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
