@@ -20,5 +20,8 @@ namespace osu.Game.Configuration
 
         [Description("'EzResource/Webm/*.webm' from local folders")]
         WebmSource,
+
+        [Description("'EzResource/BG/*.png' from local folders")]
+        Slides,
     }
 }
