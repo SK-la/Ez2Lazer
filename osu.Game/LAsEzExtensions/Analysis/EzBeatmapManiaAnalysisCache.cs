@@ -488,8 +488,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 double? xxySr = null;
 
                 bool shouldCalculateXxy = lookup.Ruleset.OnlineID == 3 && lookup.OrderedMods.Length > 0;
-                
-                if (shouldCalculateXxy && playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
+
+                if (shouldCalculateXxy && playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, rate, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
                     xxySr = sr;
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -582,11 +582,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             lock (bindableUpdateLock)
             {
                 cancelTrackedBindableUpdate();
-
-                // 规则集变化到非 mania 时，不触发后台计算。
-                // 由面板侧自行决定是否显示/清空。
-                if (currentRuleset.Value.OnlineID != 3)
-                    return;
 
                 foreach (var b in trackedBindables)
                 {

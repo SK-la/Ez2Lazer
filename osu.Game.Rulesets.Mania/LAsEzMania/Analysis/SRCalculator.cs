@@ -41,14 +41,26 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
         /// <returns>Calculated SR value.</returns>
         public static double CalculateSRWithTime(IBeatmap beatmap, out Dictionary<string, long>? times)
         {
-            (double sr, var collectedTimes) = computeInternalXxySR(beatmap);
+            (double sr, var collectedTimes) = computeInternalXxySR(beatmap, 1.0);
             times = collectedTimes;
             return sr;
         }
 
         public static double CalculateSR(IBeatmap beatmap)
         {
-            (double sr, _) = computeInternalXxySR(beatmap);
+            (double sr, _) = computeInternalXxySR(beatmap, 1.0);
+            return sr;
+        }
+
+        /// <summary>
+        ///     Computes the star rating with clock rate adjustment (for rate-changing mods like DT/HT).
+        /// </summary>
+        /// <param name="beatmap">Beatmap instance.</param>
+        /// <param name="clockRate">Clock rate multiplier (1.5 for DT, 0.75 for HT, etc.).</param>
+        /// <returns>Calculated SR value adjusted for clock rate.</returns>
+        public static double CalculateSR(IBeatmap beatmap, double clockRate)
+        {
+            (double sr, _) = computeInternalXxySR(beatmap, clockRate);
             return sr;
         }
 
@@ -59,10 +71,10 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
         /// <returns>Tuple containing the SR value and timing breakdown.</returns>
         public Task<(double sr, Dictionary<string, long> times)> CalculateSRAsync(IBeatmap beatmap)
         {
-            return Task.FromResult(computeInternalXxySR(beatmap));
+            return Task.FromResult(computeInternalXxySR(beatmap, 1.0));
         }
 
-        private static (double sr, Dictionary<string, long> times) computeInternalXxySR(IBeatmap beatmap)
+        private static (double sr, Dictionary<string, long> times) computeInternalXxySR(IBeatmap beatmap, double clockRate = 1.0)
         {
             var stopwatch = Stopwatch.StartNew();
 
@@ -70,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             // Prefer TotalColumns (reflects keymods / conversion output) over CS.
             int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.BeatmapInfo.Difficulty.CircleSize));
 
-            double sr = XxySRCalculateCore(maniaBeatmap, keyCount);
+            double sr = XxySRCalculateCore(maniaBeatmap, keyCount, clockRate);
             stopwatch.Stop();
 
             var timings = new Dictionary<string, long>
@@ -134,7 +146,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
         private static readonly Comparison<NoteStruct> note_comparer = compareNotes;
 
-        public static double XxySRCalculateCore(ManiaBeatmap maniaBeatmap, int keyCount)
+        public static double XxySRCalculateCore(ManiaBeatmap maniaBeatmap, int keyCount, double clockRate = 1.0)
         {
             double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
 
@@ -156,8 +168,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             foreach (var hitObject in maniaBeatmap.HitObjects)
             {
                 int column = Math.Clamp(hitObject.Column, 0, keyCount - 1);
-                int head = (int)Math.Round(hitObject.StartTime);
-                int tail = (int)Math.Round(hitObject.GetEndTime());
+                // Apply clockRate to timing: faster rate = shorter intervals in calculation
+                int head = (int)Math.Round(hitObject.StartTime / clockRate);
+                int tail = (int)Math.Round(hitObject.GetEndTime() / clockRate);
                 if ((hitObject as IHasDuration)?.EndTime == null)
                     tail = -1;
 
