@@ -5,7 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
+using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -23,10 +26,18 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
-            => base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
+        {
+            od =  Mods.Value.OfType<ManiaModAdjust>().FirstOrDefault(m => m.OverallDifficulty.Value is not null && m.CustomOD.Value)
+                      ?.OverallDifficulty.Value ?? beatmap.Difficulty.OverallDifficulty;
+
+            return base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
+        }
 
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
+            // if (IsLegacyScore)
+            //     return ;
+
             return 150000 * comboProgress
                    + 850000 * Math.Pow(Accuracy.Value, 2 + 2 * Accuracy.Value) * accuracyProgress
                    + bonusPortion;
@@ -42,6 +53,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Perfect:
+                    if (IsLegacyScore)
+                        return 300;
+
                     return 305;
             }
 
@@ -101,26 +115,18 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
+        private double od = 8;
+
         protected override void ApplyScoreChange(JudgementResult judgement)
         {
             // if (!IsLegacyScore) return;
 
-            var hitWindows = new ManiaHitWindows
+            var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
             {
-                ClassicModActive = true,
-                IsConvert = false,
-                ScoreV2Active = false,
+                OverallDifficulty = od
             };
-
-            PerfectRange = hitWindows.WindowFor(HitResult.Perfect);
-            GreatRange = hitWindows.WindowFor(HitResult.Great);
-            GoodRange = hitWindows.WindowFor(HitResult.Good);
-            OkRange = hitWindows.WindowFor(HitResult.Ok);
-            MehRange = hitWindows.WindowFor(HitResult.Meh);
-            MissRange = hitWindows.WindowFor(HitResult.Miss);
-
             double offset = Math.Abs(judgement.TimeOffset);
-            var result = GetResultByOffset(offset);
+            var result = hitWindows.ResultFor(offset);
             var hitObject = (ManiaHitObject)judgement.HitObject;
 
             if (hitObject is HeadNote)
@@ -130,7 +136,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore += 300;
-                ClassicBaseScore += GetLNScore(headOffsets[hitObject.Column], offset);
+                ClassicBaseScore += hitWindows.GetLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
@@ -146,68 +152,24 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     _ => 0
                 };
             }
+
+            UpdateScoreClassic();
         }
 
-        protected HitResult GetResultByOffset(double offset) =>
-            offset < PerfectRange ? HitResult.Perfect :
-            offset < GreatRange ? HitResult.Great :
-            offset < GoodRange ? HitResult.Good :
-            offset < OkRange ? HitResult.Ok :
-            offset < MehRange ? HitResult.Meh :
-            offset < MissRange ? HitResult.Miss :
-            HitResult.None;
-
-        public double GetLNScore(double head, double tail)
-        {
-            double combined = head + tail;
-
-            (double range, double headFactor, double combinedFactor, double score)[] rules = new[]
-            {
-                (PerfectRange, 1.2, 2.4, 300.0),
-                (GreatRange, 1.1, 2.2, 300),
-                (GoodRange, 1.0, 2.0, 200),
-                (OkRange, 1.0, 2.0, 100),
-                (MehRange, 1.0, 2.0, 50),
-            };
-
-            foreach (var (range, headFactor, combinedFactor, score) in rules)
-            {
-                if (head < range * headFactor && combined < range * combinedFactor)
-                    return score;
-            }
-
-            return 0;
-        }
+        // LN scoring logic moved to CustomHitWindowsHelper.GetLNScore(head, tail).
 
         private readonly double[] headOffsets = new double[18];
-
-        public double PerfectRange = 16;
-        public double GreatRange = 34;
-        public double GoodRange = 67;
-        public double OkRange = 97;
-        public double MehRange = 121;
-        public double MissRange = 158;
 
         protected override void RemoveScoreChange(JudgementResult judgement)
         {
             // if (!IsLegacyScore) return;
 
-            var hitWindows = new ManiaHitWindows
+            var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
             {
-                ClassicModActive = true,
-                IsConvert = false,
-                ScoreV2Active = false
+                OverallDifficulty = od
             };
-
-            PerfectRange = hitWindows.WindowFor(HitResult.Perfect);
-            GreatRange = hitWindows.WindowFor(HitResult.Great);
-            GoodRange = hitWindows.WindowFor(HitResult.Good);
-            OkRange = hitWindows.WindowFor(HitResult.Ok);
-            MehRange = hitWindows.WindowFor(HitResult.Meh);
-            MissRange = hitWindows.WindowFor(HitResult.Miss);
-
             double offset = Math.Abs(judgement.TimeOffset);
-            var result = GetResultByOffset(offset);
+            var result = hitWindows.ResultFor(offset);
             var hitObject = (ManiaHitObject)judgement.HitObject;
 
             if (hitObject is HeadNote)
@@ -217,7 +179,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore -= 300;
-                ClassicBaseScore -= GetLNScore(headOffsets[hitObject.Column], offset);
+                ClassicBaseScore -= hitWindows.GetLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
@@ -233,6 +195,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     _ => 0
                 };
             }
+
+            UpdateScoreClassic();
         }
     }
 }

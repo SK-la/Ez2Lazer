@@ -478,7 +478,7 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y
                 }),
-                new StatisticItem("Space Graph", () => new EzHitEventHeatmapGraph(score, playableBeatmap) //TODO:改成可实时变更
+                new StatisticItem("Space Graph", () => new EzManiaScoreGraph(score, playableBeatmap) //TODO:改成可实时变更
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 200

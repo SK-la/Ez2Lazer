@@ -7,11 +7,13 @@ using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
+using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
     public class ManiaHitWindows : HitWindows
     {
+        private readonly CustomHitWindowsHelper customHelper = new CustomHitWindowsHelper(GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer);
         public static readonly DifficultyRange PERFECT_WINDOW_RANGE = new DifficultyRange(22.4D, 19.4D, 13.9D);
         private static readonly DifficultyRange great_window_range = new DifficultyRange(64, 49, 34);
         private static readonly DifficultyRange good_window_range = new DifficultyRange(97, 82, 67);
@@ -105,7 +107,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        private bool customHitWindows;
+        private static bool customHitWindows;
 
         public bool CustomHitWindows
         {
@@ -155,7 +157,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public void SetSpecialDifficultyRange(double perfect, double great, double good, double ok, double meh, double miss)
         {
-            if (!customHitWindows) return;
+            customHitWindows = true;
 
             PerfectRange = perfect;
             GreatRange = great;
@@ -168,7 +170,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public void SetSpecialDifficultyRange(double[] difficultyRangeArray)
         {
-            if (!customHitWindows) return;
+            customHitWindows = true;
 
             PerfectRange = difficultyRangeArray[0];
             GreatRange = difficultyRangeArray[1];
@@ -187,7 +189,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public void SetHitMode(IBeatmap beatmap)
         {
-            if (!CustomHitWindows) return;
+            // if (!CustomHitWindows) return;
 
             EzMUGHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
 
@@ -198,31 +200,25 @@ namespace osu.Game.Rulesets.Mania.Scoring
                         ? O2HitModeExtension.DEFAULT_BPM
                         : beatmap.BeatmapInfo.BPM;
 
-                    double coolRange = 7500.0 / bpm * totalMultiplier;
-                    double goodRange = 22500.0 / bpm * totalMultiplier;
-                    double badRange = 31250.0 / bpm * totalMultiplier;
-
-                    // 注意：O2Jam的判定窗口是基于BPM变化的。Bad约等于om的Miss。
-                    // 此处的作用只是为了方便显示和计算，并不会影响实际判定。
-                    SetSpecialDifficultyRange(new[] { coolRange, coolRange, goodRange, goodRange, badRange, badRange });
-
                     // 这里是真正影响判定的BPM设定
                     O2HitModeExtension.NowBeatmapBPM = bpm;
                     O2HitModeExtension.PillCount.Value = 0;
                     O2HitModeExtension.CoolCombo = 0;
                     O2HitModeExtension.PillActivated = true;
+
+                    SetSpecialDifficultyRange(customHelper.GetHitWindowsO2Jam(bpm));
                     break;
 
                 case EzMUGHitMode.EZ2AC:
-                    SetSpecialDifficultyRange(new[] { 18.0, 38.0, 68.0, 88.0, 88.0, 100.0 });
+                    SetSpecialDifficultyRange(customHelper.GetHitWindowsEZ2AC());
                     break;
 
                 case EzMUGHitMode.IIDX:
-                    SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 70.0, 80.0, 100.0 });
+                    SetSpecialDifficultyRange(customHelper.GetHitWindowsIIDX());
                     break;
 
                 case EzMUGHitMode.Melody:
-                    SetSpecialDifficultyRange(new[] { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 });
+                    SetSpecialDifficultyRange(customHelper.GetHitWindowsMelody());
                     break;
 
                 default:
@@ -235,30 +231,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             if (customHitWindows)
             {
-                if (ClassicModActive)
-                {
-                    double invertedOd = Math.Clamp(10 - overallDifficulty, 0, 10);
-
-                    perfect = Math.Floor(16 * totalMultiplier) + 0.5;
-                    great = Math.Floor((34 + 3 * invertedOd) * totalMultiplier) + 0.5;
-                    good = Math.Floor((67 + 3 * invertedOd) * totalMultiplier) + 0.5;
-                    ok = Math.Floor((97 + 3 * invertedOd) * totalMultiplier) + 0.5;
-                    meh = Math.Floor((121 + 3 * invertedOd) * totalMultiplier) + 0.5;
-                    miss = Math.Floor((158 + 3 * invertedOd) * totalMultiplier) + 0.5;
-                }
-                else
-                {
-                    perfect = PerfectRange * totalMultiplier;
-                    great = GreatRange * totalMultiplier;
-                    good = GoodRange * totalMultiplier;
-                    ok = OkRange * totalMultiplier;
-                    meh = MehRange * totalMultiplier;
-                    miss = MissRange * totalMultiplier;
-                    return;
-                }
+                perfect = PerfectRange;
+                great = GreatRange;
+                good = GoodRange;
+                ok = OkRange;
+                meh = MehRange;
+                miss = MissRange;
             }
-
-            if (ClassicModActive && !ScoreV2Active)
+            else if (ClassicModActive && !ScoreV2Active)
             {
                 if (IsConvert)
                 {

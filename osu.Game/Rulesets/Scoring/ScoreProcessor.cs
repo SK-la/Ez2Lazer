@@ -205,18 +205,20 @@ namespace osu.Game.Rulesets.Scoring
 
         public bool ApplyNewJudgementsWhenFailed { get; set; }
 
-        protected double ClassicBaseScore { get; set; }
-        protected double ClassicMaxBaseScore { get; set; }
+        public double ClassicBaseScore { get; protected set; }
+        public double ClassicMaxBaseScore { get; protected set; }
 
-        public virtual bool IsLegacyScore { get; set; }
-
-        protected virtual void ApplyScoreChangeClassic(JudgementResult result)
+        public bool IsLegacyScore
         {
+            get => isLegacyScore;
+            set
+            {
+                isLegacyScore = value;
+                updateScore();
+            }
         }
 
-        protected virtual void RemoveScoreChangeClassic(JudgementResult result)
-        {
-        }
+        private bool isLegacyScore;
 
         private static double accS;
 
@@ -272,8 +274,6 @@ namespace osu.Game.Rulesets.Scoring
                 else if (result.Type.BreaksCombo() || !isComboHit)
                     Combo.Value = 0;
             }
-
-            ApplyScoreChangeClassic(result);
 
             HighestCombo.Value = Math.Max(HighestCombo.Value, Combo.Value);
 
@@ -348,8 +348,6 @@ namespace osu.Game.Rulesets.Scoring
 
             RemoveScoreChange(result);
 
-            RemoveScoreChangeClassic(result);
-
             Debug.Assert(hitEvents.Count > 0);
             lastHitObject = hitEvents[^1].LastHitObject;
             hitEvents.RemoveAt(hitEvents.Count - 1);
@@ -414,12 +412,15 @@ namespace osu.Game.Rulesets.Scoring
         {
         }
 
+        public void UpdateScoreClassic()
+        {
+            updateScore();
+        }
+
         private void updateScore()
         {
-            Accuracy.Value = currentMaximumBaseScore > 0 ? currentBaseScore / currentMaximumBaseScore : 1;
-
             AccuracyClassic.Value = ClassicMaxBaseScore > 0 ? ClassicBaseScore / ClassicMaxBaseScore : 1;
-
+            Accuracy.Value = currentMaximumBaseScore > 0 ? currentBaseScore / currentMaximumBaseScore : 1;
             MinimumAccuracy.Value = maximumBaseScore > 0 ? currentBaseScore / maximumBaseScore : 0;
             MaximumAccuracy.Value = maximumBaseScore > 0 ? (currentBaseScore + (maximumBaseScore - currentMaximumBaseScore)) / maximumBaseScore : 1;
 
@@ -483,6 +484,7 @@ namespace osu.Game.Rulesets.Scoring
 
             ClassicBaseScore = 0;
             ClassicMaxBaseScore = 0;
+            AccuracyClassic.Value = 1;
 
             currentBaseScore = 0;
             currentMaximumBaseScore = 0;

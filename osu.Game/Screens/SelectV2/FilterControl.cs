@@ -265,19 +265,13 @@ namespace osu.Game.Screens.SelectV2
             {
                 updateCriteria();
 
-                if (ruleset.Value.OnlineID == 2)
+                if (ruleset.Value.OnlineID == 1) // Taiko
                 {
                     csSelector.Hide();
-                    xxySrFilterButton.Hide();
                 }
                 else
                 {
                     csSelector.Show();
-
-                    if (ruleset.Value.OnlineID == 3)
-                    {
-                        xxySrFilterButton.Show();
-                    }
                 }
             });
             mods.BindValueChanged(m =>

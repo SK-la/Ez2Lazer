@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestEmptyScore()
         {
-            EzHitEventHeatmapGraph graph = null;
+            EzManiaScoreGraph graph = null;
 
             AddStep("Create graph with empty score", () =>
             {
@@ -61,7 +61,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                     Mods = Array.Empty<Mod>()
                 };
 
-                Child = graph = new EzHitEventHeatmapGraph(emptyScore, testBeatmap)
+                Child = graph = new EzManiaScoreGraph(emptyScore, testBeatmap)
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
@@ -76,13 +76,13 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestPerfectScore()
         {
-            EzHitEventHeatmapGraph graph = null;
+            EzManiaScoreGraph graph = null;
 
             AddStep("Create graph with perfect score", () =>
             {
                 var perfectScore = createPerfectScore(testBeatmap);
 
-                Child = graph = new EzHitEventHeatmapGraph(perfectScore, testBeatmap)
+                Child = graph = new EzManiaScoreGraph(perfectScore, testBeatmap)
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
@@ -98,11 +98,11 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestMixedResults()
         {
-            EzHitEventHeatmapGraph graph = null;
+            EzManiaScoreGraph graph = null;
 
             AddStep("Create graph with test score", () =>
             {
-                Child = graph = new EzHitEventHeatmapGraph(testScore, testBeatmap)
+                Child = graph = new EzManiaScoreGraph(testScore, testBeatmap)
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
@@ -343,7 +343,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                 Ruleset = beatmap.BeatmapInfo.Ruleset,
                 HitEvents = hitEvents,
                 Accuracy = accuracy,
-                TotalScore = 950000,
+                TotalScore = 424000,
                 MaxCombo = hitEvents.Count,
                 Mods = Array.Empty<Mod>()
             };

@@ -21,5 +21,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         [Description("O2JAM Style")]
         O2Jam,
+
+        [Description("Classic Style(NoAction)")]
+        Classic,
     }
 }
