@@ -21,18 +21,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private double speedMultiplier = 1;
 
-        private bool updateCustomHitWindows;
-
-        public bool CustomHitWindows
-        {
-            get => updateCustomHitWindows;
-            set
-            {
-                updateCustomHitWindows = value;
-                updateWindows();
-            }
-        }
-
         public static double PerfectRange;
         public static double GreatRange;
         public static double GoodRange;
@@ -117,6 +105,18 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
+        private bool customHitWindows;
+
+        public bool CustomHitWindows
+        {
+            get => customHitWindows;
+            set
+            {
+                customHitWindows = value;
+                updateWindows();
+            }
+        }
+
         private double perfect;
         private double great;
         private double good;
@@ -155,7 +155,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public void SetSpecialDifficultyRange(double perfect, double great, double good, double ok, double meh, double miss)
         {
-            updateCustomHitWindows = true;
+            if (!customHitWindows) return;
+
             PerfectRange = perfect;
             GreatRange = great;
             GoodRange = good;
@@ -167,7 +168,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public void SetSpecialDifficultyRange(double[] difficultyRangeArray)
         {
-            updateCustomHitWindows = true;
+            if (!customHitWindows) return;
+
             PerfectRange = difficultyRangeArray[0];
             GreatRange = difficultyRangeArray[1];
             GoodRange = difficultyRangeArray[2];
@@ -179,7 +181,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public void ResetRange()
         {
-            updateCustomHitWindows = false;
+            customHitWindows = false;
             updateWindows();
         }
 
@@ -231,21 +233,29 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void updateWindows()
         {
-            if (updateCustomHitWindows)
+            if (customHitWindows)
             {
-                //perfect = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, PerfectRange) * totalMultiplier);
-                //great = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, GreatRange) * totalMultiplier);
-                //good = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, GoodRange) * totalMultiplier);
-                //ok = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, OkRange) * totalMultiplier);
-                //meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MehRange) * totalMultiplier);
-                //miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, MissRange) * totalMultiplier);
-                perfect = PerfectRange * totalMultiplier;
-                great = GreatRange * totalMultiplier;
-                good = GoodRange * totalMultiplier;
-                ok = OkRange * totalMultiplier;
-                meh = MehRange * totalMultiplier;
-                miss = MissRange * totalMultiplier;
-                return;
+                if (ClassicModActive)
+                {
+                    double invertedOd = Math.Clamp(10 - overallDifficulty, 0, 10);
+
+                    perfect = Math.Floor(16 * totalMultiplier) + 0.5;
+                    great = Math.Floor((34 + 3 * invertedOd) * totalMultiplier) + 0.5;
+                    good = Math.Floor((67 + 3 * invertedOd) * totalMultiplier) + 0.5;
+                    ok = Math.Floor((97 + 3 * invertedOd) * totalMultiplier) + 0.5;
+                    meh = Math.Floor((121 + 3 * invertedOd) * totalMultiplier) + 0.5;
+                    miss = Math.Floor((158 + 3 * invertedOd) * totalMultiplier) + 0.5;
+                }
+                else
+                {
+                    perfect = PerfectRange * totalMultiplier;
+                    great = GreatRange * totalMultiplier;
+                    good = GoodRange * totalMultiplier;
+                    ok = OkRange * totalMultiplier;
+                    meh = MehRange * totalMultiplier;
+                    miss = MissRange * totalMultiplier;
+                    return;
+                }
             }
 
             if (ClassicModActive && !ScoreV2Active)

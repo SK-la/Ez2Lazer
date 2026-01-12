@@ -45,7 +45,8 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         // v5: 删除scratchText存储，改为动态计算。数据库可兼容，不升版。
         public const int ANALYSIS_VERSION = 5;
 
-        private static readonly string[] ALLOWED_COLUMNS = {
+        private static readonly string[] allowed_columns =
+        {
             "beatmap_id",
             "beatmap_hash",
             "beatmap_md5",
@@ -189,10 +190,10 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
             }
         }
 
-        public bool TryGet(BeatmapInfo beatmap, bool requireXxySr, out ManiaBeatmapAnalysisResult result, out bool missingRequiredXxySr)
+        public bool TryGet(BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
         {
             result = ManiaBeatmapAnalysisDefaults.EMPTY;
-            missingRequiredXxySr = false;
+            // missingRequiredXxySr = false;
 
             if (!Enabled)
                 return false;
@@ -280,7 +281,7 @@ LIMIT 1;
                         mutated = true;
                     }
 
-                    if (mutated || storedVersion < ANALYSIS_VERSION)
+                    if (mutated)
                     {
                         // Persist the upgraded row (without recomputing analysis).
                         writeUpgradedRow(connection, beatmap, averageKps, maxKps, kpsList, xxySr, columnCounts, holdNoteCounts);
@@ -300,7 +301,7 @@ LIMIT 1;
                     computedScratchText,
                     xxySr);
 
-                missingRequiredXxySr = requireXxySr && xxySr == null;
+                // missingRequiredXxySr = requireXxySr && xxySr == null;
 
                 return true;
             }
@@ -601,7 +602,7 @@ SET beatmap_md5 = $md5,
 WHERE beatmap_id = $id;
 ";
             update.Parameters.AddWithValue("$id", beatmap.ID.ToString());
-            update.Parameters.AddWithValue("$md5", beatmap.MD5Hash ?? string.Empty);
+            update.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
             update.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
             update.Parameters.AddWithValue("$kps_list_json", kpsListJson);
             update.Parameters.AddWithValue("$xxy_sr", xxySr is null ? DBNull.Value : xxySr.Value);
@@ -614,7 +615,7 @@ WHERE beatmap_id = $id;
         private void cleanupUnrecognizedColumns(SqliteConnection connection)
         {
             var existingColumns = getTableColumns(connection, "mania_analysis");
-            var unrecognizedColumns = existingColumns.Where(c => !ALLOWED_COLUMNS.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
+            var unrecognizedColumns = existingColumns.Where(c => !allowed_columns.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
 
             if (unrecognizedColumns.Count == 0)
                 return;
@@ -632,10 +633,12 @@ WHERE beatmap_id = $id;
             cmd.CommandText = $"PRAGMA table_info({tableName});";
 
             using var reader = cmd.ExecuteReader();
+
             while (reader.Read())
             {
                 columns.Add(reader.GetString(1)); // name
             }
+
             return columns;
         }
 

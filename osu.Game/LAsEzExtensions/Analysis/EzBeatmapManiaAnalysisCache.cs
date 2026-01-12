@@ -36,10 +36,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
     /// - 统一监听当前 ruleset/mods 及 mod 设置变化，批量更新所有已追踪的 bindable。
     /// - 缓存 key 包含 mod 设置（依赖 mod 的相等性/哈希语义），避免“切/调 mod 不重算”。
     /// </summary>
-    public partial class EzBeatmapManiaAnalysisCache : MemoryCachingComponent<EzBeatmapManiaAnalysisCache.ManiaAnalysisCacheLookup, ManiaBeatmapAnalysisResult?>
+    public partial class EzBeatmapManiaAnalysisCache : MemoryCachingComponent<ManiaAnalysisCacheLookup, ManiaBeatmapAnalysisResult?>
     {
-        private static int mod_snapshot_fail_count;
-        private static int compute_fail_count;
+        private static int computeFailCount;
 
         // (Removed runtime instrumentation counters)
         // 太多同时更新会导致卡顿；官方 star cache 使用 1 线程，但我们可以尝试略微提高并发以加快可见项响应。
@@ -70,7 +69,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         [Resolved]
         private EzManiaAnalysisPersistentStore persistentStore { get; set; } = null!;
 
-        [Resolved]
+        [Resolved(CanBeNull = true)]
         private Bindable<RulesetInfo> currentRuleset { get; set; } = null!;
 
         [Resolved]
@@ -180,10 +179,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                             persistenceReadGate.Wait(cancellationToken);
                             gateAcquired = true;
 
-                            if (persistentStore.TryGet(lookup.BeatmapInfo, requireXxySr: lookup.RequireXxySr, out var persisted, out bool missingRequiredXxy))
+                            if (persistentStore.TryGet(lookup.BeatmapInfo, out _))
                             {
-                                if (!missingRequiredXxy)
-                                    persistedExists = true;
+                                // xxysr 补算机制已禁用，直接返回持久化结果
+                                persistedExists = true;
                             }
                         }
                         catch (OperationCanceledException)
@@ -302,13 +301,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
             // Important: the computation itself should not be cancelled by any single requester.
             // Panels get recycled and cancel their tokens aggressively (eg. when off-screen), but we still
             // want shared computations to complete so results can be reused.
-            var existing = inflightComputations.GetOrAdd(lookup, _lookupKey =>
+            var existing = inflightComputations.GetOrAdd(lookup, lookupKey =>
             {
                 var task = computeValueInternalCore(lookup, CancellationToken.None);
 
                 // Remove the entry when the task completes (best-effort), but only if the value matches.
                 task.ContinueWith(
-                    _completedTask => inflightComputations.TryRemove(new KeyValuePair<ManiaAnalysisCacheLookup, Task<ManiaBeatmapAnalysisResult?>>(lookup, task)),
+                    completedTask => inflightComputations.TryRemove(new KeyValuePair<ManiaAnalysisCacheLookup, Task<ManiaBeatmapAnalysisResult?>>(lookup, task)),
                     CancellationToken.None,
                     TaskContinuationOptions.ExecuteSynchronously,
                     TaskScheduler.Default);
@@ -348,10 +347,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                         var persistedResult = await Task.Run<ManiaBeatmapAnalysisResult?>(() =>
                         {
-                            if (persistentStore.TryGet(lookup.BeatmapInfo, requireXxySr: lookup.RequireXxySr, out var persisted, out bool missingRequiredXxy))
+                            if (persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                             {
-                                if (!missingRequiredXxy)
-                                    return persisted;
+                                // xxysr 补算机制已禁用，直接返回持久化结果
+                                return persisted;
                             }
 
                             return null;
@@ -380,10 +379,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     {
                         var persistedResult = await Task.Run<ManiaBeatmapAnalysisResult?>(() =>
                         {
-                            if (persistentStore.TryGet(lookup.BeatmapInfo, requireXxySr: lookup.RequireXxySr, out var persisted, out bool missingRequiredXxy))
+                            if (persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                             {
-                                if (!missingRequiredXxy)
-                                    return persisted;
+                                // xxysr 补算机制已禁用，直接返回持久化结果
+                                return persisted;
                             }
 
                             return null;
@@ -433,37 +432,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     return null;
 
                 // Persistent fast-path for no-mod baseline.
-                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, requireXxySr: lookup.RequireXxySr, out var persisted, out bool missingRequiredXxy))
+                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                 {
                     persistHit = true;
-                    if (!missingRequiredXxy)
-                        return persisted;
-
-                    // Baseline exists but xxy is missing -> compute xxy and patch.
-                    var rulesetInstanceForXxy = lookup.Ruleset.CreateInstance();
-                    if (!(rulesetInstanceForXxy is ILegacyRuleset))
-                        return persisted;
-
-                    PlayableCachedWorkingBeatmap workingBeatmapForXxy = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
-                    var playableBeatmapForXxy = workingBeatmapForXxy.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
-
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    double? xxySrPatched = null;
-                    if (playableBeatmapForXxy.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmapForXxy, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
-                        xxySrPatched = sr;
-
-                    var patched = new ManiaBeatmapAnalysisResult(
-                        persisted.AverageKps,
-                        persisted.MaxKps,
-                        persisted.KpsList,
-                        persisted.ColumnCounts,
-                        persisted.HoldNoteCounts,
-                        persisted.ScratchText,
-                        xxySrPatched);
-
-                    persistentStore.Store(lookup.BeatmapInfo, patched);
-                    return patched;
+                    // xxysr 补算机制已禁用：缓存中任意参数丢失都算缓存未命中要重算。
+                    // 直接返回已持久化的结果，无需补算。
+                    return persisted;
                 }
 
                 var rulesetInstance = lookup.Ruleset.CreateInstance();
@@ -511,13 +485,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                         kpsList[i] *= rate;
                 }
 
+                // xxysr 补算机制已禁用，总是返回 null。
                 double? xxySr = null;
-
-                if (lookup.RequireXxySr)
-                {
-                    if (playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
-                        xxySr = sr;
-                }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -547,7 +516,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
             catch (Exception ex)
             {
-                if (Interlocked.Increment(ref compute_fail_count) <= 10)
+                if (Interlocked.Increment(ref computeFailCount) <= 10)
                 {
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
                     Logger.Error(ex, $"[EzBeatmapManiaAnalysisCache] computeAnalysis failed. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}");
@@ -597,6 +566,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private void updateTrackedBindables()
         {
+            if (currentRuleset.Value == null)
+                return;
+
             lock (bindableUpdateLock)
             {
                 cancelTrackedBindableUpdate();
@@ -691,140 +663,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             highPriorityScheduler.Dispose();
             lowPriorityScheduler.Dispose();
             highPriorityIdleEvent.Dispose();
-        }
-
-        public readonly struct ManiaAnalysisCacheLookup : IEquatable<ManiaAnalysisCacheLookup>
-        {
-            public readonly BeatmapInfo BeatmapInfo;
-            public readonly RulesetInfo Ruleset;
-            public readonly Mod[] OrderedMods;
-            public readonly bool RequireXxySr;
-            public readonly int ModsSignature;
-
-            public ManiaAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IEnumerable<Mod>? mods, bool requireXxySr)
-            {
-                BeatmapInfo = beatmapInfo;
-                Ruleset = ruleset;
-                // IMPORTANT: mod application order matters for beatmap conversion.
-                // WorkingBeatmap.GetPlayableBeatmap() applies mods in the order provided.
-                // Do not reorder here (eg. by Acronym), otherwise analysis may run on a different
-                // playable beatmap than gameplay, which can cause incorrect results or crashes.
-                OrderedMods = createModSnapshot(mods);
-                // IMPORTANT: some custom mods (notably many YuLiangSSS mods) lazily assign a random seed during ApplyToBeatmap
-                // (eg. Seed.Value ??= RNG.Next()). Because our cache key includes mod settings, such mutation would change
-                // Mod.GetHashCode()/Equals() during computation and corrupt dictionary usage.
-                // Pre-fill missing seeds deterministically on the cloned snapshot to keep cache keys stable.
-                initialiseDeterministicSeedsIfRequired(OrderedMods, beatmapInfo);
-                ModsSignature = computeModsSignature(OrderedMods);
-                RequireXxySr = requireXxySr;
-            }
-
-            private static int computeModsSignature(Mod[] orderedMods)
-            {
-                unchecked
-                {
-                    var hash = new HashCode();
-
-                    // Include order. Order matters for conversion & gameplay.
-                    for (int i = 0; i < orderedMods.Length; i++)
-                    {
-                        var mod = orderedMods[i];
-                        hash.Add(mod.GetType());
-
-                        // Mirror Mod.GetHashCode() semantics but decouple from mod instance mutation after signature is computed.
-                        // Only settings exposed via [SettingSource] are included.
-                        foreach (var setting in mod.SettingsBindables)
-                            hash.Add(setting.GetUnderlyingSettingValue());
-                    }
-
-                    return hash.ToHashCode();
-                }
-            }
-
-            private static void initialiseDeterministicSeedsIfRequired(Mod[] orderedMods, BeatmapInfo beatmapInfo)
-            {
-                if (orderedMods.Length == 0)
-                    return;
-
-                unchecked
-                {
-                    // Base seed derived from beatmap identity.
-                    int baseSeed = 17;
-                    baseSeed = baseSeed * 31 + beatmapInfo.ID.GetHashCode();
-                    baseSeed = baseSeed * 31 + (beatmapInfo.Hash?.GetHashCode(StringComparison.Ordinal) ?? 0);
-
-                    for (int i = 0; i < orderedMods.Length; i++)
-                    {
-                        if (orderedMods[i] is not IHasSeed hasSeed)
-                            continue;
-
-                        if (hasSeed.Seed.Value != null)
-                            continue;
-
-                        // Mix in the mod type to avoid all seeded mods sharing the same seed.
-                        int seed = baseSeed;
-                        seed = seed * 31 + orderedMods[i].GetType().FullName!.GetHashCode(StringComparison.Ordinal);
-                        seed = seed * 31 + i;
-
-                        // Ensure non-null.
-                        if (seed == 0)
-                            seed = 1;
-
-                        hasSeed.Seed.Value = seed;
-                    }
-                }
-            }
-
-            private static Mod[] createModSnapshot(IEnumerable<Mod>? mods)
-            {
-                if (mods == null)
-                    return Array.Empty<Mod>();
-
-                var list = new List<Mod>();
-
-                foreach (var mod in mods)
-                {
-                    if (mod == null)
-                        continue;
-
-                    try
-                    {
-                        list.Add(mod.DeepClone());
-                    }
-                    catch
-                    {
-                        // If cloning fails, fall back to using the original instance.
-                        // This is not ideal for caching, but is better than breaking analysis entirely.
-                        if (Interlocked.Increment(ref mod_snapshot_fail_count) <= 10)
-                            Logger.Log($"[EzBeatmapManiaAnalysisCache] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.", LoggingTarget.Runtime, LogLevel.Important);
-
-                        list.Add(mod);
-                    }
-                }
-
-                return list.ToArray();
-            }
-
-            public bool Equals(ManiaAnalysisCacheLookup other) => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
-                                                                  && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
-                                                                  && Ruleset.Equals(other.Ruleset)
-                                                                  && RequireXxySr == other.RequireXxySr
-                                                                  && ModsSignature == other.ModsSignature;
-
-            public override int GetHashCode()
-            {
-                var hashCode = new HashCode();
-
-                hashCode.Add(BeatmapInfo.ID);
-                hashCode.Add(BeatmapInfo.Hash);
-                hashCode.Add(Ruleset.ShortName);
-                hashCode.Add(RequireXxySr);
-
-                // Use precomputed signature rather than mod instances to avoid key mutation during analysis.
-                hashCode.Add(ModsSignature);
-
-                return hashCode.ToHashCode();
-            }
         }
 
         private class BindableManiaBeatmapAnalysis : Bindable<ManiaBeatmapAnalysisResult>

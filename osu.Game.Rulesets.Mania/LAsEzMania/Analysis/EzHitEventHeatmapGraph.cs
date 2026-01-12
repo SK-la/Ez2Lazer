@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Graphics;
@@ -33,17 +34,16 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
         private readonly ScoreInfo score;
         private readonly IBeatmap playableBeatmap;
 
-        private double binSize;
-        private double drainRate;
-        private double overallDifficulty;
+        private readonly double drainRate;
+        private readonly double overallDifficulty;
 
-        private int currentOffset = 0;
-
+        private const int current_offset = 0;
         private const int time_bins = 50; // 时间分段数
         private const float circle_size = 5f; // 圆形大小
         private float leftMarginConst { get; set; } = 158; // 左侧预留空间
         private float rightMarginConst { get; set; } = 7; // 右侧预留空间
 
+        private double binSize;
         private double maxTime;
         private double minTime;
         private double timeRange;
@@ -90,39 +90,42 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
         private (double accuracy, long score, Dictionary<HitResult, int> counts) calculateV1Accuracy()
         {
-            // var maniaHitWindows = new ManiaHitWindows
-            // {
-            //     CustomHitWindows = false,
-            //     ClassicModActive = true,
-            //     IsConvert = false,
-            //     ScoreV2Active = false,
-            //     SpeedMultiplier = hitWindows.SpeedMultiplier,
-            //     DifficultyMultiplier = hitWindows.DifficultyMultiplier
-            // };
-            //
-            // double PerfectRange = maniaHitWindows.WindowFor(HitResult.Perfect);
-            // double GreatRange = maniaHitWindows.WindowFor(HitResult.Great);
-            // double GoodRange = maniaHitWindows.WindowFor(HitResult.Good);
-            // double OkRange = maniaHitWindows.WindowFor(HitResult.Ok);
-            // double MehRange = maniaHitWindows.WindowFor(HitResult.Meh);
-            // double MissRange = maniaHitWindows.WindowFor(HitResult.Miss);
+            var maniaHitWindows = new ManiaHitWindows
+            {
+                CustomHitWindows = false,
+                ClassicModActive = true,
+                IsConvert = false,
+                ScoreV2Active = false,
+                SpeedMultiplier = hitWindows.SpeedMultiplier,
+                DifficultyMultiplier = hitWindows.DifficultyMultiplier
+            };
 
-            // Logger.Log($"[EzHitEventHeatmapGraph] V1 HitWindows: P{PerfectRange} G{GreatRange} Go{GoodRange} O{OkRange} M{MehRange} Mi{MissRange}");
+            maniaHitWindows.ResetRange();
+            maniaHitWindows.SetDifficulty(overallDifficulty);
+
+            double PerfectRange = maniaHitWindows.WindowFor(HitResult.Perfect);
+            double GreatRange = maniaHitWindows.WindowFor(HitResult.Great);
+            double GoodRange = maniaHitWindows.WindowFor(HitResult.Good);
+            double OkRange = maniaHitWindows.WindowFor(HitResult.Ok);
+            double MehRange = maniaHitWindows.WindowFor(HitResult.Meh);
+            double MissRange = maniaHitWindows.WindowFor(HitResult.Miss);
+
+            Logger.Log($"[EzHitEventHeatmapGraph] V1 HitWindows: P{PerfectRange} G{GreatRange} Go{GoodRange} O{OkRange} M{MehRange} Mi{MissRange}");
 
             double[] HeadOffsets = new double[18];
             double MaxPoints = 0;
             double TotalPoints = 0;
 
-            double TotalMultiplier = hitWindows.SpeedMultiplier / hitWindows.DifficultyMultiplier;
-
-            double invertedOd = 10 - overallDifficulty;
-
-            double PerfectRange = Math.Floor(16 * TotalMultiplier) + 0;
-            double GreatRange = Math.Floor((34 + 3 * invertedOd)) * TotalMultiplier + 0;
-            double GoodRange = Math.Floor((67 + 3 * invertedOd)) * TotalMultiplier + 0;
-            double OkRange = Math.Floor((97 + 3 * invertedOd)) * TotalMultiplier + 0;
-            double MehRange = Math.Floor((121 + 3 * invertedOd)) * TotalMultiplier + 0;
-            double MissRange = Math.Floor((158 + 3 * invertedOd)) * TotalMultiplier + 0;
+            // double TotalMultiplier = hitWindows.SpeedMultiplier / hitWindows.DifficultyMultiplier;
+            //
+            // double invertedOd = 10 - overallDifficulty;
+            //
+            // double PerfectRange = Math.Floor(16 * TotalMultiplier) + 0;
+            // double GreatRange = Math.Floor((34 + 3 * invertedOd)) * TotalMultiplier + 0;
+            // double GoodRange = Math.Floor((67 + 3 * invertedOd)) * TotalMultiplier + 0;
+            // double OkRange = Math.Floor((97 + 3 * invertedOd)) * TotalMultiplier + 0;
+            // double MehRange = Math.Floor((121 + 3 * invertedOd)) * TotalMultiplier + 0;
+            // double MissRange = Math.Floor((158 + 3 * invertedOd)) * TotalMultiplier + 0;
 
             HitResult getResultByOffset(double offset) =>
                 offset < PerfectRange ? HitResult.Perfect :
@@ -163,6 +166,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             {
                 double offset = Math.Abs(hit.TimeOffset);
                 var result = getResultByOffset(offset);
+
+                HitResult hitResult = maniaHitWindows.ResultFor(offset);
+
                 v1Counts[result] = v1Counts.GetValueOrDefault(result, 0) + 1;
                 var hitObject = (ManiaHitObject)hit.HitObject;
 
@@ -484,7 +490,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             {
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0; // 计算 x 轴位置
-                float yPosition = (float)(e.TimeOffset + currentOffset);
+                float yPosition = (float)(e.TimeOffset + current_offset);
 
                 AddInternal(new Circle
                 {
@@ -569,7 +575,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 Width = relativeWidth,
                 Alpha = 0.1f,
                 Colour = colours.ForHitResult(result),
-                Y = (float)(boundary + currentOffset),
+                Y = (float)(boundary + current_offset),
             });
 
             AddInternal(new OsuSpriteText
@@ -580,7 +586,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 Font = OsuFont.GetFont(size: 12),
                 Colour = Color4.White,
                 X = leftMarginConst - 25,
-                Y = (float)(boundary + currentOffset),
+                Y = (float)(boundary + current_offset),
             });
         }
     }
