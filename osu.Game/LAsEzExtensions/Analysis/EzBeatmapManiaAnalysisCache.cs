@@ -165,7 +165,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     highPriorityIdleEvent.Wait(cancellationToken);
 
                     // No mods: only baseline is persisted.
-                    var lookup = new ManiaAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null, requireXxySr: false);
+                    var lookup = new ManiaAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null);
 
                     // First, gate and probe the persistent store to avoid flooding readers.
                     bool persistedExists = false;
@@ -224,7 +224,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, lowPriorityScheduler);
         }
 
-        public IBindable<ManiaBeatmapAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0, bool requireXxySr = false)
+        public IBindable<ManiaBeatmapAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
 
@@ -236,7 +236,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (localBeatmapInfo == null)
                 return bindable;
 
-            updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay, requireXxySr);
+            updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay);
 
             lock (bindableUpdateLock)
                 trackedBindables.Add(bindable);
@@ -248,8 +248,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                                                   IRulesetInfo? rulesetInfo = null,
                                                                   IEnumerable<Mod>? mods = null,
                                                                   CancellationToken cancellationToken = default,
-                                                                  int computationDelay = 0,
-                                                                  bool requireXxySr = false)
+                                                                  int computationDelay = 0)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
             var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
@@ -257,7 +256,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (localBeatmapInfo == null || localRulesetInfo == null)
                 return Task.FromResult<ManiaBeatmapAnalysisResult?>(null);
 
-            var lookup = new ManiaAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods, requireXxySr);
+            // Use the original constructor that handles mod cloning and signature computation
+            var lookup = new ManiaAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
 
             return getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay);
         }
@@ -482,10 +482,14 @@ namespace osu.Game.LAsEzExtensions.Analysis
                         kpsList[i] *= rate;
                 }
 
-                // Only calculate xxySr for mania mode (OnlineID == 3)
+                // Calculate xxySr for mania mode:
+                // - With mods: always calculate (since mod combos aren't persisted)
+                // - No mods: rely on persisted value (already returned via fast-path above)
                 double? xxySr = null;
 
-                if (lookup.Ruleset.OnlineID == 3 && playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
+                bool shouldCalculateXxy = lookup.Ruleset.OnlineID == 3 && lookup.OrderedMods.Length > 0;
+                
+                if (shouldCalculateXxy && playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
                     xxySr = sr;
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -598,7 +602,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(trackedUpdateCancellationSource.Token, b.CancellationToken);
                     linkedCancellationSources.Add(linkedSource);
 
-                    updateBindable(b, localBeatmapInfo, currentRuleset.Value, currentMods.Value, linkedSource.Token, requireXxySr: false);
+                    updateBindable(b, localBeatmapInfo, currentRuleset.Value, currentMods.Value, linkedSource.Token);
                 }
             }
         }
@@ -622,8 +626,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                     IRulesetInfo? rulesetInfo,
                                     IEnumerable<Mod>? mods,
                                     CancellationToken cancellationToken = default,
-                                    int computationDelay = 0,
-                                    bool requireXxySr = false)
+                                    int computationDelay = 0)
         {
             // If the bindable is already cancelled, do nothing.
             if (cancellationToken.IsCancellationRequested)
@@ -636,7 +639,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 try
                 {
-                    var analysis = await GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, cancellationToken, computationDelay, requireXxySr).ConfigureAwait(false);
+                    var analysis = await GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, cancellationToken, computationDelay).ConfigureAwait(false);
                     if (analysis == null)
                         return;
 

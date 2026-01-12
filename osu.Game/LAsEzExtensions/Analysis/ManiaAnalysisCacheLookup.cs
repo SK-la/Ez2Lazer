@@ -19,11 +19,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
         public readonly Mod[] OrderedMods;
         public readonly int ModsSignature;
 
-        // RequireXxySr 疑似会造成双重缓存，暂时禁用。
-        // public readonly bool RequireXxySr;
         private static int modSnapshotFailCount;
 
-        public ManiaAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IEnumerable<Mod>? mods, bool requireXxySr)
+        public ManiaAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IEnumerable<Mod>? mods)
         {
             BeatmapInfo = beatmapInfo;
             Ruleset = ruleset;
@@ -38,7 +36,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             // Pre-fill missing seeds deterministically on the cloned snapshot to keep cache keys stable.
             initialiseDeterministicSeedsIfRequired(OrderedMods, beatmapInfo);
             ModsSignature = computeModsSignature(OrderedMods);
-            // RequireXxySr = requireXxySr;
         }
 
         private static int computeModsSignature(Mod[] orderedMods)
@@ -127,7 +124,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
         public bool Equals(ManiaAnalysisCacheLookup other) => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
                                                               && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
                                                               && Ruleset.Equals(other.Ruleset)
-                                                              // && RequireXxySr == other.RequireXxySr
                                                               && ModsSignature == other.ModsSignature;
 
         public override int GetHashCode()
@@ -137,7 +133,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             hashCode.Add(BeatmapInfo.ID);
             hashCode.Add(BeatmapInfo.Hash);
             hashCode.Add(Ruleset.ShortName);
-            // hashCode.Add(RequireXxySr);
 
             // Use precomputed signature rather than mod instances to avoid key mutation during analysis.
             hashCode.Add(ModsSignature);

@@ -99,7 +99,6 @@ namespace osu.Game.Screens.SelectV2
 
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
-        private bool applyNextManiaUiUpdateImmediately;
         private string? cachedScratchText;
 
         private ScheduledDelegate? scheduledManiaUiUpdate;
@@ -278,22 +277,14 @@ namespace osu.Game.Screens.SelectV2
             ruleset.BindValueChanged(_ =>
             {
                 computeStarRating();
-                invalidateManiaAnalysisBinding();
-                applyNextManiaUiUpdateImmediately = true;
-
-                if (Item?.IsVisible == true)
-                    bindManiaAnalysis();
+                computeManiaAnalysis();
                 updateKeyCount();
             });
 
             mods.BindValueChanged(_ =>
             {
                 computeStarRating();
-                invalidateManiaAnalysisBinding();
-                applyNextManiaUiUpdateImmediately = true;
-
-                if (Item?.IsVisible == true)
-                    bindManiaAnalysis();
+                computeManiaAnalysis();
                 updateKeyCount();
             }, true);
 
@@ -326,9 +317,9 @@ namespace osu.Game.Screens.SelectV2
 
             cachedScratchText = null;
 
-            bindManiaAnalysis();
             resetManiaAnalysisDisplay();
             computeStarRating();
+            computeManiaAnalysis();
             updateKeyCount();
         }
 
@@ -342,88 +333,6 @@ namespace osu.Game.Screens.SelectV2
             return rulesetInstance.CreateIcon();
         }
 
-        private void bindManiaAnalysis()
-        {
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = null;
-
-            if (Item == null)
-                return;
-
-            // Request analysis for all rulesets to get KPS data.
-            // Non-mania rulesets will have xxysr == null (which is normal).
-            // Only mania mode (OnlineID == 3) will display mania-specific UI (xxysr, column counts, etc).
-
-            maniaAnalysisCancellationSource = new CancellationTokenSource();
-            var localCancellationSource = maniaAnalysisCancellationSource;
-
-            // Request baseline (no xxy) first so UI can update quickly from persisted data.
-            // Requesting `requireXxySr: true` would force a potentially expensive xxy calculation
-            // if the persisted entry is missing xxy, which causes visible delays. We instead
-            // request the heavy xxy calculation separately in the background (for mania only).
-            // var requestTime = System.DateTimeOffset.UtcNow;
-            // Logger.Log($"[PanelBeatmap] mania analysis requested for {beatmap.OnlineID}/{beatmap.ID} requireXxy=false at {requestTime:O}", LoggingTarget.Runtime, LogLevel.Debug);
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: 0, requireXxySr: false);
-            maniaAnalysisBindable.BindValueChanged(result =>
-            {
-                // var responseTime = System.DateTimeOffset.UtcNow;
-                // var latency = responseTime - requestTime;
-                // Logger.Log($"[PanelBeatmap] mania analysis response for {beatmap.OnlineID}/{beatmap.ID} latency={latency.TotalMilliseconds}ms xxy_present={(result.NewValue.XxySr != null)} kps_count={(result.NewValue.KpsList?.Count ?? 0)}", LoggingTarget.Runtime, LogLevel.Debug);
-                // 旧 bindable 的回调（比如切换 mods / 取消重绑）直接忽略。
-                if (localCancellationSource != maniaAnalysisCancellationSource)
-                    return;
-
-                // DrawablePool 回收/Item 变更期间可能仍收到旧 bindable 的回调。
-                // 这时 beatmap 属性会因为 Item 为 null 而抛出异常，因此直接忽略。
-                if (Item == null)
-                    return;
-
-                // The bindable starts with ManiaBeatmapAnalysisDefaults.EMPTY as a placeholder.
-                // Applying it would normalize to 0..N-1 and cause the per-column notes display to flicker to zero.
-                // Ignore this placeholder update and wait for a real computed/persisted result.
-                if (isPlaceholderAnalysisResult(result.NewValue))
-                    return;
-
-                if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
-                    cachedScratchText = result.NewValue.ScratchText;
-
-                queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
-
-                // Xxy may be null in baseline results. Only update display if present.
-                if (result.NewValue.XxySr != null)
-                    displayXxySR.Current.Value = result.NewValue.XxySr;
-
-                // If xxy is missing from the baseline, trigger an on-demand background request
-                // to compute and patch xxy without blocking the main UI updates.
-                if (result.NewValue.XxySr == null && maniaAnalysisCancellationSource != null && !maniaAnalysisCancellationSource.IsCancellationRequested)
-                {
-                    var token = maniaAnalysisCancellationSource.Token;
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var full = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods.Value, token, computationDelay: 0, requireXxySr: true).ConfigureAwait(false);
-
-                            if (full?.XxySr != null)
-                            {
-                                Schedule(() => displayXxySR.Current.Value = full.Value.XxySr);
-                            }
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // ignore
-                        }
-                        catch
-                        {
-                            // ignore failures; shouldn't block UI
-                        }
-                    }, token);
-                }
-
-                updateKeyCount();
-            }, true);
-        }
-
         private static bool isPlaceholderAnalysisResult(ManiaBeatmapAnalysisResult result)
             => result.AverageKps == 0
                && result.MaxKps == 0
@@ -435,16 +344,6 @@ namespace osu.Game.Screens.SelectV2
 
         private void queueManiaUiUpdate((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
-            if (applyNextManiaUiUpdateImmediately && Item?.IsVisible == true)
-            {
-                applyNextManiaUiUpdateImmediately = false;
-                scheduledManiaUiUpdate?.Cancel();
-                scheduledManiaUiUpdate = null;
-                hasPendingUiUpdate = false;
-                updateUI(result, columnCounts, holdNoteCounts);
-                return;
-            }
-
             pendingKpsResult = result;
             pendingColumnCounts = columnCounts;
             pendingHoldNoteCounts = holdNoteCounts;
@@ -463,19 +362,6 @@ namespace osu.Game.Screens.SelectV2
                 hasPendingUiUpdate = false;
                 updateUI(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
             }, mania_ui_update_throttle_ms, false);
-        }
-
-        private void invalidateManiaAnalysisBinding()
-        {
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = null;
-            maniaAnalysisBindable = null;
-
-            scheduledManiaUiUpdate?.Cancel();
-            scheduledManiaUiUpdate = null;
-            hasPendingUiUpdate = false;
-            pendingColumnCounts = null;
-            pendingHoldNoteCounts = null;
         }
 
         private void resetManiaAnalysisDisplay()
@@ -665,6 +551,37 @@ namespace osu.Game.Screens.SelectV2
             }, true);
         }
 
+        private void computeManiaAnalysis()
+        {
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = new CancellationTokenSource();
+
+            if (Item == null)
+                return;
+
+            // Reset UI to avoid showing stale data from previous beatmap
+            resetManiaAnalysisDisplay();
+
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            maniaAnalysisBindable.BindValueChanged(result =>
+            {
+                if (Item == null)
+                    return;
+
+                // Ignore placeholder results
+                if (isPlaceholderAnalysisResult(result.NewValue))
+                    return;
+
+                if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
+                    cachedScratchText = result.NewValue.ScratchText;
+
+                queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
+
+                if (result.NewValue.XxySr != null)
+                    displayXxySR.Current.Value = result.NewValue.XxySr;
+            }, true);
+        }
+
         protected override void Update()
         {
             base.Update();
@@ -680,12 +597,10 @@ namespace osu.Game.Screens.SelectV2
             }
             else
             {
-                // 重新可见时再触发一次绑定/计算。
-                if (maniaAnalysisCancellationSource == null && Item != null && ruleset.Value.OnlineID == 3)
+                // 重新可见时再触发一次计算
+                if (maniaAnalysisCancellationSource == null && Item != null)
                 {
-                    // 离屏期间取消分析后再次可见时，先清空旧值，避免短暂显示上一次谱面的结果。
-                    resetManiaAnalysisDisplay();
-                    bindManiaAnalysis();
+                    computeManiaAnalysis();
                 }
 
                 // 如果离屏期间收到过分析结果（或刚好在离屏时更新被跳过），这里补一次 UI 应用。

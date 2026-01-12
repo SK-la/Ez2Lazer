@@ -398,7 +398,7 @@ namespace osu.Game.Screens.SelectV2
             // Logger.Log($"[PanelBeatmapStandalone] mania analysis requested for {beatmap.OnlineID}/{beatmap.ID} requireXxy=false at {requestTime:O}", LoggingTarget.Runtime, LogLevel.Debug);
 
             // Request baseline first (avoid forcing expensive xxy compute on-visible).
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: 0, requireXxySr: false);
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: 0);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
                 // var responseTime = System.DateTimeOffset.UtcNow;
@@ -437,7 +437,7 @@ namespace osu.Game.Screens.SelectV2
                     {
                         try
                         {
-                            var full = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods.Value, token, computationDelay: 0, requireXxySr: true).ConfigureAwait(false);
+                            var full = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods.Value, token, computationDelay: 0).ConfigureAwait(false);
 
                             if (full?.XxySr != null)
                             {
