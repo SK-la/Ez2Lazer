@@ -8,21 +8,21 @@ namespace osu.Game.LAsEzExtensions.Configuration
     public enum EzMUGHitMode
     {
         [Description("Lazer Style")]
-        Lazer,
+        Lazer = 0,
 
         [Description("EZ2AC Style")]
-        EZ2AC,
+        EZ2AC = 1,
 
         [Description("Beatmania IIDX Style(NoAction)")]
-        IIDX,
-
-        [Description("Melody Style")]
-        Melody,
+        IIDX = 2,
 
         [Description("O2JAM Style")]
-        O2Jam,
+        O2Jam = 3,
+
+        [Description("Malody Style")]
+        Malody = 4,
 
         [Description("Classic Style(NoAction)")]
-        Classic,
+        Classic = 5,
     }
 }

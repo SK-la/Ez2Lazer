@@ -247,8 +247,8 @@ namespace osu.Game.Screens.Edit
                 return;
             }
 
-                transformSeekTo(seekDestination, transform_time, Easing.OutQuint);
-            }
+            transformSeekTo(seekDestination, transform_time, Easing.OutQuint);
+        }
 
         public void BindAdjustments() => track.Value?.BindAdjustments(AudioAdjustments);
 

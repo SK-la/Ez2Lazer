@@ -36,9 +36,6 @@ namespace osu.Game.LAsEzExtensions.Select
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
-        private OsuConfigManager config { get; set; } = null!;
-
-        [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
         public IBindable<string> Current => tabControl.Current;
@@ -184,9 +181,9 @@ namespace osu.Game.LAsEzExtensions.Select
             public bool IsMultiSelectMode { get; set; }
 
             public Action<HashSet<string>>? SetCurrentSelections;
-
-            [Resolved]
-            private OverlayColourProvider colourProvider { get; set; } = null!;
+            //
+            // [Resolved]
+            // private OverlayColourProvider colourProvider { get; set; } = null!;
 
             public ShearedCsModeTabControl()
             {
@@ -223,13 +220,12 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 Schedule(() =>
                 {
-                    int count =  keyModes.Count;
+                    int count = keyModes.Count;
 
                     if (count > 0)
                     {
                         float totalWidth = DrawWidth;
-                        float spacing = 2f;
-                        float itemWidth = (totalWidth - (count * spacing)) / count;
+                        float itemWidth = (totalWidth - (count * 2f)) / count;
                         foreach (var tab in TabContainer.Children.Cast<ShearedCsModeTabItem>())
                             tab.Width = itemWidth;
                     }

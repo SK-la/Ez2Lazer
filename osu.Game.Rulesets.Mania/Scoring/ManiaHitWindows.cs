@@ -13,7 +13,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public class ManiaHitWindows : HitWindows
     {
-        private readonly CustomHitWindowsHelper customHelper = new CustomHitWindowsHelper(GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer);
+        private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper(GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer);
         public static readonly DifficultyRange PERFECT_WINDOW_RANGE = new DifficultyRange(22.4D, 19.4D, 13.9D);
         private static readonly DifficultyRange great_window_range = new DifficultyRange(64, 49, 34);
         private static readonly DifficultyRange good_window_range = new DifficultyRange(97, 82, 67);
@@ -206,19 +206,19 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     O2HitModeExtension.CoolCombo = 0;
                     O2HitModeExtension.PillActivated = true;
 
-                    SetSpecialDifficultyRange(customHelper.GetHitWindowsO2Jam(bpm));
+                    SetSpecialDifficultyRange(custom_helper.GetHitWindowsO2Jam(bpm));
                     break;
 
                 case EzMUGHitMode.EZ2AC:
-                    SetSpecialDifficultyRange(customHelper.GetHitWindowsEZ2AC());
+                    SetSpecialDifficultyRange(custom_helper.GetHitWindowsEZ2AC());
                     break;
 
                 case EzMUGHitMode.IIDX:
-                    SetSpecialDifficultyRange(customHelper.GetHitWindowsIIDX());
+                    SetSpecialDifficultyRange(custom_helper.GetHitWindowsIIDX());
                     break;
 
-                case EzMUGHitMode.Melody:
-                    SetSpecialDifficultyRange(customHelper.GetHitWindowsMelody());
+                case EzMUGHitMode.Malody:
+                    SetSpecialDifficultyRange(custom_helper.GetHitWindowsMelody());
                     break;
 
                 default:

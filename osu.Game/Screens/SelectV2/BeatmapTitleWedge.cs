@@ -33,9 +33,6 @@ namespace osu.Game.Screens.SelectV2
     {
         private const float corner_radius = 10;
 
-        // 这里存储所选的工作谱面以供全局访问（例如在MOD中无法注入，可以用这个来获取工作谱面）。
-        public static WorkingBeatmap? SelectedWorkingBeatmap;
-
         [Resolved]
         private IBindable<WorkingBeatmap> working { get; set; } = null!;
 
@@ -184,11 +181,7 @@ namespace osu.Game.Screens.SelectV2
         {
             base.LoadComplete();
 
-            working.BindValueChanged(value =>
-            {
-                SelectedWorkingBeatmap = value.NewValue;
-                updateDisplay();
-            });
+            working.BindValueChanged(_ => updateDisplay());
             ruleset.BindValueChanged(_ => updateDisplay());
             onlineLookupResult.BindValueChanged(_ => updateDisplay());
 

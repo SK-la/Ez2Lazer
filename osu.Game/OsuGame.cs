@@ -1068,8 +1068,7 @@ namespace osu.Game
             frameSyncMode = frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
             frameSyncMode.BindValueChanged(_ => Schedule(updateDrawLimiter), true);
 
-            if (gameHost?.Window != null)
-                gameHost.Window.CurrentDisplayMode.BindValueChanged(_ => Schedule(updateDrawLimiter), true);
+            gameHost?.Window?.CurrentDisplayMode.BindValueChanged(_ => Schedule(updateDrawLimiter), true);
 
             var languages = Enum.GetValues<Language>();
 

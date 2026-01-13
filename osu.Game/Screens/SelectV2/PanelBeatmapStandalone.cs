@@ -65,9 +65,6 @@ namespace osu.Game.Screens.SelectV2
         [Resolved]
         private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
-        [Resolved]
-        private BeatmapManager beatmapManager { get; set; } = null!;
-
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
         private bool applyNextManiaUiUpdateImmediately;

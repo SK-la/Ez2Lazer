@@ -360,7 +360,7 @@ namespace osu.Game.LAsEzExtensions.Screens
             {
                 ApplySettings();
                 Hide();
-            }, () => Hide()));
+            }, Hide));
         }
 
         public void PresentGameplay()

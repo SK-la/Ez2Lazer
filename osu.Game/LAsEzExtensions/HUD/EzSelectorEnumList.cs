@@ -25,7 +25,7 @@ namespace osu.Game.LAsEzExtensions.HUD
         {
             base.LoadComplete();
             // 动态加载GameTheme文件夹
-            var availableThemes = loadAvailableThemes();
+            // var availableThemes = loadAvailableThemes();
             Items = Enum.GetValues(typeof(EzEnumGameThemeName)).Cast<EzEnumGameThemeName>().ToList();
         }
 

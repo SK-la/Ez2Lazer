@@ -27,8 +27,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
         {
-            od =  Mods.Value.OfType<ManiaModAdjust>().FirstOrDefault(m => m.OverallDifficulty.Value is not null && m.CustomOD.Value)
-                      ?.OverallDifficulty.Value ?? beatmap.Difficulty.OverallDifficulty;
+            od = Mods.Value.OfType<ManiaModAdjust>().FirstOrDefault(m => m.OverallDifficulty.Value is not null && m.CustomOD.Value)
+                     ?.OverallDifficulty.Value ?? beatmap.Difficulty.OverallDifficulty;
 
             return base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
         }

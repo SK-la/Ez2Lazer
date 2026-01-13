@@ -3,16 +3,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
-using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Lists;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
@@ -21,9 +18,6 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Scoring;
-using osu.Game.Skinning;
-using osu.Game.Storyboards;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -103,10 +97,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
         }
 
         public Task<double?> GetXxySrAsync(IBeatmapInfo beatmapInfo,
-                                          IRulesetInfo? rulesetInfo = null,
-                                          IEnumerable<Mod>? mods = null,
-                                          CancellationToken cancellationToken = default,
-                                          int computationDelay = 0)
+                                           IRulesetInfo? rulesetInfo = null,
+                                           IEnumerable<Mod>? mods = null,
+                                           CancellationToken cancellationToken = default,
+                                           int computationDelay = 0)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
             var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
@@ -121,7 +115,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             return Task.Factory.StartNew(() =>
             {
-                if (CheckExists(lookup, out var existing))
+                if (CheckExists(lookup, out double? existing))
                     return existing;
 
                 return computeXxySr(lookup, token);
@@ -323,6 +317,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 sr = 0;
 
                 var method = calculateMethod.Value;
+
                 if (method == null)
                 {
                     if (Interlocked.Exchange(ref resolve_fail_logged, 1) == 0)
@@ -356,10 +351,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 try
                 {
                     var type = findType(calculator_type_name);
-                    if (type == null)
-                        return null;
 
-                    return type.GetMethod(calculator_method_name, BindingFlags.Public | BindingFlags.Static, binder: null, types: new[] { typeof(IBeatmap) }, modifiers: null);
+                    return type?.GetMethod(calculator_method_name, BindingFlags.Public | BindingFlags.Static, binder: null, types: new[] { typeof(IBeatmap) }, modifiers: null);
                 }
                 catch (Exception ex)
                 {

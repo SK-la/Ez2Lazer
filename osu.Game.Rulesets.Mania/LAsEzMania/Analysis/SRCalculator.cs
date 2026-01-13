@@ -426,7 +426,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return usage;
         }
 
-                #region LN计算
+        #region LN计算
 
         private static LNRepStruct buildLNRepresentation(List<NoteStruct> longNotes, int totalTime)
         {

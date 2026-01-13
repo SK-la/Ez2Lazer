@@ -398,11 +398,11 @@ namespace osu.Game.Screens.SelectV2
         {
             var meta = beatmap.BeatmapSet!.Metadata;
 
-            string source = meta.Source ?? string.Empty;
-            string tags = meta.Tags ?? string.Empty;
-            string title = meta.Title ?? string.Empty;
-            string artist = meta.Artist ?? string.Empty;
-            string diff = beatmap.DifficultyName ?? string.Empty;
+            string source = meta.Source;
+            string tags = meta.Tags;
+            string title = meta.Title;
+            string artist = meta.Artist;
+            string diff = beatmap.DifficultyName;
 
             // combine fields for matching, but preserve whether source was provided
             bool hasSource = !string.IsNullOrWhiteSpace(source);
@@ -453,9 +453,6 @@ namespace osu.Game.Screens.SelectV2
 
             if (containsAny(combined, "popn music", "pop'n", "popn"))
                 return new GroupDefinition(0, "Pop'n").Yield();
-
-            if (containsAny(combined, "maimai", "maimai deluxe", "maimaiでらっくす"))
-                return new GroupDefinition(0, "MaiMai").Yield();
 
             // If none of the special rules matched but the source field was provided, put into Others
             if (hasSource)

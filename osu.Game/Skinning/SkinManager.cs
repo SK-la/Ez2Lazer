@@ -383,7 +383,6 @@ namespace osu.Game.Skinning
 
                 if (guid == SkinInfo.RETRO_SKIN)
                     skinInfo = retroSkin.SkinInfo;
-
             }
 
             CurrentSkinInfo.Value = skinInfo ?? trianglesSkin.SkinInfo;

@@ -32,6 +32,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
 
             int lastIndex = source.Count - 1;
+
             for (int i = 0; i < targetCount; i++)
             {
                 int index = (int)((long)i * lastIndex / (targetCount - 1));
@@ -198,7 +199,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             double songEnd = hitObjects[^1].StartTime;
             double duration = Math.Max(1, songEnd - songStart);
 
-            var bucketsCounts = new long[buckets];
+            long[] bucketsCounts = new long[buckets];
 
             foreach (var obj in hitObjects)
             {

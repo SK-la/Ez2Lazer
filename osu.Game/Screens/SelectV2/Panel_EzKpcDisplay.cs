@@ -93,7 +93,7 @@ namespace osu.Game.Screens.SelectV2
                         RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
                         Content = new[]
                         {
-                            new Drawable[]
+                            new[]
                             {
                                 new OsuSpriteText
                                 {

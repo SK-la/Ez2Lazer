@@ -68,19 +68,13 @@ namespace osu.Game.Screens.SelectV2
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
+        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+
+        [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
 
         [Resolved]
-        private OverlayColourProvider colourProvider { get; set; } = null!;
-
-        [Resolved]
-        private OsuColour colours { get; set; } = null!;
-
-        [Resolved]
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
-
-        [Resolved]
-        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -92,9 +86,6 @@ namespace osu.Game.Screens.SelectV2
         private ISongSelect? songSelect { get; set; }
 
         private BeatmapInfo beatmap => ((GroupedBeatmap)Item!.Model).Beatmap;
-
-        [Resolved]
-        private BeatmapManager beatmapManager { get; set; } = null!;
 
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
@@ -255,7 +246,7 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
-                                        ezKpcDisplay = new EzKpcDisplay()
+                                        ezKpcDisplay = new EzKpcDisplay
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
@@ -591,21 +582,6 @@ namespace osu.Game.Screens.SelectV2
                 {
                     computeManiaAnalysis();
                 }
-
-                // 如果离屏期间收到过分析结果（或刚好在离屏时更新被跳过），这里补一次 UI 应用。
-                // if (hasPendingUiUpdate && scheduledManiaUiUpdate == null)
-                // {
-                //     scheduledManiaUiUpdate = Scheduler.AddDelayed(() =>
-                //     {
-                //         scheduledManiaUiUpdate = null;
-                //
-                //         if (!hasPendingUiUpdate)
-                //             return;
-                //
-                //         hasPendingUiUpdate = false;
-                //         updateKPs(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
-                //     }, 0, false);
-                // }
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.

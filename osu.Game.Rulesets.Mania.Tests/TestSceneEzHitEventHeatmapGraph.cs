@@ -290,6 +290,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                         offset = GenerateNormalOffset(random, 0, 20);
                         offset = Math.Max(-40, Math.Min(40, offset));
                         break;
+
                     case 1: // [±40, ±100]ms
                         offset = GenerateNormalOffset(random, isNegative ? -40 : 40, 30);
                         if (isNegative)
@@ -297,6 +298,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                         else
                             offset = Math.Max(40, Math.Min(100, offset));
                         break;
+
                     case 2: // [±100, ±150]ms
                         offset = GenerateNormalOffset(random, isNegative ? -100 : 100, 25);
                         if (isNegative)
@@ -304,6 +306,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                         else
                             offset = Math.Max(100, Math.Min(150, offset));
                         break;
+
                     case 3: // [±150, ±200]ms
                         offset = GenerateNormalOffset(random, isNegative ? -150 : 150, 25);
                         if (isNegative)
@@ -377,18 +380,23 @@ namespace osu.Game.Rulesets.Mania.Tests
                     case HitResult.Perfect:
                         totalPoints += 305;
                         break;
+
                     case HitResult.Great:
                         totalPoints += 300;
                         break;
+
                     case HitResult.Good:
                         totalPoints += 200;
                         break;
+
                     case HitResult.Ok:
                         totalPoints += 100;
                         break;
+
                     case HitResult.Meh:
                         totalPoints += 50;
                         break;
+
                     default:
                         totalPoints += 0;
                         break;

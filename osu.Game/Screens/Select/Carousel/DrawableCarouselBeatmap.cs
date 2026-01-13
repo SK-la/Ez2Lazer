@@ -25,7 +25,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -72,9 +71,6 @@ namespace osu.Game.Screens.Select.Carousel
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
-
-        [Resolved]
         private ManageCollectionsDialog? manageCollectionsDialog { get; set; }
 
         [Resolved]
@@ -98,18 +94,6 @@ namespace osu.Game.Screens.Select.Carousel
         private IBindable<StarDifficulty> starDifficultyBindable = null!;
         private CancellationTokenSource? starDifficultyCancellationSource;
 
-        private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
-        private CancellationTokenSource? maniaAnalysisCancellationSource;
-
-        private IBeatmap playableBeatmap = null!;
-        private WorkingBeatmap working = null!;
-        private FillFlowContainer columnNotes = null!;
-        private LineGraph kpsGraph = null!;
-        private OsuSpriteText kpsText = null!;
-
-        private Dictionary<int, int> columnNoteCounts = new Dictionary<int, int>();
-        private (double averageKps, double maxKps, List<double> kpsList) kpsResult;
-
         public DrawableCarouselBeatmap(CarouselBeatmap panel)
         {
             beatmapInfo = panel.BeatmapInfo;
@@ -128,15 +112,7 @@ namespace osu.Game.Screens.Select.Carousel
             }
 
             if (manager != null)
-            {
                 hideRequested = b => manager.Hide(b);
-
-                if (ruleset.Value.OnlineID == 3)
-                {
-                    working = manager.GetWorkingBeatmap(beatmapInfo);
-                    playableBeatmap = working.GetPlayableBeatmap(ruleset.Value, mods.Value);
-                }
-            }
 
             Header.Children = new Drawable[]
             {
@@ -151,13 +127,6 @@ namespace osu.Game.Screens.Select.Carousel
                     ColourLight = Color4Extensions.FromHex(@"3a7285"),
                     ColourDark = Color4Extensions.FromHex(@"123744")
                 },
-                kpsGraph = new LineGraph
-                {
-                    Size = new Vector2(600, 50),
-                    Colour = OsuColour.Gray(0.25f),
-                    Anchor = Anchor.CentreLeft,
-                    Origin = Anchor.CentreLeft,
-                },
                 new FillFlowContainer
                 {
                     Padding = new MarginPadding(5),
@@ -167,29 +136,10 @@ namespace osu.Game.Screens.Select.Carousel
                     Origin = Anchor.CentreLeft,
                     Children = new Drawable[]
                     {
-                        new FillFlowContainer
+                        difficultyIcon = new DifficultyIcon(beatmapInfo)
                         {
-                            Padding = new MarginPadding { Left = 2 },
-                            Direction = FillDirection.Vertical,
-                            AutoSizeAxes = Axes.X,
-                            Children = new Drawable[]
-                            {
-                                difficultyIcon = new DifficultyIcon(beatmapInfo)
-                                {
-                                    TooltipType = DifficultyIconTooltipType.None,
-                                    Scale = new Vector2(1.8f),
-                                },
-                                new Box
-                                {
-                                    RelativeSizeAxes = Axes.X,
-                                    Height = 2,
-                                    Colour = Colour4.Transparent
-                                },
-                                new TopLocalRank(beatmapInfo)
-                                {
-                                    Scale = new Vector2(0.9f),
-                                },
-                            }
+                            TooltipType = DifficultyIconTooltipType.None,
+                            Scale = new Vector2(1.8f),
                         },
                         new FillFlowContainer
                         {
@@ -211,7 +161,6 @@ namespace osu.Game.Screens.Select.Carousel
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
                                             Alpha = 0,
-                                            Colour = Colour4.Pink
                                         },
                                         new OsuSpriteText
                                         {
@@ -224,38 +173,7 @@ namespace osu.Game.Screens.Select.Carousel
                                         {
                                             Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmapInfo.Metadata.Author.Username),
                                             Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                            Colour = Colour4.LightGoldenrodYellow
-                                        },
-                                    }
-                                },
-                                new FillFlowContainer
-                                {
-                                    Direction = FillDirection.Horizontal,
-                                    Spacing = new Vector2(4, 0),
-                                    AutoSizeAxes = Axes.Both,
-                                    Children = new Drawable[]
-                                    {
-                                        new OsuSpriteText
-                                        {
-                                            Text = $"[{beatmapInfo.StarRating:F2}*] ",
-                                            Font = OsuFont.GetFont(size: 18),
-                                            Colour = Colour4.LightGoldenrodYellow,
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft,
-                                        },
-                                        starCounter = new StarCounter
-                                        {
-                                            Scale = new Vector2(0.6f),
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft
-                                        },
-                                        kpsText = new OsuSpriteText
-                                        {
-                                            Font = OsuFont.GetFont(size: 18),
-                                            Colour = Colour4.CornflowerBlue,
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft
+                                            Origin = Anchor.BottomLeft
                                         },
                                     }
                                 },
@@ -267,93 +185,23 @@ namespace osu.Game.Screens.Select.Carousel
                                     AutoSizeAxes = Axes.Both,
                                     Children = new Drawable[]
                                     {
-                                        new OsuSpriteText
-                                        {
-                                            Text = "[Notes] ",
-                                            Font = OsuFont.GetFont(size: 14),
-                                            Colour = Colour4.GhostWhite,
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft
-                                        },
-                                        columnNotes = new FillFlowContainer
-                                        {
-                                            Direction = FillDirection.Horizontal,
-                                            AutoSizeAxes = Axes.Both,
-                                        },
+                                        new TopLocalRank(beatmapInfo),
+                                        starCounter = new StarCounter()
                                     }
-                                },
+                                }
                             }
-                        },
+                        }
                     }
-                },
+                }
             };
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            updateCalculations();
-            ruleset.BindValueChanged(_ =>
-            {
-                updateCalculations();
-                updateKeyCount();
-            });
-            mods.BindValueChanged(_ =>
-            {
-                updateCalculations();
-                updateKeyCount();
-            });
-        }
 
-        private void updateCalculations()
-        {
-            if (manager == null || ruleset.Value.OnlineID != 3)
-                return;
-
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = new CancellationTokenSource();
-            var localCancellationSource = maniaAnalysisCancellationSource;
-
-            // 旧选歌界面与 V2 统一：通过 EzBeatmapManiaAnalysisCache 获取分析结果（会优先走 SQLite 持久化）。
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 0);
-            maniaAnalysisBindable.BindValueChanged(result =>
-            {
-                if (localCancellationSource != maniaAnalysisCancellationSource)
-                    return;
-
-                var value = result.NewValue;
-
-                kpsResult = (value.AverageKps, value.MaxKps, value.KpsList);
-                columnNoteCounts = value.ColumnCounts;
-
-                var (averageKps, maxKps, kpsList) = kpsResult;
-                kpsGraph.Values = kpsList.Count > 0 ? kpsList.Select(kps => (float)kps).ToArray() : new[] { 0f };
-                kpsText.Text = averageKps > 0 ? $"  KPS: {averageKps:F1} ({maxKps:F1} Max)" : "  KPS: calculating...";
-
-                columnNotes.Clear();
-                columnNotes.Children = columnNoteCounts
-                                       .OrderBy(c => c.Key)
-                                       .Select((c, index) => new FillFlowContainer
-                                       {
-                                           Direction = FillDirection.Horizontal,
-                                           AutoSizeAxes = Axes.Both,
-                                           Children = new Drawable[]
-                                           {
-                                               new OsuSpriteText
-                                               {
-                                                   Text = $"{index + 1}/",
-                                                   Font = OsuFont.GetFont(size: 12),
-                                                   Colour = Colour4.Gray,
-                                               },
-                                               new OsuSpriteText
-                                               {
-                                                   Text = $"{c.Value} ",
-                                                   Font = OsuFont.GetFont(size: 14),
-                                                   Colour = Colour4.LightCoral,
-                                               }
-                                           }
-                                       }).ToArray();
-            }, true);
+            ruleset.BindValueChanged(_ => updateKeyCount());
+            mods.BindValueChanged(_ => updateKeyCount());
         }
 
         protected override void Selected()

@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Editor
             return new SkinProvidingContainer(transformedSkin)
             {
                 RelativeSizeAxes = Axes.Both,
-                Child = createTwoKeyLayout(new[]
+                Child = createTwoKeyLayout(new Drawable[]
                 {
                     createHoldPreview(looping: true, column: 0, maniaAction: ManiaAction.Key1, width: columnWidth0),
                     createHoldPreview(looping: true, column: 1, maniaAction: ManiaAction.Key2, width: columnWidth1),
@@ -322,11 +322,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Editor
                 if (endY < startY)
                     (startY, endY) = (endY, startY);
 
-                float extraWidth = 12;
+                const float extra_width = 12;
 
-                judgementArea.X = -extraWidth / 2;
+                judgementArea.X = -extra_width / 2;
                 judgementArea.Y = startY;
-                judgementArea.Width = drawableHoldNote.DrawWidth + extraWidth;
+                judgementArea.Width = drawableHoldNote.DrawWidth + extra_width;
                 judgementArea.Height = Math.Max(0, endY - startY);
             }
 

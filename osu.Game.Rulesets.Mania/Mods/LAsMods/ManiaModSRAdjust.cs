@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Globalization;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -52,8 +53,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             get
             {
-                yield return ("Rescale Threshold", new LocalisableString(RescaleThreshold.Value.ToString()));
-                yield return ("LN Integral Multiplier", new LocalisableString(LnMultiplier.Value.ToString()));
+                yield return ("Rescale Threshold", new LocalisableString(RescaleThreshold.Value.ToString(CultureInfo.InvariantCulture)));
+                yield return ("LN Integral Multiplier", new LocalisableString(LnMultiplier.Value.ToString(CultureInfo.InvariantCulture)));
             }
         }
 

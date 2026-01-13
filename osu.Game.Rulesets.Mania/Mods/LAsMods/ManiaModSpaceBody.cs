@@ -17,6 +17,10 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
+    /// <summary>
+    /// 需要同时使用IApplicableAfterBeatmapConversion, IHasApplyOrder
+    ///否则时序错误
+    /// </summary>
     public class ManiaModSpaceBody : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
     {
         public override string Name => "Space Body";
@@ -84,7 +88,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                     newColumnObjects.Add(new HoldNote
                     {
-                        Column = Math.Clamp(column.Key, 0, (int)maniaBeatmap.TotalColumns - 1),
+                        Column = Math.Clamp(column.Key, 0, maniaBeatmap.TotalColumns - 1),
                         StartTime = locations[i].startTime,
                         Duration = duration,
                         NodeSamples = new List<IList<HitSampleInfo>> { locations[i].samples, Array.Empty<HitSampleInfo>() }

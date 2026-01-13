@@ -22,7 +22,7 @@ namespace osu.Game.LAsEzExtensions.HUD
         /// </summary>
         public static event Action? OnGameThemesReloaded;
 
-        private static readonly string gametheme_path = @"EzResources\GameTheme";
+        private const string gametheme_path = @"EzResources\GameTheme";
 
         public static List<string> AvailableGameThemes { get; } = new List<string>();
 

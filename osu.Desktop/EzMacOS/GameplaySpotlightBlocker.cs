@@ -26,7 +26,7 @@ namespace osu.Desktop.EzMacOS
         [BackgroundDependencyLoader]
         private void load(ILocalUserPlayInfo localUserInfo, Ez2ConfigManager ezConfig)
         {
-            RelativeSizeAxes = osu.Framework.Graphics.Axes.Both;
+            RelativeSizeAxes = Axes.Both;
             AlwaysPresent = true;
 
             localUserPlaying = localUserInfo.PlayingState.GetBoundCopy();

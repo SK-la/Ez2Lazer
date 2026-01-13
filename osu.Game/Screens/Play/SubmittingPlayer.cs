@@ -50,7 +50,8 @@ namespace osu.Game.Screens.Play
         [CanBeNull]
         private UserStatisticsWatcher userStatisticsWatcher { get; set; }
 
-        private InputAudioLatencyTracker? latencyTracker;
+        [CanBeNull]
+        private InputAudioLatencyTracker latencyTracker;
 
         private readonly object scoreSubmissionLock = new object();
         private TaskCompletionSource<bool> scoreSubmissionSource;

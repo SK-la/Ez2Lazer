@@ -79,6 +79,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Diagnostics
         public static void RecordRequest()
         {
             if (!Enabled) return;
+
             Interlocked.Increment(ref request_count);
         }
 
@@ -109,6 +110,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Diagnostics
         public static void RecordComputeCancelled()
         {
             if (!Enabled) return;
+
             Interlocked.Increment(ref compute_cancelled_count);
         }
 
@@ -150,12 +152,14 @@ namespace osu.Game.LAsEzExtensions.Analysis.Diagnostics
         public static void RecordEviction()
         {
             if (!Enabled) return;
+
             Interlocked.Increment(ref eviction_count);
         }
 
         public static void UpdateCacheGauges(int currentSize, int limit)
         {
             if (!Enabled) return;
+
             Volatile.Write(ref in_memory_cache_size, currentSize);
             Volatile.Write(ref in_memory_cache_limit, limit);
         }
@@ -163,6 +167,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Diagnostics
         public static void RecordUiUpdate(long elapsedTicks, long allocatedBytes)
         {
             if (!Enabled) return;
+
             Interlocked.Increment(ref ui_update_count);
             Interlocked.Add(ref ui_update_ticks, elapsedTicks);
             Interlocked.Add(ref ui_update_alloc_bytes, allocatedBytes);
@@ -171,6 +176,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Diagnostics
         public static void RecordUiGraphSet(int points, long elapsedTicks, long allocatedBytes)
         {
             if (!Enabled) return;
+
             Interlocked.Increment(ref ui_graph_set_count);
             Interlocked.Add(ref ui_graph_set_ticks, elapsedTicks);
             Interlocked.Add(ref ui_graph_set_alloc_bytes, allocatedBytes);
@@ -180,6 +186,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Diagnostics
         public static void RecordUiKpcUpdate(int columns, bool isBarChart, long elapsedTicks, long allocatedBytes)
         {
             if (!Enabled) return;
+
             Interlocked.Increment(ref ui_kpc_update_count);
             Interlocked.Add(ref ui_kpc_update_ticks, elapsedTicks);
             Interlocked.Add(ref ui_kpc_update_alloc_bytes, allocatedBytes);

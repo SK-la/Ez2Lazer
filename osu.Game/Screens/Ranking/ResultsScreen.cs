@@ -17,11 +17,11 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
 using osu.Game.Audio;
-using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -63,9 +63,6 @@ namespace osu.Game.Screens.Ranking
 
         [Resolved]
         private Player? player { get; set; }
-
-        [Resolved]
-        private OsuConfigManager config { get; set; } = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -614,7 +611,7 @@ namespace osu.Game.Screens.Ranking
                 Action = this.ShowPopover;
             }
 
-            public osu.Framework.Graphics.UserInterface.Popover GetPopover() => new HitModePopover(hitModeSetting);
+            public Popover GetPopover() => new HitModePopover(hitModeSetting);
         }
 
         private partial class HitModePopover : OsuPopover

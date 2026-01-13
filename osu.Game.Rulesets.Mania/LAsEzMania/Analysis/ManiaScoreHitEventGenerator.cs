@@ -15,7 +15,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Utils;
 
-namespace osu.Game.Rulesets.Mania.Analysis
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 {
     /// <summary>
     /// Generates <see cref="HitEvent"/>s for mania scores by re-evaluating a score's replay input against a provided playable beatmap.

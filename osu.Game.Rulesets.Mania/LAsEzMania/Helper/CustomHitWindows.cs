@@ -168,7 +168,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                 case EzMUGHitMode.IIDX:
                     return GetHitWindowsIIDX();
 
-                case EzMUGHitMode.Melody:
+                case EzMUGHitMode.Malody:
                     return GetHitWindowsMelody();
 
                 default:
@@ -204,7 +204,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                     SetRanges(GetHitWindowsIIDX());
                     break;
 
-                case EzMUGHitMode.Melody:
+                case EzMUGHitMode.Malody:
                     SetRanges(GetHitWindowsMelody());
                     break;
 
@@ -289,7 +289,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         /// <summary>
         /// Allow external code to replace the current windows (e.g. when switching hit modes).
         /// </summary>
-        public void SetRanges(double[] ranges)
+        public void SetRanges(double[]? ranges)
         {
             if (ranges == null) return;
 

@@ -34,7 +34,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         private double lastKeyPressTime;
         private Key lastKey;
 
-        public static InputAudioLatencyTracker GlobalTracker { get; set; }
+        public static InputAudioLatencyTracker? GlobalTracker { get; set; }
 
         public InputAudioLatencyTracker()
         {
@@ -61,9 +61,10 @@ namespace osu.Game.LAsEzExtensions.Audio
             Logger.Log($"[InputAudioLatency] Audio play at {timeMs:F2}ms", LoggingTarget.Runtime, LogLevel.Verbose);
 
             var lastRecord = records.LastOrDefault(r => r.AudioPlayTimeMs == 0);
+
             if (lastRecord.AudioPlayTimeMs == 0 && records.Count > 0 && records.Last().AudioPlayTimeMs == 0)
             {
-                records[records.Count - 1] = new LatencyRecord
+                records[^1] = new LatencyRecord
                 {
                     KeyPressTimeMs = lastRecord.KeyPressTimeMs,
                     JudgementTimeMs = lastRecord.JudgementTimeMs,

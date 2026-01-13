@@ -22,8 +22,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private Container sprite = null!;
 
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
+        // [Resolved]
+        // private StageDefinition stageDefinition { get; set; } = null!;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;

@@ -64,16 +64,16 @@ namespace osu.Game.Screens
             {
                 this.FadeOut();
                 this.FadeIn(TRANSITION_LENGTH, Easing.InOutQuart);
-                    this.MoveToX(x_movement_amount);
-                    this.MoveToX(0, TRANSITION_LENGTH, Easing.InOutQuart);
-                }
+                this.MoveToX(x_movement_amount);
+                this.MoveToX(0, TRANSITION_LENGTH, Easing.InOutQuart);
+            }
 
             base.OnEntering(e);
         }
 
         public override void OnSuspending(ScreenTransitionEvent e)
         {
-                this.MoveToX(-x_movement_amount, TRANSITION_LENGTH, Easing.InOutQuart);
+            this.MoveToX(-x_movement_amount, TRANSITION_LENGTH, Easing.InOutQuart);
             base.OnSuspending(e);
         }
 

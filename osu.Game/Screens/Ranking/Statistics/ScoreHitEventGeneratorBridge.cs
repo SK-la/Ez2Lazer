@@ -50,7 +50,7 @@ namespace osu.Game.Screens.Ranking.Statistics
             {
                 // Avoid spamming logs if something is systematically broken.
                 if (Interlocked.Increment(ref invoke_fail_count) <= 10)
-                    Logger.Error(ex, $"HitEvent generation bridge invoke exception. ruleset={score?.ScoreInfo?.Ruleset?.ShortName}", logger_name);
+                    Logger.Error(ex, $"HitEvent generation bridge invoke exception. ruleset={score.ScoreInfo?.Ruleset.ShortName}", logger_name);
 
                 return null;
             }

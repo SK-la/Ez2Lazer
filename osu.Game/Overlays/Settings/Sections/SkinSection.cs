@@ -71,7 +71,6 @@ namespace osu.Game.Overlays.Settings.Sections
                     AllowNonContiguousMatching = true,
                     LabelText = SkinSettingsStrings.CurrentSkin,
                     Current = skins.CurrentSkinInfo,
-                    Keywords = new[] { @"skins" },
                 },
                 new FillFlowContainer
                 {

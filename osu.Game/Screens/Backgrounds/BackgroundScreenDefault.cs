@@ -196,8 +196,7 @@ namespace osu.Game.Screens.Backgrounds
                         var loader = gameHost.CreateTextureLoaderStore(new osu.Framework.IO.Stores.StorageBackedResourceStore(storage));
                         textures.AddTextureSource(loader);
 
-                        if (largeTextures != null)
-                            largeTextures.AddTextureSource(loader);
+                        largeTextures?.AddTextureSource(loader);
 
                         storageTextureSourceAdded = true;
                     }
