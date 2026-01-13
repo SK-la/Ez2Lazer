@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
@@ -29,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         private const double difficulty_multiplier = 0.018;
 
         private readonly bool isForCurrentRuleset;
-        private readonly double originalOverallDifficulty;
+        // private readonly double originalOverallDifficulty;
 
         public override int Version => 20241007;
 
@@ -37,10 +39,10 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             : base(ruleset, beatmap)
         {
             isForCurrentRuleset = beatmap.BeatmapInfo.Ruleset.MatchesOnlineID(ruleset);
-            originalOverallDifficulty = beatmap.BeatmapInfo.Difficulty.OverallDifficulty;
+            // originalOverallDifficulty = beatmap.BeatmapInfo.Difficulty.OverallDifficulty;
         }
 
-        public double XXY_SR { get; set; }
+        // public double XXY_SR { get; set; }
 
         protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate)
         {
@@ -50,15 +52,15 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             HitWindows hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
 
-            double SR = skills[0].DifficultyValue() * difficulty_multiplier;
+            double sr = skills[0].DifficultyValue() * difficulty_multiplier;
 
-            SR = AdditionalMethod(beatmap, mods, skills, clockRate, SR);
-            XXY_SR = SR;
+            sr = AdditionalMethod(beatmap, mods, skills, clockRate, sr);
+            // XXY_SR = sr;
 
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {
-                StarRating = SR > 0
-                    ? SR
+                StarRating = sr > 0
+                    ? sr
                     : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
                 Mods = mods,
                 MaxCombo = beatmap.HitObjects.Sum(maxComboForObject),
@@ -73,14 +75,11 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
             if (mods.Any(m => m is ModStarRatingRebirth))
             {
-                try
-                {
-                    sr = SRCalculator.CalculateSR(beatmap);
-                }
-                catch
-                {
-                    sr = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
-                }
+                var xxySRFilter = GlobalConfigStore.EzConfig?.GetBindable<bool>(Ez2Setting.XxySRFilter);
+
+                sr = xxySRFilter != null && xxySRFilter.Value
+                    ? SRCalculator.CalculateSR(beatmap, clockRate)
+                    : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
             }
 
             return sr;
@@ -121,9 +120,9 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         protected override IEnumerable<DifficultyHitObject> SortObjects(IEnumerable<DifficultyHitObject> input) => input;
 
         protected override Skill[] CreateSkills(IBeatmap beatmap, Mod[] mods, double clockRate) => new Skill[]
-            {
-                new Strain(mods, ((ManiaBeatmap)Beatmap).TotalColumns)
-            };
+        {
+            new Strain(mods, ((ManiaBeatmap)Beatmap).TotalColumns)
+        };
 
         protected override Mod[] DifficultyAdjustmentMods
         {

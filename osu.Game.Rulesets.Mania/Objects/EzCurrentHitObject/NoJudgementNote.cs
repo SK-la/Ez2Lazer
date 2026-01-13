@@ -7,6 +7,13 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     public class NoJudgementNote : Note
     {
+        public NoJudgementNote(Note note)
+        {
+            StartTime = note.StartTime;
+            Column = note.Column;
+            Samples = note.Samples;
+        }
+
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
         }

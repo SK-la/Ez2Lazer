@@ -251,23 +251,23 @@ namespace osu.Game.Screens.Play
                             new OsuScrollContainer
                             {
                                 RelativeSizeAxes = Axes.Both,
-                    Child = PlayerSettings = new FillFlowContainer<PlayerSettingsGroup>
-                    {
-                        AutoSizeAxes = Axes.Both,
-                        Direction = FillDirection.Vertical,
-                        Spacing = new Vector2(0, 20),
+                                Child = PlayerSettings = new FillFlowContainer<PlayerSettingsGroup>
+                                {
+                                    AutoSizeAxes = Axes.Both,
+                                    Direction = FillDirection.Vertical,
+                                    Spacing = new Vector2(0, 20),
                                     Padding = new MarginPadding
                                     {
                                         Horizontal = padding,
                                         Vertical = padding,
                                     },
-                        Children = new PlayerSettingsGroup[]
-                        {
-                            VisualSettings = new VisualSettings(),
-                            AudioSettings = new AudioSettings(),
-                            new InputSettings()
-                        }
-                    },
+                                    Children = new PlayerSettingsGroup[]
+                                    {
+                                        VisualSettings = new VisualSettings(),
+                                        AudioSettings = new AudioSettings(),
+                                        new InputSettings()
+                                    }
+                                },
                             }
                         },
                         new Drawable[]
@@ -601,7 +601,7 @@ namespace osu.Game.Screens.Play
                 using (BeginDelayedSequence(delayBeforeSideDisplays))
                 {
                     sideContent.FadeInFromZero(500, Easing.Out)
-                                  .MoveToX(0, 500, Easing.OutQuint);
+                               .MoveToX(0, 500, Easing.OutQuint);
 
                     disclaimers.FadeInFromZero(500, Easing.Out)
                                .MoveToX(0, 500, Easing.OutQuint);

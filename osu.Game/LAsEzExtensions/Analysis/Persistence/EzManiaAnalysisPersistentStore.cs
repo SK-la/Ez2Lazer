@@ -301,6 +301,13 @@ LIMIT 1;
                     computedScratchText,
                     xxySr);
 
+                // Validate the analysis result to ensure it's reasonable
+                if (!isValidAnalysisResult(result))
+                {
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", "mania_analysis", LogLevel.Debug);
+                    return false;
+                }
+
                 // missingRequiredXxySr = requireXxySr && xxySr == null;
 
                 return true;
@@ -327,6 +334,13 @@ LIMIT 1;
             if (!Enabled)
                 return;
 
+            // Validate the analysis result before storing
+            if (!isValidAnalysisResult(analysis))
+            {
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", "mania_analysis", LogLevel.Debug);
+                return;
+            }
+
             // 跳过空谱面（no notes）- 不需要存储和管理
             if (analysis.ColumnCounts.Count == 0)
                 return;
@@ -338,7 +352,7 @@ LIMIT 1;
                 using var connection = openConnection();
 
                 // 尝试从 SQLite 读取旧数据
-                if (!TryGetRawData(connection, beatmap, out var storedAnalysis))
+                if (!tryGetRawData(connection, beatmap, out var storedAnalysis))
                 {
                     // 缓存不存在，直接存储
                     Store(beatmap, analysis);
@@ -346,7 +360,7 @@ LIMIT 1;
                 }
 
                 // 对比两个结果是否有差异
-                if (HasDifference(storedAnalysis, analysis))
+                if (hasDifference(storedAnalysis, analysis))
                 {
                     Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", "mania_analysis", LogLevel.Debug);
                     Store(beatmap, analysis);
@@ -361,7 +375,7 @@ LIMIT 1;
         /// <summary>
         /// 从数据库读取原始数据（不验证 hash/version）。
         /// </summary>
-        private bool TryGetRawData(SqliteConnection connection, BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
+        private bool tryGetRawData(SqliteConnection connection, BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
         {
             result = ManiaBeatmapAnalysisDefaults.EMPTY;
 
@@ -418,7 +432,7 @@ LIMIT 1;
         /// 比较两个分析结果是否有差异。
         /// 关键字段：xxysr, averageKps, maxKps, ColumnCounts, HoldNoteCounts
         /// </summary>
-        private bool HasDifference(ManiaBeatmapAnalysisResult stored, ManiaBeatmapAnalysisResult computed)
+        private bool hasDifference(ManiaBeatmapAnalysisResult stored, ManiaBeatmapAnalysisResult computed)
         {
             // 检查 xxysr 差异（最重要）
             // 如果 stored 是 null 而 computed 有值，必须更新
@@ -442,7 +456,7 @@ LIMIT 1;
 
             foreach (var kvp in computed.ColumnCounts)
             {
-                if (!stored.ColumnCounts.TryGetValue(kvp.Key, out var storedCount) || storedCount != kvp.Value)
+                if (!stored.ColumnCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
                     return true;
             }
 
@@ -452,7 +466,7 @@ LIMIT 1;
 
             foreach (var kvp in computed.HoldNoteCounts)
             {
-                if (!stored.HoldNoteCounts.TryGetValue(kvp.Key, out var storedCount) || storedCount != kvp.Value)
+                if (!stored.HoldNoteCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
                     return true;
             }
 
@@ -463,6 +477,13 @@ LIMIT 1;
         {
             if (!Enabled)
                 return;
+
+            // Validate the analysis result before storing
+            if (!isValidAnalysisResult(analysis))
+            {
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", "mania_analysis", LogLevel.Debug);
+                return;
+            }
 
             // 跳过空谱面（no notes）- 不需要存储和管理
             if (analysis.ColumnCounts.Count == 0)
@@ -859,6 +880,17 @@ FROM mania_analysis;
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Validates that the analysis result contains reasonable values.
+        /// </summary>
+        private static bool isValidAnalysisResult(ManiaBeatmapAnalysisResult result)
+        {
+            if (result.XxySr.HasValue && (double.IsNaN(result.XxySr.Value) || double.IsInfinity(result.XxySr.Value)))
+                return false;
+
+            return true;
         }
     }
 }

@@ -30,17 +30,17 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 Samples = GetNodeSamples(0),
             });
 
+            AddNested(Body = new NoMissLNBody
+            {
+                StartTime = StartTime,
+                Column = Column,
+            });
+
             AddNested(Tail = new NoComboBreakLNTail
             {
                 StartTime = EndTime,
                 Column = Column,
                 Samples = GetNodeSamples((NodeSamples?.Count - 1) ?? 1),
-            });
-
-            AddNested(Body = new NoMissLNBody
-            {
-                StartTime = StartTime,
-                Column = Column,
             });
         }
     }

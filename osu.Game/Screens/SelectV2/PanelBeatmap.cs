@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Logging;
 using osu.Framework.Bindables;
@@ -360,7 +359,7 @@ namespace osu.Game.Screens.SelectV2
                     return;
 
                 hasPendingUiUpdate = false;
-                updateUI(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
+                updateKPs(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
             }, mania_ui_update_throttle_ms, false);
         }
 
@@ -381,7 +380,7 @@ namespace osu.Game.Screens.SelectV2
             }
         }
 
-        private void updateUI((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
+        private void updateKPs((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
             if (Item == null)
                 return;
@@ -535,17 +534,11 @@ namespace osu.Game.Screens.SelectV2
             starDifficultyCancellationSource = new CancellationTokenSource();
 
             if (Item == null)
-            {
-                // Logger.Log("[PanelBeatmap] computeStarRating called but Item is null; skipping.", LoggingTarget.Runtime, LogLevel.Debug);
                 return;
-            }
-
-            // Logger.Log($"[PanelBeatmap] computeStarRating called for beatmap {beatmap.OnlineID}/{beatmap.ID}", LoggingTarget.Runtime, LogLevel.Debug);
 
             starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
-                // Logger.Log($"[PanelBeatmap] starDifficulty changed for beatmap {beatmap.OnlineID}/{beatmap.ID} stars={starDifficulty.NewValue.Stars}", LoggingTarget.Runtime, LogLevel.Debug);
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 starCounter.Current = (float)starDifficulty.NewValue.Stars;
             }, true);
@@ -560,17 +553,13 @@ namespace osu.Game.Screens.SelectV2
                 return;
 
             // Reset UI to avoid showing stale data from previous beatmap
-            resetManiaAnalysisDisplay();
+            // resetManiaAnalysisDisplay();
 
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                if (Item == null)
-                    return;
-
-                // Ignore placeholder results
-                if (isPlaceholderAnalysisResult(result.NewValue))
-                    return;
+                // if (isPlaceholderAnalysisResult(result.NewValue))
+                //     return;
 
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
@@ -604,19 +593,19 @@ namespace osu.Game.Screens.SelectV2
                 }
 
                 // 如果离屏期间收到过分析结果（或刚好在离屏时更新被跳过），这里补一次 UI 应用。
-                if (hasPendingUiUpdate && scheduledManiaUiUpdate == null)
-                {
-                    scheduledManiaUiUpdate = Scheduler.AddDelayed(() =>
-                    {
-                        scheduledManiaUiUpdate = null;
-
-                        if (!hasPendingUiUpdate)
-                            return;
-
-                        hasPendingUiUpdate = false;
-                        updateUI(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
-                    }, 0, false);
-                }
+                // if (hasPendingUiUpdate && scheduledManiaUiUpdate == null)
+                // {
+                //     scheduledManiaUiUpdate = Scheduler.AddDelayed(() =>
+                //     {
+                //         scheduledManiaUiUpdate = null;
+                //
+                //         if (!hasPendingUiUpdate)
+                //             return;
+                //
+                //         hasPendingUiUpdate = false;
+                //         updateKPs(pendingKpsResult, pendingColumnCounts, pendingHoldNoteCounts);
+                //     }, 0, false);
+                // }
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.

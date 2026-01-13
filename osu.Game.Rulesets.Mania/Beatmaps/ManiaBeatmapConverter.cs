@@ -141,13 +141,18 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             {
                 case ManiaHitObject maniaObj:
                 {
-                    if (maniaObj is Note note && CurrentHitMode == EzMUGHitMode.O2Jam)
+                    if (maniaObj is Note note && CurrentHitMode != EzMUGHitMode.Lazer)
                     {
-                        yield return new O2Note(note);
-                        yield break;
+                        yield return CurrentHitMode switch
+                        {
+                            EzMUGHitMode.EZ2AC => new Ez2AcNote(note),
+                            EzMUGHitMode.Melody => new NoJudgementNote(note),
+                            EzMUGHitMode.O2Jam => new O2Note(note),
+                            EzMUGHitMode.IIDX => new Ez2AcNote(note),
+                            _ => note
+                        };
                     }
-
-                    if (maniaObj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
+                    else if (maniaObj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
                     {
                         yield return CurrentHitMode switch
                         {
@@ -257,12 +262,18 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
 
                 foreach (var obj in newPattern.HitObjects)
                 {
-                    if (obj is Note note && CurrentHitMode == EzMUGHitMode.O2Jam)
+                    if (obj is Note note && CurrentHitMode != EzMUGHitMode.Lazer)
                     {
-                        yield return new O2Note(note);
+                        yield return CurrentHitMode switch
+                        {
+                            EzMUGHitMode.EZ2AC => new Ez2AcNote(note),
+                            EzMUGHitMode.Melody => new NoJudgementNote(note),
+                            EzMUGHitMode.O2Jam => new O2Note(note),
+                            EzMUGHitMode.IIDX => new Ez2AcNote(note),
+                            _ => note
+                        };
                     }
-                    else
-                    if (obj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
+                    else if (obj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
                     {
                         yield return CurrentHitMode switch
                         {

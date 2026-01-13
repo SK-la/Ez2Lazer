@@ -266,7 +266,7 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Enabled = { BindTarget = Selected }
                                         },
-                                        ezKpcDisplay = new EzKpcDisplay()
+                                        ezKpcDisplay = new EzKpcDisplay
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
@@ -287,24 +287,18 @@ namespace osu.Game.Screens.SelectV2
             ruleset.BindValueChanged(_ =>
             {
                 cachedScratchText = null;
-                invalidateManiaAnalysisBinding();
                 applyNextManiaUiUpdateImmediately = true;
 
-                // Only bind/compute when visible; off-screen panels will rebind in Update().
-                if (Item?.IsVisible == true)
-                    bindManiaAnalysis();
+                computeManiaAnalysis();
                 updateKeyCount();
             });
 
             mods.BindValueChanged(_ =>
             {
                 cachedScratchText = null;
-                invalidateManiaAnalysisBinding();
                 applyNextManiaUiUpdateImmediately = true;
 
-                // Only bind/compute when visible; off-screen panels will rebind in Update().
-                if (Item?.IsVisible == true)
-                    bindManiaAnalysis();
+                computeManiaAnalysis();
                 updateKeyCount();
             }, true);
 
@@ -342,7 +336,7 @@ namespace osu.Game.Screens.SelectV2
             cachedScratchText = null;
 
             resetManiaAnalysisDisplay();
-            bindManiaAnalysis();
+            computeManiaAnalysis();
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
@@ -380,82 +374,29 @@ namespace osu.Game.Screens.SelectV2
             }, background_load_delay_ms, false);
         }
 
-        private void bindManiaAnalysis()
+        private void computeManiaAnalysis()
         {
             maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = null;
+            maniaAnalysisCancellationSource = new CancellationTokenSource();
 
             if (Item == null)
                 return;
 
-            // if (ruleset.Value.OnlineID != 3)
-            //     return;
+            // Reset UI to avoid showing stale data from previous beatmap
+            // resetManiaAnalysisDisplay();
 
-            maniaAnalysisCancellationSource = new CancellationTokenSource();
-            var localCancellationSource = maniaAnalysisCancellationSource;
-
-            // var requestTime = System.DateTimeOffset.UtcNow;
-            // Logger.Log($"[PanelBeatmapStandalone] mania analysis requested for {beatmap.OnlineID}/{beatmap.ID} requireXxy=false at {requestTime:O}", LoggingTarget.Runtime, LogLevel.Debug);
-
-            // Request baseline first (avoid forcing expensive xxy compute on-visible).
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: 0);
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                // var responseTime = System.DateTimeOffset.UtcNow;
-                // var latency = responseTime - requestTime;
-                // Logger.Log($"[PanelBeatmapStandalone] mania analysis response for {beatmap.OnlineID}/{beatmap.ID} latency={latency.TotalMilliseconds}ms xxy_present={(result.NewValue.XxySr != null)} kps_count={(result.NewValue.KpsList?.Count ?? 0)}", LoggingTarget.Runtime, LogLevel.Debug);
-                // 旧 bindable 的回调（比如切换 mods / 取消重绑）直接忽略。
-                if (localCancellationSource != maniaAnalysisCancellationSource)
-                    return;
-
-                // DrawablePool 回收/Item 变更期间可能仍收到旧 bindable 的回调。
-                // 这时 beatmap 属性会因为 Item 为 null 而抛出异常，因此直接忽略。
-                if (Item == null)
-                    return;
-
-                // The bindable starts with ManiaBeatmapAnalysisDefaults.EMPTY as a placeholder.
-                // Applying it would normalize to 0..N-1 and cause the per-column notes display to flicker to zero.
-                // Ignore this placeholder update and wait for a real computed/persisted result.
-                if (isPlaceholderAnalysisResult(result.NewValue))
-                    return;
+                // if (isPlaceholderAnalysisResult(result.NewValue))
+                //     return;
 
                 if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
                     cachedScratchText = result.NewValue.ScratchText;
 
                 queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 
-                // Only update if present.
-                if (result.NewValue.XxySr != null)
-                    displayXxySR.Current.Value = result.NewValue.XxySr;
-
-                // If xxy is missing from the baseline, trigger an on-demand background request
-                // to compute and patch xxy without blocking the main UI updates.
-                if (result.NewValue.XxySr == null && maniaAnalysisCancellationSource != null && !maniaAnalysisCancellationSource.IsCancellationRequested)
-                {
-                    var token = maniaAnalysisCancellationSource.Token;
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var full = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods.Value, token, computationDelay: 0).ConfigureAwait(false);
-
-                            if (full?.XxySr != null)
-                            {
-                                Schedule(() => displayXxySR.Current.Value = full.Value.XxySr);
-                            }
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // ignore
-                        }
-                        catch
-                        {
-                            // ignore failures; shouldn't block UI
-                        }
-                    }, token);
-                }
-
-                updateKeyCount();
+                displayXxySR.Current.Value = result.NewValue.XxySr;
             }, true);
         }
 
@@ -467,20 +408,6 @@ namespace osu.Game.Screens.SelectV2
                && (result.HoldNoteCounts.Count) == 0
                && string.IsNullOrEmpty(result.ScratchText)
                && result.XxySr == null;
-
-        private void invalidateManiaAnalysisBinding()
-        {
-            // Always invalidate current binding so that Update() can rebind when the panel becomes visible.
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = null;
-            maniaAnalysisBindable = null;
-
-            scheduledManiaUiUpdate?.Cancel();
-            scheduledManiaUiUpdate = null;
-            hasPendingUiUpdate = false;
-            pendingColumnCounts = null;
-            pendingHoldNoteCounts = null;
-        }
 
         private void queueManiaUiUpdate((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
@@ -729,12 +656,12 @@ namespace osu.Game.Screens.SelectV2
                     scheduleBackgroundLoad();
 
                 // 重新可见时再触发一次绑定/计算。
-                if (maniaAnalysisCancellationSource == null && Item != null && ruleset.Value.OnlineID == 3)
+                if (maniaAnalysisCancellationSource == null && Item != null)
                 {
                     // 离屏期间我们会 cancel 掉分析（避免浪费计算预算）。
                     // 重新变为可见时，必须先清空旧显示值，否则会短暂显示上一次谱面的结果（表现为 xxySR 跳变）。
                     resetManiaAnalysisDisplay();
-                    bindManiaAnalysis();
+                    computeManiaAnalysis();
                 }
 
                 // 如果离屏期间收到过分析结果（或刚好在离屏时更新被跳过），这里补一次 UI 应用。

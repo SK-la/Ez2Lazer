@@ -4,15 +4,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
 using System.Linq;
 using System.Threading.Tasks;
-using osu.Framework.Allocation;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -25,10 +20,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
     {
         // 可通过 Mod 进行调整的参数（保持与原始实现一致的默认值）
         public static double RescaleHighThreshold { get; set; } = 8.0;
-        public static double LnIntegralMultiplier { get; set; } = 6.0;
-
-        [Resolved]
-        protected RulesetInfo RulesetInfo { get; set; } = null!;
+        public static double LnIntegralMultiplier { get; set; } = 4.0;
 
         /// <summary>
         ///     Singleton entry point for SR calculations.

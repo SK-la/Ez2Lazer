@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
@@ -11,7 +12,7 @@ using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModSRAdjust : Mod
+    public class ManiaModSRAdjust : Mod, IApplicableToDifficulty
     {
         public override string Name => "SR Adjust";
 
@@ -54,6 +55,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 yield return ("Rescale Threshold", new LocalisableString(RescaleThreshold.Value.ToString()));
                 yield return ("LN Integral Multiplier", new LocalisableString(LnMultiplier.Value.ToString()));
             }
+        }
+
+        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
+        {
         }
     }
 }

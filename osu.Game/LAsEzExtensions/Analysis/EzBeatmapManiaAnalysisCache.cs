@@ -94,7 +94,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private int cachedLookupsCount;
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致。
-        private const int mod_settings_debounce = SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE;
+        private const int mod_settings_debounce = SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE + 10;
 
         protected override void LoadComplete()
         {
@@ -129,15 +129,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             low_priority_scope_depth.Value++;
             return new InvokeOnDisposal(() => low_priority_scope_depth.Value--);
-        }
-
-        /// <summary>
-        /// Blocks until there are no pending/running high-priority (visible) computations.
-        /// Intended for warmup to avoid competing with visible content.
-        /// </summary>
-        public void WaitForHighPriorityIdle(CancellationToken cancellationToken = default)
-        {
-            highPriorityIdleEvent.Wait(cancellationToken);
         }
 
         /// <summary>
@@ -209,7 +200,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     {
                         try
                         {
-                            computeAnalysis(lookup, cancellationToken, out bool _);
+                            computeAnalysis(lookup, cancellationToken);
                         }
                         catch (OperationCanceledException)
                         {
@@ -414,7 +405,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 if (isLowPriority)
                     highPriorityIdleEvent.Wait(token);
 
-                return computeAnalysis(lookup, token, out _);
+                return computeAnalysis(lookup, token);
             }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, scheduler);
 
             return await task.ConfigureAwait(false);
@@ -422,18 +413,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         // enter/exit high-priority work helpers removed; gating uses ManualResetEventSlim directly.
 
-        private ManiaBeatmapAnalysisResult? computeAnalysis(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken, out bool persistHit)
+        private ManiaBeatmapAnalysisResult? computeAnalysis(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken)
         {
-            persistHit = false;
-
             try
             {
-                // Persistent fast-path for no-mod baseline.
-                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
+                // 无mod快速路径：尝试直接从持久化存储获取结果
+                if (persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                 {
-                    persistHit = true;
-                    // xxysr 补算机制已禁用：缓存中任意参数丢失都算缓存未命中要重算。
-                    // 直接返回已持久化的结果，无需补算。
                     return persisted;
                 }
 
@@ -443,18 +429,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     return null;
 
                 var legacyRuleset = (ILegacyRuleset)rulesetInstance;
-                int keyCount = 0;
-
-                try
-                {
-                    keyCount = legacyRuleset.GetKeyCount(lookup.BeatmapInfo, lookup.OrderedMods);
-                }
-                catch
-                {
-                    // Some mod combinations may cause key count derivation to fail.
-                    // We'll fall back to inferring key count from the playable beatmap.
-                    keyCount = 0;
-                }
+                int keyCount = legacyRuleset.GetKeyCount(lookup.BeatmapInfo, lookup.OrderedMods);
 
                 PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
                 var playableBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
@@ -482,12 +457,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
                         kpsList[i] *= rate;
                 }
 
-                // Calculate xxySr for mania mode:
-                // - With mods: always calculate (since mod combos aren't persisted)
-                // - No mods: rely on persisted value (already returned via fast-path above)
                 double? xxySr = null;
 
-                bool shouldCalculateXxy = lookup.Ruleset.OnlineID == 3 && lookup.OrderedMods.Length > 0;
+                bool shouldCalculateXxy = lookup.Ruleset.OnlineID == 3;
 
                 if (shouldCalculateXxy && playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, rate, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
                     xxySr = sr;
@@ -507,15 +479,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     scratchText,
                     xxySr);
 
-                if (lookup.OrderedMods.Length == 0)
+                if (lookup.OrderedMods.Length == 0 && analysis.ColumnCounts.Count > 0)
                 {
-                    // Skip storing empty beatmaps (no notes) to avoid unnecessary database entries
-                    if (analysis.ColumnCounts.Count > 0)
-                    {
-                        // For baseline (no-mod), compare with stored data and update if different
-                        // This ensures data completeness (e.g., xxySr gets patched when previously null)
-                        persistentStore.StoreIfDifferent(lookup.BeatmapInfo, analysis);
-                    }
+                    persistentStore.StoreIfDifferent(lookup.BeatmapInfo, analysis);
                 }
 
                 return analysis;

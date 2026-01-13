@@ -19,6 +19,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Input.Handlers;
 using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -164,15 +165,6 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
 
-            // Configure pools based on hit mode
-            foreach (var stage in Playfield.Stages)
-            {
-                foreach (var column in stage.Columns)
-                {
-                    configurePools(column, ManiaBeatmapConverter.CurrentHitMode);
-                }
-            }
-
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>
             {
@@ -194,6 +186,15 @@ namespace osu.Game.Rulesets.Mania.UI
                     }
                 });
             });
+
+            // Configure pools based on hit mode
+            foreach (var stage in Playfield.Stages)
+            {
+                foreach (var column in stage.Columns)
+                {
+                    configurePools(column);
+                }
+            }
         }
 
         private ManiaTouchInputArea? touchInputArea;
@@ -314,7 +315,9 @@ namespace osu.Game.Rulesets.Mania.UI
                 currentSkin.SourceChanged -= onSkinChange;
         }
 
-        private void configurePools(Column column, EzMUGHitMode hitMode)
+        private readonly EzMUGHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+
+        private void configurePools(Column column)
         {
             switch (hitMode)
             {
@@ -327,13 +330,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 case EzMUGHitMode.Melody:
                     column.RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
+                    column.RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
                     column.RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
                     break;
 
                 // TODO: 暂时先用 EZ2AC 的物件池，以后根据使用反馈单独实现
                 case EzMUGHitMode.IIDX:
-                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
                     column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
