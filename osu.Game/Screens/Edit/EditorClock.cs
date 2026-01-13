@@ -68,7 +68,7 @@ namespace osu.Game.Screens.Edit
 
             // 编辑器使用谱面原始时间。若在此应用偏移会破坏寻迹/循环逻辑
             // （FramedBeatmapClock 在原始时间上进行寻迹，但报告的 CurrentTime 却应用了偏移）。
-            underlyingClock = new FramedBeatmapClock(applyOffsets: false, requireDecoupling: true);
+            underlyingClock = new FramedBeatmapClock(applyOffsets: true, requireDecoupling: true);
             AddInternal(underlyingClock);
 
             track.BindValueChanged(_ => TrackChanged?.Invoke());

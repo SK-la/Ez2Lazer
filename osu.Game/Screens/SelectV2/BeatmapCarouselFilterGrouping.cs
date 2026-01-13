@@ -210,7 +210,7 @@ namespace osu.Game.Screens.SelectV2
                     return getGroupsBy(b => defineGroupByLength(b.Length), items);
 
                 case GroupMode.Source:
-                    return getGroupsBy(b => defineGroupBySource(b.BeatmapSet!.Metadata.Source), items);
+                    return getGroupsBy(defineGroupBySource, items);
 
                 case GroupMode.Collections:
                 {
@@ -394,12 +394,75 @@ namespace osu.Game.Screens.SelectV2
             return new GroupDefinition(11, "Over 10 minutes").Yield();
         }
 
-        private IEnumerable<GroupDefinition> defineGroupBySource(string source)
+        private IEnumerable<GroupDefinition> defineGroupBySource(BeatmapInfo beatmap)
         {
-            if (string.IsNullOrEmpty(source))
-                return new GroupDefinition(1, "Unsourced").Yield();
+            var meta = beatmap.BeatmapSet!.Metadata;
 
-            return new GroupDefinition(0, source).Yield();
+            string source = meta.Source ?? string.Empty;
+            string tags = meta.Tags ?? string.Empty;
+            string title = meta.Title ?? string.Empty;
+            string artist = meta.Artist ?? string.Empty;
+            string diff = beatmap.DifficultyName ?? string.Empty;
+
+            // combine fields for matching, but preserve whether source was provided
+            bool hasSource = !string.IsNullOrWhiteSpace(source);
+            string combined = string.Join(" ", source, tags, title, artist, diff).Trim();
+
+            if (string.IsNullOrWhiteSpace(combined))
+                return new GroupDefinition(200, "Unsourced").Yield();
+
+            // helper for case-insensitive contains
+            static bool containsAny(string haystack, params string[] needles)
+            {
+                if (string.IsNullOrEmpty(haystack)) return false;
+
+                foreach (string n in needles)
+                {
+                    if (!string.IsNullOrEmpty(n) && haystack.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
+                        return true;
+                }
+
+                return false;
+            }
+
+            // priority-ordered matching
+            if (containsAny(combined, "tv", "tv-size", "tv size", "anime", "op", "ed", "tv_ver"))
+                return new GroupDefinition(3, "Anime").Yield();
+
+            if (containsAny(combined, "touhou", "東方", "东方", "touhou project", "東方Project", "東方プロジェクト", "동방프로젝트", "동방Project", "tohou"))
+                return new GroupDefinition(2, "东方Project").Yield();
+
+            if (containsAny(combined, "vocaloid", "ボーカロイド", "보컬로이드", "vocaloids", "vocaloid music",
+                    "miku", "hatsune", "kagamine", "gumi", "luka", "meiko", "kaito", "鏡音", "初音", "巡音", "巡音ルカ", "鏡音リン", "鏡音レン", "MEIKO", "KAITO", "GUMI"))
+                return new GroupDefinition(4, "VOCALOID").Yield();
+
+            if (containsAny(combined, "ez2", "ez2ac", "ez2dj", "ez2on"))
+                return new GroupDefinition(1, "EZ2AC").Yield();
+
+            if (containsAny(combined, "djmax", "디제이맥스", "DJMAX"))
+                return new GroupDefinition(0, "DJMAX").Yield();
+
+            if (containsAny(combined, "o2", "o2jam", "o2", "오투잼", "[荣誉]", "[木星灵魂]", "[木星]"))
+                return new GroupDefinition(0, "O2").Yield();
+
+            if (containsAny(combined, "bms"))
+                return new GroupDefinition(0, "BMS").Yield();
+
+            if (containsAny(combined, "iidx", "beatmania iidx", "beatmania"))
+                return new GroupDefinition(0, "IIDX").Yield();
+
+            if (containsAny(combined, "popn music", "pop'n", "popn"))
+                return new GroupDefinition(0, "Pop'n").Yield();
+
+            if (containsAny(combined, "maimai", "maimai deluxe", "maimaiでらっくす"))
+                return new GroupDefinition(0, "MaiMai").Yield();
+
+            // If none of the special rules matched but the source field was provided, put into Others
+            if (hasSource)
+                return new GroupDefinition(50, "Others").Yield();
+
+            // No source and no match -> Unsourced
+            return new GroupDefinition(200, "Unsourced").Yield();
         }
 
         private List<GroupMapping> defineGroupsByCollection(List<CarouselItem> carouselItems, List<BeatmapCollection> allCollections)

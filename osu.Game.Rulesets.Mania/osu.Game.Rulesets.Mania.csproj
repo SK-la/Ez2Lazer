@@ -15,8 +15,4 @@
   <ItemGroup Label="Project References">
     <ProjectReference Include="..\osu.Game\osu.Game.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Mods\YuLiangSSSMods\oldbackup\" />
-  </ItemGroup>
 </Project>
