@@ -6,6 +6,7 @@
 using System;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 
@@ -32,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             {
                 BeatmapInfo = new BeatmapInfo
                 {
-                    Ruleset = new osu.Game.Rulesets.Mania.ManiaRuleset().RulesetInfo,
+                    Ruleset = new ManiaRuleset().RulesetInfo,
                     Difficulty = new BeatmapDifficulty
                     {
                         DrainRate = 6,
@@ -41,7 +42,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
                         CircleSize = columns
                     }
                 },
-                ControlPointInfo = new osu.Game.Beatmaps.ControlPoints.ControlPointInfo()
+                ControlPointInfo = new ControlPointInfo()
             };
 
             var rnd = new Random(seed);

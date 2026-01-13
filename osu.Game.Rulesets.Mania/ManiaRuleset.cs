@@ -365,6 +365,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         new ManiaModLoopPlayClip(),
+                        new ManiaModSRAdjust(),
                     };
 
                 case ModType.Fun:

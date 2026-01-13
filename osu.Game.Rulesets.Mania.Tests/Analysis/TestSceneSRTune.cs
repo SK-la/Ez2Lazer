@@ -77,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             {
                 lastSettings = (SRCalculatorTunable.Tunables.FinalLNToNotesFactor, SRCalculatorTunable.Tunables.FinalLNLenCap, SRCalculatorTunable.Tunables.TotalNotesOffset, SRCalculatorTunable.Tunables.PBarLnMultiplier, SRCalculatorTunable.Tunables.JackPenaltyMultiplier, SRCalculatorTunable.Tunables.FinalScale);
                 // also snapshot last SR values from current
-                foreach (var k in current.Keys)
+                foreach (string k in current.Keys)
                     last[k] = current[k];
             });
 
@@ -127,10 +127,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             // try load canonical test beatmap resource first
             try
             {
-                var resourcePath = @"Resources/Testing/Beatmaps/4869637.osu";
-                var fullPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "osu.Game.Rulesets.Mania.Tests", resourcePath);
-                if (!System.IO.File.Exists(fullPath))
-                    fullPath = System.IO.Path.Combine(Environment.CurrentDirectory, resourcePath);
+                string resourcePath = @"Resources/Testing/Beatmaps/4869637.osu";
 
                 // prefer a set of deterministic half-hold beatmaps for side-by-side tuning
                 sampleBeatmaps = HalfHoldBeatmapSets.CreateTen(4, 32);

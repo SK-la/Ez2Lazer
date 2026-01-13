@@ -23,6 +23,10 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
     /// </summary>
     public class SRCalculator
     {
+        // 可通过 Mod 进行调整的参数（保持与原始实现一致的默认值）
+        public static double RescaleHighThreshold { get; set; } = 8.0;
+        public static double LnIntegralMultiplier { get; set; } = 6.0;
+
         [Resolved]
         protected RulesetInfo RulesetInfo { get; set; } = null!;
 
@@ -735,7 +739,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
                 double delta = 0.001 * deltaTime;
                 double v = 1;
                 if (lnRep.HasValue)
-                    v += 6 * 0.001 * lnIntegral(lnRep.Value, leftNote.HeadTime, rightNote.HeadTime);
+                    v += LnIntegralMultiplier * 0.001 * lnIntegral(lnRep.Value, leftNote.HeadTime, rightNote.HeadTime);
 
                 double booster = streamBooster(delta);
                 double effective = Math.Max(booster, v);
@@ -1183,24 +1187,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
             return lowerBound(array, (double)value);
         }
 
-        private static int lowerBound(int[] array, double value)
-        {
-            int left = 0;
-            int right = array.Length;
-
-            while (left < right)
-            {
-                int span = right - left;
-                int mid = left + (span >> 1);
-                if (array[mid] < value)
-                    left = mid + 1;
-                else
-                    right = mid;
-            }
-
-            return left;
-        }
-
         private static int upperBound(int[] array, int value)
         {
             int left = 0;
@@ -1267,11 +1253,12 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Analysis
 
         private static double rescaleHigh(double sr)
         {
-            double excess = sr - 9;
+            double threshold = RescaleHighThreshold;
+            double excess = sr - threshold;
             double normalized = excess / 1.2;
-            double softened = 9 + normalized;
+            double softened = threshold + normalized;
 
-            return sr <= 9 ? sr : softened;
+            return sr <= threshold ? sr : softened;
         }
 
         private static int clamp(int value, int min, int max)
