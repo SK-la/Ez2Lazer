@@ -4,7 +4,6 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -12,7 +11,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Overlays;
 using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
@@ -59,9 +57,6 @@ namespace osu.Game.Beatmaps.Drawables
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
-
-        [Resolved]
-        private OverlayColourProvider? colourProvider { get; set; }
 
         /// <summary>
         /// Creates a new <see cref="StarRatingDisplay"/> using an already computed <see cref="StarDifficulty"/>.

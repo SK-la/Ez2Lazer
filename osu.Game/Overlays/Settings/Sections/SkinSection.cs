@@ -42,6 +42,8 @@ namespace osu.Game.Overlays.Settings.Sections
             Icon = OsuIcon.SkinB
         };
 
+        public override IEnumerable<LocalisableString> FilterTerms => base.FilterTerms.Concat(new LocalisableString[] { "skins" });
+
         private static readonly Live<SkinInfo> random_skin_info = new SkinInfo
         {
             ID = SkinInfo.RANDOM_SKIN,
