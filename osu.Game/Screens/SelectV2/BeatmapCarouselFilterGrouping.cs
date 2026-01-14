@@ -426,13 +426,14 @@ namespace osu.Game.Screens.SelectV2
             }
 
             // priority-ordered matching
-            if (containsAny(combined, "tv", "tv-size", "tv size", "anime", "op", "ed", "tv_ver"))
-                return new GroupDefinition(3, "Anime").Yield();
-
-            if (containsAny(combined, "touhou", "東方", "东方", "touhou project", "東方Project", "東方プロジェクト", "동방프로젝트", "동방Project", "tohou"))
+            if (containsAny(combined, "touhou", "東方", "东方", "touhou project", "東方Project", "東方プロジェクト", "동방프로젝트", "동방Project", "tohou",
+                    "瑶山百灵", "藤咲かりん", "小峠舞", "ZUN", "上海アリス幻樂団", "上海アリス", "Team Shanghai Alice", "IOSYS", "EastNewSound", "幽閉サテライト", "C-CLAYS", "Silver Forest", "Sound Holic", "Alstroemeria Records", "豚乙女", "Demetori", "SOUND HOLIC",
+                    "幽闭星光",
+                    "博麗", "霊夢", "霊夢", "魔理沙", "アリス", "咲夜", "レミリア", "フランドール", "チルノ", "パチュリー", "妖夢", "鈴仙", "早苗", "映姫", "幽々子", "蓮子", "メディスン", "妖怪",
+                    "地霊殿", "紅魔郷", "妖々夢", "永夜抄", "花映塚", "風神録", "神霊廟", "輝針城", "紺珠伝", "天空璋", "鬼形獣", "虹龍洞"))
                 return new GroupDefinition(2, "东方Project").Yield();
 
-            if (containsAny(combined, "vocaloid", "ボーカロイド", "보컬로이드", "vocaloids", "vocaloid music",
+            if (containsAny(combined, "vocaloid", "ボーカロイド", "보컬로이드", "vocaloids", "vocaloid music", "diva",
                     "miku", "hatsune", "kagamine", "gumi", "luka", "meiko", "kaito", "鏡音", "初音", "巡音", "巡音ルカ", "鏡音リン", "鏡音レン", "MEIKO", "KAITO", "GUMI"))
                 return new GroupDefinition(4, "VOCALOID").Yield();
 
@@ -442,17 +443,21 @@ namespace osu.Game.Screens.SelectV2
             if (containsAny(combined, "djmax", "디제이맥스", "DJMAX"))
                 return new GroupDefinition(0, "DJMAX").Yield();
 
-            if (containsAny(combined, "o2", "o2jam", "o2", "오투잼", "[荣誉]", "[木星灵魂]", "[木星]"))
-                return new GroupDefinition(0, "O2").Yield();
-
-            if (containsAny(combined, "bms"))
+            if (containsAny(combined, "bms", "bof"))
                 return new GroupDefinition(0, "BMS").Yield();
 
-            if (containsAny(combined, "iidx", "beatmania iidx", "beatmania"))
-                return new GroupDefinition(0, "IIDX").Yield();
+            if (containsAny(combined, "iidx", "beatmania iidx", "beatmania", "beatmaniaIIDX", "konami", "bemani", "sdvx", "sound voltex",
+                    "pop'n music", "pop'n", "popn", "guitarFreaks", "drummania", "DDR", "dance dance revolution", "DanceDanceRevolution", "jubeat", "reflec beat", "REFLEC BEAT",
+                    "あさき", "dj TAKA", "DJ YOSHITAKA", " 猫叉Master", "U1", "L.E.D.", "wac", "Qrispy Joybox", "PON", "DJ TOTTO", "PHQUASE", "村井圣夜"
+                ))
+                return new GroupDefinition(0, "BEMANI SOUND").Yield();
 
-            if (containsAny(combined, "popn music", "pop'n", "popn"))
-                return new GroupDefinition(0, "Pop'n").Yield();
+            if (containsAny(combined, "o2jam", "o2mania", "오투잼", "[荣誉]", "[木星灵魂]", "[木星]", "劲乐团"))
+                return new GroupDefinition(0, "O2").Yield();
+
+            if (containsAny(combined, "tv", "tv-size", "tv size", "anime", "op", "ed", "tv_ver", "アニメ", "动画", "acg", "galgame", "dmm", "Douga", "Nico",
+                    "game"))
+                return new GroupDefinition(3, "ACG").Yield();
 
             // If none of the special rules matched but the source field was provided, put into Others
             if (hasSource)

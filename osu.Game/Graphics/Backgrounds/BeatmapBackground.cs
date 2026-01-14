@@ -15,7 +15,7 @@ namespace osu.Game.Graphics.Backgrounds
 
         private readonly string fallbackTextureName;
 
-        public BeatmapBackground(WorkingBeatmap beatmap, string fallbackTextureName = @"Backgrounds/bg1")
+        public BeatmapBackground(WorkingBeatmap beatmap, string fallbackTextureName = @"Menu/Ez-background-3")
         {
             Beatmap = beatmap;
             this.fallbackTextureName = fallbackTextureName;
