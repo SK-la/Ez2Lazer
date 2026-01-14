@@ -86,7 +86,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<bool> editorShowStoryboard = null!;
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = null!;
-        private Bindable<bool> showBlurStoryboard = new Bindable<bool>();
+        private readonly Bindable<bool> showBlurStoryboard = new Bindable<bool>();
         private IBindable<WorkingBeatmap> workingBeatmap { get; set; } = new Bindable<WorkingBeatmap>();
 
         private readonly Box dimBox;

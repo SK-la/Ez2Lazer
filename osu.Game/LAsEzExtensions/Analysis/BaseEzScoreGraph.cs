@@ -160,14 +160,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             // Create a fresh ScoreProcessor for V2 calculation (V1 already used one)
             var v2ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
 
-            if (v2ScoreProcessor == null)
-            {
-                V2Accuracy = 0;
-                V2Score = 0;
-                V2Counts = new Dictionary<HitResult, int>();
-                return;
-            }
-
             v2ScoreProcessor.Mods.Value = Score.Mods;
             v2ScoreProcessor.ApplyBeatmap(Beatmap);
 

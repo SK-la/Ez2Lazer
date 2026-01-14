@@ -38,9 +38,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource("LN Integral Multiplier", "LN 因子", SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> LnMultiplier { get; } = new BindableDouble(SRCalculator.LnIntegralMultiplier)
         {
-            MinValue = 1,
-            MaxValue = 20,
-            Precision = 1
+            MinValue = 4,
+            MaxValue = 8,
+            Precision = 0.5
         };
 
         public ManiaModSRAdjust()

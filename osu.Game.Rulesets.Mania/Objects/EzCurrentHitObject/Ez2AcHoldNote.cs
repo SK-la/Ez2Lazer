@@ -12,10 +12,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     // 注意注册顺序必须是：头 尾 身体
     public class Ez2AcHoldNote : HoldNote
     {
-        public Ez2AcHoldNote()
-        {
-        }
-
         public Ez2AcHoldNote(HoldNote hold)
         {
             StartTime = hold.StartTime;
@@ -76,10 +72,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public class Ez2AcNote : Note
     {
-        public Ez2AcNote()
-        {
-        }
-
         public Ez2AcNote(Note note)
         {
             StartTime = note.StartTime;

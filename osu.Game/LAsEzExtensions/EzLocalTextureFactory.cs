@@ -253,7 +253,7 @@ namespace osu.Game.LAsEzExtensions
 
                     if (texture == null) break;
 
-                    if (texture.Width > 500) texture.ScaleAdjust = 0.5f; // 大纹理缩小加载，防止内存暴涨
+                    if (texture.Width > 256) texture.ScaleAdjust = 0.5f; // 大纹理缩小加载，防止内存暴涨
 
                     frames.Add(texture);
                 }
@@ -266,7 +266,11 @@ namespace osu.Game.LAsEzExtensions
                 var texture = textureStore.Get(frameFile);
 
                 if (texture != null)
+                {
+                    if (texture.Width > 256) texture.ScaleAdjust = 0.5f; // 大纹理缩小加载，防止内存暴涨
+
                     frames.Add(texture);
+                }
             }
 
             return new List<Texture>(frames);

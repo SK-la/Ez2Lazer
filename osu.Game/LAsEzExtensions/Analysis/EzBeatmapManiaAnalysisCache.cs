@@ -418,7 +418,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             try
             {
                 // 无mod快速路径：尝试直接从持久化存储获取结果
-                if (persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
+                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                 {
                     return persisted;
                 }
