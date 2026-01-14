@@ -10,6 +10,8 @@ using osu.Game.Rulesets.Taiko.Objects;
 using osu.Game.Rulesets.Taiko.Objects.Drawables;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
+using osu.Game.LAsEzExtensions.Audio;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Taiko.UI
 {
@@ -93,6 +95,31 @@ namespace osu.Game.Rulesets.Taiko.UI
                         break;
                 }
             }
+
+            // Record input for latency tracking (map TaikoAction to a representative Key)
+            try
+            {
+                Key mapped = Key.Unknown;
+                switch (e.Action)
+                {
+                    case TaikoAction.LeftCentre:
+                        mapped = Key.D;
+                        break;
+                    case TaikoAction.RightCentre:
+                        mapped = Key.J;
+                        break;
+                    case TaikoAction.LeftRim:
+                        mapped = Key.F;
+                        break;
+                    case TaikoAction.RightRim:
+                        mapped = Key.K;
+                        break;
+                }
+
+                if (mapped != Key.Unknown)
+                    InputAudioLatencyTracker.Instance?.RecordKeyPress(mapped);
+            }
+            catch { }
 
             Play(triggerSource, hitType, strong);
 

@@ -98,7 +98,7 @@ namespace osu.Game.Graphics.Backgrounds
     public partial class SeasonalBackground : Background
     {
         private readonly string url;
-        private const string fallback_texture_name = @"Backgrounds/bg1";
+        private const string fallback_texture_name = @"Menu/Ez-background-3";
 
         public SeasonalBackground(string url)
         {

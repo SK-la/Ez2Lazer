@@ -615,10 +615,6 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (Samples != null)
             {
                 Samples.Balance.Value = CalculateSamplePlaybackBalance(SamplePlaybackPosition);
-
-                #if DEBUG
-                InputAudioLatencyTracker.GlobalTracker?.RecordAudioPlay();
-                #endif
                 Samples.Play();
             }
         }
@@ -745,7 +741,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
             Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
             if (Result.HasResult)
+            {
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
+            }
 
             OnNewResult?.Invoke(this, Result);
         }

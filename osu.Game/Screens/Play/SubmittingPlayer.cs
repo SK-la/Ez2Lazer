@@ -11,11 +11,11 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
-using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.LAsEzExtensions.Audio;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.Multiplayer;
@@ -50,6 +50,9 @@ namespace osu.Game.Screens.Play
         [CanBeNull]
         private UserStatisticsWatcher userStatisticsWatcher { get; set; }
 
+        [Resolved]
+        private osu.Framework.Audio.AudioManager audioManager { get; set; }
+
         [CanBeNull]
         private InputAudioLatencyTracker latencyTracker;
 
@@ -62,7 +65,7 @@ namespace osu.Game.Screens.Play
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
             if (DrawableRuleset == null)
             {
@@ -80,12 +83,10 @@ namespace osu.Game.Screens.Play
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
             });
-#if DEBUG
-            // Initialize latency tracker
-            latencyTracker = new InputAudioLatencyTracker();
-            latencyTracker.Initialize(GameplayState.ScoreProcessor);
-#endif
-            // Key input recording is handled in OnKeyDown override
+
+            // 初始化延迟追踪
+            latencyTracker = new InputAudioLatencyTracker(ezConfig);
+            latencyTracker?.Initialize(ScoreProcessor);
         }
 
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)
@@ -269,6 +270,10 @@ namespace osu.Game.Screens.Play
             bool exiting = base.OnExiting(e);
             submitFromFailOrQuit(Score);
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());
+
+            // 生成延迟报告
+            latencyTracker?.GenerateLatencyReport();
+
             return exiting;
         }
 
@@ -371,18 +376,5 @@ namespace osu.Game.Screens.Play
             AllowRetry = true,
             IsLocalPlay = true,
         };
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-            latencyTracker?.OnGameExit();
-            latencyTracker?.Dispose();
-        }
-
-        protected override bool OnKeyDown(KeyDownEvent e)
-        {
-            latencyTracker?.RecordKeyPress(e.Key);
-            return base.OnKeyDown(e);
-        }
     }
 }

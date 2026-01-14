@@ -189,6 +189,9 @@ namespace osu.Game.Rulesets.Mania.UI
             if (e.Action != Action.Value)
                 return false;
 
+            // 记录延迟追踪按键输入
+            osu.Game.LAsEzExtensions.Audio.InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
+
             sampleTriggerSource.Play();
             return true;
         }

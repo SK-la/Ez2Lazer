@@ -36,6 +36,7 @@ using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Users;
 using osu.Game.Utils;
 using osuTK.Graphics;
@@ -263,6 +264,20 @@ namespace osu.Game.Screens.Play
             ScoreProcessor.ApplyBeatmap(playableBeatmap);
 
             dependencies.CacheAs(ScoreProcessor);
+
+            // Initialize InputAudioLatencyTracker if available in DI
+            try
+            {
+                var ezConfig = dependencies.Get<Ez2ConfigManager>();
+                var tracker = new osu.Game.LAsEzExtensions.Audio.InputAudioLatencyTracker(ezConfig);
+                dependencies.CacheAs(tracker);
+                tracker.Initialize(ScoreProcessor);
+                tracker.Start();
+            }
+            catch (Exception)
+            {
+                // Ez2ConfigManager not available or tracker initialization failed — skip silently.
+            }
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
             HealthProcessor ??= ruleset.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
