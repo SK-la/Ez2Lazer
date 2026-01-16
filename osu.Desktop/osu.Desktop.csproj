@@ -15,10 +15,6 @@
   <PropertyGroup>
     <StartupObject>osu.Desktop.Program</StartupObject>
   </PropertyGroup>
-  <PropertyGroup>
-    <PublishDir>F:\MUG OSU\Ez2Lazer_Publish\$(Configuration)</PublishDir>
-    <OutputPath>bin\$(Configuration)\</OutputPath>
-  </PropertyGroup>
   <ItemGroup Label="Project References">
     <ProjectReference Include="..\osu.Game.Tournament\osu.Game.Tournament.csproj" />
     <ProjectReference Include="..\osu.Game\osu.Game.csproj" />
