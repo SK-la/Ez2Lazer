@@ -87,6 +87,15 @@ namespace osu.Game.Screens.Play
             // 初始化延迟追踪
             latencyTracker = new InputAudioLatencyTracker(ezConfig);
             latencyTracker?.Initialize(ScoreProcessor);
+            // Ensure tracker is started for testing scenarios in SubmittingPlayer
+            try
+            {
+                latencyTracker?.Start();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"InputAudioLatencyTracker failed to Start: {ex.Message}", level: LogLevel.Error);
+            }
         }
 
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)

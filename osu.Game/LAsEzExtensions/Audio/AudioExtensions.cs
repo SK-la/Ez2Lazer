@@ -16,23 +16,6 @@ namespace osu.Game.LAsEzExtensions.Audio
         // 固定采样率列表，优先使用48kHz
         public static readonly int[] COMMON_SAMPLE_RATES = { 48000, 44100, 96000, 192000 };
 
-        // 扩展方法：获取当前采样率
-        public static int GetSampleRate(this AudioManager audioManager)
-        {
-            // Use the unified sample rate from AudioManager
-            return audioManager.SampleRate.Value;
-        }
-
-        // 扩展方法：设置采样率
-        public static void SetSampleRate(this AudioManager audioManager, int sampleRate)
-        {
-            Logger.Log($"Setting sample rate to {sampleRate}Hz", LoggingTarget.Runtime, LogLevel.Debug);
-            // 使用静态 preferred 采样率，避免触发 ValueChanged
-            AudioManager.SetPreferredAsioSampleRate(sampleRate);
-            // 设置 unified sample rate
-            audioManager.SampleRate.Value = sampleRate;
-        }
-
         // 扩展方法：设置ASIO设备初始化事件监听器
         public static void SetupAsioSampleRateSync(this AudioManager audioManager, Action<int> onSampleRateChanged)
         {
@@ -41,9 +24,6 @@ namespace osu.Game.LAsEzExtensions.Audio
                 int intSampleRate = (int)sampleRate;
                 Logger.Log($"ASIO device initialized with sample rate {intSampleRate}Hz", LoggingTarget.Runtime, LogLevel.Debug);
                 onSampleRateChanged(intSampleRate);
-
-                // 不要更新统一的采样率设置，避免覆盖用户设置导致循环
-                // audioManager.SampleRate.Value = intSampleRate;
             };
         }
 
@@ -90,9 +70,10 @@ namespace osu.Game.LAsEzExtensions.Audio
                             }
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // 如果反射失败，忽略错误
+                        // 如果反射失败，记录错误并继续
+                        Logger.Log($"Reflection failed when getting ASIO devices: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
                     }
                 }
 

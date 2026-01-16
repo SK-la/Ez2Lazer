@@ -17,7 +17,7 @@ using osuTK.Input;
 namespace osu.Game.LAsEzExtensions.Audio
 {
     /// <summary>
-    /// Unified latency measurement manager that coordinates between game input events and the EzLogModule system.
+    /// Unified latency measurement manager that coordinates between game input events and the EzLatency system.
     /// Acts as the central bridge between osu! game events and framework-level latency tracking.
     /// </summary>
     public partial class InputAudioLatencyTracker : IDisposable
@@ -32,10 +32,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         private ScoreProcessor? scoreProcessor;
 
-        private Action<EzLatencyRecord>? measurementHandler;
-
-        // 开关状态缓存
-        private bool isEnabled;
+        private EzLatencyManager latencyManager;
 
         /// <summary>
         /// Global instance for unified access
@@ -46,37 +43,25 @@ namespace osu.Game.LAsEzExtensions.Audio
         {
             ezConfig = ez2ConfigManager;
             Instance = this;
+
+            // 使用全局的 EzLatencyManager 实例以与框架层的全局插桩一致
+            latencyManager = EzLatencyManager.GLOBAL;
         }
 
         public void Initialize(ScoreProcessor processor)
         {
-            isEnabled = ezConfig.Get<bool>(Ez2Setting.InputAudioLatencyTracker);
+            Logger.Log($"InputAudioLatencyTracker.Initialize called", LoggingTarget.Runtime, LogLevel.Debug);
             scoreProcessor = processor;
 
-            // 绑定到配置变化，统一控制EzOsuLatency总开关
-            ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker).BindValueChanged(enabled =>
-            {
-                isEnabled = enabled.NewValue;
+            // 将 Ez2Setting 的启用状态绑定到 EzLatencyManager
+            var configBindable = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker);
+            latencyManager.Enabled.BindTo(configBindable);
 
-                // 通过framework的总开关接口统一控制
+            // 订阅延迟记录事件，用于日志输出
+            latencyManager.OnNewRecord += OnLatencyRecordGenerated;
 
-                // 管理所有Ez模块的启用状态
-                EzLogModule.Instance.Enabled = isEnabled;
-                EzInputModule.Enabled = isEnabled;
-                EzJudgeModule.Enabled = isEnabled;
-            });
-
-            // 设置初始状态
-
-            EzLogModule.Instance.Enabled = isEnabled;
-            EzInputModule.Enabled = isEnabled;
-            EzJudgeModule.Enabled = isEnabled;
-
-            // Do not attach event handlers here. Start/Stop controls lifecycle.
-            measurementHandler = logFrameworkRecord;
-
-            // bind enable/disable to Start/Stop
-            ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker).BindValueChanged(enabled =>
+            // 绑定启用状态变化，控制生命周期
+            latencyManager.Enabled.BindValueChanged(enabled =>
             {
                 if (enabled.NewValue)
                     Start();
@@ -93,15 +78,10 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             started = true;
 
+            Logger.Log($"InputAudioLatencyTracker.Start called", LoggingTarget.Runtime, LogLevel.Debug);
+
             if (scoreProcessor != null)
                 scoreProcessor.NewJudgement += OnNewJudgement;
-
-            try
-            {
-                if (measurementHandler != null)
-                    EzLatencyService.Instance.OnMeasurement += measurementHandler;
-            }
-            catch { }
         }
 
         public void Stop()
@@ -112,13 +92,6 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             if (scoreProcessor != null)
                 scoreProcessor.NewJudgement -= OnNewJudgement;
-
-            try
-            {
-                if (measurementHandler != null)
-                    EzLatencyService.Instance.OnMeasurement -= measurementHandler;
-            }
-            catch { }
         }
 
         /// <summary>
@@ -128,10 +101,10 @@ namespace osu.Game.LAsEzExtensions.Audio
         /// <param name="key">The key that was pressed</param>
         public void RecordKeyPress(Key key)
         {
-            if (isEnabled)
+            if (latencyManager.Enabled.Value)
             {
-                // EzOsuLatency: 记录输入时间戳 (T_input)
-                EzInputModule.RecordTimestamp(DateTime.Now, key);
+                // 记录输入事件
+                latencyManager.RecordInputEvent(key);
             }
         }
 
@@ -141,10 +114,10 @@ namespace osu.Game.LAsEzExtensions.Audio
         /// <param name="column">The column that was pressed</param>
         public void RecordColumnPress(int column)
         {
-            if (isEnabled)
+            if (latencyManager.Enabled.Value)
             {
-                // EzOsuLatency: 记录输入时间戳 (T_input) for mania
-                EzInputModule.RecordTimestamp(DateTime.Now, (Key)(Key.Z + column));
+                // 记录输入事件 (使用 column 作为标识)
+                latencyManager.RecordInputEvent(column);
             }
         }
 
@@ -153,14 +126,14 @@ namespace osu.Game.LAsEzExtensions.Audio
         /// </summary>
         public void GenerateLatencyReport()
         {
-            if (!isEnabled)
+            if (!latencyManager.Enabled.Value)
                 return;
 
-            if (scoreProcessor != null)
-                scoreProcessor.NewJudgement -= OnNewJudgement;
+            // 停止收集新数据
+            Stop();
 
-            // 从 EzLogModule 获取统计数据
-            var stats = EzLogModule.Instance.GetLatencyStatistics();
+            // 从 EzLatencyManager 获取统计数据
+            var stats = latencyManager.GetStatistics();
 
             if (!stats.HasData)
             {
@@ -168,9 +141,9 @@ namespace osu.Game.LAsEzExtensions.Audio
                 return;
             }
 
-            // 由 InputAudioLatencyTracker 负责输出日志
-            string message1 = $"Input->Judgement: {stats.AvgInputToJudge:F2}ms, Input->Audio: {stats.AvgInputToPlayback:F2}ms, Audio->Judgement: {stats.AvgPlaybackToJudge:F2}ms (based on {stats.RecordCount} complete records)";
-            string message2 = $"Input->Judgement: {stats.AvgInputToJudge:F2}ms, \nInput->Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio->Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
+            // 输出统计日志
+            string message1 = $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, Input→Audio: {stats.AvgInputToPlayback:F2}ms, Audio→Judgement: {stats.AvgPlaybackToJudge:F2}ms (based on {stats.RecordCount} complete records)";
+            string message2 = $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
 
             Logger.Log($"[EzOsuLatency] Latency Analysis: {message1}");
             Logger.Log($"[EzOsuLatency] Latency Analysis: \n{message2}", LoggingTarget.Runtime, LogLevel.Important);
@@ -180,7 +153,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             {
                 notificationOverlay.Post(new SimpleNotification
                 {
-                    Text = $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms",
+                    Text = $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms\nRecords: {stats.RecordCount}",
                     Icon = FontAwesome.Solid.ChartLine,
                 });
             }
@@ -188,7 +161,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         private void OnNewJudgement(JudgementResult result)
         {
-            if (!isEnabled)
+            if (!latencyManager.Enabled.Value)
                 return;
 
             if (result.Type.IsScorable())
@@ -201,15 +174,10 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                 bool isPerfect = result.Type == HitResult.Perfect;
 
-                if (isNote && isPerfect && EzInputModule.InputTime > 0)
+                if (isNote && isPerfect)
                 {
-                    // EzOsuLatency: 记录判定时间戳 (T_judge) - 只记录普通note的Perfect判定且有对应输入
-                    EzJudgeModule.RecordTimestamp(DateTime.Now);
-                }
-                else if (!isNote || !isPerfect)
-                {
-                    // 如果不是普通note或不是Perfect判定，清空之前记录的输入时间戳，避免记录不完整的延迟数据
-                    EzInputModule.ClearInputData();
+                    // 记录判定事件
+                    latencyManager.RecordJudgeEvent();
                 }
             }
         }
@@ -218,22 +186,27 @@ namespace osu.Game.LAsEzExtensions.Audio
         {
             Stop();
 
-            // 清理所有Ez模块的状态
-            EzLogModule.Instance.Enabled = false;
-            EzInputModule.Enabled = false;
-            EzJudgeModule.Enabled = false;
+            // 解绑事件
+            if (latencyManager != null)
+            {
+                latencyManager.OnNewRecord -= OnLatencyRecordGenerated;
+                latencyManager.Dispose();
+            }
 
             Instance = null;
         }
 
-        private void logFrameworkRecord(EzLatencyRecord r)
+        /// <summary>
+        /// 处理从 framework 层传来的延迟记录，输出详细日志
+        /// </summary>
+        private void OnLatencyRecordGenerated(EzLatencyRecord r)
         {
             try
             {
                 var inputData = r.InputData;
                 var hw = r.HardwareData;
 
-                string keyVal = inputData.KeyValue?.ToString() ?? (r.InputTime > 0 ? r.InputTime.ToString("F2") : "-");
+                string keyVal = inputData.KeyValue?.ToString() ?? "-";
 
                 string line = $"[EzOsuLatency] {r.Timestamp:O} | {r.MeasuredMs:F2} ms | note={r.Note} | in={r.InputTime:F2} | key={keyVal} | play={r.PlaybackTime:F2} | judge={r.JudgeTime:F2} | driver={r.DriverTime:F2} | out_hw={r.OutputHardwareTime:F2} | in_hw={r.InputHardwareTime:F2} | diff={r.LatencyDifference:F2}";
 
@@ -243,7 +216,10 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                 Logger.Log(line + extra, LoggingTarget.Runtime, LogLevel.Debug);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Logger.Log($"InputAudioLatencyTracker: failed to handle new record: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+            }
         }
     }
 }

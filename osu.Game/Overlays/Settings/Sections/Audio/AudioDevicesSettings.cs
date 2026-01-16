@@ -82,7 +82,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 sampleRateDropdown.Current.ValueChanged += e =>
                 {
                     Logger.Log($"User set sample rate to {e.NewValue}Hz", LoggingTarget.Runtime, LogLevel.Debug);
-                    audio.SetSampleRate(e.NewValue);
+                    audio.SetPreferredAsioSampleRate(e.NewValue);
                 };
 
                 // 根据初始设备类型显示或隐藏采样率设置
