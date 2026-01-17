@@ -1,5 +1,6 @@
 import subprocess
 import os
+import sys
 import argparse
 import shutil
 import zipfile
@@ -178,8 +179,12 @@ def main():
     parser.add_argument('--resources-path', default=None, help='Local path to resources to include in package')
     args = parser.parse_args()
 
-    timestamp = datetime.utcnow().strftime('%Y%m%d')
-    tag_suffix = f"_{args.tag}" if args.tag else f"_{timestamp}"
+    # Enforce that a tag is provided to avoid any implicit fallback tag generation
+    if not args.tag:
+        print("Error: --tag must be provided. Aborting to avoid generating fallback tags like 'locmain-...'.")
+        sys.exit(1)
+
+    tag_suffix = f"_{args.tag}"
 
     # fixed folder names
     release_dir = os.path.join(args.outroot, 'Ez2Lazer_release_x64')
