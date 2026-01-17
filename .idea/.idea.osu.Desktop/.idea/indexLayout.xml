@@ -1,22 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="UserContentModel">
-    <attachedFolders>
-      <Path>Templates</Path>
-    </attachedFolders>
-    <explicitExcludes>
-      <Path>Templates</Path>
-      <Path>osu.Game.Rulesets.Catch.Tests.Android/osu.Game.Rulesets.Catch.Tests.Android.csproj</Path>
-      <Path>osu.Game.Rulesets.Catch.Tests.iOS/osu.Game.Rulesets.Catch.Tests.iOS.csproj</Path>
-      <Path>osu.Game.Rulesets.Mania.Tests.Android/osu.Game.Rulesets.Mania.Tests.Android.csproj</Path>
-      <Path>osu.Game.Rulesets.Mania.Tests.iOS/osu.Game.Rulesets.Mania.Tests.iOS.csproj</Path>
-      <Path>osu.Game.Rulesets.Osu.Tests.Android/osu.Game.Rulesets.Osu.Tests.Android.csproj</Path>
-      <Path>osu.Game.Rulesets.Osu.Tests.iOS/osu.Game.Rulesets.Osu.Tests.iOS.csproj</Path>
-      <Path>osu.Game.Rulesets.Taiko.Tests.Android/osu.Game.Rulesets.Taiko.Tests.Android.csproj</Path>
-      <Path>osu.Game.Rulesets.Taiko.Tests.iOS/osu.Game.Rulesets.Taiko.Tests.iOS.csproj</Path>
-      <Path>osu.Game.Tests.Android/osu.Game.Tests.Android.csproj</Path>
-      <Path>osu.Game.Tests.iOS/osu.Game.Tests.iOS.csproj</Path>
-      <Path>osu.iOS/osu.iOS.csproj</Path>
-    </explicitExcludes>
+    <attachedFolders />
+    <explicitIncludes />
+    <explicitExcludes />
   </component>
 </project>
