@@ -19,7 +19,6 @@ using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
-using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Pooling;
 using osu.Game.Rulesets.Objects.Types;
@@ -741,9 +740,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
             if (Result.HasResult)
-            {
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
-            }
 
             OnNewResult?.Invoke(this, Result);
         }

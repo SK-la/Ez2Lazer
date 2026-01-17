@@ -287,9 +287,6 @@ namespace osu.Game.Rulesets.Osu.Objects.Drawables
 
                         if (IsHovered)
                         {
-                            // 记录延迟追踪按键输入
-                            osu.Game.LAsEzExtensions.Audio.InputAudioLatencyTracker.Instance?.RecordKeyPress(e.Action == OsuAction.LeftButton ? osuTK.Input.Key.Z : osuTK.Input.Key.X);
-
                             Hit();
                             HitAction ??= e.Action;
                             return true;
