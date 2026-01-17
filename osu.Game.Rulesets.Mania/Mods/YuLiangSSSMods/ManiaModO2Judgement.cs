@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModO2Judgement : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>, IApplicableToHUD
     {
-        public static ManiaHitWindows Windows = new ManiaHitWindows();
+        public static ManiaHitWindows HitWindows = new ManiaHitWindows();
 
         public override string Name => "O2JAM Judgement";
 
@@ -34,8 +34,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override double ScoreMultiplier => 1.0;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
-
-        public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -80,15 +78,27 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }).ToList();
 
             maniaBeatmap.HitObjects = hitObjects;
+
+            // Ensure global O2 BPM and this mod's hit windows are set so gameplay uses correct ranges.
+            double bpm = beatmap.BeatmapInfo.BPM;
+            O2HitModeExtension.NowBeatmapBPM = bpm;
+            O2HitModeExtension.PillCount.Value = 0;
+            HitWindows.BPM = bpm;
+            HitWindows.BPM = bpm;
         }
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            HitWindows.SetSpecialDifficultyRange(O2HitModeExtension.CoolRange, O2HitModeExtension.CoolRange, O2HitModeExtension.GoodRange, O2HitModeExtension.GoodRange, O2HitModeExtension.BadRange,
-                O2HitModeExtension.BadRange);
+            HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
+                O2HitModeExtension.CoolRange,
+                O2HitModeExtension.CoolRange,
+                O2HitModeExtension.GoodRange,
+                O2HitModeExtension.GoodRange,
+                O2HitModeExtension.BadRange,
+                O2HitModeExtension.BadRange
+            ));
             O2HitModeExtension.PillCount.Value = 0;
             O2HitModeExtension.PillActivated = PillMode.Value;
-            Windows = HitWindows;
         }
 
         public override void ResetSettingsToDefaults()

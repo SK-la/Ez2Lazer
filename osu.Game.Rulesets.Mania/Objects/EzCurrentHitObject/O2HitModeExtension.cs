@@ -17,7 +17,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         public const double COOL = 7500.0;
         public const double GOOD = 22500.0;
         public const double BAD = 31250.0;
-        public const double DEFAULT_BPM = 200;
+
+        // public const double DEFAULT_BPM = 200;
 
         // TODO: 💊缺少UI显示，以及合适的开关
         // 是否启用💊, 此处默认开启，否则必须搭配ManiaModO2Judgement.PillMode.Value才能生效
@@ -37,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         public static double CoolRange => COOL / NowBeatmapBPM;
         public static double GoodRange => GOOD / NowBeatmapBPM;
         public static double BadRange => BAD / NowBeatmapBPM;
-        public static double NowBeatmapBPM = 200;
+        public static double NowBeatmapBPM;
 
         /// <summary>
         /// 统一的 Pill 判定逻辑：将原本分散在各 Drawable 的重复实现合并到这里。

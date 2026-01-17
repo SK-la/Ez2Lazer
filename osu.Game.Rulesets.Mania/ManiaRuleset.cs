@@ -66,16 +66,7 @@ namespace osu.Game.Rulesets.Mania
 
         public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new ManiaHealthProcessor(drainStartTime);
 
-        public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap)
-        {
-            var hitWindows = new ManiaHitWindows
-            {
-                CustomHitWindows = true
-            };
-            hitWindows.SetHitMode(beatmap);
-
-            return new ManiaBeatmapConverter(beatmap, this);
-        }
+        public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap) => new ManiaBeatmapConverter(beatmap, this);
 
         public override PerformanceCalculator CreatePerformanceCalculator() => new ManiaPerformanceCalculator();
 

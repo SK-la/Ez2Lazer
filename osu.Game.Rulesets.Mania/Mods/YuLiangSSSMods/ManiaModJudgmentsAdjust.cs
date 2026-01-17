@@ -15,7 +15,7 @@ using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModJudgmentsAdjust : Mod, IApplicableToScoreProcessor, IApplicableToDifficulty
+    public class ManiaModJudgmentsAdjust : Mod, IApplicableToScoreProcessor
     {
         public override string Name => "Judgments Adjust";
 
@@ -163,6 +163,36 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
+        public ManiaModJudgmentsAdjust()
+        {
+            CustomHitRange.BindValueChanged(_ => updateCustomHitRange());
+            PerfectHit.BindValueChanged(_ => updateCustomHitRange());
+            GreatHit.BindValueChanged(_ => updateCustomHitRange());
+            GoodHit.BindValueChanged(_ => updateCustomHitRange());
+            OkHit.BindValueChanged(_ => updateCustomHitRange());
+            MehHit.BindValueChanged(_ => updateCustomHitRange());
+            MissHit.BindValueChanged(_ => updateCustomHitRange());
+        }
+
+        private void updateCustomHitRange()
+        {
+            if (CustomHitRange.Value)
+            {
+                HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
+                    PerfectHit.Value,
+                    GreatHit.Value,
+                    GoodHit.Value,
+                    OkHit.Value,
+                    MehHit.Value,
+                    MissHit.Value
+                ));
+            }
+            else
+            {
+                HitWindows.ResetRange();
+            }
+        }
+
         public ScoreRank AdjustRank(ScoreRank rank, double accuracy)
         {
             return rank;
@@ -177,16 +207,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             // mania.HitProportionScore.Ok = Ok.Value;
             // mania.HitProportionScore.Meh = Meh.Value;
             // mania.HitProportionScore.Miss = Miss.Value;
-        }
-
-        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
-        {
-            if (CustomHitRange.Value)
-            {
-                HitWindows.SetSpecialDifficultyRange(PerfectHit.Value, GreatHit.Value, GoodHit.Value, OkHit.Value, MehHit.Value, MissHit.Value);
-                difficulty.OverallDifficulty = 0;
-                HitWindows.SetDifficulty(difficulty.OverallDifficulty);
-            }
         }
     }
 }

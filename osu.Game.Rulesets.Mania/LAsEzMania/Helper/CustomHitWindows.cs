@@ -102,8 +102,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoolRange };
         }
 
-        public double[] GetHitWindowsO2Jam(double bpm)
+        public double[] GetHitWindowsO2Jam(double setBpm)
         {
+            bpm = setBpm;
             Range305 = 7500.0 / bpm * TotalMultiplier;
             Range300 = Range305;
             Range200 = 22500.0 / bpm * TotalMultiplier;
@@ -159,8 +160,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             switch (hitMode)
             {
                 case EzMUGHitMode.O2Jam:
-                    double bpmFromBeatmap = beatmap.BeatmapInfo.BPM <= 0 ? O2HitModeExtension.DEFAULT_BPM : beatmap.BeatmapInfo.BPM;
-                    return GetHitWindowsO2Jam(bpmFromBeatmap);
+                    bpm = beatmap.BeatmapInfo.BPM;
+                    return GetHitWindowsO2Jam(bpm);
 
                 case EzMUGHitMode.EZ2AC:
                     return GetHitWindowsEZ2AC();
@@ -181,8 +182,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             switch (HitMode)
             {
                 case EzMUGHitMode.O2Jam:
-                    double usedBpm = BPM > 0 ? BPM : O2HitModeExtension.DEFAULT_BPM;
-                    SetRanges(GetHitWindowsO2Jam(usedBpm));
+                    SetRanges(GetHitWindowsO2Jam(bpm));
                     break;
 
                 case EzMUGHitMode.Lazer:

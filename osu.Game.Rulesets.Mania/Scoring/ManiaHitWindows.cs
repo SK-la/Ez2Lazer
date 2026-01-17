@@ -11,6 +11,13 @@ using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
+    public readonly record struct ManiaModifyHitRange(double Perfect,
+                                                      double Great,
+                                                      double Good,
+                                                      double Ok,
+                                                      double Meh,
+                                                      double Miss);
+
     public class ManiaHitWindows : HitWindows
     {
         private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper(GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer);
@@ -107,16 +114,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        private static bool customHitWindows;
+        private static bool modifyHitWindows;
 
-        public bool CustomHitWindows
+        public bool ModifyHitWindows
         {
-            get => customHitWindows;
-            set
-            {
-                customHitWindows = value;
-                updateWindows();
-            }
+            get => modifyHitWindows;
+            set => modifyHitWindows = value;
         }
 
         private double perfect;
@@ -127,7 +130,20 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double miss;
         private double pool;
 
+        private double bpm;
+
+        public double BPM
+        {
+            get => bpm;
+            set
+            {
+                bpm = value;
+                setHitMode();
+            }
+        }
+
         public override bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResult) ?? false;
+        public EzMUGHitMode HitMode { get; set; }
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -155,22 +171,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        public void SetSpecialDifficultyRange(double perfect, double great, double good, double ok, double meh, double miss)
+        private void modifyManiaHitRange(double[] difficultyRangeArray)
         {
-            customHitWindows = true;
-
-            PerfectRange = perfect;
-            GreatRange = great;
-            GoodRange = good;
-            OkRange = ok;
-            MehRange = meh;
-            MissRange = miss;
-            updateWindows();
-        }
-
-        public void SetSpecialDifficultyRange(double[] difficultyRangeArray)
-        {
-            customHitWindows = true;
+            modifyHitWindows = true;
 
             PerfectRange = difficultyRangeArray[0];
             GreatRange = difficultyRangeArray[1];
@@ -181,55 +184,69 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        public void ResetRange()
+        public void ModifyManiaHitRange(ManiaModifyHitRange range)
         {
-            customHitWindows = false;
+            modifyHitWindows = true;
+
+            PerfectRange = range.Perfect;
+            GreatRange = range.Great;
+            GoodRange = range.Good;
+            OkRange = range.Ok;
+            MehRange = range.Meh;
+            MissRange = range.Miss;
             updateWindows();
         }
 
-        public void SetHitMode(IBeatmap beatmap)
+        public void ResetRange()
         {
-            // if (!CustomHitWindows) return;
+            ModifyHitWindows = false;
+            if (ModifyHitWindows) setHitMode();
+            updateWindows();
+        }
 
+        private void setHitMode()
+        {
             EzMUGHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+
+            if (hitMode == EzMUGHitMode.Lazer)
+            {
+                ResetRange();
+                return;
+            }
 
             switch (hitMode)
             {
                 case EzMUGHitMode.O2Jam:
-                    double bpm = beatmap.BeatmapInfo.BPM <= 0
-                        ? O2HitModeExtension.DEFAULT_BPM
-                        : beatmap.BeatmapInfo.BPM;
+                    // double bpm = BPM <= 0
+                        // ? O2HitModeExtension.DEFAULT_BPM
+                        // : O2BPM;
 
                     // 这里是真正影响判定的BPM设定
-                    O2HitModeExtension.NowBeatmapBPM = bpm;
+                    O2HitModeExtension.NowBeatmapBPM = BPM;
                     O2HitModeExtension.PillCount.Value = 0;
                     O2HitModeExtension.CoolCombo = 0;
                     O2HitModeExtension.PillActivated = true;
 
-                    SetSpecialDifficultyRange(custom_helper.GetHitWindowsO2Jam(bpm));
+                    modifyManiaHitRange(custom_helper.GetHitWindowsO2Jam(BPM));
                     break;
 
                 case EzMUGHitMode.EZ2AC:
-                    SetSpecialDifficultyRange(custom_helper.GetHitWindowsEZ2AC());
+                    modifyManiaHitRange(custom_helper.GetHitWindowsEZ2AC());
                     break;
 
                 case EzMUGHitMode.IIDX:
-                    SetSpecialDifficultyRange(custom_helper.GetHitWindowsIIDX());
+                    modifyManiaHitRange(custom_helper.GetHitWindowsIIDX());
                     break;
 
                 case EzMUGHitMode.Malody:
-                    SetSpecialDifficultyRange(custom_helper.GetHitWindowsMelody());
-                    break;
-
-                default:
-                    ResetRange();
+                    modifyManiaHitRange(custom_helper.GetHitWindowsMelody());
                     break;
             }
         }
 
         private void updateWindows()
         {
-            if (customHitWindows)
+            if (modifyHitWindows)
             {
                 perfect = PerfectRange;
                 great = GreatRange;

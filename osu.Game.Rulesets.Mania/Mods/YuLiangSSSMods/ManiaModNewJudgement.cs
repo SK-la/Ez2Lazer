@@ -12,7 +12,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModNewJudgement : Mod, IApplicableToDifficulty, IApplicableToBeatmap
+    public class ManiaModNewJudgement : Mod, IApplicableToBeatmap
     {
         public override string Name => "New Judgement";
 
@@ -48,14 +48,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public double BeatmapBPM;
 
-        public void ApplyToBeatmap(IBeatmap beatmap)
+        public ManiaModNewJudgement()
         {
-            BeatmapBPM = beatmap.BeatmapInfo.BPM > 0
-                ? beatmap.BeatmapInfo.BPM
-                : 200;
+            Divide.BindValueChanged(_ =>
+            {
+                updateHitRanges();
+            });
         }
 
-        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
+        private void updateHitRanges()
         {
             double perBeatLength = 60 / BeatmapBPM * 1000;
             if (BPM.Value is not null) perBeatLength = 60 / (double)BPM.Value * 1000;
@@ -65,16 +66,29 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             if (For16Stream.Value) perBeatLength /= 1.5;
 
             if (For13Jack.Value) perBeatLength = perBeatLength * 4 / 6;
+
             double perfectRange = perBeatLength / Divide.Value;
             double greatRange = perBeatLength / (Divide.Value / 1.5);
             double goodRange = perBeatLength / (Divide.Value / 2);
             double okRange = perBeatLength / (Divide.Value / 2.5);
             double mehRange = perBeatLength / (Divide.Value / 3);
             double missRange = perBeatLength / (Divide.Value / 3.5);
-            // difficulty.OverallDifficulty = 0;
-            HitWindows.SetDifficulty(difficulty.OverallDifficulty);
 
-            HitWindows.SetSpecialDifficultyRange(perfectRange, greatRange, goodRange, okRange, mehRange, missRange);
+            HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
+                perfectRange,
+                greatRange,
+                goodRange,
+                okRange,
+                mehRange,
+                missRange
+            ));
+        }
+
+        public void ApplyToBeatmap(IBeatmap beatmap)
+        {
+            BeatmapBPM = beatmap.BeatmapInfo.BPM > 0
+                ? beatmap.BeatmapInfo.BPM
+                : 200;
         }
 
         public override void ResetSettingsToDefaults()
