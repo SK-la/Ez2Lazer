@@ -172,11 +172,9 @@ namespace osu.Game.LAsEzExtensions.Audio
                               result.HitObject.GetType().Name == "HitCircle" ||
                               result.HitObject.GetType().Name == "Hit";
 
-                bool isPerfect = result.Type == HitResult.Perfect;
-
-                if (isNote && isPerfect)
+                // 记录所有可计分的 note 判定，以便收集判定时间戳（不局限于 Perfect）
+                if (isNote)
                 {
-                    // 记录判定事件
                     latencyManager.RecordJudgeEvent();
                 }
             }

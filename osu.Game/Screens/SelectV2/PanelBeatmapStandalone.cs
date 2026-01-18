@@ -385,11 +385,12 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                // if (isPlaceholderAnalysisResult(result.NewValue))
-                //     return;
-
-                if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
+                if (!isPlaceholderAnalysisResult(result.NewValue))
+                {
+                    // Update cached scratch text even when empty to reflect columns becoming empty.
                     cachedScratchText = result.NewValue.ScratchText;
+                    Schedule(updateKeyCount);
+                }
 
                 queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 

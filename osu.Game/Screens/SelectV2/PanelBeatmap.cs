@@ -549,11 +549,15 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                // if (isPlaceholderAnalysisResult(result.NewValue))
-                //     return;
-
-                if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
+                // Don't treat placeholder analysis results as real updates.
+                if (!isPlaceholderAnalysisResult(result.NewValue))
+                {
+                    // Update cached scratch text even when it's an empty string, so the UI can reflect
+                    // changes such as columns becoming empty. Schedule a key-count update so the
+                    // displayed text refreshes immediately instead of waiting for a mods/ruleset change.
                     cachedScratchText = result.NewValue.ScratchText;
+                    Schedule(updateKeyCount);
+                }
 
                 queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 

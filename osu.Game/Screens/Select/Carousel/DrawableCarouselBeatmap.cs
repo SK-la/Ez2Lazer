@@ -532,8 +532,9 @@ namespace osu.Game.Screens.Select.Carousel
             {
                 // Ignore placeholder handling – use whatever real data is provided.
 
-                if (!string.IsNullOrEmpty(result.NewValue.ScratchText))
-                    cachedScratchText = result.NewValue.ScratchText;
+                // Always update cachedScratchText (may be empty) so 0-note columns are reflected.
+                cachedScratchText = result.NewValue.ScratchText;
+                Schedule(updateKeyCount);
 
                 queueManiaUiUpdate((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
 
