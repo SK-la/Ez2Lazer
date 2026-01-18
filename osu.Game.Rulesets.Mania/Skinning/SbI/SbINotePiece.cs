@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -16,13 +17,12 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    internal partial class SbINotePiece : EzNoteBase
+    public partial class SbINotePiece : EzNoteBase
     {
-        public const float NOTE_HEIGHT = 45;
-        public const float NOTE_ACCENT_RATIO = 1f;
-        public const float CORNER_RADIUS = 0;
+        public Bindable<double> NoteAccentRatio = new Bindable<double>(1f);
+        public Bindable<double> NoteHeight = new Bindable<double>(8);
+        public Bindable<double> CORNER_RADIUS = new Bindable<double>(0);
 
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private readonly IBindable<Color4> accentColour = new Bindable<Color4>();
 
         private Box colouredBox = null!;
@@ -31,21 +31,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             RelativeSizeAxes = Axes.X;
 
-            CornerRadius = CORNER_RADIUS;
             // Masking = true;
         }
 
-        protected override void Update()
-        {
-            base.Update();
-            Height = 8;
-
-            // CreateIcon().Size = new Vector2(DrawWidth / 43 * 0.7f);
-        }
+        // protected override void Update()
+        // {
+        //     base.Update();
+        //
+        //     // CreateIcon().Size = new Vector2(DrawWidth / 43 * 0.7f);
+        // }
 
         [BackgroundDependencyLoader(true)]
-        private void load(IScrollingInfo scrollingInfo, DrawableHitObject? drawableObject)
+        private void load(DrawableHitObject? drawableObject)
         {
+            CornerRadius = (float)CORNER_RADIUS.Value;
+
             if (MainContainer != null)
             {
                 MainContainer.Children = new[]
@@ -78,23 +78,26 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 };
             }
 
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
-
             if (drawableObject != null)
             {
                 accentColour.BindTo(drawableObject.AccentColour);
                 accentColour.BindValueChanged(onAccentChanged, true);
             }
+
+            NoteAccentRatio = EzSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
         }
 
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
+        protected override void UpdateSize()
         {
-            colouredBox.Anchor = colouredBox.Origin = direction.NewValue == ScrollingDirection.Up
-                ? Anchor.TopCentre
-                : Anchor.BottomCentre;
+            base.UpdateSize();
 
-            Scale = new Vector2(1, direction.NewValue == ScrollingDirection.Up ? -1 : 1);
+            float fixedA = NoteAccentRatio.Value > 5
+                ? (float)NoteAccentRatio.Value * 1.5f
+                : NoteAccentRatio.Value > 2
+                    ? (float)NoteAccentRatio.Value * 1.5f
+                    : (float)NoteAccentRatio.Value;
+
+            Height = (float)NoteHeight.Value * fixedA;
         }
 
         private void onAccentChanged(ValueChangedEvent<Color4> accent)

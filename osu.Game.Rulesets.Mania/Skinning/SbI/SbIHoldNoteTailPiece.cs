@@ -8,6 +8,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
 using osuTK;
@@ -15,16 +17,13 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    internal partial class SbIHoldNoteTailPiece : CompositeDrawable
+    public partial class SbIHoldNoteTailPiece : SbINotePiece
     {
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }
 
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly IBindable<Color4> accentColour = new Bindable<Color4>();
-
-        private readonly Box foreground;
-        private readonly Box foregroundAdditive;
+        private Bindable<bool> enabledColor = null!;
+        private Bindable<double> tailAlpha = null!;
 
         // private SbIHoldNoteHittingLayer hittingLayer { get; set; }
 
@@ -33,64 +32,27 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             RelativeSizeAxes = Axes.X;
             Height = 8;
             Alpha = 0;
-
-            InternalChildren = new Drawable[]
-            {
-                new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = SbINotePiece.NOTE_HEIGHT,
-                    CornerRadius = SbINotePiece.CORNER_RADIUS,
-                    Masking = true,
-                    Children = new Drawable[]
-                    {
-                        new Box
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Colour = ColourInfo.GradientVertical(Color4.Black.Opacity(0), Colour4.Black),
-                            Height = 0.9f,
-                        },
-                        new Container
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Anchor = Anchor.BottomCentre,
-                            Origin = Anchor.BottomCentre,
-                            Height = SbINotePiece.NOTE_ACCENT_RATIO,
-                            CornerRadius = SbINotePiece.CORNER_RADIUS,
-                            Masking = true,
-                            Children = new Drawable[]
-                            {
-                                foreground = new Box
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                },
-                                // hittingLayer = new SbIHoldNoteHittingLayer(new SbIHoldBodyPiece()),
-                                foregroundAdditive = new Box
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Blending = BlendingParameters.Additive,
-                                    Height = 0.5f,
-                                },
-                            },
-                        },
-                    }
-                },
-            };
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(IScrollingInfo scrollingInfo)
+        private void load()
         {
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
+            if (MainContainer != null)
+            {
+                MainContainer.Rotation = 180;
+            }
 
             if (drawableObject != null)
             {
-                accentColour.BindTo(drawableObject.AccentColour);
-                accentColour.BindValueChanged(onAccentChanged, true);
-
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
+
+            enabledColor = EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            tailAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
+            tailAlpha.BindValueChanged(alpha =>
+            {
+                Alpha = (float)alpha.NewValue;
+            }, true);
         }
 
         private void hitObjectApplied(DrawableHitObject drawableHitObject)
@@ -104,21 +66,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             //
             // hittingLayer.IsHitting.UnbindBindings();
             // ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHitting);
-        }
-
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
-        {
-            Scale = new Vector2(1, direction.NewValue == ScrollingDirection.Up ? -1 : 1);
-        }
-
-        private void onAccentChanged(ValueChangedEvent<Color4> accent)
-        {
-            foreground.Colour = accent.NewValue.Darken(0.6f);
-
-            foregroundAdditive.Colour = ColourInfo.GradientVertical(
-                accent.NewValue.Opacity(0.4f),
-                accent.NewValue.Opacity(0)
-            );
         }
 
         // protected override void Update()

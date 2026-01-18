@@ -330,31 +330,32 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 case EzMUGHitMode.EZ2AC:
                     column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
+                    column.RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
                     column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
+                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
                 case EzMUGHitMode.Malody:
                     column.RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
-                    column.RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
                     column.RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
+                    column.RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
                     break;
 
                 // TODO: 暂时先用 EZ2AC 的物件池，以后根据使用反馈单独实现
                 case EzMUGHitMode.IIDX:
                     column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
+                    column.RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
                     column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
+                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
                 case EzMUGHitMode.O2Jam:
                     column.RegisterPool<O2Note, O2DrawableNote>(10, 50);
-                    column.RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
                     column.RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
                     column.RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
+                    column.RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
                     break;
             }
         }

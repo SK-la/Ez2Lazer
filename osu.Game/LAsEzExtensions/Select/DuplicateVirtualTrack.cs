@@ -13,6 +13,13 @@ namespace osu.Game.LAsEzExtensions.Select
 {
     public partial class DuplicateVirtualTrack : EzPreviewTrackManager
     {
+        /// <summary>
+        /// 全局静态开关：当设置为 <see langword="false"/> 时，DuplicateVirtualTrack 将回退到基类行为，
+        /// 避免使用独立复制 track / 静音原始 track，从而降低状态混乱的风险。
+        /// 默认启用。
+        /// </summary>
+        public new static bool Enabled { get; set; } = true;
+
         public IPreviewOverrideProvider? OverrideProvider { get; set; }
         public PreviewOverrideSettings? PendingOverrides { get; set; }
 
@@ -21,6 +28,7 @@ namespace osu.Game.LAsEzExtensions.Select
         private IWorkingBeatmap? pendingBeatmap;
 
         private double? beatmapTrackVolumeBeforeMute;
+        private Track? mutedOriginalTrack;
 
         [Resolved(canBeNull: true)]
         private IGameplayClock? gameplayClock { get; set; }
@@ -33,6 +41,11 @@ namespace osu.Game.LAsEzExtensions.Select
 
         public new void StartPreview(IWorkingBeatmap beatmap, bool forceEnhanced = false)
         {
+            if (!Enabled)
+            {
+                return;
+            }
+
             pendingBeatmap = beatmap;
             startRequested = true;
 
@@ -56,7 +69,13 @@ namespace osu.Game.LAsEzExtensions.Select
             // 这里改为：保留 beatmap.Track 作为时钟来源，但将其静音，避免听到整首歌。
             if (gameplayClock != null && beatmap.Track != null)
             {
-                beatmapTrackVolumeBeforeMute ??= beatmap.Track.Volume.Value;
+                // 保存被静音的 Track 实例以及其原始音量，确保后续能正确恢复。
+                if (mutedOriginalTrack == null || mutedOriginalTrack != beatmap.Track)
+                {
+                    beatmapTrackVolumeBeforeMute = beatmap.Track.Volume.Value;
+                    mutedOriginalTrack = beatmap.Track;
+                }
+
                 beatmap.Track.Volume.Value = 0;
             }
 
@@ -67,15 +86,25 @@ namespace osu.Game.LAsEzExtensions.Select
 
         protected override void Dispose(bool isDisposing)
         {
-            // 尽可能恢复 beatmap.Track 的音量，避免退出/切换后一直静音。
-            if (pendingBeatmap?.Track != null && beatmapTrackVolumeBeforeMute != null)
-                pendingBeatmap.Track.Volume.Value = beatmapTrackVolumeBeforeMute.Value;
+            // 尽可能恢复被静音的原始 track 的音量，避免退出/切换后一直静音。
+            if (mutedOriginalTrack != null && beatmapTrackVolumeBeforeMute != null)
+            {
+                mutedOriginalTrack.Volume.Value = beatmapTrackVolumeBeforeMute.Value;
+                beatmapTrackVolumeBeforeMute = null;
+                mutedOriginalTrack = null;
+            }
 
             base.Dispose(isDisposing);
         }
 
         protected override void UpdateAfterChildren()
         {
+            if (!Enabled)
+            {
+                base.UpdateAfterChildren();
+                return;
+            }
+
             base.UpdateAfterChildren();
 
             if (started || !startRequested || pendingBeatmap == null)
@@ -92,6 +121,9 @@ namespace osu.Game.LAsEzExtensions.Select
         protected override Track? CreateTrack(IWorkingBeatmap beatmap, out bool ownsTrack)
         {
             ownsTrack = false;
+
+            if (!Enabled)
+                return beatmap.Track;
 
             // 由 EzPreviewTrackManager 负责外部时钟驱动的切片/循环/间隔（Seek/Stop/Start）。
             // 在 gameplay 场景下必须使用独立 Track 实例：
@@ -193,6 +225,24 @@ namespace osu.Game.LAsEzExtensions.Select
 
         protected override void StopPreviewInternal(string reason)
         {
+            if (!Enabled)
+            {
+                base.StopPreviewInternal(reason);
+                // also clear any pending state just in case
+                startRequested = false;
+                started = false;
+                pendingBeatmap = null;
+                return;
+            }
+
+            // 恢复被静音的原始 beatmap.Track 音量（如果我们在 StartPreview 时修改过）
+            if (mutedOriginalTrack != null && beatmapTrackVolumeBeforeMute != null)
+            {
+                mutedOriginalTrack.Volume.Value = beatmapTrackVolumeBeforeMute.Value;
+                beatmapTrackVolumeBeforeMute = null;
+                mutedOriginalTrack = null;
+            }
+
             base.StopPreviewInternal(reason);
 
             // 重置 DuplicateVirtualTrack 特有的状态

@@ -30,6 +30,12 @@ namespace osu.Game.LAsEzExtensions.Select
     public partial class EzPreviewTrackManager : CompositeDrawable
     {
         /// <summary>
+        /// 全局静态开关：当设置为 <see langword="false"/> 时，EzPreviewTrackManager 将拒绝启动新的预览。
+        /// 由外部（例如 UI 的 `keySoundPreview`）控制。
+        /// </summary>
+        public static bool Enabled { get; set; } = true;
+
+        /// <summary>
         /// 当前是否处于“正在播放预览”的状态。
         /// 注意：该值同时要求内部状态认为正在播放，且底层 <see cref="Track"/> 实际处于运行状态。
         /// </summary>
@@ -42,13 +48,13 @@ namespace osu.Game.LAsEzExtensions.Select
 
         // 外部时钟驱动（gameplay）模式下，过短的切片会导致高频 Seek/Restart，音频听感会明显“撕裂”。
         // 这里设置一个最小切片长度作为下限，避免 1ms 这类极端情况。
-        private const double min_loop_length = 150; // ms
+        private const double min_loop_length = 100; // ms
 
         // 在 gameplay 外部时钟驱动模式下，音频设备/解码缓冲会导致 Track.CurrentTime 与外部时钟存在微小漂移。
         // 若仍按 15ms 容差每帧 Seek，会产生明显的“撕裂/卡带”听感。
         // 因此对“音频轨道重同步”使用更宽容差，并加入冷却时间。
-        private const double audio_resync_tolerance = 80; // ms
-        private const double audio_resync_cooldown = 250; // ms
+        private const double audio_resync_tolerance = 50; // ms
+        private const double audio_resync_cooldown = 120; // ms
 
         private double lastAudioResyncClockTime;
         private const double max_dynamic_preview_length = 60000; // 动态扩展最长 ms
@@ -177,6 +183,9 @@ namespace osu.Game.LAsEzExtensions.Select
         /// <param name="forceEnhanced">是否强制使用增强预览（忽略命中音效数量阈值）</param>
         public void StartPreview(IWorkingBeatmap beatmap, bool forceEnhanced = false)
         {
+            if (!Enabled)
+                return;
+
             if (playback.IsPlaying && currentBeatmap == beatmap)
                 return;
 
@@ -259,8 +268,9 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 return set.Count >= threshold;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.Log($"EzPreviewTrackManager: fastCheckShouldUseEnhanced error: {ex}", LoggingTarget.Runtime);
                 return false;
             }
 
@@ -420,8 +430,9 @@ namespace osu.Game.LAsEzExtensions.Select
                 updateDelegate = Scheduler.AddDelayed(updateSamples, scheduler_interval, true);
                 updateSamples();
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.Log($"EzPreviewTrackManager: startEnhancedPreview error: {ex}", LoggingTarget.Runtime);
                 clearEnhancedElements();
                 startStandardPreview(beatmap);
             }
@@ -677,9 +688,9 @@ namespace osu.Game.LAsEzExtensions.Select
                         Logger.Log($"EzPreviewTrackManager: Miss hitsound {info.Bank}-{info.Name}", LoggingTarget.Runtime);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // 错误保持静默或可选记录，这里不记录成功日志
+                Logger.Log($"EzPreviewTrackManager: triggerHitSound error: {ex}", LoggingTarget.Runtime);
             }
         }
 
@@ -731,8 +742,9 @@ namespace osu.Game.LAsEzExtensions.Select
                 sampleScheduler.ActiveChannels.Add(channel);
                 // Logger.Log($"EzPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}", LoggingTarget.Runtime);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Logger.Log($"EzPreviewTrackManager: triggerStoryboardSample error: {ex}", LoggingTarget.Runtime);
             }
         }
 

@@ -298,7 +298,7 @@ namespace osu.Game.Beatmaps
             // 没有该接口的Mod默认为顺序0，以保持现有行为。
             // Apply conversion mods to the result
             foreach (var mod in mods.OfType<IApplicableAfterBeatmapConversion>()
-                                    .OrderBy(m => (m as IHasApplyOrder)?.ApplyOrder ?? 0)
+                                    .OrderBy(m => (m as IHasApplyOrder)?.ApplyOrder)
                     )
             {
                 token.ThrowIfCancellationRequested();

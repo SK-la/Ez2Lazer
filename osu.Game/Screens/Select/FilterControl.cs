@@ -126,7 +126,7 @@ namespace osu.Game.Screens.Select
             base.ReceivePositionalInputAt(screenSpacePos) || sortTabs.ReceivePositionalInputAt(screenSpacePos);
 
         [BackgroundDependencyLoader(permitNulls: true)]
-        private void load(OsuColour colours, OsuConfigManager config)
+        private void load(OsuColour colours, OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
             groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupMode);
@@ -297,6 +297,9 @@ namespace osu.Game.Screens.Select
                     updateCriteria();
             });
 
+            ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
+            ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
+
             groupMode.BindValueChanged(_ => updateCriteria());
             sortMode.BindValueChanged(_ => updateCriteria());
 
@@ -305,21 +308,10 @@ namespace osu.Game.Screens.Select
             updateCriteria();
         }
 
-        [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
-
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            // Bind ez2 settings where available
-            ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
-            ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
-
-            // Bind config values to controls where appropriate
-            // showConverted already bound earlier to showConverted bindable
-
-            // Ruleset/mod logic copied from V2: hide/show csSelector/xxy filter based on ruleset
             ruleset?.BindValueChanged(_ =>
             {
                 updateCriteria();

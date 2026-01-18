@@ -18,10 +18,8 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    public partial class SbIKeyArea : EzNoteBase
+    public partial class SbIKeyArea : SbINotePiece
     {
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-
         private Container directionContainer = null!;
         private Drawable background = null!;
 
@@ -36,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo)
+        private void load()
         {
             InternalChild = directionContainer = new Container
             {
@@ -48,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     {
                         Masking = true,
                         RelativeSizeAxes = Axes.Both,
-                        CornerRadius = SbINotePiece.CORNER_RADIUS,
+                        CornerRadius = (float)CORNER_RADIUS.Value,
                         Child = background = new Box
                         {
                             Name = "Key gradient",
@@ -58,9 +56,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     },
                 }
             };
-
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
 
             accentColour = column.AccentColour.GetBoundCopy();
             accentColour.BindValueChanged(colour =>

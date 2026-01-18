@@ -87,7 +87,7 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary.Parts
                 if (editorClock.IsRunning && !data.instant && lastSeekTime != null && Time.Current - lastSeekTime < NowPlayingOverlay.TRACK_DRAG_SEEK_DEBOUNCE)
                     return;
 
-                editorClock.SeekSmoothlyTo(seekDestination);
+                editorClock.Seek(seekDestination);
 
                 lastSeekTime = data.instant ? null : Time.Current;
             }, (screenPosition, instant));

@@ -5,8 +5,11 @@ using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
+using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
@@ -22,11 +25,27 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     public class ManiaSbISkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
+        private readonly Ez2ConfigManager ezSkinConfig;
+        private readonly IBindable<double> columnWidthBindable;
+        private readonly IBindable<double> specialFactorBindable;
+        private readonly IBindable<double> hitPosition;
+        private readonly IBindable<double> virtualHitPosition;
 
         public ManiaSbISkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
+
+            if (GlobalConfigStore.EzConfig == null)
+            {
+                Logger.Log("!GlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
+            }
+
+            ezSkinConfig = GlobalConfigStore.EzConfig!;
+            columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            virtualHitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.VisualHitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -91,13 +110,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     hitErrorMeter.CentreMarkerStyle.Value = BarHitErrorMeter.CentreMarkerStyles.Line;
                                     hitErrorMeter.LabelStyle.Value = BarHitErrorMeter.LabelStyles.None;
                                 }
+
+                                var fsd = container.OfType<YuComFastSlowDisplay>().FirstOrDefault();
                             })
                             {
                                 new EzComHitTiming(),
                                 new EzComHitTiming(),
                                 new EzComComboCounter(),
                                 new BarHitErrorMeter(),
-                                new YuComFastSlowDisplay(),
                             };
                     }
 
@@ -121,17 +141,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                             //     return Drawable.Empty();
                             return new SbIColumnBackground();
 
-                        case ManiaSkinComponents.HoldNoteBody:
-                            return new SbIHoldBodyPiece();
-
-                        case ManiaSkinComponents.HoldNoteTail:
-                            return new SbIHoldNoteTailPiece();
+                        case ManiaSkinComponents.Note:
+                            return new SbINotePiece();
 
                         case ManiaSkinComponents.HoldNoteHead:
                             return new SbIHoldNoteHeadPiece();
 
-                        case ManiaSkinComponents.Note:
-                            return new SbINotePiece();
+                        case ManiaSkinComponents.HoldNoteTail:
+                            return new SbIHoldNoteTailPiece();
+
+                        case ManiaSkinComponents.HoldNoteBody:
+                            return new SbIHoldBodyPiece();
 
                         // case ManiaSkinComponents.HitTarget:
                         //     return new SbIHitTarget();
@@ -149,18 +169,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             return base.GetDrawableComponent(lookup);
         }
 
+        private float columnWidth;
+
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {
             if (lookup is ManiaSkinConfigurationLookup maniaLookup)
             {
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
-
-                const float total_width = 512;
-                float width = total_width / stage.Columns;
+                bool isSpecialColumn = ezSkinConfig.IsSpecialColumn(stage.Columns, columnIndex);
+                columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
 
                 switch (maniaLookup.Lookup)
                 {
+                    case LegacyManiaSkinConfigurationLookups.ColumnWidth:
+                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
+
+                    case LegacyManiaSkinConfigurationLookups.HitPosition:
+                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+
+                    case LegacyManiaSkinConfigurationLookups.BarLineHeight:
+                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+
                     case LegacyManiaSkinConfigurationLookups.LeftColumnSpacing:
                     case LegacyManiaSkinConfigurationLookups.RightColumnSpacing:
                         return SkinUtils.As<TValue>(new Bindable<float>(0));
@@ -170,18 +200,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
                     case LegacyManiaSkinConfigurationLookups.StagePaddingTop:
                         return SkinUtils.As<TValue>(new Bindable<float>(0));
-
-                    case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
-
-                    case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-                        return SkinUtils.As<TValue>(new Bindable<float>(width));
-
-                    case LegacyManiaSkinConfigurationLookups.BarLineHeight:
-                        return SkinUtils.As<TValue>(new Bindable<int>(0));
-
-                    case LegacyManiaSkinConfigurationLookups.BarLineColour:
-                        return SkinUtils.As<TValue>(new Bindable<Color4>(Color4.Transparent.Opacity(0f)));
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
 

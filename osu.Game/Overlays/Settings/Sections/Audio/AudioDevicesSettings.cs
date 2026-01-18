@@ -93,6 +93,10 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 };
             }
 
+            audio.OnNewDevice += onDeviceChanged;
+            audio.OnLostDevice += onDeviceChanged;
+            dropdown.Current = audio.AudioDevice;
+
             onDeviceChanged(string.Empty);
         }
 

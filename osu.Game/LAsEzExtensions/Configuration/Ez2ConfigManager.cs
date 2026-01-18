@@ -73,7 +73,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.NoteSetName, "lucenteclat");
             SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
             SetDefault(Ez2Setting.GameThemeName, EzEnumGameThemeName.Celeste_Lumiere);
-            SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 2, 0.1);
+            SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 10, 0.1);
             SetDefault(Ez2Setting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             #endregion
@@ -102,14 +102,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             #endregion
 
-            #region 定制皮肤编辑器
-
-            // Mania 长按尾部相关（皮肤编辑器用，暂时只作为占位设置项）。
-            SetDefault(Ez2Setting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
-            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
-
-            #endregion
-
             SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
@@ -133,6 +125,9 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.O2JamNormal);
             SetDefault(Ez2Setting.CustomPoorHitResultBool, true);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
+
+            SetDefault(Ez2Setting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
         }
 
         #region 列类型管理
