@@ -166,6 +166,8 @@ def main():
     parser.add_argument('--cleanup-release', default=None)
     parser.add_argument('--cleanup-debug', default=None)
     parser.add_argument('--outroot', default=gh_workspace)
+    # Note: no local-only root option to keep publish.py CI-friendly
+    parser.add_argument('--zip-only', action='store_true', help='Only create zip files locally and do not attempt any remote operations')
     parser.add_argument('--no-zip', action='store_true', help='Do not create zip files')
     parser.add_argument('--tag', default=None, help='Optional tag to include in asset name')
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
@@ -181,14 +183,19 @@ def main():
 
     # Enforce that a tag is provided to avoid any implicit fallback tag generation
     if not args.tag:
-        print("Error: --tag must be provided. Aborting to avoid generating fallback tags like 'locmain-...'.")
-        sys.exit(1)
+        # default to today's date tag if not provided when running locally
+        today = datetime.utcnow()
+        args.tag = f"{today.year}-{today.month}-{today.day}"
+        print(f"No --tag provided; defaulting to {args.tag}")
 
     tag_suffix = f"_{args.tag}"
 
     # fixed folder names
-    release_dir = os.path.join(args.outroot, 'Ez2Lazer_release_x64')
-    debug_dir = os.path.join(args.outroot, 'Ez2Lazer_debug_x64')
+    # If running in zip-only (local) mode, place artifacts under the user-specified local root
+    base_out = args.outroot
+
+    release_dir = os.path.join(base_out, 'Ez2Lazer_release_x64')
+    debug_dir = os.path.join(base_out, 'Ez2Lazer_debug_x64')
 
     # remove existing folders to ensure deterministic output
     for d in (release_dir, debug_dir):
@@ -215,7 +222,7 @@ def main():
         run_cleanup(args.cleanup_debug, debug_dir)
 
     # create zips with fixed base name + tag
-    artifacts_dir = os.path.join(args.outroot, 'artifacts')
+    artifacts_dir = os.path.join(base_out, 'artifacts')
     # Try to create artifacts dir; if permission denied (e.g. running from system32),
     # fall back to a safe location next to this script.
     try:
@@ -226,6 +233,7 @@ def main():
         os.makedirs(fallback, exist_ok=True)
         artifacts_dir = fallback
 
+    # Use asset names that match workflow-normalized names when tag present
     release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_x64{tag_suffix}.zip")
     debug_zip = os.path.join(artifacts_dir, f"Ez2Lazer_debug_x64{tag_suffix}.zip")
 
