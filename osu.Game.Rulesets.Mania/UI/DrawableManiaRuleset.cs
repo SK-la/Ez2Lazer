@@ -87,6 +87,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private Bindable<bool> globalHitPosition = new Bindable<bool>();
+        private Bindable<bool> barLinesBindable = new Bindable<bool>();
 
         //自定义判定系统
         private Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
@@ -128,8 +129,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     p.EffectPoint = new EffectControlPoint();
             }
 
-            BarLines.ForEach(Playfield.Add);
-
             Config.BindWith(ManiaRulesetSetting.ScrollDirection, configDirection);
             configDirection.BindValueChanged(direction => Direction.Value = (ScrollingDirection)direction.NewValue, true);
 
@@ -159,6 +158,14 @@ namespace osu.Game.Rulesets.Mania.UI
             hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
             globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
+            barLinesBindable = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool);
+            barLinesBindable.BindValueChanged(b =>
+            {
+                if (b.NewValue)
+                {
+                    BarLines.ForEach(Playfield.Add);
+                }
+            }, true);
         }
 
         protected override void LoadComplete()

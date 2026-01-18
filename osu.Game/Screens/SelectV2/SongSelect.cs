@@ -159,7 +159,7 @@ namespace osu.Game.Screens.SelectV2
 
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
-        private EzPreviewTrackManager ezPreviewManager = null!;
+        private EzPreviewTrackManager? ezPreviewManager;
         private Bindable<bool> keySoundPreview = null!;
 
         private IDisposable? modSelectOverlayRegistration;
@@ -299,8 +299,7 @@ namespace osu.Game.Screens.SelectV2
                     Origin = Anchor.Centre,
                     RelativeSizeAxes = Axes.Both,
                 },
-                ezPreviewManager = new EzPreviewTrackManager(),
-                modSpeedHotkeyHandler = new ModSpeedHotkeyHandler(),
+                modSpeedHotkeyHandler = new ModSpeedHotkeyHandler()
             });
 
             LoadComponent(modSelectOverlay = CreateModSelectOverlay());
@@ -378,6 +377,14 @@ namespace osu.Game.Screens.SelectV2
             modSelectOverlayRegistration = overlayManager?.RegisterBlockingOverlay(modSelectOverlay);
 
             inputManager = GetContainingInputManager()!;
+
+            keySoundPreview.BindValueChanged(v =>
+            {
+                if (v.NewValue)
+                    createEzPreview(Beatmap.Value);
+                else
+                    removePreviewManager();
+            });
 
             filterControl.CriteriaChanged += criteriaChanged;
 
@@ -523,14 +530,42 @@ namespace osu.Game.Screens.SelectV2
             music.TrackChanged += ensureTrackLooping;
         }
 
+        private void createDuplicatePreview(IPreviewOverrideProvider provider, PreviewOverrideSettings overrides, IWorkingBeatmap beatmap)
+        {
+            ezPreviewManager?.StopPreview();
+            RemoveInternal(ezPreviewManager, true);
+
+            var duplicate = new DuplicateVirtualTrack
+            {
+                OverrideProvider = provider,
+                PendingOverrides = overrides
+            };
+            ezPreviewManager = duplicate;
+            AddInternal(duplicate);
+            duplicate.StartPreview(beatmap);
+        }
+
+        private void createEzPreview(IWorkingBeatmap beatmap)
+        {
+            ezPreviewManager = new EzPreviewTrackManager();
+            AddInternal(ezPreviewManager);
+
+            ezPreviewManager.StartPreview(beatmap);
+        }
+
+        private void removePreviewManager()
+        {
+            ezPreviewManager?.StopPreview();
+            RemoveInternal(ezPreviewManager, true);
+        }
+
         private void endLooping()
         {
             // may be called multiple times during screen exit process.
             if (!isHandlingLooping)
                 return;
 
-            if (keySoundPreview.Value)
-                ezPreviewManager.StopPreview();
+            removePreviewManager();
 
             music.CurrentTrack.Looping = isHandlingLooping = false;
 
@@ -539,35 +574,26 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            if (keySoundPreview.Value)
+            var provider = Mods.Value.OfType<IPreviewOverrideProvider>().FirstOrDefault();
+            var overrides = provider?.GetPreviewOverrides(beatmap);
+
+            if (overrides != null && provider != null)
             {
-                var provider = Mods.Value.OfType<IPreviewOverrideProvider>().FirstOrDefault();
-                var overrides = provider?.GetPreviewOverrides(beatmap);
-
-                if (overrides != null)
-                {
-                    ezPreviewManager.StopPreview();
-                    RemoveInternal(ezPreviewManager, true);
-
-                    var duplicate = new DuplicateVirtualTrack
-                    {
-                        OverrideProvider = provider,
-                        PendingOverrides = overrides
-                    };
-                    ezPreviewManager = duplicate;
-                    AddInternal(duplicate);
-
-                    duplicate.StartPreview(beatmap);
-                }
-                else
-                {
-                    // 如果没有 Loop mod，仅开启 keySoundPreview，使用正常的预览
-                    beatmap.PrepareTrackForPreview(true);
-                }
+                createDuplicatePreview(provider, overrides, beatmap);
+            }
+            else if (keySoundPreview.Value)
+            {
+                createEzPreview(beatmap);
             }
             else
             {
+                removePreviewManager();
                 beatmap.PrepareTrackForPreview(true);
+
+                //
+                // // restore default preview on the global music controller
+                // beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo).PrepareTrackForPreview(true);
+                // ensurePlayingSelected();
             }
         }
 

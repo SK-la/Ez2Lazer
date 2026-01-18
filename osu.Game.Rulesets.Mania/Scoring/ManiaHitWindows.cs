@@ -142,7 +142,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        public override bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResult) ?? false;
+        public override bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
 
         private static EzMUGHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
 

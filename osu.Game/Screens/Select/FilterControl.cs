@@ -313,8 +313,8 @@ namespace osu.Game.Screens.Select
             base.LoadComplete();
 
             // Bind ez2 settings where available
-            ezConfig?.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton?.Active ?? new Bindable<bool>());
-            ezConfig?.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton?.Active ?? new Bindable<bool>());
+            ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
+            ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
 
             // Bind config values to controls where appropriate
             // showConverted already bound earlier to showConverted bindable

@@ -237,6 +237,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
             + "A statistics window will pop up after the game ends. More detailed information can be found in the runtime.log file."
             + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
 
+        public static readonly LocalisableString ManiaBarLinesBool = new EzLocalisableString("Mania 强制小节线显示开关", "(Mania) BarLines Boolean Toggle");
+        public static readonly LocalisableString ManiaBarLinesBoolTooltip = new EzLocalisableString("强制显示Mania小节线功能的开关，关闭后仅由皮肤控制", "(Mania) Toggle to force display of bar lines, when off only controlled by skin");
     }
 
     public static class EzLocalizationExtensions

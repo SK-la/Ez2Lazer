@@ -242,7 +242,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             return HitResult.None;
         }
 
-        public virtual bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResult) ?? false;
+        public virtual bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
 
         public virtual bool IsHitResultAllowed(HitResult result)
         {

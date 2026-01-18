@@ -110,8 +110,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             #endregion
 
-
-
             SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
 
@@ -133,7 +131,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.O2JamNormal);
-            SetDefault(Ez2Setting.CustomPoorHitResult, true);
+            SetDefault(Ez2Setting.CustomPoorHitResultBool, true);
+            SetDefault(Ez2Setting.ManiaBarLinesBool, true);
         }
 
         #region 列类型管理
@@ -503,7 +502,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
         // Mania游戏专属设置
         HitMode,
         CustomHealthMode,
-        CustomPoorHitResult,
+        CustomPoorHitResultBool,
+        ManiaBarLinesBool
     }
 
     public enum EzColumnType

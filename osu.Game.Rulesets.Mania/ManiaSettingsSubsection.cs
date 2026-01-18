@@ -51,9 +51,16 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsCheckbox
                 {
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResult),
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResultBool),
                     LabelText = EzLocalizationManager.PoorHitResult,
                     TooltipText = EzLocalizationManager.PoorHitResultTooltip,
+                    Keywords = new[] { "mania" }
+                },
+                new SettingsCheckbox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool),
+                    LabelText = EzLocalizationManager.ManiaBarLinesBool,
+                    TooltipText = EzLocalizationManager.ManiaBarLinesBoolTooltip,
                     Keywords = new[] { "mania" }
                 },
                 new SettingsEnumDropdown<ManiaScrollingDirection>
