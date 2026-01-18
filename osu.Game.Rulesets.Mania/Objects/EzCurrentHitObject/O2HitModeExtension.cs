@@ -4,9 +4,7 @@
 using System;
 using System.Threading;
 using osu.Framework.Bindables;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
@@ -17,8 +15,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         public const double COOL = 7500.0;
         public const double GOOD = 22500.0;
         public const double BAD = 31250.0;
-
-        // public const double DEFAULT_BPM = 200;
 
         // TODO: 💊缺少UI显示，以及合适的开关
         // 是否启用💊, 此处默认开启，否则必须搭配ManiaModO2Judgement.PillMode.Value才能生效

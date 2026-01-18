@@ -31,7 +31,6 @@ namespace osu.Game.Rulesets.Mania.Difficulty
         private const double difficulty_multiplier = 0.018;
 
         private readonly bool isForCurrentRuleset;
-        // private readonly double originalOverallDifficulty;
 
         public override int Version => 20241007;
 
@@ -39,10 +38,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             : base(ruleset, beatmap)
         {
             isForCurrentRuleset = beatmap.BeatmapInfo.Ruleset.MatchesOnlineID(ruleset);
-            // originalOverallDifficulty = beatmap.BeatmapInfo.Difficulty.OverallDifficulty;
         }
-
-        // public double XXY_SR { get; set; }
 
         protected override DifficultyAttributes CreateDifficultyAttributes(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate)
         {
@@ -55,7 +51,6 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             double sr = skills[0].DifficultyValue() * difficulty_multiplier;
 
             sr = AdditionalMethod(beatmap, mods, skills, clockRate, sr);
-            // XXY_SR = sr;
 
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {

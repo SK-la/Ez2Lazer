@@ -20,7 +20,6 @@ using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Utils;
 using osuTK;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
-using osu.Game.Rulesets.Mania.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Beatmaps
 {
@@ -54,7 +53,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         /// <summary>
         /// The current hit mode for mania judgement system.
         /// </summary>
-        public static EzMUGHitMode CurrentHitMode { get; set; } = EzMUGHitMode.Lazer;
+        public static EzMUGHitMode CurrentHitMode { get; set; }
 
         // Internal for testing purposes
         internal readonly LegacyRandom Random;

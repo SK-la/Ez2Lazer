@@ -1,25 +1,20 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Input;
-using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Input.Handlers;
-using osu.Game.LAsEzExtensions;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -36,8 +31,6 @@ using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
-using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
@@ -93,9 +86,6 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
-
-        // private readonly ManiaHitModeConvertor hitModeConvertor;
-        // private readonly Bindable<EzMUGHitMode> hitMode = new Bindable<EzMUGHitMode>();
 
         public DrawableManiaRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)
@@ -173,35 +163,26 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
 
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
-            Schedule(() =>
-            {
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        var factory = Dependencies.Get<EzLocalTextureFactory>();
-
-                        if (factory != null)
-                        {
-                            await factory.PreloadGameTextures().ConfigureAwait(false);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}",
-                            LoggingTarget.Runtime, LogLevel.Error);
-                    }
-                });
-            });
-
-            // Configure pools based on hit mode
-            foreach (var stage in Playfield.Stages)
-            {
-                foreach (var column in stage.Columns)
-                {
-                    configurePools(column);
-                }
-            }
+            // Schedule(() =>
+            // {
+            //     _ = Task.Run(async () =>
+            //     {
+            //         try
+            //         {
+            //             var factory = Dependencies.Get<EzLocalTextureFactory>();
+            //
+            //             if (factory != null)
+            //             {
+            //                 await factory.PreloadGameTextures().ConfigureAwait(false);
+            //             }
+            //         }
+            //         catch (Exception ex)
+            //         {
+            //             Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}",
+            //                 LoggingTarget.Runtime, LogLevel.Error);
+            //         }
+            //     });
+            // });
         }
 
         private ManiaTouchInputArea? touchInputArea;
@@ -320,44 +301,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (currentSkin.IsNotNull())
                 currentSkin.SourceChanged -= onSkinChange;
-        }
-
-        private readonly EzMUGHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
-
-        private void configurePools(Column column)
-        {
-            switch (hitMode)
-            {
-                case EzMUGHitMode.EZ2AC:
-                    column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
-                    column.RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
-                    column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
-                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-
-                case EzMUGHitMode.Malody:
-                    column.RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
-                    column.RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
-                    column.RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
-                    break;
-
-                // TODO: 暂时先用 EZ2AC 的物件池，以后根据使用反馈单独实现
-                case EzMUGHitMode.IIDX:
-                    column.RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
-                    column.RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
-                    column.RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
-                    column.RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
-                    break;
-
-                case EzMUGHitMode.O2Jam:
-                    column.RegisterPool<O2Note, O2DrawableNote>(10, 50);
-                    column.RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
-                    column.RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
-                    break;
-            }
         }
     }
 }

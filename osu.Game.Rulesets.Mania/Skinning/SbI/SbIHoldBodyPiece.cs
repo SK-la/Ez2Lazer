@@ -24,8 +24,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
         private Container? topContainer;
         private Container? bodyContainer;
-        private Container? bodyScaleContainer;
-        private Box? bodyInnerContainer;
 
         private float tailHeight;
 
@@ -89,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 RelativeSizeAxes = Axes.X,
                 Anchor = Anchor.BottomCentre,
                 Origin = Anchor.BottomCentre,
-                Child = bodyInnerContainer = new Box
+                Child = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
                 }

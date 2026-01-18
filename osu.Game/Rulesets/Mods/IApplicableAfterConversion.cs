@@ -8,7 +8,7 @@ namespace osu.Game.Rulesets.Mods
     /// <summary>
     /// 提供一个接口，用于在通过 <see cref="BeatmapConverter{TObject}"/> 生成 <see cref="IBeatmap"/> 后应用更改的 <see cref="Mod"/>。
     /// <para>可以实现 n to m key。</para>
-    /// 但需要注意转换过程。建议搭配 <see cref="IApplyOrder"/> 一起使用，以确保在正确环节进行转k。
+    /// 但需要注意转换过程。建议搭配 <see cref="IHasApplyOrder"/> 一起使用，以确保在正确环节进行转k。
     /// </summary>
     public interface IApplicableAfterConversion : IApplicableMod
     {

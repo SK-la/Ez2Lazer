@@ -11,10 +11,13 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -57,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.UI
         public readonly bool IsSpecial;
 
         public readonly Bindable<Color4> AccentColour = new Bindable<Color4>(Color4.Black);
-
+        private Bindable<EzMUGHitMode> hitModeBindable = null!;
         private IBindable<bool> touchOverlay = null!;
 
         private float leftColumnSpacing;
@@ -83,7 +86,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private ISkinSource skin { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig)
+        private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, Ez2ConfigManager ezConfig)
         {
             SkinnableDrawable keyArea;
 
@@ -122,6 +125,7 @@ namespace osu.Game.Rulesets.Mania.UI
             RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
             RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
 
+            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
         }
@@ -143,6 +147,8 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
             NewResult += OnNewResult;
+
+            hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue), true);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -205,6 +211,42 @@ namespace osu.Game.Rulesets.Mania.UI
             // Extend input coverage to the gaps close to this column.
             var spacingInflation = new MarginPadding { Left = leftColumnSpacing, Right = rightColumnSpacing };
             return DrawRectangle.Inflate(spacingInflation).Contains(ToLocalSpace(screenSpacePos));
+        }
+
+        private void configurePools(EzMUGHitMode hitMode)
+        {
+            switch (hitMode)
+            {
+                case EzMUGHitMode.EZ2AC:
+                    RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
+                    RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
+                    RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    break;
+
+                case EzMUGHitMode.Malody:
+                    RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
+                    RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
+                    RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
+                    break;
+
+                // TODO: 暂时先用 EZ2AC 的物件池，以后根据使用反馈单独实现
+                case EzMUGHitMode.IIDX:
+                    RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
+                    RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
+                    RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    break;
+
+                case EzMUGHitMode.O2Jam:
+                    RegisterPool<O2Note, O2DrawableNote>(10, 50);
+                    RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
+                    RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
+                    break;
+            }
         }
 
         #region Touch Input

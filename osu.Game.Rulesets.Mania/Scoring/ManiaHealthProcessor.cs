@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Framework.Logging;
 using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
@@ -13,19 +14,39 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaHealthProcessor : LegacyDrainingHealthProcessor
     {
+        private static readonly double[,] difficulty_settings =
+        {
+            //  305 |    300|    200|   100|    50|      Miss|     Poor
+            { 0.0004, 0.0003, 0.0001, 0.0000, -0.0010, -0.0040, -0.0040 }, // Lazer
+            { 0.0003, 0.0000, 0.0002, 0.0000, -0.0010, -0.0050, -0.0060 }, // O2 Easy
+            { 0.0002, 0.0000, 0.0001, 0.0000, -0.0070, -0.0040, -0.0050 }, // O2 Normal
+            { 0.0001, 0.0000, 0.0000, 0.0000, -0.0050, -0.0030, -0.0040 }, // O2 Hard
+            { 0.0004, 0.0003, 0.0001, 0.0000, -0.0010, -0.0040, -0.0060 }, // Ez2Ac
+            { 0.0004, 0.0003, 0.0001, 0.0000, -0.0010, -0.0040, -0.0040 }, // IIDX
+        };
+
+        private static EnumHealthMode mode = EnumHealthMode.Lazer;
+        private static int row;
+
         private HitResult lastResult = HitResult.None;
         private int streak;
 
         public ManiaHealthProcessor(double drainStartTime)
             : base(drainStartTime)
         {
+            if (GlobalConfigStore.EzConfig != null)
+                mode = GlobalConfigStore.EzConfig.Get<EnumHealthMode>(Ez2Setting.CustomHealthMode);
+
+            row = switchHealthMode(mode);
         }
 
         protected override double ComputeDrainRate()
         {
             // Base call is run only to compute HP recovery (namely, `HpMultiplierNormal`).
             // This closely mirrors (broken) behaviour of stable and as such is preserved unchanged.
-            base.ComputeDrainRate();
+            // 只有Lazer模式下，会调用此方法。从基类中计算HP作用。非Lazer模式禁止使用，否则会出现无限计算。
+            if (mode == EnumHealthMode.Lazer)
+                base.ComputeDrainRate();
 
             return 0;
         }
@@ -34,6 +55,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override IEnumerable<HitObject> EnumerateNestedHitObjects(HitObject hitObject) => hitObject.NestedHitObjects;
 
+        // 特别强调：血量机制异常时会导致无法进入Gameplay，无限加载。
         protected override double GetHealthIncreaseFor(HitObject hitObject, HitResult result)
         {
             if (result == lastResult)
@@ -45,21 +67,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
 
             double increase = 0;
-            int modeIndex = 0;
 
-            if (GlobalConfigStore.EzConfig != null)
-            {
-                var healthMode = GlobalConfigStore.EzConfig.Get<EnumHealthMode>(Ez2Setting.CustomHealthMode);
-                modeIndex = (int)healthMode;
-            }
-
-            if (modeIndex == 0) // Lazer
+            if (mode == EnumHealthMode.Lazer)
             {
                 switch (result)
                 {
                     case HitResult.Pool:
-                        double poolIncrease = 0.075 + Math.Min(streak - 1, 4) * 0.0125;
-                        return -poolIncrease;
+                        return -getPoorHealthDelta(streak);
 
                     case HitResult.Miss:
                         switch (hitObject)
@@ -93,56 +107,77 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                 if (increase > 0)
                     increase *= streak;
-
+                Logger.Log($"ManiaHealthProcessor: raw health change {HpMultiplierNormal * increase} for mode {mode}");
                 return HpMultiplierNormal * increase;
             }
 
             switch (result)
             {
                 case HitResult.Pool:
-                    increase = difficultySettings[modeIndex][6];
-                    break;
+                    return -getPoorHealthDelta(streak);
 
                 case HitResult.Miss:
-                    increase = difficultySettings[modeIndex][5];
-                    break;
+                    switch (hitObject)
+                    {
+                        case HeadNote:
+                        case TailNote:
+                            return difficulty_settings[row, 5] / 5;
+
+                        default:
+                            return difficulty_settings[row, 5];
+                    }
 
                 case HitResult.Meh:
-                    increase = difficultySettings[modeIndex][4];
-                    break;
+                    return difficulty_settings[row, 4];
 
                 case HitResult.Ok:
-                    increase = difficultySettings[modeIndex][3];
-                    break;
+                    return difficulty_settings[row, 3];
 
                 case HitResult.Good:
-                    increase = difficultySettings[modeIndex][2];
+                    increase = difficulty_settings[row, 2];
                     break;
 
                 case HitResult.Great:
-                    increase = difficultySettings[modeIndex][1];
+                    increase = difficulty_settings[row, 1];
                     break;
 
                 case HitResult.Perfect:
-                    increase = difficultySettings[modeIndex][0];
+                    increase = difficulty_settings[row, 0];
                     break;
             }
 
-            if (increase > 0)
-                increase *= streak;
+            // Non-default health modes use integer table values where the final value
+            double scaled = Math.Clamp(increase, -0.00001, 0.01);
 
-            return increase / 1000.0;
+            // Suppress extremely small floating-point changes which are noise
+            // and can cause issues (e.g. infinite loading) when treated as non-zero.
+            const double EPSILON = 1e-6;
+
+            if (Math.Abs(scaled) < EPSILON)
+            {
+                scaled = 0;
+            }
+            else
+            {
+                Logger.Log($"ManiaHealthProcessor: raw health change {scaled} for mode {mode}");
+            }
+
+            return scaled;
         }
 
-        private readonly int[][] difficultySettings =
+        private int switchHealthMode(EnumHealthMode mode)
         {
-            //      Perfect, Great, Good, Ok, Meh, Miss, Pool
-            new[] { 4, 3, 1, 0, -10, -40, -40 }, // Lazer
-            new[] { 3, 0, 2, 0, -10, -50, -60 }, // O2 Easy
-            new[] { 2, 0, 1, 0, -7, -40, -50 }, // O2 Normal
-            new[] { 1, 0, 0, 0, -5, -30, -40 }, // O2 Hard
-            new[] { 4, 3, 1, 0, -10, -40, -60 }, // Ez2Ac
-            new[] { 4, 3, 1, 0, -10, -40, -40 }, // IIDX
-        };
+            int idx = (int)mode;
+
+            if (idx < 0 || idx >= difficulty_settings.GetLength(0))
+                idx = 0;
+
+            return idx;
+        }
+
+        private static double getPoorHealthDelta(int streak)
+        {
+            return 0.075 + Math.Min(streak - 1, 4) * 0.0125;
+        }
     }
 }

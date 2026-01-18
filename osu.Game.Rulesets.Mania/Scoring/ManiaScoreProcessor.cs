@@ -35,9 +35,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
-            // if (IsLegacyScore)
-            //     return ;
-
             return 150000 * comboProgress
                    + 850000 * Math.Pow(Accuracy.Value, 2 + 2 * Accuracy.Value) * accuracyProgress
                    + bonusPortion;
@@ -156,14 +153,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
             UpdateScoreClassic();
         }
 
-        // LN scoring logic moved to CustomHitWindowsHelper.GetLNScore(head, tail).
-
         private readonly double[] headOffsets = new double[18];
 
         protected override void RemoveScoreChange(JudgementResult judgement)
         {
-            // if (!IsLegacyScore) return;
-
             var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
             {
                 OverallDifficulty = od

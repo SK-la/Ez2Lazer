@@ -9,7 +9,6 @@ using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Skinning.Ez2;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens;
