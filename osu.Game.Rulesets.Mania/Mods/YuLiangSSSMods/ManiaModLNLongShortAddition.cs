@@ -24,7 +24,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override string Acronym => "LS";
 
         public override LocalisableString Description => EzManiaModStrings.LNLongShortAddition_Description;
-
+        public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
         public readonly int[] DivideNumber = [2, 4, 8, 3, 6, 9, 5, 7, 12, 16, 48, 35, 64];
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription

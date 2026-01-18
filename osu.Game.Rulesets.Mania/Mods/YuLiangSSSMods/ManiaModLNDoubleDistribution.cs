@@ -33,7 +33,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override bool Ranked => false;
-
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
         public readonly int[] DivideNumber = [2, 4, 8, 3, 6, 9, 5, 7, 12, 16, 48, 35, 64];
 
         public readonly double ERROR = 2;
@@ -177,7 +178,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var maniaBeatmap = (ManiaBeatmap)beatmap;
             var newObjects = new List<ManiaHitObject>();
             var originalLNObjects = new List<ManiaHitObject>();
-            int keys = maniaBeatmap.TotalColumns;
+            // int keys = maniaBeatmap.TotalColumns;
             var notTransformColumn = new List<int>();
 
             Seed.Value ??= RNG.Next();

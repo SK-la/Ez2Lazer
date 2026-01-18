@@ -26,7 +26,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override string Acronym => "LT";
 
         public override LocalisableString Description => EzManiaModStrings.LNTransformer_Description;
-
+        public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
         public readonly double ERROR = 2;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription

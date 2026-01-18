@@ -33,6 +33,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override double ScoreMultiplier => 1;
 
+        public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
+
         // public override Type[] IncompatibleMods => new[] { typeof(ModRateAdjust), typeof(ModTimeRamp), typeof(ModAutoplay) };
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.InitialRate_Label), nameof(EzManiaModStrings.InitialRate_Description), SettingControlType = typeof(MultiplierSettingsSlider))]

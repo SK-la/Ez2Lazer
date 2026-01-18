@@ -230,13 +230,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             // Dispose last note on the column
 
-            if (Math.Abs(locations[locations.Count - 1].startTime - locations[locations.Count - 1].endTime) <= error || rng.Next(100) >= percentage)
+            if (Math.Abs(locations[^1].startTime - locations[^1].endTime) <= error || rng.Next(100) >= percentage)
             {
                 newColumnObjects.Add(new Note
                 {
                     Column = column.Key,
-                    StartTime = locations[locations.Count - 1].startTime,
-                    Samples = locations[locations.Count - 1].samples
+                    StartTime = locations[^1].startTime,
+                    Samples = locations[^1].samples
                 });
             }
             else
@@ -244,9 +244,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 newColumnObjects.Add(new HoldNote
                 {
                     Column = column.Key,
-                    StartTime = locations[locations.Count - 1].startTime,
-                    Duration = locations[locations.Count - 1].endTime - locations[locations.Count - 1].startTime,
-                    NodeSamples = [locations[locations.Count - 1].samples, Array.Empty<HitSampleInfo>()]
+                    StartTime = locations[^1].startTime,
+                    Duration = locations[^1].endTime - locations[^1].startTime,
+                    NodeSamples = [locations[^1].samples, Array.Empty<HitSampleInfo>()]
                 });
             }
 

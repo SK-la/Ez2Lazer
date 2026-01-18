@@ -35,6 +35,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {

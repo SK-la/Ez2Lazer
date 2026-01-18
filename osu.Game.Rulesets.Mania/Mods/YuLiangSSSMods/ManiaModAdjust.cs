@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                           IReadFromConfig,
                                           IApplicableToHealthProcessor,
                                           IApplicableToScoreProcessor,
-                                          IHasSeed //, IUpdatableByPlayfield
+                                          IHasSeed
     {
         public override string Name => @"Adjust";
 
@@ -54,21 +54,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override IconUsage? Icon => FontAwesome.Solid.Atlas;
 
         public override double ScoreMultiplier => ScoreMultiplierAdjust.Value;
-        //{
-        //    get
-        //    {
-        //        double SpeedValue = SpeedChange.Value;
-        //        float? ODValue = OverallDifficulty.Value;
-        //        if (ODValue is not null)
-        //        {
-        //            return SpeedValue * (double)(ODValue / 5 + 1);
-        //        }
-        //        return SpeedValue;
-        //    }
-        //}
 
         public override bool Ranked => false;
-
+        public override bool ValidForMultiplayer => false;
         public override Type[] IncompatibleMods => new[] { typeof(ModEasy), typeof(ModHardRock), typeof(ModTimeRamp), typeof(ModAdaptiveSpeed), typeof(ModRateAdjust) };
 
         public BindableDouble OriginalOD = new BindableDouble();
@@ -192,95 +180,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.025
         };
 
-        public override void ApplyToSample(IAdjustableAudioComponent sample)
-        {
-            //if (UseBPM.Value && BPM.Value is not null)
-            //{
-            //    var newBindable = new Bindable<double>
-            //    {
-            //        Value = (double)BPM.Value / NowBeatmapBPM
-            //    };
-            //    sample.AddAdjustment(AdjustableProperty.Frequency, newBindable);
-            //}
-            //else
-            {
-                base.ApplyToSample(sample);
-            }
-        }
-
-        public override double ApplyToRate(double time, double rate)
-        {
-            //if (UseBPM.Value && BPM.Value is not null)
-            //{
-            //    try
-            //    {
-            //        return rate * (double)(BPM.Value / NowBeatmapBPM);
-            //    }
-            //    catch
-            //    {
-            //        return rate;
-            //    }
-            //}
-            return base.ApplyToRate(time, rate);
-        }
-
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustPitch_Label), nameof(EzManiaModStrings.AdjustPitch_Description))]
         public virtual BindableBool AdjustPitch { get; } = new BindableBool();
 
         private readonly RateAdjustModHelper rateAdjustHelper;
 
-        //public double NowBeatmapBPM
-        //{
-        //    get
-        //    {
-        //        double result;
-        //        if (BeatmapTitleWedge.SelectedWorkingBeatmap is not null)
-        //        {
-        //            result = BeatmapTitleWedge.SelectedWorkingBeatmap.BeatmapInfo.BPM;
-        //        }
-        //        else
-        //        {
-        //            result = 200;
-        //        }
-        //        if (BPM.Value is not null)
-        //        {
-        //            try
-        //            {
-        //                SpeedChange.Value = (double)BPM.Value / result;
-        //            }
-        //            catch
-        //            {
-        //                SpeedChange.Value = 1;
-        //            }
-        //        }
-        //        return result;
-        //    }
-        //}
-
-        //[SettingSource("BPM", "Change the BPM of the beatmap.", SettingControlType = typeof(SettingsNumberBox))]
-        //public Bindable<int?> BPM { get; set; } = new Bindable<int?>(200);
-
-        //[SettingSource("Use BPM", "Use BPM instead of speed rate.")]
-        //public BindableBool UseBPM { get; set; } = new BindableBool(false);
-
-        public void ReadFromDifficulty(IBeatmapDifficultyInfo difficulty)
-        {
-        }
-
         public ManiaModAdjust()
         {
-            //if (UseBPM.Value && BPM.Value is not null)
-            //{
-            //    var newBindable = new BindableNumber<double>
-            //    {
-            //        Value = (double)BPM.Value / NowBeatmapBPM
-            //    };
-            //    rateAdjustHelper = new RateAdjustModHelper(newBindable);
-            //}
-            //else
-            {
-                rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
-            }
+            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
 
             foreach (var (_, property) in this.GetOrderedSettingsSourceProperties())
             {
@@ -393,12 +300,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             if (Test.Value)
             {
-                var mobj = maniaBeatmap;
-                var groups = mobj.HitObjects.GroupBy(c => c.Column).OrderBy(c => c.Key);
-                int hote = mobj.HitObjects.Select(h => h.GetEndTime() != h.StartTime).Count();
-                int note = mobj.HitObjects.Count - hote;
+                var obj = maniaBeatmap;
+                var groups = obj.HitObjects.GroupBy(c => c.Column).OrderBy(c => c.Key);
+                // int note = obj.HitObjects.Select(h => h.GetEndTime() != h.StartTime).Count();
+                // int note = obj.HitObjects.Count - note;
                 foreach (var column in groups) Logger.Log($"Column {column.Key + 1}: {column.Count()} notes", level: LogLevel.Important);
-                //Logger.Log($"Test:\nThis beatmap has {mobj.HitObjects.Count} HitObjects.\n", level: LogLevel.Important);
+                //Logger.Log($"Test:\nThis beatmap has {obj.HitObjects.Count} HitObjects.\n", level: LogLevel.Important);
             }
 
             if (RandomSelect.Value)
@@ -484,15 +391,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
         {
             triggerFailureDelegate = healthProcessor.TriggerFailure;
-            //healthProcessor.FailConditions += FailCondition;
         }
-
-        //protected bool FailCondition(HealthProcessor healthProcessor, JudgementResult result)
-        //{
-        //    return result.Type.AffectsCombo()
-        //       && !result.IsHit;
-        //}
-        //------Fail Condition------
 
         protected void TriggerFailure()
         {

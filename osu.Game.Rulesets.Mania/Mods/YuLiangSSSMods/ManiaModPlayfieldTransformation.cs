@@ -29,6 +29,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override double ScoreMultiplier => 1.0;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MinimumScale_Label), nameof(EzManiaModStrings.MinimumScale_Description))]
         public BindableFloat MinScale { get; } = new BindableFloat(0.3f)

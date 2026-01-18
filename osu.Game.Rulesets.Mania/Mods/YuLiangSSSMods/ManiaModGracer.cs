@@ -34,6 +34,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override IconUsage? Icon => FontAwesome.Solid.Star;
 
         public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
 
         public override LocalisableString Description => EzManiaModStrings.Gracer_Description;
 

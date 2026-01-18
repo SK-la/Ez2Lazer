@@ -43,6 +43,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
+        public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
+
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PillSwitch_Label), nameof(EzManiaModStrings.PillSwitch_Description))]
         public BindableBool PillMode { get; set; } = new BindableBool(true);
 

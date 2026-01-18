@@ -33,6 +33,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override double ScoreMultiplier => 1;
 
         public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -48,11 +50,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        public static int RemedyGreat = 0;
-        public static int RemedyGood = 0;
-        public static int RemedyOk = 0;
-        public static int RemedyMeh = 0;
-        public static int RemedyMiss = 0;
+        public static int RemedyGreat;
+        public static int RemedyGood;
+        public static int RemedyOk;
+        public static int RemedyMeh;
+        public static int RemedyMiss;
 
         public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
 

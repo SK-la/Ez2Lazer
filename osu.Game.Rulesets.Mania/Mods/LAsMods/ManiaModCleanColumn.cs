@@ -37,8 +37,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override IconUsage? Icon => FontAwesome.Solid.Backspace;
 
         public override ModType Type => ModType.LA_Mod;
-
         public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+
+        public override bool ValidForFreestyleAsRequiredMod => false;
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.DeleteSColumn_Label), nameof(EzManiaModStrings.DeleteSColumn_Description))]
         public BindableBool DeleteSColumn { get; } = new BindableBool(true);

@@ -31,7 +31,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     /// 基于凉雨的 Duplicate Mod, 解决无循环音频问题；
     /// <para></para>备注部分为我修改的内容, 增加IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider接口的使用
     /// </summary>
-    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider, ILoopTimeRangeMod, IApplicableFailOverride, IApplicableToRate, IApplicableToDrawableRuleset<ManiaHitObject>
+    public class ManiaModLoopPlayClip : Mod, IApplicableAfterBeatmapConversion,
+                                        IHasSeed,
+                                        IApplicableToPlayer,
+                                        IApplicableToHUD,
+                                        IPreviewOverrideProvider,
+                                        ILoopTimeRangeMod,
+                                        IApplicableFailOverride,
+                                        IApplicableToRate,
+                                        IApplicableToDrawableRuleset<ManiaHitObject>
     {
         private DuplicateVirtualTrack? duplicateTrack;
         private IWorkingBeatmap? pendingWorkingBeatmap;
@@ -51,6 +59,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override ModType Type => ModType.LA_Mod;
 
         public override bool Ranked => false;
+        public override bool ValidForMultiplayer => false;
+        public override bool ValidForFreestyleAsRequiredMod => false;
 
         // LP 内置变速（复刻 HT 的实现）后，为避免叠加导致体验混乱，直接与其它变速 Mod 互斥。
         public override Type[] IncompatibleMods => new[]

@@ -32,6 +32,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override ModType Type => ModType.LA_Mod;
 
+        public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
         public override Type[] IncompatibleMods => new[] { typeof(ManiaModHoldOff) };
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SpaceBody_Label), nameof(EzManiaModStrings.SpaceBodyGap_Description), SettingControlType = typeof(MultiplierSettingsSlider))]

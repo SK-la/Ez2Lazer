@@ -26,6 +26,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
         public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Divide_Label), nameof(EzManiaModStrings.Divide_Description))]
         public BindableNumber<int> Divide { get; set; } = new BindableInt(4)

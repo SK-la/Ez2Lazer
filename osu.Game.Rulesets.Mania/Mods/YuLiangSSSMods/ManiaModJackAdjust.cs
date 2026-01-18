@@ -36,6 +36,8 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override double ScoreMultiplier => 1;
 
         public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -211,7 +213,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var jackLine = new List<ManiaHitObject>(); // first line
             var lastLine = new List<ManiaHitObject>();
             bool init = true;
-            int jackCount = 0;
+            // int jackCount = 0;
 
             foreach (var group in area.GroupBy(h => h.StartTime))
             {
@@ -223,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     lastLine = thisLine;
                     resultObjects.AddRange(thisLine);
                     init = false;
-                    jackCount = jackLine.Count;
+                    // jackCount = jackLine.Count;
                     continue;
                 }
 
@@ -250,7 +252,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 //int count = Math.Min(jackCount, thisLine.Count);
                 //var select = SelectNote(Rng, thisLine, probability, count);
                 //count = select.result.Count;
-                var select = thisLine;
+                // var select = thisLine;
                 var jackColumn = jackLine.Select(c => c.Column).ShuffleIndex(rng).ToList();
                 if (!align) jackColumn = lastLine.Select(c => c.Column).ShuffleIndex(rng).ToList();
                 thisLine = thisLine.ShuffleIndex(rng).ToList();
@@ -261,7 +263,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     {
                         int randColumn = jackColumn.SelectRandomOne(rng);
                         int opportunity = 0;
-                        int max = 20;
+                        const int max = 20;
 
                         while (opportunity < max)
                         {

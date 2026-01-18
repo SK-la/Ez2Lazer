@@ -21,7 +21,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override LocalisableString Description => EzManiaModStrings.NewJudgement_Description;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
-
+        public override bool Ranked => false;
+        public override bool ValidForMultiplayer => true;
+        public override bool ValidForFreestyleAsRequiredMod => false;
         public override double ScoreMultiplier => 1.0;
 
         public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
