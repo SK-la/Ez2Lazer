@@ -33,7 +33,6 @@ using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osuTK;
 using osuTK.Graphics;
-using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.UserInterface;
@@ -53,7 +52,7 @@ namespace osu.Game.Screens.Select.Carousel
         /// </summary>
         public const float HEIGHT = height + CAROUSEL_BEATMAP_SPACING;
 
-        private const float height = MAX_HEIGHT * 0.6f;
+        private const float height = MAX_HEIGHT * 1.2f;
 
         private readonly BeatmapInfo beatmapInfo;
 
@@ -183,6 +182,8 @@ namespace osu.Game.Screens.Select.Carousel
                         {
                             TooltipType = DifficultyIconTooltipType.None,
                             Scale = new Vector2(1.8f),
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft
                         },
                         new FillFlowContainer
                         {
@@ -194,9 +195,24 @@ namespace osu.Game.Screens.Select.Carousel
                                 new FillFlowContainer
                                 {
                                     Direction = FillDirection.Horizontal,
+                                    Spacing = new Vector2(3),
+                                    AutoSizeAxes = Axes.Both,
+                                    Children = new Drawable[]
+                                    {
+                                        ezKpsGraph = new EzDisplayLineGraph
+                                        {
+                                            Size = new Vector2(300, 20),
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                        },
+                                    }
+                                },
+                                new FillFlowContainer
+                                {
+                                    Direction = FillDirection.Horizontal,
                                     Spacing = new Vector2(4, 0),
                                     AutoSizeAxes = Axes.Both,
-                                    Children = new[]
+                                    Children = new Drawable[]
                                     {
                                         keyCountText = new OsuSpriteText
                                         {
@@ -218,6 +234,11 @@ namespace osu.Game.Screens.Select.Carousel
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
                                         },
+                                        ezKpsDisplay = new EzKpsDisplay
+                                        {
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft
+                                        },
                                     }
                                 },
                                 new FillFlowContainer
@@ -230,19 +251,6 @@ namespace osu.Game.Screens.Select.Carousel
                                     {
                                         new TopLocalRank(beatmapInfo),
                                         starCounter = new StarCounter(),
-                                        ezKpsDisplay = new EzKpsDisplay
-                                        {
-                                            Anchor = Anchor.BottomLeft,
-                                        }
-                                    }
-                                },
-                                new FillFlowContainer
-                                {
-                                    Direction = FillDirection.Horizontal,
-                                    Spacing = new Vector2(3),
-                                    AutoSizeAxes = Axes.Both,
-                                    Children = new Drawable[]
-                                    {
                                         displayXxySR = new EzDisplayXxySR
                                         {
                                             Origin = Anchor.CentreLeft,
@@ -253,16 +261,9 @@ namespace osu.Game.Screens.Select.Carousel
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
-                                        },
+                                        }
                                     }
-                                },
-                                Empty(),
-                                ezKpsGraph = new EzDisplayLineGraph
-                                {
-                                    Size = new Vector2(300, 20),
-                                    Anchor = Anchor.BottomLeft,
-                                    Origin = Anchor.BottomLeft,
-                                },
+                                }
                             }
                         }
                     }
@@ -421,12 +422,18 @@ namespace osu.Game.Screens.Select.Carousel
 
         private void ensureNormalizedCounts(int keyCount)
         {
+            // Defensive: ensure keyCount is non-negative. Some legacy paths may
+            // return -1 when unimplemented, which would crash when used as a
+            // Dictionary capacity.
+            if (keyCount < 0)
+                keyCount = 0;
+
             if (normalizedColumnCounts != null && normalizedHoldNoteCounts != null && normalizedCountsKeyCount == keyCount)
                 return;
 
             normalizedCountsKeyCount = keyCount;
-            normalizedColumnCounts = new Dictionary<int, int>(keyCount);
-            normalizedHoldNoteCounts = new Dictionary<int, int>(keyCount);
+            normalizedColumnCounts = new Dictionary<int, int>(Math.Max(0, keyCount));
+            normalizedHoldNoteCounts = new Dictionary<int, int>(Math.Max(0, keyCount));
 
             for (int i = 0; i < keyCount; i++)
             {

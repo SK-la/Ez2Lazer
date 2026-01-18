@@ -31,7 +31,6 @@ using osuTK;
 using osuTK.Input;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Select;
-using osu.Game.Graphics.UserInterfaceV2;
 
 namespace osu.Game.Screens.Select
 {
@@ -173,7 +172,7 @@ namespace osu.Game.Screens.Select
                                     new Dimension(GridSizeMode.AutoSize),
                                     new Dimension(GridSizeMode.Absolute, OsuTabControl<SortMode>.HORIZONTAL_SPACING),
                                     new Dimension(),
-                                    new Dimension(GridSizeMode.Absolute, OsuTabControl<SortMode>.HORIZONTAL_SPACING),
+                                    new Dimension(GridSizeMode.AutoSize),
                                     new Dimension(GridSizeMode.AutoSize),
                                 },
                                 RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
@@ -200,7 +199,6 @@ namespace osu.Game.Screens.Select
                                             AccentColour = colours.GreenLight,
                                             Current = { BindTarget = sortMode }
                                         },
-                                        Empty(),
                                         new OsuTabControlCheckbox
                                         {
                                             Text = "Show converted",
@@ -208,6 +206,13 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.BottomRight,
                                             Origin = Anchor.BottomRight,
                                         },
+                                        keySoundPreviewButton = new ShearedToggleButton
+                                        {
+                                            Anchor = Anchor.TopRight,
+                                            Origin = Anchor.TopRight,
+                                            Text = "kSound Preview",
+                                            Height = 30f,
+                                        }
                                     }
                                 }
                             },
@@ -250,23 +255,18 @@ namespace osu.Game.Screens.Select
                                 {
                                     csSelector = new EzKeyModeSelector
                                     {
+                                        Anchor = Anchor.TopLeft,
+                                        Origin = Anchor.TopLeft,
                                         RelativeSizeAxes = Axes.X,
                                     },
                                     xxySrFilterButton = new ShearedToggleButton
                                     {
-                                        Anchor = Anchor.Centre,
-                                        Origin = Anchor.Centre,
+                                        Anchor = Anchor.TopRight,
+                                        Origin = Anchor.TopRight,
                                         Text = "xxy_SR Filter",
                                         TooltipText = "(NoActive)Filter, sort beatmaps by Xxy Star Rating",
                                         Height = 30f,
                                     },
-                                    keySoundPreviewButton = new ShearedToggleButton
-                                    {
-                                        Anchor = Anchor.Centre,
-                                        Origin = Anchor.Centre,
-                                        Text = "kSound Preview",
-                                        Height = 30f,
-                                    }
                                 }
                             },
                         }
