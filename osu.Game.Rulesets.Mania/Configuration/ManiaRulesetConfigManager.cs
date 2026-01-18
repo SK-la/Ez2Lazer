@@ -3,6 +3,7 @@
 
 using osu.Framework.Configuration.Tracking;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Mania.LAsEZMania;
@@ -24,13 +25,10 @@ namespace osu.Game.Rulesets.Mania.Configuration
         {
             base.InitialiseDefaults();
 
-            // SetDefault(ManiaRulesetSetting.HitMode, EzMUGHitMode.EZ2AC);
             SetDefault(ManiaRulesetSetting.ScrollBaseSpeed, 500, 100, 1000, 1.0);
             SetDefault(ManiaRulesetSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
             SetDefault(ManiaRulesetSetting.ScrollStyle, EzManiaScrollingStyle.ScrollTimeStyleFixed);
 
-            SetDefault(ManiaRulesetSetting.ScrollPerKeyMode, false);
-            SetDefault(ManiaRulesetSetting.PerspectiveAngle, 90.0f, 30.0f, 90.0f);
             SetDefault(ManiaRulesetSetting.ScrollSpeed, 200, 1.0, 401.0, current_scroll_speed_precision);
             SetDefault(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
             SetDefault(ManiaRulesetSetting.TimingBasedNoteColouring, false);
@@ -73,11 +71,6 @@ namespace osu.Game.Rulesets.Mania.Configuration
         ScrollTime,
         ScrollBaseSpeed,
         ScrollTimePerSpeed,
-
-        // HitMode,
-        //暂时无用
-        PerspectiveAngle,
-        ScrollPerKeyMode,
 
         //官方设置
         ScrollSpeed,

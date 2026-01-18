@@ -76,7 +76,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
         private readonly Bindable<double> columnWidthBindable = new Bindable<double>();
         private readonly Bindable<double> specialFactorBindable = new Bindable<double>();
-        private readonly Bindable<EzColumnWidthStyle> ezColumnWidthStyle = new Bindable<EzColumnWidthStyle>();
+        private readonly Bindable<ColumnWidthStyle> ezColumnWidthStyle = new Bindable<ColumnWidthStyle>();
 
         [BackgroundDependencyLoader]
         private void load(ManiaRulesetConfigManager? rulesetConfig)
@@ -168,17 +168,17 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 switch (ezColumnWidthStyle.Value)
                 {
-                    case EzColumnWidthStyle.EzStyleProOnly:
+                    case ColumnWidthStyle.EzStyleProOnly:
                         var skinInfo = skinManager.CurrentSkinInfo.Value;
                         if (skinInfo.Value.Name.Contains("Ez Style Pro"))
                             width = ezWidth;
                         break;
 
-                    case EzColumnWidthStyle.GlobalWidth:
+                    case ColumnWidthStyle.GlobalWidth:
                         width = ezWidth;
                         break;
 
-                    case EzColumnWidthStyle.GlobalTotalWidth:
+                    case ColumnWidthStyle.GlobalTotalWidth:
                         width = ezWidth * 10 / stageDefinition.Columns;
                         break;
                 }

@@ -31,7 +31,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         private FillFlowContainer columnsContainer = null!;
         private FillFlowContainer baseColorsContainer = null!;
 
-        private Bindable<int> keyModeSelection = null!;
+        private Bindable<int> columnTypeListSelectBindable = null!;
         private Bindable<bool> colorSettingsEnabled = null!;
         private Bindable<double> columnBlur = new Bindable<double>();
         private Bindable<double> columnDim = new Bindable<double>();
@@ -51,7 +51,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         [BackgroundDependencyLoader]
         private void load()
         {
-            keyModeSelection = ezSkinConfig.GetBindable<int>(Ez2Setting.SelectedKeyMode);
+            columnTypeListSelectBindable = ezSkinConfig.GetBindable<int>(Ez2Setting.LastSelectForColumnsType);
             colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
             columnDim = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim);
@@ -69,7 +69,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         {
             base.LoadComplete();
             setupEventHandlers();
-            updateColumnsType(keyModeSelection.Value);
+            updateColumnsType(columnTypeListSelectBindable.Value);
         }
 
         private void createUI()
@@ -165,7 +165,7 @@ namespace osu.Game.LAsEzExtensions.Screens
                     }.WithUnderline(),
                     new SettingsDropdown<int>
                     {
-                        Current = keyModeSelection,
+                        Current = columnTypeListSelectBindable,
                         Items = available_key_modes
                     },
                     new Box
@@ -200,7 +200,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         private void setupEventHandlers()
         {
             colorSettingsEnabled.BindValueChanged(onColorSettingsEnabledChanged, true);
-            keyModeSelection.BindValueChanged(e => updateColumnsType(e.NewValue));
+            columnTypeListSelectBindable.BindValueChanged(e => updateColumnsType(e.NewValue));
 
             // 设置颜色变化事件
             colorBindables[Ez2Setting.ColumnTypeA].BindValueChanged(e => updateBaseColour(e.NewValue, Ez2Setting.ColumnTypeA, EzConstants.COLUMN_TYPE_A));
@@ -250,14 +250,14 @@ namespace osu.Game.LAsEzExtensions.Screens
 
                 if (currentKeyCount > 0 && available_key_modes.Contains(currentKeyCount))
                 {
-                    keyModeSelection.Value = currentKeyCount;
+                    columnTypeListSelectBindable.Value = currentKeyCount;
                 }
             }
         }
 
-        private void updateColumnsType(int keyMode)
+        private void updateColumnsType(int keyModeForList)
         {
-            if (columnSelectorCache.TryGetValue(keyMode, out var cachedSelectors))
+            if (columnSelectorCache.TryGetValue(keyModeForList, out var cachedSelectors))
             {
                 columnsContainer.Clear();
                 columnsContainer.AddRange(cachedSelectors);
@@ -266,7 +266,7 @@ namespace osu.Game.LAsEzExtensions.Screens
 
             columnsContainer.Clear();
 
-            if (keyMode == 0 || !available_key_modes.Contains(keyMode))
+            if (keyModeForList == 0 || !available_key_modes.Contains(keyModeForList))
             {
                 columnsContainer.Add(new OsuSpriteText
                 {
@@ -277,7 +277,7 @@ namespace osu.Game.LAsEzExtensions.Screens
                 return;
             }
 
-            createColumnSelectors(keyMode);
+            createColumnSelectors(keyModeForList);
         }
 
         private void createColumnSelectors(int keyMode)

@@ -15,29 +15,9 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
     {
         protected override LocalisableString Header => CommonStrings.General;
 
-        private SettingsEnumDropdown<EzMUGHitMode> hitMode = null!;
-        private SettingsEnumDropdown<EnumHealthMode> healthMode = null!;
-        private SettingsCheckbox poorHitResultCheckbox = null!;
-
         [BackgroundDependencyLoader]
         private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
-            healthMode = new SettingsEnumDropdown<EnumHealthMode>
-            {
-                ClassicDefault = EnumHealthMode.Lazer,
-                Current = ezConfig.GetBindable<EnumHealthMode>(Ez2Setting.CustomHealthMode),
-                LabelText = EzLocalizationManager.HealthMode,
-                TooltipText = EzLocalizationManager.HealthModeTooltip,
-                Keywords = new[] { "mania" }
-            };
-            poorHitResultCheckbox = new SettingsCheckbox
-            {
-                Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResult),
-                LabelText = EzLocalizationManager.PoorHitResult,
-                TooltipText = EzLocalizationManager.PoorHitResultTooltip,
-                Keywords = new[] { "mania" }
-            };
-
             Children = new Drawable[]
             {
                 new SettingsEnumDropdown<ScoringMode>
@@ -47,16 +27,6 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = config.GetBindable<ScoringMode>(OsuSetting.ScoreDisplayMode),
                     Keywords = new[] { "scoring" }
                 },
-                hitMode = new SettingsEnumDropdown<EzMUGHitMode>
-                {
-                    ClassicDefault = EzMUGHitMode.EZ2AC,
-                    LabelText = EzLocalizationManager.HitMode,
-                    TooltipText = EzLocalizationManager.HitModeTooltip,
-                    Current = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode),
-                    Keywords = new[] { "mania" }
-                },
-                healthMode,
-                poorHitResultCheckbox,
                 new SettingsSlider<double>
                 {
                     LabelText = EzLocalizationManager.AccuracyCutoffS,
@@ -84,14 +54,6 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Current = config.GetBindable<bool>(OsuSetting.StarFountains)
                 },
             };
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            hitMode.Current.BindValueChanged(mode =>
-                healthMode.Alpha = mode.NewValue == EzMUGHitMode.O2Jam ? 1 : 0, true);
         }
     }
 }

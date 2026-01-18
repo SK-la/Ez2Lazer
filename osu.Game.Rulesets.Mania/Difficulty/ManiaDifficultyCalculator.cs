@@ -51,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
             var hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
-            hitWindows.BPM = beatmap.BeatmapInfo.BPM;
+            if (beatmap.BeatmapInfo.BPM > 0) hitWindows.BPM = beatmap.BeatmapInfo.BPM;
             double sr = skills[0].DifficultyValue() * difficulty_multiplier;
 
             sr = AdditionalMethod(beatmap, mods, skills, clockRate, sr);

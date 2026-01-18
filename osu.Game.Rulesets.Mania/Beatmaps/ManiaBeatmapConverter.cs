@@ -20,6 +20,7 @@ using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Utils;
 using osuTK;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
+using osu.Game.Rulesets.Mania.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Beatmaps
 {
@@ -63,12 +64,12 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         public ManiaBeatmapConverter(IBeatmap beatmap, Ruleset ruleset)
             : this(beatmap, LegacyBeatmapConversionDifficultyInfo.FromBeatmap(beatmap), ruleset)
         {
-            CurrentHitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
         }
 
         private ManiaBeatmapConverter(IBeatmap? beatmap, LegacyBeatmapConversionDifficultyInfo difficulty, Ruleset ruleset)
             : base(beatmap!, ruleset)
         {
+            CurrentHitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
             IsForCurrentRuleset = difficulty.SourceRuleset.Equals(ruleset.RulesetInfo);
             Random = new LegacyRandom((int)MathF.Round(difficulty.DrainRate + difficulty.CircleSize) * 20 + (int)(difficulty.OverallDifficulty * 41.2) + (int)MathF.Round(difficulty.ApproachRate));
             TargetColumns = getColumnCount(difficulty);

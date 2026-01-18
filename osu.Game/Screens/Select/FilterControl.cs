@@ -29,6 +29,9 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select.Filter;
 using osuTK;
 using osuTK.Input;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Select;
+using osu.Game.Graphics.UserInterfaceV2;
 
 namespace osu.Game.Screens.Select
 {
@@ -52,6 +55,9 @@ namespace osu.Game.Screens.Select
         private Bindable<SortMode> sortMode;
         private Bindable<GroupMode> groupMode;
         private FilterControlTextBox searchTextBox;
+        private EzKeyModeSelector csSelector = null!;
+        private ShearedToggleButton keySoundPreviewButton = null!;
+        private ShearedToggleButton xxySrFilterButton = null!;
         private CollectionDropdown collectionDropdown;
 
         [CanBeNull]
@@ -78,9 +84,42 @@ namespace osu.Game.Screens.Select
                 criteria.UserStarDifficulty.Max = maximumStars.Value;
 
             criteria.RulesetCriteria = ruleset.Value.CreateInstance().CreateRulesetFilterCriteria();
+            applyCircleSizeFilter(criteria);
 
             FilterQueryParser.ApplyQueries(criteria, query);
             return criteria;
+        }
+
+        private void applyCircleSizeFilter(FilterCriteria criteria)
+        {
+            if (csSelector == null)
+                return;
+
+            var selectedModeIds = csSelector.EzKeyModeFilter.SelectedModeIds;
+
+            if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
+                return;
+
+            var selectedModes = CsItemIds.ALL
+                                         .Where(m => selectedModeIds.Contains(m.Id) && m.CsValue.HasValue)
+                                         .Select(m => m.CsValue!.Value)
+                                         .ToList();
+
+            if (selectedModes.Count == 0)
+                return;
+
+            criteria.DiscreteCircleSizeValues = new List<float>(selectedModes);
+
+            if (ruleset.Value.OnlineID != 3)
+            {
+                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                {
+                    Min = selectedModes.Min() - 0.5f,
+                    Max = selectedModes.Max() + 0.5f,
+                    IsLowerInclusive = false,
+                    IsUpperInclusive = false
+                };
+            }
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) =>
@@ -203,6 +242,33 @@ namespace osu.Game.Screens.Select
                                     }
                                 }
                             },
+                            new Container
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                Height = 30,
+                                Children = new Drawable[]
+                                {
+                                    csSelector = new EzKeyModeSelector
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                    },
+                                    xxySrFilterButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.Centre,
+                                        Origin = Anchor.Centre,
+                                        Text = "xxy_SR Filter",
+                                        TooltipText = "(NoActive)Filter, sort beatmaps by Xxy Star Rating",
+                                        Height = 30f,
+                                    },
+                                    keySoundPreviewButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.Centre,
+                                        Origin = Anchor.Centre,
+                                        Text = "kSound Preview",
+                                        Height = 30f,
+                                    }
+                                }
+                            },
                         }
                     }
                 }
@@ -237,6 +303,56 @@ namespace osu.Game.Screens.Select
             searchTextBox.Current.ValueChanged += _ => updateCriteria();
 
             updateCriteria();
+        }
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            // Bind ez2 settings where available
+            ezConfig?.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton?.Active ?? new Bindable<bool>());
+            ezConfig?.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton?.Active ?? new Bindable<bool>());
+
+            // Bind config values to controls where appropriate
+            // showConverted already bound earlier to showConverted bindable
+
+            // Ruleset/mod logic copied from V2: hide/show csSelector/xxy filter based on ruleset
+            ruleset?.BindValueChanged(_ =>
+            {
+                updateCriteria();
+
+                if (ruleset.Value.OnlineID == 1) // Taiko
+                {
+                    csSelector.Hide();
+                    xxySrFilterButton.Hide();
+                }
+                else
+                {
+                    csSelector.Show();
+
+                    if (ruleset.Value.OnlineID == 3)
+                    {
+                        xxySrFilterButton.Show();
+                    }
+                }
+            });
+
+            mods?.BindValueChanged(m =>
+            {
+                if (m.NewValue.SequenceEqual(m.OldValue))
+                    return;
+
+                if (currentCriteria?.RulesetCriteria?.FilterMayChangeFromMods(m) == true)
+                    updateCriteria();
+            });
+
+            csSelector?.Current.BindValueChanged(_ => updateCriteria());
+            // csSelector?.EzKeyModeFilter.SelectionChanged += updateCriteria;
+            xxySrFilterButton?.Active.BindValueChanged(_ => updateCriteria());
+            keySoundPreviewButton?.Active.BindValueChanged(_ => updateCriteria());
         }
 
         public void Deactivate()

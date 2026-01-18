@@ -11,15 +11,13 @@ using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
-using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Screens.SelectV2;
-using osu.Game.Skinning.Components;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
     public class Ez2ConfigManager : IniConfigManager<Ez2Setting>, IGameplaySettings
     {
-        protected override string Filename => "EzSkinSettings.ini"; // 以后可能改成 Ez2Settings.ini
+        protected override string Filename => "EzSkinSettings.ini";
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;
 
@@ -60,8 +58,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
         {
             #region 皮肤类
 
-            SetDefault(Ez2Setting.SelectedKeyMode, 4);
-            SetDefault(Ez2Setting.ColumnWidthStyle, EzColumnWidthStyle.EzStyleProOnly);
+            SetDefault(Ez2Setting.LastSelectForColumnsType, 4);
+            SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzStyleProOnly);
             SetDefault(Ez2Setting.GlobalHitPosition, false);
             SetDefault(Ez2Setting.GlobalTextureName, 4);
 
@@ -112,14 +110,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             #endregion
 
-            SetDefault(Ez2Setting.KpcDisplayMode, EzKpcDisplay.KpcDisplayMode.Numbers);
-            SetDefault(Ez2Setting.XxySRFilter, false);
-            SetDefault(Ez2Setting.KeySoundPreview, false);
-            SetDefault(Ez2Setting.EzSelectCsMode, "");
 
-            SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
-            SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.O2JamNormal);
-            SetDefault(Ez2Setting.CustomPoorHitResult, true);
 
             SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
             SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
@@ -129,6 +120,20 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.GameplayDisableCmdSpace, true);
             SetDefault(Ez2Setting.AsioSampleRate, 48000);
             SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
+
+            initializeManiaDefaults();
+        }
+
+        private void initializeManiaDefaults()
+        {
+            SetDefault(Ez2Setting.KpcDisplayMode, EzKpcDisplay.KpcDisplayMode.Numbers);
+            SetDefault(Ez2Setting.XxySRFilter, false);
+            SetDefault(Ez2Setting.KeySoundPreview, false);
+            SetDefault(Ez2Setting.EzSelectCsMode, "");
+
+            SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
+            SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.O2JamNormal);
+            SetDefault(Ez2Setting.CustomPoorHitResult, true);
         }
 
         #region 列类型管理
@@ -359,7 +364,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         {
             var columnWidthBindable = GetBindable<double>(Ez2Setting.ColumnWidth);
             var specialFactorBindable = GetBindable<double>(Ez2Setting.SpecialFactor);
-            var columnWidthStyleBindable = GetBindable<EzColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
+            var columnWidthStyleBindable = GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
 
             columnWidthBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
             specialFactorBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
@@ -415,7 +420,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         }
     }
 
-    public enum EzColumnWidthStyle
+    public enum ColumnWidthStyle
     {
         [Description("EzStylePro Only")]
         EzStyleProOnly,
@@ -429,7 +434,15 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
     public enum Ez2Setting
     {
-        SelectedKeyMode,
+        // 界面设置
+        LastSelectForColumnsType,
+        KeySoundPreview,
+        EzSelectCsMode,
+        ScalingGameMode,
+        AccuracyCutoffS,
+        AccuracyCutoffA,
+        XxySRFilter,
+        KpcDisplayMode,
 
         // 全局开关
         ColumnWidthStyle,
@@ -480,24 +493,17 @@ namespace osu.Game.LAsEzExtensions.Configuration
         ColumnBlur,
         ColumnDim,
 
-        // 其他设置
-        KeySoundPreview,
-        EzSelectCsMode,
-        ScalingGameMode,
-        AccuracyCutoffS,
-        AccuracyCutoffA,
-        HitMode,
-        CustomHealthMode,
-        CustomPoorHitResult,
-        XxySRFilter,
-        KpcDisplayMode,
-
         // 音频相关
         AsioSampleRate,
         InputAudioLatencyTracker,
 
         // 来自拉取
         GameplayDisableCmdSpace,
+
+        // Mania游戏专属设置
+        HitMode,
+        CustomHealthMode,
+        CustomPoorHitResult,
     }
 
     public enum EzColumnType

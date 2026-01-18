@@ -83,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private GameHost gameHost { get; set; } = null!;
 
         [Resolved]
-        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private Bindable<bool> globalHitPosition = new Bindable<bool>();
@@ -155,9 +155,9 @@ namespace osu.Game.Rulesets.Mania.UI
             Config.BindWith(ManiaRulesetSetting.TouchOverlay, touchOverlay);
             touchOverlay.BindValueChanged(_ => updateMobileLayout(), true);
 
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            hitPositonBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
             hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
-            globalHitPosition = ezSkinConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
+            globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
         }
 

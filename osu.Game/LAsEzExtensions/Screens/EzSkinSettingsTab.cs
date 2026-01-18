@@ -127,11 +127,11 @@ namespace osu.Game.LAsEzExtensions.Screens
                             Current = nameOfNote,
                             Items = availableNoteSets,
                         },
-                        new SettingsEnumDropdown<EzColumnWidthStyle>
+                        new SettingsEnumDropdown<ColumnWidthStyle>
                         {
                             LabelText = EzLocalizationManager.ColumnWidthStyle,
                             TooltipText = EzLocalizationManager.ColumnWidthStyleTooltip,
-                            Current = ezSkinConfig.GetBindable<EzColumnWidthStyle>(Ez2Setting.ColumnWidthStyle),
+                            Current = ezSkinConfig.GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle),
                         },
                         new SettingsSlider<double>
                         {

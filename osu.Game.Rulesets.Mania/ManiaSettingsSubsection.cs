@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Configuration;
@@ -26,12 +27,35 @@ namespace osu.Game.Rulesets.Mania
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
             var config = (ManiaRulesetConfigManager)Config;
 
             Children = new Drawable[]
             {
+                new SettingsEnumDropdown<EzMUGHitMode>
+                {
+                    ClassicDefault = EzMUGHitMode.EZ2AC,
+                    LabelText = EzLocalizationManager.HitMode,
+                    TooltipText = EzLocalizationManager.HitModeTooltip,
+                    Current = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode),
+                    Keywords = new[] { "mania" }
+                },
+                new SettingsEnumDropdown<EnumHealthMode>
+                {
+                    ClassicDefault = EnumHealthMode.Lazer,
+                    Current = ezConfig.GetBindable<EnumHealthMode>(Ez2Setting.CustomHealthMode),
+                    LabelText = EzLocalizationManager.HealthMode,
+                    TooltipText = EzLocalizationManager.HealthModeTooltip,
+                    Keywords = new[] { "mania" }
+                },
+                new SettingsCheckbox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResult),
+                    LabelText = EzLocalizationManager.PoorHitResult,
+                    TooltipText = EzLocalizationManager.PoorHitResultTooltip,
+                    Keywords = new[] { "mania" }
+                },
                 new SettingsEnumDropdown<ManiaScrollingDirection>
                 {
                     LabelText = RulesetSettingsStrings.ScrollingDirection,
