@@ -139,11 +139,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             BoxElementAlpha.BindValueChanged(value => requestAlphaUpdate(value.NewValue), true);
             SpriteDropdown.BindValueChanged(_ => requestRebuild());
             PillFillDirection.BindValueChanged(_ => requestLayoutUpdate());
-            PillCount.BindValueChanged(value =>
-            {
-                currentPillCount = value.NewValue;
-                requestRebuild();
-            }, true);
         }
 
         private void requestAlphaUpdate(float alpha)
@@ -226,7 +221,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             base.LoadComplete();
 
+            // Keep local bindable bindable for external use, but subscribe
+            // directly to the global PillCount for reliable updates.
             PillCount.BindTo(O2HitModeExtension.PillCount);
+
+            // Direct subscription ensures we react even if other mods
+            // temporarily reassign or reset the global bindable's value.
+            O2HitModeExtension.PillCount.BindValueChanged(value =>
+            {
+                currentPillCount = value.NewValue;
+                requestRebuild();
+            }, true);
+
             AccentColour.BindValueChanged(_ => Colour = AccentColour.Value, true);
         }
 
