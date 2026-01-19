@@ -246,8 +246,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     modifyManiaHitRange(custom_helper.GetHitWindowsEZ2AC());
                     break;
 
-                case EzMUGHitMode.IIDX:
-                    modifyManiaHitRange(custom_helper.GetHitWindowsIIDX(0));
+                case EzMUGHitMode.IIDX_HD:
+                case EzMUGHitMode.LR2_HD:
+                case EzMUGHitMode.Raja_NM:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsIIDX(HitMode));
                     break;
 
                 case EzMUGHitMode.Malody:

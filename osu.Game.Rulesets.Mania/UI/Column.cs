@@ -232,7 +232,9 @@ namespace osu.Game.Rulesets.Mania.UI
                     break;
 
                 // TODO: 暂时先用 EZ2AC 的物件池，以后根据使用反馈单独实现
-                case EzMUGHitMode.IIDX:
+                case EzMUGHitMode.IIDX_HD:
+                case EzMUGHitMode.LR2_HD:
+                case EzMUGHitMode.Raja_NM:
                     RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
                     RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
                     RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);

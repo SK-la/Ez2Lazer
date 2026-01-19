@@ -17,8 +17,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             //  305   300    200     100     50     Miss    Poor
             { 16.67, 33.33, 116.67, 250, 250, 000 }, // IIDX
             { 15.00, 30.00, 060.00, 200, 200, 1000 }, // LR2 Hard
-            { 20.00, 60.00, 150.00, 220, 500, 500 }, // raja easy (100%)
             { 15.00, 45.00, 112.00, 165, 165, 500 }, // raja normal (75%)
+            { 20.00, 60.00, 150.00, 220, 500, 500 }, // raja easy (100%)
         };
 
         private EzMUGHitMode hitMode = EzMUGHitMode.Classic;
@@ -138,8 +138,25 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoolRange };
         }
 
-        public double[] GetHitWindowsIIDX(int row)
+        public double[] GetHitWindowsIIDX(EzMUGHitMode mode)
         {
+            int row = 0;
+
+            switch (mode)
+            {
+                case EzMUGHitMode.IIDX_HD:
+                    row = 0;
+                    break;
+
+                case EzMUGHitMode.LR2_HD:
+                    row = 1;
+                    break;
+
+                case EzMUGHitMode.Raja_NM:
+                    row = 2;
+                    break;
+            }
+
             Range305 = hit_range_bms[row, 0] * TotalMultiplier;
             Range300 = hit_range_bms[row, 1] * TotalMultiplier;
             Range200 = hit_range_bms[row, 2] * TotalMultiplier;
@@ -187,7 +204,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                     SetRanges(GetHitWindowsEZ2AC());
                     break;
 
-                case EzMUGHitMode.IIDX:
+                case EzMUGHitMode.IIDX_HD:
                     SetRanges(GetHitWindowsIIDX(0));
                     break;
 

@@ -13,16 +13,22 @@ namespace osu.Game.LAsEzExtensions.Configuration
         [Description("EZ2AC Style")]
         EZ2AC = 1,
 
-        [Description("Beatmania IIDX Style(NoAction)")]
-        IIDX = 2,
-
         [Description("O2JAM Style")]
-        O2Jam = 3,
+        O2Jam = 2,
 
-        [Description("Malody Style")]
-        Malody = 4,
+        [Description("IIDX Hard Style(Testing)")]
+        IIDX_HD = 3,
 
-        [Description("Classic Style(NoAction)")]
-        Classic = 5,
+        [Description("LR2 Hard Style(Testing)")]
+        LR2_HD = 4,
+
+        [Description("Raja Hard Style(Testing)")]
+        Raja_NM = 5,
+
+        [Description("/(NotAction)")]
+        Malody = 6,
+
+        [Description("/(NotAction)")]
+        Classic = 7,
     }
 }

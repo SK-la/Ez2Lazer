@@ -8,21 +8,27 @@ namespace osu.Game.LAsEzExtensions.Configuration
     public enum EnumHealthMode
     {
         [Description("Lazer")]
-        Lazer,
+        Lazer = 0,
 
         [Description("O2Jam Easy")]
-        O2JamEasy,
+        O2JamEasy = 1,
 
         [Description("O2Jam Normal")]
-        O2JamNormal,
+        O2JamNormal = 2,
 
         [Description("O2Jam Hard")]
-        O2JamHard,
+        O2JamHard = 3,
 
         [Description("Ez2Ac(NoActive)")]
-        Ez2Ac,
+        Ez2Ac = 4,
 
-        [Description("IIDX(NoActive)")]
-        IIDX,
+        [Description("IIDX Hard(Testing)")]
+        IIDX_HD = 5,
+
+        [Description("LR2 Hard(Testing)")]
+        LR2_HD = 6,
+
+        [Description("raja normal(Testing)")]
+        Raja_NM = 7,
     }
 }

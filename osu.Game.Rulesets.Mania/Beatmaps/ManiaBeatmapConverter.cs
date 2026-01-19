@@ -148,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                             EzMUGHitMode.EZ2AC => new Ez2AcNote(note),
                             EzMUGHitMode.Malody => new NoJudgementNote(note),
                             EzMUGHitMode.O2Jam => new O2Note(note),
-                            EzMUGHitMode.IIDX => new Ez2AcNote(note),
+                            EzMUGHitMode.IIDX_HD => new Ez2AcNote(note),
                             _ => note
                         };
                     }
@@ -160,7 +160,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                             EzMUGHitMode.EZ2AC => new Ez2AcHoldNote(hold),
                             EzMUGHitMode.Malody => new NoJudgmentHoldNote(hold),
                             EzMUGHitMode.O2Jam => new O2HoldNote(hold),
-                            EzMUGHitMode.IIDX => new Ez2AcHoldNote(hold),
+                            EzMUGHitMode.IIDX_HD => new Ez2AcHoldNote(hold),
                             _ => hold
                         };
                     }
@@ -270,7 +270,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                             EzMUGHitMode.EZ2AC => new Ez2AcNote(note),
                             EzMUGHitMode.Malody => new NoJudgementNote(note),
                             EzMUGHitMode.O2Jam => new O2Note(note),
-                            EzMUGHitMode.IIDX => new Ez2AcNote(note),
+                            EzMUGHitMode.IIDX_HD => new Ez2AcNote(note),
                             _ => note
                         };
                     }
@@ -282,7 +282,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                             EzMUGHitMode.EZ2AC => new Ez2AcHoldNote(hold),
                             EzMUGHitMode.Malody => new NoJudgmentHoldNote(hold),
                             EzMUGHitMode.O2Jam => new O2HoldNote(hold),
-                            EzMUGHitMode.IIDX => new Ez2AcHoldNote(hold),
+                            EzMUGHitMode.IIDX_HD => new Ez2AcHoldNote(hold),
                             _ => hold
                         };
                     }
