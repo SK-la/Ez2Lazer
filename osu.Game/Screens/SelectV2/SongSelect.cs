@@ -95,6 +95,11 @@ namespace osu.Game.Screens.SelectV2
         /// </summary>
         protected bool ControlGlobalMusic { get; init; } = true;
 
+        /// <summary>
+        /// Whether the osu! logo should be shown at the bottom-right of the screen.
+        /// </summary>
+        protected bool ShowOsuLogo { get; init; } = true;
+
         protected MarginPadding LeftPadding { get; init; }
 
         private ModSelectOverlay modSelectOverlay = null!;
@@ -404,7 +409,8 @@ namespace osu.Game.Screens.SelectV2
                 if (!this.IsCurrentScreen())
                     return;
 
-                logo?.FadeTo(v.NewValue == Visibility.Visible ? 0f : 1f, 200, Easing.OutQuint);
+                if (ShowOsuLogo)
+                    logo?.FadeTo(v.NewValue == Visibility.Visible ? 0f : 1f, 200, Easing.OutQuint);
             });
 
             // 当 mod 变化时，只有在存在 Loop 类型的 mod 时才开启 DuplicateVirtualTrack 行为，避免状态混乱。
@@ -850,6 +856,9 @@ namespace osu.Game.Screens.SelectV2
         {
             base.LogoArriving(logo, resuming);
 
+            if (!ShowOsuLogo)
+                return;
+
             if (logo.Alpha > 0.8f && resuming)
                 Footer?.StartTrackingLogo(logo, 400, Easing.OutQuint);
             else
@@ -873,12 +882,19 @@ namespace osu.Game.Screens.SelectV2
         protected override void LogoSuspending(OsuLogo logo)
         {
             base.LogoSuspending(logo);
+
+            if (!ShowOsuLogo)
+                return;
+
             Footer?.StopTrackingLogo();
         }
 
         protected override void LogoExiting(OsuLogo logo)
         {
             base.LogoExiting(logo);
+
+            if (!ShowOsuLogo)
+                return;
 
             Footer?.StopTrackingLogo();
 
