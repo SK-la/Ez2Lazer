@@ -31,9 +31,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             sr = 0;
 
+            double cs = beatmap.BeatmapInfo.Difficulty.CircleSize;
+            int keyCount = Math.Max(1, (int)Math.Round(cs));
+
+            if (keyCount >= 11 && (keyCount % 2 == 1))
+            {
+                return false;
+            }
+
             var method = calculate_method.Value;
 
-            // Try method with clockRate first (newer signature)
             if (method != null)
             {
                 try
