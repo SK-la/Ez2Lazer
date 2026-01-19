@@ -8,10 +8,9 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osuTK.Graphics;
 using osu.Framework.Bindables;
-using System.Linq;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Logging;
 using osu.Game.Configuration;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
@@ -221,15 +220,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             base.LoadComplete();
 
-            // Keep local bindable bindable for external use, but subscribe
-            // directly to the global PillCount for reliable updates.
             PillCount.BindTo(O2HitModeExtension.PillCount);
 
-            // Direct subscription ensures we react even if other mods
-            // temporarily reassign or reset the global bindable's value.
-            O2HitModeExtension.PillCount.BindValueChanged(value =>
+            PillCount.BindValueChanged(value =>
             {
                 currentPillCount = value.NewValue;
+                // Logger.Log($"[EzComO2JamPillUI] PillCount changed -> {currentPillCount}");
                 requestRebuild();
             }, true);
 

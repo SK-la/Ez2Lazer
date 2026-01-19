@@ -11,7 +11,7 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
-using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Configuration;
@@ -196,7 +196,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 return false;
 
             // 记录延迟追踪按键输入
-            osu.Game.LAsEzExtensions.Audio.InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
+            InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
 
             sampleTriggerSource.Play();
             return true;
@@ -247,6 +247,12 @@ namespace osu.Game.Rulesets.Mania.UI
                     RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
                     RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
                     RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
+
+                    // 临时使用解决 转K Mod 后，HitObject
+                    RegisterPool<Note, O2DrawableNote>(10, 50);
+                    RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, O2DrawableHoldNoteTail>(10, 50);
                     break;
             }
         }

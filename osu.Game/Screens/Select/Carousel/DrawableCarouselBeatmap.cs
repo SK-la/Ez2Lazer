@@ -52,7 +52,7 @@ namespace osu.Game.Screens.Select.Carousel
         /// </summary>
         public const float HEIGHT = height + CAROUSEL_BEATMAP_SPACING;
 
-        private const float height = MAX_HEIGHT * 1.2f;
+        private const float height = MAX_HEIGHT * 0.9f;
 
         private readonly BeatmapInfo beatmapInfo;
 

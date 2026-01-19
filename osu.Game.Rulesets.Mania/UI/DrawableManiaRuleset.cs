@@ -25,6 +25,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mods;
@@ -85,6 +86,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private Bindable<bool> globalHitPosition = new Bindable<bool>();
         private Bindable<bool> barLinesBindable = new Bindable<bool>();
+        private Bindable<EzMUGHitMode> hitMode = new Bindable<EzMUGHitMode>();
 
         //自定义判定系统
         private Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
@@ -153,6 +155,23 @@ namespace osu.Game.Rulesets.Mania.UI
             globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
             barLinesBindable = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool);
+            hitMode = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            hitMode.BindValueChanged(h =>
+            {
+                if (h.NewValue == EzMUGHitMode.O2Jam)
+                {
+                    O2HitModeExtension.NowBeatmapBPM = Beatmap.BeatmapInfo.BPM;
+                    O2HitModeExtension.PillCount.Value = 0;
+                    O2HitModeExtension.CoolCombo = 0;
+                    O2HitModeExtension.PillActivated = true;
+                }
+            }, true);
             barLinesBindable.BindValueChanged(b =>
             {
                 if (b.NewValue)
@@ -160,12 +179,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     BarLines.ForEach(Playfield.Add);
                 }
             }, true);
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>
             {

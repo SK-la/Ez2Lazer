@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Rulesets.Scoring;
@@ -220,6 +221,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private void setHitMode()
         {
             HitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+            // Logger.Log("HitMode set to: " + HitMode);
 
             if (HitMode == EzMUGHitMode.Lazer)
             {
@@ -229,16 +231,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (HitMode)
             {
                 case EzMUGHitMode.O2Jam:
-                    // double bpm = BPM <= 0
-                        // ? O2HitModeExtension.DEFAULT_BPM
-                        // : O2BPM;
-
-                    // 这里是真正影响判定的BPM设定
-                    O2HitModeExtension.NowBeatmapBPM = BPM > 0 ? BPM : 1;
-                    O2HitModeExtension.PillCount.Value = 0;
-                    O2HitModeExtension.CoolCombo = 0;
-                    O2HitModeExtension.PillActivated = true;
-
                     modifyManiaHitRange(custom_helper.GetHitWindowsO2Jam(BPM));
                     break;
 

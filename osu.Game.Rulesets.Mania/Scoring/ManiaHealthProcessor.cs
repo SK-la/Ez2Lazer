@@ -161,9 +161,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
             else
             {
-                #if DEBUG
-                Logger.Log($"ManiaHealthProcessor: raw health change {scaled} for mode {mode}");
-                #endif
+                // #if DEBUG
+                // Logger.Log($"ManiaHealthProcessor: raw health change {scaled} for mode {mode}");
+                // #endif
             }
 
             return scaled;

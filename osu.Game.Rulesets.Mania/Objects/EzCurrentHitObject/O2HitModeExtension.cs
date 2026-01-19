@@ -4,6 +4,7 @@
 using System;
 using System.Threading;
 using osu.Framework.Bindables;
+using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 
@@ -77,6 +78,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 {
                     // 有 Pill 时：消耗 1 个，并将该次判定提升为 Perfect（不应断连）。
                     PillCount.Value--;
+                    // Logger.Log($"[O2HitModeExtension] Pill consumed -> {PillCount.Value}");
                     upgradeToPerfect = true;
                 }
                 else
@@ -98,8 +100,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (userTriggered)
             {
-                bool applyComboBreak;
-                bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak, out upgradeToPerfect);
+                bool cont = O2HitModeExtension.PillCheck(timeOffset, out bool _, out upgradeToPerfect);
                 if (!cont) return;
             }
 
@@ -142,8 +143,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (userTriggered)
             {
-                bool applyComboBreak;
-                bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak, out upgradeToPerfect);
+                bool cont = O2HitModeExtension.PillCheck(timeOffset, out bool _, out upgradeToPerfect);
                 if (!cont) return;
             }
 
@@ -185,8 +185,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (userTriggered)
             {
-                bool applyComboBreak;
-                bool cont = O2HitModeExtension.PillCheck(timeOffset, out applyComboBreak, out upgradeToPerfect);
+                bool cont = O2HitModeExtension.PillCheck(timeOffset, out bool _, out upgradeToPerfect);
                 if (!cont) return;
             }
 
