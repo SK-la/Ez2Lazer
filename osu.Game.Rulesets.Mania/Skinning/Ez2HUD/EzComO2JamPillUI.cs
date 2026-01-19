@@ -91,8 +91,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [BackgroundDependencyLoader]
         private void load()
         {
-            Anchor = Anchor.CentreRight;
-            Origin = Anchor.CentreRight;
             Masking = true;
 
             InternalChildren = new Drawable[]

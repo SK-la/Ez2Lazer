@@ -144,7 +144,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public override bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
 
-        private static EzMUGHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+        private static EzMUGHitMode hitMode;
 
         public EzMUGHitMode HitMode
         {
@@ -152,7 +152,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
             set
             {
                 hitMode = value;
-                setHitMode();
                 updateWindows();
             }
         }
@@ -216,10 +215,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper(hitMode);
+        private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper();
 
         private void setHitMode()
         {
+            HitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+
             if (HitMode == EzMUGHitMode.Lazer)
             {
                 return;
@@ -246,7 +247,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     break;
 
                 case EzMUGHitMode.IIDX:
-                    modifyManiaHitRange(custom_helper.GetHitWindowsIIDX());
+                    modifyManiaHitRange(custom_helper.GetHitWindowsIIDX(0));
                     break;
 
                 case EzMUGHitMode.Malody:

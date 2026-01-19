@@ -14,15 +14,16 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaHealthProcessor : LegacyDrainingHealthProcessor
     {
-        private static readonly double[,] difficulty_settings =
+        private static readonly double[,] health_settings =
         {
-            //  305 |    300|    200|   100|    50|      Miss|     Poor
-            { 0.0004, 0.0003, 0.0001, 0.0000, -0.0010, -0.0040, -0.0040 }, // Lazer
-            { 0.0003, 0.0000, 0.0002, 0.0000, -0.0010, -0.0050, -0.0060 }, // O2 Easy
-            { 0.0002, 0.0000, 0.0001, 0.0000, -0.0070, -0.0040, -0.0050 }, // O2 Normal
-            { 0.0001, 0.0000, 0.0000, 0.0000, -0.0050, -0.0030, -0.0040 }, // O2 Hard
-            { 0.0004, 0.0003, 0.0001, 0.0000, -0.0010, -0.0040, -0.0060 }, // Ez2Ac
-            { 0.0004, 0.0003, 0.0001, 0.0000, -0.0010, -0.0040, -0.0040 }, // IIDX
+            //  305   300    200     100     50     Miss    Poor
+            { 0.004, 0.003, 0.001, 0.000, -0.010, -0.065, -0.000 }, // Lazer
+            { 0.003, 0.000, 0.002, 0.000, -0.010, -0.050, -0.060 }, // O2 Easy
+            { 0.002, 0.000, 0.001, 0.000, -0.070, -0.040, -0.050 }, // O2 Normal
+            { 0.001, 0.000, 0.000, 0.000, -0.050, -0.030, -0.040 }, // O2 Hard
+            { 0.004, 0.003, 0.001, 0.000, -0.010, -0.050, -0.050 }, // Ez2Ac
+            { 0.004, 0.003, 0.001, 0.000, -0.050, -0.090, -0.050 }, // IIDX Hard
+            { 0.004, 0.003, 0.001, 0.000, -0.060, -0.100, -0.020 }, // LR2 EXHard
         };
 
         private static EnumHealthMode mode = EnumHealthMode.Lazer;
@@ -107,7 +108,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                 if (increase > 0)
                     increase *= streak;
-                Logger.Log($"ManiaHealthProcessor: raw health change {HpMultiplierNormal * increase} for mode {mode}");
+                // Logger.Log($"ManiaHealthProcessor: raw health change {HpMultiplierNormal * increase} for mode {mode}");
                 return HpMultiplierNormal * increase;
             }
 
@@ -121,28 +122,28 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     {
                         case HeadNote:
                         case TailNote:
-                            return difficulty_settings[row, 5] / 5;
+                            return health_settings[row, 5] / 5;
 
                         default:
-                            return difficulty_settings[row, 5];
+                            return health_settings[row, 5];
                     }
 
                 case HitResult.Meh:
-                    return difficulty_settings[row, 4];
+                    return health_settings[row, 4];
 
                 case HitResult.Ok:
-                    return difficulty_settings[row, 3];
+                    return health_settings[row, 3];
 
                 case HitResult.Good:
-                    increase = difficulty_settings[row, 2];
+                    increase = health_settings[row, 2];
                     break;
 
                 case HitResult.Great:
-                    increase = difficulty_settings[row, 1];
+                    increase = health_settings[row, 1];
                     break;
 
                 case HitResult.Perfect:
-                    increase = difficulty_settings[row, 0];
+                    increase = health_settings[row, 0];
                     break;
             }
 
@@ -159,7 +160,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
             else
             {
+                #if DEBUG
                 Logger.Log($"ManiaHealthProcessor: raw health change {scaled} for mode {mode}");
+                #endif
             }
 
             return scaled;
@@ -169,7 +172,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             int idx = (int)mode;
 
-            if (idx < 0 || idx >= difficulty_settings.GetLength(0))
+            if (idx < 0 || idx >= health_settings.GetLength(0))
                 idx = 0;
 
             return idx;
