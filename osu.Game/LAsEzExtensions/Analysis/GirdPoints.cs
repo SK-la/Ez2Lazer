@@ -27,7 +27,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             points.Clear();
             points.AddRange(newPoints);
+
             Invalidate(Invalidation.DrawNode);
+            Invalidate(Invalidation.DrawInfo);
+
+            Schedule(() => Invalidate(Invalidation.DrawNode));
         }
 
         protected override DrawNode CreateDrawNode() => new ScorePointsDrawNode(this, size, points);

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
@@ -13,6 +14,7 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Utils;
 
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
@@ -21,13 +23,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
     /// Generates <see cref="HitEvent"/>s for mania scores by re-evaluating a score's replay input against a provided playable beatmap.
     /// This is intended for results/statistics usage where <see cref="ScoreInfo.HitEvents"/> are not persisted.
     /// </summary>
-    public static class ManiaScoreHitEventGenerator
+    public sealed class ManiaScoreHitEventGenerator : IHitEventGenerator
     {
+        public static ManiaScoreHitEventGenerator Instance { get; } = new ManiaScoreHitEventGenerator();
+
         /// <summary>
-        /// Attempt to generate <see cref="HitEvent"/>s for a mania <paramref name="score"/>.
-        /// Returns <see langword="null"/> if replay frames are missing or not in a supported format.
+        /// Instance implementation of generator.
         /// </summary>
-        public static List<HitEvent>? Generate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
+        public List<HitEvent>? Generate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -213,6 +216,18 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             }
 
             return hitEvents;
+        }
+
+        static ManiaScoreHitEventGenerator()
+        {
+            try
+            {
+                ScoreHitEventGeneratorBridge.Register(ManiaRuleset.SHORT_NAME, Instance);
+                ScoreHitEventGeneratorBridge.Register("3", Instance);
+            }
+            catch
+            {
+            }
         }
 
         private static void collectJudgementTargets(HitObject hitObject, List<HitObject> targets, CancellationToken cancellationToken)

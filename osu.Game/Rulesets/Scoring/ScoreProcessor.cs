@@ -208,18 +208,8 @@ namespace osu.Game.Rulesets.Scoring
         public double ClassicBaseScore { get; protected set; }
         public double ClassicMaxBaseScore { get; protected set; }
 
-        public bool IsLegacyScore
-        {
-            get => isLegacyScore;
-            set
-            {
-                isLegacyScore = value;
-                updateScore();
-            }
-        }
-
-        private bool isLegacyScore;
-
+        // 标记后，用于分数算法切换。
+        public bool IsLegacyScore = false;
         private static double accS;
 
         private static double accA;

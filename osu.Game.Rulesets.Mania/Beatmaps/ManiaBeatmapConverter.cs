@@ -8,8 +8,6 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
-using osu.Game.LAsEzExtensions.Background;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Mania.Beatmaps.Patterns;
@@ -19,7 +17,6 @@ using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Utils;
 using osuTK;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania.Beatmaps
 {
@@ -50,11 +47,6 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         /// </summary>
         public readonly bool IsForCurrentRuleset;
 
-        /// <summary>
-        /// The current hit mode for mania judgement system.
-        /// </summary>
-        public static EzMUGHitMode CurrentHitMode { get; set; }
-
         // Internal for testing purposes
         internal readonly LegacyRandom Random;
 
@@ -68,7 +60,6 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
         private ManiaBeatmapConverter(IBeatmap? beatmap, LegacyBeatmapConversionDifficultyInfo difficulty, Ruleset ruleset)
             : base(beatmap!, ruleset)
         {
-            CurrentHitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
             IsForCurrentRuleset = difficulty.SourceRuleset.Equals(ruleset.RulesetInfo);
             Random = new LegacyRandom((int)MathF.Round(difficulty.DrainRate + difficulty.CircleSize) * 20 + (int)(difficulty.OverallDifficulty * 41.2) + (int)MathF.Round(difficulty.ApproachRate));
             TargetColumns = getColumnCount(difficulty);
@@ -141,33 +132,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             {
                 case ManiaHitObject maniaObj:
                 {
-                    if (maniaObj is Note note && CurrentHitMode != EzMUGHitMode.Lazer)
-                    {
-                        yield return CurrentHitMode switch
-                        {
-                            EzMUGHitMode.EZ2AC => new Ez2AcNote(note),
-                            EzMUGHitMode.Malody => new NoJudgementNote(note),
-                            EzMUGHitMode.O2Jam => new O2Note(note),
-                            EzMUGHitMode.IIDX_HD => new Ez2AcNote(note),
-                            _ => note
-                        };
-                    }
-                    else
-                    if (maniaObj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
-                    {
-                        yield return CurrentHitMode switch
-                        {
-                            EzMUGHitMode.EZ2AC => new Ez2AcHoldNote(hold),
-                            EzMUGHitMode.Malody => new NoJudgmentHoldNote(hold),
-                            EzMUGHitMode.O2Jam => new O2HoldNote(hold),
-                            EzMUGHitMode.IIDX_HD => new Ez2AcHoldNote(hold),
-                            _ => hold
-                        };
-                    }
-                    else
-                    {
-                        yield return maniaObj;
-                    }
+                    yield return maniaObj;
 
                     yield break;
                 }
@@ -262,35 +227,7 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                     lastPattern = newPattern;
 
                 foreach (var obj in newPattern.HitObjects)
-                {
-                    if (obj is Note note && CurrentHitMode != EzMUGHitMode.Lazer)
-                    {
-                        yield return CurrentHitMode switch
-                        {
-                            EzMUGHitMode.EZ2AC => new Ez2AcNote(note),
-                            EzMUGHitMode.Malody => new NoJudgementNote(note),
-                            EzMUGHitMode.O2Jam => new O2Note(note),
-                            EzMUGHitMode.IIDX_HD => new Ez2AcNote(note),
-                            _ => note
-                        };
-                    }
-                    else
-                    if (obj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
-                    {
-                        yield return CurrentHitMode switch
-                        {
-                            EzMUGHitMode.EZ2AC => new Ez2AcHoldNote(hold),
-                            EzMUGHitMode.Malody => new NoJudgmentHoldNote(hold),
-                            EzMUGHitMode.O2Jam => new O2HoldNote(hold),
-                            EzMUGHitMode.IIDX_HD => new Ez2AcHoldNote(hold),
-                            _ => hold
-                        };
-                    }
-                    else
-                    {
-                        yield return obj;
-                    }
-                }
+                    yield return obj;
             }
         }
 

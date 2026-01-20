@@ -21,23 +21,8 @@ using osuTK.Graphics;
 namespace osu.Game.LAsEzExtensions.Analysis
 {
     /// <summary>
-    /// Default implementation of score graph for general rulesets.
-    /// Inherits from BaseEzScoreGraph to leverage shared hit event analysis and visualization.
+    /// 创建每列偏移分布
     /// </summary>
-    public partial class EzScoreGraph : BaseEzScoreGraph
-    {
-        public EzScoreGraph(ScoreInfo score, IBeatmap beatmap)
-            : base(score, beatmap, new DefaultHitWindows())
-        {
-            HitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
-        }
-
-        protected override HitResult RecalculateV2Result(HitEvent hitEvent)
-        {
-            return HitWindows.ResultFor(hitEvent.TimeOffset);
-        }
-    }
-
     public partial class CreateRotatedColumnGraphs : CompositeDrawable
     {
         private const float horizontal_spacing_ratio = 0.015f;

@@ -196,6 +196,7 @@ namespace osu.Game.Screens.Ranking
             // Expand the new panel.
             expandedTrackingComponent.Margin = new MarginPadding { Horizontal = expanded_panel_spacing };
             expandedPanel.State = PanelState.Expanded;
+
             // requires schedule after children to ensure the flow (and thus ScrollContainer's ScrollableExtent) has been updated.
             ScheduleAfterChildren(() =>
             {
@@ -206,8 +207,7 @@ namespace osu.Game.Screens.Ranking
                 float scrollOffset = flow.GetPanelIndex(expandedPanel.Score) * (ScorePanel.CONTRACTED_WIDTH + panel_spacing);
                 scroll.ScrollTo(scrollOffset);
 
-                // If a post-expand action is provided (for example to open the statistics panel), invoke it
-                // so expanding a panel via click also performs the quick-load action.
+                // 进入结算自动展开拓展分析
                 PostExpandAction?.Invoke();
             });
         }
