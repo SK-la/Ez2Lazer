@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Rendering.Vertices;
-using osu.Game.Graphics.OpenGL.Vertices;
 using osuTK;
 using osuTK.Graphics;
 
@@ -71,7 +70,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     int chunk = Math.Min(max_quads, total - offset);
 
                     // create temporary batch for this chunk (chunk = max number of quads)
-                    using (var localBatch = renderer.CreateQuadBatch<PositionAndColourVertex>(chunk, 4))
+                    using (var localBatch = renderer.CreateQuadBatch<TexturedVertex2D>(chunk, 4))
                     {
                         for (int i = 0; i < chunk; i++)
                         {
@@ -81,10 +80,30 @@ namespace osu.Game.LAsEzExtensions.Analysis
                             var br = new Vector2(p.pos.X + half, p.pos.Y + half);
                             var bl = new Vector2(p.pos.X - half, p.pos.Y + half);
 
-                            localBatch.Add(new PositionAndColourVertex { Position = tl, Colour = p.colour });
-                            localBatch.Add(new PositionAndColourVertex { Position = tr, Colour = p.colour });
-                            localBatch.Add(new PositionAndColourVertex { Position = br, Colour = p.colour });
-                            localBatch.Add(new PositionAndColourVertex { Position = bl, Colour = p.colour });
+                            localBatch.Add(new TexturedVertex2D(renderer)
+                            {
+                                Position = tl,
+                                TexturePosition = Vector2.Zero,
+                                Colour = p.colour
+                            });
+                            localBatch.Add(new TexturedVertex2D(renderer)
+                            {
+                                Position = tr,
+                                TexturePosition = new Vector2(1, 0),
+                                Colour = p.colour
+                            });
+                            localBatch.Add(new TexturedVertex2D(renderer)
+                            {
+                                Position = br,
+                                TexturePosition = Vector2.One,
+                                Colour = p.colour
+                            });
+                            localBatch.Add(new TexturedVertex2D(renderer)
+                            {
+                                Position = bl,
+                                TexturePosition = new Vector2(0, 1),
+                                Colour = p.colour
+                            });
                         }
 
                         localBatch.Draw();
