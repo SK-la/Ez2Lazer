@@ -78,6 +78,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
         private static Type? find_type(string fullName)
         {
+            // First attempt: direct lookup of the provided full name across loaded assemblies.
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
                 var t = asm.GetType(fullName, throwOnError: false);
@@ -85,15 +86,50 @@ namespace osu.Game.Screens.Ranking.Statistics
                     return t;
             }
 
+            // Fallback: try to find any type with the expected class name in loaded assemblies.
+            // This handles cases where the ruleset namespace has been modified (e.g. LAsEzMania).
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    var types = asm.GetTypes();
+                    foreach (var candidate in types)
+                    {
+                        if (candidate.Name == "ManiaScoreHitEventGenerator" || (candidate.FullName?.EndsWith(".ManiaScoreHitEventGenerator") == true))
+                            return candidate;
+                    }
+                }
+                catch
+                {
+                    // Some assemblies may throw on GetTypes(); ignore and continue.
+                }
+            }
+
+            // Last resort: try loading the expected assembly name and lookup by full name or by name inside it.
             try
             {
                 var asm = Assembly.Load(mania_assembly_name);
-                return asm.GetType(fullName, throwOnError: false);
+                var t = asm.GetType(fullName, throwOnError: false);
+                if (t != null) return t;
+
+                try
+                {
+                    var types = asm.GetTypes();
+                    foreach (var candidate in types)
+                    {
+                        if (candidate.Name == "ManiaScoreHitEventGenerator" || (candidate.FullName?.EndsWith(".ManiaScoreHitEventGenerator") == true))
+                            return candidate;
+                    }
+                }
+                catch
+                {
+                }
             }
             catch
             {
-                return null;
             }
+
+            return null;
         }
     }
 }

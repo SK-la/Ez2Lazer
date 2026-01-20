@@ -47,7 +47,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private const int current_offset = 0;
         private const int time_bins = 50;
-        private const float circle_size = 3f;
+        private const float circle_size = 2f;
 
         private double binSize;
         private double maxTime;
