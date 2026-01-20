@@ -429,7 +429,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 drawBoundaryLine(-boundary, result);
             }
 
-            var sortedHitEvents = HitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
+            var sortedHitEvents = GetApplicableHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
 
             var pointList = new List<(Vector2 pos, Color4 colour)>();
 
@@ -465,7 +465,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private void drawHealthLine()
         {
-            var sortedEvents = HitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
+            var sortedEvents = GetApplicableHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
             double currentHealth = 0.0;
             List<Vector2> healthPoints = new List<Vector2>();
 

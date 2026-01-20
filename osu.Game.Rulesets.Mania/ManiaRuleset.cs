@@ -458,7 +458,7 @@ namespace osu.Game.Rulesets.Mania
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap)
         {
             var hitEventsByColumn = score.HitEvents
-                                         .Where(e => e.HitObject is ManiaHitObject)
+                                         .Where(e => e.HitObject is ManiaHitObject && isTimingDistributionEvent(e))
                                          .GroupBy(e => ((ManiaHitObject)e.HitObject).Column)
                                          .OrderBy(g => g.Key)
                                          .ToList();
@@ -475,7 +475,7 @@ namespace osu.Game.Rulesets.Mania
                     RelativeSizeAxes = Axes.X,
                     Height = 200
                 }, true),
-                new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
+                new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents.Where(isTimingDistributionEvent).ToList())
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 120
@@ -493,6 +493,14 @@ namespace osu.Game.Rulesets.Mania
             };
 
             return statistics.ToArray();
+        }
+
+        private static bool isTimingDistributionEvent(HitEvent e)
+        {
+            if (!e.Result.IsBasic() || !e.Result.IsHit())
+                return false;
+
+            return e.Result is not (HitResult.SmallTickHit or HitResult.LargeTickHit or HitResult.SmallTickMiss or HitResult.LargeTickMiss);
         }
 
         /// <seealso cref="ManiaHitWindows"/>
