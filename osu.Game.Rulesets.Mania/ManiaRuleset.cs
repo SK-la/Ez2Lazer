@@ -500,7 +500,7 @@ namespace osu.Game.Rulesets.Mania
             if (!e.Result.IsBasic() || !e.Result.IsHit())
                 return false;
 
-            return e.Result is not (HitResult.SmallTickHit or HitResult.LargeTickHit or HitResult.SmallTickMiss or HitResult.LargeTickMiss);
+            return !e.Result.IsTick();
         }
 
         /// <seealso cref="ManiaHitWindows"/>

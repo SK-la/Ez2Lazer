@@ -62,12 +62,10 @@ namespace osu.Game.Screens.Ranking.Statistics
                              .Where(e => e.HitObject.HitWindows != HitWindows.Empty
                                          && e.Result.IsBasic()
                                          && e.Result.IsHit()
-                                         && !isTickResult(e.Result))
+                                         && !e.Result.IsTick())
                              .ToList();
             bins = Enumerable.Range(0, total_timing_distribution_bins).Select(_ => new Dictionary<HitResult, int>()).ToArray<IDictionary<HitResult, int>>();
         }
-
-        private static bool isTickResult(HitResult result) => result is HitResult.SmallTickHit or HitResult.LargeTickHit or HitResult.SmallTickMiss or HitResult.LargeTickMiss;
 
         [BackgroundDependencyLoader]
         private void load()

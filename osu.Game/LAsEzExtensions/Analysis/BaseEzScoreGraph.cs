@@ -455,7 +455,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 AddInternal(scorePoints);
             }
 
-            drawHealthLine();
+            drawHealthLine(sortedHitEvents);
         }
 
         protected virtual double UpdateBoundary(HitResult result)
@@ -463,9 +463,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return HitWindows.WindowFor(result);
         }
 
-        private void drawHealthLine()
+        private void drawHealthLine(IReadOnlyList<HitEvent> sortedEvents)
         {
-            var sortedEvents = GetApplicableHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
             double currentHealth = 0.0;
             List<Vector2> healthPoints = new List<Vector2>();
 
