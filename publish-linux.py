@@ -239,8 +239,8 @@ def main():
         artifacts_dir = fallback
 
     # Use asset names that match workflow-normalized names when tag present
-    release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_x64{tag_suffix}.zip")
-    debug_zip = os.path.join(artifacts_dir, f"Ez2Lazer_debug_x64{tag_suffix}.zip")
+    release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_{target_platform}_x64{tag_suffix}.zip")
+    debug_zip = os.path.join(artifacts_dir, f"Ez2Lazer_debug_{target_platform}_x64{tag_suffix}.zip")
 
     if not args.no_zip:
         if os.path.exists(release_dir):

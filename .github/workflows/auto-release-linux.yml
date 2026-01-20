@@ -26,6 +26,10 @@ on:
         description: '是否在 workflow 完成后创建 GitHub Release 并上传 zip（true/false）。默认 false'
         required: false
         default: 'false'
+      pack_appimage:
+        description: 'Is It Need To Pack AppImage? (true*/false)'
+        required: false
+        default: 'true'
 
 jobs:
   build-and-package:
@@ -297,7 +301,7 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ steps.prepare_assets.outputs.release_asset_path }}
-          asset_name: Ez2Lazer_release_x64.zip
+          asset_name: Ez2Lazer_release_linux_x64.zip
           asset_content_type: application/zip
 
       - name: Upload release asset (debug)
@@ -308,5 +312,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ${{ steps.prepare_assets.outputs.debug_asset_path }}
-          asset_name: Ez2Lazer_debug_x64.zip
+          asset_name: Ez2Lazer_debug_linux_x64.zip
           asset_content_type: application/zip
