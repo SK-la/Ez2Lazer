@@ -1,0 +1,312 @@
+name: Ez2Lazer Auto Release For Linux (manual build + package + release)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '发布使用的 tag（格式 YYYY-M-D，年为四位，月禁止前导0 如 1-12，日为1-31，例如 2026-1-14），必填。工作流会在你选择的分支最新提交上创建该 tag（如果远程不存在）。'
+        required: true
+      branch:
+        description: '主仓要构建的分支（默认 locmain）'
+        required: true
+        default: 'locmain'
+      framework_branch:
+        description: '可选：用于 checkout osu-framework 的分支（留空则使用上面的 branch）'
+        required: false
+        default: ''
+      resources_branch:
+        description: '可选：用于 checkout osu-resources 的分支（留空则使用上面的 branch）'
+        required: false
+        default: ''
+      create_zip:
+        description: '是否在 workflow 中创建 zip 包（true/false）。默认 false'
+        required: false
+        default: 'false'
+      upload_assets:
+        description: '是否在 workflow 完成后创建 GitHub Release 并上传 zip（true/false）。默认 false'
+        required: false
+        default: 'false'
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main repo into osu/
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: osu
+          ref: refs/heads/${{ github.event.inputs.branch }}
+
+      - name: Checkout osu-framework (deps) as sibling
+        uses: actions/checkout@v4
+        with:
+          repository: SK-la/osu-framework
+          path: osu-framework
+          # Use framework_branch if provided, otherwise fall back to the main `branch` input
+          ref: refs/heads/${{ github.event.inputs.framework_branch || github.event.inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate osu-framework checkout (Windows)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'osu-framework\.git')) {
+            Write-Output 'actions/checkout did not populate osu-framework; attempting HTTPS clone fallback'
+            git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/SK-la/osu-framework.git osu-framework
+            Push-Location osu-framework
+            $FrameworkBranch = '${{ github.event.inputs.framework_branch || github.event.inputs.branch }}'
+            git checkout $FrameworkBranch || Write-Output "checkout $FrameworkBranch failed, continuing"
+            Pop-Location
+          } else {
+            Write-Output 'osu-framework already present'
+          }
+
+      - name: Checkout osu-resources (resources) as sibling
+        uses: actions/checkout@v4
+        with:
+          repository: SK-la/osu-resources
+          path: osu-resources
+          ref: refs/heads/${{ github.event.inputs.resources_branch || github.event.inputs.branch }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate osu-resources checkout (Windows)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'osu-resources\.git')) {
+            Write-Output 'actions/checkout did not populate osu-resources; attempting HTTPS clone fallback'
+            git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/SK-la/osu-resources.git osu-resources
+            Push-Location osu-resources
+            $ResourcesBranch = '${{ github.event.inputs.resources_branch || github.event.inputs.branch }}'
+            git checkout $ResourcesBranch || Write-Output "checkout $ResourcesBranch failed, continuing"
+            Pop-Location
+          } else {
+            Write-Output 'osu-resources already present'
+          }
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: C:\\Users\\runneradmin\\.nuget\\packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props','**/*.csproj','**/packages.lock.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Cache MSBuild outputs (obj/bin)
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/obj
+            **/bin
+          key: msbuild-${{ runner.os }}-${{ hashFiles('**/*.csproj','**/Directory.Packages.props') }}
+          restore-keys: |
+            msbuild-${{ runner.os }}-
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Dotnet restore (desktop project)
+        working-directory: osu
+        shell: pwsh
+        run: |
+          dotnet --info
+          dotnet restore ./osu.Desktop/osu.Desktop.csproj --packages $env:USERPROFILE\\.nuget\\packages
+
+      - name: Dotnet build (desktop project)
+        working-directory: osu
+        shell: pwsh
+        run: |
+          dotnet build ./osu.Desktop/osu.Desktop.csproj -c Release -p:GenerateFullPaths=true --no-restore --verbosity minimal
+
+      - name: Prepare release tag and environment
+        shell: pwsh
+        id: export
+        run: |
+          $inputTag = '${{ github.event.inputs.tag }}'
+          if (-not $inputTag) { Write-Error 'Input tag is required and must follow YYYY-M-D format'; exit 1 }
+          # validate strict: 4-digit year, month 1-12 without leading zero, day 1-31 without leading zero
+          if ($inputTag -notmatch '^[0-9]{4}-(?:[1-9]|1[0-2])-(?:[1-9]|[12][0-9]|3[01])$') { Write-Error 'Tag must match YYYY-M-D with no leading zero in month (e.g. 2026-1-14)'; exit 1 }
+          Write-Output "RELEASE_TAG=$inputTag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # export branch for clarity (branch chosen when triggering the workflow)
+          Write-Output "TARGET_BRANCH=${{ github.event.inputs.branch }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run publish script (pack & create release)
+        working-directory: osu
+        shell: pwsh
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+          PYTHONUTF8: '1'
+          PYTHONIOENCODING: 'utf-8'
+        run: |
+          # Use the RELEASE_TAG prepared by prior step; fail if not set to avoid fallback behavior
+          if (-not $env:RELEASE_TAG) { Write-Error 'RELEASE_TAG is not set; aborting to avoid fallback tag generation' ; exit 1 }
+          $tag = $env:RELEASE_TAG
+          Write-Output "Using TAG=$tag"
+          # Explicitly pass project, workdir, and outroot so artifacts land under osu/artifacts
+          $project = Join-Path (Get-Location) 'osu.Desktop\osu.Desktop.csproj'
+          $workdir = (Get-Location).Path
+          # outroot should be the working directory; publish-linux.py will append /artifacts
+          $outroot = $workdir
+          $create_zip = '${{ github.event.inputs.create_zip }}'
+          if ($create_zip -eq 'true') {
+            python ./publish-linux.py --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "${{ github.workspace }}\osu-resources\osu.Game.Resources\Resources" --tag "$tag"
+          } else {
+            Write-Output 'create_zip is false -> running publish-linux.py with --no-zip to avoid creating zip files'
+            python ./publish-linux.py --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "${{ github.workspace }}\osu-resources\osu.Game.Resources\Resources" --tag "$tag" --no-zip
+          }
+
+      - name: Debug publish environment (list files + --help)
+        working-directory: osu
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Write-Output "PWD: $(Get-Location)"
+          Write-Output "Listing osu/ (first 200 entries)"
+          Get-ChildItem -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 200 | ForEach-Object { Write-Output $_.FullName }
+          Write-Output "Python version:"
+          python --version || Write-Output 'python --version failed'
+          Write-Output "Dotnet info:"
+          dotnet --info || Write-Output 'dotnet --info failed'
+          Write-Output "Show the first 200 lines of publish-linux.py"
+          Get-Content publish-linux.py -TotalCount 200 -ErrorAction SilentlyContinue || Write-Output 'cat publish-linux.py failed'
+          Write-Output "Running publish-linux.py --help"
+          python ./publish-linux.py --help || Write-Output 'publish-linux.py --help failed'
+
+      - name: List artifacts directories for diagnostics
+        shell: pwsh
+        run: |
+          Write-Output 'Listing $GITHUB_WORKSPACE/artifacts:'
+          if (Test-Path "$env:GITHUB_WORKSPACE\artifacts") { Get-ChildItem -Path "$env:GITHUB_WORKSPACE\artifacts" -Recurse -Force | Select-Object FullName, Length | ForEach-Object { Write-Output "$($_.FullName) - $($_.Length)" } } else { Write-Output 'No root artifacts dir' }
+          Write-Output 'Listing $GITHUB_WORKSPACE/osu/artifacts:'
+          if (Test-Path "$env:GITHUB_WORKSPACE\osu\artifacts") { Get-ChildItem -Path "$env:GITHUB_WORKSPACE\osu\artifacts" -Recurse -Force | Select-Object FullName, Length | ForEach-Object { Write-Output "$($_.FullName) - $($_.Length)" } } else { Write-Output 'No osu artifacts dir' }
+
+      - name: Find produced zip artifact
+        if: ${{ github.event.inputs.create_zip == 'true' }}
+        shell: pwsh
+        id: list_zips
+        run: |
+          Write-Output "Searching for zip files under $env:GITHUB_WORKSPACE and $env:GITHUB_WORKSPACE\osu\artifacts"
+          $repoRoot = $env:GITHUB_WORKSPACE
+          $paths = @()
+          $paths += $repoRoot
+          $paths += (Join-Path $repoRoot 'osu\artifacts')
+          $found = $null
+          foreach ($p in $paths) {
+            if (Test-Path $p) {
+              Write-Output "Searching in: $p"
+              $z = Get-ChildItem -Path $p -Filter *.zip -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.FullName }
+              if ($z -and $z.Count -gt 0) { $found = $z; break }
+            }
+          }
+          if ($found) {
+            Write-Output "Found zip(s): $found"
+            $first = $found[0]
+            $name = Split-Path -Path $first -Leaf
+            Write-Output "zip_path=$first" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Output "zip_name=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            Write-Output "No zip files found in searched locations."
+            exit 1
+          }
+
+      - name: Normalize artifact names to fixed asset names
+        if: ${{ github.event.inputs.create_zip == 'true' }}
+        id: prepare_assets
+        shell: pwsh
+        run: |
+          $ws = $env:GITHUB_WORKSPACE
+          $artifacts_dir = Join-Path $ws 'artifacts'
+          if (-not (Test-Path $artifacts_dir)) { New-Item -ItemType Directory -Path $artifacts_dir | Out-Null }
+
+          $release_pattern = 'Ez2Lazer_release_x64*.zip'
+          $debug_pattern = 'Ez2Lazer_debug_x64*.zip'
+
+          function find-first([string]$base, [string]$pattern) {
+            $f = Get-ChildItem -Path $base -Filter $pattern -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
+            return $f
+          }
+
+          $rel = find-first $ws $release_pattern
+          if (-not $rel) { $rel = find-first (Join-Path $ws 'osu\artifacts') $release_pattern }
+          $dbg = find-first $ws $debug_pattern
+          if (-not $dbg) { $dbg = find-first (Join-Path $ws 'osu\artifacts') $debug_pattern }
+
+          $out_rel = ''
+          $out_dbg = ''
+          if ($rel) {
+            $out_rel = Join-Path $artifacts_dir 'Ez2Lazer_release_x64.zip'
+            Copy-Item -Path $rel.FullName -Destination $out_rel -Force
+            Write-Output "Prepared release asset: $out_rel"
+          } else { Write-Output 'Release zip not found' }
+
+          if ($dbg) {
+            $out_dbg = Join-Path $artifacts_dir 'Ez2Lazer_debug_x64.zip'
+            Copy-Item -Path $dbg.FullName -Destination $out_dbg -Force
+            Write-Output "Prepared debug asset: $out_dbg"
+          } else { Write-Output 'Debug zip not found' }
+
+          Write-Output "release_asset_path=$out_rel" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Output "debug_asset_path=$out_dbg" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Check remote tag existence and create if missing
+        shell: pwsh
+        run: |
+          $tag = '${{ env.RELEASE_TAG }}'
+          Write-Output "Checking remote for tag $tag..."
+          $found = git ls-remote --tags https://github.com/${{ github.repository }}.git refs/tags/$tag | Select-String -Pattern $tag
+          if ($found) { Write-Output "Tag $tag exists remotely"; exit 0 }
+          Write-Output "Tag $tag not found remotely - creating on branch tip"
+          # determine commit to tag: use the branch selected when triggering the workflow
+          $targetBranch = '${{ github.event.inputs.branch }}'
+          Write-Output "Resolving latest commit of branch $targetBranch"
+          $commitLine = git ls-remote https://github.com/${{ github.repository }}.git refs/heads/$targetBranch
+          if (-not $commitLine) { Write-Error "Could not resolve branch $targetBranch"; exit 1 }
+          $commit = $commitLine.Split()[0]
+          Write-Output "Tagging commit $commit"
+          git -C osu config user.name "github-actions[bot]"
+          git -C osu config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C osu tag $tag $commit
+          git -C osu push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git refs/tags/$tag
+
+      - name: Create or get GitHub Release (create tag if needed)
+        if: ${{ github.event.inputs.upload_assets == 'true' }}
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release asset (release)
+        if: ${{ github.event.inputs.upload_assets == 'true' && steps.prepare_assets.outputs.release_asset_path != '' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.prepare_assets.outputs.release_asset_path }}
+          asset_name: Ez2Lazer_release_x64.zip
+          asset_content_type: application/zip
+
+      - name: Upload release asset (debug)
+        if: ${{ github.event.inputs.upload_assets == 'true' && steps.prepare_assets.outputs.debug_asset_path != '' }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.prepare_assets.outputs.debug_asset_path }}
+          asset_name: Ez2Lazer_debug_x64.zip
+          asset_content_type: application/zip
