@@ -3,7 +3,7 @@
     "osu! Desktop": {
       "commandName": "Project",
       "environmentVariables": {
-        "OSU_SDL3": "1"
+        "OSU_SDL3": "0"
       }
     },
     "osu! Tournament": {

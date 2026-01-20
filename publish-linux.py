@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
 import subprocess
 import os
 import sys
+import platform
 import argparse
 import shutil
 import zipfile
@@ -8,14 +10,14 @@ import hashlib
 from datetime import datetime
 
 
-def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str) -> int:
-    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir]
+def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str,os: str) -> int:
+    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "true", "--os", os]
     print("Running:", " ".join(cmd))
     res = subprocess.run(cmd, cwd=working_dir)
     return res.returncode
 
 
-def run_cleanup(script_path: str, target_dir: str) -> int:
+def run_cleanup(script_path: str, target_dir: str, platform: str) -> int:
     # If an external script is provided and exists, run it. Otherwise use internal cleaner.
     if script_path and os.path.exists(script_path):
         print(f"Running external cleanup script: {script_path}")
@@ -23,7 +25,7 @@ def run_cleanup(script_path: str, target_dir: str) -> int:
         return res.returncode
     else:
         print("External cleanup script not found, using internal cleanup logic")
-        return clean_publish_folder(target_dir)
+        return clean_publish_folder(target_dir, platform)
 
 
 def clean_publish_folder(release_dir=None, platform=None):
@@ -179,6 +181,7 @@ def main():
     parser.add_argument('--resources-github-repo', default='SK-la/osu-resources', help='GitHub repo for resources to clone')
     parser.add_argument('--resources-github-path', default='osu.Game.Resources/Resources', help='Path inside resources repo to copy')
     parser.add_argument('--resources-path', default=None, help='Local path to resources to include in package')
+    parser.add_argument('--platform', default=None, help='Platform to include in package name')
     args = parser.parse_args()
 
     # Enforce that a tag is provided to avoid any implicit fallback tag generation
@@ -203,23 +206,25 @@ def main():
             print(f"Removing existing directory: {d}")
             shutil.rmtree(d)
 
+    target_platform = args.platform or platform.system().lower()
+    print("building for platform", target_platform)
     # publish
     print('Publishing Release...')
-    rc = run_publish(args.project, args.workdir, 'Release', release_dir)
+    rc = run_publish(args.project, args.workdir, 'Release', release_dir,target_platform)
     if rc != 0:
         print('Release publish failed with code', rc)
     else:
         print('Release publish succeeded')
         # optional cleanup
-        run_cleanup(args.cleanup_release, release_dir)
+        run_cleanup(args.cleanup_release, release_dir,target_platform)
 
     print('Publishing Debug...')
-    rc2 = run_publish(args.project, args.workdir, 'Debug', debug_dir)
+    rc2 = run_publish(args.project, args.workdir, 'Debug', debug_dir,target_platform)
     if rc2 != 0:
         print('Debug publish failed with code', rc2)
     else:
         print('Debug publish succeeded')
-        run_cleanup(args.cleanup_debug, debug_dir)
+        run_cleanup(args.cleanup_debug, debug_dir,target_platform)
 
     # create zips with fixed base name + tag
     artifacts_dir = os.path.join(base_out, 'artifacts')
