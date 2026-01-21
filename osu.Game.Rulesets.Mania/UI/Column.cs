@@ -219,7 +219,7 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 case EzMUGHitMode.EZ2AC:
                     // RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
-                    // RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
                     // RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
                     RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
                     // RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
@@ -236,7 +236,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 case EzMUGHitMode.LR2_HD:
                 case EzMUGHitMode.Raja_NM:
                     // RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
-                    // RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
                     // RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
                     RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
                     // RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);

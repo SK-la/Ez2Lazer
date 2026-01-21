@@ -86,21 +86,22 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             // Ensure global O2 BPM and this mod's hit windows are set so gameplay uses correct ranges.
             double bpm = beatmap.BeatmapInfo.BPM;
             O2HitModeExtension.SetOriginalBPM(bpm);
-            // O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
+            O2HitModeExtension.SetControlPoints(beatmap.ControlPointInfo);
+            O2HitModeExtension.PillActivated = true;
             O2HitModeExtension.PILL_COUNT.Value = 0;
             HitWindows.BPM = bpm;
+            HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
+                O2HitModeExtension.BASE_COOL / bpm,
+                O2HitModeExtension.BASE_COOL / bpm,
+                O2HitModeExtension.BASE_GOOD / bpm,
+                O2HitModeExtension.BASE_GOOD / bpm,
+                O2HitModeExtension.BASE_BAD / bpm,
+                O2HitModeExtension.BASE_BAD / bpm
+            ));
         }
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            // HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
-            //     O2HitModeExtension.CoolRange,
-            //     O2HitModeExtension.CoolRange,
-            //     O2HitModeExtension.GoodRange,
-            //     O2HitModeExtension.GoodRange,
-            //     O2HitModeExtension.BadRange,
-            //     O2HitModeExtension.BadRange
-            // ));
             O2HitModeExtension.PILL_COUNT.Value = 0;
             O2HitModeExtension.PillActivated = PillMode.Value;
         }

@@ -27,6 +27,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
@@ -116,6 +117,21 @@ namespace osu.Game.Screens.SelectV2
             };
 
             AddInternal(loading = new LoadingLayer());
+
+#if DEBUG
+            // Lightweight on-screen instrumentation for development.
+            var debugText = new OsuSpriteText
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                Colour = Colour4.White,
+                Alpha = 0.8f,
+                Margin = new MarginPadding { Left = 10, Top = 6 }
+            };
+
+            AddInternal(debugText);
+            Scheduler.AddDelayed(() => debugText.Text = $"filter: {LastFilterMs:F1}ms items: {LastFilterItems} panels: {LastFilterPanels} runs: {FilterRuns}", 250, true);
+#endif
         }
 
         [BackgroundDependencyLoader]
@@ -792,6 +808,17 @@ namespace osu.Game.Screens.SelectV2
 
         private ScheduledDelegate? loadingDebounce;
 
+        // Lightweight instrumentation for investigating filter performance regressions.
+        private double lastFilterMs;
+        private int lastFilterItems;
+        private int lastFilterPanels;
+        private int filterRuns;
+
+        public double LastFilterMs => lastFilterMs;
+        public int LastFilterItems => lastFilterItems;
+        public int LastFilterPanels => lastFilterPanels;
+        public int FilterRuns => filterRuns;
+
         public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
         {
             bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
@@ -810,13 +837,29 @@ namespace osu.Game.Screens.SelectV2
                 loading.Show();
             }, showLoadingImmediately ? 0 : 250);
 
+            // Instrumented call: measure filter duration and record counts.
+            Interlocked.Increment(ref filterRuns);
+            var sw = Stopwatch.StartNew();
+
             FilterAsync(resetDisplay).ContinueWith(_ => Schedule(() =>
             {
-                loadingDebounce?.Cancel();
-                loadingDebounce = null;
+                try
+                {
+                    sw.Stop();
+                    lastFilterMs = sw.Elapsed.TotalMilliseconds;
 
-                Scroll.FadeColour(OsuColour.Gray(1f), 500, Easing.OutQuint);
-                loading.Hide();
+                    var items = GetCarouselItems();
+                    lastFilterItems = items?.Count ?? 0;
+                    lastFilterPanels = Scroll.Panels.Count;
+                }
+                finally
+                {
+                    loadingDebounce?.Cancel();
+                    loadingDebounce = null;
+
+                    Scroll.FadeColour(OsuColour.Gray(1f), 500, Easing.OutQuint);
+                    loading.Hide();
+                }
             }));
         }
 
