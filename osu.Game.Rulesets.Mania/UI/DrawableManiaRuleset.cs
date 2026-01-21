@@ -166,8 +166,9 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 if (h.NewValue == EzMUGHitMode.O2Jam)
                 {
-                    O2HitModeExtension.NowBeatmapBPM = Beatmap.BeatmapInfo.BPM;
-                    O2HitModeExtension.PillCount.Value = 0;
+                    O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
+                    O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
+                    O2HitModeExtension.PILL_COUNT.Value = 0;
                     O2HitModeExtension.CoolCombo = 0;
                     O2HitModeExtension.PillActivated = true;
                 }
