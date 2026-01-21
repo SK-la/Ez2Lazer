@@ -31,6 +31,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private const float horizontal_margin = 10;
 
         private readonly List<IGrouping<int, HitEvent>> hitEventsByColumn;
+        private float lastDrawWidth = -1;
+        private float lastDrawHeight = -1;
 
         public CreateRotatedColumnGraphs(List<IGrouping<int, HitEvent>> hitEventsByColumn)
         {
@@ -78,7 +80,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (InternalChildren.Count == 0 || DrawWidth <= 0)
                 return;
 
-            updateLayout();
+            if (DrawWidth != lastDrawWidth || DrawHeight != lastDrawHeight)
+            {
+                updateLayout();
+                lastDrawWidth = DrawWidth;
+                lastDrawHeight = DrawHeight;
+            }
         }
 
         private void updateLayout()

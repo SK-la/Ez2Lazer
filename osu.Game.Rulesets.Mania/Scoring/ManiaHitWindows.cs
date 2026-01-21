@@ -145,18 +145,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public override bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
 
-        private static EzMUGHitMode hitMode;
-
-        public EzMUGHitMode HitMode
-        {
-            get => hitMode;
-            set
-            {
-                hitMode = value;
-                updateWindows();
-            }
-        }
-
         public override bool IsHitResultAllowed(HitResult result)
         {
             switch (result)
@@ -220,8 +208,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void setHitMode()
         {
-            HitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
-            // Logger.Log("HitMode set to: " + HitMode);
+            EzMUGHitMode HitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
 
             if (HitMode == EzMUGHitMode.Lazer)
             {

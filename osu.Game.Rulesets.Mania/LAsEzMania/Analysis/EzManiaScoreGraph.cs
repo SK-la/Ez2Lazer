@@ -3,6 +3,8 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
@@ -27,10 +29,21 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
     {
         private readonly ManiaHitWindows maniaHitWindows = new ManiaHitWindows();
 
+        private readonly CustomHitWindowsHelper hitWindows1;
+        private readonly CustomHitWindowsHelper hitWindows2;
+        private Bindable<EzMUGHitMode> hitModeBindable = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
         public EzManiaScoreGraph(ScoreInfo score, IBeatmap beatmap)
             : base(score, beatmap, new ManiaHitWindows())
         {
             maniaHitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
+
+            // Initialize helpers here (after base ctor has run and static OD/HP have been set).
+            hitWindows1 = new CustomHitWindowsHelper { OverallDifficulty = OD };
+            hitWindows2 = new CustomHitWindowsHelper { OverallDifficulty = OD };
         }
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
@@ -43,15 +56,24 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             return maniaHitWindows.WindowFor(result);
         }
 
-        private readonly CustomHitWindowsHelper hitWindows1 = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
+        [BackgroundDependencyLoader]
+        private void load()
         {
-            OverallDifficulty = OD
-        };
+            // Bind to the global hit mode setting so that switching hit modes updates our helpers and redraws.
+            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitModeBindable.BindValueChanged(v =>
+            {
+                hitWindows1.HitMode = v.NewValue;
+                hitWindows2.HitMode = v.NewValue;
 
-        private readonly CustomHitWindowsHelper hitWindows2 = new CustomHitWindowsHelper
-        {
-            OverallDifficulty = OD
-        };
+                // Ensure mania windows re-evaluate based on global config and difficulty.
+                maniaHitWindows.ResetRange();
+                maniaHitWindows.SetDifficulty(Beatmap.Difficulty.OverallDifficulty);
+
+                // Recalculate and redraw.
+                Refresh();
+            }, true);
+        }
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
         {
@@ -60,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)
         {
-            return hitWindows2.ResultFor(hitEvent.TimeOffset);
+            return maniaHitWindows.ResultFor(hitEvent.TimeOffset);
         }
 
         protected override void UpdateText()

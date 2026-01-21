@@ -10,14 +10,12 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
@@ -25,9 +23,9 @@ using osu.Game.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
@@ -67,7 +65,7 @@ namespace osu.Game.Screens.Ranking
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private readonly Bindable<EzMUGHitMode> hitModeSetting = new Bindable<EzMUGHitMode>();
+        private Bindable<EzMUGHitMode> hitModeBindable = new Bindable<EzMUGHitMode>();
 
         private HitModeButton hitModeButton = null!;
 
@@ -246,9 +244,9 @@ namespace osu.Game.Screens.Ranking
             if (Score?.BeatmapInfo?.BeatmapSet != null && Score.BeatmapInfo.BeatmapSet.OnlineID > 0)
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
 
-            // Add HitMode button with menu
-            hitModeButton = new HitModeButton(hitModeSetting);
-            buttons.Add(hitModeButton);
+            // 底部增加按钮
+            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            buttons.Add(new HitModeButton(hitModeBindable));
 
             // Add settings button (placeholder)
             buttons.Add(new IconButton
@@ -265,25 +263,15 @@ namespace osu.Game.Screens.Ranking
         {
             base.LoadComplete();
 
-            hitModeSetting.Value = ezConfig.Get<EzMUGHitMode>(Ez2Setting.HitMode);
-            hitModeSetting.BindValueChanged(v =>
+            hitModeBindable.BindValueChanged(v =>
             {
-                ezConfig.SetValue(Ez2Setting.HitMode, v.NewValue);
-                refreshStatistics();
+                Score?.HitEvents.Clear();
+                StatisticsPanel.Score.TriggerChange();
             });
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
 
             fetchScores(null);
-        }
-
-        private void refreshStatistics()
-        {
-            if (Score != null)
-            {
-                Score.HitEvents.Clear();
-                StatisticsPanel.Score.TriggerChange();
-            }
         }
 
         protected override void Update()
@@ -593,54 +581,6 @@ namespace osu.Game.Screens.Ranking
                 base.Update();
                 content.Height = Math.Max(screen_height, DrawHeight);
             }
-        }
-
-        private partial class HitModeButton : RoundedButton, IHasPopover
-        {
-            private readonly Bindable<EzMUGHitMode> hitModeSetting;
-
-            public HitModeButton(Bindable<EzMUGHitMode> hitModeSetting)
-            {
-                this.hitModeSetting = hitModeSetting;
-
-                Size = new Vector2(75, 30);
-                Text = hitModeSetting.Value.ToString();
-
-                hitModeSetting.BindValueChanged(v => Text = v.NewValue.ToString());
-
-                Action = this.ShowPopover;
-            }
-
-            public Popover GetPopover() => new HitModePopover(hitModeSetting);
-        }
-
-        private partial class HitModePopover : OsuPopover
-        {
-            private readonly Bindable<EzMUGHitMode> hitModeSetting;
-
-            public HitModePopover(Bindable<EzMUGHitMode> hitModeSetting)
-                : base(false)
-            {
-                this.hitModeSetting = hitModeSetting;
-
-                Body.CornerRadius = 4;
-                AllowableAnchors = new[] { Anchor.TopCentre };
-            }
-
-            [BackgroundDependencyLoader]
-            private void load()
-            {
-                Children = new[]
-                {
-                    new OsuMenu(Direction.Vertical, true)
-                    {
-                        Items = items,
-                        MaxHeight = 375,
-                    },
-                };
-            }
-
-            private OsuMenuItem[] items => Enum.GetValues<EzMUGHitMode>().Select(mode => new OsuMenuItem(mode.ToString(), MenuItemType.Standard, () => hitModeSetting.Value = mode)).ToArray();
         }
     }
 }

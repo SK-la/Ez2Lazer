@@ -35,6 +35,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         // 保存原始 BPM 值
         private static double originalBPM = 120.0;
+        public static bool IsPlaying = false;
 
         /// <summary>
         /// 设置当前谱面的控制点信息，用于动态 BPM 计算
@@ -61,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         /// <returns>对应时间的 BPM，最低为 120</returns>
         public static double GetBPMAtTime(double time)
         {
-            if (currentControlPoints != null)
+            if (currentControlPoints != null && IsPlaying)
             {
                 var timingPoint = currentControlPoints.TimingPointAt(time);
                 // 确保 BPM 不低于 120

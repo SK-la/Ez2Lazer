@@ -213,7 +213,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
         protected virtual void StopPreviewInternal(string reason)
         {
-            Logger.Log($"EzPreviewTrackManager: Stopping preview (reason={reason})", LoggingTarget.Runtime);
+            // Logger.Log($"EzPreviewTrackManager: Stopping preview (reason={reason})");
             playback.IsPlaying = false;
             updateDelegate?.Cancel();
             updateDelegate = null;
@@ -725,7 +725,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 if (sample == null)
                 {
-                    Logger.Log($"EzPreviewTrackManager: Miss storyboard sample {sampleInfo.Path} (tried: {string.Join("|", tried)})", LoggingTarget.Runtime);
+                    // Logger.Log($"EzPreviewTrackManager: Miss storyboard sample {sampleInfo.Path} (tried: {string.Join("|", tried)})", LoggingTarget.Runtime);
                     return;
                 }
 

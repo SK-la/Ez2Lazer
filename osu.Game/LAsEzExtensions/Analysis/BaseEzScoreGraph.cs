@@ -39,7 +39,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private const int current_offset = 0;
         private const int time_bins = 50;
-        private const float circle_size = 2f;
 
         private double binSize;
         private double maxTime;
@@ -158,17 +157,18 @@ namespace osu.Game.LAsEzExtensions.Analysis
             var v2ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
             v2ScoreProcessor.Mods.Value = Score.Mods;
             v2ScoreProcessor.ApplyBeatmap(Beatmap);
+            var v2Counts = new Dictionary<HitResult, int>();
 
             foreach (var hitEvent in HitEvents)
             {
+                var recalculated = RecalculateV2Result(hitEvent);
+                v2Counts[recalculated] = v2Counts.GetValueOrDefault(recalculated, 0) + 1;
                 v2ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
                 {
-                    Type = hitEvent.Result,
+                    Type = recalculated,
                     TimeOffset = hitEvent.TimeOffset
                 });
             }
-
-            Dictionary<HitResult, int> v2Counts = HitEvents.GroupBy(e => e.Result).ToDictionary(g => g.Key, g => g.Count());
 
             double accuracy = v2ScoreProcessor.Accuracy.Value;
             long totalScore = v2ScoreProcessor.TotalScore.Value;
@@ -183,8 +183,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         protected virtual void UpdateDisplay()
         {
-            // If layout hasn't been performed yet, DrawWidth/DrawHeight may be 0.
-            // Reschedule so we calculate points with correct sizes.
+            if (!IsAlive || IsDisposed)
+                return;
+
             if (DrawWidth <= 0 || DrawHeight <= 0)
             {
                 Scheduler.AddOnce(UpdateDisplay);
@@ -206,6 +207,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             var sortedHitEvents = HitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
 
+            drawHealthLine(sortedHitEvents);
+            drawPointsGraph(sortedHitEvents);
+        }
+
+        private void drawPointsGraph(List<HitEvent> sortedHitEvents)
+        {
             var pointList = new List<(Vector2 pos, Color4 colour)>();
 
             foreach (var e in sortedHitEvents)
@@ -220,7 +227,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             if (pointList.Count > 0)
             {
-                var scorePoints = new GirdPoints(circle_size)
+                var scorePoints = new GirdPoints()
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
@@ -229,8 +236,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 scorePoints.SetPoints(pointList);
                 AddInternal(scorePoints);
             }
-
-            drawHealthLine();
         }
 
         protected virtual void UpdateText()
@@ -250,13 +255,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return HitWindows.WindowFor(result);
         }
 
-        private void drawHealthLine()
+        private void drawHealthLine(List<HitEvent> sortedHitEvents)
         {
-            var sortedEvents = HitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
             double currentHealth = 0.0;
             List<Vector2> healthPoints = new List<Vector2>();
 
-            foreach (var e in sortedEvents)
+            foreach (var e in sortedHitEvents)
             {
                 var judgement = e.HitObject.CreateJudgement();
                 var judgementResult = new JudgementResult(e.HitObject, judgement) { Type = e.Result };
