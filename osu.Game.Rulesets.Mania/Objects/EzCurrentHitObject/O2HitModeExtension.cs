@@ -4,6 +4,7 @@
 using System;
 using System.Threading;
 using osu.Framework.Bindables;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -35,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         // 保存原始 BPM 值
         private static double originalBPM = 120.0;
-        public static bool IsPlaying = false;
+        public static bool IsPlaying = true;
 
         /// <summary>
         /// 设置当前谱面的控制点信息，用于动态 BPM 计算
@@ -66,11 +67,11 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             {
                 var timingPoint = currentControlPoints.TimingPointAt(time);
                 // 确保 BPM 不低于 120
-                return Math.Max(timingPoint.BPM, 120.0);
+                return Math.Max(timingPoint.BPM, 75.0);
             }
 
             // 如果没有控制点信息，则使用原始 BPM 值，同样确保不低于 120
-            return Math.Max(originalBPM, 120.0);
+            return Math.Max(originalBPM, 120);
         }
 
         /// <summary>
@@ -132,6 +133,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             double coolRange = GetCoolRangeAtTime(currentTime);
             double goodRange = GetGoodRangeAtTime(currentTime);
             double badRange = GetBadRangeAtTime(currentTime);
+
+            Logger.Log("[O2HitModeExtension] Ranges at time " + currentTime + ": Cool=" + coolRange + ", Good=" + goodRange + ", Bad=" + badRange);
 
             if (absOffset <= coolRange)
             {
