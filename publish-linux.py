@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import subprocess
 import os
-import sys
 import platform
 import argparse
 import shutil
@@ -30,7 +29,6 @@ def run_cleanup(script_path: str, target_dir: str, platform: str) -> int:
 
 def clean_publish_folder(release_dir=None, platform=None):
     from pathlib import Path
-    import fnmatch
 
     if release_dir is None:
         release_dir = Path(__file__).parent / "Release"
