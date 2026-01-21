@@ -1777,7 +1777,7 @@ namespace osu.Game
         private void updateDrawLimiter()
         {
             // 暂时屏蔽测试情况
-            return;
+            // return;
 
             if (gameHost?.Window == null)
                 return;
