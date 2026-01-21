@@ -21,6 +21,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API;
 using osu.Game.Online.Placeholders;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics.User;
 using osuTK;
@@ -116,10 +117,12 @@ namespace osu.Game.Screens.Ranking.Statistics
             // Todo: The placement of this is temporary. Eventually we'll both generate the playable beatmap _and_ run through it in a background task to generate the hit events.
             Task.Run(() =>
             {
+                #region 接口反射后台加载结算
+
                 // 结算后加载一次分数，后台计算
                 var playable = workingBeatmap.GetPlayableBeatmap(newScore.Ruleset, newScore.Mods);
 
-                List<Rulesets.Scoring.HitEvent>? generatedHitEvents = null;
+                List<HitEvent>? generatedHitEvents = null;
 
                 if (newScore.HitEvents.Count == 0)
                 {
@@ -141,6 +144,8 @@ namespace osu.Game.Screens.Ranking.Statistics
                 Container<Drawable> container;
 
                 var statisticItems = CreateStatisticItems(newScore, result.playable).ToArray();
+
+                #endregion
 
                 if (!hitEventsAvailable && statisticItems.All(c => c.RequiresHitEvents))
                 {

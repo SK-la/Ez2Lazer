@@ -213,7 +213,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
         protected virtual void StopPreviewInternal(string reason)
         {
-            Logger.Log($"EzPreviewTrackManager: Stopping preview (reason={reason})", LoggingTarget.Runtime);
+            // Logger.Log($"EzPreviewTrackManager: Stopping preview (reason={reason})");
             playback.IsPlaying = false;
             updateDelegate?.Cancel();
             updateDelegate = null;
@@ -508,7 +508,22 @@ namespace osu.Game.LAsEzExtensions.Select
 
                         if (key != null && uniqueHitInfos.Add(key))
                         {
-                            sample?.GetChannel().Stop();
+                            var ch = sample?.GetChannel();
+
+                            if (ch != null)
+                            {
+                                try
+                                {
+                                    ch.Stop();
+                                }
+                                finally
+                                {
+                                    // GetChannel() does not register the channel with the Sample unless Play() was invoked,
+                                    // so ensure we dispose temporary channels created for preload to avoid relying on finalizers.
+                                    if (!ch.IsDisposed && !ch.ManualFree)
+                                        ch.Dispose();
+                                }
+                            }
                         }
                     }
                 }
@@ -519,8 +534,24 @@ namespace osu.Game.LAsEzExtensions.Select
                 {
                     // 通过统一的 fetchStoryboardSample 进行预热
                     var fetched = fetchStoryboardSample(sb.Sample, true);
+
                     if (fetched.sample != null && uniqueStoryboard.Add(fetched.chosenKey))
-                        fetched.sample.GetChannel().Stop();
+                    {
+                        var ch = fetched.sample.GetChannel();
+
+                        if (ch != null)
+                        {
+                            try
+                            {
+                                ch.Stop();
+                            }
+                            finally
+                            {
+                                if (!ch.IsDisposed && !ch.ManualFree)
+                                    ch.Dispose();
+                            }
+                        }
+                    }
                 }
 
                 // 移除成功日志
@@ -725,7 +756,7 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 if (sample == null)
                 {
-                    Logger.Log($"EzPreviewTrackManager: Miss storyboard sample {sampleInfo.Path} (tried: {string.Join("|", tried)})", LoggingTarget.Runtime);
+                    // Logger.Log($"EzPreviewTrackManager: Miss storyboard sample {sampleInfo.Path} (tried: {string.Join("|", tried)})", LoggingTarget.Runtime);
                     return;
                 }
 
@@ -814,9 +845,27 @@ namespace osu.Game.LAsEzExtensions.Select
 
         private void clearEnhancedElements()
         {
-            // 停止所有仍在播放的样本通道
+            // 停止并释放所有仍在播放的样本通道，避免依赖最终化器来回收短期通道
             foreach (var channel in sampleScheduler.ActiveChannels)
-                channel.Stop();
+            {
+                try
+                {
+                    channel.Stop();
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    if (!channel.IsDisposed && !channel.ManualFree)
+                        channel.Dispose();
+                }
+                catch
+                {
+                }
+            }
+
             sampleScheduler.Reset();
             playback.ShortBgmOneShotMode = false;
             playback.ShortBgmMutedAfterFirstLoop = false;

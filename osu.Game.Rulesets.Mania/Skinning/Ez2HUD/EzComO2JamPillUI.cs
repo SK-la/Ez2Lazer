@@ -220,7 +220,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             base.LoadComplete();
 
-            PillCount.BindTo(O2HitModeExtension.PillCount);
+            PillCount.BindTo(O2HitModeExtension.PILL_COUNT);
 
             PillCount.BindValueChanged(value =>
             {

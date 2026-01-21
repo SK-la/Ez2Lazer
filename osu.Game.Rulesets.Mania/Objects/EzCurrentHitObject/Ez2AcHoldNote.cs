@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
         {
-            AddNested(Head = new Ez2AcLNHead
+            AddNested(Head = new HeadNote
             {
                 StartTime = StartTime,
                 Column = Column,
@@ -36,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 Samples = GetNodeSamples((NodeSamples?.Count - 1) ?? 1),
             });
 
-            AddNested(Body = new NoMissLNBody
+            AddNested(Body = new HoldNoteBody
             {
                 StartTime = StartTime,
                 Column = Column
