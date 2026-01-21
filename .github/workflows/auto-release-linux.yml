@@ -233,8 +233,8 @@ jobs:
           $artifacts_dir = Join-Path $ws 'artifacts'
           if (-not (Test-Path $artifacts_dir)) { New-Item -ItemType Directory -Path $artifacts_dir | Out-Null }
 
-          $release_pattern = 'Ez2Lazer_release_x64*.zip'
-          $debug_pattern = 'Ez2Lazer_debug_x64*.zip'
+          $release_pattern = 'Ez2Lazer_release_linux_x64*.zip'
+          $debug_pattern = 'Ez2Lazer_debug_linux_x64*.zip'
 
           function find-first([string]$base, [string]$pattern) {
             $f = Get-ChildItem -Path $base -Filter $pattern -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
