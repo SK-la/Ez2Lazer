@@ -19,6 +19,7 @@ using osu.Framework.Platform.Windows;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osuTK;
 using osuTK.Graphics;
@@ -70,7 +71,7 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
         private const int transition_duration = 400;
 
         [BackgroundDependencyLoader]
-        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, GameHost host)
+        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, GameHost host, Ez2ConfigManager ezConfig)
         {
             window = host.Window;
 
@@ -149,6 +150,11 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                     LabelText = GraphicsSettingsStrings.ScreenScaling,
                     Current = osuConfig.GetBindable<ScalingMode>(OsuSetting.Scaling),
                     Keywords = new[] { "scale", "letterbox" },
+                },
+                new SettingsEnumDropdown<ScalingGameMode>
+                {
+                    LabelText = "Scaling To Game Mode",
+                    Current = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode),
                 },
                 scalingSettings = new FillFlowContainer<SettingsSlider<float>>
                 {

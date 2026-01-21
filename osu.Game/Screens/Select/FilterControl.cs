@@ -29,6 +29,8 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select.Filter;
 using osuTK;
 using osuTK.Input;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Select;
 
 namespace osu.Game.Screens.Select
 {
@@ -52,6 +54,9 @@ namespace osu.Game.Screens.Select
         private Bindable<SortMode> sortMode;
         private Bindable<GroupMode> groupMode;
         private FilterControlTextBox searchTextBox;
+        private EzKeyModeSelector csSelector = null!;
+        private ShearedToggleButton keySoundPreviewButton = null!;
+        private ShearedToggleButton xxySrFilterButton = null!;
         private CollectionDropdown collectionDropdown;
 
         [CanBeNull]
@@ -78,16 +83,49 @@ namespace osu.Game.Screens.Select
                 criteria.UserStarDifficulty.Max = maximumStars.Value;
 
             criteria.RulesetCriteria = ruleset.Value.CreateInstance().CreateRulesetFilterCriteria();
+            applyCircleSizeFilter(criteria);
 
             FilterQueryParser.ApplyQueries(criteria, query);
             return criteria;
+        }
+
+        private void applyCircleSizeFilter(FilterCriteria criteria)
+        {
+            if (csSelector == null)
+                return;
+
+            var selectedModeIds = csSelector.EzKeyModeFilter.SelectedModeIds;
+
+            if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
+                return;
+
+            var selectedModes = CsItemIds.ALL
+                                         .Where(m => selectedModeIds.Contains(m.Id) && m.CsValue.HasValue)
+                                         .Select(m => m.CsValue!.Value)
+                                         .ToList();
+
+            if (selectedModes.Count == 0)
+                return;
+
+            criteria.DiscreteCircleSizeValues = new List<float>(selectedModes);
+
+            if (ruleset.Value.OnlineID != 3)
+            {
+                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                {
+                    Min = selectedModes.Min() - 0.5f,
+                    Max = selectedModes.Max() + 0.5f,
+                    IsLowerInclusive = false,
+                    IsUpperInclusive = false
+                };
+            }
         }
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) =>
             base.ReceivePositionalInputAt(screenSpacePos) || sortTabs.ReceivePositionalInputAt(screenSpacePos);
 
         [BackgroundDependencyLoader(permitNulls: true)]
-        private void load(OsuColour colours, OsuConfigManager config)
+        private void load(OsuColour colours, OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             sortMode = config.GetBindable<SortMode>(OsuSetting.SongSelectSortingMode);
             groupMode = config.GetBindable<GroupMode>(OsuSetting.SongSelectGroupMode);
@@ -134,7 +172,7 @@ namespace osu.Game.Screens.Select
                                     new Dimension(GridSizeMode.AutoSize),
                                     new Dimension(GridSizeMode.Absolute, OsuTabControl<SortMode>.HORIZONTAL_SPACING),
                                     new Dimension(),
-                                    new Dimension(GridSizeMode.Absolute, OsuTabControl<SortMode>.HORIZONTAL_SPACING),
+                                    new Dimension(GridSizeMode.AutoSize),
                                     new Dimension(GridSizeMode.AutoSize),
                                 },
                                 RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
@@ -161,7 +199,6 @@ namespace osu.Game.Screens.Select
                                             AccentColour = colours.GreenLight,
                                             Current = { BindTarget = sortMode }
                                         },
-                                        Empty(),
                                         new OsuTabControlCheckbox
                                         {
                                             Text = "Show converted",
@@ -169,6 +206,13 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.BottomRight,
                                             Origin = Anchor.BottomRight,
                                         },
+                                        keySoundPreviewButton = new ShearedToggleButton
+                                        {
+                                            Anchor = Anchor.TopRight,
+                                            Origin = Anchor.TopRight,
+                                            Text = "kSound Preview",
+                                            Height = 30f,
+                                        }
                                     }
                                 }
                             },
@@ -203,6 +247,28 @@ namespace osu.Game.Screens.Select
                                     }
                                 }
                             },
+                            new Container
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                Height = 30,
+                                Children = new Drawable[]
+                                {
+                                    csSelector = new EzKeyModeSelector
+                                    {
+                                        Anchor = Anchor.TopLeft,
+                                        Origin = Anchor.TopLeft,
+                                        RelativeSizeAxes = Axes.X,
+                                    },
+                                    xxySrFilterButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.TopRight,
+                                        Origin = Anchor.TopRight,
+                                        Text = "xxy_SR Filter",
+                                        TooltipText = "(NoActive)Filter, sort beatmaps by Xxy Star Rating",
+                                        Height = 30f,
+                                    },
+                                }
+                            },
                         }
                     }
                 }
@@ -231,12 +297,54 @@ namespace osu.Game.Screens.Select
                     updateCriteria();
             });
 
+            ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
+            ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
+
             groupMode.BindValueChanged(_ => updateCriteria());
             sortMode.BindValueChanged(_ => updateCriteria());
 
             searchTextBox.Current.ValueChanged += _ => updateCriteria();
 
             updateCriteria();
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            ruleset?.BindValueChanged(_ =>
+            {
+                updateCriteria();
+
+                if (ruleset.Value.OnlineID == 1) // Taiko
+                {
+                    csSelector.Hide();
+                    xxySrFilterButton.Hide();
+                }
+                else
+                {
+                    csSelector.Show();
+
+                    if (ruleset.Value.OnlineID == 3)
+                    {
+                        xxySrFilterButton.Show();
+                    }
+                }
+            });
+
+            mods?.BindValueChanged(m =>
+            {
+                if (m.NewValue.SequenceEqual(m.OldValue))
+                    return;
+
+                if (currentCriteria?.RulesetCriteria?.FilterMayChangeFromMods(m) == true)
+                    updateCriteria();
+            });
+
+            csSelector?.Current.BindValueChanged(_ => updateCriteria());
+            // csSelector?.EzKeyModeFilter.SelectionChanged += updateCriteria;
+            xxySrFilterButton?.Active.BindValueChanged(_ => updateCriteria());
+            keySoundPreviewButton?.Active.BindValueChanged(_ => updateCriteria());
         }
 
         public void Deactivate()

@@ -31,7 +31,7 @@ namespace osu.Game.Graphics.Backgrounds
         [Resolved]
         private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
-        public BeatmapBackgroundWithStoryboard(WorkingBeatmap beatmap, string fallbackTextureName = "Backgrounds/bg1")
+        public BeatmapBackgroundWithStoryboard(WorkingBeatmap beatmap, string fallbackTextureName = "Menu/Ez-background-3")
             : base(beatmap, fallbackTextureName)
         {
             storyboardClock = new InterpolatingFramedClock();

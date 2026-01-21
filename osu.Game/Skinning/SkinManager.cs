@@ -60,6 +60,8 @@ namespace osu.Game.Skinning
 
         private readonly IResourceStore<byte[]> userFiles;
 
+        private Skin ezProSkin { get; }
+
         private Skin argonSkin { get; }
 
         private Skin trianglesSkin { get; }
@@ -98,6 +100,9 @@ namespace osu.Game.Skinning
                 trianglesSkin = new TrianglesSkin(this),
                 argonSkin = new ArgonSkin(this),
                 new ArgonProSkin(this),
+                new Ez2Skin(this),
+                ezProSkin = new EzStyleProSkin(this),
+                new SbISkin(this),
             };
 
             // Ensure the default entries are present.
@@ -370,6 +375,9 @@ namespace osu.Game.Skinning
 
             if (skinInfo == null)
             {
+                if (guid == SkinInfo.EZ_STYLE_PRO_SKIN)
+                    skinInfo = ezProSkin.SkinInfo;
+
                 if (guid == SkinInfo.CLASSIC_SKIN)
                     skinInfo = DefaultClassicSkin.SkinInfo;
 

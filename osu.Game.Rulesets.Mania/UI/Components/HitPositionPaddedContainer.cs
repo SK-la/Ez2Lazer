@@ -6,8 +6,10 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens;
 using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania.UI.Components
@@ -19,22 +21,39 @@ namespace osu.Game.Rulesets.Mania.UI.Components
         [Resolved]
         private ISkinSource skin { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+
+        private Bindable<double> hitPositonBindable = new Bindable<double>();
+        private Bindable<bool> globalHitPosition = new Bindable<bool>();
+
         [BackgroundDependencyLoader]
         private void load(IScrollingInfo scrollingInfo)
         {
             Direction.BindTo(scrollingInfo.Direction);
             Direction.BindValueChanged(_ => UpdateHitPosition(), true);
 
+            globalHitPosition = ezSkinConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
             skin.SourceChanged += onSkinChanged;
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            globalHitPosition.BindValueChanged(_ => UpdateHitPosition(), true);
+            hitPositonBindable.BindValueChanged(_ => UpdateHitPosition(), true);
         }
 
         private void onSkinChanged() => UpdateHitPosition();
 
         protected virtual void UpdateHitPosition()
         {
-            float hitPosition = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                                    new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                                ?? Stage.HIT_TARGET_POSITION;
+            float hitPosition = globalHitPosition.Value
+                ? (float)hitPositonBindable.Value
+                : skin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                      new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
+                  ?? (float)hitPositonBindable.Value;
 
             Padding = Direction.Value == ScrollingDirection.Up
                 ? new MarginPadding { Top = hitPosition }

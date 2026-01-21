@@ -1,24 +1,31 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Input;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Input.Handlers;
+using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mods;
@@ -73,6 +80,19 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private GameHost gameHost { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private Bindable<double> hitPositonBindable = new Bindable<double>();
+        private Bindable<bool> globalHitPosition = new Bindable<bool>();
+        private Bindable<bool> barLinesBindable = new Bindable<bool>();
+        private Bindable<EzMUGHitMode> hitMode = new Bindable<EzMUGHitMode>();
+
+        //自定义判定系统
+        private Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
+        private readonly BindableDouble configBaseMs = new BindableDouble();
+        private readonly BindableDouble configTimePerSpeed = new BindableDouble();
+
         public DrawableManiaRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)
         {
@@ -105,27 +125,80 @@ namespace osu.Game.Rulesets.Mania.UI
                     p.EffectPoint = new EffectControlPoint();
             }
 
-            BarLines.ForEach(Playfield.Add);
-
             Config.BindWith(ManiaRulesetSetting.ScrollDirection, configDirection);
             configDirection.BindValueChanged(direction => Direction.Value = (ScrollingDirection)direction.NewValue, true);
 
+            Config.BindWith(ManiaRulesetSetting.ScrollBaseSpeed, configBaseMs);
+            Config.BindWith(ManiaRulesetSetting.ScrollTimePerSpeed, configTimePerSpeed);
             Config.BindWith(ManiaRulesetSetting.ScrollSpeed, configScrollSpeed);
             configScrollSpeed.BindValueChanged(speed =>
             {
                 if (!AllowScrollSpeedAdjustment)
                     return;
 
-                TargetTimeRange = ComputeScrollTime(speed.NewValue);
+                TargetTimeRange = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value);
             });
 
-            TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value);
+            scrollingStyle = Config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle);
+            scrollingStyle.BindValueChanged(_ => updateTimeRange());
+
+            TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
             mobileLayout.BindValueChanged(_ => updateMobileLayout(), true);
 
             Config.BindWith(ManiaRulesetSetting.TouchOverlay, touchOverlay);
             touchOverlay.BindValueChanged(_ => updateMobileLayout(), true);
+
+            hitPositonBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
+            globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
+            globalHitPosition.BindValueChanged(_ => skinChanged(), true);
+            barLinesBindable = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool);
+            hitMode = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            hitMode.BindValueChanged(h =>
+            {
+                if (h.NewValue == EzMUGHitMode.O2Jam)
+                {
+                    O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
+                    O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
+                    O2HitModeExtension.PillActivated = true;
+                }
+            }, true);
+            barLinesBindable.BindValueChanged(b =>
+            {
+                if (b.NewValue)
+                {
+                    BarLines.ForEach(Playfield.Add);
+                }
+            }, true);
+            // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
+            Schedule(() =>
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var factory = Dependencies.Get<EzLocalTextureFactory>();
+
+                        if (factory != null)
+                        {
+                            await factory.PreloadGameTextures().ConfigureAwait(false);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}",
+                            LoggingTarget.Runtime, LogLevel.Error);
+                    }
+                });
+            });
         }
 
         private ManiaTouchInputArea? touchInputArea;
@@ -164,9 +237,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void skinChanged()
         {
-            hitPosition = currentSkin.GetConfig<ManiaSkinConfigurationLookup, float>(
-                              new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
-                          ?? Stage.HIT_TARGET_POSITION;
+            if (globalHitPosition.Value)
+                hitPosition = (float)hitPositonBindable.Value;
+            else
+            {
+                hitPosition = currentSkin.GetConfig<ManiaSkinConfigurationLookup, float>(
+                                  new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.HitPosition))?.Value
+                              ?? (float)hitPositonBindable.Value;
+            }
 
             pendingSkinChange = null;
         }
@@ -174,10 +252,31 @@ namespace osu.Game.Rulesets.Mania.UI
         private void updateTimeRange()
         {
             const float length_to_default_hit_position = 768 - LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION;
+
+            skinChanged();
             float lengthToHitPosition = 768 - hitPosition;
 
             // This scaling factor preserves the scroll speed as the scroll length varies from changes to the hit position.
-            float scale = lengthToHitPosition / length_to_default_hit_position;
+            float scale = 1.0f;
+
+            switch (scrollingStyle.Value)
+            {
+                case EzManiaScrollingStyle.ScrollSpeedStyle:
+                case EzManiaScrollingStyle.ScrollTimeStyle:
+                    // Preserve the scroll speed as the scroll length varies from changes to the hit position.
+                    scale = lengthToHitPosition / length_to_default_hit_position;
+                    break;
+
+                case EzManiaScrollingStyle.ScrollTimeForRealJudgement:
+                    // 直接使用设置的速度作为时间范围，忽略 hit position 的影响
+                    scale = 1.0f;
+                    break;
+
+                case EzManiaScrollingStyle.ScrollTimeStyleFixed:
+                    // Ensure the travel time from the top of the screen to the hit position remains constant.
+                    scale = lengthToHitPosition / 768;
+                    break;
+            }
 
             // we're intentionally using the game host's update clock here to decouple the time range tween from the gameplay clock (which can be arbitrarily paused, or even rewinding)
             currentTimeRange = Interpolation.DampContinuously(currentTimeRange, TargetTimeRange, 50, gameHost.UpdateThread.Clock.ElapsedFrameTime);
@@ -188,8 +287,13 @@ namespace osu.Game.Rulesets.Mania.UI
         /// Computes a scroll time (in milliseconds) from a scroll speed in the range of 1-40.
         /// </summary>
         /// <param name="scrollSpeed">The scroll speed.</param>
+        /// <param name="baseSpeed"></param>
+        /// <param name="timePerSpeed"></param>
         /// <returns>The scroll time.</returns>
-        public static double ComputeScrollTime(double scrollSpeed) => MAX_TIME_RANGE / scrollSpeed;
+        public static double ComputeScrollTime(double scrollSpeed, double baseSpeed, double timePerSpeed)
+        {
+            return baseSpeed - (scrollSpeed - 200) * timePerSpeed;
+        }
 
         public override PlayfieldAdjustmentContainer CreatePlayfieldAdjustmentContainer() => new ManiaPlayfieldAdjustmentContainer(this);
 

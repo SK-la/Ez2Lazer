@@ -8,9 +8,11 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania
@@ -25,22 +27,71 @@ namespace osu.Game.Rulesets.Mania
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
             var config = (ManiaRulesetConfigManager)Config;
 
             Children = new Drawable[]
             {
+                new SettingsEnumDropdown<EzMUGHitMode>
+                {
+                    ClassicDefault = EzMUGHitMode.EZ2AC,
+                    LabelText = EzLocalizationManager.HitMode,
+                    TooltipText = EzLocalizationManager.HitModeTooltip,
+                    Current = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode),
+                    Keywords = new[] { "mania" }
+                },
+                new SettingsEnumDropdown<EnumHealthMode>
+                {
+                    ClassicDefault = EnumHealthMode.Lazer,
+                    Current = ezConfig.GetBindable<EnumHealthMode>(Ez2Setting.CustomHealthMode),
+                    LabelText = EzLocalizationManager.HealthMode,
+                    TooltipText = EzLocalizationManager.HealthModeTooltip,
+                    Keywords = new[] { "mania" }
+                },
+                new SettingsCheckbox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResultBool),
+                    LabelText = EzLocalizationManager.PoorHitResult,
+                    TooltipText = EzLocalizationManager.PoorHitResultTooltip,
+                    Keywords = new[] { "mania" }
+                },
+                new SettingsCheckbox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool),
+                    LabelText = EzLocalizationManager.ManiaBarLinesBool,
+                    TooltipText = EzLocalizationManager.ManiaBarLinesBoolTooltip,
+                    Keywords = new[] { "mania" }
+                },
                 new SettingsEnumDropdown<ManiaScrollingDirection>
                 {
                     LabelText = RulesetSettingsStrings.ScrollingDirection,
                     Current = config.GetBindable<ManiaScrollingDirection>(ManiaRulesetSetting.ScrollDirection)
                 },
+                new SettingsEnumDropdown<EzManiaScrollingStyle>
+                {
+                    LabelText = "Scrolling style",
+                    Current = config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle)
+                },
                 new SettingsSlider<double, ManiaScrollSlider>
                 {
                     LabelText = RulesetSettingsStrings.ScrollSpeed,
                     Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed),
-                    KeyboardStep = 1
+                    KeyboardStep = 1,
+                },
+                new SettingsSlider<double, ManiaScrollBaseSlider>
+                {
+                    LabelText = "Scroll Base MS (when 200 Speed)",
+                    Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollBaseSpeed),
+                    KeyboardStep = 1,
+                    Keywords = new[] { "base" }
+                },
+                new SettingsSlider<double, ManiaScrollMsPerSpeedSlider>
+                {
+                    LabelText = "MS / Speed",
+                    Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollTimePerSpeed),
+                    KeyboardStep = 1,
+                    Keywords = new[] { "mps" }
                 },
                 new SettingsCheckbox
                 {
@@ -71,7 +122,72 @@ namespace osu.Game.Rulesets.Mania
 
         private partial class ManiaScrollSlider : RoundedSliderBar<double>
         {
-            public override LocalisableString TooltipText => RulesetSettingsStrings.ScrollSpeedTooltip((int)DrawableManiaRuleset.ComputeScrollTime(Current.Value), Current.Value);
+            // 自定义提示
+            private ManiaRulesetConfigManager config = null!;
+
+            [BackgroundDependencyLoader]
+            private void load(ManiaRulesetConfigManager config)
+            {
+                this.config = config;
+            }
+
+            public override LocalisableString TooltipText
+            {
+                get
+                {
+                    double baseSpeed = config.Get<double>(ManiaRulesetSetting.ScrollBaseSpeed);
+                    double timePerSpeed = config.Get<double>(ManiaRulesetSetting.ScrollTimePerSpeed);
+                    int computedTime = (int)DrawableManiaRuleset.ComputeScrollTime(Current.Value, baseSpeed, timePerSpeed);
+                    LocalisableString speedInfo = RulesetSettingsStrings.ScrollSpeedTooltip(computedTime, Current.Value);
+                    return $"{baseSpeed}base - ( {Current.Value} - 200) * {timePerSpeed}mps\n = {speedInfo}";
+                }
+            }
+        }
+
+        private partial class ManiaScrollBaseSlider : RoundedSliderBar<double>
+        {
+            private ManiaRulesetConfigManager config = null!;
+
+            [BackgroundDependencyLoader]
+            private void load(ManiaRulesetConfigManager config)
+            {
+                this.config = config;
+            }
+
+            public override LocalisableString TooltipText
+            {
+                get
+                {
+                    double speed = config.Get<double>(ManiaRulesetSetting.ScrollSpeed);
+                    double timePerSpeed = config.Get<double>(ManiaRulesetSetting.ScrollTimePerSpeed);
+                    int computedTime = (int)DrawableManiaRuleset.ComputeScrollTime(speed, Current.Value, timePerSpeed);
+                    LocalisableString speedInfo = RulesetSettingsStrings.ScrollSpeedTooltip(computedTime, speed);
+                    return $"{Current.Value}base - ( {speed} - 200) * {timePerSpeed}mps\n = {speedInfo}";
+                }
+            }
+        }
+
+        private partial class ManiaScrollMsPerSpeedSlider : RoundedSliderBar<double>
+        {
+            private ManiaRulesetConfigManager config = null!;
+
+            [BackgroundDependencyLoader]
+            private void load(ManiaRulesetConfigManager config)
+            {
+                this.config = config;
+            }
+
+            public override LocalisableString TooltipText
+            {
+                get
+                {
+                    double speed = config.Get<double>(ManiaRulesetSetting.ScrollSpeed);
+                    double baseSpeed = config.Get<double>(ManiaRulesetSetting.ScrollBaseSpeed);
+                    int computedTime = (int)DrawableManiaRuleset.ComputeScrollTime(speed, baseSpeed, Current.Value);
+                    LocalisableString speedInfo = RulesetSettingsStrings.ScrollSpeedTooltip(computedTime, speed);
+                    return $"{baseSpeed}base - ( {speed} - 200) * {Current.Value}mps\n = {speedInfo}";
+                }
+            }
         }
     }
 }

@@ -1,0 +1,133 @@
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Textures;
+using osu.Framework.Logging;
+using osu.Game.Screens;
+using osu.Game.Screens.LAsEzExtensions;
+
+namespace osu.Game.Skinning.Components
+{
+    public partial class EzTextureFactory : CompositeDrawable
+    {
+        public Bindable<string> TextureNameBindable { get; } = new Bindable<string>("Celeste_Lumiere");
+        public string TextureBasePath = @"EzResources/note";
+        private readonly EzAnimationType animationType;
+
+        private readonly EzSkinSettingsManager ezSkinConfig;
+        private readonly TextureStore textureStore;
+
+        public EzTextureFactory(EzSkinSettingsManager ezSkinConfig, EzAnimationType type, TextureStore textureStore, string? customTexturePath = null)
+        {
+            this.ezSkinConfig = ezSkinConfig;
+            animationType = type;
+            this.textureStore = textureStore;
+            initialize();
+
+            if (!string.IsNullOrEmpty(customTexturePath))
+                TextureBasePath = customTexturePath;
+
+            RelativeSizeAxes = Axes.Both;
+            Anchor = Anchor.Centre;
+            Origin = Anchor.Centre;
+            Blending = new BlendingParameters
+            {
+                Source = BlendingType.SrcAlpha,
+                Destination = BlendingType.One,
+            };
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+        }
+
+        private void initialize()
+        {
+            TextureNameBindable.Value = ezSkinConfig.Get<string>(EzSkinSetting.NoteSetName);
+
+            ezSkinConfig.GetBindable<string>(EzSkinSetting.NoteSetName).BindValueChanged(e =>
+                TextureNameBindable.Value = e.NewValue, true);
+        }
+
+        public virtual Drawable CreateAnimation(string component)
+        {
+            string noteSetName = TextureNameBindable.Value;
+
+            Container container;
+            TextureAnimation animation;
+
+            if (animationType == EzAnimationType.Note)
+            {
+                container = new Container
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.Both,
+                };
+
+                animation = new TextureAnimation
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.Both,
+                    DefaultFrameLength = 1000 / 10f,
+                    Loop = true
+                };
+            }
+            else // Hit
+            {
+                container = new Container
+                {
+                    AutoSizeAxes = Axes.None,
+                };
+
+                animation = new TextureAnimation
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.None,
+                    Loop = false
+                };
+            }
+
+            for (int i = 0;; i++)
+            {
+                string framePath = $@"{TextureBasePath}/{noteSetName}/{component}/{i:D3}.png";
+                var texture = textureStore.Get(framePath);
+                if (texture == null)
+                    break;
+
+                animation.AddFrame(texture);
+            }
+
+            if (animation.FrameCount == 0)
+            {
+                Logger.Log("No animation frames loaded.", LoggingTarget.Runtime, LogLevel.Important);
+                return container;
+            }
+
+            if (animationType == EzAnimationType.Hit)
+            {
+                animation.OnUpdate += _ =>
+                {
+                    var tex = animation.CurrentFrame?.Size;
+
+                    if (tex != null)
+                    {
+                        container.Width = tex.Value.X;
+                        container.Height = tex.Value.Y;
+                    }
+
+                    if (animation.CurrentFrameIndex == animation.FrameCount - 1)
+                        animation.Expire();
+                };
+            }
+
+            container.Add(animation);
+            return container;
+        }
+    }
+}

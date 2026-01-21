@@ -10,6 +10,8 @@ namespace osu.Game.Rulesets.Mods
         Conversion,
         Automation,
         Fun,
-        System
+        System,
+        LA_Mod,
+        YuLiangSSS_Mod,
     }
 }

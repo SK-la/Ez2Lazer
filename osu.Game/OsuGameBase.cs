@@ -45,6 +45,10 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
+using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Analysis.Persistence;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -76,9 +80,9 @@ namespace osu.Game
     public partial class OsuGameBase : Framework.Game, ICanAcceptFiles, IBeatSyncProvider
     {
 #if DEBUG
-        public const string GAME_NAME = "osu! (development)";
+        public const string GAME_NAME = "ez2osu! (development)";
 #else
-        public const string GAME_NAME = "osu!";
+        public const string GAME_NAME = "ez2osu!";
 #endif
 
         public const string OSU_PROTOCOL = "osu://";
@@ -172,6 +176,10 @@ namespace osu.Game
 
         protected Storage Storage { get; set; }
 
+        protected Ez2ConfigManager Ez2ConfigManager { get; private set; }
+
+        protected EzLocalTextureFactory NoteFactory { get; private set; }
+
         /// <summary>
         /// The language in which the game is currently displayed in.
         /// </summary>
@@ -204,6 +212,7 @@ namespace osu.Game
         public readonly Bindable<Dictionary<ModType, IReadOnlyList<Mod>>> AvailableMods = new Bindable<Dictionary<ModType, IReadOnlyList<Mod>>>(new Dictionary<ModType, IReadOnlyList<Mod>>());
 
         private BeatmapDifficultyCache difficultyCache;
+        private EzBeatmapManiaAnalysisCache maniaAnalysisCache;
         private IBeatmapUpdater beatmapUpdater;
 
         private UserLookupCache userCache;
@@ -276,6 +285,15 @@ namespace osu.Game
 
             Resources.AddStore(new DllResourceStore(OsuResources.ResourceAssembly));
 
+            // 初始化并注册EzSkinSettingsManager
+            dependencies.Cache(Ez2ConfigManager = new Ez2ConfigManager(Storage));
+
+            dependencies.Cache(
+                NoteFactory = new EzLocalTextureFactory(
+                    Ez2ConfigManager,
+                    Host.Renderer,
+                    Storage));
+
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 
             dependencies.CacheAs<RulesetStore>(RulesetStore = new RealmRulesetStore(realm, Storage));
@@ -325,11 +343,15 @@ namespace osu.Game
             dependencies.Cache(BeatmapManager = new BeatmapManager(Storage, realm, API, Audio, Resources, Host, defaultBeatmap, difficultyCache, performOnlineLookups: true));
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
+            dependencies.Cache(new EzManiaAnalysisPersistentStore(Storage));
+            dependencies.Cache(maniaAnalysisCache = new EzBeatmapManiaAnalysisCache());
+
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
             dependencies.Cache(ScoreDownloader = new ScoreModelDownloader(ScoreManager, API));
 
             // Add after all the above cache operations as it depends on them.
             base.Content.Add(difficultyCache);
+            base.Content.Add(maniaAnalysisCache);
 
             // TODO: OsuGame or OsuGameBase?
             dependencies.CacheAs(beatmapUpdater = CreateBeatmapUpdater());
@@ -435,6 +457,9 @@ namespace osu.Game
             // if this becomes a more common thing, tracked settings should be reconsidered to allow local DI.
             LocalConfig.LookupSkinName = id => SkinManager.Query(s => s.ID == id)?.ToString() ?? "Unknown";
             LocalConfig.LookupKeyBindings = l => KeyBindingStore.GetBindingsStringFor(l);
+
+            // 添加自动背景捕获组件，启用亚克力效果
+            // base.Content.Add(new AutoBackgroundCapture());
         }
 
         private void updateLanguage() => CurrentLanguage.Value = LanguageExtensions.GetLanguageFor(frameworkLocale.Value, localisationParameters.Value);

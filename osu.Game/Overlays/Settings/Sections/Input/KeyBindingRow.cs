@@ -515,7 +515,12 @@ namespace osu.Game.Overlays.Settings.Sections.Input
         private void tryPersistKeyBinding(RealmKeyBinding keyBinding, bool advanceToNextBinding, bool restoringDefaults = false)
         {
             List<RealmKeyBinding> bindings = GetAllSectionBindings();
-            RealmKeyBinding? existingBinding = keyBinding.KeyCombination.Equals(new KeyCombination(InputKey.None))
+
+            // 检查是否是Mania规则集的操作
+            var actionType = Action.GetType();
+            bool isManiaAction = actionType.Namespace?.StartsWith("osu.Game.Rulesets.Mania", StringComparison.Ordinal) == true;
+
+            RealmKeyBinding? existingBinding = isManiaAction || keyBinding.KeyCombination.Equals(new KeyCombination(InputKey.None))
                 ? null
                 : bindings.FirstOrDefault(other => isConflictingBinding(keyBinding, other, restoringDefaults));
 

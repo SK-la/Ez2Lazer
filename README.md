@@ -2,141 +2,144 @@
   <img width="500" alt="osu! logo" src="assets/lazer.png">
 </p>
 
-# osu!
+# Ez2Lazer!
 
-[![Build status](https://github.com/ppy/osu/actions/workflows/ci.yml/badge.svg?branch=master&event=push)](https://github.com/ppy/osu/actions/workflows/ci.yml)
-[![GitHub release](https://img.shields.io/github/release/ppy/osu.svg)](https://github.com/ppy/osu/releases/latest)
-[![CodeFactor](https://www.codefactor.io/repository/github/ppy/osu/badge)](https://www.codefactor.io/repository/github/ppy/osu)
-[![dev chat](https://discordapp.com/api/guilds/188630481301012481/widget.png?style=shield)](https://discord.gg/ppy)
-[![Crowdin](https://d322cqt584bo4o.cloudfront.net/osu-web/localized.svg)](https://crowdin.com/project/osu-web)
+This is always a pre-release version, maintained by me personally
 
-A free-to-win rhythm game. Rhythm is just a *click* away!
+## Latest release: [Windows 10+ (x64)](https://github.com/SK-la/Ez2Lazer/releases)
+- **Setup [EzResources](https://la1225-my.sharepoint.com/:f:/g/personal/la_la1225_onmicrosoft_com/EiosAbw_1C9ErYCNRD1PQvkBaYvhflOkt8G9ZKHNYuppLg?e=DWY1kn) Pack to osu datebase path.**
 
-This is the future – and final – iteration of the [osu!](https://osu.ppy.sh) game client which marks the beginning of an open era! Currently known by and released under the release codename "*lazer*". As in sharper than cutting-edge.
+- A desktop platform with the [.NET 8.0 RunTime](https://dotnet.microsoft.com/download) installed.
 
-## Status
-
-This project is under constant development, but we do our best to keep things in a stable state. Players are encouraged to install from a release alongside their stable *osu!* client. This project will continue to evolve until we eventually reach the point where most users prefer it over the previous "osu!stable" release.
-
-A few resources are available as starting points to getting involved and understanding the project:
-
-- Detailed release changelogs are available on the [official osu! site](https://osu.ppy.sh/home/changelog/lazer).
-- You can learn more about our approach to [project management](https://github.com/ppy/osu/wiki/Project-management).
-- Track our current efforts [towards improving the game](https://github.com/orgs/ppy/projects/7/views/6).
-
-## Running osu!
-
-If you are just looking to give the game a whirl, you can grab the latest release for your platform:
-
-### Latest release:
-
-| [Windows 10+ (x64)](https://github.com/ppy/osu/releases/latest/download/install.exe) | macOS 12+ ([Intel](https://github.com/ppy/osu/releases/latest/download/osu.app.Intel.zip), [Apple Silicon](https://github.com/ppy/osu/releases/latest/download/osu.app.Apple.Silicon.zip)) | [Linux (x64)](https://github.com/ppy/osu/releases/latest/download/osu.AppImage) | [iOS 13.4+](https://osu.ppy.sh/home/testflight) | [Android 5+](https://github.com/ppy/osu/releases/latest/download/sh.ppy.osulazer.apk) |
-|--------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| ------------- | ------------- | ------------- |
-
-You can also generally download a version for your current device from the [osu! site](https://osu.ppy.sh/home/download).
-
-If your platform is unsupported or not listed above, there is still a chance you can run the release or manually build it by following the instructions below.
-
-**For iOS/iPadOS users**: The iOS testflight link fills up very fast (Apple has a hard limit of 10,000 users). We reset it occasionally. Please do not ask about this. Check back regularly for link resets or follow [peppy](https://twitter.com/ppy) on twitter for announcements. Our goal is to get the game on mobile app stores very soon so we don't have to live with this limitation.
-
-## Developing a custom ruleset
-
-osu! is designed to allow user-created gameplay variations, called "rulesets". Building one of these allows a developer to harness the power of the osu! beatmap library, game engine, and general UX for a new style of gameplay. To get started working on a ruleset, we have some templates available [here](https://github.com/ppy/osu/tree/master/Templates).
-
-You can see some examples of custom rulesets by visiting the [custom ruleset directory](https://github.com/ppy/osu/discussions/13096).
-
-## Developing osu!
-
-### Prerequisites
-
-Please make sure you have the following prerequisites:
-
-- A desktop platform with the [.NET 8.0 SDK](https://dotnet.microsoft.com/download) installed.
+- Develop modifications using Rider + VS Code
 
 When working with the codebase, we recommend using an IDE with intelligent code completion and syntax highlighting, such as the latest version of [Visual Studio](https://visualstudio.microsoft.com/vs/), [JetBrains Rider](https://www.jetbrains.com/rider/), or [Visual Studio Code](https://code.visualstudio.com/) with the [EditorConfig](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) and [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit) plugin installed.
 
-### Downloading the source code
+## Build Instructions
+- Clone the repository
+```bash
 
-Clone the repository:
+git clone SK-la/Ez2Lazer
+git clone SK-la/osu-framework
+git clone SK-la/osu-resources
+// There is a lack of special texture resources in Resource, so it is recommended that you use the DLL in the release package to replace it after building
 
-```shell
-git clone https://github.com/ppy/osu
-cd osu
+build Ez2Lazer
 ```
 
-To update the source code to the latest commit, run the following command inside the `osu` directory:
+## Feature support 
+(It's not always updated here)
 
-```shell
-git pull
-```
+### Vedio Main Background
+- Support vedio as main background (.webm)
+<img width="3440" height="1440" alt="img_10" src="https://github.com/user-attachments/assets/f0277860-8db5-4244-8dd0-e6eb8ac9fcea" />
+<img width="1039" height="156" alt="img_13" src="https://github.com/user-attachments/assets/18da55c5-a996-48ba-be45-7071d9c71922" />
 
-### Building
 
-#### From an IDE
+### SongSelect Ez to Filter
+- Keys Filter (One\Multi)
+- Notes by column
+- Avg\Max KPS
+<img width="1524" height="637" alt="img_12" src="https://github.com/user-attachments/assets/8caae7a3-74d0-42fa-a9de-a15385541ca7" />
 
-You should load the solution via one of the platform-specific `.slnf` files, rather than the main `.sln`. This will reduce dependencies and hide platforms that you don't care about. Valid `.slnf` files are:
 
-- `osu.Desktop.slnf` (most common)
-- `osu.Android.slnf`
-- `osu.iOS.slnf`
+### Freedom Speed Adjust System
 
-Run configurations for the recommended IDEs (listed above) are included. You should use the provided Build/Run functionality of your IDE to get things going. When testing or building new components, it's highly encouraged you use the `osu! (Tests)` project/configuration. More information on this is provided [below](#contributing).
+| - | Speed     | + |
+|--|-----------|--|
+| ← | Base Speed | → |
+| 0 | Scroll Speed | 401 |
 
-To build for mobile platforms, you will likely need to run `sudo dotnet workload restore` if you haven't done so previously. This will install Android/iOS tooling required to complete the build.
+Base Speed - Setting Speed(0~401) * MPS(Gaming ±Speed)
 
-#### From CLI
+<img width="1055" height="677" alt="img_11" src="https://github.com/user-attachments/assets/f2878062-5e12-40a3-9f51-90637f617053" />
 
-You can also build and run *osu!* from the command-line with a single command:
 
-```shell
-dotnet run --project osu.Desktop
-```
 
-When running locally to do any kind of performance testing, make sure to add `-c Release` to the build command, as the overhead of running with the default `Debug` configuration can be large (especially when testing with local framework modifications as below).
+### New Skin System
+- Ez Pro SKin System
+   - New Ez Style SKin Sprites - 全新Ez风格皮肤素材
+   - New Dynamic real-time preview SKin Options - 全新动态实时预览皮肤选项
+   - Built-in skin.ini settings - 内置skin.ini设置
+   - New color settings, column type setting system - 全新颜色设置、列类型设置系统
 
-If the build fails, try to restore NuGet packages with `dotnet restore`.
+  <img width="3440" height="1440" alt="img_5" src="https://github.com/user-attachments/assets/89cb4ea0-3a03-4252-8378-91e15789e229" />
+  <img width="3440" height="1440" alt="img_4" src="https://github.com/user-attachments/assets/246bbc63-f6a5-47e1-a05c-d5f7606bdae2" />
 
-### Testing with resource/framework modifications
+- Preload skin resources when entering the game interface to reduce lag in the early stages of the game
+- Change to the Smart Subfolder drop-down list
+   <img width="1167" height="759" alt="Snipaste_2025-12-07_21-37-22" src="https://github.com/user-attachments/assets/6485aa3f-f153-4cbf-be57-d5bb7f85a615" />
 
-Sometimes it may be necessary to cross-test changes in [osu-resources](https://github.com/ppy/osu-resources) or [osu-framework](https://github.com/ppy/osu-framework). This can be quickly achieved using included commands:
+- Mania Playfield Support Blur and Dim Effect
 
-Windows:
+   <img width="1129" height="1131" alt="Snipaste_2025-12-07_21-29-40" src="https://github.com/user-attachments/assets/d1959f40-a90a-4803-9d0a-3cd36663b8dd" />
 
-```ps
-UseLocalFramework.ps1
-UseLocalResources.ps1
-```
+- HUD Components
+- <img width="443" height="974" alt="img_16" src="https://github.com/user-attachments/assets/71dd717c-b4c6-43ec-90b3-c5d974575e80" />
 
-macOS / Linux:
 
-```ps
-UseLocalFramework.sh
-UseLocalResources.sh
-```
+### Pool Judgment (Empty Judgment)
 
-Note that these commands assume you have the relevant project(s) checked out in adjacent directories:
+- Pool判定不影响ACC、Combo，仅严格扣血，连续的Pool判将累加扣血幅度.
+- The pool hit result does not affect ACC and Combo, only strict blood deduction, and continuous pools will accumulate the blood deduction amplitude.
+> -500 < -Pool < miss < +Pool < +150
+>
+> <img width="629" height="77" alt="img_9" src="https://github.com/user-attachments/assets/523d62d3-9796-4657-b1a8-359586c7ab83" />
 
-```
-|- osu            // this repository
-|- osu-framework
-|- osu-resources
-```
 
-### Code analysis
+### New Judgment Mode
 
-Before committing your code, please run a code formatter. This can be achieved by running `dotnet format` in the command line, or using the `Format code` command in your IDE.
+> For the time being, only the settings are implemented, and the actual parameters will be matched in the future
+>
+> 暂时仅实现设置，未来匹配实际参数
 
-We have adopted some cross-platform, compiler integrated analyzers. They can provide warnings when you are editing, building inside IDE or from command line, as-if they are provided by the compiler itself.
+<img width="1041" height="585" alt="img_14" src="https://github.com/user-attachments/assets/d4264792-db76-478a-9351-31527a030368" />
 
-JetBrains ReSharper InspectCode is also used for wider rule sets. You can run it from PowerShell with `.\InspectCode.ps1`. Alternatively, you can install ReSharper or use Rider to get inline support in your IDE of choice.
+- Ez2AC: LN-NoRelease (Press and hold LN-tail to perfect)
+> { 18.0, 32.0, 64.0, 80.0, 100.0, 120.0 }
 
-## Contributing
+- O2Jam: None-Press is miss
+>       coolRange = 7500.0 / bpm;
+>       goodRange = 22500.0 / bpm;
+>       badRange = 31250.0 / bpm;
 
-When it comes to contributing to the project, the two main things you can do to help out are reporting issues and submitting pull requests. Please refer to the [contributing guidelines](CONTRIBUTING.md) to understand how to help in the most effective way possible.
+- IIDX (instant): LN-NoRelease
+> { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 }
 
-If you wish to help with localisation efforts, head over to [crowdin](https://crowdin.com/project/osu-web).
+- Malody (instant): LN-NoRelease
+> { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 }
 
-We love to reward quality contributions. If you have made a large contribution, or are a regular contributor, you are welcome to [submit an expense via opencollective](https://opencollective.com/ppy/expenses/new). If you have any questions, feel free to [reach out to peppy](mailto:pe@ppy.sh) before doing so.
+Audio System
+
+- 增加采样打断重放（防止全key音谱多音轨重叠变成噪音）
+- Added sampling interruption playback (to prevent overlapping multiple tracks of the full key note spectrum from becoming noise)
+- 选歌界面增加预览keysound和故事板背景音乐
+- Added preview keysound and storyboard background music to the song selection interface
+
+### Static Score
+- Space Graph
+  <img width="2511" height="464" alt="img_7" src="https://github.com/user-attachments/assets/681064a3-d632-41cf-a575-984d6f7e3c10" />
+
+
+- Column One by One
+  <img width="2560" height="889" alt="img_8" src="https://github.com/user-attachments/assets/d245f649-c64a-4e4b-ad43-365f657ef155" />
+
+
+### Other
+- Scale Only Mode
+  <img width="1023" height="162" alt="img_15" src="https://github.com/user-attachments/assets/fd6f26e6-ffce-421a-930e-7b29bb7c6281" />
+
+
+## Mod
+
+<img width="1136" height="932" alt="img_1" src="https://github.com/user-attachments/assets/f09e8c19-6459-4431-a40d-bfb3700fd24f" />
+
+
+## Special Thanks
+- [osu!](https://github.com/ppy/osu): The original game and framework. The code is very strong and elegant.
+- [YuLiangSSS](https://osu.ppy.sh/users/15889644): Many fun mods contributed.
+
+
 
 ## Licence
 

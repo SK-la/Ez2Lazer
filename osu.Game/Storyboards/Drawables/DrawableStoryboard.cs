@@ -63,11 +63,14 @@ namespace osu.Game.Storyboards.Drawables
             Storyboard = storyboard;
             Mods = mods ?? Array.Empty<Mod>();
 
-            Size = new Vector2(640, 480);
-
             bool onlyHasVideoElements = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
 
-            Width = Height * (storyboard.Beatmap.WidescreenStoryboard || onlyHasVideoElements ? 16 / 9f : 4 / 3f);
+            if (!onlyHasVideoElements)
+            {
+                Size = new Vector2(640, 480);
+                // TODO:考虑更多比例的适配
+                Width = Height * (storyboard.Beatmap.WidescreenStoryboard ? 16 / 9f : 4 / 3f);
+            }
 
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
@@ -106,6 +109,31 @@ namespace osu.Game.Storyboards.Drawables
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            if (Storyboard.Layers.SelectMany(l => l.Elements).FirstOrDefault() is StoryboardVideo videoElement)
+            {
+                if (videoElement.CreateDrawable() is DrawableStoryboardVideo drawableVideo)
+                {
+                    Schedule(() =>
+                    {
+                        if (Parent != null)
+                        {
+                            float videoAspectRatio = drawableVideo.DrawSize.X / drawableVideo.DrawSize.Y;
+
+                            if (videoAspectRatio < 1.5f)
+                            {
+                                RelativeSizeAxes = Axes.X;
+                                Width = 1f / DrawScale.X;
+                            }
+                            else
+                            {
+                                RelativeSizeAxes = Axes.Y;
+                                Height = 1f / DrawScale.Y;
+                            }
+                        }
+                    });
+                }
+            }
 
             health.BindValueChanged(val => passing.Value = val.NewValue >= 0.5, true);
             passing.BindValueChanged(_ => updateLayerVisibility(), true);

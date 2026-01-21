@@ -3,8 +3,10 @@
 
 using osu.Framework.Configuration.Tracking;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Configuration;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Configuration
@@ -17,11 +19,17 @@ namespace osu.Game.Rulesets.Mania.Configuration
             Migrate();
         }
 
+        private const double current_scroll_speed_precision = 1.0;
+
         protected override void InitialiseDefaults()
         {
             base.InitialiseDefaults();
 
-            SetDefault(ManiaRulesetSetting.ScrollSpeed, 8.0, 1.0, 40.0, 0.1);
+            SetDefault(ManiaRulesetSetting.ScrollBaseSpeed, 500, 100, 1000, 1.0);
+            SetDefault(ManiaRulesetSetting.ScrollTimePerSpeed, 5, 1.0, 40, 1.0);
+            SetDefault(ManiaRulesetSetting.ScrollStyle, EzManiaScrollingStyle.ScrollTimeStyleFixed);
+
+            SetDefault(ManiaRulesetSetting.ScrollSpeed, 200, 1.0, 401.0, current_scroll_speed_precision);
             SetDefault(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
             SetDefault(ManiaRulesetSetting.TimingBasedNoteColouring, false);
             SetDefault(ManiaRulesetSetting.MobileLayout, ManiaMobileLayout.Portrait);
@@ -47,14 +55,24 @@ namespace osu.Game.Rulesets.Mania.Configuration
                 speed => new SettingDescription(
                     rawValue: speed,
                     name: RulesetSettingsStrings.ScrollSpeed,
-                    value: RulesetSettingsStrings.ScrollSpeedTooltip((int)DrawableManiaRuleset.ComputeScrollTime(speed), speed)
+                    value: RulesetSettingsStrings.ScrollSpeedTooltip(
+                        (int)DrawableManiaRuleset.ComputeScrollTime(speed, Get<double>(ManiaRulesetSetting.ScrollBaseSpeed), Get<double>(ManiaRulesetSetting.ScrollTimePerSpeed)),
+                        speed
+                    )
                 )
-            )
+            ),
         };
     }
 
+    // TODO: 未来应考虑完全迁移到Ez2Setting中
     public enum ManiaRulesetSetting
     {
+        ScrollStyle,
+        ScrollTime,
+        ScrollBaseSpeed,
+        ScrollTimePerSpeed,
+
+        //官方设置
         ScrollSpeed,
         ScrollDirection,
         TimingBasedNoteColouring,

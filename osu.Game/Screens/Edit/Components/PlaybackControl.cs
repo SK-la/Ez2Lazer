@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osuTK;
 using osuTK.Graphics;
@@ -19,6 +20,7 @@ using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osuTK.Input;
@@ -27,6 +29,10 @@ namespace osu.Game.Screens.Edit.Components
 {
     public partial class PlaybackControl : BottomBarContainer
     {
+        private LoopPointButton setAButton = null!;
+        private LoopPointButton setBButton = null!;
+        private IconButton loopButton = null!;
+
         private IconButton playButton = null!;
         private PlaybackSpeedControl playbackSpeedControl = null!;
 
@@ -35,6 +41,7 @@ namespace osu.Game.Screens.Edit.Components
 
         private readonly Bindable<EditorScreenMode> currentScreenMode = new Bindable<EditorScreenMode>();
         private readonly BindableNumber<double> tempoAdjustment = new BindableDouble(1);
+        private readonly BindableBool loopEnabled = new BindableBool();
 
         [BackgroundDependencyLoader]
         private void load(OverlayColourProvider colourProvider, Editor? editor)
@@ -43,19 +50,53 @@ namespace osu.Game.Screens.Edit.Components
 
             Children = new Drawable[]
             {
-                playButton = new IconButton
+                new FillFlowContainer
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
-                    Scale = new Vector2(1.2f),
-                    IconScale = new Vector2(1.2f),
-                    Icon = FontAwesome.Regular.PlayCircle,
-                    Action = togglePause,
+                    RelativeSizeAxes = Axes.Both,
+                    Direction = FillDirection.Horizontal,
+                    Spacing = new Vector2(5, 0),
+                    Children = new Drawable[]
+                    {
+                        setAButton = new LoopPointButton("A")
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(1.2f),
+                            Action = setLoopStartToCurrentTime,
+                        },
+                        setBButton = new LoopPointButton("B")
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(1.2f),
+                            Action = setLoopEndToCurrentTime,
+                        },
+                        loopButton = new IconButton
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(1.2f),
+                            IconScale = new Vector2(1.2f),
+                            Icon = FontAwesome.Solid.SyncAlt,
+                            Action = toggleLoop,
+                        },
+                        playButton = new IconButton
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Scale = new Vector2(1.2f),
+                            IconScale = new Vector2(1.2f),
+                            Icon = FontAwesome.Regular.PlayCircle,
+                            Action = togglePause,
+                        },
+                    },
                 },
                 playbackSpeedControl = new PlaybackSpeedControl
                 {
                     AutoSizeAxes = Axes.Y,
-                    RelativeSizeAxes = Axes.X,
+                    Width = 180,
                     Padding = new MarginPadding { Left = 45, },
                     Anchor = Anchor.CentreRight,
                     Origin = Anchor.CentreRight,
@@ -80,6 +121,8 @@ namespace osu.Game.Screens.Edit.Components
 
             if (editor != null)
                 currentScreenMode.BindTo(editor.Mode);
+
+            loopEnabled.BindTo(editorClock.LoopEnabled);
         }
 
         protected override void LoadComplete()
@@ -135,14 +178,93 @@ namespace osu.Game.Screens.Edit.Components
                 editorClock.Start();
         }
 
+        private void toggleLoop()
+        {
+            loopEnabled.Value = !loopEnabled.Value;
+
+            if (loopEnabled.Value)
+            {
+                // Prefer persisted session A/B range (ms). Only fall back to defaults when not available.
+                if (LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
+                {
+                    editorClock.SetLoopStartTime(editorClock.GetSnappedTime(startMs));
+                    editorClock.SetLoopEndTime(editorClock.GetSnappedTime(endMs));
+                }
+                else
+                {
+                    // 默认范围：以当前活动光标为 A 起点，向后 设置 B 终点。
+                    double currentTime = Math.Clamp(editorClock.CurrentTime, 0, editorClock.TrackLength);
+
+                    double startTime = editorClock.GetSnappedTime(currentTime);
+                    var timingPoint = editorClock.ControlPointInfo.TimingPointAt(startTime);
+
+                    // 8 * (4/4 beat) = 8 beats.也就是8根白线。
+                    double endTime = startTime + timingPoint.BeatLength * 8;
+                    endTime = Math.Min(endTime, editorClock.TrackLength);
+                    endTime = editorClock.GetSnappedTime(endTime);
+
+                    if (endTime <= startTime)
+                        endTime = Math.Min(editorClock.TrackLength, startTime + 1);
+
+                    editorClock.SetLoopStartTime(startTime);
+                    editorClock.SetLoopEndTime(endTime);
+                }
+
+                editorClock.Seek(editorClock.LoopStartTime.Value); // 跳转到开头
+            }
+        }
+
+        private void setLoopStartToCurrentTime()
+        {
+            double currentTime = Math.Clamp(editorClock.CurrentTime, 0, editorClock.TrackLength);
+            editorClock.SetLoopStartTime(editorClock.GetSnappedTime(currentTime));
+            persistLoopRangeIfValid();
+        }
+
+        private void setLoopEndToCurrentTime()
+        {
+            double currentTime = Math.Clamp(editorClock.CurrentTime, 0, editorClock.TrackLength);
+            editorClock.SetLoopEndTime(editorClock.GetSnappedTime(currentTime));
+            persistLoopRangeIfValid();
+        }
+
+        private void persistLoopRangeIfValid()
+        {
+            double start = editorClock.LoopStartTime.Value;
+            double end = editorClock.LoopEndTime.Value;
+
+            if (end > start)
+                LoopTimeRangeStore.Set(start, end);
+        }
+
         private static readonly IconUsage play_icon = FontAwesome.Regular.PlayCircle;
         private static readonly IconUsage pause_icon = FontAwesome.Regular.PauseCircle;
+        private static readonly IconUsage loop_on_icon = FontAwesome.Solid.Redo;
+        private static readonly IconUsage loop_off_icon = FontAwesome.Regular.Circle;
 
         protected override void Update()
         {
             base.Update();
 
             playButton.Icon = editorClock.IsRunning ? pause_icon : play_icon;
+            loopButton.Icon = loopEnabled.Value ? loop_on_icon : loop_off_icon;
+        }
+
+        private partial class LoopPointButton : OsuAnimatedButton
+        {
+            public LoopPointButton(string label)
+                : base(HoverSampleSet.Button)
+            {
+                Size = new Vector2(IconButton.DEFAULT_BUTTON_SIZE);
+
+                Add(new OsuSpriteText
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Text = label,
+                    Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
+                });
+            }
         }
 
         private partial class PlaybackSpeedControl : FillFlowContainer, IHasTooltip

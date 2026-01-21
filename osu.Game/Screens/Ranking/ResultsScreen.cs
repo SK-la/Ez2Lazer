@@ -15,6 +15,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
@@ -23,6 +24,8 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
@@ -58,6 +61,13 @@ namespace osu.Game.Screens.Ranking
 
         [Resolved]
         private Player? player { get; set; }
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private Bindable<EzMUGHitMode> hitModeBindable = new Bindable<EzMUGHitMode>();
+
+        private HitModeButton hitModeButton = null!;
 
         private bool skipExitTransition;
 
@@ -233,11 +243,31 @@ namespace osu.Game.Screens.Ranking
 
             if (Score?.BeatmapInfo?.BeatmapSet != null && Score.BeatmapInfo.BeatmapSet.OnlineID > 0)
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
+
+            // 底部增加按钮
+            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            buttons.Add(new HitModeButton(hitModeBindable));
+
+            // Add settings button (placeholder)
+            buttons.Add(new IconButton
+            {
+                Icon = FontAwesome.Solid.Cog,
+                Action = () =>
+                {
+                     /* TODO: show settings menu */
+                }
+            });
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            hitModeBindable.BindValueChanged(v =>
+            {
+                Score?.HitEvents.Clear();
+                StatisticsPanel.Score.TriggerChange();
+            });
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
 

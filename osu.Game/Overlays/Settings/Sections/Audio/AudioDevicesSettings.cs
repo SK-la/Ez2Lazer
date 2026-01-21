@@ -8,9 +8,12 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
 using osu.Framework.Extensions.ObjectExtensions;
+using osu.Game.LAsEzExtensions.Audio;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
+using osu.Framework.Logging;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.Overlays.Settings.Sections.Audio
 {
@@ -21,6 +24,10 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         [Resolved]
         private AudioManager audio { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private SettingsDropdown<int>? sampleRateDropdown;
         private SettingsDropdown<string> dropdown = null!;
 
         private SettingsCheckbox? wasapiExperimental;
@@ -33,12 +40,26 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 dropdown = new AudioDeviceSettingsDropdown
                 {
                     LabelText = AudioSettingsStrings.OutputDevice,
-                    Keywords = new[] { "speaker", "headphone", "output" }
+                    Keywords = new[] { "speaker", "headphone", "output" },
+                    TooltipText = "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive."
                 },
             };
 
+            audio.OnNewDevice += onDeviceChanged;
+            audio.OnLostDevice += onDeviceChanged;
+            dropdown.Current = audio.AudioDevice;
+
             if (RuntimeInfo.OS == RuntimeInfo.Platform.Windows)
             {
+                Add(sampleRateDropdown = new SettingsDropdown<int>
+                {
+                    LabelText = "ASIO Sample Rate(Testing)",
+                    Keywords = new[] { "sample", "rate", "frequency" },
+                    Items = AudioExtensions.COMMON_SAMPLE_RATES,
+                    Current = ezConfig.GetBindable<int>(Ez2Setting.AsioSampleRate),
+                    // Current = new Bindable<int>(audio.GetSampleRate()),
+                    TooltipText = "48k is better, too high a value will cause delays and clock synchronization errors"
+                });
                 Add(wasapiExperimental = new SettingsCheckbox
                 {
                     LabelText = AudioSettingsStrings.WasapiLabel,
@@ -47,12 +68,30 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     Keywords = new[] { "wasapi", "latency", "exclusive" }
                 });
 
-                wasapiExperimental.Current.ValueChanged += _ => onDeviceChanged(string.Empty);
-            }
+                // Setup ASIO sample rate synchronization
+                audio.SetupAsioSampleRateSync(actualSampleRate =>
+                {
+                    Schedule(() =>
+                    {
+                        // Logger.Log($"ASIO sync: actualSampleRate={actualSampleRate}", LoggingTarget.Runtime, LogLevel.Debug);
+                        sampleRateDropdown.Current.Value = actualSampleRate;
+                    });
+                });
 
-            audio.OnNewDevice += onDeviceChanged;
-            audio.OnLostDevice += onDeviceChanged;
-            dropdown.Current = audio.AudioDevice;
+                wasapiExperimental.Current.ValueChanged += _ => onDeviceChanged(string.Empty);
+                sampleRateDropdown.Current.ValueChanged += e =>
+                {
+                    Logger.Log($"User set sample rate to {e.NewValue}Hz", LoggingTarget.Runtime, LogLevel.Debug);
+                    audio.SetPreferredAsioSampleRate(e.NewValue);
+                };
+
+                // 根据初始设备类型显示或隐藏采样率设置
+                dropdown.Current.ValueChanged += e =>
+                {
+                    if (e.NewValue.Contains("(ASIO)")) sampleRateDropdown.Show();
+                    else sampleRateDropdown.Hide();
+                };
+            }
 
             onDeviceChanged(string.Empty);
         }

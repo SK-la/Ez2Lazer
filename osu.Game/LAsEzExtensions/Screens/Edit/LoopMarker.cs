@@ -1,0 +1,231 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using osu.Framework.Allocation;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Input.Events;
+using osu.Game.Overlays;
+using osuTK;
+using osuTK.Input;
+
+namespace osu.Game.LAsEzExtensions.Screens.Edit
+{
+    public partial class LoopMarker : CompositeDrawable
+    {
+        public new double Time { get; set; }
+
+        public event Action<double>? TimeChanged;
+
+        public Func<float, double>? TimeAtX { get; set; }
+
+        /// <summary>
+        /// Optional snapping function applied to times produced by <see cref="TimeAtX"/>.
+        /// </summary>
+        public Func<double, double>? SnapTime { get; set; }
+
+        /// <summary>
+        /// Optional mapping from time back to X (in parent centre-based coordinates).
+        /// When provided, the marker will visually jump to the snapped position while dragging.
+        /// </summary>
+        public Func<double, float>? XAtTime { get; set; }
+
+        /// <summary>
+        /// Optional clamp for X (in parent centre-based coordinates).
+        /// </summary>
+        public Func<float, float>? ClampX { get; set; }
+
+        private readonly bool isStart;
+
+        private readonly Container clippedBottomHalf;
+
+        public LoopMarker(bool isStart)
+        {
+            this.isStart = isStart;
+
+            RelativeSizeAxes = Axes.Y;
+            Width = 8;
+
+            // Only show the bottom half of the marker visuals to keep the upper half of the timeline clean
+            // for the active playback cursor.
+            InternalChild = clippedBottomHalf = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Height = 0.5f,
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
+                Masking = true,
+                Child = new Container
+                {
+                    // 2x the height of the clip container => full marker height.
+                    RelativeSizeAxes = Axes.Both,
+                    Height = 2,
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            RelativeSizeAxes = Axes.Y,
+                            Width = 1.4f,
+                            EdgeSmoothness = new Vector2(1, 0)
+                        },
+                        new VerticalTriangles
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            RelativeSizeAxes = Axes.Both,
+                            EdgeSmoothness = Vector2.One
+                        }
+                    }
+                }
+            };
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(OverlayColourProvider colours)
+        {
+            Colour = isStart ? colours.Colour3 : colours.Colour4; // Green for A, Red for B
+        }
+
+        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
+        {
+            if (!base.ReceivePositionalInputAt(screenSpacePos))
+                return false;
+
+            // Only allow interaction in the lower half of the timeline.
+            var localPos = ToLocalSpace(screenSpacePos);
+            return localPos.Y >= DrawHeight / 2;
+        }
+
+        public new bool IsDragged { get; private set; }
+
+        protected override bool OnMouseDown(MouseDownEvent e)
+        {
+            if (e.Button == MouseButton.Left)
+            {
+                // Handle drag to set time
+                return true;
+            }
+
+            return base.OnMouseDown(e);
+        }
+
+        protected override bool OnDragStart(DragStartEvent e)
+        {
+            var localPos = ToLocalSpace(e.ScreenSpaceMousePosition);
+
+            // Only allow dragging in the lower half of the timeline (matching ReceivePositionalInputAt).
+            if (localPos.Y < DrawHeight / 2)
+                return false;
+
+            IsDragged = true;
+            return true;
+        }
+
+        protected override void OnDrag(DragEvent e)
+        {
+            if (Parent == null)
+                return;
+
+            // Use absolute mouse position mapped into parent space to avoid scale/unit mismatches.
+            Vector2 parentLocal = Parent.ToLocalSpace(e.ScreenSpaceMousePosition);
+            float anchorX = Parent.ChildOffset.X + Parent.ChildSize.X / 2;
+            float newX = parentLocal.X - anchorX;
+
+            if (ClampX != null)
+                newX = ClampX(newX);
+
+            double newTime = TimeAtX?.Invoke(newX) ?? 0;
+
+            if (SnapTime != null)
+                newTime = SnapTime(newTime);
+
+            if (XAtTime != null)
+                newX = XAtTime(newTime);
+
+            X = newX;
+            Time = newTime;
+            TimeChanged?.Invoke(newTime);
+        }
+
+        protected override void OnDragEnd(DragEndEvent e)
+        {
+            IsDragged = false;
+        }
+
+        /// <summary>
+        /// Triangles drawn at the top and bottom of <see cref="LoopMarker"/>.
+        /// </summary>
+        /// <remarks>
+        /// Since framework-side triangles don't support antialiasing we are using custom implementation involving rotated smoothened boxes to avoid
+        /// mismatch in antialiasing between top and bottom triangles when drawable moves across the screen.
+        /// To "trim" boxes we must enable masking at the top level.
+        /// </remarks>
+        private partial class VerticalTriangles : Sprite
+        {
+            [BackgroundDependencyLoader]
+            private void load(IRenderer renderer)
+            {
+                Texture = renderer.WhitePixel;
+            }
+
+            protected override DrawNode CreateDrawNode() => new VerticalTrianglesDrawNode(this);
+
+            private class VerticalTrianglesDrawNode : SpriteDrawNode
+            {
+                public new VerticalTriangles Source => (VerticalTriangles)base.Source;
+
+                public VerticalTrianglesDrawNode(VerticalTriangles source)
+                    : base(source)
+                {
+                }
+
+                private float triangleScreenSpaceHeight;
+
+                public override void ApplyState()
+                {
+                    base.ApplyState();
+
+                    triangleScreenSpaceHeight = ScreenSpaceDrawQuad.Width * 0.8f; // TriangleHeightRatio = 0.8f
+                }
+
+                protected override void Blit(IRenderer renderer)
+                {
+                    if (triangleScreenSpaceHeight == 0 || DrawRectangle.Width == 0 || DrawRectangle.Height == 0)
+                        return;
+
+                    Vector2 inflation = new Vector2(InflationAmount.X / DrawRectangle.Width, InflationAmount.Y / (DrawRectangle.Width * 0.8f));
+
+                    Quad topTriangle = new Quad
+                    (
+                        ScreenSpaceDrawQuad.TopLeft,
+                        ScreenSpaceDrawQuad.TopLeft + new Vector2(ScreenSpaceDrawQuad.Width * 0.5f, -triangleScreenSpaceHeight),
+                        ScreenSpaceDrawQuad.TopLeft + new Vector2(ScreenSpaceDrawQuad.Width * 0.5f, triangleScreenSpaceHeight),
+                        ScreenSpaceDrawQuad.TopRight
+                    );
+
+                    Quad bottomTriangle = new Quad
+                    (
+                        ScreenSpaceDrawQuad.BottomLeft,
+                        ScreenSpaceDrawQuad.BottomLeft + new Vector2(ScreenSpaceDrawQuad.Width * 0.5f, -triangleScreenSpaceHeight),
+                        ScreenSpaceDrawQuad.BottomLeft + new Vector2(ScreenSpaceDrawQuad.Width * 0.5f, triangleScreenSpaceHeight),
+                        ScreenSpaceDrawQuad.BottomRight
+                    );
+
+                    renderer.DrawQuad(Texture, topTriangle, DrawColourInfo.Colour, inflationPercentage: inflation);
+                    renderer.DrawQuad(Texture, bottomTriangle, DrawColourInfo.Colour, inflationPercentage: inflation);
+                }
+
+                protected override bool CanDrawOpaqueInterior => false;
+            }
+        }
+    }
+}

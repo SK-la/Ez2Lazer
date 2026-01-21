@@ -24,6 +24,16 @@ namespace osu.Game.Rulesets.Scoring
         None,
 
         /// <summary>
+        /// mania特殊专用，按键事件的未命中结果。
+        /// 禁止用在Judgement覆写上，这不属于note返回的判定结果
+        /// TODO: 这是一个错误拼写，为了突出这是一个临时解决方案。未来应当通过更好的方式实现可切换的空判机制，并改为正确的Poor。
+        /// </summary>
+        [Description(@"Pool")]
+        [EnumMember(Value = "pool")]
+        [Order(17)]
+        Pool,
+
+        /// <summary>
         /// Indicates that the object has been judged as a miss.
         /// </summary>
         /// <remarks>
@@ -217,6 +227,10 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.ComboBreak:
                     return false;
 
+                // 不影响ACC
+                case HitResult.Pool:
+                    return false;
+
                 default:
                     return IsScorable(result) && !IsBonus(result);
             }
@@ -236,6 +250,10 @@ namespace osu.Game.Rulesets.Scoring
                 // ComboBreak is a special type that only affects combo. It cannot be considered as basic, tick, bonus, or accuracy-affecting.
                 case HitResult.ComboBreak:
                     return false;
+
+                // 有这个才能把Pool添加到计数器控件中
+                case HitResult.Pool:
+                    return true;
 
                 default:
                     return IsScorable(result) && !IsTick(result) && !IsBonus(result);
@@ -292,6 +310,7 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.SmallTickMiss:
                 case HitResult.LargeTickMiss:
                 case HitResult.ComboBreak:
+                case HitResult.Pool:
                     return true;
 
                 default:
@@ -340,6 +359,9 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.SliderTailHit:
                     return true;
 
+                case HitResult.Pool:
+                    return false;
+
                 default:
                     // Note that IgnoreHit and IgnoreMiss are excluded as they do not affect score.
                     return result >= HitResult.Miss && result < HitResult.IgnoreMiss;
@@ -366,6 +388,9 @@ namespace osu.Game.Rulesets.Scoring
             if (result == minResult || result == maxResult)
                 return true;
 
+            if (result == HitResult.Pool)
+                return true;
+
             Debug.Assert(minResult <= maxResult);
             return result > minResult && result < maxResult;
         }
@@ -381,6 +406,10 @@ namespace osu.Game.Rulesets.Scoring
         {
             if (maxResult == HitResult.None || !IsHit(maxResult))
                 throw new ArgumentOutOfRangeException(nameof(maxResult), $"{maxResult} is not a valid maximum judgement result.");
+
+            // Pool is a special result that can be both max and min
+            if (minResult == HitResult.Pool)
+                return;
 
             if (minResult == HitResult.None || IsHit(minResult))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum judgement result.");

@@ -5,7 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
+using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -23,7 +26,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
-            => base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
+        {
+            od = Mods.Value.OfType<ManiaModAdjust>().FirstOrDefault(m => m.OverallDifficulty.Value is not null && m.CustomOD.Value)
+                     ?.OverallDifficulty.Value ?? beatmap.Difficulty.OverallDifficulty;
+
+            return base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
+        }
 
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
@@ -42,6 +50,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Perfect:
+                    if (IsLegacyScore)
+                        return 300;
+
                     return 305;
             }
 
@@ -99,6 +110,86 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     ? maniaX.Column.CompareTo(maniaY.Column)
                     : 0;
             }
+        }
+
+        private double od = 8;
+
+        protected override void ApplyScoreChange(JudgementResult judgement)
+        {
+            // if (!IsLegacyScore) return;
+
+            var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
+            {
+                OverallDifficulty = od
+            };
+            double offset = Math.Abs(judgement.TimeOffset);
+            var result = hitWindows.ResultFor(offset);
+            var hitObject = (ManiaHitObject)judgement.HitObject;
+
+            if (hitObject is HeadNote)
+            {
+                headOffsets[hitObject.Column] = offset;
+            }
+            else if (hitObject is TailNote)
+            {
+                ClassicMaxBaseScore += 300;
+                ClassicBaseScore += hitWindows.GetLNScore(headOffsets[hitObject.Column], offset);
+                headOffsets[hitObject.Column] = 0;
+            }
+            else if (hitObject is Note)
+            {
+                ClassicMaxBaseScore += 300;
+                ClassicBaseScore += result switch
+                {
+                    HitResult.Perfect => 300,
+                    HitResult.Great => 300,
+                    HitResult.Good => 200,
+                    HitResult.Ok => 100,
+                    HitResult.Meh => 50,
+                    _ => 0
+                };
+            }
+
+            UpdateScoreClassic();
+        }
+
+        private readonly double[] headOffsets = new double[18];
+
+        protected override void RemoveScoreChange(JudgementResult judgement)
+        {
+            var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
+            {
+                OverallDifficulty = od
+            };
+            double offset = Math.Abs(judgement.TimeOffset);
+            var result = hitWindows.ResultFor(offset);
+            var hitObject = (ManiaHitObject)judgement.HitObject;
+
+            if (hitObject is HeadNote)
+            {
+                headOffsets[hitObject.Column] = offset;
+            }
+            else if (hitObject is TailNote)
+            {
+                ClassicMaxBaseScore -= 300;
+                ClassicBaseScore -= hitWindows.GetLNScore(headOffsets[hitObject.Column], offset);
+                headOffsets[hitObject.Column] = 0;
+            }
+            else if (hitObject is Note)
+            {
+                ClassicMaxBaseScore -= 300;
+                ClassicBaseScore -= result switch
+                {
+                    HitResult.Perfect => 300,
+                    HitResult.Great => 300,
+                    HitResult.Good => 200,
+                    HitResult.Ok => 100,
+                    HitResult.Meh => 50,
+                    _ => 0
+                };
+            }
+
+            UpdateScoreClassic();
         }
     }
 }

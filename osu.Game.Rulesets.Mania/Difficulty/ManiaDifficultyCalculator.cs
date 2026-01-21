@@ -6,14 +6,18 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Mania.Difficulty.Skills;
+using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
 using osu.Game.Rulesets.Mania.MathUtils;
 using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
@@ -41,17 +45,39 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             if (beatmap.HitObjects.Count == 0)
                 return new ManiaDifficultyAttributes { Mods = mods };
 
-            HitWindows hitWindows = new ManiaHitWindows();
+            var hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
+            if (beatmap.BeatmapInfo.BPM > 0) hitWindows.BPM = beatmap.BeatmapInfo.BPM;
+            double sr = skills[0].DifficultyValue() * difficulty_multiplier;
+
+            sr = AdditionalMethod(beatmap, mods, skills, clockRate, sr);
 
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {
-                StarRating = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
+                StarRating = sr > 0
+                    ? sr
+                    : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
                 Mods = mods,
                 MaxCombo = beatmap.HitObjects.Sum(maxComboForObject),
             };
 
             return attributes;
+        }
+
+        public double AdditionalMethod(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate, double originalValue)
+        {
+            double sr = originalValue;
+
+            if (mods.Any(m => m is ModStarRatingRebirth))
+            {
+                var xxySRFilter = GlobalConfigStore.EzConfig?.GetBindable<bool>(Ez2Setting.XxySRFilter);
+
+                sr = xxySRFilter != null && xxySRFilter.Value
+                    ? SRCalculator.CalculateSR(beatmap, clockRate)
+                    : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
+            }
+
+            return sr;
         }
 
         private static int maxComboForObject(HitObject hitObject)

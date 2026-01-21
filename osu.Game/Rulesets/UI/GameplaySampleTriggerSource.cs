@@ -73,6 +73,17 @@ namespace osu.Game.Rulesets.UI
 
         protected virtual void PlaySamples(ISampleInfo[] samples) => Schedule(() =>
         {
+            var existing = hitSounds.FirstOrDefault(h => h.IsPlaying && h.Samples != null && h.Samples.SequenceEqual(samples));
+
+            if (existing != null)
+            {
+                // 如果相同的音效正在播放，打断并重放
+                existing.Stop();
+                ApplySampleInfo(existing, samples);
+                existing.Play();
+                return;
+            }
+
             var hitSound = GetNextSample();
             ApplySampleInfo(hitSound, samples);
             hitSound.Play();

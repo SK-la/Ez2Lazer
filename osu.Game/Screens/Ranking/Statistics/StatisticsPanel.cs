@@ -21,6 +21,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API;
 using osu.Game.Online.Placeholders;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics.User;
 using osuTK;
@@ -45,6 +46,9 @@ namespace osu.Game.Screens.Ranking.Statistics
 
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
+
+        [Resolved]
+        private ScoreManager scoreManager { get; set; } = null!;
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
@@ -111,12 +115,37 @@ namespace osu.Game.Screens.Ranking.Statistics
             var workingBeatmap = beatmapManager.GetWorkingBeatmap(newScore.BeatmapInfo);
 
             // Todo: The placement of this is temporary. Eventually we'll both generate the playable beatmap _and_ run through it in a background task to generate the hit events.
-            Task.Run(() => workingBeatmap.GetPlayableBeatmap(newScore.Ruleset, newScore.Mods), loadCancellation.Token).ContinueWith(task => Schedule(() =>
+            Task.Run(() =>
             {
+                #region 接口反射后台加载结算
+
+                // 结算后加载一次分数，后台计算
+                var playable = workingBeatmap.GetPlayableBeatmap(newScore.Ruleset, newScore.Mods);
+
+                List<HitEvent>? generatedHitEvents = null;
+
+                if (newScore.HitEvents.Count == 0)
+                {
+                    // Only attempt generation when we have a local replay.
+                    var databasedScore = scoreManager.GetScore(newScore);
+                    if (databasedScore != null)
+                        generatedHitEvents = ScoreHitEventGeneratorBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
+                }
+
+                return (playable, generatedHitEvents);
+            }, loadCancellation.Token).ContinueWith(task => Schedule(() =>
+            {
+                var result = task.GetResultSafely();
+
+                if (result.generatedHitEvents != null)
+                    newScore.HitEvents = result.generatedHitEvents;
+
                 bool hitEventsAvailable = newScore.HitEvents.Count != 0;
                 Container<Drawable> container;
 
-                var statisticItems = CreateStatisticItems(newScore, task.GetResultSafely()).ToArray();
+                var statisticItems = CreateStatisticItems(newScore, result.playable).ToArray();
+
+                #endregion
 
                 if (!hitEventsAvailable && statisticItems.All(c => c.RequiresHitEvents))
                 {

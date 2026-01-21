@@ -12,6 +12,8 @@ using osu.Framework.Layout;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Screens.Backgrounds;
 using osuTK;
@@ -126,11 +128,19 @@ namespace osu.Game.Graphics.Containers
             }
         }
 
+        private Bindable<ScalingGameMode> scalingGameMode = null!;
+
+        [Resolved]
+        private IBindable<RulesetInfo> ruleset { get; set; } = null!;
+
         [BackgroundDependencyLoader]
-        private void load(GameHost host, OsuConfigManager config, ISafeArea safeArea)
+        private void load(GameHost host, OsuConfigManager config, ISafeArea safeArea, Ez2ConfigManager ezConfig)
         {
             scalingMode = config.GetBindable<ScalingMode>(OsuSetting.Scaling);
             scalingMode.ValueChanged += _ => Scheduler.AddOnce(updateSize);
+
+            scalingGameMode = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode);
+            scalingGameMode.ValueChanged += _ => Scheduler.AddOnce(updateSize);
 
             sizeX = config.GetBindable<float>(OsuSetting.ScalingSizeX);
             sizeX.ValueChanged += _ => Scheduler.AddOnce(updateSize);
@@ -204,12 +214,30 @@ namespace osu.Game.Graphics.Containers
             }
             else if (targetMode == null || scalingMode.Value == targetMode)
             {
-                sizableContainer.RelativePositionAxes = Axes.Both;
+                if (targetMode == ScalingMode.Gameplay)
+                {
+                    if ((scalingGameMode.Value == ScalingGameMode.Standard && ruleset.Value.OnlineID == 0) ||
+                        (scalingGameMode.Value == ScalingGameMode.Taiko && ruleset.Value.OnlineID == 1) ||
+                        (scalingGameMode.Value == ScalingGameMode.Catch && ruleset.Value.OnlineID == 2) ||
+                        (scalingGameMode.Value == ScalingGameMode.Mania && ruleset.Value.OnlineID == 3))
+                    {
+                        sizableContainer.RelativePositionAxes = Axes.Both;
 
-                Vector2 scale = new Vector2(sizeX.Value, sizeY.Value);
-                Vector2 pos = new Vector2(posX.Value, posY.Value) * (Vector2.One - scale);
+                        Vector2 scale = new Vector2(sizeX.Value, sizeY.Value);
+                        Vector2 pos = new Vector2(posX.Value, posY.Value) * (Vector2.One - scale);
 
-                targetRect = new RectangleF(pos, scale);
+                        targetRect = new RectangleF(pos, scale);
+                    }
+                }
+                else
+                {
+                    sizableContainer.RelativePositionAxes = Axes.Both;
+
+                    Vector2 scale = new Vector2(sizeX.Value, sizeY.Value);
+                    Vector2 pos = new Vector2(posX.Value, posY.Value) * (Vector2.One - scale);
+
+                    targetRect = new RectangleF(pos, scale);
+                }
             }
 
             bool requiresMasking = targetRect.Size != Vector2.One

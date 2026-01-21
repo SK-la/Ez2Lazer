@@ -6,10 +6,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using MessagePack;
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
@@ -68,6 +70,11 @@ namespace osu.Game.Rulesets.Scoring
         /// The current accuracy.
         /// </summary>
         public readonly BindableDouble Accuracy = new BindableDouble(1) { MinValue = 0, MaxValue = 1 };
+
+        /// <summary>
+        /// The current accuracy in legacy (Classic) mode.
+        /// </summary>
+        public readonly BindableDouble AccuracyClassic = new BindableDouble(1) { MinValue = 0, MaxValue = 1 };
 
         /// <summary>
         /// The minimum achievable accuracy for the whole beatmap at this stage of gameplay.
@@ -198,6 +205,22 @@ namespace osu.Game.Rulesets.Scoring
 
         public bool ApplyNewJudgementsWhenFailed { get; set; }
 
+        public double ClassicBaseScore { get; protected set; }
+        public double ClassicMaxBaseScore { get; protected set; }
+
+        // 标记后，用于分数算法切换。
+        public bool IsLegacyScore = false;
+        private static double accS;
+
+        private static double accA;
+
+        [BackgroundDependencyLoader]
+        private void load(Ez2ConfigManager ezConfig)
+        {
+            accS = ezConfig.Get<double>(Ez2Setting.AccuracyCutoffS);
+            accA = ezConfig.Get<double>(Ez2Setting.AccuracyCutoffA);
+        }
+
         public ScoreProcessor(Ruleset ruleset)
         {
             Ruleset = ruleset;
@@ -232,10 +255,15 @@ namespace osu.Game.Rulesets.Scoring
 
             ScoreResultCounts[result.Type] = ScoreResultCounts.GetValueOrDefault(result.Type) + 1;
 
-            if (result.Type.IncreasesCombo())
-                Combo.Value++;
-            else if (result.Type.BreaksCombo())
-                Combo.Value = 0;
+            if (result.Type.AffectsCombo())
+            {
+                bool isComboHit = result.IsComboHit ?? result.Type.IsHit();
+
+                if (result.Type.IncreasesCombo() || isComboHit)
+                    Combo.Value++;
+                else if (result.Type.BreaksCombo() || !isComboHit)
+                    Combo.Value = 0;
+            }
 
             HighestCombo.Value = Math.Max(HighestCombo.Value, Combo.Value);
 
@@ -374,8 +402,14 @@ namespace osu.Game.Rulesets.Scoring
         {
         }
 
+        public void UpdateScoreClassic()
+        {
+            updateScore();
+        }
+
         private void updateScore()
         {
+            AccuracyClassic.Value = ClassicMaxBaseScore > 0 ? ClassicBaseScore / ClassicMaxBaseScore : 1;
             Accuracy.Value = currentMaximumBaseScore > 0 ? currentBaseScore / currentMaximumBaseScore : 1;
             MinimumAccuracy.Value = maximumBaseScore > 0 ? currentBaseScore / maximumBaseScore : 0;
             MaximumAccuracy.Value = maximumBaseScore > 0 ? (currentBaseScore + (maximumBaseScore - currentMaximumBaseScore)) / maximumBaseScore : 1;
@@ -437,6 +471,10 @@ namespace osu.Game.Rulesets.Scoring
             }
 
             ScoreResultCounts.Clear();
+
+            ClassicBaseScore = 0;
+            ClassicMaxBaseScore = 0;
+            AccuracyClassic.Value = 1;
 
             currentBaseScore = 0;
             currentMaximumBaseScore = 0;
@@ -537,9 +575,9 @@ namespace osu.Game.Rulesets.Scoring
         {
             if (accuracy == accuracy_cutoff_x)
                 return ScoreRank.X;
-            if (accuracy >= accuracy_cutoff_s)
+            if (accuracy >= accS)
                 return ScoreRank.S;
-            if (accuracy >= accuracy_cutoff_a)
+            if (accuracy >= accA)
                 return ScoreRank.A;
             if (accuracy >= accuracy_cutoff_b)
                 return ScoreRank.B;

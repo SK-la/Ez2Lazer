@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Scoring;
 
@@ -15,7 +16,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
         protected override LocalisableString Header => CommonStrings.General;
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             Children = new Drawable[]
             {
@@ -25,6 +26,22 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     LabelText = GameplaySettingsStrings.ScoreDisplayMode,
                     Current = config.GetBindable<ScoringMode>(OsuSetting.ScoreDisplayMode),
                     Keywords = new[] { "scoring" }
+                },
+                new SettingsSlider<double>
+                {
+                    LabelText = EzLocalizationManager.AccuracyCutoffS,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS),
+                    KeyboardStep = 0.01f,
+                    DisplayAsPercentage = true,
+                    Keywords = new[] { "mania" }
+                },
+                new SettingsSlider<double>
+                {
+                    LabelText = EzLocalizationManager.AccuracyCutoffA,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA),
+                    KeyboardStep = 0.01f,
+                    DisplayAsPercentage = true,
+                    Keywords = new[] { "mania" }
                 },
                 new SettingsCheckbox
                 {

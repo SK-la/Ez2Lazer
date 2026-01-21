@@ -20,6 +20,8 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -35,7 +37,7 @@ namespace osu.Game.Screens.SelectV2
     public partial class FilterControl : OverlayContainer
     {
         // taken from draw visualiser. used for carousel alignment purposes.
-        public const float HEIGHT_FROM_SCREEN_TOP = 141 - corner_radius;
+        public const float HEIGHT_FROM_SCREEN_TOP = 171 - corner_radius;
 
         private const float corner_radius = 10;
 
@@ -47,6 +49,12 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<SortMode> sortDropdown = null!;
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
+        private EzKeyModeSelector csSelector = null!;
+        private ShearedToggleButton keySoundPreviewButton = null!;
+        private ShearedToggleButton xxySrFilterButton = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -164,6 +172,7 @@ namespace osu.Game.Screens.SelectV2
                                 new Dimension(GridSizeMode.Absolute, 5),
                                 new Dimension(),
                                 new Dimension(GridSizeMode.AutoSize),
+                                new Dimension(GridSizeMode.AutoSize),
                             },
                             Content = new[]
                             {
@@ -185,13 +194,53 @@ namespace osu.Game.Screens.SelectV2
                                     {
                                         RelativeSizeAxes = Axes.X,
                                     },
+                                    keySoundPreviewButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.TopCentre,
+                                        Origin = Anchor.TopCentre,
+                                        Text = "kSound Preview",
+                                        Height = 30f,
+                                    },
                                 }
+                            }
+                        },
+                        new GridContainer
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Shear = -OsuGame.SHEAR,
+                            RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                            ColumnDimensions = new[]
+                            {
+                                new Dimension(),
+                                new Dimension(GridSizeMode.Absolute), // can probably be removed?
+                                new Dimension(GridSizeMode.AutoSize),
+                            },
+                            Content = new[]
+                            {
+                                new[]
+                                {
+                                    csSelector = new EzKeyModeSelector
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                    },
+                                    Empty(),
+                                    xxySrFilterButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.Centre,
+                                        Origin = Anchor.Centre,
+                                        Text = "xxy_SR Filter",
+                                        TooltipText = "(NoActive)Filter, sort beatmaps by Xxy Star Rating",
+                                        Height = 30f,
+                                    },
+                                },
                             }
                         },
                         new ScopedBeatmapSetDisplay
                         {
                             ScopedBeatmapSet = ScopedBeatmapSet,
-                        }
+                            Depth = float.MinValue, // hack to ensure that the scoped display handles `GlobalAction.Back` input before the filter control
+                        },
                     },
                 }
             };
@@ -206,11 +255,31 @@ namespace osu.Game.Screens.SelectV2
 
             difficultyRangeSlider.LowerBound = config.GetBindable<double>(OsuSetting.DisplayStarsMinimum);
             difficultyRangeSlider.UpperBound = config.GetBindable<double>(OsuSetting.DisplayStarsMaximum);
+            ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
+            ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
             config.BindWith(OsuSetting.SongSelectGroupMode, groupDropdown.Current);
 
-            ruleset.BindValueChanged(_ => updateCriteria());
+            ruleset.BindValueChanged(_ =>
+            {
+                updateCriteria();
+
+                if (ruleset.Value.OnlineID == 1) // Taiko
+                {
+                    csSelector.Hide();
+                    xxySrFilterButton.Hide();
+                }
+                else
+                {
+                    csSelector.Show();
+
+                    if (ruleset.Value.OnlineID == 3)
+                    {
+                        xxySrFilterButton.Show();
+                    }
+                }
+            });
             mods.BindValueChanged(m =>
             {
                 // The following is a note carried from old song select and may not be a valid reason anymore:
@@ -252,7 +321,17 @@ namespace osu.Game.Screens.SelectV2
             localUserFavouriteBeatmapSets.BindCollectionChanged((_, _) => updateCriteria());
             ScopedBeatmapSet.BindValueChanged(_ => updateCriteria(clearScopedSet: false));
 
+            csSelector.Current.BindValueChanged(_ => updateCriteria());
+            csSelector.EzKeyModeFilter.SelectionChanged += updateCriteria;
+            xxySrFilterButton.Active.BindValueChanged(_ => updateCriteria());
+
             updateCriteria();
+        }
+
+        private void updateCriteria()
+        {
+            currentCriteria = CreateCriteria();
+            CriteriaChanged?.Invoke(currentCriteria);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -288,10 +367,42 @@ namespace osu.Game.Screens.SelectV2
             if (!difficultyRangeSlider.UpperBound.IsDefault)
                 criteria.UserStarDifficulty.Max = difficultyRangeSlider.UpperBound.Value;
 
+            applyCircleSizeFilter(criteria);
+
             criteria.RulesetCriteria = ruleset.Value.CreateInstance().CreateRulesetFilterCriteria();
 
             FilterQueryParser.ApplyQueries(criteria, query);
             return criteria;
+        }
+
+        private void applyCircleSizeFilter(FilterCriteria criteria)
+        {
+            var selectedModeIds = csSelector.EzKeyModeFilter.SelectedModeIds;
+
+            if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
+                return;
+
+            var selectedModes = CsItemIds.ALL
+                                         .Where(m => selectedModeIds.Contains(m.Id) && m.CsValue.HasValue)
+                                         .Select(m => m.CsValue!.Value)
+                                         .ToList();
+
+            if (selectedModes.Count == 0)
+                return;
+
+            criteria.DiscreteCircleSizeValues = new List<float>(selectedModes);
+
+            if (ruleset.Value.OnlineID != 3)
+            {
+                // For no mania rulesets, ±0.5 is an intuitive range.
+                criteria.CircleSize = new FilterCriteria.OptionalRange<float>
+                {
+                    Min = selectedModes.Min() - 0.5f,
+                    Max = selectedModes.Max() + 0.5f,
+                    IsLowerInclusive = false,
+                    IsUpperInclusive = false
+                };
+            }
         }
 
         private void updateCriteria(bool clearScopedSet = true)

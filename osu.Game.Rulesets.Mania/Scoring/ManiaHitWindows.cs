@@ -2,11 +2,23 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
+using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
+    public readonly record struct ManiaModifyHitRange(double Perfect,
+                                                      double Great,
+                                                      double Good,
+                                                      double Ok,
+                                                      double Meh,
+                                                      double Miss);
+
     public class ManiaHitWindows : HitWindows
     {
         public static readonly DifficultyRange PERFECT_WINDOW_RANGE = new DifficultyRange(22.4D, 19.4D, 13.9D);
@@ -17,6 +29,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private static readonly DifficultyRange miss_window_range = new DifficultyRange(188, 173, 158);
 
         private double speedMultiplier = 1;
+
+        public static double PerfectRange;
+        public static double GreatRange;
+        public static double GoodRange;
+        public static double OkRange;
+        public static double MehRange;
+        public static double MissRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -95,12 +114,36 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
+        private static bool modifyHitWindows;
+
+        public bool ModifyHitWindows
+        {
+            get => modifyHitWindows;
+            set => modifyHitWindows = value;
+        }
+
         private double perfect;
         private double great;
         private double good;
         private double ok;
         private double meh;
         private double miss;
+        private double pool;
+
+        private static double bpm = 200;
+
+        public double BPM
+        {
+            get => bpm;
+            set
+            {
+                bpm = value;
+                setHitMode();
+                updateWindows();
+            }
+        }
+
+        public override bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -113,9 +156,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Meh:
                 case HitResult.Miss:
                     return true;
-            }
 
-            return false;
+                case HitResult.Pool:
+                    return AllowPoolEnabled;
+
+                default:
+                    return false;
+            }
         }
 
         public override void SetDifficulty(double difficulty)
@@ -124,9 +171,84 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
+        private void modifyManiaHitRange(double[] difficultyRangeArray)
+        {
+            ModifyHitWindows = true;
+
+            PerfectRange = difficultyRangeArray[0];
+            GreatRange = difficultyRangeArray[1];
+            GoodRange = difficultyRangeArray[2];
+            OkRange = difficultyRangeArray[3];
+            MehRange = difficultyRangeArray[4];
+            MissRange = difficultyRangeArray[5];
+            updateWindows();
+        }
+
+        public void ModifyManiaHitRange(ManiaModifyHitRange range)
+        {
+            ModifyHitWindows = true;
+
+            PerfectRange = range.Perfect;
+            GreatRange = range.Great;
+            GoodRange = range.Good;
+            OkRange = range.Ok;
+            MehRange = range.Meh;
+            MissRange = range.Miss;
+            updateWindows();
+        }
+
+        public void ResetRange()
+        {
+            ModifyHitWindows = false;
+            setHitMode();
+            updateWindows();
+        }
+
+        private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper();
+
+        private void setHitMode()
+        {
+            EzMUGHitMode HitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+
+            if (HitMode == EzMUGHitMode.Lazer)
+            {
+                return;
+            }
+
+            switch (HitMode)
+            {
+                case EzMUGHitMode.O2Jam:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsO2Jam(BPM));
+                    break;
+
+                case EzMUGHitMode.EZ2AC:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsEZ2AC());
+                    break;
+
+                case EzMUGHitMode.IIDX_HD:
+                case EzMUGHitMode.LR2_HD:
+                case EzMUGHitMode.Raja_NM:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsIIDX(HitMode));
+                    break;
+
+                case EzMUGHitMode.Malody:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsMelody());
+                    break;
+            }
+        }
+
         private void updateWindows()
         {
-            if (ClassicModActive && !ScoreV2Active)
+            if (ModifyHitWindows)
+            {
+                perfect = PerfectRange;
+                great = GreatRange;
+                good = GoodRange;
+                ok = OkRange;
+                meh = MehRange;
+                miss = MissRange;
+            }
+            else if (ClassicModActive && !ScoreV2Active)
             {
                 if (IsConvert)
                 {
@@ -158,6 +280,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, meh_window_range) * totalMultiplier) + 0.5;
                 miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, miss_window_range) * totalMultiplier) + 0.5;
             }
+
+            // 这里的Pool区间只是用于显示，并不会影响实际判定；实际判定请见 HitWindows.ResultFor 方法
+            pool = miss + 150;
         }
 
         public override double WindowFor(HitResult result)
@@ -178,6 +303,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                 case HitResult.Meh:
                     return meh;
+
+                case HitResult.Pool:
+                    return pool;
 
                 case HitResult.Miss:
                     return miss;

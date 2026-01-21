@@ -125,6 +125,17 @@ namespace osu.Game.Skinning
             activeChannel.Looping = Looping;
             activeChannel.Play();
 
+            // Framework-level latency instrumentation: best-effort playback event routing.
+            try
+            {
+                if (osu.Framework.Audio.EzLatency.EzLatencyManager.GLOBAL.Enabled.Value)
+                    osu.Framework.Audio.EzLatency.EzLatencyManager.GLOBAL.RecordPlaybackEvent();
+            }
+            catch (Exception ex)
+            {
+                osu.Framework.Logging.Logger.Log($"PoolableSkinnableSample: failed to record playback event: {ex.Message}", osu.Framework.Logging.LoggingTarget.Runtime, osu.Framework.Logging.LogLevel.Debug);
+            }
+
             Played = true;
         }
 

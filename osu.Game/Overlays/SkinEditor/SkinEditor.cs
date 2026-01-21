@@ -35,6 +35,7 @@ using osu.Game.Screens.Edit.Components.Menus;
 using osu.Game.Skinning;
 using osu.Framework.Graphics.Cursor;
 using osu.Game.Input.Bindings;
+using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Utils;
 
 namespace osu.Game.Overlays.SkinEditor
@@ -84,7 +85,7 @@ namespace osu.Game.Overlays.SkinEditor
         private Container? content;
 
         private EditorSidebar componentsSidebar = null!;
-        private EditorSidebar settingsSidebar = null!;
+        private EzEditorSidebar settingsSidebar = null!;
 
         private SkinEditorChangeHandler? changeHandler;
 
@@ -228,7 +229,7 @@ namespace osu.Game.Overlays.SkinEditor
                                                 Depth = float.MaxValue,
                                                 RelativeSizeAxes = Axes.Both,
                                             },
-                                            settingsSidebar = new EditorSidebar(),
+                                            settingsSidebar = new EzEditorSidebar(),
                                         }
                                     }
                                 }
@@ -537,10 +538,12 @@ namespace osu.Game.Overlays.SkinEditor
 
         private void populateSettings()
         {
-            settingsSidebar.Clear();
-
-            foreach (var component in SelectedComponents.OfType<Drawable>())
-                settingsSidebar.Add(new SkinSettingsToolbox(component));
+            //过滤选择组件
+            settingsSidebar.PopulateSettings(content =>
+            {
+                foreach (var component in SelectedComponents.OfType<Drawable>())
+                    content.Add(new SkinSettingsToolbox(component));
+            });
         }
 
         private IEnumerable<SkinnableContainer> availableTargets => targetScreen.ChildrenOfType<SkinnableContainer>();

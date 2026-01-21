@@ -1,0 +1,68 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Framework.Graphics;
+using osu.Game.Collections;
+using osu.Game.Graphics.UserInterface;
+
+namespace osu.Game.Screens.Select.Filter
+{
+    public partial class EzToCollection : OsuButton
+    {
+        public Func<FilterCriteria?> GetCurrentCriteria { private get; set; } = null!;
+        public Action<BeatmapCollection> ShowNamingDialog { private get; set; } = null!;
+        public IEnumerable<BeatmapCollection> ExistingCollections { private get; set; } = null!;
+
+        public EzToCollection()
+            : base(HoverSampleSet.Default)
+        {
+            Text = "保存为合集";
+            RelativeSizeAxes = Axes.X;
+            Height = 30;
+
+            Action = () =>
+            {
+                var currentCriteria = GetCurrentCriteria();
+                if (currentCriteria == null)
+                    return;
+
+                // 动态生成合集名称
+                int collectionNumber = 1;
+                string collectionName;
+
+                do
+                {
+                    collectionName = $"EzCollection{collectionNumber++}";
+                } while (collectionExists(collectionName)); // 确保名称唯一
+
+                // 创建一个新的合集
+                var newCollection = new BeatmapCollection
+                {
+                    Name = collectionName
+                };
+
+                // 将筛选结果添加到合集
+                var beatmapHashes = currentCriteria.CollectionBeatmapMD5Hashes;
+
+                if (beatmapHashes != null)
+                {
+                    foreach (string hash in beatmapHashes)
+                    {
+                        newCollection.BeatmapMD5Hashes.Add(hash);
+                    }
+                }
+
+                // 弹出命名对话框
+                ShowNamingDialog(newCollection);
+            };
+        }
+
+        private bool collectionExists(string name)
+        {
+            return ExistingCollections?.Any(c => c.Name == name) ?? false;
+        }
+    }
+}

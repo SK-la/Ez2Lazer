@@ -37,6 +37,7 @@ using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -162,6 +163,15 @@ namespace osu.Game
 
         [Resolved]
         private FrameworkConfigManager frameworkConfig { get; set; }
+
+        private const int non_gameplay_draw_multiplier = 4;
+        private const int maximum_sane_draw_fps = 8000;
+
+        private Bindable<FrameSync> frameSyncMode;
+
+        private GameHost gameHost;
+
+        private bool gameplayScreenActive;
 
         private DifficultyRecommender difficultyRecommender;
 
@@ -358,6 +368,8 @@ namespace osu.Game
         public override void SetHost(GameHost host)
         {
             base.SetHost(host);
+
+            gameHost = host;
 
             if (host.Window != null)
             {
@@ -1053,6 +1065,11 @@ namespace osu.Game
         {
             base.LoadComplete();
 
+            frameSyncMode = frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
+            frameSyncMode.BindValueChanged(_ => Schedule(updateDrawLimiter), true);
+
+            gameHost?.Window?.CurrentDisplayMode.BindValueChanged(_ => Schedule(updateDrawLimiter), true);
+
             var languages = Enum.GetValues<Language>();
 
             var mappings = languages.Select(language =>
@@ -1262,6 +1279,7 @@ namespace osu.Game
             loadComponentSingleFile(new MedalOverlay(), topMostOverlayContent.Add);
 
             loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add);
+            loadComponentSingleFile(new EzManiaAnalysisWarmupProcessor(), Add);
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
             loadComponentSingleFile(new QueueController(), Add, true);
 
@@ -1374,6 +1392,24 @@ namespace osu.Game
             if (entry.Level < LogLevel.Important || entry.Target > LoggingTarget.Database || entry.Target == null) return;
 
             if (entry.Exception is SentryOnlyDiagnosticsException)
+                return;
+
+            // Custom builds may hit server-side gating for online features.
+            // These messages are not actionable for end-users of this fork, so avoid spamming notifications.
+            if (entry.Message?.Contains("Realtime online functionality is not supported on this version of the game", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("Please ensure that you are using the latest version of the official game releases", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("Your score will not be submitted", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("This is not an official build of the game", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            // Some of the above messages are logged with a blank separator line at important level.
+            if (string.IsNullOrWhiteSpace(entry.Message) && entry.Target == LoggingTarget.Network)
                 return;
 
             const int short_term_display_limit = 3;
@@ -1732,6 +1768,91 @@ namespace osu.Game
                     Toolbar.Show();
 
                 skinEditor.SetTarget(newOsuScreen);
+            }
+
+            gameplayScreenActive = newScreen is Player || newScreen is PlayerLoader;
+            Schedule(updateDrawLimiter);
+        }
+
+        private void updateDrawLimiter()
+        {
+            // 暂时屏蔽测试情况
+            // return;
+
+            if (gameHost?.Window == null)
+                return;
+
+            int refreshRate = (int)MathF.Round(gameHost.Window.CurrentDisplayMode.Value.RefreshRate);
+
+            // For invalid refresh rates let's assume 60 Hz as it is most common.
+            if (refreshRate <= 0)
+                refreshRate = 120;
+
+            int drawLimiter;
+            bool shouldVSync;
+            bool shouldThrottleTextureUploads;
+
+            if (gameplayScreenActive)
+            {
+                // gameplay 期间遵循玩家配置的帧同步（FrameSync）。
+                drawLimiter = refreshRate;
+                shouldVSync = false;
+                shouldThrottleTextureUploads = false;
+
+                if (frameSyncMode != null)
+                {
+                    switch (frameSyncMode.Value)
+                    {
+                        case FrameSync.VSync:
+                        case FrameSync.Unlimited:
+                            drawLimiter = int.MaxValue;
+                            shouldVSync = frameSyncMode.Value == FrameSync.VSync;
+                            break;
+
+                        case FrameSync.Limit2x:
+                            drawLimiter *= 2;
+                            break;
+
+                        case FrameSync.Limit4x:
+                            drawLimiter *= 4;
+                            break;
+
+                        case FrameSync.Limit8x:
+                            drawLimiter *= 8;
+                            break;
+                    }
+                }
+            }
+            else
+            {
+                // 非 gameplay 场景强制按显示器刷新率的 4 倍绘制。
+                drawLimiter = refreshRate * non_gameplay_draw_multiplier;
+
+                // 额外强制关闭 VSync，避免 draw 被量化到刷新率（并尽量避免 OpenGL 下类似 glFinish 的额外停顿）。
+                shouldVSync = false;
+
+                // UI 界面在快速滚动时可能会大量流式加载纹理（封面/背景等）。
+                // 通过限制“每帧上传预算”来降低帧时间尖刺。
+                shouldThrottleTextureUploads = true;
+            }
+
+            // 仅对 draw 应用与 framework 类似的“合理上限”限制。
+            if (!gameHost.AllowBenchmarkUnlimitedFrames)
+                drawLimiter = Math.Min(maximum_sane_draw_fps, drawLimiter);
+
+            gameHost.MaximumDrawHz = drawLimiter;
+
+            gameHost.SetVerticalSync(shouldVSync);
+
+            if (shouldThrottleTextureUploads)
+            {
+                // 偏保守的默认值：优先保证交互流畅，代价是缩略图/封面加载完成会稍慢。
+                // 前者提高随机速度，后者提高顺序速度。
+                gameHost.SetTextureUploadLimits(maxTexturesUploadedPerFrame: 12, maxPixelsUploadedPerFrame: 1024 * 1024);
+            }
+            else
+            {
+                gameHost.RestoreTextureUploadLimits();
             }
         }
 

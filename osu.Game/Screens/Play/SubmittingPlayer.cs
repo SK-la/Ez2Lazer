@@ -14,6 +14,8 @@ using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.LAsEzExtensions.Audio;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.Multiplayer;
@@ -48,6 +50,12 @@ namespace osu.Game.Screens.Play
         [CanBeNull]
         private UserStatisticsWatcher userStatisticsWatcher { get; set; }
 
+        [Resolved]
+        private osu.Framework.Audio.AudioManager audioManager { get; set; }
+
+        [CanBeNull]
+        private InputAudioLatencyTracker latencyTracker;
+
         private readonly object scoreSubmissionLock = new object();
         private TaskCompletionSource<bool> scoreSubmissionSource;
 
@@ -57,7 +65,7 @@ namespace osu.Game.Screens.Play
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
             if (DrawableRuleset == null)
             {
@@ -75,6 +83,19 @@ namespace osu.Game.Screens.Play
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
             });
+
+            // 初始化延迟追踪
+            latencyTracker = new InputAudioLatencyTracker(ezConfig);
+            latencyTracker?.Initialize(ScoreProcessor);
+            // Ensure tracker is started for testing scenarios in SubmittingPlayer
+            try
+            {
+                latencyTracker?.Start();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"InputAudioLatencyTracker failed to Start: {ex.Message}", level: LogLevel.Error);
+            }
         }
 
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)
@@ -186,23 +207,24 @@ namespace osu.Game.Screens.Play
         /// <returns>Whether gameplay should be immediately exited as a result. Returning false allows the gameplay session to continue. Defaults to true.</returns>
         protected virtual bool ShouldExitOnTokenRetrievalFailure(Exception exception) => true;
 
-        public override bool AllowCriticalSettingsAdjustment
-        {
-            get
-            {
-                // General limitations to ensure players don't do anything too weird.
-                // These match stable for now.
-
-                // TODO: the blocking conditions should probably display a message.
-                if (!IsBreakTime.Value && GameplayClockContainer.CurrentTime - GameplayClockContainer.GameplayStartTime > 10000)
-                    return false;
-
-                if (GameplayClockContainer.IsPaused.Value)
-                    return false;
-
-                return base.AllowCriticalSettingsAdjustment;
-            }
-        }
+        // 重写允许在游戏过程中调整关键设置（如速度修改器）大于10秒后、非休息时间且未暂停时不允许调整
+        // public override bool AllowCriticalSettingsAdjustment
+        // {
+        //     get
+        //     {
+        //         // General limitations to ensure players don't do anything too weird.
+        //         // These match stable for now.
+        //
+        //         // TODO: the blocking conditions should probably display a message.
+        //         if (!IsBreakTime.Value && GameplayClockContainer.CurrentTime - GameplayClockContainer.GameplayStartTime > 10000)
+        //             return false;
+        //
+        //         if (GameplayClockContainer.IsPaused.Value)
+        //             return false;
+        //
+        //         return base.AllowCriticalSettingsAdjustment;
+        //     }
+        // }
 
         protected override async Task PrepareScoreForResultsAsync(Score score)
         {
@@ -257,6 +279,10 @@ namespace osu.Game.Screens.Play
             bool exiting = base.OnExiting(e);
             submitFromFailOrQuit(Score);
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());
+
+            // 生成延迟报告
+            latencyTracker?.GenerateLatencyReport();
+
             return exiting;
         }
 

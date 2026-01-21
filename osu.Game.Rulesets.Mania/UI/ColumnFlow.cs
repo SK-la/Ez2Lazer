@@ -9,6 +9,7 @@ using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -66,12 +67,28 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private ISkinSource skin { get; set; } = null!;
 
+        [Resolved]
+        private SkinManager skinManager { get; set; } = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
+        private readonly Bindable<double> columnWidthBindable = new Bindable<double>();
+        private readonly Bindable<double> specialFactorBindable = new Bindable<double>();
+        private readonly Bindable<ColumnWidthStyle> ezColumnWidthStyle = new Bindable<ColumnWidthStyle>();
 
         [BackgroundDependencyLoader]
         private void load(ManiaRulesetConfigManager? rulesetConfig)
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
+
+            ezSkinConfig.BindWith(Ez2Setting.ColumnWidthStyle, ezColumnWidthStyle);
+            ezSkinConfig.BindWith(Ez2Setting.ColumnWidth, columnWidthBindable);
+            ezSkinConfig.BindWith(Ez2Setting.SpecialFactor, specialFactorBindable);
+            ezColumnWidthStyle.BindValueChanged(v => updateColumnSize());
+            columnWidthBindable.BindValueChanged(v => updateColumnSize());
+            specialFactorBindable.BindValueChanged(v => updateColumnSize());
 
             mobileLayout.BindValueChanged(_ => invalidateLayout());
             skin.SourceChanged += invalidateLayout;
@@ -138,7 +155,33 @@ namespace osu.Game.Rulesets.Mania.UI
                                        new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.ColumnWidth, i))
                                    ?.Value;
 
-                bool isSpecialColumn = stageDefinition.IsSpecialColumn(i);
+                if (width == 0)
+                {
+                    columns[i].Width = 0;
+                    columns[i].Margin = new MarginPadding { Left = 0, Right = 0 };
+                    continue;
+                }
+
+                bool isSpecialColumn =
+                    ezSkinConfig.IsSpecialColumn(stageDefinition.Columns, i);
+                float ezWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
+
+                switch (ezColumnWidthStyle.Value)
+                {
+                    case ColumnWidthStyle.EzStyleProOnly:
+                        var skinInfo = skinManager.CurrentSkinInfo.Value;
+                        if (skinInfo.Value.Name.Contains("Ez Style Pro"))
+                            width = ezWidth;
+                        break;
+
+                    case ColumnWidthStyle.GlobalWidth:
+                        width = ezWidth;
+                        break;
+
+                    case ColumnWidthStyle.GlobalTotalWidth:
+                        width = ezWidth * 10 / stageDefinition.Columns;
+                        break;
+                }
 
                 // only used by default skin (legacy skins get defaults set in LegacyManiaSkinConfiguration)
                 width ??= isSpecialColumn ? Column.SPECIAL_COLUMN_WIDTH : Column.COLUMN_WIDTH;
