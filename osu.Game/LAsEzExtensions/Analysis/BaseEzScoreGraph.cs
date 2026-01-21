@@ -47,7 +47,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private const int current_offset = 0;
         private const int time_bins = 50;
-        private const float circle_size = 5f;
+        private const float circle_size = 3f;
 
         private double binSize;
         private double maxTime;
@@ -431,22 +431,28 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             var sortedHitEvents = HitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
 
+            var pointList = new List<(Vector2 pos, Color4 colour)>();
+
             foreach (var e in sortedHitEvents)
             {
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
                 float yPosition = (float)(e.TimeOffset + current_offset);
 
-                AddInternal(new Circle
+                var x = (xPosition * (DrawWidth - LeftMarginConst - RightMarginConst)) - (DrawWidth / 2) + LeftMarginConst;
+                pointList.Add((new Vector2(x, yPosition), colours.ForHitResult(e.Result)));
+            }
+
+            if (pointList.Count > 0)
+            {
+                var scorePoints = new GirdPoints(circle_size)
                 {
-                    Size = new Vector2(circle_size),
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    X = (xPosition * (DrawWidth - LeftMarginConst - RightMarginConst)) - (DrawWidth / 2) + LeftMarginConst,
-                    Y = yPosition,
-                    Alpha = 0.8f,
-                    Colour = colours.ForHitResult(e.Result),
-                });
+                };
+
+                scorePoints.SetPoints(pointList);
+                AddInternal(scorePoints);
             }
 
             drawHealthLine();
