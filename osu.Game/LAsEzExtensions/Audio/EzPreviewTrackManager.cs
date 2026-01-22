@@ -12,14 +12,14 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
+using osu.Framework.Timing;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
-using osu.Framework.Timing;
 
-namespace osu.Game.LAsEzExtensions.Select
+namespace osu.Game.LAsEzExtensions.Audio
 {
     /// <summary>
     /// <para>一个增强的预览音轨管理器，支持在预览时播放note音效和故事板背景音。</para>
@@ -133,8 +133,8 @@ namespace osu.Game.LAsEzExtensions.Select
                 return;
             }
 
-            OverridePreviewStartTime = settings.PreviewStart;
-            OverridePreviewDuration = settings.PreviewDuration;
+            OverridePreviewStartTime = settings.StartTime;
+            OverridePreviewDuration = settings.Duration;
             OverrideLoopCount = settings.LoopCount;
             OverrideLoopInterval = settings.LoopInterval;
             OverrideLooping = settings.ForceLooping;
@@ -539,17 +539,14 @@ namespace osu.Game.LAsEzExtensions.Select
                     {
                         var ch = fetched.sample.GetChannel();
 
-                        if (ch != null)
+                        try
                         {
-                            try
-                            {
-                                ch.Stop();
-                            }
-                            finally
-                            {
-                                if (!ch.IsDisposed && !ch.ManualFree)
-                                    ch.Dispose();
-                            }
+                            ch.Stop();
+                        }
+                        finally
+                        {
+                            if (!ch.IsDisposed && !ch.ManualFree)
+                                ch.Dispose();
                         }
                     }
                 }
@@ -1109,12 +1106,12 @@ namespace osu.Game.LAsEzExtensions.Select
         /// <summary>
         /// 预览起点（毫秒）。null 表示使用谱面元数据的 PreviewTime。
         /// </summary>
-        public double? PreviewStart { get; init; }
+        public double? StartTime { get; init; }
 
         /// <summary>
         /// 预览段长度（毫秒）。null 表示使用默认值。
         /// </summary>
-        public double? PreviewDuration { get; init; }
+        public double? Duration { get; init; }
 
         /// <summary>
         /// 循环次数。null 表示使用默认值（标准预览通常为 1，增强预览通常为无限）。

@@ -10,6 +10,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Overlays.Settings;
@@ -24,7 +25,7 @@ namespace osu.Game.LAsEzExtensions.Mods
     /// </summary>
     public class ModLoopPlayClip : Mod,
                                    IHasSeed,
-                                   IPreviewOverrideProvider,
+                                   IApplyToLoopPlay,
                                    ILoopTimeRangeMod,
                                    IApplicableToPlayer,
                                    IApplicableToHUD,
@@ -307,8 +308,8 @@ namespace osu.Game.LAsEzExtensions.Mods
 
             return new PreviewOverrideSettings
             {
-                PreviewStart = ResolvedCutTimeStart,
-                PreviewDuration = ResolvedSegmentLength,
+                StartTime = ResolvedCutTimeStart,
+                Duration = ResolvedSegmentLength,
                 LoopCount = LoopCount.Value,
                 LoopInterval = BreakTime.Value * 1000,
                 ForceLooping = true,

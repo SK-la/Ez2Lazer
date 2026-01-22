@@ -37,6 +37,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
+using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Localisation;
@@ -165,6 +166,7 @@ namespace osu.Game.Screens.SelectV2
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
         private EzPreviewTrackManager? ezPreviewManager;
+        private DuplicateVirtualTrack? duplicate;
         private Bindable<bool> keySoundPreview = null!;
 
         private IDisposable? modSelectOverlayRegistration;
@@ -335,22 +337,6 @@ namespace osu.Game.Screens.SelectV2
             queueBeatmapSelection(groupedBeatmaps.First(bug => bug.Beatmap.Equals(recommendedBeatmap)));
         }
 
-        private void updateLoopModEnabled()
-        {
-            try
-            {
-                // 当被选中的 mods 中包含可提供循环时间范围的 mod 时（ILoopTimeRangeMod），启用 DuplicateVirtualTrack
-                bool hasLoopMod = Mods.Value.OfType<ILoopTimeRangeMod>().Any();
-                DuplicateVirtualTrack.Enabled = hasLoopMod;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"SongSelect: updateLoopModEnabled error: {ex}", LoggingTarget.Runtime);
-                // 若出现异常，默认禁用以安全回退
-                DuplicateVirtualTrack.Enabled = false;
-            }
-        }
-
         /// <summary>
         /// Called when a selection is made to progress away from the song select screen.
         ///
@@ -399,9 +385,6 @@ namespace osu.Game.Screens.SelectV2
 
             inputManager = GetContainingInputManager()!;
 
-            // 仅设置允许标志；具体创建与销毁由 onArrivingAtScreen/onLeavingScreen 控制，避免在非当前 screen 启动预览。
-            keySoundPreview.BindValueChanged(v => EzPreviewTrackManager.Enabled = v.NewValue, true);
-
             filterControl.CriteriaChanged += criteriaChanged;
 
             modSelectOverlay.State.BindValueChanged(v =>
@@ -412,9 +395,6 @@ namespace osu.Game.Screens.SelectV2
                 if (ShowOsuLogo)
                     logo?.FadeTo(v.NewValue == Visibility.Visible ? 0f : 1f, 200, Easing.OutQuint);
             });
-
-            // 当 mod 变化时，只有在存在 Loop 类型的 mod 时才开启 DuplicateVirtualTrack 行为，避免状态混乱。
-            Mods.BindValueChanged(_ => updateLoopModEnabled(), true);
 
             Beatmap.BindValueChanged(_ =>
             {
@@ -428,6 +408,15 @@ namespace osu.Game.Screens.SelectV2
                 updateWedgeVisibility();
                 fetchOnlineInfo();
             });
+
+            keySoundPreview.BindValueChanged(v =>
+                EzPreviewTrackManager.Enabled = v.NewValue, true);
+
+            Mods.BindValueChanged(_ =>
+            {
+                bool hasLoopMod = Mods.Value.OfType<ILoopTimeRangeMod>().Any();
+                DuplicateVirtualTrack.DuplicateEnabled = hasLoopMod;
+            }, true);
         }
 
         protected override void Update()
@@ -550,18 +539,17 @@ namespace osu.Game.Screens.SelectV2
             music.TrackChanged += ensureTrackLooping;
         }
 
-        private void createDuplicatePreview(IPreviewOverrideProvider provider, PreviewOverrideSettings overrides, IWorkingBeatmap beatmap)
+        private void createDuplicatePreview(IApplyToLoopPlay provider, PreviewOverrideSettings overrides, IWorkingBeatmap beatmap)
         {
             removePreviewManager();
 
-            var duplicate = new DuplicateVirtualTrack
+            duplicate = new DuplicateVirtualTrack
             {
                 OverrideProvider = provider,
                 PendingOverrides = overrides
             };
-            ezPreviewManager = duplicate;
-            AddInternal(ezPreviewManager);
-            ezPreviewManager.StartPreview(beatmap);
+            AddInternal(duplicate);
+            duplicate.StartPreview(beatmap);
         }
 
         private void createEzPreview()
@@ -576,6 +564,12 @@ namespace osu.Game.Screens.SelectV2
             {
                 ezPreviewManager.StopPreview();
                 RemoveInternal(ezPreviewManager, true);
+            }
+
+            if (duplicate != null)
+            {
+                duplicate.StopPreview();
+                RemoveInternal(duplicate, true);
             }
         }
 
@@ -594,8 +588,7 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            // 优化：查找第一个对该 beatmap 返回非空 overrides 的 provider（避免第一个 provider 无 overrides 时错过后续 provider）
-            var providerWithOverrides = Mods.Value.OfType<IPreviewOverrideProvider>()
+            var providerWithOverrides = Mods.Value.OfType<IApplyToLoopPlay>()
                                             .Select(p => (provider: p, overrides: p.GetPreviewOverrides(beatmap)))
                                             .FirstOrDefault(x => x.overrides != null);
 
@@ -617,11 +610,6 @@ namespace osu.Game.Screens.SelectV2
             {
                 removePreviewManager();
                 beatmap.PrepareTrackForPreview(true);
-
-                //
-                // // restore default preview on the global music controller
-                // beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo).PrepareTrackForPreview(true);
-                // ensurePlayingSelected();
             }
         }
 
@@ -832,7 +820,6 @@ namespace osu.Game.Screens.SelectV2
             updateBackgroundDim();
             fetchOnlineInfo(force: true);
 
-            // Create simple ez preview on arrival if the user setting allows it and manager is enabled.
             if (keySoundPreview.Value && EzPreviewTrackManager.Enabled)
             {
                 createEzPreview();
