@@ -67,8 +67,6 @@ namespace osu.Game.Screens.Ranking
 
         private Bindable<EzMUGHitMode> hitModeBindable = new Bindable<EzMUGHitMode>();
 
-        private HitModeButton hitModeButton = null!;
-
         private bool skipExitTransition;
 
         protected StatisticsPanel StatisticsPanel { get; private set; } = null!;

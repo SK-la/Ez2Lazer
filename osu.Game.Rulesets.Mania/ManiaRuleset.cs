@@ -352,7 +352,7 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
-                        new ManiaModCleanColumn(), // 待调试
+                        new ManiaModCleanColumn(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         new ManiaModLoopPlayClip(),
