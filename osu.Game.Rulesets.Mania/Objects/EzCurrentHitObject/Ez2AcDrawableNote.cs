@@ -22,12 +22,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             if (timeOffset >= 0 && HoldNote.IsHolding.Value)
             {
                 ApplyMaxResult();
-                return;
             }
             else if (timeOffset > 0)
             {
                 ApplyMinResult();
-                return;
             }
         }
     }

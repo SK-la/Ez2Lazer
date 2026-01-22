@@ -157,7 +157,6 @@ namespace osu.Game.Screens.SelectV2
                                 {
                                     Origin = Anchor.CentreLeft,
                                     Anchor = Anchor.CentreLeft,
-                                    Expanded = { BindTarget = Expanded },
                                     VisibleBeatmaps = { BindTarget = VisibleBeatmaps },
                                 },
                             },

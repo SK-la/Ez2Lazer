@@ -7,15 +7,9 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
-    public class NoComboBreakLNTail : TailNote
+    public class IgnoreHitLNTail : TailNote
     {
-        public override Judgement CreateJudgement() => new NoComboBreakTailJudgement();
+        public override Judgement CreateJudgement() => new HoldNoteBodyJudgement();
         protected override HitWindows CreateHitWindows() => HitWindows.Empty;
-
-        public class NoComboBreakTailJudgement : ManiaJudgement
-        {
-            public override HitResult MaxResult => HitResult.IgnoreHit;
-            public override HitResult MinResult => HitResult.ComboBreak;
-        }
     }
 }

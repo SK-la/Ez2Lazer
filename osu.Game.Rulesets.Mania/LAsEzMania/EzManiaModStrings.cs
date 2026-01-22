@@ -177,8 +177,26 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         public static readonly LocalisableString MinSpeed_Description = new EzLocalisableString("最小速度", "Min Speed");
 
         // NiceBPM
-        public static readonly LocalisableString InitialRate_Label = new EzLocalisableString("初始速度", "Initial rate");
-        public static readonly LocalisableString InitialRate_Description = new EzLocalisableString("轨道的起始速度", "Initial rate. The starting speed of the track");
+        public static readonly LocalisableString InitialRate_Label = new EzLocalisableString("初始速度倍率", "Initial rate");
+        public static readonly LocalisableString InitialRate_Description = new EzLocalisableString("调整初始播放速度倍率", "Initial rate. The starting speed of the track");
+
+        public static readonly LocalisableString FreeBPM_Label = new EzLocalisableString("初始BPM", "Initial BPM");
+        public static readonly LocalisableString FreeBPM_Description = new EzLocalisableString("设置BPM值以调整初始播放速度", "BPM to speed");
+
+        public static readonly LocalisableString EnableDynamicBPM_Label = new EzLocalisableString("启用动态BPM", "Enable Dynamic BPM");
+        public static readonly LocalisableString EnableDynamicBPM_Description = new EzLocalisableString("基于表现启用动态BPM调整", "Enable dynamic BPM adjustment based on performance");
+
+        public static readonly LocalisableString MinAllowableRate_Label = new EzLocalisableString("最小允许速率", "Min Allowable Rate");
+        public static readonly LocalisableString MinAllowableRate_Description = new EzLocalisableString("动态BPM调整的最小速率", "Minimum rate for dynamic BPM adjustment");
+
+        public static readonly LocalisableString MaxAllowableRate_Label = new EzLocalisableString("最大允许速率", "Max Allowable Rate");
+        public static readonly LocalisableString MaxAllowableRate_Description = new EzLocalisableString("动态BPM调整的最大速率", "Maximum rate for dynamic BPM adjustment");
+
+        public static readonly LocalisableString MissCountThreshold_Label = new EzLocalisableString("Miss计数阈值", "Miss Count Threshold");
+        public static readonly LocalisableString MissCountThreshold_Description = new EzLocalisableString("触发降速所需的Miss数量", "Number of misses required to trigger rate decrease");
+
+        public static readonly LocalisableString RateChangeOnMiss_Label = new EzLocalisableString("Miss时的速率变化", "Rate Change On Miss");
+        public static readonly LocalisableString RateChangeOnMiss_Description = new EzLocalisableString("达到Miss阈值时应用的速率倍数", "Rate multiplier applied when miss threshold is reached");
 
         // Gracer
         public static readonly LocalisableString Bias_Label = new EzLocalisableString("偏差", "Bias");

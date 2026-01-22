@@ -1,8 +1,11 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Judgements;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects
 {
@@ -18,7 +21,20 @@ namespace osu.Game.Rulesets.Mania.Objects
         /// </summary>
         public const double RELEASE_WINDOW_LENIENCE = 1.5;
 
-        public override Judgement CreateJudgement() => new ManiaJudgement();
+        public override Judgement CreateJudgement()
+        {
+            var hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+
+            switch (hitMode)
+            {
+                case EzMUGHitMode.Lazer:
+                case EzMUGHitMode.Classic:
+                    return new ManiaJudgement();
+
+                default:
+                    return new HoldNoteBodyJudgement();
+            }
+        }
 
         public override double MaximumJudgementOffset => base.MaximumJudgementOffset * RELEASE_WINDOW_LENIENCE;
     }
