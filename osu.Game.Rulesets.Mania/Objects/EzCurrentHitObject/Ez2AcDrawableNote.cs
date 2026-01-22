@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.ComponentModel;
+using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
@@ -19,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 return;
             }
 
-            if (timeOffset >= 0 && HoldNote.IsHolding.Value)
+            if ((timeOffset >= 0 && HoldNote.IsHolding.Value) || (timeOffset <= 20 && HoldNote.Tail.IsHit))
             {
                 ApplyMaxResult();
             }
@@ -27,6 +29,22 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             {
                 ApplyMinResult();
             }
+        }
+
+        protected override HitResult GetCappedResult(HitResult result)
+        {
+            bool hasComboBreak = !HoldNote.Head.IsHit || HoldNote.Body.HasHoldBreak;
+
+            if (result > HitResult.Miss && hasComboBreak)
+                return HitResult.ComboBreak;
+
+            return result;
+        }
+
+        public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e) => false; // Handled by the hold note
+
+        public override void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
+        {
         }
     }
 
