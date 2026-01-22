@@ -14,10 +14,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
 
@@ -25,61 +23,61 @@ namespace osu.Game.LAsEzExtensions.Analysis
 {
     /// <summary>
     /// 基类分数图表，用于分析和可视化得分数据。
-    /// 继承类应实现特定规则集的逻辑。
     /// </summary>
     public abstract partial class BaseEzScoreGraph : CompositeDrawable
     {
-        protected readonly IReadOnlyList<HitEvent> HitEvents;
         protected readonly ScoreInfo Score;
         protected readonly IBeatmap Beatmap;
 
-        protected ScoreProcessor ScoreProcessor { get; set; }
-
         protected HitWindows HitWindows { get; set; }
-
-        protected virtual HitResult GetHitResult()
-        {
-            return HitResult.Perfect;
-        }
 
         protected static double HP;
         protected static double OD;
 
+        protected float LeftMarginConst { get; set; } = 158;
+        protected float RightMarginConst { get; set; } = 7;
+
         private const int current_offset = 0;
         private const int time_bins = 50;
-        private const float circle_size = 5f;
 
         private double binSize;
         private double maxTime;
         private double minTime;
         private double timeRange;
 
-        protected float LeftMarginConst { get; set; } = 158;
-        protected float RightMarginConst { get; set; } = 7;
+        [Resolved]
+        private OsuColour colours { get; set; } = null!;
 
         protected double V1Accuracy { get; set; }
         protected long V1Score { get; set; }
         protected Dictionary<HitResult, int> V1Counts { get; set; } = new Dictionary<HitResult, int>();
 
-        // V2 Accuracy calculation properties
         protected double V2Accuracy { get; set; }
         protected long V2Score { get; set; }
         protected Dictionary<HitResult, int> V2Counts { get; set; } = new Dictionary<HitResult, int>();
 
-        [Resolved]
-        private OsuColour colours { get; set; } = null!;
+        private readonly IReadOnlyList<HitEvent> originalHitEvents;
+
+        protected IReadOnlyList<HitEvent> HitEvents => FilterHitEvents();
+
+        /// <summary>
+        /// 继承类应 HitWindows.IsHitResultAllowed 等方式过滤出有效的 HitEvent。
+        /// </summary>
+        /// <returns>应当返回与当前规则集HitWindows匹配的 HitEvent</returns>
+        protected virtual IReadOnlyList<HitEvent> FilterHitEvents()
+        {
+            return originalHitEvents.Where(e => e.Result.IsBasic()).ToList();
+        }
 
         protected BaseEzScoreGraph(ScoreInfo score, IBeatmap beatmap, HitWindows hitWindows)
         {
             Score = score;
             HitWindows = hitWindows;
-            HitEvents = score.HitEvents;
+            originalHitEvents = score.HitEvents;
             Beatmap = beatmap;
 
             HP = beatmap.Difficulty.DrainRate;
-            // OD = beatmap.Difficulty.OverallDifficulty;
-
-            ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
+            OD = beatmap.Difficulty.OverallDifficulty;
         }
 
         [BackgroundDependencyLoader]
@@ -95,7 +93,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             minTime = HitEvents.Count > 0 ? HitEvents.Min(e => e.HitObject.StartTime) : 0;
             timeRange = maxTime - minTime;
 
-            Scheduler.AddOnce(updateDisplay);
+            Scheduler.AddOnce(UpdateDisplay);
         }
 
         /// <summary>
@@ -104,27 +102,26 @@ namespace osu.Game.LAsEzExtensions.Analysis
         /// </summary>
         protected virtual void CalculateV1Accuracy()
         {
-            ScoreProcessor.Mods.Value = Score.Mods;
-            ScoreProcessor.ApplyBeatmap(Beatmap);
+            var v1ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
+            v1ScoreProcessor.IsLegacyScore = true;
+            v1ScoreProcessor.Mods.Value = Score.Mods;
+            v1ScoreProcessor.ApplyBeatmap(Beatmap);
 
             var v1Counts = new Dictionary<HitResult, int>();
 
-            foreach (var hitEvent in GetApplicableHitEvents())
+            foreach (var hitEvent in HitEvents)
             {
                 var recalculated = RecalculateV1Result(hitEvent);
-
-                // track recalculated counts for V1
                 v1Counts[recalculated] = v1Counts.GetValueOrDefault(recalculated, 0) + 1;
-
-                ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
+                v1ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
                 {
                     Type = recalculated,
                     TimeOffset = hitEvent.TimeOffset
                 });
             }
 
-            double accuracy = ScoreProcessor.AccuracyClassic.Value;
-            long totalScore = ScoreProcessor.TotalScore.Value;
+            double accuracy = v1ScoreProcessor.AccuracyClassic.Value;
+            long totalScore = v1ScoreProcessor.TotalScore.Value;
 
             Logger.Log($"[V1 ScoreProcessor]: {accuracy * 100:F2}%, Score: {totalScore / 10000}w");
 
@@ -132,11 +129,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             V1Accuracy = accuracy;
             V1Score = totalScore;
             V1Counts = v1Counts;
-        }
-
-        protected virtual IEnumerable<HitEvent> GetApplicableHitEvents()
-        {
-            return Score.HitEvents.Where(e => e.Result.IsBasic());
         }
 
         /// <summary>
@@ -147,8 +139,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
         /// <returns>The recalculated <see cref="HitResult"/> for V1 accuracy.</returns>
         protected virtual HitResult RecalculateV1Result(HitEvent hitEvent)
         {
-            double offset = Math.Abs(hitEvent.TimeOffset);
-            return HitWindows.ResultFor(offset);
+            return HitWindows.ResultFor(hitEvent.TimeOffset);
+        }
+
+        protected virtual HitResult RecalculateV2Result(HitEvent hitEvent)
+        {
+            return HitWindows.ResultFor(hitEvent.TimeOffset);
         }
 
         /// <summary>
@@ -159,21 +155,20 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             // Create a fresh ScoreProcessor for V2 calculation (V1 already used one)
             var v2ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
-
             v2ScoreProcessor.Mods.Value = Score.Mods;
             v2ScoreProcessor.ApplyBeatmap(Beatmap);
+            var v2Counts = new Dictionary<HitResult, int>();
 
-            foreach (var hitEvent in GetApplicableHitEvents())
+            foreach (var hitEvent in HitEvents)
             {
-                var judgement = hitEvent.HitObject.CreateJudgement();
-                v2ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, judgement)
+                var recalculated = RecalculateV2Result(hitEvent);
+                v2Counts[recalculated] = v2Counts.GetValueOrDefault(recalculated, 0) + 1;
+                v2ScoreProcessor.ApplyResult(new JudgementResult(hitEvent.HitObject, hitEvent.HitObject.CreateJudgement())
                 {
-                    Type = hitEvent.Result,
+                    Type = recalculated,
                     TimeOffset = hitEvent.TimeOffset
                 });
             }
-
-            Dictionary<HitResult, int> v2Counts = HitEvents.GroupBy(e => e.Result).ToDictionary(g => g.Key, g => g.Count());
 
             double accuracy = v2ScoreProcessor.Accuracy.Value;
             long totalScore = v2ScoreProcessor.TotalScore.Value;
@@ -186,241 +181,22 @@ namespace osu.Game.LAsEzExtensions.Analysis
             V2Counts = v2Counts;
         }
 
-        private void updateDisplay()
+        protected virtual void UpdateDisplay()
         {
-            ClearInternal();
+            if (!IsAlive || IsDisposed)
+                return;
 
-            double scAcc = Score.Accuracy * 100;
-            long scScore = Score.TotalScore;
+            if (DrawWidth <= 0 || DrawHeight <= 0)
+            {
+                Scheduler.AddOnce(UpdateDisplay);
+                return;
+            }
+
+            ClearInternal();
 
             CalculateV1Accuracy();
             CalculateV2Accuracy();
-
-            AddInternal(new GridContainer
-            {
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.TopLeft,
-                Position = Vector2.Zero,
-                RowDimensions = new[]
-                {
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                },
-                ColumnDimensions = new[]
-                {
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.AutoSize),
-                },
-                Content = new[]
-                {
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "Acc org",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {scAcc:F1}%",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "Acc v2",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V2Accuracy * 100:F1}%",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "Acc v1",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V1Accuracy * 100:F1}%",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "Scr org",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {scScore / 1000.0:F0}k",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "Scr v2",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V2Score / 1000.0:F0}k",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "Scr v1",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V1Score / 1000.0:F0}k",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "Pauses",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {Score.Pauses.Count}",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "PERFECT",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Perfect, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Perfect, 0)}",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "GREAT",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Great, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Great, 0)}",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "GOOD",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Good, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Good, 0)}",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "OK",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Ok, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Ok, 0)}",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "MEH",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Meh, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Meh, 0)}",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                    new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = "MISS",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Miss, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Miss, 0)}",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.White,
-                        },
-                    },
-                }
-            });
+            UpdateText();
 
             foreach (HitResult result in Enum.GetValues(typeof(HitResult)).Cast<HitResult>().Where(r => r <= HitResult.Perfect && r >= HitResult.Meh))
             {
@@ -431,25 +207,47 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             var sortedHitEvents = HitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
 
+            drawHealthLine(sortedHitEvents);
+            drawPointsGraph(sortedHitEvents);
+        }
+
+        private void drawPointsGraph(List<HitEvent> sortedHitEvents)
+        {
+            var pointList = new List<(Vector2 pos, Color4 colour)>();
+
             foreach (var e in sortedHitEvents)
             {
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
                 float yPosition = (float)(e.TimeOffset + current_offset);
 
-                AddInternal(new Circle
-                {
-                    Size = new Vector2(circle_size),
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    X = (xPosition * (DrawWidth - LeftMarginConst - RightMarginConst)) - (DrawWidth / 2) + LeftMarginConst,
-                    Y = yPosition,
-                    Alpha = 0.8f,
-                    Colour = colours.ForHitResult(e.Result),
-                });
+                float x = (xPosition * (DrawWidth - LeftMarginConst - RightMarginConst)) - (DrawWidth / 2) + LeftMarginConst;
+                pointList.Add((new Vector2(x, yPosition), colours.ForHitResult(e.Result)));
             }
 
-            drawHealthLine();
+            if (pointList.Count > 0)
+            {
+                var scorePoints = new GirdPoints()
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                };
+
+                scorePoints.SetPoints(pointList);
+                AddInternal(scorePoints);
+            }
+        }
+
+        protected virtual void UpdateText()
+        {
+        }
+
+        /// <summary>
+        /// Request the graph to recalculate and redraw. Safe to call from other threads (will schedule on update thread).
+        /// </summary>
+        protected void Refresh()
+        {
+            Scheduler.AddOnce(UpdateDisplay);
         }
 
         protected virtual double UpdateBoundary(HitResult result)
@@ -457,13 +255,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return HitWindows.WindowFor(result);
         }
 
-        private void drawHealthLine()
+        private void drawHealthLine(List<HitEvent> sortedHitEvents)
         {
-            var sortedEvents = HitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
             double currentHealth = 0.0;
             List<Vector2> healthPoints = new List<Vector2>();
 
-            foreach (var e in sortedEvents)
+            foreach (var e in sortedHitEvents)
             {
                 var judgement = e.HitObject.CreateJudgement();
                 var judgementResult = new JudgementResult(e.HitObject, judgement) { Type = e.Result };
@@ -531,8 +328,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 Y = (float)(boundary + current_offset),
             });
         }
-
-        protected abstract HitResult RecalculateV2Result(HitEvent hitEvent);
     }
 }
 

@@ -218,15 +218,15 @@ namespace osu.Game.Rulesets.Mania.UI
             switch (hitMode)
             {
                 case EzMUGHitMode.EZ2AC:
-                    RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
+                    // RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
                     RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
+                    // RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
                     RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
-                    RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    // RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
                 case EzMUGHitMode.Malody:
-                    RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
+                    // RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
                     RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
                     RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
                     break;
@@ -235,20 +235,19 @@ namespace osu.Game.Rulesets.Mania.UI
                 case EzMUGHitMode.IIDX_HD:
                 case EzMUGHitMode.LR2_HD:
                 case EzMUGHitMode.Raja_NM:
-                    RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
+                    // RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
                     RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
-                    RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    // RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
+                    // RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
                 case EzMUGHitMode.O2Jam:
-                    RegisterPool<O2Note, O2DrawableNote>(10, 50);
-                    RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
-                    RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
+                    // RegisterPool<O2Note, O2DrawableNote>(10, 50);
+                    // RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
+                    // RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
+                    // RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
 
-                    // 临时使用解决 转K Mod 后，HitObject
                     RegisterPool<Note, O2DrawableNote>(10, 50);
                     RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
                     RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);

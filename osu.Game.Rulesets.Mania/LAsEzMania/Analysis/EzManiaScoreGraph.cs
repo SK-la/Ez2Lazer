@@ -3,13 +3,21 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 {
@@ -21,10 +29,26 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
     {
         private readonly ManiaHitWindows maniaHitWindows = new ManiaHitWindows();
 
+        private readonly CustomHitWindowsHelper hitWindows1;
+        private readonly CustomHitWindowsHelper hitWindows2;
+        private Bindable<EzMUGHitMode> hitModeBindable = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
         public EzManiaScoreGraph(ScoreInfo score, IBeatmap beatmap)
             : base(score, beatmap, new ManiaHitWindows())
         {
             maniaHitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
+
+            // Initialize helpers here (after base ctor has run and static OD/HP have been set).
+            hitWindows1 = new CustomHitWindowsHelper { OverallDifficulty = OD };
+            hitWindows2 = new CustomHitWindowsHelper { OverallDifficulty = OD };
+        }
+
+        protected override IReadOnlyList<HitEvent> FilterHitEvents()
+        {
+            return Score.HitEvents.Where(e => maniaHitWindows.IsHitResultAllowed(e.Result)).ToList();
         }
 
         protected override double UpdateBoundary(HitResult result)
@@ -32,23 +56,24 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
             return maniaHitWindows.WindowFor(result);
         }
 
-        /// <summary>
-        /// Override to get Mania-specific hit events for V1 calculation.
-        /// </summary>
-        protected override IEnumerable<HitEvent> GetApplicableHitEvents()
+        [BackgroundDependencyLoader]
+        private void load()
         {
-            return Score.HitEvents.Where(e => e.Result.IsBasic());
+            // Bind to the global hit mode setting so that switching hit modes updates our helpers and redraws.
+            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitModeBindable.BindValueChanged(v =>
+            {
+                hitWindows1.HitMode = v.NewValue;
+                hitWindows2.HitMode = v.NewValue;
+
+                // Ensure mania windows re-evaluate based on global config and difficulty.
+                maniaHitWindows.ResetRange();
+                maniaHitWindows.SetDifficulty(Beatmap.Difficulty.OverallDifficulty);
+
+                // Recalculate and redraw.
+                Refresh();
+            }, true);
         }
-
-        private readonly CustomHitWindowsHelper hitWindows1 = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
-        {
-            OverallDifficulty = OD
-        };
-
-        private readonly CustomHitWindowsHelper hitWindows2 = new CustomHitWindowsHelper
-        {
-            OverallDifficulty = OD
-        };
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
         {
@@ -57,104 +82,239 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)
         {
-            return hitWindows2.ResultFor(hitEvent.TimeOffset);
+            return maniaHitWindows.ResultFor(hitEvent.TimeOffset);
+        }
+
+        protected override void UpdateText()
+        {
+            double scAcc = Score.Accuracy * 100;
+            long scScore = Score.TotalScore;
+
+            AddInternal(new GridContainer
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                Position = Vector2.Zero,
+                RowDimensions = new[]
+                {
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                },
+                ColumnDimensions = new[]
+                {
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.AutoSize),
+                },
+                Content = new[]
+                {
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Acc org",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {scAcc:F1}%",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Acc v2",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V2Accuracy * 100:F1}%",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Acc v1",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V1Accuracy * 100:F1}%",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Scr org",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {scScore / 1000.0:F0}k",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Scr v2",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V2Score / 1000.0:F0}k",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Scr v1",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V1Score / 1000.0:F0}k",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "Pauses",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {Score.Pauses.Count}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "PERFECT",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Perfect, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Perfect, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "GREAT",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Great, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Great, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "GOOD",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Good, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Good, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "OK",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Ok, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Ok, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "MEH",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Meh, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Meh, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                    new Drawable[]
+                    {
+                        new OsuSpriteText
+                        {
+                            Text = "MISS",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = $" : {V2Counts.GetValueOrDefault(HitResult.Miss, 0)}\\{V1Counts.GetValueOrDefault(HitResult.Miss, 0)}",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Color4.White,
+                        },
+                    },
+                }
+            });
         }
     }
 }
-
-        // protected override void CalculateV1Accuracy()
-        // {
-        //     base.CalculateV1Accuracy();
-        //
-        //     var maniaHitWindows = new ManiaHitWindows
-        //     {
-        //         CustomHitWindows = false,
-        //         ClassicModActive = true,
-        //         IsConvert = false,
-        //         ScoreV2Active = false,
-        //         SpeedMultiplier = (HitWindows as ManiaHitWindows)?.SpeedMultiplier ?? 1.0,
-        //         DifficultyMultiplier = (HitWindows as ManiaHitWindows)?.DifficultyMultiplier ?? 1.0
-        //     };
-        //
-        //     maniaHitWindows.ResetRange();
-        //     maniaHitWindows.SetDifficulty(OD);
-        //
-        //     double PerfectRange = maniaHitWindows.WindowFor(HitResult.Perfect);
-        //     double GreatRange = maniaHitWindows.WindowFor(HitResult.Great);
-        //     double GoodRange = maniaHitWindows.WindowFor(HitResult.Good);
-        //     double OkRange = maniaHitWindows.WindowFor(HitResult.Ok);
-        //     double MehRange = maniaHitWindows.WindowFor(HitResult.Meh);
-        //     double MissRange = maniaHitWindows.WindowFor(HitResult.Miss);
-        //
-        //     Logger.Log($"[EzManiaScoreGraph] V1 HitWindows: P{PerfectRange} G{GreatRange} Go{GoodRange} O{OkRange} M{MehRange} Mi{MissRange}");
-        //
-        //     double[] HeadOffsets = new double[18];
-        //     double MaxPoints = 0;
-        //     double TotalPoints = 0;
-        //
-        //     double getLNScore(double head, double tail)
-        //     {
-        //         double combined = head + tail;
-        //
-        //         (double range, double headFactor, double combinedFactor, double scoreVal)[] rules = new[]
-        //         {
-        //             (PerfectRange, 1.2, 2.4, 300.0),
-        //             (GreatRange, 1.1, 2.2, 300.0),
-        //             (GoodRange, 1.0, 2.0, 200.0),
-        //             (OkRange, 1.0, 2.0, 100.0),
-        //             (MehRange, 1.0, 2.0, 50.0),
-        //         };
-        //
-        //         foreach (var (range, headFactor, combinedFactor, scoreValue) in rules)
-        //         {
-        //             if (head < range * headFactor && combined < range * combinedFactor)
-        //             {
-        //                 return scoreValue;
-        //             }
-        //         }
-        //
-        //         return 0;
-        //     }
-        //
-        //     Dictionary<HitResult, int> v1Counts = new Dictionary<HitResult, int>();
-        //
-        //     foreach (var hit in Score.HitEvents.Where(e => e.Result.IsBasic()))
-        //     {
-        //         double offset = Math.Abs(hit.TimeOffset);
-        //         HitResult result = maniaHitWindows.ResultFor(offset);
-        //         v1Counts[result] = v1Counts.GetValueOrDefault(result, 0) + 1;
-        //
-        //         var hitObject = (ManiaHitObject)hit.HitObject;
-        //
-        //         if (hitObject is HeadNote)
-        //         {
-        //             HeadOffsets[hitObject.Column] = offset;
-        //         }
-        //         else if (hitObject is TailNote)
-        //         {
-        //             MaxPoints += 300;
-        //             TotalPoints += getLNScore(HeadOffsets[hitObject.Column], offset);
-        //             HeadOffsets[hitObject.Column] = 0;
-        //         }
-        //         else if (hitObject is Note)
-        //         {
-        //             MaxPoints += 300;
-        //             TotalPoints += result switch
-        //             {
-        //                 HitResult.Perfect => 300,
-        //                 HitResult.Great => 300,
-        //                 HitResult.Good => 200,
-        //                 HitResult.Ok => 100,
-        //                 HitResult.Meh => 50,
-        //                 _ => 0
-        //             };
-        //         }
-        //     }
-        //
-        //     double accuracy = MaxPoints > 0 ? TotalPoints / MaxPoints : 0;
-        //     V1Accuracy = accuracy;
-        //     V1Counts = v1Counts;
-        //     // V1Score = TotalPoints;
-        // }
-
-

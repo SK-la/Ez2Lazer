@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import subprocess
 import os
-import sys
 import platform
 import argparse
 import shutil
@@ -30,7 +29,6 @@ def run_cleanup(script_path: str, target_dir: str, platform: str) -> int:
 
 def clean_publish_folder(release_dir=None, platform=None):
     from pathlib import Path
-    import fnmatch
 
     if release_dir is None:
         release_dir = Path(__file__).parent / "Release"
@@ -239,8 +237,8 @@ def main():
         artifacts_dir = fallback
 
     # Use asset names that match workflow-normalized names when tag present
-    release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_x64{tag_suffix}.zip")
-    debug_zip = os.path.join(artifacts_dir, f"Ez2Lazer_debug_x64{tag_suffix}.zip")
+    release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_{target_platform}_x64{tag_suffix}.zip")
+    debug_zip = os.path.join(artifacts_dir, f"Ez2Lazer_debug_{target_platform}_x64{tag_suffix}.zip")
 
     if not args.no_zip:
         if os.path.exists(release_dir):

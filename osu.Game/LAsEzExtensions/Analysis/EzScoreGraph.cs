@@ -21,23 +21,8 @@ using osuTK.Graphics;
 namespace osu.Game.LAsEzExtensions.Analysis
 {
     /// <summary>
-    /// Default implementation of score graph for general rulesets.
-    /// Inherits from BaseEzScoreGraph to leverage shared hit event analysis and visualization.
+    /// 创建每列偏移分布
     /// </summary>
-    public partial class EzScoreGraph : BaseEzScoreGraph
-    {
-        public EzScoreGraph(ScoreInfo score, IBeatmap beatmap)
-            : base(score, beatmap, new DefaultHitWindows())
-        {
-            HitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
-        }
-
-        protected override HitResult RecalculateV2Result(HitEvent hitEvent)
-        {
-            return HitWindows.ResultFor(hitEvent.TimeOffset);
-        }
-    }
-
     public partial class CreateRotatedColumnGraphs : CompositeDrawable
     {
         private const float horizontal_spacing_ratio = 0.015f;
@@ -46,6 +31,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private const float horizontal_margin = 10;
 
         private readonly List<IGrouping<int, HitEvent>> hitEventsByColumn;
+        private float lastDrawWidth = -1;
+        private float lastDrawHeight = -1;
 
         public CreateRotatedColumnGraphs(List<IGrouping<int, HitEvent>> hitEventsByColumn)
         {
@@ -93,7 +80,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (InternalChildren.Count == 0 || DrawWidth <= 0)
                 return;
 
-            updateLayout();
+            if (DrawWidth != lastDrawWidth || DrawHeight != lastDrawHeight)
+            {
+                updateLayout();
+                lastDrawWidth = DrawWidth;
+                lastDrawHeight = DrawHeight;
+            }
         }
 
         private void updateLayout()

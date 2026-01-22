@@ -15,10 +15,10 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         private static readonly double[,] hit_range_bms =
         {
             //  305   300    200     100     50     Miss    Poor
-            { 16.67, 33.33, 116.67, 250, 250, 000 }, // IIDX
-            { 15.00, 30.00, 060.00, 200, 200, 1000 }, // LR2 Hard
-            { 15.00, 45.00, 112.00, 165, 165, 500 }, // raja normal (75%)
-            { 20.00, 60.00, 150.00, 220, 500, 500 }, // raja easy (100%)
+            { 16.67, 33.33, 116.67, 250, 250, 250, 500 }, // IIDX
+            { 15.00, 30.00, 060.00, 200, 200, 1000, 1000 }, // LR2 Hard
+            { 15.00, 45.00, 112.00, 165, 165, 500, 500 }, // raja normal (75%)
+            { 20.00, 60.00, 150.00, 220, 500, 500, 500 }, // raja easy (100%)
         };
 
         private EzMUGHitMode hitMode = EzMUGHitMode.Classic;

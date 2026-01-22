@@ -14,12 +14,12 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Mania.Beatmaps.Patterns;
 using osu.Game.Rulesets.Mania.Beatmaps.Patterns.Legacy;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Utils;
 using osuTK;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
 namespace osu.Game.Rulesets.Mania.Beatmaps
 {
@@ -141,18 +141,6 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
             {
                 case ManiaHitObject maniaObj:
                 {
-                    if (maniaObj is Note note && CurrentHitMode != EzMUGHitMode.Lazer)
-                    {
-                        yield return CurrentHitMode switch
-                        {
-                            EzMUGHitMode.EZ2AC => new Ez2AcNote(note),
-                            EzMUGHitMode.Malody => new NoJudgementNote(note),
-                            EzMUGHitMode.O2Jam => new O2Note(note),
-                            EzMUGHitMode.IIDX_HD => new Ez2AcNote(note),
-                            _ => note
-                        };
-                    }
-                    else
                     if (maniaObj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
                     {
                         yield return CurrentHitMode switch
@@ -262,19 +250,6 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                     lastPattern = newPattern;
 
                 foreach (var obj in newPattern.HitObjects)
-                {
-                    if (obj is Note note && CurrentHitMode != EzMUGHitMode.Lazer)
-                    {
-                        yield return CurrentHitMode switch
-                        {
-                            EzMUGHitMode.EZ2AC => new Ez2AcNote(note),
-                            EzMUGHitMode.Malody => new NoJudgementNote(note),
-                            EzMUGHitMode.O2Jam => new O2Note(note),
-                            EzMUGHitMode.IIDX_HD => new Ez2AcNote(note),
-                            _ => note
-                        };
-                    }
-                    else
                     if (obj is HoldNote hold && CurrentHitMode != EzMUGHitMode.Lazer)
                     {
                         yield return CurrentHitMode switch
@@ -290,7 +265,6 @@ namespace osu.Game.Rulesets.Mania.Beatmaps
                     {
                         yield return obj;
                     }
-                }
             }
         }
 
