@@ -58,36 +58,20 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             {
                 foreach (var column in stage.Columns)
                 {
-                    column.RegisterPool<O2Note, O2DrawableNote>(10, 50);
-                    column.RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
-                    column.RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
-                    column.RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
+                    column.RegisterPool<Note, O2DrawableNote>(10, 50);
+                    column.RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
+                    column.RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);
+                    column.RegisterPool<TailNote, O2DrawableHoldNoteTail>(10, 50);
                 }
             }
         }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            var maniaBeatmap = (ManiaBeatmap)beatmap;
-
-            var hitObjects = maniaBeatmap.HitObjects.Select(obj =>
-            {
-                if (obj is Note note)
-                    return new O2Note(note);
-
-                if (obj is HoldNote hold)
-                    return new O2HoldNote(hold);
-
-                return obj;
-            }).ToList();
-
-            maniaBeatmap.HitObjects = hitObjects;
-
-            // Ensure global O2 BPM and this mod's hit windows are set so gameplay uses correct ranges.
             double bpm = beatmap.BeatmapInfo.BPM;
             O2HitModeExtension.SetOriginalBPM(bpm);
             O2HitModeExtension.SetControlPoints(beatmap.ControlPointInfo);
-            O2HitModeExtension.PillActivated = true;
+            O2HitModeExtension.PillActivated = PillMode.Value;
             O2HitModeExtension.PILL_COUNT.Value = 0;
             HitWindows.BPM = bpm;
             HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
@@ -102,8 +86,6 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            O2HitModeExtension.PILL_COUNT.Value = 0;
-            O2HitModeExtension.PillActivated = PillMode.Value;
         }
 
         public override void ResetSettingsToDefaults()

@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -434,20 +434,41 @@ namespace osu.Game.Rulesets.UI
 
             IDrawablePool pool;
 
-            // Tests may add derived hitobject instances for which pools don't exist. Try to find any applicable pool and dynamically assign the type if the pool exists.
-            if (!pools.TryGetValue(lookupType, out pool))
-            {
-                foreach (var (t, p) in pools)
-                {
-                    if (!t.IsInstanceOfType(hitObject))
-                        continue;
+            // First, try to find an exact match for the hit object type
+            if (pools.TryGetValue(lookupType, out pool))
+                return pool;
 
-                    pools[lookupType] = pool = p;
-                    break;
+            // If no exact match, search through inheritance hierarchy for the most specific match
+            Type currentType = lookupType;
+
+            while (currentType != null && currentType != typeof(object))
+            {
+                // Check if any registered pool type is assignable from current type
+                foreach (var (registeredType, candidatePool) in pools)
+                {
+                    if (registeredType.IsAssignableFrom(currentType))
+                    {
+                        // Cache this lookup for future use
+                        pools[lookupType] = candidatePool;
+                        return candidatePool;
+                    }
+                }
+
+                currentType = currentType.BaseType;
+            }
+
+            // As fallback, check if any pool can handle this object via IsInstanceOfType
+            foreach (var (t, p) in pools)
+            {
+                if (t.IsInstanceOfType(hitObject))
+                {
+                    // Cache this lookup for future use
+                    pools[lookupType] = p;
+                    return p;
                 }
             }
 
-            return pool;
+            return null;
         }
 
         private readonly Dictionary<ISampleInfo, DrawablePool<PoolableSkinnableSample>> samplePools = new Dictionary<ISampleInfo, DrawablePool<PoolableSkinnableSample>>();

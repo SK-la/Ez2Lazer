@@ -218,40 +218,38 @@ namespace osu.Game.Rulesets.Mania.UI
             switch (hitMode)
             {
                 case EzMUGHitMode.EZ2AC:
-                    // RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
-                    RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
-                    // RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<Ez2AcLNTail, Ez2AcDrawableLNTail>(10, 50);
-                    // RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    RegisterPool<Note, DrawableNote>(10, 50);
+                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
+                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
                 case EzMUGHitMode.Malody:
-                    // RegisterPool<NoJudgementNote, DrawableNote>(10, 50);
-                    RegisterPool<NoComboBreakLNTail, MalodyDrawableLNTail>(10, 50);
-                    RegisterPool<NoMissLNBody, MalodyDrawableLNBody>(10, 50);
+                    RegisterPool<Note, DrawableNote>(10, 50);
+                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, MalodyDrawableLNTail>(10, 50);
+                    RegisterPool<HoldNoteBody, MalodyDrawableLNBody>(10, 50);
                     break;
 
                 // TODO: 暂时先用 EZ2AC 的物件池，以后根据使用反馈单独实现
                 case EzMUGHitMode.IIDX_HD:
                 case EzMUGHitMode.LR2_HD:
                 case EzMUGHitMode.Raja_NM:
-                    // RegisterPool<Ez2AcNote, DrawableNote>(10, 50);
-                    RegisterPool<Ez2AcHoldNote, DrawableHoldNote>(10, 50);
-                    // RegisterPool<Ez2AcLNHead, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<Note, DrawableNote>(10, 50);
+                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
                     RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
-                    // RegisterPool<NoMissLNBody, DrawableHoldNoteBody>(10, 50);
+                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
                 case EzMUGHitMode.O2Jam:
-                    // RegisterPool<O2Note, O2DrawableNote>(10, 50);
-                    // RegisterPool<O2LNHead, O2DrawableHoldNoteHead>(10, 50);
-                    // RegisterPool<O2LNTail, O2DrawableHoldNoteTail>(10, 50);
-                    // RegisterPool<O2HoldNote, O2DrawableHoldNote>(10, 50);
-
                     RegisterPool<Note, O2DrawableNote>(10, 50);
                     RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
                     RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);
                     RegisterPool<TailNote, O2DrawableHoldNoteTail>(10, 50);
+                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
             }
         }
