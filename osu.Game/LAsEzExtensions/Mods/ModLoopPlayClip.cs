@@ -62,7 +62,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             {
                 yield return ($"Speed x{SpeedChange.Value:N2}", AdjustPitch.Value ? "Pitch Adjusted" : "Pitch Unchanged");
                 yield return ($"{LoopCount.Value}", "Loop Count");
-                yield return ("Break", $"{BreakTime:N1}s");
+                yield return ("Break", $"{BreakQuarter.Value} × 1/4 beat");
                 yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : Millisecond.Value ? $"{CutTimeStart.Value} ms" : GetStringTime((int)CutTimeStart.Value))}");
                 yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : Millisecond.Value ? $"{CutTimeEnd.Value} ms" : GetStringTime((int)CutTimeEnd.Value))}");
                 yield return ("Infinite Loop", InfiniteLoop.Value ? "Enabled" : "Disabled");
@@ -129,11 +129,11 @@ namespace osu.Game.LAsEzExtensions.Mods
         public BindableBool UseGlobalAbRange { get; set; } = new BindableBool(true);
 
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.BreakTime_Label), nameof(EzModStrings.BreakTime_Description))]
-        public BindableDouble BreakTime { get; set; } = new BindableDouble(0)
+        public BindableInt BreakQuarter { get; set; } = new BindableInt(4)
         {
-            MinValue = 0,
-            MaxValue = 20,
-            Precision = 0.1
+            MinValue = 1,
+            MaxValue = 12,
+            Precision = 1
         };
 
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Random_Label), nameof(EzModStrings.Random_Description))]
@@ -349,12 +349,28 @@ namespace osu.Game.LAsEzExtensions.Mods
             double start = ResolvedCutTimeStart;
             double end = ResolvedCutTimeEnd;
 
+            // Compute loop interval in milliseconds as a multiple of a quarter-beat at the slice start.
+            double loopIntervalMs;
+
+            try
+            {
+                var timing = beatmap.Beatmap.ControlPointInfo.TimingPointAt(start);
+                // BeatLength is ms per beat; quarter-beat is BeatLength / 4.
+                double quarterMs = timing.BeatLength / 4.0;
+                loopIntervalMs = quarterMs * Math.Max(1, BreakQuarter.Value);
+            }
+            catch
+            {
+                // Fallback: treat quarter as 250ms (i.e. 60 BPM) if timing unavailable.
+                loopIntervalMs = 250 * Math.Max(1, BreakQuarter.Value);
+            }
+
             return new OverrideSettings
             {
                 StartTime = start,
                 Duration = Math.Max(0, end - start),
                 LoopCount = LoopCount.Value,
-                LoopInterval = BreakTime.Value * 1000,
+                LoopInterval = loopIntervalMs,
                 ForceLooping = true,
             };
         }

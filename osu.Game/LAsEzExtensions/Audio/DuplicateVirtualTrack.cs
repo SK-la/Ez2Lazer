@@ -3,21 +3,38 @@
 
 using System;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
-using osu.Framework.Graphics.Containers;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.LAsEzExtensions.Audio
 {
     public partial class DuplicateVirtualTrack : CompositeDrawable
     {
+        private const string log_prefix = "[LAsEz/DuplicateVirtualTrack]";
+
+        private void Log(string message)
+        {
+            try
+            {
+                // Suppress informational logs by default. Only forward messages
+                // that contain failure/error keywords to reduce verbosity in normal runs.
+                if (!message.Contains("failed", StringComparison.OrdinalIgnoreCase)
+                    && !message.Contains("error", StringComparison.OrdinalIgnoreCase)
+                    && !message.Contains("exception", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                Logger.Log($"{log_prefix} {message}", LoggingTarget.Runtime);
+            }
+            catch { }
+        }
+
         private bool startRequested;
         private bool started;
         private IWorkingBeatmap? pendingBeatmap;
@@ -26,7 +43,6 @@ namespace osu.Game.LAsEzExtensions.Audio
         private BindableDouble? beatmapTrackMuteAdjustment;
         private Track? mutedOriginalTrack;
         private double? desiredCandidateStartTime;
-        private bool? prevEzPreviewManagerEnabled;
         private Track? activeCandidateTrack;
         private bool ownsCandidateTrack;
         private double? overrideDuration;
@@ -39,6 +55,8 @@ namespace osu.Game.LAsEzExtensions.Audio
         private bool? prevCandidateLooping;
         private ScheduledDelegate? loopDelayDelegate;
         private ScheduledDelegate? loopCheckerDelegate;
+        private BindableDouble? candidateMuteAdjustment;
+        private bool inLoopDelay;
 
         [Resolved(canBeNull: true)]
         private IGameplayClock? gameplayClock { get; set; }
@@ -82,7 +100,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"DuplicateVirtualTrack: error removing previous mute adjustment: {ex}", LoggingTarget.Runtime);
+                        Log($"error removing previous mute adjustment: {ex}");
                     }
 
                     beatmapTrackMuteAdjustment = new BindableDouble(0);
@@ -91,7 +109,8 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                     try
                     {
-                        Logger.Log($"DuplicateVirtualTrack: muted original track (hash={mutedOriginalTrack.GetHashCode()}) preMuteVol={mutedOriginalTrack.Volume.Value:F3} agg={mutedOriginalTrack.AggregateVolume.Value:F3}", LoggingTarget.Runtime);
+                        Log(
+                            $"StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}");
                     }
                     catch { }
                 }
@@ -112,12 +131,14 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             try
             {
-                Logger.Log($"DuplicateVirtualTrack: StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}", LoggingTarget.Runtime);
+                Log(
+                    $"StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}");
             }
             catch { }
 
             // 计算初始循环计数与片段边界（若提供）
             sliceStart = desiredCandidateStartTime ?? 0;
+
             if (overrideDuration != null)
             {
                 sliceEnd = sliceStart + overrideDuration.Value;
@@ -167,8 +188,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 if (activeCandidateTrack != null && gameplayClock != null)
                 {
                     bool running = gameplayClock.IsRunning;
-                    if (prevGameplayClockRunning == null)
-                        prevGameplayClockRunning = running;
+                    prevGameplayClockRunning ??= running;
 
                     if (running != prevGameplayClockRunning)
                     {
@@ -177,12 +197,13 @@ namespace osu.Game.LAsEzExtensions.Audio
                             try
                             {
                                 activeCandidateTrack.Stop();
-                                Logger.Log("DuplicateVirtualTrack: paused candidate due to gameplayClock.IsRunning=false", LoggingTarget.Runtime);
+                                Log("paused candidate due to gameplayClock.IsRunning=false");
                             }
                             catch { }
 
                             // Pause loop checking while paused to avoid triggering seeks while stopped.
-                            try { loopCheckerDelegate?.Cancel(); } catch { }
+                            try { loopCheckerDelegate?.Cancel(); }
+                            catch { }
                         }
                         else
                         {
@@ -190,7 +211,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                             {
                                 // Resume playback from current time.
                                 activeCandidateTrack.Start();
-                                Logger.Log("DuplicateVirtualTrack: resumed candidate due to gameplayClock.IsRunning=true", LoggingTarget.Runtime);
+                                Log("resumed candidate due to gameplayClock.IsRunning=true");
                             }
                             catch { }
 
@@ -204,11 +225,13 @@ namespace osu.Game.LAsEzExtensions.Audio
                                         try
                                         {
                                             if (activeCandidateTrack == null) return;
+
                                             double now = activeCandidateTrack.CurrentTime;
                                             const double epsilon = 2.0;
+
                                             if (now + epsilon >= sliceEnd)
                                             {
-                                                Logger.Log($"DuplicateVirtualTrack: loopChecker triggered now={now} sliceEnd={sliceEnd} loopsRemaining={loopsRemaining}", LoggingTarget.Runtime);
+                                                Log($"loopChecker triggered now={now} sliceEnd={sliceEnd} loopsRemaining={loopsRemaining}");
 
                                                 if (loopsRemaining <= 1)
                                                 {
@@ -218,21 +241,62 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                                                 loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
 
-                                                if (overrideLoopInterval != null && overrideLoopInterval > 0)
+                                                if (overrideLoopInterval > 0)
                                                 {
-                                                    try { activeCandidateTrack.Stop(); } catch { }
+                                                    try
+                                                    {
+                                                        // Prevent further loopChecker triggers while in delay window.
+                                                        try { loopCheckerDelegate?.Cancel(); }
+                                                        catch { }
+
+                                                        loopCheckerDelegate = null;
+
+                                                        // Mute the candidate during the interval instead of stopping it,
+                                                        // which some Track implementations may still advance in time when stopped.
+                                                        candidateMuteAdjustment ??= new BindableDouble(0);
+
+                                                        try { activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment); }
+                                                        catch { }
+
+                                                        inLoopDelay = true;
+                                                    }
+                                                    catch { }
 
                                                     loopDelayDelegate?.Cancel();
-                                                    var delayMs = (int)Math.Max(0, overrideLoopInterval.Value);
+                                                    int delayMs = (int)Math.Max(0, overrideLoopInterval.Value);
                                                     loopDelayDelegate = Scheduler.AddDelayed(() =>
                                                     {
-                                                        try { activeCandidateTrack?.Seek(sliceStart); activeCandidateTrack?.Start(); Logger.Log($"DuplicateVirtualTrack: restarted candidate after interval", LoggingTarget.Runtime); }
-                                                        catch (Exception ex) { Logger.Log($"DuplicateVirtualTrack: delayed restart failed: {ex}", LoggingTarget.Runtime); }
+                                                        try
+                                                        {
+                                                            activeCandidateTrack?.Seek(sliceStart);
+
+                                                            try
+                                                            {
+                                                                if (candidateMuteAdjustment != null) activeCandidateTrack.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+                                                            }
+                                                            catch { }
+
+                                                            activeCandidateTrack?.Start();
+                                                            Logger.Log("DuplicateVirtualTrack: restarted candidate after interval", LoggingTarget.Runtime);
+
+                                                            inLoopDelay = false;
+
+                                                            try { ensureLoopCheckerRunning(); }
+                                                            catch { }
+                                                        }
+                                                        catch (Exception ex)
+                                                        {
+                                                            Log($"delayed restart failed: {ex}");
+                                                        }
                                                     }, delayMs);
                                                 }
                                                 else
                                                 {
-                                                    try { activeCandidateTrack.Seek(sliceStart); Logger.Log($"DuplicateVirtualTrack: seamless seek to {sliceStart}", LoggingTarget.Runtime); }
+                                                    try
+                                                    {
+                                                        activeCandidateTrack.Seek(sliceStart);
+                                                        Logger.Log($"DuplicateVirtualTrack: seamless seek to {sliceStart}", LoggingTarget.Runtime);
+                                                    }
                                                     catch (Exception ex) { Logger.Log($"DuplicateVirtualTrack: seamless seek failed: {ex}", LoggingTarget.Runtime); }
                                                 }
                                             }
@@ -284,7 +348,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch (Exception ex)
             {
-                Logger.Log($"DuplicateVirtualTrack: failed to start candidate playback: {ex}", LoggingTarget.Runtime);
+                Log($"failed to start candidate playback: {ex}");
             }
         }
 
@@ -305,8 +369,19 @@ namespace osu.Game.LAsEzExtensions.Audio
                             {
                                 if (activeCandidateTrack != null)
                                 {
-                                    try { activeCandidateTrack.Stop(); Logger.Log("DuplicateVirtualTrack: paused candidate via IsPaused=true", LoggingTarget.Runtime); } catch { }
-                                    try { loopCheckerDelegate?.Cancel(); loopCheckerDelegate = null; } catch { }
+                                    try
+                                    {
+                                        activeCandidateTrack.Stop();
+                                        Logger.Log("DuplicateVirtualTrack: paused candidate via IsPaused=true", LoggingTarget.Runtime);
+                                    }
+                                    catch { }
+
+                                    try
+                                    {
+                                        loopCheckerDelegate?.Cancel();
+                                        loopCheckerDelegate = null;
+                                    }
+                                    catch { }
                                 }
                             }
                             else
@@ -321,28 +396,30 @@ namespace osu.Game.LAsEzExtensions.Audio
                                             try
                                             {
                                                 double now = activeCandidateTrack.CurrentTime;
+
                                                 if (now >= sliceEnd)
                                                 {
                                                     activeCandidateTrack.Seek(sliceStart);
-                                                    Logger.Log($"DuplicateVirtualTrack: seeked candidate to sliceStart on resume ({sliceStart})", LoggingTarget.Runtime);
+                                                    Log($"seeked candidate to sliceStart on resume ({sliceStart})");
                                                 }
                                             }
                                             catch { }
                                         }
 
                                         activeCandidateTrack.Start();
-                                        Logger.Log("DuplicateVirtualTrack: resumed candidate via IsPaused=false", LoggingTarget.Runtime);
+                                        Log("resumed candidate via IsPaused=false");
                                     }
                                     catch { }
 
                                     // Restart loopChecker if needed.
-                                    try { ensureLoopCheckerRunning(); } catch { }
+                                    try { ensureLoopCheckerRunning(); }
+                                    catch { }
                                 }
                             }
                         }
                         catch (Exception ex)
                         {
-                            Logger.Log($"DuplicateVirtualTrack: error handling IsPaused change: {ex}", LoggingTarget.Runtime);
+                            Log($"error handling IsPaused change: {ex}");
                         }
                     };
 
@@ -358,16 +435,21 @@ namespace osu.Game.LAsEzExtensions.Audio
             {
                 if (overrideDuration == null || activeCandidateTrack == null)
                     return;
-
-                // Cancel existing checker if any, then add a new repeating checker.
+                // Cancel existing checker if any, then add a new repeating checker using mute-based interval handling.
                 loopCheckerDelegate?.Cancel();
                 loopCheckerDelegate = Scheduler.AddDelayed(() =>
                 {
                     try
                     {
                         if (activeCandidateTrack == null) return;
+
+                        // If we're currently in a loop delay, ignore checks.
+                        if (inLoopDelay)
+                            return;
+
                         double now = activeCandidateTrack.CurrentTime;
                         const double epsilon = 2.0;
+
                         if (now + epsilon >= sliceEnd)
                         {
                             Logger.Log($"DuplicateVirtualTrack: loopChecker triggered now={now} sliceEnd={sliceEnd} loopsRemaining={loopsRemaining}", LoggingTarget.Runtime);
@@ -380,34 +462,69 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                             loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
 
-                            if (overrideLoopInterval != null && overrideLoopInterval > 0)
+                            if (overrideLoopInterval > 0)
                             {
-                                try { activeCandidateTrack.Stop(); } catch { }
+                                // Enter delay: cancel checker, mark inLoopDelay and mute candidate instead of stopping it.
+                                try { loopCheckerDelegate?.Cancel(); }
+                                catch { }
+
+                                loopCheckerDelegate = null;
+
+                                candidateMuteAdjustment ??= new BindableDouble(0);
+
+                                try { activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment); }
+                                catch { }
+
+                                inLoopDelay = true;
 
                                 loopDelayDelegate?.Cancel();
-                                var delayMs = (int)Math.Max(0, overrideLoopInterval.Value);
+                                int delayMs = (int)Math.Max(0, overrideLoopInterval.Value);
                                 loopDelayDelegate = Scheduler.AddDelayed(() =>
                                 {
-                                    try { activeCandidateTrack?.Seek(sliceStart); activeCandidateTrack?.Start(); Logger.Log($"DuplicateVirtualTrack: restarted candidate after interval", LoggingTarget.Runtime); }
-                                    catch (Exception ex) { Logger.Log($"DuplicateVirtualTrack: delayed restart failed: {ex}", LoggingTarget.Runtime); }
+                                    try
+                                    {
+                                        activeCandidateTrack?.Seek(sliceStart);
+
+                                        try
+                                        {
+                                            if (candidateMuteAdjustment != null) activeCandidateTrack.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+                                        }
+                                        catch { }
+
+                                        activeCandidateTrack?.Start();
+                                        Log("restarted candidate after interval");
+
+                                        inLoopDelay = false;
+
+                                        try { ensureLoopCheckerRunning(); }
+                                        catch { }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Logger.Log($"DuplicateVirtualTrack: delayed restart failed: {ex}", LoggingTarget.Runtime);
+                                    }
                                 }, delayMs);
                             }
                             else
                             {
-                                try { activeCandidateTrack.Seek(sliceStart); Logger.Log($"DuplicateVirtualTrack: seamless seek to {sliceStart}", LoggingTarget.Runtime); }
-                                catch (Exception ex) { Logger.Log($"DuplicateVirtualTrack: seamless seek failed: {ex}", LoggingTarget.Runtime); }
+                                try
+                                {
+                                    activeCandidateTrack.Seek(sliceStart);
+                                    Log($"seamless seek to {sliceStart}");
+                                }
+                                catch (Exception ex) { Log($"seamless seek failed: {ex}"); }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"DuplicateVirtualTrack: loopChecker error: {ex}", LoggingTarget.Runtime);
+                        Log($"loopChecker error: {ex}");
                     }
                 }, 30, true);
             }
             catch (Exception ex)
             {
-                Logger.Log($"DuplicateVirtualTrack: ensureLoopCheckerRunning failed: {ex}", LoggingTarget.Runtime);
+                Log($"ensureLoopCheckerRunning failed: {ex}");
             }
         }
 
@@ -468,12 +585,12 @@ namespace osu.Game.LAsEzExtensions.Audio
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"DuplicateVirtualTrack: ensure length failed for {candidateNames[i]}: {ex.Message}", LoggingTarget.Runtime);
+                    Log($"ensure length failed for {candidateNames[i]}: {ex.Message}");
                 }
 
                 if (t.Length > 0)
                 {
-                    Logger.Log($"DuplicateVirtualTrack: selected {candidateNames[i]} (length={t.Length})", LoggingTarget.Runtime);
+                    Log($"selected {candidateNames[i]} (length={t.Length})");
                     if (gameplayClockContainer != null)
                         t.BindAdjustments(gameplayClockContainer.AdjustmentsFromMods);
                     if (gameplayClockContainer is MasterGameplayClockContainer master)
@@ -491,11 +608,11 @@ namespace osu.Game.LAsEzExtensions.Audio
                             // Seek to desired candidate start time if provided, otherwise to 0.
                             double seekTarget = desiredCandidateStartTime ?? 0;
                             t.Seek(seekTarget);
-                            Logger.Log($"DuplicateVirtualTrack: prepared independent candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.", LoggingTarget.Runtime);
+                            Log($"prepared independent candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.");
                         }
                         catch (Exception ex)
                         {
-                            Logger.Log($"DuplicateVirtualTrack: failed to prepare candidate track: {ex}", LoggingTarget.Runtime);
+                            Log($"failed to prepare candidate track: {ex}");
                         }
                     }
 
@@ -510,7 +627,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 var t = candidates[i];
                 if (t == null) continue;
 
-                Logger.Log($"DuplicateVirtualTrack: fallback to {candidateNames[i]} (length={t.Length})", LoggingTarget.Runtime);
+                Log($"fallback to {candidateNames[i]} (length={t.Length})");
                 if (gameplayClockContainer != null)
                     t.BindAdjustments(gameplayClockContainer.AdjustmentsFromMods);
                 if (gameplayClockContainer is MasterGameplayClockContainer master)
@@ -525,11 +642,11 @@ namespace osu.Game.LAsEzExtensions.Audio
                         t.Stop();
                         double seekTarget = desiredCandidateStartTime ?? 0;
                         t.Seek(seekTarget);
-                        Logger.Log($"DuplicateVirtualTrack: prepared fallback candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.", LoggingTarget.Runtime);
+                        Log($"prepared fallback candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.");
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"DuplicateVirtualTrack: failed to prepare fallback candidate track: {ex}", LoggingTarget.Runtime);
+                        Log($"failed to prepare fallback candidate track: {ex}");
                     }
                 }
 
@@ -537,7 +654,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 return t;
             }
 
-            Logger.Log("DuplicateVirtualTrack: no candidate found, using beatmap.Track", LoggingTarget.Runtime);
+            Log("no candidate found, using beatmap.Track");
             return null;
         }
 
@@ -554,8 +671,34 @@ namespace osu.Game.LAsEzExtensions.Audio
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"DuplicateVirtualTrack: failed to stop active candidate track on StopPreview: {ex}", LoggingTarget.Runtime);
+                        Log($"failed to stop active candidate track on StopPreview: {ex}");
                     }
+
+                    // If we applied a candidate mute adjustment during a loop delay, remove it now.
+                    try
+                    {
+                        if (candidateMuteAdjustment != null)
+                        {
+                            try { activeCandidateTrack.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment); }
+                            catch { }
+
+                            candidateMuteAdjustment = null;
+                        }
+                    }
+                    catch { }
+
+                    // Restore underlying track looping if we changed it earlier.
+                    try
+                    {
+                        if (prevCandidateLooping != null)
+                        {
+                            try { activeCandidateTrack.Looping = prevCandidateLooping.Value; }
+                            catch { }
+
+                            Log($"restored candidate track.Looping to {prevCandidateLooping.Value}");
+                        }
+                    }
+                    catch { }
 
                     if (ownsCandidateTrack)
                     {
@@ -578,7 +721,8 @@ namespace osu.Game.LAsEzExtensions.Audio
                 {
                     try
                     {
-                        Logger.Log($"DuplicateVirtualTrack: removing mute adjustment from original track (hash={mutedOriginalTrack.GetHashCode()}) on StopPreview. pre: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}", LoggingTarget.Runtime);
+                        Log(
+                            $"removing mute adjustment from original track (hash={mutedOriginalTrack.GetHashCode()}) on StopPreview. pre: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
                     }
                     catch { }
 
@@ -588,19 +732,19 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                         try
                         {
-                            Logger.Log($"DuplicateVirtualTrack: removed mute adjustment on StopPreview. post: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}", LoggingTarget.Runtime);
+                            Log($"removed mute adjustment on StopPreview. post: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
                         }
                         catch { }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"DuplicateVirtualTrack: failed to remove mute adjustment on StopPreview: {ex}", LoggingTarget.Runtime);
+                        Log($"failed to remove mute adjustment on StopPreview: {ex}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"DuplicateVirtualTrack: failed to remove mute adjustment on StopPreview: {ex}", LoggingTarget.Runtime);
+                Log($"failed to remove mute adjustment on StopPreview: {ex}");
             }
 
             beatmapTrackMuteAdjustment = null;
@@ -621,20 +765,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch { }
 
-            // 恢复之前修改的底层 track Looping（若我们在 Start 时修改过）
-            try
-            {
-                if (activeCandidateTrack != null && prevCandidateLooping != null)
-                {
-                    try
-                    {
-                        activeCandidateTrack.Looping = prevCandidateLooping.Value;
-                        Logger.Log($"DuplicateVirtualTrack: restored candidate track.Looping to {prevCandidateLooping.Value}", LoggingTarget.Runtime);
-                    }
-                    catch { }
-                }
-            }
-            catch { }
+            // (已在停止前尝试恢复底层 track.Looping 与移除候选静音调整)
 
             // 重置 DuplicateVirtualTrack 特有的状态
             startRequested = false;
@@ -687,62 +818,25 @@ namespace osu.Game.LAsEzExtensions.Audio
                     t.Start();
                     Logger.Log($"DuplicateVirtualTrack: started candidate track (hash={t.GetHashCode()}) at {t.CurrentTime}", LoggingTarget.Runtime);
 
-                    // 启动短周期检测器以可靠处理切片/拼接（避免仅依赖 Drawable 的 Update 时序）
+                    // 启动或确保短周期检测器（切片/拼接）运行。
                     try
                     {
-                        loopCheckerDelegate?.Cancel();
+                        // Cancel any existing checker; ensureLoopCheckerRunning will recreate if needed.
+                        try { loopCheckerDelegate?.Cancel(); }
+                        catch { }
+
                         loopCheckerDelegate = null;
 
-                        if (overrideDuration != null && !double.IsNaN(sliceEnd))
+                        // Let the shared helper create the loopChecker using consistent logic.
+                        try { ensureLoopCheckerRunning(); }
+                        catch (Exception ex)
                         {
-                            loopCheckerDelegate = Scheduler.AddDelayed(() =>
-                            {
-                                try
-                                {
-                                    if (activeCandidateTrack == null) return;
-                                    double now = activeCandidateTrack.CurrentTime;
-                                    const double epsilon = 2.0;
-                                    if (now + epsilon >= sliceEnd)
-                                    {
-                                        Logger.Log($"DuplicateVirtualTrack: loopChecker triggered now={now} sliceEnd={sliceEnd} loopsRemaining={loopsRemaining}", LoggingTarget.Runtime);
-
-                                        if (loopsRemaining <= 1)
-                                        {
-                                            stopPreviewInternal("loops_finished");
-                                            return;
-                                        }
-
-                                        loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
-
-                                        if (overrideLoopInterval != null && overrideLoopInterval > 0)
-                                        {
-                                            try { activeCandidateTrack.Stop(); } catch { }
-
-                                            loopDelayDelegate?.Cancel();
-                                            var delayMs = (int)Math.Max(0, overrideLoopInterval.Value);
-                                            loopDelayDelegate = Scheduler.AddDelayed(() =>
-                                            {
-                                                try { activeCandidateTrack?.Seek(sliceStart); activeCandidateTrack?.Start(); Logger.Log($"DuplicateVirtualTrack: restarted candidate after interval", LoggingTarget.Runtime); }
-                                                catch (Exception ex) { Logger.Log($"DuplicateVirtualTrack: delayed restart failed: {ex}", LoggingTarget.Runtime); }
-                                            }, delayMs);
-                                        }
-                                        else
-                                        {
-                                            try { activeCandidateTrack.Seek(sliceStart); Logger.Log($"DuplicateVirtualTrack: seamless seek to {sliceStart}", LoggingTarget.Runtime); }
-                                            catch (Exception ex) { Logger.Log($"DuplicateVirtualTrack: seamless seek failed: {ex}", LoggingTarget.Runtime); }
-                                        }
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Logger.Log($"DuplicateVirtualTrack: loopChecker error: {ex}", LoggingTarget.Runtime);
-                                }
-                            }, 30, true);
+                            Logger.Log($"DuplicateVirtualTrack: failed to start loopChecker: {ex}", LoggingTarget.Runtime);
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Log($"DuplicateVirtualTrack: failed to start loopChecker: {ex}", LoggingTarget.Runtime);
+                        Logger.Log($"DuplicateVirtualTrack: failed to initialize loopChecker: {ex}", LoggingTarget.Runtime);
                     }
                 }
                 catch (Exception ex)

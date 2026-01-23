@@ -73,7 +73,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             "Use global A-B range. Always use the editor A/B range stored for this session (ms).");
 
         public static readonly LocalisableString BreakTime_Label = new EzLocalisableString("休息时间", "Break Time");
-        public static readonly LocalisableString BreakTime_Description = new EzLocalisableString("设置两个切片循环之间的休息时间（秒）", "Break Time. If you need break(second).");
+        public static readonly LocalisableString BreakTime_Description = new EzLocalisableString("设置两个切片循环之间的休息时间（以四分之一拍为单位，范围 1-12，默认 4）", "Set the break between clip loops as multiples of 1/4 beat (1-12, default 4).");
         public static readonly LocalisableString Random_Label = new EzLocalisableString("随机", "Random");
         public static readonly LocalisableString Random_Description = new EzLocalisableString("在切片每次重复时进行随机", "Random. Do a Random on every duplicate.");
         public static readonly LocalisableString Mirror_Label = new EzLocalisableString("镜像", "Mirror");

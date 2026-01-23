@@ -53,9 +53,21 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
             maniaBeatmap.Breaks.Clear();
-            double breakTime = BreakTime.Value * 1000;
 
             var (cutTimeStart, cutTimeEnd, length) = ResolveSliceTimesForBeatmap(beatmap);
+
+            double breakTime;
+
+            try
+            {
+                var timing = beatmap.ControlPointInfo.TimingPointAt(cutTimeStart);
+                double quarterMs = timing.BeatLength / 4.0;
+                breakTime = quarterMs * Math.Max(1, BreakQuarter.Value);
+            }
+            catch
+            {
+                breakTime = 250 * Math.Max(1, BreakQuarter.Value);
+            }
 
             var cutObjectList = maniaBeatmap.HitObjects.Where(h => h.StartTime > cutTimeStart && h.GetEndTime() < cutTimeEnd).ToList();
 
