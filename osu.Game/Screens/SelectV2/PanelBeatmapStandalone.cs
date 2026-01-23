@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using osu.Framework.Allocation;
-using osu.Framework.Logging;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
@@ -56,27 +55,28 @@ namespace osu.Game.Screens.SelectV2
         private BeatmapManager beatmaps { get; set; } = null!;
 
         [Resolved]
-        private OsuColour colours { get; set; } = null!;
+        private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
+
+        #region Ez功能
 
         [Resolved]
-        private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
+        private OsuColour colours { get; set; } = null!;
 
         [Resolved]
         private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
-        private bool applyNextManiaUiUpdateImmediately;
-        private string? cachedScratchText;
+        private EzDisplayXxySR displayXxySR = null!;
+        private EzKpcDisplay ezKpcDisplay = null!;
         private EzKpsDisplay ezKpsDisplay = null!;
         private EzDisplayLineGraph ezKpsGraph = null!;
-        private EzKpcDisplay ezKpcDisplay = null!;
 
-        private EzDisplayXxySR displayXxySR = null!;
+        private EzKpcDisplay.KpcDisplayMode lastKpcMode;
+        private int lastKpcCountsHash;
 
-        private IBindable<StarDifficulty>? starDifficultyBindable;
-        private CancellationTokenSource? starDifficultyCancellationSource;
-
+        private bool applyNextManiaUiUpdateImmediately;
+        private string? cachedScratchText;
         private int cachedKpcKeyCount = -1;
         private Guid cachedKpcBeatmapId;
         private int cachedKpcRulesetId = -1;
@@ -86,19 +86,20 @@ namespace osu.Game.Screens.SelectV2
         private Dictionary<int, int>? normalizedHoldNoteCounts;
         private int normalizedCountsKeyCount;
 
-        private int lastKpcCountsHash;
-        private EzKpcDisplay.KpcDisplayMode lastKpcMode;
-
-        private PanelSetBackground beatmapBackground = null!;
-        private ScheduledDelegate? scheduledBackgroundRetrieval;
-
         private ScheduledDelegate? scheduledMetadataTextUpdate;
-
         private ScheduledDelegate? scheduledManiaUiUpdate;
         private (double averageKps, double maxKps, List<double> kpsList) pendingKpsResult;
         private Dictionary<int, int>? pendingColumnCounts;
         private Dictionary<int, int>? pendingHoldNoteCounts;
         private bool hasPendingUiUpdate;
+
+        #endregion
+
+        private IBindable<StarDifficulty>? starDifficultyBindable;
+        private CancellationTokenSource? starDifficultyCancellationSource;
+
+        private PanelSetBackground beatmapBackground = null!;
+        private ScheduledDelegate? scheduledBackgroundRetrieval;
 
         private OsuSpriteText titleText = null!;
         private OsuSpriteText artistText = null!;
@@ -260,7 +261,6 @@ namespace osu.Game.Screens.SelectV2
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
-                                            Enabled = { BindTarget = Selected }
                                         },
                                         ezKpcDisplay = new EzKpcDisplay
                                         {
@@ -289,6 +289,11 @@ namespace osu.Game.Screens.SelectV2
                 updateKeyCount();
             });
 
+            Selected.BindValueChanged(s =>
+            {
+                Expanded.Value = s.NewValue;
+                spreadDisplay.Enabled.Value = s.NewValue;
+            }, true);
             mods.BindValueChanged(_ =>
             {
                 cachedScratchText = null;
@@ -517,7 +522,15 @@ namespace osu.Game.Screens.SelectV2
 
             scheduledBackgroundRetrieval?.Cancel();
             scheduledBackgroundRetrieval = null;
+            beatmapBackground.Beatmap = null;
+            updateButton.BeatmapSet = null;
+            localRank.Beatmap = null;
+            starDifficultyBindable = null;
+            spreadDisplay.Beatmap.Value = null;
 
+            starDifficultyCancellationSource?.Cancel();
+
+            // Ez功能
             scheduledMetadataTextUpdate?.Cancel();
             scheduledMetadataTextUpdate = null;
 
@@ -526,13 +539,6 @@ namespace osu.Game.Screens.SelectV2
             hasPendingUiUpdate = false;
             pendingColumnCounts = null;
             pendingHoldNoteCounts = null;
-            beatmapBackground.Beatmap = null;
-            updateButton.BeatmapSet = null;
-            localRank.Beatmap = null;
-            starDifficultyBindable = null;
-            spreadDisplay.Beatmap.Value = null;
-
-            starDifficultyCancellationSource?.Cancel();
             maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisBindable = null;
             cachedScratchText = null;
@@ -616,7 +622,6 @@ namespace osu.Game.Screens.SelectV2
 
         private void computeStarRating()
         {
-            // Logger.Log($"[PanelBeatmapStandalone] computeStarRating called for beatmap {beatmap.OnlineID}/{beatmap.ID}", LoggingTarget.Runtime, LogLevel.Debug);
             starDifficultyCancellationSource?.Cancel();
             starDifficultyCancellationSource = new CancellationTokenSource();
 
@@ -626,7 +631,6 @@ namespace osu.Game.Screens.SelectV2
             starDifficultyBindable = difficultyCache.GetBindableDifficulty(beatmap, starDifficultyCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             starDifficultyBindable.BindValueChanged(starDifficulty =>
             {
-                // Logger.Log($"[PanelBeatmapStandalone] starDifficulty changed for beatmap {beatmap.OnlineID}/{beatmap.ID} stars={starDifficulty.NewValue.Stars}", LoggingTarget.Runtime, LogLevel.Debug);
                 starRatingDisplay.Current.Value = starDifficulty.NewValue;
                 spreadDisplay.StarDifficulty.Value = starDifficulty.NewValue;
             }, true);
@@ -638,16 +642,15 @@ namespace osu.Game.Screens.SelectV2
 
             if (Item?.IsVisible != true)
             {
+                starDifficultyCancellationSource?.Cancel();
+                starDifficultyCancellationSource = null;
+
+                // 离屏取消，避免后台为不可见项占用计算预算。
                 scheduledBackgroundRetrieval?.Cancel();
                 scheduledBackgroundRetrieval = null;
 
                 scheduledMetadataTextUpdate?.Cancel();
                 scheduledMetadataTextUpdate = null;
-
-                starDifficultyCancellationSource?.Cancel();
-                starDifficultyCancellationSource = null;
-
-                // 离屏时取消 mania 分析（其中包含 xxy_SR），避免后台为不可见项占用计算预算。
                 maniaAnalysisCancellationSource?.Cancel();
                 maniaAnalysisCancellationSource = null;
             }

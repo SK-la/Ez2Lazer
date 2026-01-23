@@ -181,7 +181,7 @@ namespace osu.Game
         [Cached]
         private readonly ScreenshotManager screenshotManager = new ScreenshotManager();
 
-        protected SentryLogger SentryLogger;
+        private SentryLogger sentryLogger;
 
         public virtual StableStorage GetStorageForStableInstall() => null;
 
@@ -362,7 +362,7 @@ namespace osu.Game
         public override void SetupLogging(Storage gameStorage, Storage cacheStorage)
         {
             base.SetupLogging(gameStorage, cacheStorage);
-            SentryLogger = new SentryLogger(this, cacheStorage);
+            sentryLogger = new SentryLogger(this, cacheStorage);
         }
 
         public override void SetHost(GameHost host)
@@ -416,7 +416,7 @@ namespace osu.Game
         [BackgroundDependencyLoader]
         private void load()
         {
-            SentryLogger.AttachUser(API.LocalUser);
+            sentryLogger.AttachUser(API.LocalUser);
 
             if (SeasonalUIConfig.ENABLED)
                 dependencies.CacheAs(osuLogo = new OsuLogoChristmas { Alpha = 0 });
@@ -1039,7 +1039,7 @@ namespace osu.Game
 
             base.Dispose(isDisposing);
 
-            SentryLogger.Dispose();
+            sentryLogger.Dispose();
 
             if (Host?.Window != null)
                 Host.Window.DragDrop -= onWindowDragDrop;
