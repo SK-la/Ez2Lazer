@@ -164,9 +164,8 @@ namespace osu.Game.Screens.SelectV2
 
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
-        private EzPreviewTrackManager ezPreviewManager = null!;
         private Bindable<bool> keySoundPreview = null!;
-        private bool isEnteringGameplay;
+        private EzPreviewTrackManager ezPreviewManager = null!;
 
         private IDisposable? modSelectOverlayRegistration;
 
@@ -319,6 +318,8 @@ namespace osu.Game.Screens.SelectV2
                 updateBackgroundDim();
             });
 
+            ezPreviewManager = new EzPreviewTrackManager();
+            AddInternal(ezPreviewManager);
             keySoundPreview = ezConfig.GetBindable<bool>(Ez2Setting.KeySoundPreview);
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
         }
@@ -408,16 +409,8 @@ namespace osu.Game.Screens.SelectV2
                 fetchOnlineInfo();
             });
 
-            ezPreviewManager = new EzPreviewTrackManager();
-            AddInternal(ezPreviewManager);
             keySoundPreview.BindValueChanged(v =>
                 EzPreviewTrackManager.Enabled = v.NewValue, true);
-
-            Mods.BindValueChanged(_ =>
-            {
-                bool hasLoopMod = Mods.Value.OfType<ILoopTimeRangeMod>().Any();
-                DuplicateVirtualTrack.DuplicateEnabled = hasLoopMod;
-            }, true);
         }
 
         protected override void Update()
@@ -555,9 +548,10 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            if (keySoundPreview.Value && !isEnteringGameplay)
+            if (keySoundPreview.Value && this.IsCurrentScreen())
             {
-                ezPreviewManager.StartPreview(beatmap);
+                if (!ezPreviewManager.StartPreview(beatmap))
+                    beatmap.PrepareTrackForPreview(true);
             }
             else
             {
@@ -591,10 +585,6 @@ namespace osu.Game.Screens.SelectV2
 
             if (Beatmap.IsDefault)
                 return;
-
-            isEnteringGameplay = true;
-            bool hasLoopMod = Mods.Value.OfType<IApplyToLoopPlay>().Any();
-            DuplicateVirtualTrack.DuplicateEnabled = hasLoopMod;
 
             startAction();
         }
@@ -775,14 +765,6 @@ namespace osu.Game.Screens.SelectV2
             ensurePlayingSelected();
             updateBackgroundDim();
             fetchOnlineInfo(force: true);
-
-            // 重置进入gameplay标志
-            isEnteringGameplay = false;
-
-            if (keySoundPreview.Value && !isEnteringGameplay)
-            {
-                ezPreviewManager.StartPreview(Beatmap.Value);
-            }
         }
 
         private void onLeavingScreen()

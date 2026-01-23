@@ -19,11 +19,10 @@ using osu.Game.Screens.Play;
 namespace osu.Game.LAsEzExtensions.Mods
 {
     /// <summary>
-    /// 继承Mod需要自己实现IApplicableToPlayer, IApplicableToHUD, IPreviewOverrideProvider接口的使用
+    /// 继承Mod需要自己实现IApplicableToPlayer, IApplicableToHUD接口的使用
     /// </summary>
     public class ModLoopPlayClip : Mod,
                                    IHasSeed,
-                                   IApplyToLoopPlay,
                                    ILoopTimeRangeMod,
                                    IApplicableToPlayer,
                                    IApplicableToHUD,
@@ -185,10 +184,10 @@ namespace osu.Game.LAsEzExtensions.Mods
                 }
 
                 // 开启AB开关时，优先从LoopTimeRangeStore获取值，并写入SettingSource
-                if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out _))
+                if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
                 {
-                    // 将全局值同步到本地设置
-                    setGlobalRange(startMs, ResolvedCutTimeEnd);
+                    // 将全局值同步到本地设置（使用从 store 获得的 endMs，避免在 getter 中触发对另一个 getter 的调用导致递归）
+                    setGlobalRange(startMs, endMs);
                     return startMs;
                 }
 
@@ -216,10 +215,10 @@ namespace osu.Game.LAsEzExtensions.Mods
                 }
 
                 // 开启AB开关时，优先从LoopTimeRangeStore获取值，并写入SettingSource
-                if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out _, out double endMs))
+                if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
                 {
-                    // 将全局值同步到本地设置
-                    setGlobalRange(ResolvedCutTimeStart, endMs);
+                    // 将全局值同步到本地设置（使用从 store 获得的 startMs，避免在 getter 中触发对另一个 getter 的调用导致递归）
+                    setGlobalRange(startMs, endMs);
                     return endMs;
                 }
 
@@ -300,9 +299,9 @@ namespace osu.Game.LAsEzExtensions.Mods
             if (duplicateTrack.Parent == null)
                 overlay.Add(duplicateTrack);
 
-            DuplicateVirtualTrack.DuplicateEnabled = true;
-            duplicateTrack.SetOverrideProvider(this);
-            duplicateTrack.StartPreview(pendingWorkingBeatmap);
+            // Start duplicate preview directly with explicit overrides.
+            var overrides = GetOverrides(pendingWorkingBeatmap);
+            duplicateTrack.StartPreview(pendingWorkingBeatmap, overrides);
         }
 
         public void SetLoopTimeRange(double startTime, double endTime)
@@ -357,7 +356,6 @@ namespace osu.Game.LAsEzExtensions.Mods
                 LoopCount = LoopCount.Value,
                 LoopInterval = BreakTime.Value * 1000,
                 ForceLooping = true,
-                EnableHitSounds = false
             };
         }
 
@@ -382,25 +380,12 @@ namespace osu.Game.LAsEzExtensions.Mods
         {
             base.ResetSettingsToDefaults();
             applyRangeFromStore();
-            // 停止并禁用 DuplicateVirtualTrack，而不是直接 Dispose，避免之后再次启用时出现已释放的 Drawable 问题。
-            DuplicateVirtualTrack.DuplicateEnabled = false;
-            try
-            {
-                duplicateTrack.StopPreview();
-            }
-            catch
-            {
-            }
+
+            duplicateTrack.StopPreview();
 
             // 从父容器中移除 duplicateTrack（如果已加入），确保 mod 关闭时不会残留在 HUD 中或影响后续音频。
-            try
-            {
-                if (duplicateTrack.Parent is osu.Framework.Graphics.Containers.Container c)
-                    c.Remove(duplicateTrack, false);
-            }
-            catch
-            {
-            }
+            if (duplicateTrack.Parent is osu.Framework.Graphics.Containers.Container c)
+                c.Remove(duplicateTrack, false);
         }
 
         /// <summary>
