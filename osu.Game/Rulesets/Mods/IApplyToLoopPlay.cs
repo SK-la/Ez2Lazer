@@ -1,6 +1,5 @@
 using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Audio;
-using osu.Game.LAsEzExtensions.Select;
 
 namespace osu.Game.Rulesets.Mods
 {
@@ -9,6 +8,6 @@ namespace osu.Game.Rulesets.Mods
     /// </summary>
     public interface IApplyToLoopPlay
     {
-        PreviewOverrideSettings? GetPreviewOverrides(IWorkingBeatmap beatmap);
+        OverrideSettings GetOverrides(IWorkingBeatmap beatmap);
     }
 }

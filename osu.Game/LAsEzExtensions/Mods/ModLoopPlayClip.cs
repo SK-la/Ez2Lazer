@@ -3,19 +3,17 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Select;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.LAsEzExtensions.Mods
@@ -32,11 +30,6 @@ namespace osu.Game.LAsEzExtensions.Mods
                                    IApplicableFailOverride,
                                    IApplicableToRate
     {
-        private DuplicateVirtualTrack? duplicateTrack;
-        private IWorkingBeatmap? pendingWorkingBeatmap;
-        internal double? ResolvedCutTimeStart { get; private set; }
-        internal double? ResolvedCutTimeEnd { get; private set; }
-        internal double ResolvedSegmentLength { get; private set; }
         public override string Name => "Loop Play Clip (No Fail)";
 
         public override string Acronym => "LP";
@@ -51,6 +44,9 @@ namespace osu.Game.LAsEzExtensions.Mods
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => false;
         public override bool ValidForFreestyleAsRequiredMod => false;
+        public bool PerformFail() => false;
+
+        public bool RestartOnFail => false;
 
         // LP 内置变速（复刻 HT 的实现）后，为避免叠加导致体验混乱，直接与其它变速 Mod 互斥。
         public override Type[] IncompatibleMods => new[]
@@ -68,10 +64,19 @@ namespace osu.Game.LAsEzExtensions.Mods
                 yield return ($"Speed x{SpeedChange.Value:N2}", AdjustPitch.Value ? "Pitch Adjusted" : "Pitch Unchanged");
                 yield return ($"{LoopCount.Value}", "Loop Count");
                 yield return ("Break", $"{BreakTime:N1}s");
-                yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : (Millisecond.Value ? $"{CutTimeStart.Value} ms" : CalculateTime((int)CutTimeStart.Value)))}");
-                yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : (Millisecond.Value ? $"{CutTimeEnd.Value} ms" : CalculateTime((int)CutTimeEnd.Value)))}");
+                yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : Millisecond.Value ? $"{CutTimeStart.Value} ms" : GetStringTime((int)CutTimeStart.Value))}");
+                yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : Millisecond.Value ? $"{CutTimeEnd.Value} ms" : GetStringTime((int)CutTimeEnd.Value))}");
                 yield return ("Infinite Loop", InfiniteLoop.Value ? "Enabled" : "Disabled");
             }
+        }
+
+        public static string GetStringTime(double time)
+        {
+            int minute = Math.Abs((int)time / 60);
+            double second = Math.Abs(time % 60);
+            string minus = time < 0 ? "-" : string.Empty;
+            string secondLessThan10 = second < 10 ? "0" : string.Empty;
+            return $"{minus}{minute}:{secondLessThan10}{second:N1}";
         }
 
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.LoopCount_Label), nameof(EzModStrings.LoopCount_Description))]
@@ -124,55 +129,6 @@ namespace osu.Game.LAsEzExtensions.Mods
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.UseGlobalABRange_Label), nameof(EzModStrings.UseGlobalABRange_Description))]
         public BindableBool UseGlobalAbRange { get; set; } = new BindableBool(true);
 
-        private readonly RateAdjustModHelper rateAdjustHelper;
-
-        public ModLoopPlayClip()
-        {
-            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
-            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
-
-            UseGlobalAbRange.BindValueChanged(_ => applyRangeFromStore(), true);
-
-            // 当全局A/B范围改变时，更新设置
-            LoopTimeRangeStore.START_TIME_MS.BindValueChanged(_ => applyRangeFromStoreIfGlobal());
-            LoopTimeRangeStore.END_TIME_MS.BindValueChanged(_ => applyRangeFromStoreIfGlobal());
-        }
-
-        public void ApplyToTrack(IAdjustableAudioComponent track) => rateAdjustHelper.ApplyToTrack(track);
-
-        public void ApplyToSample(IAdjustableAudioComponent sample)
-        {
-            // 与 ModRateAdjust 一致：sample 仅做音高/频率调整即可。
-            sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
-        }
-
-        public double ApplyToRate(double time, double rate = 1) => rate * SpeedChange.Value;
-
-        public override void ResetSettingsToDefaults()
-        {
-            base.ResetSettingsToDefaults();
-            applyRangeFromStore();
-        }
-
-        private void applyRangeFromStore()
-        {
-            if (!UseGlobalAbRange.Value)
-                return;
-
-            if (!LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
-                return;
-
-            // Store is always milliseconds.
-            setCutTimeFromMs(startMs, endMs);
-            SetResolvedCut(null, null);
-        }
-
-        private void applyRangeFromStoreIfGlobal()
-        {
-            if (UseGlobalAbRange.Value)
-                applyRangeFromStore();
-        }
-
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.BreakTime_Label), nameof(EzModStrings.BreakTime_Description))]
         public BindableDouble BreakTime { get; set; } = new BindableDouble(0)
         {
@@ -212,109 +168,141 @@ namespace osu.Game.LAsEzExtensions.Mods
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
-        // 提供切片时间点给 DuplicateVirtualTrack 使用
-        protected void SetResolvedCut(double? start, double? end)
+        private readonly DuplicateVirtualTrack duplicateTrack;
+        private IWorkingBeatmap? pendingWorkingBeatmap;
+
+        // 时间设置统一管理
+        private readonly RateAdjustModHelper rateAdjustHelper;
+
+        protected double ResolvedCutTimeStart
         {
-            ResolvedCutTimeStart = start;
-            ResolvedCutTimeEnd = end;
-            ResolvedSegmentLength = start.HasValue && end.HasValue ? Math.Max(0, end.Value - start.Value) : 0;
-        }
-
-        // 获取当前生效的切片起止时间（毫秒）
-        protected (double? startMs, double? endMs) GetEffectiveCutTimeMs()
-        {
-            if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
-                return (startMs, endMs);
-
-            return (cutTimeStartMs, cutTimeEndMs);
-        }
-
-        private bool ensureResolvedForPreview(IWorkingBeatmap beatmap)
-        {
-            if (ResolvedSegmentLength > 0 && ResolvedCutTimeStart is not null && ResolvedCutTimeEnd is not null)
-                return true;
-
-            try
+            get
             {
-                var maniaBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
-
-                var (cutTimeStart, cutTimeEnd) = GetEffectiveCutTimeMs();
-
-                // 若开始为空则取最早物件时间，若结束为空则取最晚物件时间（不再整体判无效）。
-                var minTime = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
-                var maxTime = maniaBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
-                cutTimeStart ??= minTime?.StartTime;
-                cutTimeEnd ??= maxTime?.GetEndTime();
-
-                double? length = cutTimeEnd - cutTimeStart;
-
-                if (length is null || length <= 0)
+                if (pendingWorkingBeatmap != null)
                 {
-                    SetResolvedCut(null, null);
-                    return false;
+                    // 先确保已解析时间范围
+                    EnsureResolvedForBeatmap(pendingWorkingBeatmap);
                 }
 
-                SetResolvedCut(cutTimeStart, cutTimeEnd);
-                return true;
-            }
-            catch
-            {
-                SetResolvedCut(null, null);
-                return false;
+                // 开启AB开关时，优先从LoopTimeRangeStore获取值，并写入SettingSource
+                if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out _))
+                {
+                    // 将全局值同步到本地设置
+                    setGlobalRange(startMs, ResolvedCutTimeEnd);
+                    return startMs;
+                }
+
+                // 从SettingSource获取值
+                double start = toMs(CutTimeStart.Value);
+
+                // 开始时间获取失败时设为0
+                if (double.IsNaN(start) || double.IsInfinity(start) || !CutTimeStart.Value.HasValue)
+                {
+                    return 0;
+                }
+
+                return start;
             }
         }
 
-        // 将 Beatmap 交给 DuplicateVirtualTrack，用独立 Track 实例按切片参数播放
+        protected double ResolvedCutTimeEnd
+        {
+            get
+            {
+                if (pendingWorkingBeatmap != null)
+                {
+                    // 先确保已解析时间范围
+                    EnsureResolvedForBeatmap(pendingWorkingBeatmap);
+                }
+
+                // 开启AB开关时，优先从LoopTimeRangeStore获取值，并写入SettingSource
+                if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out _, out double endMs))
+                {
+                    // 将全局值同步到本地设置
+                    setGlobalRange(ResolvedCutTimeStart, endMs);
+                    return endMs;
+                }
+
+                // 从SettingSource获取值
+                if (CutTimeEnd.Value.HasValue)
+                {
+                    double end = toMs(CutTimeEnd.Value);
+
+                    // 结束时间获取失败时使用歌曲原本的结束时间
+                    if (double.IsNaN(end) || double.IsInfinity(end))
+                    {
+                        return GetOriginalBounds().end;
+                    }
+
+                    return end;
+                }
+
+                // 结束时间获取失败时使用歌曲原本的结束时间
+                return GetOriginalBounds().end;
+            }
+        }
+
+        protected double ResolvedSegmentLength { get; private set; }
+
+        public ModLoopPlayClip()
+        {
+            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
+            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
+
+            UseGlobalAbRange.BindValueChanged(_ => applyRangeFromStore(), true);
+
+            // 当全局A/B范围改变时，更新设置
+            LoopTimeRangeStore.START_TIME_MS.BindValueChanged(_ => applyRangeFromStore());
+            LoopTimeRangeStore.END_TIME_MS.BindValueChanged(_ => applyRangeFromStore());
+
+            duplicateTrack = new DuplicateVirtualTrack();
+        }
+
+        private void applyRangeFromStore()
+        {
+            if (!LoopTimeRangeStore.TryGet(out double startMs, out double endMs))
+                return;
+
+            setCutTimeToSettingSource(startMs, endMs);
+        }
+
+        private void setCutTimeToSettingSource(double startMs, double endMs)
+        {
+            CutTimeStart.Value = Millisecond.Value ? (int)startMs : (int)(startMs / 1000d);
+            CutTimeEnd.Value = Millisecond.Value ? (int)endMs : (int)(endMs / 1000d);
+        }
+
+        public void ApplyToTrack(IAdjustableAudioComponent track) => rateAdjustHelper.ApplyToTrack(track);
+
+        public void ApplyToSample(IAdjustableAudioComponent sample)
+        {
+            sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
+        }
+
+        public double ApplyToRate(double time, double rate = 1) => rate * SpeedChange.Value;
+
         public void ApplyToPlayer(Player player)
         {
-            if (ResolvedSegmentLength <= 0)
-                return;
-
             pendingWorkingBeatmap = player.Beatmap.Value;
 
-            duplicateTrack = new DuplicateVirtualTrack
-            {
-                OverrideProvider = this,
-                PendingOverrides = null,
-            };
+            // 确保时间范围已解析
+            EnsureResolvedForBeatmap(pendingWorkingBeatmap);
         }
 
-        public static string CalculateTime(double time)
-        {
-            int minute = Math.Abs((int)time / 60);
-            double second = Math.Abs(time % 60);
-            string minus = time < 0 ? "-" : string.Empty;
-            string secondLessThan10 = second < 10 ? "0" : string.Empty;
-            return $"{minus}{minute}:{secondLessThan10}{second:N1}";
-        }
-
-        // 需要有一个Drawable来承载虚拟音轨
         public void ApplyToHUD(HUDOverlay overlay)
         {
-            if (duplicateTrack == null)
-                return;
-
             if (pendingWorkingBeatmap == null)
-                return;
-
-            overlay.Add(duplicateTrack);
-            duplicateTrack.StartPreview(pendingWorkingBeatmap);
-        }
-
-        public PreviewOverrideSettings? GetPreviewOverrides(IWorkingBeatmap beatmap)
-        {
-            if (!ensureResolvedForPreview(beatmap))
-                return null;
-
-            return new PreviewOverrideSettings
             {
-                StartTime = ResolvedCutTimeStart,
-                Duration = ResolvedSegmentLength,
-                LoopCount = LoopCount.Value,
-                LoopInterval = BreakTime.Value * 1000,
-                ForceLooping = true,
-                EnableHitSounds = false
-            };
+                Logger.Log("[ModLoopPlayClip] ApplyToHUD: beatmap is null.", LoggingTarget.Runtime, LogLevel.Error);
+                return;
+            }
+
+            if (duplicateTrack.Parent == null)
+                overlay.Add(duplicateTrack);
+
+            DuplicateVirtualTrack.DuplicateEnabled = true;
+            duplicateTrack.SetOverrideProvider(this);
+            duplicateTrack.StartPreview(pendingWorkingBeatmap);
         }
 
         public void SetLoopTimeRange(double startTime, double endTime)
@@ -325,91 +313,119 @@ namespace osu.Game.LAsEzExtensions.Mods
             LoopTimeRangeStore.Set(startTime, endTime);
 
             // The editor timeline works in milliseconds, while this mod exposes seconds by default.
-            setCutTimeFromMs(startTime, endTime);
-
-            // Reset preview cache so changes take effect immediately where used.
-            SetResolvedCut(null, null);
+            setCutTimeToSettingSource(startTime, endTime);
 
             // Keep current instance in sync with the session store when global mode is enabled.
             if (UseGlobalAbRange.Value)
                 applyRangeFromStore();
         }
 
-        public bool PerformFail() => false;
-
-        public bool RestartOnFail => false;
-
-        // 简化后的统一参数访问器，自动适配全局/本地，单位换算集中
-        private double? cutTimeStartMs
+        protected void EnsureResolvedForBeatmap(IWorkingBeatmap beatmap)
         {
-            get => UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double startMs, out _)
-                ? startMs
-                : toMs(CutTimeStart.Value);
-            set
+            if (ResolvedSegmentLength > 0)
+                return;
+
+            bool hasRange = LoopTimeRangeStore.TryGet(out double cutTimeStart, out double cutTimeEnd);
+            var playableBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
+
+            if (!hasRange)
             {
-                if (UseGlobalAbRange.Value)
-                    setGlobalRange(value, cutTimeEndMs);
-                else
-                    CutTimeStart.Value = fromMs(value);
+                // 若开始为空则取最早物件时间，若结束为空则取最晚物件时间（不再整体判无效）。
+                var (minTime, maxTime) = playableBeatmap.CalculatePlayableBounds();
+                cutTimeStart = minTime;
+                cutTimeEnd = maxTime;
             }
+
+            double length = cutTimeEnd - cutTimeStart;
+
+            ResolvedSegmentLength = Math.Max(0, length);
         }
 
-        private double? cutTimeEndMs
+        // StartPreview方法调用时会调用此方法获取参数
+        public OverrideSettings GetOverrides(IWorkingBeatmap beatmap)
         {
-            get => UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out _, out double endMs)
-                ? endMs
-                : toMs(CutTimeEnd.Value);
-            set
+            EnsureResolvedForBeatmap(beatmap);
+
+            // 使用属性获取最新的时间值
+            double start = ResolvedCutTimeStart;
+            double end = ResolvedCutTimeEnd;
+
+            return new OverrideSettings
             {
-                if (UseGlobalAbRange.Value)
-                    setGlobalRange(cutTimeStartMs, value);
-                else
-                    CutTimeEnd.Value = fromMs(value);
-            }
+                StartTime = start,
+                Duration = Math.Max(0, end - start),
+                LoopCount = LoopCount.Value,
+                LoopInterval = BreakTime.Value * 1000,
+                ForceLooping = true,
+                EnableHitSounds = false
+            };
         }
 
         // 工具方法，集中单位换算和全局写入
-        private double? toMs(int? v) => v == null ? null : v * (Millisecond.Value ? 1 : 1000);
-        private int? fromMs(double? ms) => ms == null ? null : (Millisecond.Value ? (int)ms : (int)(ms / 1000d));
+        private double toMs(int? v) => v == null ? 0.0 : (int)v * (Millisecond.Value ? 1 : 1000);
         private void setGlobalRange(double? start, double? end) => LoopTimeRangeStore.Set(start ?? 0, end ?? 0);
 
-        // 新增：根据当前单位设置 CutTimeStart/End
-        private void setCutTimeFromMs(double startMs, double endMs)
+        // 获取原始音谱边界
+        protected (double start, double end) GetOriginalBounds()
         {
-            CutTimeStart.Value = Millisecond.Value ? (int)startMs : (int)(startMs / 1000d);
-            CutTimeEnd.Value = Millisecond.Value ? (int)endMs : (int)(endMs / 1000d);
-        }
-    }
-
-    /*public partial class CutStart : RoundedSliderBar<double>
-    {
-        public override LocalisableString TooltipText
-        {
-            get
+            if (pendingWorkingBeatmap != null)
             {
-                double value = Current.Value;
-                if (value == -10)
-                {
-                    return "Original Start Time";
-                }
-                return ManiaModLoopPlayClip.CalculateTime(value);
+                var playableBeatmap = pendingWorkingBeatmap.GetPlayableBeatmap(pendingWorkingBeatmap.BeatmapInfo.Ruleset);
+                return playableBeatmap.CalculatePlayableBounds();
+            }
+
+            // 默认返回0, 0
+            return (0, 0);
+        }
+
+        public override void ResetSettingsToDefaults()
+        {
+            base.ResetSettingsToDefaults();
+            applyRangeFromStore();
+            // 停止并禁用 DuplicateVirtualTrack，而不是直接 Dispose，避免之后再次启用时出现已释放的 Drawable 问题。
+            DuplicateVirtualTrack.DuplicateEnabled = false;
+            try
+            {
+                duplicateTrack.StopPreview();
+            }
+            catch
+            {
+            }
+
+            // 从父容器中移除 duplicateTrack（如果已加入），确保 mod 关闭时不会残留在 HUD 中或影响后续音频。
+            try
+            {
+                if (duplicateTrack.Parent is osu.Framework.Graphics.Containers.Container c)
+                    c.Remove(duplicateTrack, false);
+            }
+            catch
+            {
             }
         }
-    }
 
-    public partial class CutEnd : RoundedSliderBar<double>
-    {
-        public override LocalisableString TooltipText
+        /// <summary>
+        /// 解析给定 <see cref="IBeatmap"/> 的切片时间（毫秒），优先使用全局 A/B 范围，
+        /// 否则使用设置中的值（支持秒/毫秒模式），缺失时回退到谱面可播放边界。
+        /// 返回 (start, end, length)。
+        /// </summary>
+        protected (double start, double end, double length) ResolveSliceTimesForBeatmap(IBeatmap beatmap)
         {
-            get
-            {
-                double value = Current.Value;
-                if (value == 1800)
-                {
-                    return "Original End Time";
-                }
-                return ManiaModLoopPlayClip.CalculateTime(value);
-            }
+            if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double globalStart, out double globalEnd))
+                return (globalStart, globalEnd, Math.Max(0, globalEnd - globalStart));
+
+            double cutTimeStart = CutTimeStart.Value.HasValue ? (Millisecond.Value ? CutTimeStart.Value.Value : CutTimeStart.Value.Value * 1000d) : double.NaN;
+            double cutTimeEnd = CutTimeEnd.Value.HasValue ? (Millisecond.Value ? CutTimeEnd.Value.Value : CutTimeEnd.Value.Value * 1000d) : double.NaN;
+
+            var (minTime, maxTime) = beatmap.CalculatePlayableBounds();
+
+            if (double.IsNaN(cutTimeStart) || double.IsInfinity(cutTimeStart))
+                cutTimeStart = minTime;
+
+            if (double.IsNaN(cutTimeEnd) || double.IsInfinity(cutTimeEnd))
+                cutTimeEnd = maxTime;
+
+            double length = Math.Max(0, cutTimeEnd - cutTimeStart);
+            return (cutTimeStart, cutTimeEnd, length);
         }
-    }*/
+    }
 }

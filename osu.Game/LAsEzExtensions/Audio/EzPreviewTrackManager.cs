@@ -33,13 +33,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         /// 全局静态开关：当设置为 <see langword="false"/> 时，EzPreviewTrackManager 将拒绝启动新的预览。
         /// 由外部（例如 UI 的 `keySoundPreview`）控制。
         /// </summary>
-        public static bool Enabled { get; set; } = true;
-
-        /// <summary>
-        /// 当前是否处于“正在播放预览”的状态。
-        /// 注意：该值同时要求内部状态认为正在播放，且底层 <see cref="Track"/> 实际处于运行状态。
-        /// </summary>
-        public bool IsPlaying => playback.IsPlaying && currentTrack?.IsRunning == true;
+        public static bool Enabled { get; set; }
 
         private const int hitsound_threshold = 10;
         private const double preview_window_length = 20000; // 20s
@@ -122,17 +116,11 @@ namespace osu.Game.LAsEzExtensions.Audio
         public double? ExternalClockStartTime { get; set; }
 
         /// <summary>
-        /// 从 <see cref="PreviewOverrideSettings"/> 批量应用覆盖参数。
+        /// 从 <see cref="OverrideSettings"/> 批量应用覆盖参数。
         /// 传入 null 等同于 <see cref="ResetOverrides"/>。
         /// </summary>
-        public void ApplyOverrides(PreviewOverrideSettings? settings)
+        public void ApplyOverrides(OverrideSettings settings)
         {
-            if (settings == null)
-            {
-                ResetOverrides();
-                return;
-            }
-
             OverridePreviewStartTime = settings.StartTime;
             OverridePreviewDuration = settings.Duration;
             OverrideLoopCount = settings.LoopCount;
@@ -1101,7 +1089,7 @@ namespace osu.Game.LAsEzExtensions.Audio
     /// <summary>
     /// 预览覆盖参数集合，用于一次性配置 <see cref="EzPreviewTrackManager"/> 的切片与循环行为。
     /// </summary>
-    public class PreviewOverrideSettings
+    public class OverrideSettings
     {
         /// <summary>
         /// 预览起点（毫秒）。null 表示使用谱面元数据的 PreviewTime。
@@ -1109,7 +1097,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         public double? StartTime { get; init; }
 
         /// <summary>
-        /// 预览段长度（毫秒）。null 表示使用默认值。
+        /// 长度（毫秒）。null 表示使用默认值。
         /// </summary>
         public double? Duration { get; init; }
 

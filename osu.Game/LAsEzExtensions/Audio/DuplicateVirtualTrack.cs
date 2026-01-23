@@ -3,6 +3,7 @@
 
 using System;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Extensions;
@@ -18,16 +19,15 @@ namespace osu.Game.LAsEzExtensions.Audio
         /// <summary>
         /// 通过外部Mods检查接口控制开关，默认关闭。
         /// </summary>
-        public static bool DuplicateEnabled { get; set; } = false;
+        public static bool DuplicateEnabled { get; set; }
 
-        public IApplyToLoopPlay? OverrideProvider { get; set; }
-        public PreviewOverrideSettings? PendingOverrides { get; set; }
+        private IApplyToLoopPlay? overrideProvider;
 
         private bool startRequested;
         private bool started;
         private IWorkingBeatmap? pendingBeatmap;
 
-        private double? beatmapTrackVolumeBeforeMute;
+        private BindableDouble? beatmapTrackMuteAdjustment;
         private Track? mutedOriginalTrack;
 
         [Resolved(canBeNull: true)]
@@ -39,9 +39,14 @@ namespace osu.Game.LAsEzExtensions.Audio
         [Resolved(canBeNull: true)]
         private BeatmapManager? beatmapManager { get; set; }
 
-        public new void StartPreview(IWorkingBeatmap beatmap, bool forceEnhanced = false)
+        public void SetOverrideProvider(IApplyToLoopPlay provider)
         {
-            if (!DuplicateEnabled)
+            overrideProvider = provider;
+        }
+
+        public void StartPreview(IWorkingBeatmap beatmap)
+        {
+            if (!DuplicateEnabled || overrideProvider == null)
             {
                 return;
             }
@@ -49,34 +54,41 @@ namespace osu.Game.LAsEzExtensions.Audio
             pendingBeatmap = beatmap;
             startRequested = true;
 
-            var overrides = PendingOverrides ?? OverrideProvider?.GetPreviewOverrides(beatmap);
+            var overrides = overrideProvider.GetOverrides(beatmap);
+            ApplyOverrides(overrides);
 
-            if (overrides != null)
-                ApplyOverrides(overrides);
-
-            OverrideLooping = overrides?.ForceLooping ?? OverrideLooping;
+            OverrideLooping = overrides.ForceLooping;
             ExternalClock = gameplayClock;
-            ExternalClockStartTime = overrides?.StartTime ?? OverridePreviewStartTime;
-            EnableHitSounds = overrides?.EnableHitSounds ?? true;
+            ExternalClockStartTime = overrides.StartTime ?? OverridePreviewStartTime;
+            EnableHitSounds = overrides.EnableHitSounds;
 
             // 重置循环状态
             ResetLoopState();
 
-            // gameplay 下不要把 MasterGameplayClockContainer 从真实 beatmap.Track “断开”。
+            // gameplay 下不要把 MasterGameplayClockContainer 从真实 beatmap.Track "断开"。
             // 断开会导致：
             // 1) 变速 Mod（HT/DT/RateAdjust）对 gameplay 时钟不生效（TrackVirtual 不一定按 Tempo/Frequency 推进时间）。
             // 2) SubmittingPlayer 的播放校验会持续报 "System audio playback is not working"。
             // 这里改为：保留 beatmap.Track 作为时钟来源，但将其静音，避免听到整首歌。
             if (gameplayClock != null && beatmap.Track != null)
             {
-                // 保存被静音的 Track 实例以及其原始音量，确保后续能正确恢复。
+                // 使用可撤销的音量调整而不是直接写入 Volume.Value，确保调整可以安全移除且不会覆盖其它调整。
                 if (mutedOriginalTrack == null || mutedOriginalTrack != beatmap.Track)
                 {
-                    beatmapTrackVolumeBeforeMute = beatmap.Track.Volume.Value;
+                    // 若之前对其它 track 应用过 mute adjustment，则先移除它。
+                    try
+                    {
+                        if (beatmapTrackMuteAdjustment != null && mutedOriginalTrack != null)
+                            mutedOriginalTrack.RemoveAdjustment(AdjustableProperty.Volume, beatmapTrackMuteAdjustment);
+                    }
+                    catch
+                    {
+                    }
+
+                    beatmapTrackMuteAdjustment = new BindableDouble(0);
+                    beatmap.Track.AddAdjustment(AdjustableProperty.Volume, beatmapTrackMuteAdjustment);
                     mutedOriginalTrack = beatmap.Track;
                 }
-
-                beatmap.Track.Volume.Value = 0;
             }
 
             // 不直接开播：等待本 Drawable 完成依赖注入，并在 gameplay 时钟 running 时再开始。
@@ -86,13 +98,18 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         protected override void Dispose(bool isDisposing)
         {
-            // 尽可能恢复被静音的原始 track 的音量，避免退出/切换后一直静音。
-            if (mutedOriginalTrack != null && beatmapTrackVolumeBeforeMute != null)
+            // 尝试移除之前添加的音量调整，确保不会在 Dispose 后仍保持静音。
+            try
             {
-                mutedOriginalTrack.Volume.Value = beatmapTrackVolumeBeforeMute.Value;
-                beatmapTrackVolumeBeforeMute = null;
-                mutedOriginalTrack = null;
+                if (beatmapTrackMuteAdjustment != null && mutedOriginalTrack != null)
+                    mutedOriginalTrack.RemoveAdjustment(AdjustableProperty.Volume, beatmapTrackMuteAdjustment);
             }
+            catch
+            {
+            }
+
+            beatmapTrackMuteAdjustment = null;
+            mutedOriginalTrack = null;
 
             base.Dispose(isDisposing);
         }
@@ -129,10 +146,10 @@ namespace osu.Game.LAsEzExtensions.Audio
             if (gameplayClock == null)
                 return beatmap.Track;
 
-            return AcquireIndependentTrack(beatmap, out ownsTrack) ?? beatmap.Track;
+            return acquireIndependentTrack(beatmap, out ownsTrack) ?? beatmap.Track;
         }
 
-        private Track? AcquireIndependentTrack(IWorkingBeatmap beatmap, out bool ownsTrack)
+        private Track? acquireIndependentTrack(IWorkingBeatmap beatmap, out bool ownsTrack)
         {
             ownsTrack = false;
 
@@ -152,7 +169,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             bool hasBeatmapTrackStore = beatmapManager?.BeatmapTrackStore != null;
 
-            Track?[] candidates = new Track?[]
+            Track?[] candidates = new[]
             {
                 hasBeatmapTrackStore && !string.IsNullOrEmpty(rawFileStorePath) ? beatmapManager!.BeatmapTrackStore.Get(rawFileStorePath) : null,
                 hasBeatmapTrackStore && !string.IsNullOrEmpty(standardisedFileStorePath) ? beatmapManager!.BeatmapTrackStore.Get(standardisedFileStorePath) : null,
@@ -160,7 +177,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 !string.IsNullOrEmpty(standardisedFileStorePath) ? AudioManager.Tracks.Get(standardisedFileStorePath) : null,
             };
 
-            string[] candidateNames = new string[] { "beatmapStoreRaw", "beatmapStoreStandardised", "globalStoreRaw", "globalStoreStandardised" };
+            string[] candidateNames = new[] { "beatmapStoreRaw", "beatmapStoreStandardised", "globalStoreRaw", "globalStoreStandardised" };
 
             // Try candidates: ensure length populated first (lazy-load), prefer Length>0
             for (int i = 0; i < candidates.Length; i++)
@@ -223,13 +240,18 @@ namespace osu.Game.LAsEzExtensions.Audio
                 return;
             }
 
-            // 恢复被静音的原始 beatmap.Track 音量（如果我们在 StartPreview 时修改过）
-            if (mutedOriginalTrack != null && beatmapTrackVolumeBeforeMute != null)
+            // 恢复之前添加的音量调整（如果存在）
+            try
             {
-                mutedOriginalTrack.Volume.Value = beatmapTrackVolumeBeforeMute.Value;
-                beatmapTrackVolumeBeforeMute = null;
-                mutedOriginalTrack = null;
+                if (beatmapTrackMuteAdjustment != null && mutedOriginalTrack != null)
+                    mutedOriginalTrack.RemoveAdjustment(AdjustableProperty.Volume, beatmapTrackMuteAdjustment);
             }
+            catch
+            {
+            }
+
+            beatmapTrackMuteAdjustment = null;
+            mutedOriginalTrack = null;
 
             base.StopPreviewInternal(reason);
 

@@ -9,6 +9,7 @@ using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
@@ -31,38 +32,21 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Mods
 
             osuBeatmap.Breaks.Clear();
 
-            var (cutTimeStart, cutTimeEnd) = GetEffectiveCutTimeMs();
-
             double breakTime = BreakTime.Value * 1000;
 
-            // 默认取第一个/最后一个物件时间
-            var minTimeBeatmap = osuBeatmap.HitObjects.MinBy(h => h.StartTime);
-            var maxTimeBeatmap = osuBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
-            cutTimeStart ??= minTimeBeatmap?.StartTime;
-            cutTimeEnd ??= maxTimeBeatmap?.GetEndTime();
-
-            double? length = cutTimeEnd - cutTimeStart;
+            var (cutTimeStart, cutTimeEnd, length) = ResolveSliceTimesForBeatmap(beatmap);
 
             var selectedPart = osuBeatmap.HitObjects.Where(h => h.StartTime > cutTimeStart && h.GetEndTime() < cutTimeEnd).ToList();
-
-            if (length is null || length <= 0)
-            {
-                SetResolvedCut(null, null);
-                return;
-            }
-
-            SetResolvedCut(cutTimeStart, cutTimeEnd);
 
             var newPart = new List<OsuHitObject>();
 
             for (int timeIndex = 0; timeIndex < LoopCount.Value; timeIndex++)
             {
-                double offset = timeIndex * (breakTime + (double)length);
+                double offset = timeIndex * (breakTime + length);
 
                 foreach (var note in selectedPart)
                 {
-                    // For the first iteration we want the slice to start at 0, so offset is -cutTimeStart
-                    double baseOffset = timeIndex == 0 ? -cutTimeStart!.Value : offset;
+                    double baseOffset = offset - cutTimeStart;
 
                     if (note is HitCircle circle)
                     {
@@ -106,15 +90,16 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Mods
                     {
                         // fallback: attempt to create a shallow instance of the same type and copy StartTime/Samples
                         var type = note.GetType();
+
                         try
                         {
-                            var inst = (OsuHitObject?)System.Activator.CreateInstance(type);
+                            var inst = (OsuHitObject?)Activator.CreateInstance(type);
+
                             if (inst != null)
                             {
                                 inst.StartTime = note.StartTime + baseOffset;
                                 inst.Samples = note.Samples.ToList();
                                 newPart.Add(inst);
-                                continue;
                             }
                         }
                         catch

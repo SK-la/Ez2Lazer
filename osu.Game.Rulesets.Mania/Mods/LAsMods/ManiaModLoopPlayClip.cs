@@ -10,6 +10,7 @@ using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
@@ -52,82 +53,56 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
             maniaBeatmap.Breaks.Clear();
-
-            var (cutTimeStart, cutTimeEnd) = GetEffectiveCutTimeMs();
-
             double breakTime = BreakTime.Value * 1000;
 
-            // 改为最少一个非空设置
-            var minTimeBeatmap = maniaBeatmap.HitObjects.MinBy(h => h.StartTime);
-            var maxTimeBeatmap = maniaBeatmap.HitObjects.MaxBy(h => h.GetEndTime());
-            cutTimeStart ??= minTimeBeatmap?.StartTime;
-            cutTimeEnd ??= maxTimeBeatmap?.GetEndTime();
+            var (cutTimeStart, cutTimeEnd, length) = ResolveSliceTimesForBeatmap(beatmap);
 
-            // IMPORTANT: compute length only after null defaults have been applied.
-            // Otherwise, when both cut times are null (default settings and no global A/B range),
-            // this mod would early-return and appear to have no effect (and thus no analysis change).
-            double? length = cutTimeEnd - cutTimeStart;
-
-            var selectedPart = maniaBeatmap.HitObjects.Where(h => h.StartTime > cutTimeStart && h.GetEndTime() < cutTimeEnd).ToList();
-
-            if (length is null || length <= 0)
-            {
-                SetResolvedCut(null, null);
-                return;
-            }
-
-            SetResolvedCut(cutTimeStart, cutTimeEnd);
+            var cutObjectList = maniaBeatmap.HitObjects.Where(h => h.StartTime > cutTimeStart && h.GetEndTime() < cutTimeEnd).ToList();
 
             var newPart = new List<ManiaHitObject>();
 
             for (int timeIndex = 0; timeIndex < LoopCount.Value; timeIndex++)
             {
-                if (timeIndex == 0)
-                {
-                    if (Rand.Value)
-                    {
-                        var shuffledColumns = Enumerable.Range(0, maniaBeatmap.TotalColumns).OrderBy(_ => rng.Next()).ToList();
-                        selectedPart.ForEach(h => h.Column = shuffledColumns[h.Column]);
-                    }
+                double offset = timeIndex * (breakTime + length);
 
-                    if (Mirror.Value)
-                    {
-                    }
-
-                    // 调整时间从切片起点开始
-                    foreach (var note in selectedPart)
-                    {
-                        note.StartTime -= (float)cutTimeStart!;
-                        if (note is HoldNote holdNote)
-                            holdNote.EndTime -= (float)cutTimeStart;
-                    }
-
-                    newPart.AddRange(selectedPart);
-                    continue;
-                }
+                // 统一基准偏移：将原始对象时间相对于切片起点平移，然后根据循环索引叠加循环间隔
+                double baseOffset = offset - cutTimeStart;
 
                 var obj = new List<ManiaHitObject>();
 
-                foreach (var note in selectedPart)
+                foreach (var note in cutObjectList)
                 {
                     if (note.GetEndTime() != note.StartTime)
                     {
-                        obj.Add(new HoldNote
+                        var hold = new HoldNote
                         {
                             Column = note.Column,
-                            StartTime = note.StartTime + timeIndex * (breakTime + (double)length),
-                            EndTime = note.GetEndTime() + timeIndex * (breakTime + (double)length),
-                            NodeSamples = [note.Samples, Array.Empty<HitSampleInfo>()]
-                        });
+                            StartTime = note.StartTime + (float)baseOffset,
+                            EndTime = note.GetEndTime() + (float)baseOffset,
+                        };
+
+                        // 尝试复制样本信息（若存在）以保持音效一致性
+                        try
+                        {
+                            if (note is HoldNote hn && hn.NodeSamples != null)
+                                hold.NodeSamples = hn.NodeSamples.Select(n => (IList<HitSampleInfo>)n.ToList()).ToList();
+                        }
+                        catch
+                        {
+                        }
+
+                        obj.Add(hold);
                     }
                     else
                     {
-                        obj.Add(new Note
+                        var n = new Note
                         {
                             Column = note.Column,
-                            StartTime = note.StartTime + timeIndex * (breakTime + (double)length),
+                            StartTime = note.StartTime + (float)baseOffset,
                             Samples = note.Samples,
-                        });
+                        };
+
+                        obj.Add(n);
                     }
                 }
 
@@ -135,6 +110,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 {
                     var shuffledColumns = Enumerable.Range(0, maniaBeatmap.TotalColumns).OrderBy(_ => rng.Next()).ToList();
                     obj.OfType<ManiaHitObject>().ForEach(h => h.Column = shuffledColumns[h.Column]);
+                }
+
+                if (Mirror.Value)
+                {
+                    // 保留原有行为：如需实现镜像，请在此添加逻辑
                 }
 
                 newPart.AddRange(obj);
