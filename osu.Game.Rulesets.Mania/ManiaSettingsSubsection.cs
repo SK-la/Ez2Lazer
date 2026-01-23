@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using osu.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -21,6 +22,8 @@ namespace osu.Game.Rulesets.Mania
     public partial class ManiaSettingsSubsection : RulesetSettingsSubsection
     {
         protected override LocalisableString Header => "osu!mania";
+        protected Bindable<double> BaseSpeedBindable = null!;
+        protected Bindable<double> TimePerSpeedBindable = null!;
 
         public ManiaSettingsSubsection(ManiaRuleset ruleset)
             : base(ruleset)
@@ -31,6 +34,9 @@ namespace osu.Game.Rulesets.Mania
         private void load(Ez2ConfigManager ezConfig)
         {
             var config = (ManiaRulesetConfigManager)Config;
+
+            BaseSpeedBindable = config.GetBindable<double>(ManiaRulesetSetting.ScrollBaseSpeed);
+            TimePerSpeedBindable = config.GetBindable<double>(ManiaRulesetSetting.ScrollTimePerSpeed);
 
             Children = new Drawable[]
             {
@@ -82,20 +88,21 @@ namespace osu.Game.Rulesets.Mania
                     Caption = RulesetSettingsStrings.ScrollSpeed,
                     Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed),
                     KeyboardStep = 1,
-                    LabelFormat = v => RulesetSettingsStrings.ScrollSpeedTooltip((int)DrawableManiaRuleset.ComputeScrollTime(v), v),
+                    LabelFormat = v => RulesetSettingsStrings.ScrollSpeedTooltip(
+                        (int)DrawableManiaRuleset.ComputeScrollTime(v, BaseSpeedBindable.Value, TimePerSpeedBindable.Value), v),
                 }),
 
                 new SettingsSlider<double, ManiaScrollBaseSlider>
                 {
                     LabelText = "Scroll Base MS (when 200 Speed)",
-                    Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollBaseSpeed),
+                    Current = BaseSpeedBindable,
                     KeyboardStep = 1,
                     Keywords = new[] { "base" }
                 },
                 new SettingsSlider<double, ManiaScrollMsPerSpeedSlider>
                 {
                     LabelText = "MS / Speed",
-                    Current = config.GetBindable<double>(ManiaRulesetSetting.ScrollTimePerSpeed),
+                    Current = TimePerSpeedBindable,
                     KeyboardStep = 1,
                     Keywords = new[] { "mps" }
                 },
