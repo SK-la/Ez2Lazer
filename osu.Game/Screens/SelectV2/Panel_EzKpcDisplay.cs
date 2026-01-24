@@ -21,144 +21,108 @@ namespace osu.Game.Screens.SelectV2
 {
     public partial class EzKpcDisplay : CompositeDrawable
     {
-        public Bindable<KpcDisplayMode> KpcDisplayMode { get; } = new Bindable<KpcDisplayMode>(SelectV2.KpcDisplayMode.BarChart);
+        public Bindable<KpcDisplayMode> KpcDisplayModeBindable { get; } = new Bindable<KpcDisplayMode>(KpcDisplayMode.BarChart);
 
-        /// <summary>
-        /// Maximum bar height in pixels. Can be set externally.
-        /// Default aligned to SpreadDisplay max height.
-        /// </summary>
-        public float MaxBarHeight { get; set; } = 6f;
-
-        private readonly FillFlowContainer columnNotesContainer;
-        private readonly OsuSpriteText? headerText;
+        private readonly List<NumberColumnEntry> numberEntries = new List<NumberColumnEntry>();
+        private readonly List<BarChartColumnEntry> barEntries = new List<BarChartColumnEntry>();
         private readonly Box backgroundBox;
+        private FillFlowContainer? columnNotesContainer;
+        private OsuSpriteText? headerText;
 
         private int currentColumnCount;
         private bool modeChanged;
-        private readonly List<NumberColumnEntry> numberEntries = new List<NumberColumnEntry>();
-        private readonly List<BarChartColumnEntry> barEntries = new List<BarChartColumnEntry>();
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         public EzKpcDisplay()
         {
-            AutoSizeAxes = Axes.Both;
+            // Match SpreadDisplay sizing: auto-size horizontally, fill vertically.
+            AutoSizeAxes = Axes.X;
+            RelativeSizeAxes = Axes.Y;
 
             InternalChild = new Container
             {
                 Masking = true,
                 CornerRadius = 5,
-                AutoSizeAxes = Axes.Both,
+                AutoSizeAxes = Axes.X,
+                RelativeSizeAxes = Axes.Y,
                 Children = new Drawable[]
                 {
                     backgroundBox = new Box
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = Colour4.Black.Opacity(0.6f),
-                    },
-                    new GridContainer
-                    {
-                        AutoSizeAxes = Axes.Both,
-                        Margin = new MarginPadding { Horizontal = 8f },
-                        ColumnDimensions = new[]
-                        {
-                            new Dimension(GridSizeMode.AutoSize),
-                            new Dimension(GridSizeMode.Absolute, 3f),
-                            new Dimension(GridSizeMode.AutoSize),
-                        },
-                        RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
-                        Content = new[]
-                        {
-                            new[]
-                            {
-                                headerText = new OsuSpriteText
-                                {
-                                    Text = "[Notes]",
-                                    Font = OsuFont.GetFont(size: 14),
-                                    Colour = Colour4.GhostWhite,
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft
-                                },
-                                Empty(),
-                                columnNotesContainer = new FillFlowContainer
-                                {
-                                    Direction = FillDirection.Horizontal,
-                                    AutoSizeAxes = Axes.Both,
-                                    Spacing = new Vector2(5), // align spacing with SpreadDisplay
-                                    Anchor = Anchor.CentreLeft,
-                                    Origin = Anchor.CentreLeft,
-                                },
-                            }
-                        }
                     }
                 }
             };
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-            FinishTransforms(true);
-        }
-
         [BackgroundDependencyLoader]
         private void load()
         {
-            // Initialize bindable from config and hook up visibility/builder logic here (same lifecycle as SpreadDisplay).
-            KpcDisplayMode.Value = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode).Value;
+            AddInternal(new GridContainer
+            {
+                AutoSizeAxes = Axes.Both,
+                Padding = new MarginPadding { Horizontal = 5f },
+                ColumnDimensions = new[]
+                {
+                    new Dimension(GridSizeMode.AutoSize),
+                    new Dimension(GridSizeMode.Absolute, 3f),
+                    new Dimension(GridSizeMode.AutoSize),
+                },
+                RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                Content = new[]
+                {
+                    new[]
+                    {
+                        headerText,
+                        Empty(),
+                        columnNotesContainer = new FillFlowContainer
+                        {
+                            Direction = FillDirection.Horizontal,
+                            AutoSizeAxes = Axes.Both,
+                            Spacing = new Vector2(5), // align spacing with SpreadDisplay
+                            Padding = new MarginPadding { Horizontal = 0 },
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                        },
+                    }
+                }
+            });
 
-            // Ensure we rebuild entries when the display mode changes and toggle header visibility.
-            KpcDisplayMode.BindValueChanged(mode =>
+            KpcDisplayModeBindable.Value = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode).Value;
+            KpcDisplayModeBindable.BindValueChanged(mode =>
             {
                 modeChanged = true;
 
-                if (headerText != null)
+                switch (mode.NewValue)
                 {
-                    if (mode.NewValue == SelectV2.KpcDisplayMode.Numbers)
+                    case KpcDisplayMode.Numbers:
+                    {
+                        headerText = new OsuSpriteText
+                        {
+                            Text = "[Notes]",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Colour4.GhostWhite,
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft
+                        };
                         headerText.Show();
-                    else
-                        headerText.Hide();
-                }
-                // Adjust background to match SpreadDisplay-like style in BarChart mode.
-                if (backgroundBox != null)
-                {
-                    if (mode.NewValue == SelectV2.KpcDisplayMode.BarChart)
-                    {
-                        backgroundBox.Colour = Colour4.White;
-                        backgroundBox.Alpha = 0.06f;
+                        backgroundBox.Colour = Colour4.Black.Opacity(0.6f);
                     }
-                    else
+                        break;
+
+                    case KpcDisplayMode.BarChart:
                     {
-                        backgroundBox.Colour = Colour4.Black;
-                        backgroundBox.Alpha = 0.6f;
+                        backgroundBox.Colour = Colour4.White.Opacity(0.6f);
+                        headerText?.Hide();
                     }
+                        break;
                 }
-            }, false);
+            }, true);
 
-            // Initial header visibility based on current mode.
-            if (headerText != null)
-            {
-                if (KpcDisplayMode.Value == SelectV2.KpcDisplayMode.Numbers)
-                    headerText.Show();
-                else
-                    headerText.Hide();
-            }
-
-            // Apply initial background style based on current mode.
-            if (backgroundBox != null)
-            {
-                if (KpcDisplayMode.Value == SelectV2.KpcDisplayMode.BarChart)
-                {
-                    backgroundBox.Colour = Colour4.White;
-                    backgroundBox.Alpha = 0.06f;
-                }
-                else
-                {
-                    backgroundBox.Colour = Colour4.Black;
-                    backgroundBox.Alpha = 0.6f;
-                }
-            }
+            KpcDisplayModeBindable.BindValueChanged(_ => modeChanged = true, true);
         }
 
         /// <summary>
@@ -191,8 +155,12 @@ namespace osu.Game.Screens.SelectV2
                 if (columnNoteCounts.Count > 0)
                 {
                     int maxKey = 0;
-                    foreach (var k in columnNoteCounts.Keys)
-                        if (k > maxKey) maxKey = k;
+
+                    foreach (int k in columnNoteCounts.Keys)
+                    {
+                        if (k > maxKey)
+                            maxKey = k;
+                    }
 
                     int kc = maxKey + 1;
                     var normalized = new Dictionary<int, int>(Math.Max(0, kc));
@@ -214,13 +182,13 @@ namespace osu.Game.Screens.SelectV2
 
         private void updateDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
-            switch (KpcDisplayMode.Value)
+            switch (KpcDisplayModeBindable.Value)
             {
-                case SelectV2.KpcDisplayMode.Numbers:
+                case KpcDisplayMode.Numbers:
                     updateNumbersDisplay(columnNoteCounts, holdNoteCounts);
                     break;
 
-                case SelectV2.KpcDisplayMode.BarChart:
+                case KpcDisplayMode.BarChart:
                     updateBarChartDisplay(columnNoteCounts, holdNoteCounts);
                     break;
             }
@@ -232,7 +200,7 @@ namespace osu.Game.Screens.SelectV2
             if (modeChanged)
             {
                 currentColumnCount = 0;
-                columnNotesContainer.Clear();
+                columnNotesContainer?.Clear();
                 numberEntries.Clear();
                 barEntries.Clear();
                 modeChanged = false;
@@ -244,24 +212,24 @@ namespace osu.Game.Screens.SelectV2
             // If increasing column count, add new entries. If decreasing, hide extras.
             if (columns > currentColumnCount)
             {
-                switch (KpcDisplayMode.Value)
+                switch (KpcDisplayModeBindable.Value)
                 {
-                    case SelectV2.KpcDisplayMode.Numbers:
+                    case KpcDisplayMode.Numbers:
                         for (int i = currentColumnCount; i < columns; i++)
                         {
                             var entry = new NumberColumnEntry(i);
                             numberEntries.Add(entry);
-                            columnNotesContainer.Add(entry.Container);
+                            columnNotesContainer?.Add(entry.Container);
                         }
 
                         break;
 
-                    case SelectV2.KpcDisplayMode.BarChart:
+                    case KpcDisplayMode.BarChart:
                         for (int i = currentColumnCount; i < columns; i++)
                         {
-                            var entry = new BarChartColumnEntry(i, MaxBarHeight, false);
+                            var entry = new BarChartColumnEntry(i);
                             barEntries.Add(entry);
-                            columnNotesContainer.Add(entry.Container);
+                            columnNotesContainer?.Add(entry.Container);
                         }
 
                         break;
@@ -269,15 +237,15 @@ namespace osu.Game.Screens.SelectV2
             }
             else
             {
-                switch (KpcDisplayMode.Value)
+                switch (KpcDisplayModeBindable.Value)
                 {
-                    case SelectV2.KpcDisplayMode.Numbers:
+                    case KpcDisplayMode.Numbers:
                         for (int i = columns; i < numberEntries.Count; i++)
                             numberEntries[i].Container.Hide();
 
                         break;
 
-                    case SelectV2.KpcDisplayMode.BarChart:
+                    case KpcDisplayMode.BarChart:
                         for (int i = columns; i < barEntries.Count; i++)
                             barEntries[i].Container.Hide();
 
@@ -382,6 +350,8 @@ namespace osu.Game.Screens.SelectV2
                 {
                     Direction = FillDirection.Horizontal,
                     AutoSizeAxes = Axes.Both,
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
                     Children = new Drawable[]
                     {
                         new OsuSpriteText
@@ -424,11 +394,10 @@ namespace osu.Game.Screens.SelectV2
 
         private class BarChartColumnEntry
         {
-            // Align width/spacing with SpreadDisplay maximums for consistent visuals and layout.
-            private const float bar_width = 7f;
-            private const float bar_spacing = 5f;
-            private readonly float maxBarHeight;
+            private const float bar_width = 6f;
+            private const float max_bar_height = 12f;
             private static readonly Color4 hold_note_color = Color4Extensions.FromHex("#FFD39B");
+            private static readonly Color4 note_color = Color4Extensions.FromHex("#4DA6FF");
 
             public readonly Container Container;
             private readonly Box regularBox;
@@ -439,33 +408,39 @@ namespace osu.Game.Screens.SelectV2
             private int lastHoldNotes = int.MinValue;
             private int lastMaxCount = int.MinValue;
 
-            public BarChartColumnEntry(int index, float maxBarHeight, bool showText = false)
+            public BarChartColumnEntry(int index, bool showText = false)
             {
-                this.maxBarHeight = maxBarHeight;
-
                 // Match SpreadDisplay's largest dot: width 7, height 12 (maxBarHeight).
                 Container = new Container
                 {
-                    Size = new Vector2(bar_width, this.maxBarHeight),
-                    Margin = new MarginPadding { Right = bar_spacing },
+                    Size = new Vector2(bar_width, max_bar_height),
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Margin = new MarginPadding(-1.5f),
                 };
 
-                // Create a masked bar area with corner radius to achieve capsule appearance.
+                // Create a masked bar area with fixed pixel size so mask cropping is exact.
                 var barArea = new Container
                 {
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                    Size = new Vector2(bar_width, this.maxBarHeight),
-                    Margin = new MarginPadding { Bottom = 0 },
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                    Size = new Vector2(bar_width, max_bar_height),
                     Masking = true,
-                    CornerRadius = bar_width / 2f, // pill shape: radius = half width (matches reference)
+                    CornerRadius = bar_width / 2f,
+                };
+
+                // background inside mask so corners are applied consistently
+                var background = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Color4.Gray.Opacity(0.2f),
                 };
 
                 regularBox = new Box
                 {
                     RelativeSizeAxes = Axes.X,
                     Height = 0,
-                    Colour = Color4Extensions.FromHex("#4DA6FF"), // regular notes: blue
+                    Colour = note_color,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
                 };
@@ -479,20 +454,10 @@ namespace osu.Game.Screens.SelectV2
                     Origin = Anchor.BottomCentre,
                 };
 
-                barArea.AddRange(new Drawable[] { regularBox, holdBox });
+                barArea.AddRange(new Drawable[] { background, regularBox, holdBox });
 
-                // Build children list and only create text drawables when requested to avoid allocations/layout.
                 var children = new List<Drawable>
                 {
-                    new Box
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Height = this.maxBarHeight,
-                        Colour = Color4.Gray.Opacity(0.2f),
-                        Anchor = Anchor.BottomCentre,
-                        Origin = Anchor.BottomCentre,
-                        Margin = new MarginPadding { Bottom = 0 }
-                    },
                     barArea,
                 };
 
@@ -535,10 +500,9 @@ namespace osu.Game.Screens.SelectV2
 
                 int regularNotes = totalNotes - holdNotes;
 
-                float totalHeight = maxCount > 0 ? (float)totalNotes / maxCount * maxBarHeight : 0;
-                float regularHeight = maxCount > 0 ? (float)regularNotes / maxCount * maxBarHeight : 0;
+                float totalHeight = maxCount > 0 ? (float)totalNotes / maxCount * max_bar_height : 0;
+                float regularHeight = maxCount > 0 ? (float)regularNotes / maxCount * max_bar_height : 0;
 
-                // Smoothly animate height/margin/text changes to avoid visual jitter when data updates.
                 const float transition_duration = 200f;
                 regularBox.ResizeHeightTo(regularHeight, transition_duration, Easing.OutQuint);
 

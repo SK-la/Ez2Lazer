@@ -235,15 +235,15 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        spreadDisplay = new SpreadDisplay
-                                        {
-                                            Origin = Anchor.CentreLeft,
-                                            Anchor = Anchor.CentreLeft,
-                                        },
                                         ezKpcDisplay = new EzKpcDisplay
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
+                                        },
+                                        spreadDisplay = new SpreadDisplay
+                                        {
+                                            Origin = Anchor.CentreLeft,
+                                            Anchor = Anchor.CentreLeft,
                                         },
                                     },
                                 }
@@ -275,7 +275,7 @@ namespace osu.Game.Screens.SelectV2
                 spreadDisplay.Enabled.Value = s.NewValue;
             }, true);
 
-            kpcDisplayModeBindable.BindValueChanged(z => ezKpcDisplay.KpcDisplayMode.Value = z.NewValue, true);
+            kpcDisplayModeBindable.BindValueChanged(z => ezKpcDisplay.KpcDisplayModeBindable.Value = z.NewValue, true);
         }
 
         protected override void PrepareForUse()

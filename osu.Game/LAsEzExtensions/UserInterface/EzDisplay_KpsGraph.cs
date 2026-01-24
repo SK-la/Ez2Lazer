@@ -113,8 +113,6 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             if (count <= 0)
                 return;
 
-            int totalCount = Math.Max(count, max_draw_points);
-
             // Use the path's own draw size so vertices are in the path's local space.
             float availableWidth = Math.Max(0, path.DrawWidth - 2 * path.PathRadius);
             float availableHeight = Math.Max(0, path.DrawHeight - 2 * path.PathRadius);
@@ -123,12 +121,13 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth - 2 * path.PathRadius);
             if (availableHeight <= 0) availableHeight = Math.Max(0, DrawHeight - 2 * path.PathRadius);
 
-            int denom = Math.Max(1, totalCount - 1);
+            // Map points across the actual number of values so the graph fills the container.
+            int denom = Math.Max(1, count - 1);
 
             for (int i = 0; i < count; i++)
             {
                 // account for the radius margin so vertices are inset by PathRadius on all sides
-                float x = path.PathRadius + (i + totalCount - count) / (float)denom * availableWidth;
+                float x = path.PathRadius + (count == 1 ? 0f : i / (float)denom * availableWidth);
                 float y = path.PathRadius + GetYPosition(values[i]) * availableHeight;
                 path.AddVertex(new Vector2(x, y));
             }
