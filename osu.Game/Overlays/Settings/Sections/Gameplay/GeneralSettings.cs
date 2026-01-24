@@ -31,21 +31,25 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                     Keywords = new[] { "scoring" },
                     ApplyClassicDefault = c => ((IHasCurrentValue<ScoringMode>)c).Current.Value = ScoringMode.Classic,
                 },
-                new SettingsSlider<double>
+                new SettingsItemV2(new FormSliderBar<double>
                 {
-                    LabelText = EzLocalizationManager.AccuracyCutoffS,
+                    Caption = EzLocalizationManager.AccuracyCutoffS,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true,
-                    Keywords = new[] { "mania" }
-                },
-                new SettingsSlider<double>
+                })
                 {
-                    LabelText = EzLocalizationManager.AccuracyCutoffA,
+                    Keywords = new[] { "mania", "acc" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzLocalizationManager.AccuracyCutoffA,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true,
-                    Keywords = new[] { "mania" }
+                })
+                {
+                    Keywords = new[] { "mania", "acc" }
                 },
                 new SettingsItemV2(new FormCheckBox
                 {

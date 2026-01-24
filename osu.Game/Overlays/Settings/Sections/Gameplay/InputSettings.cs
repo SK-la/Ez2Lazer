@@ -54,11 +54,11 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
 
             if (RuntimeInfo.OS == RuntimeInfo.Platform.macOS)
             {
-                Add(new SettingsCheckbox
+                Add(new SettingsItemV2(new FormCheckBox
                 {
-                    LabelText = EzLocalizationManager.DisableCmdSpace,
+                    Caption = EzLocalizationManager.DisableCmdSpace,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDisableCmdSpace)
-                });
+                }));
             }
         }
     }

@@ -121,7 +121,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.KeySoundPreview, false);
             SetDefault(Ez2Setting.EzSelectCsMode, "");
 
-            SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
+            SetDefault(Ez2Setting.HitMode, EzMUGHitMode.Lazer);
             SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.Lazer);
             SetDefault(Ez2Setting.CustomPoorHitResultBool, true);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);

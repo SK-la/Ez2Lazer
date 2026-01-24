@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
@@ -28,7 +28,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private SettingsDropdown<int>? sampleRateDropdown;
+        private FormDropdown<int>? sampleRateDropdown;
 
         private AudioDeviceDropdown dropdown = null!;
 
@@ -44,23 +44,24 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 new SettingsItemV2(dropdown = new AudioDeviceDropdown
                 {
                     Caption = AudioSettingsStrings.OutputDevice,
+                    HintText = "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive.",
                 })
                 {
-                    Keywords = new[] { "speaker", "headphone", "output" }
-                    // TooltipText = "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive."
+                    Keywords = new[] { "speaker", "headphone", "output" },
                 },
             };
 
             if (RuntimeInfo.OS == RuntimeInfo.Platform.Windows)
             {
-                Add(sampleRateDropdown = new SettingsDropdown<int>
+                Add(new SettingsItemV2(sampleRateDropdown = new FormDropdown<int>
                 {
-                    LabelText = "ASIO Sample Rate(Testing)",
-                    Keywords = new[] { "sample", "rate", "frequency" },
-                    Items = AudioExtensions.COMMON_SAMPLE_RATES,
+                    Caption = "ASIO Sample Rate(Testing)",
+                    HintText = "48k is better, too high a value will cause delays and clock synchronization errors",
                     Current = ezConfig.GetBindable<int>(Ez2Setting.AsioSampleRate),
-                    // Current = new Bindable<int>(audio.GetSampleRate()),
-                    TooltipText = "48k is better, too high a value will cause delays and clock synchronization errors"
+                    Items = AudioExtensions.COMMON_SAMPLE_RATES,
+                })
+                {
+                    Keywords = new[] { "sample", "rate", "frequency" },
                 });
                 Add(new SettingsItemV2(wasapiExperimental = new FormCheckBox
                 {
@@ -84,17 +85,11 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 });
 
                 wasapiExperimental.Current.ValueChanged += _ => onDeviceChanged(string.Empty);
+                dropdown.Current.ValueChanged += e => onDeviceChanged(e.NewValue);
                 sampleRateDropdown.Current.ValueChanged += e =>
                 {
                     Logger.Log($"User set sample rate to {e.NewValue}Hz", LoggingTarget.Runtime, LogLevel.Debug);
                     audio.SetPreferredAsioSampleRate(e.NewValue);
-                };
-
-                // 根据初始设备类型显示或隐藏采样率设置
-                dropdown.Current.ValueChanged += e =>
-                {
-                    if (e.NewValue.Contains("(ASIO)")) sampleRateDropdown.Show();
-                    else sampleRateDropdown.Hide();
                 };
             }
 
@@ -115,6 +110,14 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     wasapiExperimentalNote.Value = new SettingsNote.Data(AudioSettingsStrings.WasapiNotice, SettingsNote.Type.Warning);
                 else
                     wasapiExperimentalNote.Value = null;
+            }
+
+            if (sampleRateDropdown != null)
+            {
+                if (_.Contains("(ASIO)"))
+                    sampleRateDropdown.Show();
+                else
+                    sampleRateDropdown.Hide();
             }
         }
 

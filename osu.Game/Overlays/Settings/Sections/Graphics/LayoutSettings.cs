@@ -179,10 +179,13 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 {
                     Keywords = new[] { "scale", "letterbox" },
                 },
-                new SettingsEnumDropdown<ScalingGameMode>
+                new SettingsItemV2(new FormEnumDropdown<ScalingGameMode>
                 {
-                    LabelText = "Scaling To Game Mode",
+                    Caption = "Scaling To Game Mode",
                     Current = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode),
+                })
+                {
+                    Keywords = new[] { "scale", "letterbox" },
                 },
                 scalingSettings = new FillFlowContainer<SettingsItemV2>
                 {
