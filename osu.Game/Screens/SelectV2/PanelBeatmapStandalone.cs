@@ -339,21 +339,6 @@ namespace osu.Game.Screens.SelectV2
             columnLNs = null;
         }
 
-        private void ensureNormalizedCounts(int keyCount)
-        {
-            if (columnNotes != null && columnLNs != null)
-                return;
-
-            columnNotes = new Dictionary<int, int>(keyCount);
-            columnLNs = new Dictionary<int, int>(keyCount);
-
-            for (int i = 0; i < keyCount; i++)
-            {
-                columnNotes[i] = 0;
-                columnLNs[i] = 0;
-            }
-        }
-
         private void updateKPS((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
             if (Item == null || Item.IsVisible != true)
@@ -370,7 +355,6 @@ namespace osu.Game.Screens.SelectV2
 
             if (columnCounts != null)
             {
-                ensureNormalizedCounts(keyCount);
                 ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
             }
         }
