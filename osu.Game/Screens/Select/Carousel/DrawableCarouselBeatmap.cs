@@ -71,7 +71,7 @@ namespace osu.Game.Screens.Select.Carousel
 
         private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
         private EzKpsDisplay ezKpsDisplay = null!;
-        // private EzKpcDisplay ezKpcDisplay = null!;
+        private EzKpcDisplay ezKpcDisplay = null!;
         private EzDisplayXxySR displayXxySR = null!;
 
         private Bindable<bool> xxySrFilterSetting = null!;
@@ -243,11 +243,11 @@ namespace osu.Game.Screens.Select.Carousel
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        // ezKpcDisplay = new EzKpcDisplay
-                                        // {
-                                        //     Anchor = Anchor.CentreLeft,
-                                        //     Origin = Anchor.CentreLeft,
-                                        // }
+                                        ezKpcDisplay = new EzKpcDisplay
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                        }
                                     }
                                 }
                             }
@@ -347,12 +347,12 @@ namespace osu.Game.Screens.Select.Carousel
         {
             if (ruleset.Value.OnlineID == 3)
             {
-                // ezKpcDisplay.Show();
+                ezKpcDisplay.Show();
                 displayXxySR.Show();
             }
             else
             {
-                // ezKpcDisplay.Hide();
+                ezKpcDisplay.Hide();
                 displayXxySR.Hide();
             }
         }
@@ -396,10 +396,10 @@ namespace osu.Game.Screens.Select.Carousel
                 ezDisplayKpsGraph.SetPoints(kpsList);
             }
 
-            // if (columnCounts != null)
-            // {
-            //     ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
-            // }
+            if (columnCounts != null)
+            {
+                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
+            }
         }
 
         private void computeManiaAnalysis()

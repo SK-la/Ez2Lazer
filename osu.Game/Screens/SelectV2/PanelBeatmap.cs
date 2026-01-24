@@ -63,8 +63,6 @@ namespace osu.Game.Screens.SelectV2
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
 
-        private Dictionary<int, int>? columnNotes;
-        private Dictionary<int, int>? columnLNs;
         private int keyCount;
         private string? scratchText;
 
@@ -316,9 +314,6 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisBindable = null;
             scratchText = null;
-
-            columnNotes = null;
-            columnLNs = null;
         }
 
         private void updateKPS((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)

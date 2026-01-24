@@ -64,6 +64,8 @@ namespace osu.Game.Screens.SelectV2
             AddInternal(new GridContainer
             {
                 AutoSizeAxes = Axes.Both,
+                Anchor = Anchor.CentreLeft,
+                Origin = Anchor.CentreLeft,
                 Padding = new MarginPadding { Horizontal = 5f },
                 ColumnDimensions = new[]
                 {
@@ -76,7 +78,14 @@ namespace osu.Game.Screens.SelectV2
                 {
                     new[]
                     {
-                        headerText,
+                        headerText = new OsuSpriteText
+                        {
+                            Text = "[Notes]",
+                            Font = OsuFont.GetFont(size: 14),
+                            Colour = Colour4.GhostWhite,
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft
+                        },
                         Empty(),
                         columnNotesContainer = new FillFlowContainer
                         {
@@ -100,14 +109,6 @@ namespace osu.Game.Screens.SelectV2
                 {
                     case KpcDisplayMode.Numbers:
                     {
-                        headerText = new OsuSpriteText
-                        {
-                            Text = "[Notes]",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Colour4.GhostWhite,
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft
-                        };
                         headerText.Show();
                         backgroundBox.Colour = Colour4.Black.Opacity(0.6f);
                     }
@@ -394,7 +395,7 @@ namespace osu.Game.Screens.SelectV2
 
         private class BarChartColumnEntry
         {
-            private const float bar_width = 6f;
+            private const float bar_width = 7f;
             private const float max_bar_height = 12f;
             private static readonly Color4 hold_note_color = Color4Extensions.FromHex("#FFD39B");
             private static readonly Color4 note_color = Color4Extensions.FromHex("#4DA6FF");

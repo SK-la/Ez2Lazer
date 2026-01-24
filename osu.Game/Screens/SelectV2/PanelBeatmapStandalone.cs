@@ -66,8 +66,6 @@ namespace osu.Game.Screens.SelectV2
         private Bindable<KpcDisplayMode> kpcDisplayModeBindable = new Bindable<KpcDisplayMode>(KpcDisplayMode.BarChart);
         private CancellationTokenSource? maniaAnalysisCancellationSource;
 
-        private Dictionary<int, int>? columnNotes;
-        private Dictionary<int, int>? columnLNs;
         private int keyCount;
         private string? scratchText;
 
@@ -335,8 +333,6 @@ namespace osu.Game.Screens.SelectV2
             // Ez功能
             maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisBindable = null;
-            columnNotes = null;
-            columnLNs = null;
         }
 
         private void updateKPS((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
