@@ -11,7 +11,6 @@ using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using osu.Game.Utils;
 
 namespace osu.Game.Screens.Ranking.Statistics
 {
@@ -21,8 +20,6 @@ namespace osu.Game.Screens.Ranking.Statistics
     /// </summary>
     public static class ScoreHitEventGeneratorBridge
     {
-        private const string logger_name = "hit_events";
-
         private static readonly ConcurrentDictionary<string, IHitEventGenerator> generators = new ConcurrentDictionary<string, IHitEventGenerator>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
@@ -91,7 +88,7 @@ namespace osu.Game.Screens.Ranking.Statistics
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, $"HitEvent generation via bridge failed. ruleset={score.ScoreInfo.Ruleset.ShortName}", logger_name);
+                Logger.Error(ex, $"HitEvent generation via bridge failed. ruleset={score.ScoreInfo.Ruleset.ShortName}", EzAnalysisPersistentStore.LOGGER_NAME);
                 return null;
             }
         }
@@ -154,7 +151,7 @@ namespace osu.Game.Screens.Ranking.Statistics
                 }
             }
 
-            Logger.Log($"No HitEvent generator found for ruleset={key}. Skipping local generation.", logger_name, LogLevel.Debug);
+            Logger.Log($"No HitEvent generator found for ruleset={key}. Skipping local generation.", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Debug);
             return null;
         }
     }

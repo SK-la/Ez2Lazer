@@ -19,7 +19,6 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.LAsEzExtensions.Analysis.Persistence;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Types;
@@ -67,7 +66,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private BeatmapManager beatmapManager { get; set; } = null!;
 
         [Resolved]
-        private EzManiaAnalysisPersistentStore persistentStore { get; set; } = null!;
+        private EzAnalysisPersistentStore persistentStore { get; set; } = null!;
 
         [Resolved(CanBeNull = true)]
         private Bindable<RulesetInfo> currentRuleset { get; set; } = null!;
@@ -137,7 +136,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         /// </summary>
         public Task WarmupPersistentOnlyAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
-            if (!EzManiaAnalysisPersistentStore.Enabled)
+            if (!EzAnalysisPersistentStore.Enabled)
                 return Task.CompletedTask;
 
             // Only mania is supported.
@@ -161,7 +160,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     // First, gate and probe the persistent store to avoid flooding readers.
                     bool persistedExists = false;
 
-                    if (EzManiaAnalysisPersistentStore.Enabled)
+                    if (EzAnalysisPersistentStore.Enabled)
                     {
                         bool gateAcquired = false;
 
@@ -264,7 +263,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 if (cachedLookups.TryAdd(lookup, 0))
                     Interlocked.Increment(ref cachedLookupsCount);
 
-                int maxEntries = EzManiaAnalysisPersistentStore.Enabled
+                int maxEntries = EzAnalysisPersistentStore.Enabled
                     ? max_in_memory_entries_with_persistence
                     : max_in_memory_entries_without_persistence;
 
@@ -321,7 +320,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             // Quick path: if a persisted no-mod baseline exists, return it without entering the single-thread compute queue.
             // This avoids head-of-line blocking where one expensive miss would delay many cheap hits.
-            if (lookup.OrderedMods.Length == 0 && EzManiaAnalysisPersistentStore.Enabled)
+            if (lookup.OrderedMods.Length == 0 && EzAnalysisPersistentStore.Enabled)
             {
                 // Use low_priority_scope_depth to distinguish warmup/background flows from visible flows.
                 // Warmup flows will call BeginLowPriorityScope and set the async-local depth > 0.

@@ -31,8 +31,6 @@ namespace osu.Game.LAsEzExtensions.Analysis.Diagnostics
                       || raw.Equals("on", StringComparison.OrdinalIgnoreCase);
         }
 
-        private const string log_category = "mania_analysis_perf";
-
         private static long last_log_timestamp;
 
         private static long request_count;
@@ -288,7 +286,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Diagnostics
                 $"graph(set count/ms/KB pts)={graphCount}/{graphTotalMs:F2}/{graphTotalKb:F1} pts={graphPoints} avg={graphAvgMs:F2}ms/{graphAvgKb:F1}KB " +
                 $"kpc(upd count/ms/KB cols bar)={kpcCount}/{kpcTotalMs:F2}/{kpcTotalKb:F1} cols={kpcCols} bar={kpcBar} avg={kpcAvgMs:F2}ms/{kpcAvgKb:F1}KB " +
                 $"cache={cacheSize}/{cacheLimit} evict={evict} inflight(H/L)={highInflight}/{lowInflight}",
-                log_category,
+                EzAnalysisPersistentStore.LOGGER_NAME,
                 LogLevel.Important);
         }
     }

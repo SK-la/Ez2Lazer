@@ -11,8 +11,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
 {
     internal static class XxySrCalculatorBridge
     {
-        private const string logger_name = "xxy_sr";
-
         private const string calculator_type_name = "osu.Game.Rulesets.Mania.LAsEZMania.Analysis.SRCalculator";
         private const string calculator_method_name = "CalculateSR";
         private const string mania_assembly_name = "osu.Game.Rulesets.Mania";
@@ -58,7 +56,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 catch (Exception ex)
                 {
                     if (Interlocked.Increment(ref invokeFailCount) <= 10)
-                        Logger.Error(ex, $"xxy_SR bridge invoke exception with clockRate. beatmapType={beatmap.GetType().FullName}, clockRate={clockRate}", logger_name);
+                        Logger.Error(ex, $"xxy_SR bridge invoke exception with clockRate. beatmapType={beatmap.GetType().FullName}, clockRate={clockRate}", EzAnalysisPersistentStore.LOGGER_NAME);
                 }
             }
 
@@ -76,7 +74,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             catch (Exception ex)
             {
                 if (Interlocked.Exchange(ref resolveFailLogged, 1) == 0)
-                    Logger.Error(ex, $"xxy_SR bridge resolve exception for {calculator_type_name}.{calculator_method_name}.", logger_name);
+                    Logger.Error(ex, $"xxy_SR bridge resolve exception for {calculator_type_name}.{calculator_method_name}.", EzAnalysisPersistentStore.LOGGER_NAME);
 
                 return null;
             }

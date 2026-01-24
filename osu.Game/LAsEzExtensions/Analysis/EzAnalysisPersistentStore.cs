@@ -12,7 +12,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 
-namespace osu.Game.LAsEzExtensions.Analysis.Persistence
+namespace osu.Game.LAsEzExtensions.Analysis
 {
     /// <summary>
     /// 本地持久化的 mania analysis 存储。
@@ -27,13 +27,14 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
     /// 注意：此处使用 SQLite（而不是额外 Realm 文件），因为向 osu.Game 程序集新增 RealmObject 类型
     /// 会改变 client.realm 的 schema 并要求迁移；而 SQLite 独立文件更安全、易恢复。
     /// </summary>
-    public class EzManiaAnalysisPersistentStore
+    public class EzAnalysisPersistentStore
     {
         /// <summary>
         /// 持久化总开关（默认关闭）：未来考虑是否允许用户通过配置关闭此功能以避免额外的磁盘读写。
         /// </summary>
         public static bool Enabled = true;
 
+        public static readonly string LOGGER_NAME = "ez_runtime";
         public static readonly string DATABASE_FILENAME = $@"mania-analysis_v{ANALYSIS_VERSION}.sqlite";
 
         // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
@@ -69,7 +70,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         // v3 introduced hold note counts, which are relied upon by parts of the UI.
         private const int min_inplace_upgrade_version = 3;
 
-        public EzManiaAnalysisPersistentStore(Storage storage)
+        public EzAnalysisPersistentStore(Storage storage)
         {
             this.storage = storage;
         }
@@ -94,7 +95,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
                     // forcing a full recompute (when changes are only schema/serialization related).
                     tryClonePreviousDatabaseIfMissing();
 
-                    Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", "mania_analysis", LogLevel.Important);
+                    Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", LOGGER_NAME, LogLevel.Important);
 
                     using var connection = openConnection();
 
@@ -242,7 +243,7 @@ LIMIT 1;
 
                 if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_hash mismatch for {beatmap.ID}: stored={storedHash} runtime={beatmap.Hash}", "mania_analysis", LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_hash mismatch for {beatmap.ID}: stored={storedHash} runtime={beatmap.Hash}", LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -251,7 +252,7 @@ LIMIT 1;
                 // - If stored md5 is present, require it to match.
                 if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_md5 mismatch for {beatmap.ID}: stored={storedMd5} runtime={beatmap.MD5Hash}", "mania_analysis", LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_md5 mismatch for {beatmap.ID}: stored={storedMd5} runtime={beatmap.MD5Hash}", LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -304,7 +305,7 @@ LIMIT 1;
                 // Validate the analysis result to ensure it's reasonable
                 if (!isValidAnalysisResult(result))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", "mania_analysis", LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -314,7 +315,7 @@ LIMIT 1;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.");
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.", LOGGER_NAME);
                 return false;
             }
         }
@@ -337,7 +338,7 @@ LIMIT 1;
             // Validate the analysis result before storing
             if (!isValidAnalysisResult(analysis))
             {
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", "mania_analysis", LogLevel.Debug);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", LOGGER_NAME, LogLevel.Debug);
                 return;
             }
 
@@ -362,7 +363,7 @@ LIMIT 1;
                 // 对比两个结果是否有差异
                 if (hasDifference(storedAnalysis, analysis))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", "mania_analysis", LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", LOGGER_NAME, LogLevel.Debug);
                     Store(beatmap, analysis);
                 }
             }
@@ -481,7 +482,7 @@ LIMIT 1;
             // Validate the analysis result before storing
             if (!isValidAnalysisResult(analysis))
             {
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", "mania_analysis", LogLevel.Debug);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", LOGGER_NAME, LogLevel.Debug);
                 return;
             }
 
