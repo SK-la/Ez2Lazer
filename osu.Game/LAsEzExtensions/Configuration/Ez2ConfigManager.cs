@@ -116,7 +116,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.KpcDisplayMode, EzKpcDisplay.KpcDisplayMode.Numbers);
+            SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.Numbers);
             SetDefault(Ez2Setting.XxySRFilter, false);
             SetDefault(Ez2Setting.KeySoundPreview, false);
             SetDefault(Ez2Setting.EzSelectCsMode, "");

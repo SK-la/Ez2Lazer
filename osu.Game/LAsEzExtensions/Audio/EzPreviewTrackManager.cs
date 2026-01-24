@@ -48,7 +48,6 @@ namespace osu.Game.LAsEzExtensions.Audio
         private const double audio_resync_tolerance = 50; // ms
         private const double audio_resync_cooldown = 120; // ms
 
-        private double lastAudioResyncClockTime;
         private const double max_dynamic_preview_length = 60000; // 动态扩展最长 ms
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
         private readonly PlaybackState playback = new PlaybackState();

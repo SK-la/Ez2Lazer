@@ -1,15 +1,19 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Configuration;
 using osuTK;
 using osuTK.Graphics;
 
@@ -17,71 +21,44 @@ namespace osu.Game.Screens.SelectV2
 {
     public partial class EzKpcDisplay : CompositeDrawable
     {
-        /// <summary>
-        /// 显示模式枚举
-        /// </summary>
-        public enum KpcDisplayMode
-        {
-            /// <summary>
-            /// 数字（默认，最高性能）
-            /// </summary>
-            Numbers,
+        public Bindable<KpcDisplayMode> KpcDisplayMode { get; } = new Bindable<KpcDisplayMode>(SelectV2.KpcDisplayMode.BarChart);
 
-            /// <summary>
-            /// 柱状图
-            /// </summary>
-            BarChart
-        }
+        /// <summary>
+        /// Maximum bar height in pixels. Can be set externally.
+        /// Default aligned to SpreadDisplay max height.
+        /// </summary>
+        public float MaxBarHeight { get; set; } = 6f;
 
         private readonly FillFlowContainer columnNotesContainer;
-        private KpcDisplayMode currentKpcDisplayMode = KpcDisplayMode.Numbers;
-        private Dictionary<int, int>? currentColumnCounts;
-        private Dictionary<int, int>? currentHoldNoteCounts;
+        private readonly OsuSpriteText? headerText;
+        private readonly Box backgroundBox;
 
         private int currentColumnCount;
+        private bool modeChanged;
         private readonly List<NumberColumnEntry> numberEntries = new List<NumberColumnEntry>();
         private readonly List<BarChartColumnEntry> barEntries = new List<BarChartColumnEntry>();
 
-        /// <summary>
-        /// 当前显示模式
-        /// </summary>
-        public KpcDisplayMode CurrentKpcDisplayMode
-        {
-            get => currentKpcDisplayMode;
-            set
-            {
-                if (currentKpcDisplayMode == value)
-                    return;
-
-                currentKpcDisplayMode = value;
-
-                // 如果有数据，立即重新渲染
-                if (currentColumnCounts != null)
-                {
-                    updateDisplay(currentColumnCounts, currentHoldNoteCounts);
-                }
-            }
-        }
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         public EzKpcDisplay()
         {
             AutoSizeAxes = Axes.Both;
 
-            InternalChild = new CircularContainer
+            InternalChild = new Container
             {
                 Masking = true,
+                CornerRadius = 5,
                 AutoSizeAxes = Axes.Both,
                 Children = new Drawable[]
                 {
-                    new Box
+                    backgroundBox = new Box
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = Colour4.Black.Opacity(0.6f),
                     },
                     new GridContainer
                     {
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
                         AutoSizeAxes = Axes.Both,
                         Margin = new MarginPadding { Horizontal = 8f },
                         ColumnDimensions = new[]
@@ -95,7 +72,7 @@ namespace osu.Game.Screens.SelectV2
                         {
                             new[]
                             {
-                                new OsuSpriteText
+                                headerText = new OsuSpriteText
                                 {
                                     Text = "[Notes]",
                                     Font = OsuFont.GetFont(size: 14),
@@ -108,6 +85,7 @@ namespace osu.Game.Screens.SelectV2
                                 {
                                     Direction = FillDirection.Horizontal,
                                     AutoSizeAxes = Axes.Both,
+                                    Spacing = new Vector2(5), // align spacing with SpreadDisplay
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
                                 },
@@ -118,38 +96,131 @@ namespace osu.Game.Screens.SelectV2
             };
         }
 
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            FinishTransforms(true);
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            // Initialize bindable from config and hook up visibility/builder logic here (same lifecycle as SpreadDisplay).
+            KpcDisplayMode.Value = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode).Value;
+
+            // Ensure we rebuild entries when the display mode changes and toggle header visibility.
+            KpcDisplayMode.BindValueChanged(mode =>
+            {
+                modeChanged = true;
+
+                if (headerText != null)
+                {
+                    if (mode.NewValue == SelectV2.KpcDisplayMode.Numbers)
+                        headerText.Show();
+                    else
+                        headerText.Hide();
+                }
+                // Adjust background to match SpreadDisplay-like style in BarChart mode.
+                if (backgroundBox != null)
+                {
+                    if (mode.NewValue == SelectV2.KpcDisplayMode.BarChart)
+                    {
+                        backgroundBox.Colour = Colour4.White;
+                        backgroundBox.Alpha = 0.06f;
+                    }
+                    else
+                    {
+                        backgroundBox.Colour = Colour4.Black;
+                        backgroundBox.Alpha = 0.6f;
+                    }
+                }
+            }, false);
+
+            // Initial header visibility based on current mode.
+            if (headerText != null)
+            {
+                if (KpcDisplayMode.Value == SelectV2.KpcDisplayMode.Numbers)
+                    headerText.Show();
+                else
+                    headerText.Hide();
+            }
+
+            // Apply initial background style based on current mode.
+            if (backgroundBox != null)
+            {
+                if (KpcDisplayMode.Value == SelectV2.KpcDisplayMode.BarChart)
+                {
+                    backgroundBox.Colour = Colour4.White;
+                    backgroundBox.Alpha = 0.06f;
+                }
+                else
+                {
+                    backgroundBox.Colour = Colour4.Black;
+                    backgroundBox.Alpha = 0.6f;
+                }
+            }
+        }
+
         /// <summary>
         /// 更新列音符数量显示
         /// </summary>
         /// <param name="columnNoteCounts">每列的音符数量</param>
         /// <param name="holdNoteCounts">面条数量</param>
-        public void UpdateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
+        /// <param name="keyCount"></param>
+        public void UpdateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null, int? keyCount = null)
         {
-            currentColumnCounts = columnNoteCounts;
-            currentHoldNoteCounts = holdNoteCounts;
+            if (keyCount.HasValue)
+            {
+                int kc = keyCount.Value;
+                var normalized = new Dictionary<int, int>(Math.Max(0, kc));
+                var normalizedHold = new Dictionary<int, int>(Math.Max(0, kc));
+
+                for (int i = 0; i < kc; i++)
+                {
+                    normalized[i] = columnNoteCounts.GetValueOrDefault(i);
+                    normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                }
+
+                columnNoteCounts = normalized;
+                holdNoteCounts = normalizedHold;
+            }
+            else
+            {
+                // When keyCount is not provided, normalize sparse key dictionaries into
+                // a continuous 0..maxKey range so callers can index by column.
+                if (columnNoteCounts.Count > 0)
+                {
+                    int maxKey = 0;
+                    foreach (var k in columnNoteCounts.Keys)
+                        if (k > maxKey) maxKey = k;
+
+                    int kc = maxKey + 1;
+                    var normalized = new Dictionary<int, int>(Math.Max(0, kc));
+                    var normalizedHold = new Dictionary<int, int>(Math.Max(0, kc));
+
+                    for (int i = 0; i < kc; i++)
+                    {
+                        normalized[i] = columnNoteCounts.GetValueOrDefault(i);
+                        normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                    }
+
+                    columnNoteCounts = normalized;
+                    holdNoteCounts = normalizedHold;
+                }
+            }
+
             updateDisplay(columnNoteCounts, holdNoteCounts);
         }
 
         private void updateDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
-            int columns = columnNoteCounts.Count;
-
-            if (columns == 0)
+            switch (KpcDisplayMode.Value)
             {
-                currentColumnCount = 0;
-                columnNotesContainer.Clear();
-                numberEntries.Clear();
-                barEntries.Clear();
-                return;
-            }
-
-            switch (currentKpcDisplayMode)
-            {
-                case KpcDisplayMode.Numbers:
+                case SelectV2.KpcDisplayMode.Numbers:
                     updateNumbersDisplay(columnNoteCounts, holdNoteCounts);
                     break;
 
-                case KpcDisplayMode.BarChart:
+                case SelectV2.KpcDisplayMode.BarChart:
                     updateBarChartDisplay(columnNoteCounts, holdNoteCounts);
                     break;
             }
@@ -157,65 +228,104 @@ namespace osu.Game.Screens.SelectV2
 
         private void rebuildForModeIfNeeded(int columns)
         {
+            // If mode changed, recreate entries for the new mode (mode changes are rare).
+            if (modeChanged)
+            {
+                currentColumnCount = 0;
+                columnNotesContainer.Clear();
+                numberEntries.Clear();
+                barEntries.Clear();
+                modeChanged = false;
+            }
+
             if (currentColumnCount == columns)
                 return;
 
-            currentColumnCount = columns;
-            columnNotesContainer.Clear();
-            numberEntries.Clear();
-            barEntries.Clear();
-
-            switch (currentKpcDisplayMode)
+            // If increasing column count, add new entries. If decreasing, hide extras.
+            if (columns > currentColumnCount)
             {
-                case KpcDisplayMode.Numbers:
-                    for (int i = 0; i < columns; i++)
-                    {
-                        var entry = new NumberColumnEntry(i);
-                        numberEntries.Add(entry);
-                        columnNotesContainer.Add(entry.Container);
-                    }
+                switch (KpcDisplayMode.Value)
+                {
+                    case SelectV2.KpcDisplayMode.Numbers:
+                        for (int i = currentColumnCount; i < columns; i++)
+                        {
+                            var entry = new NumberColumnEntry(i);
+                            numberEntries.Add(entry);
+                            columnNotesContainer.Add(entry.Container);
+                        }
 
-                    break;
+                        break;
 
-                case KpcDisplayMode.BarChart:
-                    for (int i = 0; i < columns; i++)
-                    {
-                        var entry = new BarChartColumnEntry(i);
-                        barEntries.Add(entry);
-                        columnNotesContainer.Add(entry.Container);
-                    }
+                    case SelectV2.KpcDisplayMode.BarChart:
+                        for (int i = currentColumnCount; i < columns; i++)
+                        {
+                            var entry = new BarChartColumnEntry(i, MaxBarHeight, false);
+                            barEntries.Add(entry);
+                            columnNotesContainer.Add(entry.Container);
+                        }
 
-                    break;
+                        break;
+                }
             }
+            else
+            {
+                switch (KpcDisplayMode.Value)
+                {
+                    case SelectV2.KpcDisplayMode.Numbers:
+                        for (int i = columns; i < numberEntries.Count; i++)
+                            numberEntries[i].Container.Hide();
+
+                        break;
+
+                    case SelectV2.KpcDisplayMode.BarChart:
+                        for (int i = columns; i < barEntries.Count; i++)
+                            barEntries[i].Container.Hide();
+
+                        break;
+                }
+            }
+
+            currentColumnCount = columns;
         }
 
         private void updateNumbersDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             rebuildForModeIfNeeded(columnNoteCounts.Count);
 
-            // Expect 0..N-1 keys (PanelBeatmap normalizes). Fall back to ordered keys if needed.
-            if (columnNoteCounts.Count == numberEntries.Count && columnNoteCounts.ContainsKey(0))
+            int visible = currentColumnCount;
+
+            // 必须使用方法补0
+            if (columnNoteCounts.Count >= visible && columnNoteCounts.ContainsKey(0))
             {
-                for (int i = 0; i < numberEntries.Count; i++)
+                for (int i = 0; i < visible; i++)
                 {
                     int total = columnNoteCounts.GetValueOrDefault(i);
                     int hold = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                    numberEntries[i].Container.Show();
                     numberEntries[i].SetValues(total, hold);
                 }
+
+                return;
             }
-            else
+
+            int idx = 0;
+
+            foreach (var kvp in columnNoteCounts.OrderBy(k => k.Key))
             {
-                int idx = 0;
+                if (idx >= visible)
+                    break;
 
-                foreach (var kvp in columnNoteCounts.OrderBy(k => k.Key))
-                {
-                    if (idx >= numberEntries.Count)
-                        break;
+                int hold = holdNoteCounts?.GetValueOrDefault(kvp.Key) ?? 0;
+                numberEntries[idx].Container.Show();
+                numberEntries[idx].SetValues(kvp.Value, hold);
+                idx++;
+            }
 
-                    int hold = holdNoteCounts?.GetValueOrDefault(kvp.Key) ?? 0;
-                    numberEntries[idx].SetValues(kvp.Value, hold);
-                    idx++;
-                }
+            // Zero-fill remaining visible slots.
+            for (int i = idx; i < visible; i++)
+            {
+                numberEntries[i].Container.Show();
+                numberEntries[i].SetValues(0, 0);
             }
         }
 
@@ -223,9 +333,11 @@ namespace osu.Game.Screens.SelectV2
         {
             rebuildForModeIfNeeded(columnNoteCounts.Count);
 
+            int visible = currentColumnCount;
+
             int maxCount = 0;
 
-            for (int i = 0; i < currentColumnCount; i++)
+            for (int i = 0; i < visible; i++)
             {
                 int total = columnNoteCounts.GetValueOrDefault(i);
                 int hold = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
@@ -236,36 +348,29 @@ namespace osu.Game.Screens.SelectV2
 
             if (maxCount == 0)
             {
-                // Nothing to show.
-                for (int i = 0; i < barEntries.Count; i++)
+                // Nothing to show: zero-fill visible slots.
+                for (int i = 0; i < visible; i++)
+                    barEntries[i].Container.Show();
+
+                for (int i = 0; i < visible; i++)
                     barEntries[i].SetValues(0, 0, 1);
+
                 return;
             }
 
-            for (int i = 0; i < barEntries.Count; i++)
+            for (int i = 0; i < visible; i++)
             {
                 int total = columnNoteCounts.GetValueOrDefault(i);
                 int hold = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                barEntries[i].Container.Show();
                 barEntries[i].SetValues(total, hold, maxCount);
             }
-        }
-
-        /// <summary>
-        /// 清空显示
-        /// </summary>
-        public void Clear()
-        {
-            currentColumnCounts = null;
-            columnNotesContainer.Clear();
-            numberEntries.Clear();
-            barEntries.Clear();
-            currentColumnCount = 0;
         }
 
         private class NumberColumnEntry
         {
             public readonly FillFlowContainer Container;
-            private readonly OsuSpriteText valueText;
+            private readonly OsuSpriteText? valueText;
             private readonly OsuSpriteText holdText;
 
             private int lastTotal = int.MinValue;
@@ -306,7 +411,7 @@ namespace osu.Game.Screens.SelectV2
                 if (lastTotal != total)
                 {
                     lastTotal = total;
-                    valueText.Text = total.ToString(CultureInfo.InvariantCulture);
+                    if (valueText != null) valueText.Text = total.ToString(CultureInfo.InvariantCulture);
                 }
 
                 if (lastHold != hold)
@@ -319,67 +424,81 @@ namespace osu.Game.Screens.SelectV2
 
         private class BarChartColumnEntry
         {
-            private const float max_bar_height = 30f;
-            private const float bar_width = 20f;
-            private const float bar_spacing = 2f;
+            // Align width/spacing with SpreadDisplay maximums for consistent visuals and layout.
+            private const float bar_width = 7f;
+            private const float bar_spacing = 5f;
+            private readonly float maxBarHeight;
             private static readonly Color4 hold_note_color = Color4Extensions.FromHex("#FFD39B");
 
             public readonly Container Container;
             private readonly Box regularBox;
             private readonly Box holdBox;
-            private readonly OsuSpriteText valueText;
+            private readonly OsuSpriteText? valueText;
 
             private int lastTotalNotes = int.MinValue;
             private int lastHoldNotes = int.MinValue;
             private int lastMaxCount = int.MinValue;
 
-            public BarChartColumnEntry(int index)
+            public BarChartColumnEntry(int index, float maxBarHeight, bool showText = false)
             {
+                this.maxBarHeight = maxBarHeight;
+
+                // Match SpreadDisplay's largest dot: width 7, height 12 (maxBarHeight).
                 Container = new Container
                 {
-                    Size = new Vector2(bar_width, max_bar_height + 20),
+                    Size = new Vector2(bar_width, this.maxBarHeight),
                     Margin = new MarginPadding { Right = bar_spacing },
+                };
+
+                // Create a masked bar area with corner radius to achieve capsule appearance.
+                var barArea = new Container
+                {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    Size = new Vector2(bar_width, this.maxBarHeight),
+                    Margin = new MarginPadding { Bottom = 0 },
+                    Masking = true,
+                    CornerRadius = bar_width / 2f, // pill shape: radius = half width (matches reference)
                 };
 
                 regularBox = new Box
                 {
                     RelativeSizeAxes = Axes.X,
-                    Colour = Color4.LightCoral,
+                    Height = 0,
+                    Colour = Color4Extensions.FromHex("#4DA6FF"), // regular notes: blue
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
-                    Margin = new MarginPadding { Bottom = 15 }
                 };
 
                 holdBox = new Box
                 {
                     RelativeSizeAxes = Axes.X,
+                    Height = 0,
                     Colour = hold_note_color,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
                 };
 
-                valueText = new OsuSpriteText
-                {
-                    Font = OsuFont.GetFont(size: 10),
-                    Colour = Color4.White,
-                    Anchor = Anchor.BottomCentre,
-                    Origin = Anchor.BottomCentre,
-                };
+                barArea.AddRange(new Drawable[] { regularBox, holdBox });
 
-                Container.Children = new Drawable[]
+                // Build children list and only create text drawables when requested to avoid allocations/layout.
+                var children = new List<Drawable>
                 {
                     new Box
                     {
                         RelativeSizeAxes = Axes.X,
-                        Height = max_bar_height,
+                        Height = this.maxBarHeight,
                         Colour = Color4.Gray.Opacity(0.2f),
                         Anchor = Anchor.BottomCentre,
                         Origin = Anchor.BottomCentre,
-                        Margin = new MarginPadding { Bottom = 15 }
+                        Margin = new MarginPadding { Bottom = 0 }
                     },
-                    regularBox,
-                    holdBox,
-                    new OsuSpriteText
+                    barArea,
+                };
+
+                if (showText)
+                {
+                    var idxText = new OsuSpriteText
                     {
                         Text = (index + 1).ToString(),
                         Font = OsuFont.GetFont(size: 12),
@@ -387,9 +506,21 @@ namespace osu.Game.Screens.SelectV2
                         Anchor = Anchor.BottomCentre,
                         Origin = Anchor.BottomCentre,
                         Margin = new MarginPadding { Bottom = 2 }
-                    },
-                    valueText,
-                };
+                    };
+
+                    valueText = new OsuSpriteText
+                    {
+                        Font = OsuFont.GetFont(size: 10),
+                        Colour = Color4.White,
+                        Anchor = Anchor.BottomCentre,
+                        Origin = Anchor.BottomCentre,
+                    };
+
+                    children.Add(idxText);
+                    children.Add(valueText);
+                }
+
+                Container.Children = children.ToArray();
             }
 
             public void SetValues(int totalNotes, int holdNotes, int maxCount)
@@ -404,19 +535,42 @@ namespace osu.Game.Screens.SelectV2
 
                 int regularNotes = totalNotes - holdNotes;
 
-                float totalHeight = maxCount > 0 ? (float)totalNotes / maxCount * max_bar_height : 0;
-                float regularHeight = maxCount > 0 ? (float)regularNotes / maxCount * max_bar_height : 0;
+                float totalHeight = maxCount > 0 ? (float)totalNotes / maxCount * maxBarHeight : 0;
+                float regularHeight = maxCount > 0 ? (float)regularNotes / maxCount * maxBarHeight : 0;
 
-                regularBox.Height = regularHeight;
+                // Smoothly animate height/margin/text changes to avoid visual jitter when data updates.
+                const float transition_duration = 200f;
+                regularBox.ResizeHeightTo(regularHeight, transition_duration, Easing.OutQuint);
 
-                holdBox.Height = totalHeight - regularHeight;
-                holdBox.Margin = new MarginPadding { Bottom = 15 + regularHeight };
+                float holdHeight = Math.Max(0, totalHeight - regularHeight);
+                holdBox.ResizeHeightTo(holdHeight, transition_duration, Easing.OutQuint);
+                // place holdBox above regular by animating its bottom margin inside the masked bar area
+                holdBox.TransformTo(nameof(Drawable.Margin), new MarginPadding { Bottom = regularHeight }, transition_duration, Easing.OutQuint);
 
-                valueText.Text = holdNotes > 0
-                    ? $"{totalNotes.ToString(CultureInfo.InvariantCulture)}({holdNotes.ToString(CultureInfo.InvariantCulture)})"
-                    : totalNotes.ToString(CultureInfo.InvariantCulture);
-                valueText.Y = -(totalHeight + 17);
+                if (valueText != null)
+                {
+                    valueText.Text = holdNotes > 0
+                        ? $"{totalNotes.ToString(CultureInfo.InvariantCulture)}({holdNotes.ToString(CultureInfo.InvariantCulture)})"
+                        : totalNotes.ToString(CultureInfo.InvariantCulture);
+                    valueText.MoveToY(-(totalHeight + 6), transition_duration, Easing.OutQuint);
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// 显示模式枚举
+    /// </summary>
+    public enum KpcDisplayMode
+    {
+        /// <summary>
+        /// 数字（默认，最高性能）
+        /// </summary>
+        Numbers,
+
+        /// <summary>
+        /// 柱状图
+        /// </summary>
+        BarChart
     }
 }

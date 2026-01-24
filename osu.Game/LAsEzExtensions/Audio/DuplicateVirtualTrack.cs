@@ -270,19 +270,13 @@ namespace osu.Game.LAsEzExtensions.Audio
                                                         {
                                                             activeCandidateTrack?.Seek(sliceStart);
 
-                                                            try
-                                                            {
-                                                                if (candidateMuteAdjustment != null) activeCandidateTrack.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
-                                                            }
-                                                            catch { }
+                                                            if (candidateMuteAdjustment != null)
+                                                                activeCandidateTrack?.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
 
                                                             activeCandidateTrack?.Start();
-                                                            Logger.Log("DuplicateVirtualTrack: restarted candidate after interval", LoggingTarget.Runtime);
-
                                                             inLoopDelay = false;
 
-                                                            try { ensureLoopCheckerRunning(); }
-                                                            catch { }
+                                                            ensureLoopCheckerRunning();
                                                         }
                                                         catch (Exception ex)
                                                         {
@@ -485,19 +479,11 @@ namespace osu.Game.LAsEzExtensions.Audio
                                     {
                                         activeCandidateTrack?.Seek(sliceStart);
 
-                                        try
-                                        {
-                                            if (candidateMuteAdjustment != null) activeCandidateTrack.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
-                                        }
-                                        catch { }
+                                        if (candidateMuteAdjustment != null) activeCandidateTrack?.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
 
                                         activeCandidateTrack?.Start();
-                                        Log("restarted candidate after interval");
-
                                         inLoopDelay = false;
-
-                                        try { ensureLoopCheckerRunning(); }
-                                        catch { }
+                                        ensureLoopCheckerRunning();
                                     }
                                     catch (Exception ex)
                                     {

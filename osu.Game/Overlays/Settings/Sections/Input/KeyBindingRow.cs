@@ -528,11 +528,7 @@ namespace osu.Game.Overlays.Settings.Sections.Input
         {
             List<RealmKeyBinding> bindings = GetAllSectionBindings();
 
-            // 检查是否是Mania规则集的操作
-            var actionType = Action.GetType();
-            bool isManiaAction = actionType.Namespace?.StartsWith("osu.Game.Rulesets.Mania", StringComparison.Ordinal) == true;
-
-            RealmKeyBinding? existingBinding = isManiaAction || keyBinding.KeyCombination.Equals(new KeyCombination(InputKey.None))
+            RealmKeyBinding? existingBinding = keyBinding.KeyCombination.Equals(new KeyCombination(InputKey.None))
                 ? null
                 : bindings.FirstOrDefault(other => isConflictingBinding(keyBinding, other, restoringDefaults));
 
