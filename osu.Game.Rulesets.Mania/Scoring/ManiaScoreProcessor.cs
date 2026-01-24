@@ -50,9 +50,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Perfect:
-                    if (IsLegacyScore)
-                        return 300;
-
                     return 305;
             }
 

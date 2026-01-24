@@ -99,11 +99,11 @@ namespace osu.Game.Rulesets.Mania.Scoring
                         break;
 
                     case HitResult.Great:
-                        increase = 0.0051 - Beatmap.Difficulty.DrainRate * 0.0005;
+                        increase = 0.005 - Beatmap.Difficulty.DrainRate * 0.0005;
                         break;
 
                     case HitResult.Perfect:
-                        increase = 0.0053 - Beatmap.Difficulty.DrainRate * 0.0005;
+                        increase = 0.0055 - Beatmap.Difficulty.DrainRate * 0.0005;
                         break;
                 }
 

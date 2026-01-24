@@ -108,10 +108,8 @@ namespace osu.Game.LAsEzExtensions.Audio
             currentBeatmap = beatmap;
             currentTrack = CreateTrack(beatmap, out ownsCurrentTrack);
 
-            if (currentTrack != null)
-                Logger.Log($"EzPreviewTrackManager: created currentTrack (hash={currentTrack.GetHashCode()}) owns={ownsCurrentTrack} cur={currentTrack.CurrentTime} len={currentTrack.Length}", LoggingTarget.Runtime);
-            else
-                Logger.Log("EzPreviewTrackManager: currentTrack is null (falling back?)", LoggingTarget.Runtime);
+            if (currentTrack == null)
+                Logger.Log("EzPreviewTrackManager: currentTrack is null (falling back?)");
 
             playback.ResetPlaybackProgress();
 
@@ -181,7 +179,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: fastCheckShouldUseEnhanced error: {ex}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: fastCheckShouldUseEnhanced error: {ex}");
                 return false;
             }
 
@@ -291,7 +289,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: startEnhancedPreview error: {ex}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: startEnhancedPreview error: {ex}");
                 clearEnhancedElements();
             }
         }
@@ -342,7 +340,6 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
 
             sampleScheduler.ScheduledStoryboardSamples.Sort((a, b) => a.Time.CompareTo(b.Time));
-            // 移除成功日志
         }
 
         // 样本预加载：去重后调用一次 GetChannel() 以确保缓存 / 文件读取
@@ -370,8 +367,6 @@ namespace osu.Game.LAsEzExtensions.Audio
                                 }
                                 finally
                                 {
-                                    // GetChannel() does not register the channel with the Sample unless Play() was invoked,
-                                    // so ensure we dispose temporary channels created for preload to avoid relying on finalizers.
                                     if (!ch.IsDisposed && !ch.ManualFree)
                                         ch.Dispose();
                                 }
@@ -402,12 +397,10 @@ namespace osu.Game.LAsEzExtensions.Audio
                         }
                     }
                 }
-
-                // 移除成功日志
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: Preload error {ex.Message}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: Preload error {ex.Message}");
             }
         }
 
@@ -545,10 +538,6 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                         var channelInner = sample.GetChannel();
 
-                        Logger.Log(
-                            $"EzPreviewTrackManager: triggering sample {info.Bank}-{info.Name} sampleObj={sample} channelHash={channelInner.GetHashCode()} volBefore={channelInner.Volume.Value:F3} playing={channelInner.Playing}",
-                            LoggingTarget.Runtime);
-
                         // 同上：仅当命中对象样本显式给出音量 (>0) 时才应用；否则保持默认以跟随系统设置。
                         if (info.Volume > 0)
                         {
@@ -557,20 +546,21 @@ namespace osu.Game.LAsEzExtensions.Audio
                         }
 
                         channelInner.Play();
-                        Logger.Log($"EzPreviewTrackManager: played channelHash={channelInner.GetHashCode()} volAfter={channelInner.Volume.Value:F3} playing={channelInner.Playing}",
-                            LoggingTarget.Runtime);
+                        // Logger.Log($"EzPreviewTrackManager: played channelHash={channelInner.GetHashCode()} volAfter={channelInner.Volume.Value:F3} playing={channelInner.Playing}");
                         sampleScheduler.ActiveChannels.Add(channelInner);
                         playedAny = true;
                         break; // 只需播放命中链中的首个可用样本
                     }
 
+                    #if DEBUG
                     if (!playedAny)
-                        Logger.Log($"EzPreviewTrackManager: Miss hitsound {info.Bank}-{info.Name}", LoggingTarget.Runtime);
+                        Logger.Log($"EzPreviewTrackManager: Miss hitsound {info.Bank}-{info.Name}");
+                    #endif
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: triggerHitSound error: {ex}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: triggerHitSound error: {ex}");
             }
         }
 
@@ -620,11 +610,11 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                 channel.Play();
                 sampleScheduler.ActiveChannels.Add(channel);
-                // Logger.Log($"EzPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}", LoggingTarget.Runtime);
+                // Logger.Log($"EzPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}");
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: triggerStoryboardSample error: {ex}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: triggerStoryboardSample error: {ex}");
             }
         }
 
