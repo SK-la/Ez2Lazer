@@ -47,6 +47,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Online;
@@ -285,13 +286,14 @@ namespace osu.Game
             Resources.AddStore(new DllResourceStore(OsuResources.ResourceAssembly));
 
             // 初始化并注册EzSkinSettingsManager
-            dependencies.Cache(Ez2ConfigManager = new Ez2ConfigManager(Storage));
-
-            dependencies.Cache(
-                NoteFactory = new EzLocalTextureFactory(
-                    Ez2ConfigManager,
-                    Host.Renderer,
-                    Storage));
+            Ez2ConfigManager = new Ez2ConfigManager(Storage);
+            GlobalConfigStore.Config = LocalConfig;
+            GlobalConfigStore.EzConfig = Ez2ConfigManager;
+            dependencies.Cache(Ez2ConfigManager);
+            dependencies.Cache(NoteFactory = new EzLocalTextureFactory(
+                Ez2ConfigManager,
+                Host.Renderer,
+                Storage));
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 

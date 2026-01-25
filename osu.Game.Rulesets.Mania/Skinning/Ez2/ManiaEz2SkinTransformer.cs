@@ -4,8 +4,10 @@
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -25,17 +27,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     public class ManiaEz2SkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
+        private readonly Ez2ConfigManager ezSkinConfig;
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> hitPosition;
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
-        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap, Ez2ConfigManager ezSkinConfig)
+        public ManiaEz2SkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            // this.config = config ?? throw new ArgumentNullException(nameof(config));
+            if (GlobalConfigStore.EzConfig == null)
+            {
+                Logger.Log("!GlobalConfigStore.EzConfig Ez2Skin", LoggingTarget.Runtime, LogLevel.Important);
+            }
+
+            ezSkinConfig = GlobalConfigStore.EzConfig!;
             // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
 
             columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);

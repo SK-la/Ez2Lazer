@@ -89,22 +89,10 @@ namespace osu.Game.Rulesets.Mania
                     return new ManiaArgonSkinTransformer(skin, beatmap);
 
                 case Ez2Skin:
-                    if (GlobalConfigStore.EzConfig == null)
-                    {
-                        Logger.Log("!GlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
-                        break;
-                    }
-
-                    return new ManiaEz2SkinTransformer(skin, beatmap, GlobalConfigStore.EzConfig);
+                    return new ManiaEz2SkinTransformer(skin, beatmap);
 
                 case EzStyleProSkin:
-                    if (GlobalConfigStore.EzConfig == null)
-                    {
-                        Logger.Log("!GlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
-                        break;
-                    }
-
-                    return new ManiaEzStyleProSkinTransformer(skin, beatmap, GlobalConfigStore.EzConfig);
+                    return new ManiaEzStyleProSkinTransformer(skin, beatmap);
 
                 case SbISkin:
                     return new ManiaSbISkinTransformer(skin, beatmap);
