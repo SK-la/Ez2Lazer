@@ -14,8 +14,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -89,22 +89,10 @@ namespace osu.Game.Rulesets.Mania
                     return new ManiaArgonSkinTransformer(skin, beatmap);
 
                 case Ez2Skin:
-                    if (GlobalConfigStore.EzConfig == null)
-                    {
-                        Logger.Log("!GlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
-                        break;
-                    }
-
-                    return new ManiaEz2SkinTransformer(skin, beatmap, GlobalConfigStore.EzConfig);
+                    return new ManiaEz2SkinTransformer(skin, beatmap);
 
                 case EzStyleProSkin:
-                    if (GlobalConfigStore.EzConfig == null)
-                    {
-                        Logger.Log("!GlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
-                        break;
-                    }
-
-                    return new ManiaEzStyleProSkinTransformer(skin, beatmap, GlobalConfigStore.EzConfig);
+                    return new ManiaEzStyleProSkinTransformer(skin, beatmap);
 
                 case SbISkin:
                     return new ManiaSbISkinTransformer(skin, beatmap);
@@ -352,7 +340,7 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
-                        new ManiaModCleanColumn(), // 待调试
+                        new ManiaModCleanColumn(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         new ManiaModLoopPlayClip(),
@@ -449,6 +437,7 @@ namespace osu.Game.Rulesets.Mania
                 HitResult.Pool,
                 HitResult.IgnoreHit,
                 HitResult.IgnoreMiss,
+                HitResult.ComboBreak
 
                 // HitResult.SmallBonus is used for awarding perfect bonus score but is not included here as
                 // it would be a bit redundant to show this to the user.

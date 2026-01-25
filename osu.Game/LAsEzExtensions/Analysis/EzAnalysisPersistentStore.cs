@@ -2,8 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -12,7 +15,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 
-namespace osu.Game.LAsEzExtensions.Analysis.Persistence
+namespace osu.Game.LAsEzExtensions.Analysis
 {
     /// <summary>
     /// 本地持久化的 mania analysis 存储。
@@ -27,13 +30,14 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
     /// 注意：此处使用 SQLite（而不是额外 Realm 文件），因为向 osu.Game 程序集新增 RealmObject 类型
     /// 会改变 client.realm 的 schema 并要求迁移；而 SQLite 独立文件更安全、易恢复。
     /// </summary>
-    public class EzManiaAnalysisPersistentStore
+    public class EzAnalysisPersistentStore
     {
         /// <summary>
         /// 持久化总开关（默认关闭）：未来考虑是否允许用户通过配置关闭此功能以避免额外的磁盘读写。
         /// </summary>
         public static bool Enabled = true;
 
+        public static readonly string LOGGER_NAME = "ez_runtime";
         public static readonly string DATABASE_FILENAME = $@"mania-analysis_v{ANALYSIS_VERSION}.sqlite";
 
         // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
@@ -56,7 +60,8 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
             "kps_list_json",
             "xxy_sr",
             "column_counts_json",
-            "hold_note_counts_json"
+            "hold_note_counts_json",
+            "last_updated"
         };
 
         private readonly Storage storage;
@@ -65,11 +70,17 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
         private bool initialised;
         private string dbPath = string.Empty;
 
+        private record PendingWrite(BeatmapInfo Beatmap, EzAnalysisResult Analysis, long Timestamp);
+
+        private readonly ConcurrentDictionary<Guid, PendingWrite> pendingWrites = new ConcurrentDictionary<Guid, PendingWrite>();
+        private CancellationTokenSource? writeCts;
+        private Task? backgroundWriterTask;
+
         // Old versions earlier than v3 may not have sufficient data to safely upgrade without recomputation.
         // v3 introduced hold note counts, which are relied upon by parts of the UI.
         private const int min_inplace_upgrade_version = 3;
 
-        public EzManiaAnalysisPersistentStore(Storage storage)
+        public EzAnalysisPersistentStore(Storage storage)
         {
             this.storage = storage;
         }
@@ -94,7 +105,7 @@ namespace osu.Game.LAsEzExtensions.Analysis.Persistence
                     // forcing a full recompute (when changes are only schema/serialization related).
                     tryClonePreviousDatabaseIfMissing();
 
-                    Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", "mania_analysis", LogLevel.Important);
+                    Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", LOGGER_NAME, LogLevel.Important);
 
                     using var connection = openConnection();
 
@@ -159,10 +170,21 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
                     // Store the current analysis version as meta (informational).
                     setMeta(connection, "analysis_version", ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
 
+                    // Ensure last_updated column exists for bookkeeping (minimal schema extension).
+                    if (!hasColumn(connection, "mania_analysis", "last_updated"))
+                    {
+                        using var add = connection.CreateCommand();
+                        add.CommandText = "ALTER TABLE mania_analysis ADD COLUMN last_updated INTEGER NOT NULL DEFAULT 0;";
+                        add.ExecuteNonQuery();
+                    }
+
                     // 检查并清理不需要的列（处理版本升级时删除的字段）
                     cleanupUnrecognizedColumns(connection);
 
                     initialised = true;
+
+                    // Start background writer for pending writes.
+                    startBackgroundWriter();
                 }
                 catch (Exception e)
                 {
@@ -190,10 +212,9 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
             }
         }
 
-        public bool TryGet(BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
+        public bool TryGet(BeatmapInfo beatmap, out EzAnalysisResult result)
         {
-            result = ManiaBeatmapAnalysisDefaults.EMPTY;
-            // missingRequiredXxySr = false;
+            result = default;
 
             if (!Enabled)
                 return false;
@@ -201,6 +222,18 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
             try
             {
                 Initialise();
+
+                // If we have a pending write for this beatmap, prefer that (latest in-memory result).
+                if (pendingWrites.TryGetValue(beatmap.ID, out var pending))
+                {
+                    // Basic validation against hash to avoid returning stale pending for different beatmap content.
+                    if (string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    {
+                        result = pending.Analysis;
+                        return true;
+                    }
+                    // otherwise fall through to DB lookup
+                }
 
                 using var connection = openConnection();
 
@@ -242,7 +275,7 @@ LIMIT 1;
 
                 if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_hash mismatch for {beatmap.ID}: stored={storedHash} runtime={beatmap.Hash}", "mania_analysis", LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_hash mismatch for {beatmap.ID}: stored={storedHash} runtime={beatmap.Hash}", LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -251,7 +284,7 @@ LIMIT 1;
                 // - If stored md5 is present, require it to match.
                 if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_md5 mismatch for {beatmap.ID}: stored={storedMd5} runtime={beatmap.MD5Hash}", "mania_analysis", LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_md5 mismatch for {beatmap.ID}: stored={storedMd5} runtime={beatmap.MD5Hash}", LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -288,23 +321,15 @@ LIMIT 1;
                     }
                 }
 
-                // Compute scratchText since it's not stored
-                int keyCount = columnCounts.Count;
-                string computedScratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+                var summary = new KpsSummary(averageKps, maxKps, kpsList);
+                var details = new ManiaDetails(columnCounts, holdNoteCounts, xxySr);
 
-                result = new ManiaBeatmapAnalysisResult(
-                    averageKps,
-                    maxKps,
-                    kpsList,
-                    columnCounts,
-                    holdNoteCounts,
-                    computedScratchText,
-                    xxySr);
+                result = new EzAnalysisResult(summary, details);
 
                 // Validate the analysis result to ensure it's reasonable
                 if (!isValidAnalysisResult(result))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", "mania_analysis", LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -314,7 +339,7 @@ LIMIT 1;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.");
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.", LOGGER_NAME);
                 return false;
             }
         }
@@ -329,7 +354,7 @@ LIMIT 1;
         /// - 如果 stored xxysr == null 而 computed 有值，说明需要补充 xxysr，更新
         /// - 如果都是 xxysr == null，说明是非 mania 模式数据，比较 KPS 数据是否相同
         /// </summary>
-        public void StoreIfDifferent(BeatmapInfo beatmap, ManiaBeatmapAnalysisResult analysis)
+        public void StoreIfDifferent(BeatmapInfo beatmap, EzAnalysisResult analysis)
         {
             if (!Enabled)
                 return;
@@ -337,12 +362,12 @@ LIMIT 1;
             // Validate the analysis result before storing
             if (!isValidAnalysisResult(analysis))
             {
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", "mania_analysis", LogLevel.Debug);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", LOGGER_NAME, LogLevel.Debug);
                 return;
             }
 
             // 跳过空谱面（no notes）- 不需要存储和管理
-            if (analysis.ColumnCounts.Count == 0)
+            if (analysis.Details.ColumnCounts.Count == 0)
                 return;
 
             try
@@ -362,7 +387,7 @@ LIMIT 1;
                 // 对比两个结果是否有差异
                 if (hasDifference(storedAnalysis, analysis))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", "mania_analysis", LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", LOGGER_NAME, LogLevel.Debug);
                     Store(beatmap, analysis);
                 }
             }
@@ -375,12 +400,22 @@ LIMIT 1;
         /// <summary>
         /// 从数据库读取原始数据（不验证 hash/version）。
         /// </summary>
-        private bool tryGetRawData(SqliteConnection connection, BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
+        private bool tryGetRawData(SqliteConnection connection, BeatmapInfo beatmap, out EzAnalysisResult result)
         {
-            result = ManiaBeatmapAnalysisDefaults.EMPTY;
+            result = default;
 
             try
             {
+                // Check pending writes first to ensure we return the freshest data even if not flushed.
+                if (pendingWrites.TryGetValue(beatmap.ID, out var pending))
+                {
+                    if (string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    {
+                        result = pending.Analysis;
+                        return true;
+                    }
+                }
+
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = @"
@@ -407,17 +442,9 @@ LIMIT 1;
                     var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
                     var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
 
-                    int keyCount = columnCounts.Count;
-                    string scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
-
-                    result = new ManiaBeatmapAnalysisResult(
-                        averageKps,
-                        maxKps,
-                        kpsList,
-                        columnCounts,
-                        holdNoteCounts,
-                        scratchText,
-                        xxySr);
+                    var summary = new KpsSummary(averageKps, maxKps, kpsList);
+                    var details = new ManiaDetails(columnCounts, holdNoteCounts, xxySr);
+                    result = new EzAnalysisResult(summary, details);
 
                     return true;
                 }
@@ -432,48 +459,48 @@ LIMIT 1;
         /// 比较两个分析结果是否有差异。
         /// 关键字段：xxysr, averageKps, maxKps, ColumnCounts, HoldNoteCounts
         /// </summary>
-        private bool hasDifference(ManiaBeatmapAnalysisResult stored, ManiaBeatmapAnalysisResult computed)
+        private bool hasDifference(EzAnalysisResult stored, EzAnalysisResult computed)
         {
             // 检查 xxysr 差异（最重要）
             // 如果 stored 是 null 而 computed 有值，必须更新
-            if (!stored.XxySr.HasValue && computed.XxySr.HasValue)
+            if (!stored.Details.XxySr.HasValue && computed.Details.XxySr.HasValue)
                 return true;
 
             // 如果都有值，比较数值是否相同
-            if (stored.XxySr.HasValue && computed.XxySr.HasValue)
+            if (stored.Details.XxySr.HasValue && computed.Details.XxySr.HasValue)
             {
-                if (!stored.XxySr.Value.Equals(computed.XxySr.Value))
+                if (!stored.Details.XxySr.Value.Equals(computed.Details.XxySr.Value))
                     return true;
             }
 
             // 检查 KPS 相关数据
-            if (!stored.AverageKps.Equals(computed.AverageKps) || !stored.MaxKps.Equals(computed.MaxKps))
+            if (!stored.Summary.AverageKps.Equals(computed.Summary.AverageKps) || !stored.Summary.MaxKps.Equals(computed.Summary.MaxKps))
                 return true;
 
             // 检查列统计
-            if (stored.ColumnCounts.Count != computed.ColumnCounts.Count)
+            if (stored.Details.ColumnCounts.Count != computed.Details.ColumnCounts.Count)
                 return true;
 
-            foreach (var kvp in computed.ColumnCounts)
+            foreach (var kvp in computed.Details.ColumnCounts)
             {
-                if (!stored.ColumnCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
+                if (!stored.Details.ColumnCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
                     return true;
             }
 
             // 检查长按统计
-            if (stored.HoldNoteCounts.Count != computed.HoldNoteCounts.Count)
+            if (stored.Details.HoldNoteCounts.Count != computed.Details.HoldNoteCounts.Count)
                 return true;
 
-            foreach (var kvp in computed.HoldNoteCounts)
+            foreach (var kvp in computed.Details.HoldNoteCounts)
             {
-                if (!stored.HoldNoteCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
+                if (!stored.Details.HoldNoteCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
                     return true;
             }
 
             return false;
         }
 
-        public void Store(BeatmapInfo beatmap, ManiaBeatmapAnalysisResult analysis)
+        public void Store(BeatmapInfo beatmap, EzAnalysisResult analysis)
         {
             if (!Enabled)
                 return;
@@ -481,83 +508,38 @@ LIMIT 1;
             // Validate the analysis result before storing
             if (!isValidAnalysisResult(analysis))
             {
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", "mania_analysis", LogLevel.Debug);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", LOGGER_NAME, LogLevel.Debug);
                 return;
             }
 
             // 跳过空谱面（no notes）- 不需要存储和管理
-            if (analysis.ColumnCounts.Count == 0)
+            if (analysis.Details.ColumnCounts.Count == 0)
                 return;
 
+            // Enqueue pending write and return quickly. Background writer will flush to SQLite.
             try
             {
                 Initialise();
 
-                using var connection = openConnection();
-                using var cmd = connection.CreateCommand();
-
-                string kpsListJson = JsonSerializer.Serialize(analysis.KpsList);
-                string columnCountsJson = JsonSerializer.Serialize(analysis.ColumnCounts);
-                string holdNoteCountsJson = JsonSerializer.Serialize(analysis.HoldNoteCounts);
-
-                cmd.CommandText = @"
-INSERT INTO mania_analysis(
-    beatmap_id,
-    beatmap_hash,
-    beatmap_md5,
-    analysis_version,
-    average_kps,
-    max_kps,
-    kps_list_json,
-    xxy_sr,
-    column_counts_json,
-    hold_note_counts_json
-)
-VALUES(
-    $id,
-    $hash,
-    $md5,
-    $version,
-    $avg,
-    $max,
-    $kps,
-    $xxy,
-    $cols,
-    $holds
-)
-ON CONFLICT(beatmap_id) DO UPDATE SET
-    beatmap_hash = excluded.beatmap_hash,
-    beatmap_md5 = excluded.beatmap_md5,
-    analysis_version = excluded.analysis_version,
-    average_kps = excluded.average_kps,
-    max_kps = excluded.max_kps,
-    kps_list_json = excluded.kps_list_json,
-    xxy_sr = excluded.xxy_sr,
-    column_counts_json = excluded.column_counts_json,
-    hold_note_counts_json = excluded.hold_note_counts_json;
-";
-
-                cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
-                cmd.Parameters.AddWithValue("$hash", beatmap.Hash);
-                cmd.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
-                cmd.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
-                cmd.Parameters.AddWithValue("$avg", analysis.AverageKps);
-                cmd.Parameters.AddWithValue("$max", analysis.MaxKps);
-                cmd.Parameters.AddWithValue("$kps", kpsListJson);
-
-                if (analysis.XxySr.HasValue)
-                    cmd.Parameters.AddWithValue("$xxy", analysis.XxySr.Value);
-                else
-                    cmd.Parameters.AddWithValue("$xxy", DBNull.Value);
-
-                cmd.Parameters.AddWithValue("$cols", columnCountsJson);
-                cmd.Parameters.AddWithValue("$holds", holdNoteCountsJson);
-
-                cmd.ExecuteNonQuery();
+                var pending = new PendingWrite(beatmap, analysis, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                pendingWrites[beatmap.ID] = pending;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore Store failed.");
+                // If enqueue fails for some reason, fallback to synchronous write to avoid data loss.
+                Logger.Error(e, "EzManiaAnalysisPersistentStore enqueue Store failed, falling back to sync write.");
+
+                try
+                {
+                    // synchronous fallback
+                    Initialise();
+                    using var connection = openConnection();
+                    writePendingEntryToConnection(connection, beatmap, analysis);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "EzManiaAnalysisPersistentStore Store fallback failed.");
+                }
             }
         }
 
@@ -784,6 +766,152 @@ WHERE beatmap_id = $id;
             update.ExecuteNonQuery();
         }
 
+        private void startBackgroundWriter()
+        {
+            if (backgroundWriterTask != null)
+                return;
+
+            writeCts = new CancellationTokenSource();
+            backgroundWriterTask = Task.Run(() => backgroundWriterLoop(writeCts.Token));
+        }
+
+        private async Task backgroundWriterLoop(CancellationToken token)
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(500, token).ConfigureAwait(false);
+
+                    if (pendingWrites.IsEmpty)
+                        continue;
+
+                    var batch = pendingWrites.ToArray();
+
+                    try
+                    {
+                        using var connection = openConnection();
+                        using var transaction = connection.BeginTransaction();
+
+                        foreach (var kv in batch)
+                        {
+                            var id = kv.Key;
+                            var pw = kv.Value;
+
+                            try
+                            {
+                                writePendingEntryToConnection(connection, pw.Beatmap, pw.Analysis);
+
+                                // Only remove if the pending entry we wrote is still the latest.
+                                if (pendingWrites.TryGetValue(id, out var latest) && latest.Timestamp == pw.Timestamp)
+                                    pendingWrites.TryRemove(id, out _);
+                            }
+                            catch (Exception e)
+                            {
+                                Logger.Error(e, "EzManiaAnalysisPersistentStore background write failed for entry.");
+                            }
+                        }
+
+                        transaction.Commit();
+                    }
+                    catch (Exception e)
+                    {
+                        // Log and continue; writer will retry on next loop.
+                        Logger.Error(e, "EzManiaAnalysisPersistentStore background batch write failed.");
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // expected on cancellation
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore background writer crashed.");
+            }
+        }
+
+        private void writePendingEntryToConnection(SqliteConnection connection, BeatmapInfo beatmap, EzAnalysisResult analysis)
+        {
+            using var cmd = connection.CreateCommand();
+
+            string kpsListJson = JsonSerializer.Serialize(analysis.Summary.KpsList);
+            string columnCountsJson = JsonSerializer.Serialize(analysis.Details.ColumnCounts);
+            string holdNoteCountsJson = JsonSerializer.Serialize(analysis.Details.HoldNoteCounts);
+
+            cmd.CommandText = @"
+INSERT INTO mania_analysis(
+    beatmap_id,
+    beatmap_hash,
+    beatmap_md5,
+    analysis_version,
+    average_kps,
+    max_kps,
+    kps_list_json,
+    xxy_sr,
+    column_counts_json,
+    hold_note_counts_json
+)
+VALUES(
+    $id,
+    $hash,
+    $md5,
+    $version,
+    $avg,
+    $max,
+    $kps,
+    $xxy,
+    $cols,
+    $holds
+)
+ON CONFLICT(beatmap_id) DO UPDATE SET
+    beatmap_hash = excluded.beatmap_hash,
+    beatmap_md5 = excluded.beatmap_md5,
+    analysis_version = excluded.analysis_version,
+    average_kps = excluded.average_kps,
+    max_kps = excluded.max_kps,
+    kps_list_json = excluded.kps_list_json,
+    xxy_sr = excluded.xxy_sr,
+    column_counts_json = excluded.column_counts_json,
+    hold_note_counts_json = excluded.hold_note_counts_json;
+";
+
+            cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+            cmd.Parameters.AddWithValue("$hash", beatmap.Hash);
+            cmd.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
+            cmd.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
+            cmd.Parameters.AddWithValue("$avg", analysis.Summary.AverageKps);
+            cmd.Parameters.AddWithValue("$max", analysis.Summary.MaxKps);
+            cmd.Parameters.AddWithValue("$kps", kpsListJson);
+
+            if (analysis.Details.XxySr.HasValue)
+                cmd.Parameters.AddWithValue("$xxy", analysis.Details.XxySr.Value);
+            else
+                cmd.Parameters.AddWithValue("$xxy", DBNull.Value);
+
+            cmd.Parameters.AddWithValue("$cols", columnCountsJson);
+            cmd.Parameters.AddWithValue("$holds", holdNoteCountsJson);
+
+            cmd.ExecuteNonQuery();
+
+            // Update last_updated if column exists
+            try
+            {
+                if (hasColumn(connection, "mania_analysis", "last_updated"))
+                {
+                    using var upd = connection.CreateCommand();
+                    upd.CommandText = "UPDATE mania_analysis SET last_updated = $ts WHERE beatmap_id = $id";
+                    upd.Parameters.AddWithValue("$ts", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                    upd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+                    upd.ExecuteNonQuery();
+                }
+            }
+            catch
+            {
+                // ignore last_updated failures
+            }
+        }
+
         private void cleanupUnrecognizedColumns(SqliteConnection connection)
         {
             var existingColumns = getTableColumns(connection, "mania_analysis");
@@ -873,7 +1001,6 @@ FROM mania_analysis;
 
             while (reader.Read())
             {
-                // PRAGMA table_info: cid, name, type, notnull, dflt_value, pk
                 string name = reader.GetString(1);
                 if (string.Equals(name, columnName, StringComparison.OrdinalIgnoreCase))
                     return true;
@@ -885,9 +1012,9 @@ FROM mania_analysis;
         /// <summary>
         /// Validates that the analysis result contains reasonable values.
         /// </summary>
-        private static bool isValidAnalysisResult(ManiaBeatmapAnalysisResult result)
+        private static bool isValidAnalysisResult(EzAnalysisResult result)
         {
-            if (result.XxySr.HasValue && (double.IsNaN(result.XxySr.Value) || double.IsInfinity(result.XxySr.Value)))
+            if (result.Details.XxySr.HasValue && (double.IsNaN(result.Details.XxySr.Value) || double.IsInfinity(result.Details.XxySr.Value)))
                 return false;
 
             return true;

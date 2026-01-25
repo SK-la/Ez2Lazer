@@ -3,23 +3,25 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
+using osu.Framework.Timing;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
-using osu.Framework.Timing;
 
-namespace osu.Game.LAsEzExtensions.Select
+namespace osu.Game.LAsEzExtensions.Audio
 {
     /// <summary>
     /// <para>一个增强的预览音轨管理器，支持在预览时播放note音效和故事板背景音。</para>
@@ -29,37 +31,19 @@ namespace osu.Game.LAsEzExtensions.Select
     /// </summary>
     public partial class EzPreviewTrackManager : CompositeDrawable
     {
-        /// <summary>
-        /// 全局静态开关：当设置为 <see langword="false"/> 时，EzPreviewTrackManager 将拒绝启动新的预览。
-        /// 由外部（例如 UI 的 `keySoundPreview`）控制。
-        /// </summary>
-        public static bool Enabled { get; set; } = true;
+        // 单例/实例都可用，但我们使用实例级 Bindable 以便在 `SongSelect` 中直接 BindTo。
+        public BindableBool EnabledBindable { get; } = new BindableBool();
 
-        /// <summary>
-        /// 当前是否处于“正在播放预览”的状态。
-        /// 注意：该值同时要求内部状态认为正在播放，且底层 <see cref="Track"/> 实际处于运行状态。
-        /// </summary>
-        public bool IsPlaying => playback.IsPlaying && currentTrack?.IsRunning == true;
-
+        // 预览时，非重复音效必须大于此值才会激活hitsound预览，否则退回外部预览。
         private const int hitsound_threshold = 10;
         private const double preview_window_length = 20000; // 20s
         private const double scheduler_interval = 16; // ~60fps
         private const double trigger_tolerance = 15; // ms 容差
 
-        // 外部时钟驱动（gameplay）模式下，过短的切片会导致高频 Seek/Restart，音频听感会明显“撕裂”。
-        // 这里设置一个最小切片长度作为下限，避免 1ms 这类极端情况。
-        private const double min_loop_length = 100; // ms
-
-        // 在 gameplay 外部时钟驱动模式下，音频设备/解码缓冲会导致 Track.CurrentTime 与外部时钟存在微小漂移。
-        // 若仍按 15ms 容差每帧 Seek，会产生明显的“撕裂/卡带”听感。
-        // 因此对“音频轨道重同步”使用更宽容差，并加入冷却时间。
-        private const double audio_resync_tolerance = 50; // ms
-        private const double audio_resync_cooldown = 120; // ms
-
-        private double lastAudioResyncClockTime;
         private const double max_dynamic_preview_length = 60000; // 动态扩展最长 ms
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
         private readonly PlaybackState playback = new PlaybackState();
+        public readonly Bindable<IBeatmap> Beatmap = new Bindable<IBeatmap>();
 
         private Track? currentTrack;
         private IWorkingBeatmap? currentBeatmap;
@@ -73,8 +57,6 @@ namespace osu.Game.LAsEzExtensions.Select
         [Resolved]
         private ISkinSource skinSource { get; set; } = null!;
 
-        public bool EnableHitSounds { get; set; } = true;
-
         /// <summary>
         /// 覆盖预览起点时间（毫秒）。
         /// 若为 null，则使用谱面元数据的预览时间（PreviewTime）。
@@ -82,85 +64,11 @@ namespace osu.Game.LAsEzExtensions.Select
         public double? OverridePreviewStartTime { get; set; }
 
         /// <summary>
-        /// 覆盖预览段长度（毫秒）。
-        /// 若为 null，则使用默认窗口长度，并在增强预览中可能动态延长以覆盖更多事件。
-        /// </summary>
-        public double? OverridePreviewDuration { get; set; }
-
-        /// <summary>
-        /// 覆盖底层 Track 的 Looping 行为。
-        /// 注意：当启用外部驱动（存在 Duration/LoopCount/LoopInterval/ExternalClock 等）时，
-        /// 预览会通过 <see cref="updateSamples"/> 的 Stop/Seek/Start 来严格实现切片与间隔，
-        /// 此时 Track.Looping/RestartPoint 不再用于控制循环。
-        /// </summary>
-        public bool? OverrideLooping { get; set; }
-
-        /// <summary>
-        /// 覆盖循环次数。
-        /// - 标准预览中默认 1 次。
-        /// - 增强预览中默认无限（直到用户停止预览）。
-        /// </summary>
-        public int? OverrideLoopCount { get; set; }
-
-        /// <summary>
-        /// 覆盖循环间隔（毫秒）。
-        /// 仅在使用外部驱动的切片循环模式下生效。
-        /// </summary>
-        public double? OverrideLoopInterval { get; set; }
-
-        /// <summary>
-        /// 外部时钟源。
-        /// 设定后将使用该时钟的时间域来计算“逻辑播放时间”，用于与 gameplay 等场景同步（例如切片从 cutStart 开始）。
-        /// </summary>
-        public IClock? ExternalClock { get; set; }
-
-        /// <summary>
-        /// 当提供 <see cref="ExternalClock"/> 时，定义预览“开始”的参考时间（毫秒，属于外部时钟的时间域）。
-        /// 主要用于把预览延后到某个外部时间点才开始生效（例如 gameplay 时间到达 cutStart 时再开始切片播放）。
-        /// 若为 null，则会在 <see cref="StartPreview"/> 实际启动时捕获当下的外部时钟时间作为参考。
-        /// </summary>
-        public double? ExternalClockStartTime { get; set; }
-
-        /// <summary>
-        /// 从 <see cref="PreviewOverrideSettings"/> 批量应用覆盖参数。
-        /// 传入 null 等同于 <see cref="ResetOverrides"/>。
-        /// </summary>
-        public void ApplyOverrides(PreviewOverrideSettings? settings)
-        {
-            if (settings == null)
-            {
-                ResetOverrides();
-                return;
-            }
-
-            OverridePreviewStartTime = settings.PreviewStart;
-            OverridePreviewDuration = settings.PreviewDuration;
-            OverrideLoopCount = settings.LoopCount;
-            OverrideLoopInterval = settings.LoopInterval;
-            OverrideLooping = settings.ForceLooping;
-            EnableHitSounds = settings.EnableHitSounds;
-        }
-
-        /// <summary>
-        /// 重置所有覆盖参数到默认值。
-        /// </summary>
-        public void ResetOverrides()
-        {
-            OverridePreviewStartTime = null;
-            OverridePreviewDuration = null;
-            OverrideLoopCount = null;
-            OverrideLoopInterval = null;
-            OverrideLooping = null;
-            EnableHitSounds = true;
-        }
-
-        /// <summary>
         /// 重置循环状态，用于在开始新预览时清除之前的循环进度。
         /// </summary>
         public void ResetLoopState()
         {
-            playback.ResetExternalClockCapture();
-            // 其他重置逻辑如果需要
+            playback.ResetPlaybackProgress();
         }
 
         private bool ownsCurrentTrack;
@@ -181,39 +89,34 @@ namespace osu.Game.LAsEzExtensions.Select
         /// </summary>
         /// <param name="beatmap">要预览的谱面</param>
         /// <param name="forceEnhanced">是否强制使用增强预览（忽略命中音效数量阈值）</param>
-        public void StartPreview(IWorkingBeatmap beatmap, bool forceEnhanced = false)
+        public bool StartPreview(IWorkingBeatmap beatmap, bool forceEnhanced = false)
         {
-            if (!Enabled)
-                return;
-
-            if (playback.IsPlaying && currentBeatmap == beatmap)
-                return;
+            if (!EnabledBindable.Value)
+                return false;
 
             StopPreview();
 
             currentBeatmap = beatmap;
             currentTrack = CreateTrack(beatmap, out ownsCurrentTrack);
-            playback.ResetExternalClockCapture();
 
-            bool enableEnhanced = forceEnhanced || fastCheckShouldUseEnhanced(beatmap, hitsound_threshold);
+            if (currentTrack == null)
+                Logger.Log("EzPreviewTrackManager: currentTrack is null (falling back?)");
 
-            if (!enableEnhanced)
-            {
-                startStandardPreview(beatmap);
-                return;
-            }
+            playback.ResetPlaybackProgress();
+
+            if (!forceEnhanced && !fastCheckShouldUseEnhanced(beatmap, hitsound_threshold)) return false;
 
             startEnhancedPreview(beatmap);
+            return true;
         }
 
         public void StopPreview()
         {
-            StopPreviewInternal("manual");
+            StopPreviewInternal();
         }
 
-        protected virtual void StopPreviewInternal(string reason)
+        protected void StopPreviewInternal()
         {
-            // Logger.Log($"EzPreviewTrackManager: Stopping preview (reason={reason})");
             playback.IsPlaying = false;
             updateDelegate?.Cancel();
             updateDelegate = null;
@@ -230,14 +133,6 @@ namespace osu.Game.LAsEzExtensions.Select
             currentBeatmap = null;
             currentTrack = null;
             playback.ResetPlaybackProgress();
-
-            // 清除所有 override 设置，确保不会影响后续使用
-            OverrideLooping = null;
-            OverrideLoopCount = null;
-            OverrideLoopInterval = null;
-            ExternalClock = null;
-            ExternalClockStartTime = null;
-            OverridePreviewStartTime = null;
         }
 
         [BackgroundDependencyLoader]
@@ -249,78 +144,49 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 RelativeSizeAxes = Axes.Both
             };
+
+            // EnabledBindable.BindValueChanged(_ =>
+            // {
+            //     // 在主调度线程执行 Stop/Start 操作以保证线程安全。
+            //     Schedule(() =>
+            //     {
+            //         if (currentBeatmap != null)
+            //         {
+            //             StopPreviewInternal();
+            //             StartPreview(currentBeatmap);
+            //         }
+            //     });
+            // }, false);
         }
 
-        // 快速判定：遍历命中对象直到达到阈值即返回 true，避免完整建立 HashSet 带来的额外分配
+        // 快速判定：遍历命中对象直到达到阈值即返回 true。
+        // 统计谱面中命中对象所使用的采样音频的唯一文件名数量（使用 HitSampleInfo.LookupNames 的首选值）。
         private bool fastCheckShouldUseEnhanced(IWorkingBeatmap beatmap, int threshold)
         {
-            try
-            {
-                var playable = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
-                var set = new HashSet<HitSampleInfo>();
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                foreach (var obj in playable.HitObjects)
+            foreach (var obj in beatmap.Beatmap.HitObjects)
+            {
+                var stack = new Stack<HitObject>();
+                stack.Push(obj);
+
+                while (stack.Count > 0)
                 {
-                    collect(obj, set);
-                    if (set.Count >= threshold)
-                        return true;
+                    var ho = stack.Pop();
+
+                    foreach (var sm in ho.Samples)
+                    {
+                        string? first = sm.LookupNames.FirstOrDefault();
+                        if (first != null && set.Add(first) && set.Count >= threshold)
+                            return true;
+                    }
+
+                    foreach (var n in ho.NestedHitObjects)
+                        stack.Push(n);
                 }
-
-                return set.Count >= threshold;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"EzPreviewTrackManager: fastCheckShouldUseEnhanced error: {ex}", LoggingTarget.Runtime);
-                return false;
             }
 
-            static void collect(HitObject ho, HashSet<HitSampleInfo> s)
-            {
-                foreach (var sm in ho.Samples) s.Add(sm);
-                foreach (var n in ho.NestedHitObjects) collect(n, s);
-            }
-        }
-
-        private void startStandardPreview(IWorkingBeatmap beatmap)
-        {
-            beatmap.PrepareTrackForPreview(true);
-            playback.PreviewStartTime = OverridePreviewStartTime ?? beatmap.BeatmapInfo.Metadata.PreviewTime;
-
-            if (playback.PreviewStartTime < 0 || playback.PreviewStartTime > currentTrack?.Length)
-                playback.PreviewStartTime = (currentTrack?.Length ?? 0) * 0.4;
-
-            playback.PreviewEndTime = OverridePreviewDuration.HasValue
-                ? playback.PreviewStartTime + Math.Max(0, OverridePreviewDuration.Value)
-                : playback.PreviewStartTime + preview_window_length;
-
-            double segmentLength = playback.PreviewEndTime - playback.PreviewStartTime;
-            double minSegmentLength = ExternalClock != null ? min_loop_length : 1;
-            playback.LoopSegmentLength = Math.Max(minSegmentLength, segmentLength);
-            playback.LoopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
-            playback.EffectiveLoopCount = OverrideLoopCount ?? 1;
-            // 当存在“切片/循环”相关 override 时，需要通过 updateSamples() 手动驱动 Track（Stop/Seek）。
-            // 仅靠 Track.Looping/RestartPoint 无法严格约束 Duration/LoopCount/LoopInterval。
-            playback.UseExternalLooping = ExternalClock != null
-                                          || playback.LoopInterval > 0
-                                          || OverrideLoopCount.HasValue
-                                          || OverridePreviewDuration.HasValue
-                                          || (OverrideLooping.HasValue && !OverrideLooping.Value);
-
-            if (currentTrack != null)
-            {
-                currentTrack.Seek(playback.PreviewStartTime);
-                currentTrack.Looping = !playback.UseExternalLooping && (OverrideLooping ?? true);
-                currentTrack.RestartPoint = playback.PreviewStartTime;
-            }
-
-            currentTrack?.Start();
-            playback.IsPlaying = true;
-
-            if (playback.UseExternalLooping)
-            {
-                updateDelegate = Scheduler.AddDelayed(updateSamples, scheduler_interval, true);
-                updateSamples();
-            }
+            return set.Count >= threshold;
         }
 
         /// <summary>
@@ -328,10 +194,8 @@ namespace osu.Game.LAsEzExtensions.Select
         /// </summary>
         private void startEnhancedPreview(IWorkingBeatmap beatmap)
         {
-            double longestHitTime = 0; // 修复作用域：提前声明
+            double longestHitTime = 0;
             double longestStoryboardTime = 0;
-
-            playback.LastReferenceTime = 0;
 
             void collectLongest(HitObject ho)
             {
@@ -374,43 +238,37 @@ namespace osu.Game.LAsEzExtensions.Select
                         dynamicEnd = Math.Min(playback.PreviewStartTime + max_dynamic_preview_length, longestEventTime);
                 }
 
-                double segmentLength = OverridePreviewDuration.HasValue
-                    ? Math.Max(0, OverridePreviewDuration.Value)
-                    : dynamicEnd - playback.PreviewStartTime;
+                double segmentLength = dynamicEnd - playback.PreviewStartTime;
 
-                double minSegmentLength = ExternalClock != null ? min_loop_length : 1;
-                playback.LoopSegmentLength = Math.Max(minSegmentLength, segmentLength);
-                playback.EffectiveLoopCount = OverrideLoopCount ?? int.MaxValue;
-                playback.LoopInterval = Math.Max(0, OverrideLoopInterval ?? 0);
+                playback.LoopSegmentLength = Math.Max(1, segmentLength);
 
-                if (playback.EffectiveLoopCount == int.MaxValue)
-                    playback.PreviewEndTime = double.MaxValue;
-                else
-                    playback.PreviewEndTime = playback.PreviewStartTime + playback.EffectiveLoopCount * (playback.LoopSegmentLength + playback.LoopInterval) - playback.LoopInterval;
+                // 播放至谱面事件结束或音轨结尾（取较小者），作为一次循环的结束点。
+                playback.PreviewEndTime = Math.Min(currentTrack?.Length ?? double.MaxValue, playback.PreviewStartTime + playback.LoopSegmentLength);
 
                 playback.LastTrackTime = playback.PreviewStartTime;
                 playback.LegacyLoopCount = 0;
                 playback.LegacyLogicalOffset = 0;
-                playback.UseExternalLooping = ExternalClock != null
-                                              || playback.LoopInterval > 0
-                                              || OverrideLoopCount.HasValue
-                                              || OverridePreviewDuration.HasValue
-                                              || (OverrideLooping.HasValue && !OverrideLooping.Value);
+                // external-clock / manual looping behavior has been removed from this manager.
                 playback.ShortBgmOneShotMode = false;
                 playback.ShortBgmMutedAfterFirstLoop = false;
 
-                // 判定一次性短BGM模式：原始音轨长度 <2s 且 谱面事件覆盖长度 > 10s
-                if (currentTrack != null && currentTrack.Length < 2000 && longestEventTime >= playback.PreviewStartTime + preview_window_length)
-                    playback.ShortBgmOneShotMode = true;
+                // 判定一次性短BGM模式：
+                // 若主音频非常短（<10s），则将其视为短 BGM，在循环时在第一次循环后静音（从而实现“播放一次可听，后续不再循环”的效果），
+                // 同时保留命中音效与故事板音效的触发逻辑。
+                if (currentTrack != null)
+                {
+                    if (currentTrack.Length < 10000 || longestEventTime > (currentTrack.Length + 5000))
+                        playback.ShortBgmOneShotMode = true;
+                }
 
                 prepareHitSounds(playableBeatmap, playback.PreviewEndTime);
+
                 prepareStoryboardSamples(beatmap.Storyboard, playback.PreviewEndTime);
                 // preloadSamples();
 
                 if (sampleScheduler.ScheduledHitSounds.Count == 0 && sampleScheduler.ScheduledStoryboardSamples.Count == 0)
                 {
                     clearEnhancedElements();
-                    startStandardPreview(beatmap);
                     return;
                 }
 
@@ -420,33 +278,28 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 if (currentTrack != null)
                 {
-                    currentTrack.Looping = !playback.UseExternalLooping && (OverrideLooping ?? true);
+                    // 在已简化的 manager 中，交由底层 track 的 Looping 决定是否循环；我们尽量保持默认可循环体验。
+                    currentTrack.Looping = true;
                     currentTrack.RestartPoint = playback.PreviewStartTime;
                 }
 
                 currentTrack?.Start();
+
                 playback.IsPlaying = true;
 
+                // 保持样本调度逻辑以触发命中音效与故事板样本。
                 updateDelegate = Scheduler.AddDelayed(updateSamples, scheduler_interval, true);
                 updateSamples();
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: startEnhancedPreview error: {ex}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: startEnhancedPreview error: {ex}");
                 clearEnhancedElements();
-                startStandardPreview(beatmap);
             }
         }
 
-        // 改为接受 endTime 参数
         private void prepareHitSounds(IBeatmap beatmap, double previewEndTime)
         {
-            if (!EnableHitSounds)
-            {
-                sampleScheduler.ScheduledHitSounds.Clear();
-                return;
-            }
-
             sampleScheduler.ScheduledHitSounds.Clear();
             foreach (var ho in beatmap.HitObjects)
                 schedule(ho, previewEndTime);
@@ -490,7 +343,6 @@ namespace osu.Game.LAsEzExtensions.Select
             }
 
             sampleScheduler.ScheduledStoryboardSamples.Sort((a, b) => a.Time.CompareTo(b.Time));
-            // 移除成功日志
         }
 
         // 样本预加载：去重后调用一次 GetChannel() 以确保缓存 / 文件读取
@@ -518,8 +370,6 @@ namespace osu.Game.LAsEzExtensions.Select
                                 }
                                 finally
                                 {
-                                    // GetChannel() does not register the channel with the Sample unless Play() was invoked,
-                                    // so ensure we dispose temporary channels created for preload to avoid relying on finalizers.
                                     if (!ch.IsDisposed && !ch.ManualFree)
                                         ch.Dispose();
                                 }
@@ -539,26 +389,21 @@ namespace osu.Game.LAsEzExtensions.Select
                     {
                         var ch = fetched.sample.GetChannel();
 
-                        if (ch != null)
+                        try
                         {
-                            try
-                            {
-                                ch.Stop();
-                            }
-                            finally
-                            {
-                                if (!ch.IsDisposed && !ch.ManualFree)
-                                    ch.Dispose();
-                            }
+                            ch.Stop();
+                        }
+                        finally
+                        {
+                            if (!ch.IsDisposed && !ch.ManualFree)
+                                ch.Dispose();
                         }
                     }
                 }
-
-                // 移除成功日志
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: Preload error {ex.Message}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: Preload error {ex.Message}");
             }
         }
 
@@ -567,22 +412,37 @@ namespace osu.Game.LAsEzExtensions.Select
         {
             if (!playback.IsPlaying || currentTrack == null) return;
 
-            if (!tryGetLogicalTime(out double logicalTime, out bool inBreak))
+            // 简化：使用底层 track 的 CurrentTime 作为逻辑时间来驱动样本触发。
+            double physicalTime = currentTrack.CurrentTime;
+
+            // 回绕检测：若物理时间回绕（小于上一次记录的时间超出阈值），视为一次循环已发生，重置样本触发状态。
+            if (playback.LastTrackTime != 0 && physicalTime + 200 < playback.LastTrackTime)
             {
-                StopPreviewInternal("loop-end");
-                return;
+                // 重置命中音效触发标记
+                for (int i = 0; i < sampleScheduler.ScheduledHitSounds.Count; i++)
+                {
+                    var s = sampleScheduler.ScheduledHitSounds[i];
+                    s.HasTriggered = false;
+                    sampleScheduler.ScheduledHitSounds[i] = s;
+                }
+
+                // 重置 storyboard 样本触发标记
+                for (int i = 0; i < sampleScheduler.ScheduledStoryboardSamples.Count; i++)
+                {
+                    var sb = sampleScheduler.ScheduledStoryboardSamples[i];
+                    sb.HasTriggered = false;
+                    sampleScheduler.ScheduledStoryboardSamples[i] = sb;
+                }
+
+                // 重新定位下一触发索引（从当前物理时间附近开始查找）
+                sampleScheduler.NextHitSoundIndex = findNextValidIndex(sampleScheduler.ScheduledHitSounds, 0, physicalTime - trigger_tolerance);
+                sampleScheduler.NextStoryboardSampleIndex = findNextValidIndex(sampleScheduler.ScheduledStoryboardSamples, 0, physicalTime - trigger_tolerance);
+
+                // 清理已停止的活动通道
+                sampleScheduler.ActiveChannels.RemoveAll(c => !c.Playing);
             }
 
-            if (inBreak)
-            {
-                if (currentTrack.IsRunning)
-                    currentTrack.Stop();
-                if (Math.Abs(currentTrack.CurrentTime - logicalTime) > trigger_tolerance)
-                    currentTrack.Seek(logicalTime);
-                playback.LastTrackTime = logicalTime;
-                sampleScheduler.ActiveChannels.RemoveAll(c => !c.Playing);
-                return;
-            }
+            double logicalTime = physicalTime;
 
             if (!currentTrack.IsRunning)
             {
@@ -594,28 +454,6 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 currentTrack.Start();
             }
-
-            double drift = Math.Abs(currentTrack.CurrentTime - logicalTime);
-
-            // 在 gameplay 外部时钟模式下，不要为了微小漂移每帧 Seek。
-            // 只在漂移明显且超过冷却时间时才重同步一次。
-            if (ExternalClock != null)
-            {
-                if (drift > audio_resync_tolerance && Clock.CurrentTime - lastAudioResyncClockTime >= audio_resync_cooldown)
-                {
-                    currentTrack.Seek(logicalTime);
-                    lastAudioResyncClockTime = Clock.CurrentTime;
-                }
-            }
-            else
-            {
-                if (drift > trigger_tolerance)
-                    currentTrack.Seek(logicalTime);
-            }
-
-            // 记录上一次逻辑时间，供外部时钟“暂停/不推进”判定使用。
-            // 否则在某些情况下会被误判为暂停，从而导致重复 Seek 到固定时间点。
-            playback.LastTrackTime = logicalTime;
 
             double logicalTimeForEvents = logicalTime;
             bool withinWindow = logicalTimeForEvents <= playback.PreviewEndTime + trigger_tolerance;
@@ -652,7 +490,8 @@ namespace osu.Game.LAsEzExtensions.Select
             }
 
             // 同样优化 storyboard samples
-            sampleScheduler.NextStoryboardSampleIndex = findNextValidIndex(sampleScheduler.ScheduledStoryboardSamples, sampleScheduler.NextStoryboardSampleIndex, logicalTimeForEvents - trigger_tolerance);
+            sampleScheduler.NextStoryboardSampleIndex = findNextValidIndex(sampleScheduler.ScheduledStoryboardSamples, sampleScheduler.NextStoryboardSampleIndex,
+                logicalTimeForEvents - trigger_tolerance);
 
             while (withinWindow && sampleScheduler.NextStoryboardSampleIndex < sampleScheduler.ScheduledStoryboardSamples.Count)
             {
@@ -682,8 +521,8 @@ namespace osu.Game.LAsEzExtensions.Select
                 else break;
             }
 
-            playback.LastTrackTime = logicalTimeForEvents;
             sampleScheduler.ActiveChannels.RemoveAll(c => !c.Playing);
+            playback.LastTrackTime = logicalTimeForEvents;
         }
 
         private void triggerHitSound(HitSampleInfo[] samples)
@@ -694,7 +533,7 @@ namespace osu.Game.LAsEzExtensions.Select
             {
                 foreach (var info in samples)
                 {
-                    bool playedAny = false;
+                    // bool playedAny = false;
 
                     foreach (var sample in fetchSamplesForInfo(info))
                     {
@@ -711,17 +550,13 @@ namespace osu.Game.LAsEzExtensions.Select
 
                         channelInner.Play();
                         sampleScheduler.ActiveChannels.Add(channelInner);
-                        playedAny = true;
                         break; // 只需播放命中链中的首个可用样本
                     }
-
-                    if (!playedAny)
-                        Logger.Log($"EzPreviewTrackManager: Miss hitsound {info.Bank}-{info.Name}", LoggingTarget.Runtime);
                 }
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: triggerHitSound error: {ex}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: triggerHitSound error: {ex}");
             }
         }
 
@@ -771,11 +606,11 @@ namespace osu.Game.LAsEzExtensions.Select
 
                 channel.Play();
                 sampleScheduler.ActiveChannels.Add(channel);
-                // Logger.Log($"EzPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}", LoggingTarget.Runtime);
+                // Logger.Log($"EzPreviewTrackManager: Played storyboard sample {sampleInfo.Path} <- {chosenKey}");
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: triggerStoryboardSample error: {ex}", LoggingTarget.Runtime);
+                Logger.Log($"EzPreviewTrackManager: triggerStoryboardSample error: {ex}");
             }
         }
 
@@ -827,7 +662,7 @@ namespace osu.Game.LAsEzExtensions.Select
             // 5. 额外尝试：去扩展名或补 wav/mp3 (有些 beatmap 在 LookupNames 第二项无扩展)
             if (selected == null)
             {
-                string withoutExt = System.IO.Path.ChangeExtension(normalizedPath, null);
+                string withoutExt = Path.ChangeExtension(normalizedPath, null);
 
                 foreach (string ext in new[] { ".wav", ".ogg", ".mp3" })
                 {
@@ -924,89 +759,6 @@ namespace osu.Game.LAsEzExtensions.Select
             return low;
         }
 
-        private bool tryGetLogicalTime(out double logicalTime, out bool inBreak)
-        {
-            logicalTime = playback.PreviewStartTime;
-            inBreak = false;
-
-            if (!playback.UseExternalLooping)
-                return legacyTrackLogicalTime(out logicalTime, out inBreak);
-
-            double referenceTime = ExternalClock?.CurrentTime ?? currentTrack?.CurrentTime ?? 0;
-
-            // 如果 gameplay 时钟暂停（或“看似在跑但时间不推进”），音频也应保持暂停。
-            // 否则 updateSamples() 会每帧 Seek 到固定时间点，而音频设备继续播放，
-            // 听起来像“卡带”一样重复同一小段。
-            if (ExternalClock != null)
-            {
-                // 有些时钟在暂停时仍可能 IsRunning=true，但 CurrentTime 不再推进。
-                // 这里在已观察到上一次 referenceTime 后，把近似 0 的 delta 视为暂停。
-                const double paused_delta_epsilon = 0.5; // ms
-
-                if (!ExternalClock.IsRunning
-                    || (playback.LastReferenceTime != 0 && Math.Abs(referenceTime - playback.LastReferenceTime) <= paused_delta_epsilon))
-                {
-                    inBreak = true;
-                    logicalTime = playback.LastTrackTime == 0 ? playback.PreviewStartTime : playback.LastTrackTime;
-                    playback.LastReferenceTime = referenceTime;
-                    return true;
-                }
-            }
-
-            if (!playback.ExternalClockStartCaptured)
-            {
-                playback.ExternalClockStartReference = ExternalClockStartTime ?? referenceTime;
-                playback.ExternalClockStartCaptured = true;
-            }
-
-            double timeSinceStart = referenceTime - playback.ExternalClockStartReference;
-
-            double segmentLen = playback.LoopSegmentLength + playback.LoopInterval;
-            if (segmentLen <= 0)
-                return false;
-
-            if (timeSinceStart < 0)
-            {
-                inBreak = true; // 外部时钟尚未到达起点，保持暂停
-                logicalTime = playback.PreviewStartTime;
-                playback.LastReferenceTime = referenceTime;
-                return true;
-            }
-
-            double segment = Math.Floor(timeSinceStart / segmentLen);
-
-            if (segment < 0)
-            {
-                inBreak = true;
-                logicalTime = playback.PreviewStartTime;
-                playback.LastReferenceTime = referenceTime;
-                return true;
-            }
-
-            if (segment >= playback.EffectiveLoopCount)
-                return false;
-
-            double offset = timeSinceStart - segment * segmentLen;
-
-            if (offset < playback.LoopSegmentLength)
-            {
-                logicalTime = playback.PreviewStartTime + offset;
-                playback.LastReferenceTime = referenceTime;
-                return true;
-            }
-
-            inBreak = true;
-            logicalTime = playback.PreviewEndTime;
-
-            if (ExternalClock == null && playback.UseExternalLooping && inBreak && currentTrack != null && !currentTrack.IsRunning)
-            {
-                referenceTime += Clock.ElapsedFrameTime;
-            }
-
-            playback.LastReferenceTime = referenceTime;
-            return true;
-        }
-
         private bool legacyTrackLogicalTime(out double logicalTime, out bool inBreak)
         {
             double physicalTime = currentTrack?.CurrentTime ?? 0;
@@ -1039,9 +791,6 @@ namespace osu.Game.LAsEzExtensions.Select
             public double LastTrackTime;
 
             public double LoopSegmentLength;
-            public double LoopInterval;
-            public int EffectiveLoopCount;
-            public bool UseExternalLooping;
 
             public int LegacyLoopCount;
             public double LegacyLogicalOffset;
@@ -1049,22 +798,11 @@ namespace osu.Game.LAsEzExtensions.Select
             public bool ShortBgmOneShotMode;
             public bool ShortBgmMutedAfterFirstLoop;
 
-            public double ExternalClockStartReference;
-            public bool ExternalClockStartCaptured;
-            public double LastReferenceTime;
-
-            public void ResetExternalClockCapture()
-            {
-                ExternalClockStartCaptured = false;
-                ExternalClockStartReference = 0;
-            }
-
             public void ResetPlaybackProgress()
             {
                 LastTrackTime = 0;
                 LegacyLoopCount = 0;
                 LegacyLogicalOffset = 0;
-                LastReferenceTime = 0;
             }
         }
 
@@ -1099,39 +837,5 @@ namespace osu.Game.LAsEzExtensions.Select
             ownsTrack = false;
             return beatmap.Track;
         }
-    }
-
-    /// <summary>
-    /// 预览覆盖参数集合，用于一次性配置 <see cref="EzPreviewTrackManager"/> 的切片与循环行为。
-    /// </summary>
-    public class PreviewOverrideSettings
-    {
-        /// <summary>
-        /// 预览起点（毫秒）。null 表示使用谱面元数据的 PreviewTime。
-        /// </summary>
-        public double? PreviewStart { get; init; }
-
-        /// <summary>
-        /// 预览段长度（毫秒）。null 表示使用默认值。
-        /// </summary>
-        public double? PreviewDuration { get; init; }
-
-        /// <summary>
-        /// 循环次数。null 表示使用默认值（标准预览通常为 1，增强预览通常为无限）。
-        /// </summary>
-        public int? LoopCount { get; init; }
-
-        /// <summary>
-        /// 循环间隔（毫秒）。null 表示使用默认值。
-        /// </summary>
-        public double? LoopInterval { get; init; }
-
-        /// <summary>
-        /// 是否强制开启底层 Track.Looping。
-        /// 注意：在启用外部驱动切片循环时，该项不会用于实现 Duration/LoopCount/LoopInterval 的严格约束。
-        /// </summary>
-        public bool? ForceLooping { get; init; }
-
-        public bool EnableHitSounds { get; init; } = true;
     }
 }

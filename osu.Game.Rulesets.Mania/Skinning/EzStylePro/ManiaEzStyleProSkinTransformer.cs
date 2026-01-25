@@ -4,8 +4,10 @@
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -29,11 +31,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<double> virtualHitPosition;
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
-        public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap, Ez2ConfigManager ezSkinConfig)
+        public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
-            this.ezSkinConfig = ezSkinConfig;
+
+            if (GlobalConfigStore.EzConfig == null)
+            {
+                Logger.Log("!GlobalConfigStore.EzConfig EzStyleProSkin", LoggingTarget.Runtime, LogLevel.Important);
+            }
+
+            ezSkinConfig = GlobalConfigStore.EzConfig!;
+
             columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
             hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);

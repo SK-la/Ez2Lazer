@@ -11,8 +11,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
     /// </summary>
     public static class LoopTimeRangeStore
     {
-        public static readonly Bindable<double?> START_TIME_MS = new Bindable<double?>();
-        public static readonly Bindable<double?> END_TIME_MS = new Bindable<double?>();
+        public static readonly Bindable<double> START_TIME_MS = new Bindable<double>();
+        public static readonly Bindable<double> END_TIME_MS = new Bindable<double>();
 
         public static void Set(double startTimeMs, double endTimeMs)
         {
@@ -25,10 +25,10 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         public static bool TryGet(out double startTimeMs, out double endTimeMs)
         {
-            startTimeMs = START_TIME_MS.Value ?? 0;
-            endTimeMs = END_TIME_MS.Value ?? 0;
+            startTimeMs = START_TIME_MS.Value;
+            endTimeMs = END_TIME_MS.Value;
 
-            return START_TIME_MS.Value.HasValue && END_TIME_MS.Value.HasValue && endTimeMs > startTimeMs;
+            return endTimeMs > startTimeMs;
         }
     }
 }

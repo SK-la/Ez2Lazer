@@ -98,14 +98,14 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 Logger.Log(
                     FormatAbnormalSr(beatmap, "xxySR_null", null, xxySr),
-                    "xxy_sr",
+                    EzAnalysisPersistentStore.LOGGER_NAME,
                     LogLevel.Error);
             }
             else if (Math.Abs(star.Value - xxySr.Value) > 3)
             {
                 Logger.Log(
                     FormatAbnormalSr(beatmap, "xxySR_large_diff", star, xxySr),
-                    "xxy_sr",
+                    EzAnalysisPersistentStore.LOGGER_NAME,
                     LogLevel.Error);
             }
         }

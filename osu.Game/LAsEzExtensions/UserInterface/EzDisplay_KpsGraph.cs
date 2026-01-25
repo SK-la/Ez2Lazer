@@ -9,39 +9,34 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Layout;
+using osu.Game.LAsEzExtensions.Analysis;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.LAsEzExtensions.UserInterface
 {
-    public partial class EzDisplayLineGraph : Container
+    public partial class EzDisplayKpsGraph : CompositeDrawable
     {
-        public float? MaxValue { get; set; }
+        private const int max_draw_points = OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS;
 
-        public float? MinValue { get; set; }
+        private readonly LayoutValue pathCached = new LayoutValue(Invalidation.DrawSize);
+        private readonly Path path;
+
+        // private readonly BufferedContainer bufferedHost;
+
+        private float[] values;
 
         public float ActualMaxValue { get; private set; } = float.NaN;
         public float ActualMinValue { get; private set; } = float.NaN;
-
-        private const double transform_duration = 1500;
-
-        public int DefaultValueCount;
+        public float? MaxValue { get; set; }
+        public float? MinValue { get; set; }
+        private const double transform_duration = 1000;
 
         private readonly Container<Path> maskingContainer;
-        private readonly Path path;
-
-        private float[] values;
         private int valuesCount;
 
-        public Color4 LineColour
+        public EzDisplayKpsGraph()
         {
-            get => maskingContainer.Colour;
-            set => maskingContainer.Colour = value;
-        }
-
-        public EzDisplayLineGraph()
-        {
-            Add(maskingContainer = new Container<Path>
+            AddInternal(maskingContainer = new Container<Path>
             {
                 Masking = true,
                 RelativeSizeAxes = Axes.Both,
@@ -49,14 +44,15 @@ namespace osu.Game.LAsEzExtensions.UserInterface
                 {
                     AutoSizeAxes = Axes.None,
                     RelativeSizeAxes = Axes.Both,
-                    PathRadius = 1
+                    PathRadius = 1.5f,
+                    Colour = Colour4.CornflowerBlue
                 }
             });
 
             AddLayout(pathCached);
         }
 
-        public void SetValues(IReadOnlyList<double> source)
+        public void SetPoints(IReadOnlyList<double> source)
         {
             if (source == null)
                 return;
@@ -98,8 +94,6 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             maskingContainer.ResizeWidthTo(1, transform_duration, Easing.OutQuint);
         }
 
-        private readonly LayoutValue pathCached = new LayoutValue(Invalidation.DrawSize);
-
         protected override void Update()
         {
             base.Update();
@@ -119,12 +113,22 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             if (count <= 0)
                 return;
 
-            int totalCount = Math.Max(count, DefaultValueCount);
+            // Use the path's own draw size so vertices are in the path's local space.
+            float availableWidth = Math.Max(0, path.DrawWidth - 2 * path.PathRadius);
+            float availableHeight = Math.Max(0, path.DrawHeight - 2 * path.PathRadius);
+
+            // Fallback to parent draw size if path hasn't been sized yet.
+            if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth - 2 * path.PathRadius);
+            if (availableHeight <= 0) availableHeight = Math.Max(0, DrawHeight - 2 * path.PathRadius);
+
+            // Map points across the actual number of values so the graph fills the container.
+            int denom = Math.Max(1, count - 1);
 
             for (int i = 0; i < count; i++)
             {
-                float x = (i + totalCount - count) / (float)(totalCount - 1) * (DrawWidth - 2 * path.PathRadius);
-                float y = GetYPosition(values[i]) * (DrawHeight - 2 * path.PathRadius);
+                // account for the radius margin so vertices are inset by PathRadius on all sides
+                float x = path.PathRadius + (count == 1 ? 0f : i / (float)denom * availableWidth);
+                float y = path.PathRadius + GetYPosition(values[i]) * availableHeight;
                 path.AddVertex(new Vector2(x, y));
             }
         }

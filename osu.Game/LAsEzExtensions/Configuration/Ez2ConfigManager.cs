@@ -116,12 +116,12 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.KpcDisplayMode, EzKpcDisplay.KpcDisplayMode.Numbers);
+            SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
             SetDefault(Ez2Setting.XxySRFilter, false);
             SetDefault(Ez2Setting.KeySoundPreview, false);
             SetDefault(Ez2Setting.EzSelectCsMode, "");
 
-            SetDefault(Ez2Setting.HitMode, EzMUGHitMode.EZ2AC);
+            SetDefault(Ez2Setting.HitMode, EzMUGHitMode.Lazer);
             SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.Lazer);
             SetDefault(Ez2Setting.CustomPoorHitResultBool, true);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
@@ -429,16 +429,17 @@ namespace osu.Game.LAsEzExtensions.Configuration
     public enum Ez2Setting
     {
         // 界面设置
-        LastSelectForColumnsType,
         KeySoundPreview,
-        EzSelectCsMode,
-        ScalingGameMode,
-        AccuracyCutoffS,
-        AccuracyCutoffA,
         XxySRFilter,
         KpcDisplayMode,
 
+        LastSelectForColumnsType,
+        EzSelectCsMode,
+
         // 全局开关
+        ScalingGameMode,
+        AccuracyCutoffS,
+        AccuracyCutoffA,
         ColumnWidthStyle,
         GlobalHitPosition, //TODO:未来改成下拉栏，补充虚拟判定线
 

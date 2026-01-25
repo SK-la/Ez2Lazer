@@ -4,7 +4,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
-namespace osu.Game.LAsEzExtensions.Analysis
+namespace osu.Game.LAsEzExtensions.Statistics
 {
     public interface IHitEventGenerator
     {

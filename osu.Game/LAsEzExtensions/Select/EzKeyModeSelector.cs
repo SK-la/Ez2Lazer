@@ -40,7 +40,13 @@ namespace osu.Game.LAsEzExtensions.Select
 
         public IBindable<string> Current => tabControl.Current;
 
-        public EzKeyModeFilter EzKeyModeFilter { get; } = new EzKeyModeFilter();
+        public HashSet<string> SelectedModeIds { get; } = new HashSet<string>();
+
+        public void SetSelection(HashSet<string> modeIds)
+        {
+            SelectedModeIds.Clear();
+            SelectedModeIds.UnionWith(modeIds);
+        }
 
         public EzKeyModeSelector()
         {
@@ -101,36 +107,45 @@ namespace osu.Game.LAsEzExtensions.Select
 
             multiSelectButton.Active.BindTo(isMultiSelectMode);
 
-            labelButton.Action = () => EzKeyModeFilter.SetSelection(new HashSet<string>());
+            labelButton.Action = () =>
+            {
+                SelectedModeIds.Clear();
+                updateValue();
+            };
 
             keyModeId = ezConfig.GetBindable<string>(Ez2Setting.EzSelectCsMode);
             keyModeId.BindValueChanged(onSelectorChanged, true);
 
             isMultiSelectMode.BindValueChanged(_ => updateValue(), true);
             ruleset.BindValueChanged(onRulesetChanged, true);
-            EzKeyModeFilter.SelectionChanged += updateValue;
 
             tabControl.Current.BindTarget = keyModeId;
         }
 
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            EzKeyModeFilter.SelectionChanged -= updateValue;
-        }
-
         private void onRulesetChanged(ValueChangedEvent<RulesetInfo> e)
         {
-            tabControl.UpdateForRuleset(e.NewValue.OnlineID);
-            labelButton.Text = e.NewValue.OnlineID == 3 ? "Keys" : "CS";
+            int id = e.NewValue.OnlineID;
+
+            if (id == 1) // Taiko
+            {
+                Hide();
+                SelectedModeIds.Clear();
+            }
+            else
+            {
+                Show();
+            }
+
+            tabControl.UpdateForRuleset(id);
+            labelButton.Text = id == 3 ? "Keys" : "CS";
+
             updateValue();
         }
 
         private void onSelectorChanged(ValueChangedEvent<string> e)
         {
             var modes = parseModeIds(e.NewValue);
-            EzKeyModeFilter.SetSelection(modes);
+            SetSelection(modes);
             tabControl.UpdateTabItemUI(modes);
         }
 
@@ -141,7 +156,7 @@ namespace osu.Game.LAsEzExtensions.Select
             if (!modeSelections.ContainsKey(currentRulesetId))
                 modeSelections[currentRulesetId] = new HashSet<string>();
 
-            HashSet<string> selectedModes = EzKeyModeFilter.SelectedModeIds;
+            HashSet<string> selectedModes = SelectedModeIds;
 
             if (selectedModes.Count == 0)
             {

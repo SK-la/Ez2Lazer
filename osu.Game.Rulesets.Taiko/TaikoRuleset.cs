@@ -34,6 +34,7 @@ using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Skinning;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Rulesets.Taiko.Configuration;
@@ -131,6 +132,13 @@ namespace osu.Game.Rulesets.Taiko
         {
             switch (type)
             {
+                case ModType.LA_Mod:
+                    return new Mod[]
+                    {
+                        new ModNiceBPM(),
+                        new UniversalLoopPlayClip(),
+                    };
+
                 case ModType.DifficultyReduction:
                     return new Mod[]
                     {

@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -30,7 +29,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
     [Obsolete("已由 EzBeatmapManiaAnalysisCache 接管（统一缓存 KPS/KPC/Scratch/xxy_SR）。该类型仅保留为备份/回归对比用途，请不要在运行时再注入或使用。")]
     public partial class EzBeatmapXxySrCache : MemoryCachingComponent<EzBeatmapXxySrCache.XxySrCacheLookup, double?>
     {
-        private const string logger_name = "xxy_sr";
         private const int mod_settings_debounce = 150;
 
         private readonly ThreadedTaskScheduler updateScheduler = new ThreadedTaskScheduler(1, nameof(EzBeatmapXxySrCache));
@@ -143,7 +141,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 if (playableBeatmap.HitObjects.Count == 0)
                 {
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-                    Logger.Log($"xxy_SR aborted: playableBeatmap has 0 hitobjects. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", logger_name, LogLevel.Error);
+                    Logger.Log(
+                        $"xxy_SR aborted: playableBeatmap has 0 hitobjects. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}",
+                        EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Error);
                     return null;
                 }
 
@@ -153,7 +153,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 // Defensive: avoid propagating invalid values to UI.
                 if (double.IsNaN(sr) || double.IsInfinity(sr))
                 {
-                    Logger.Log($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}", logger_name, LogLevel.Error);
+                    Logger.Log($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}", EzAnalysisPersistentStore.LOGGER_NAME,
+                        LogLevel.Error);
                     return null;
                 }
 
@@ -161,7 +162,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 if (sr < 0 || sr > 1000)
                 {
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-                    Logger.Log($"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", logger_name, LogLevel.Error);
+                    Logger.Log(
+                        $"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}",
+                        EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Error);
                 }
 
                 return sr;
@@ -174,7 +177,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 // 只记录异常：用于排查“值偏差非常大/计算失败导致空 pill”。
                 string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-                Logger.Error(ex, $"xxy_SR compute exception. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}", logger_name);
+                Logger.Error(ex, $"xxy_SR compute exception. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}",
+                    EzAnalysisPersistentStore.LOGGER_NAME);
                 return null;
             }
         }

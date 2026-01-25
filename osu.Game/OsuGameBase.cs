@@ -47,8 +47,8 @@ using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Analysis.Persistence;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -286,13 +286,14 @@ namespace osu.Game
             Resources.AddStore(new DllResourceStore(OsuResources.ResourceAssembly));
 
             // 初始化并注册EzSkinSettingsManager
-            dependencies.Cache(Ez2ConfigManager = new Ez2ConfigManager(Storage));
-
-            dependencies.Cache(
-                NoteFactory = new EzLocalTextureFactory(
-                    Ez2ConfigManager,
-                    Host.Renderer,
-                    Storage));
+            Ez2ConfigManager = new Ez2ConfigManager(Storage);
+            GlobalConfigStore.Config = LocalConfig;
+            GlobalConfigStore.EzConfig = Ez2ConfigManager;
+            dependencies.Cache(Ez2ConfigManager);
+            dependencies.Cache(NoteFactory = new EzLocalTextureFactory(
+                Ez2ConfigManager,
+                Host.Renderer,
+                Storage));
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 
@@ -343,7 +344,7 @@ namespace osu.Game
             dependencies.Cache(BeatmapManager = new BeatmapManager(Storage, realm, API, Audio, Resources, Host, defaultBeatmap, difficultyCache, performOnlineLookups: true));
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
-            dependencies.Cache(new EzManiaAnalysisPersistentStore(Storage));
+            dependencies.Cache(new EzAnalysisPersistentStore(Storage));
             dependencies.Cache(maniaAnalysisCache = new EzBeatmapManiaAnalysisCache());
 
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
@@ -650,7 +651,7 @@ namespace osu.Game
                     return new TouchSettings(th);
 
                 case MidiHandler:
-                    return new InputSection.HandlerSection(handler);
+                    return new InputSubsection(handler);
 
                 // return null for handlers that shouldn't have settings.
                 default:
@@ -673,16 +674,16 @@ namespace osu.Game
 
             Ruleset instance = null;
 
-            try
+            if (r.NewValue?.Available == true)
             {
-                if (r.NewValue?.Available == true)
+                try
                 {
                     instance = r.NewValue.CreateInstance();
                 }
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Ruleset load failed and has been rolled back");
+                catch (Exception e)
+                {
+                    Rulesets.RulesetStore.LogRulesetFailure(r.NewValue, e);
+                }
             }
 
             if (instance == null)
@@ -707,7 +708,7 @@ namespace osu.Game
             }
             catch (Exception e)
             {
-                Logger.Error(e, $"Could not load mods for \"{instance.RulesetInfo.Name}\" ruleset. Current ruleset has been rolled back.");
+                Rulesets.RulesetStore.LogRulesetFailure(r.NewValue, e);
                 revertRulesetChange();
                 return;
             }

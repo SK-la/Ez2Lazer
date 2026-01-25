@@ -13,13 +13,14 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Analysis
+namespace osu.Game.LAsEzExtensions.Statistics
 {
     /// <summary>
     /// 基类分数图表，用于分析和可视化得分数据。
@@ -227,7 +228,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             if (pointList.Count > 0)
             {
-                var scorePoints = new GirdPoints()
+                var scorePoints = new GirdPoints
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,

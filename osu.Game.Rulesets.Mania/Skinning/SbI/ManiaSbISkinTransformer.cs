@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             if (GlobalConfigStore.EzConfig == null)
             {
-                Logger.Log("!GlobalConfigStore.EzConfig", LoggingTarget.Runtime, LogLevel.Important);
+                Logger.Log("!GlobalConfigStore.EzConfig SbISkin", LoggingTarget.Runtime, LogLevel.Important);
             }
 
             ezSkinConfig = GlobalConfigStore.EzConfig!;

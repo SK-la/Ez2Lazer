@@ -3,7 +3,6 @@
 
 using osu.Framework.Configuration.Tracking;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Mania.LAsEZMania;

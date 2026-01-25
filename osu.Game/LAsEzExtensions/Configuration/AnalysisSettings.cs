@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens;
 
@@ -15,15 +16,17 @@ namespace osu.Game.LAsEzExtensions.Configuration
         protected override LocalisableString Header => "Analysis";
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig, OsuGameBase game, GameHost host, IPerformFromScreenRunner? performer)
+        private void load(Ez2ConfigManager ezConfig)
         {
             AddRange(new Drawable[]
             {
-                new SettingsCheckbox
+                new SettingsItemV2(new FormCheckBox
                 {
-                    LabelText = EzLocalizationManager.InputAudioLatencyTracker,
+                    Caption = EzLocalizationManager.InputAudioLatencyTracker,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker),
-                    TooltipText = EzLocalizationManager.InputAudioLatencyTrackerTooltip,
+                    HintText = EzLocalizationManager.InputAudioLatencyTrackerTooltip,
+                })
+                {
                     Keywords = new[] { "latency", "audio", "input" }
                 }
             });

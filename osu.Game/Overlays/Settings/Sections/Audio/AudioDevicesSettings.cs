@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
@@ -7,10 +7,11 @@ using osu.Framework.Graphics;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Framework.Localisation;
-using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Framework.Logging;
 using osu.Game.LAsEzExtensions.Configuration;
@@ -27,45 +28,50 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private SettingsDropdown<int>? sampleRateDropdown;
-        private SettingsDropdown<string> dropdown = null!;
+        private FormDropdown<int>? sampleRateDropdown;
 
-        private SettingsCheckbox? wasapiExperimental;
+        private AudioDeviceDropdown dropdown = null!;
+
+        private FormCheckBox? wasapiExperimental;
+
+        private readonly Bindable<SettingsNote.Data?> wasapiExperimentalNote = new Bindable<SettingsNote.Data?>();
 
         [BackgroundDependencyLoader]
         private void load()
         {
             Children = new Drawable[]
             {
-                dropdown = new AudioDeviceSettingsDropdown
+                new SettingsItemV2(dropdown = new AudioDeviceDropdown
                 {
-                    LabelText = AudioSettingsStrings.OutputDevice,
+                    Caption = AudioSettingsStrings.OutputDevice,
+                    HintText = "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive.",
+                })
+                {
                     Keywords = new[] { "speaker", "headphone", "output" },
-                    TooltipText = "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive."
                 },
             };
 
-            audio.OnNewDevice += onDeviceChanged;
-            audio.OnLostDevice += onDeviceChanged;
-            dropdown.Current = audio.AudioDevice;
-
             if (RuntimeInfo.OS == RuntimeInfo.Platform.Windows)
             {
-                Add(sampleRateDropdown = new SettingsDropdown<int>
+                Add(new SettingsItemV2(sampleRateDropdown = new FormDropdown<int>
                 {
-                    LabelText = "ASIO Sample Rate(Testing)",
-                    Keywords = new[] { "sample", "rate", "frequency" },
-                    Items = AudioExtensions.COMMON_SAMPLE_RATES,
+                    Caption = "ASIO Sample Rate(Testing)",
+                    HintText = "48k is better, too high a value will cause delays and clock synchronization errors",
                     Current = ezConfig.GetBindable<int>(Ez2Setting.AsioSampleRate),
-                    // Current = new Bindable<int>(audio.GetSampleRate()),
-                    TooltipText = "48k is better, too high a value will cause delays and clock synchronization errors"
-                });
-                Add(wasapiExperimental = new SettingsCheckbox
+                    Items = AudioExtensions.COMMON_SAMPLE_RATES,
+                })
                 {
-                    LabelText = AudioSettingsStrings.WasapiLabel,
-                    TooltipText = AudioSettingsStrings.WasapiTooltip,
+                    Keywords = new[] { "sample", "rate", "frequency" },
+                });
+                Add(new SettingsItemV2(wasapiExperimental = new FormCheckBox
+                {
+                    Caption = AudioSettingsStrings.WasapiLabel,
+                    HintText = AudioSettingsStrings.WasapiTooltip,
                     Current = audio.UseExperimentalWasapi,
-                    Keywords = new[] { "wasapi", "latency", "exclusive" }
+                })
+                {
+                    Keywords = new[] { "wasapi", "latency", "exclusive" },
+                    Note = { BindTarget = wasapiExperimentalNote },
                 });
 
                 // Setup ASIO sample rate synchronization
@@ -79,19 +85,17 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 });
 
                 wasapiExperimental.Current.ValueChanged += _ => onDeviceChanged(string.Empty);
+                dropdown.Current.ValueChanged += e => onDeviceChanged(e.NewValue);
                 sampleRateDropdown.Current.ValueChanged += e =>
                 {
                     Logger.Log($"User set sample rate to {e.NewValue}Hz", LoggingTarget.Runtime, LogLevel.Debug);
                     audio.SetPreferredAsioSampleRate(e.NewValue);
                 };
-
-                // 根据初始设备类型显示或隐藏采样率设置
-                dropdown.Current.ValueChanged += e =>
-                {
-                    if (e.NewValue.Contains("(ASIO)")) sampleRateDropdown.Show();
-                    else sampleRateDropdown.Hide();
-                };
             }
+
+            audio.OnNewDevice += onDeviceChanged;
+            audio.OnLostDevice += onDeviceChanged;
+            dropdown.Current = audio.AudioDevice;
 
             onDeviceChanged(string.Empty);
         }
@@ -103,9 +107,17 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             if (wasapiExperimental != null)
             {
                 if (wasapiExperimental.Current.Value)
-                    wasapiExperimental.SetNoticeText(AudioSettingsStrings.WasapiNotice, true);
+                    wasapiExperimentalNote.Value = new SettingsNote.Data(AudioSettingsStrings.WasapiNotice, SettingsNote.Type.Warning);
                 else
-                    wasapiExperimental.ClearNoticeText();
+                    wasapiExperimentalNote.Value = null;
+            }
+
+            if (sampleRateDropdown != null)
+            {
+                if (_.Contains("(ASIO)"))
+                    sampleRateDropdown.Show();
+                else
+                    sampleRateDropdown.Hide();
             }
         }
 
@@ -142,15 +154,10 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             }
         }
 
-        private partial class AudioDeviceSettingsDropdown : SettingsDropdown<string>
+        private partial class AudioDeviceDropdown : FormDropdown<string>
         {
-            protected override OsuDropdown<string> CreateDropdown() => new AudioDeviceDropdownControl();
-
-            private partial class AudioDeviceDropdownControl : DropdownControl
-            {
-                protected override LocalisableString GenerateItemText(string item)
-                    => string.IsNullOrEmpty(item) ? CommonStrings.Default : base.GenerateItemText(item);
-            }
+            protected override LocalisableString GenerateItemText(string item)
+                => string.IsNullOrEmpty(item) ? CommonStrings.Default : base.GenerateItemText(item);
         }
     }
 }

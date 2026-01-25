@@ -221,8 +221,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
             "Mania增加Pool判定，范围是比Miss提前150ms范围内时出现，动态严格扣血(连续累积将加剧，最大10%)",
             "Mania add the Poor HitResult, which appears within 150ms before Miss, with dynamic and strict health deduction (continuous accumulation will worsen, up to 10%)");
 
-        public static readonly EzLocalisableString AccuracyCutoffS = new EzLocalisableString("Acc S评级线", "Accuracy Cutoff S");
-        public static readonly EzLocalisableString AccuracyCutoffA = new EzLocalisableString("Acc A评级线", "Accuracy Cutoff A");
+        public static readonly EzLocalisableString AccuracyCutoffS = new EzLocalisableString("Acc S评级线(Mania)", "Accuracy Cutoff S (Mania)");
+        public static readonly EzLocalisableString AccuracyCutoffA = new EzLocalisableString("Acc A评级线(Mania)", "Accuracy Cutoff A (Mania)");
 
         // Storage folder messages
         public static readonly EzLocalisableString StorageFolder_Created = new EzLocalisableString("已创建目录：{0}\n请将文件放入该目录", "Created folder: {0}\nAdd files to the folder");

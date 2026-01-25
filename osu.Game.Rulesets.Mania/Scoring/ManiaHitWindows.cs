@@ -7,7 +7,6 @@ using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
 
 namespace osu.Game.Rulesets.Mania.Scoring

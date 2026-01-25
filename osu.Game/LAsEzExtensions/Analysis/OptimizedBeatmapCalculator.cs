@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -56,8 +57,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
             double interval = 240000.0 / bpm; // 4拍的时间间隔（毫秒）
             double songEndTime = hitObjects[^1].StartTime;
 
-            // 预分配List容量以避免频繁扩容
+            // 预分配List容量以避免频繁扩容（防御性处理 NaN/Infinity/负数）
             int estimatedIntervals = (int)((songEndTime / interval) + 1);
+            if (double.IsNaN(songEndTime) || double.IsInfinity(songEndTime) || double.IsNaN(interval) || double.IsInfinity(interval))
+                estimatedIntervals = 0;
+            estimatedIntervals = Math.Max(0, estimatedIntervals);
             var kpsList = new List<double>(estimatedIntervals);
 
             // 缓存hitObjects数组以提高访问性能
@@ -241,6 +245,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
             double songEndTime = hitObjects[^1].StartTime;
 
             int estimatedIntervals = (int)((songEndTime / interval) + 1);
+            if (double.IsNaN(songEndTime) || double.IsInfinity(songEndTime) || double.IsNaN(interval) || double.IsInfinity(interval))
+                estimatedIntervals = 0;
+            estimatedIntervals = Math.Max(0, estimatedIntervals);
             var kpsList = new List<double>(estimatedIntervals);
             var columnCounts = new Dictionary<int, int>();
             var holdNoteCounts = new Dictionary<int, int>();

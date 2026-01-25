@@ -50,7 +50,7 @@ namespace osu.Game.Screens.Backgrounds
         protected virtual bool AllowStoryboardBackground => true;
 
         [BackgroundDependencyLoader]
-        private void load(IAPIProvider api, SkinManager skinManager, OsuConfigManager config, Ez2ConfigManager ezSkinConfig)
+        private void load(IAPIProvider api, SkinManager skinManager, OsuConfigManager config)
         {
             user = api.LocalUser.GetBoundCopy();
             skin = skinManager.CurrentSkin.GetBoundCopy();
@@ -58,8 +58,6 @@ namespace osu.Game.Screens.Backgrounds
             introSequence = config.GetBindable<IntroSequence>(OsuSetting.IntroSequence);
 
             AddInternal(seasonalBackgroundLoader);
-            GlobalConfigStore.Config = config;
-            GlobalConfigStore.EzConfig = ezSkinConfig;
         }
 
         protected override void LoadComplete()

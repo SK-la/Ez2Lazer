@@ -14,7 +14,7 @@ using osu.Game.Graphics.UserInterface;
 using osuTK;
 using Realms;
 
-namespace osu.Game.LAsEzExtensions.Analysis
+namespace osu.Game.LAsEzExtensions.Statistics
 {
     public partial class EzAnalysisScoreButton : GrayButton, IHasPopover
     {

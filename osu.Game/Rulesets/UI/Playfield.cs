@@ -434,7 +434,7 @@ namespace osu.Game.Rulesets.UI
 
             IDrawablePool pool;
 
-            // First, try to find an exact match for the hit object type
+            // 尝试找到适合的对象池，适配不同DrawableHitObject
             if (pools.TryGetValue(lookupType, out pool))
                 return pool;
 

@@ -15,6 +15,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
+using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -161,6 +162,13 @@ namespace osu.Game.Rulesets.Osu
         {
             switch (type)
             {
+                case ModType.LA_Mod:
+                    return new Mod[]
+                    {
+                        new ModNiceBPM(),
+                        new UniversalLoopPlayClip(),
+                    };
+
                 case ModType.DifficultyReduction:
                     return new Mod[]
                     {
