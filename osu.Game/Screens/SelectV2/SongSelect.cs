@@ -409,8 +409,12 @@ namespace osu.Game.Screens.SelectV2
                 fetchOnlineInfo();
             });
 
-            // 把配置直接绑定到实例 manager 的 Bindable，避免静态赋值与手动初始回调。
-            ezPreviewManager.EnabledBindable.BindTo(keySoundPreview);
+            keySoundPreview.BindValueChanged(e =>
+            {
+                ezPreviewManager.EnabledBindable.Value = e.NewValue;
+                ensureTrackLooping(Beatmap.Value, TrackChangeDirection.None);
+                ensurePlayingSelected();
+            });
         }
 
         protected override void Update()
@@ -548,10 +552,12 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            if (keySoundPreview.Value && this.IsCurrentScreen())
+            if (this.IsCurrentScreen())
             {
                 if (!ezPreviewManager.StartPreview(beatmap))
-                    beatmap.PrepareTrackForPreview(true);
+                {
+                    ezPreviewManager.StopPreview();
+                }
             }
             else
             {

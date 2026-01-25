@@ -145,38 +145,18 @@ namespace osu.Game.LAsEzExtensions.Audio
                 RelativeSizeAxes = Axes.Both
             };
 
-            // 当启用开关变化时，重置循环状态并根据新状态重启或停止预览。
-            // 不在此处立即触发初始值（因此 useFire:false）。
-            EnabledBindable.BindValueChanged(e =>
-            {
-                // 在主调度线程执行 Stop/Start 操作以保证线程安全。
-                Schedule(() =>
-                {
-                    if (!e.NewValue)
-                    {
-                        StopPreviewInternal();
-                        return;
-                    }
-
-                    // enabled -> reset and restart if we currently have a beatmap
-                    ResetLoopState();
-
-                    if (currentBeatmap != null)
-                    {
-                        StopPreviewInternal();
-
-                        try
-                        {
-                            // 尝试以原始逻辑重启预览（不强制增强模式）
-                            StartPreview(currentBeatmap, forceEnhanced: false);
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.Log($"EzPreviewTrackManager: restart on enable failed: {ex}");
-                        }
-                    }
-                });
-            }, false);
+            // EnabledBindable.BindValueChanged(_ =>
+            // {
+            //     // 在主调度线程执行 Stop/Start 操作以保证线程安全。
+            //     Schedule(() =>
+            //     {
+            //         if (currentBeatmap != null)
+            //         {
+            //             StopPreviewInternal();
+            //             StartPreview(currentBeatmap);
+            //         }
+            //     });
+            // }, false);
         }
 
         // 快速判定：遍历命中对象直到达到阈值即返回 true。
