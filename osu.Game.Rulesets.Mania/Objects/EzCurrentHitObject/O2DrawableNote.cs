@@ -1,8 +1,11 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Bindables;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
+using osu.Framework.Input.Events;
+using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
@@ -108,9 +111,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!cont) return;
             }
 
-            // Behaviour parity with previous implementation:
-            // Previously we forwarded `timeOffset * RELEASE_WINDOW_LENIENCE` to base, which then divided by RELEASE_WINDOW_LENIENCE,
-            // resulting in `timeOffset` being used for hit windows.
             double adjustedOffset = timeOffset;
 
             if (!userTriggered)
@@ -126,7 +126,13 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             if (result == HitResult.None)
                 return;
 
-            result = GetCappedResult(result);
+            // 如果 Body 已断连，在到达尾点之前不应出任何判定，等待 adjustedOffset >= 0。
+            if (HoldNote.Body.HasHoldBreak && adjustedOffset < 0)
+                return;
+
+            // 到达尾点（或其后）且玩家未按住时，因 Body 已断连而强制 Miss。
+            if (HoldNote.Body.HasHoldBreak && adjustedOffset >= 0)
+                result = HitResult.Miss;
 
             if (upgradeToPerfect)
                 result = HitResult.Perfect;
@@ -156,7 +162,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                         r.Type = r.Judgement.MaxResult;
 
                         // In O2Jam hit mode, a Meh on the tail should terminally break combo.
-                        // Prevent the parent hold note result from immediately re-increasing combo afterwards.
                         if (breakCombo)
                             r.IsComboHit = false;
                     }, breakComboFromTailMeh);
@@ -170,6 +175,37 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
                 // Important that this is always called when a result is applied.
                 Result.ReportHoldState(Time.Current, false);
+            }
+        }
+
+        private System.Func<DrawableHitObject, double, bool>? originalCheckHittable;
+
+        protected override void Update()
+        {
+            base.Update();
+
+            // 如果 Body 已断连且尚未到达尾点，强制锁定 IsHolding 状态。
+            if (Body != null && Tail != null && Body.HasHoldBreak && Time.Current < Tail.HitObject.StartTime)
+            {
+                if (IsHolding is Bindable<bool> b)
+                    b.Value = false;
+            }
+            else
+            {
+                // 当不处于锁定期，恢复可能被替换的 CheckHittable
+                if (originalCheckHittable != null)
+                {
+                    CheckHittable = originalCheckHittable;
+                    originalCheckHittable = null;
+                }
+            }
+
+            // 在锁定期，确保输入不可命中
+            if (Body != null && Tail != null && Body.HasHoldBreak && Time.Current < Tail.HitObject.StartTime)
+            {
+                originalCheckHittable ??= CheckHittable;
+
+                CheckHittable = (d, t) => false;
             }
         }
     }
