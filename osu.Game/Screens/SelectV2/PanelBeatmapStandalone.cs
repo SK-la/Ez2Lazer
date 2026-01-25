@@ -265,7 +265,7 @@ namespace osu.Game.Screens.SelectV2
             {
                 resetManiaAnalysisDisplay();
                 updateKeyCount();
-            });
+            }, true);
 
             mods.BindValueChanged(_ =>
             {

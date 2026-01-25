@@ -264,7 +264,7 @@ namespace osu.Game.Screens.Select.Carousel
             {
                 resetManiaAnalysisDisplay();
                 updateKeyCount();
-            });
+            }, true);
 
             mods.BindValueChanged(_ =>
             {
