@@ -22,12 +22,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         // LRU缓存：限制内存中最大存储N个谱面数据，新计算缓存替换旧缓存
         private const int max_cache_entries = 20;
-        private static readonly ConcurrentDictionary<string, ManiaBeatmapAnalysisResult> result_cache = new ConcurrentDictionary<string, ManiaBeatmapAnalysisResult>();
+        private static readonly ConcurrentDictionary<string, EzDifficultyResult> result_cache = new ConcurrentDictionary<string, EzDifficultyResult>();
         private static readonly ConcurrentQueue<string> access_order = new ConcurrentQueue<string>();
 
         // Lazy<Task<>> 用于去重同一 key 的并发计算。
-        private static readonly ConcurrentDictionary<string, Lazy<Task<ManiaBeatmapAnalysisResult>>> in_flight =
-            new ConcurrentDictionary<string, Lazy<Task<ManiaBeatmapAnalysisResult>>>();
+        private static readonly ConcurrentDictionary<string, Lazy<Task<EzDifficultyResult>>> in_flight =
+            new ConcurrentDictionary<string, Lazy<Task<EzDifficultyResult>>>();
 
         public static string CreateCacheKey(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IReadOnlyList<Mod> mods)
             => $"{beatmapInfo.Hash}_{ruleset.OnlineID}_{createModsKey(mods)}";
@@ -42,7 +42,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                     .Select(m => $"{m.GetType().FullName}:{unchecked((uint)m.GetHashCode()):x8}"));
         }
 
-        public static bool TryGet(string cacheKey, out ManiaBeatmapAnalysisResult result)
+        public static bool TryGet(string cacheKey, out EzDifficultyResult result)
         {
             if (result_cache.TryGetValue(cacheKey, out result))
             {
@@ -76,7 +76,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
         }
 
-        public static Task<ManiaBeatmapAnalysisResult> GetOrComputeAsync(BeatmapManager beatmapManager,
+        public static Task<EzDifficultyResult> GetOrComputeAsync(BeatmapManager beatmapManager,
                                                                          BeatmapInfo beatmapInfo,
                                                                          RulesetInfo ruleset,
                                                                          IReadOnlyList<Mod> mods,
@@ -87,7 +87,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (TryGet(cacheKey, out var cached))
                 return Task.FromResult(cached);
 
-            var lazyTask = in_flight.GetOrAdd(cacheKey, _ => new Lazy<Task<ManiaBeatmapAnalysisResult>>(() => computeAsync(
+            var lazyTask = in_flight.GetOrAdd(cacheKey, _ => new Lazy<Task<EzDifficultyResult>>(() => computeAsync(
                 beatmapManager,
                 beatmapInfo,
                 ruleset,
@@ -98,7 +98,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return lazyTask.Value;
         }
 
-        private static async Task<ManiaBeatmapAnalysisResult> computeAsync(BeatmapManager beatmapManager,
+        private static async Task<EzDifficultyResult> computeAsync(BeatmapManager beatmapManager,
                                                                            BeatmapInfo beatmapInfo,
                                                                            RulesetInfo ruleset,
                                                                            IReadOnlyList<Mod> mods,
@@ -148,7 +148,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 // 复用已算出的 columnCounts/kpsList，避免 GetScratch() 再次遍历/计算。
                 string scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
 
-                var result = new ManiaBeatmapAnalysisResult(
+                var result = new EzDifficultyResult(
                     averageKps,
                     maxKps,
                     kpsList,
@@ -173,26 +173,5 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 in_flight.TryRemove(cacheKey, out _);
             }
         }
-    }
-
-    public readonly record struct ManiaBeatmapAnalysisResult(double AverageKps,
-                                                             double MaxKps,
-                                                             List<double> KpsList,
-                                                             Dictionary<int, int> ColumnCounts,
-                                                             Dictionary<int, int> HoldNoteCounts,
-                                                             string ScratchText,
-                                                             double? XxySr);
-
-    public static class ManiaBeatmapAnalysisDefaults
-    {
-        public static readonly ManiaBeatmapAnalysisResult EMPTY =
-            new ManiaBeatmapAnalysisResult(
-                0,
-                0,
-                new List<double>(),
-                new Dictionary<int, int>(),
-                new Dictionary<int, int>(),
-                string.Empty,
-                null);
     }
 }

@@ -62,7 +62,7 @@ namespace osu.Game.Screens.SelectV2
         private Bindable<bool> xxySrFilterSetting = null!;
         private Bindable<KpcDisplayMode> kpcMode = null!;
 
-        private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
+        private IBindable<EzDifficultyResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
         private bool maniaWasVisible;
 

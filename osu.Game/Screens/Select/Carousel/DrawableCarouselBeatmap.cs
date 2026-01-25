@@ -78,7 +78,7 @@ namespace osu.Game.Screens.Select.Carousel
 
         private int keyCount;
 
-        private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
+        private IBindable<EzDifficultyResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
         private string? cachedScratchText;
 

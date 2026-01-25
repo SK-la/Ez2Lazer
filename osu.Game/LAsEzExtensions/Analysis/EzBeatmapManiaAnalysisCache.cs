@@ -35,7 +35,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
     /// - 统一监听当前 ruleset/mods 及 mod 设置变化，批量更新所有已追踪的 bindable。
     /// - 缓存 key 包含 mod 设置（依赖 mod 的相等性/哈希语义），避免“切/调 mod 不重算”。
     /// </summary>
-    public partial class EzBeatmapManiaAnalysisCache : MemoryCachingComponent<ManiaAnalysisCacheLookup, ManiaBeatmapAnalysisResult?>
+    public partial class EzBeatmapManiaAnalysisCache : MemoryCachingComponent<ManiaAnalysisCacheLookup, EzDifficultyResult?>
     {
         private static int computeFailCount;
 
@@ -51,8 +51,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private readonly SemaphoreSlim persistenceReadGate = new SemaphoreSlim(4, 4);
 
         // Deduplicate in-flight computations so multiple requests for the same lookup reuse the same Task
-        private readonly ConcurrentDictionary<ManiaAnalysisCacheLookup, Task<ManiaBeatmapAnalysisResult?>> inflightComputations =
-            new ConcurrentDictionary<ManiaAnalysisCacheLookup, Task<ManiaBeatmapAnalysisResult?>>();
+        private readonly ConcurrentDictionary<ManiaAnalysisCacheLookup, Task<EzDifficultyResult?>> inflightComputations =
+            new ConcurrentDictionary<ManiaAnalysisCacheLookup, Task<EzDifficultyResult?>>();
 
         private static readonly AsyncLocal<int> low_priority_scope_depth = new AsyncLocal<int>();
 
@@ -214,13 +214,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, lowPriorityScheduler);
         }
 
-        public IBindable<ManiaBeatmapAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
+        public IBindable<EzDifficultyResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
 
             var bindable = new BindableManiaBeatmapAnalysis(beatmapInfo, cancellationToken)
             {
-                Value = ManiaBeatmapAnalysisDefaults.EMPTY
             };
 
             if (localBeatmapInfo == null)
@@ -234,7 +233,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return bindable;
         }
 
-        public Task<ManiaBeatmapAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo,
+        public Task<EzDifficultyResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo,
                                                                   IRulesetInfo? rulesetInfo = null,
                                                                   IEnumerable<Mod>? mods = null,
                                                                   CancellationToken cancellationToken = default,
@@ -244,7 +243,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
 
             if (localBeatmapInfo == null || localRulesetInfo == null)
-                return Task.FromResult<ManiaBeatmapAnalysisResult?>(null);
+                return Task.FromResult<EzDifficultyResult?>(null);
 
             // Use the original constructor that handles mod cloning and signature computation
             var lookup = new ManiaAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
@@ -252,9 +251,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay);
         }
 
-        private async Task<ManiaBeatmapAnalysisResult?> getAndMaybeEvictAsync(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
+        private async Task<EzDifficultyResult?> getAndMaybeEvictAsync(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
         {
-            ManiaBeatmapAnalysisResult? result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
+            EzDifficultyResult? result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
 
             if (result.HasValue)
             {
@@ -280,12 +279,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return result;
         }
 
-        protected override Task<ManiaBeatmapAnalysisResult?> ComputeValueAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token = default)
+        protected override Task<EzDifficultyResult?> ComputeValueAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token = default)
         {
             return computeValueWithDedupAsync(lookup, token);
         }
 
-        private async Task<ManiaBeatmapAnalysisResult?> computeValueWithDedupAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token)
+        private async Task<EzDifficultyResult?> computeValueWithDedupAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token)
         {
             // If a computation for this lookup is already in-flight, reuse it.
             // Important: the computation itself should not be cancelled by any single requester.
@@ -297,7 +296,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 // Remove the entry when the task completes (best-effort), but only if the value matches.
                 task.ContinueWith(
-                    completedTask => inflightComputations.TryRemove(new KeyValuePair<ManiaAnalysisCacheLookup, Task<ManiaBeatmapAnalysisResult?>>(lookup, task)),
+                    completedTask => inflightComputations.TryRemove(new KeyValuePair<ManiaAnalysisCacheLookup, Task<EzDifficultyResult?>>(lookup, task)),
                     CancellationToken.None,
                     TaskContinuationOptions.ExecuteSynchronously,
                     TaskScheduler.Default);
@@ -316,7 +315,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
         }
 
-        private async Task<ManiaBeatmapAnalysisResult?> computeValueInternalCore(ManiaAnalysisCacheLookup lookup, CancellationToken token)
+        private async Task<EzDifficultyResult?> computeValueInternalCore(ManiaAnalysisCacheLookup lookup, CancellationToken token)
         {
             // Quick path: if a persisted no-mod baseline exists, return it without entering the single-thread compute queue.
             // This avoids head-of-line blocking where one expensive miss would delay many cheap hits.
@@ -335,7 +334,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                         await persistenceReadGate.WaitAsync(token).ConfigureAwait(false);
                         gateAcquired = true;
 
-                        var persistedResult = await Task.Run<ManiaBeatmapAnalysisResult?>(() =>
+                        var persistedResult = await Task.Run<EzDifficultyResult?>(() =>
                         {
                             if (persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                             {
@@ -367,7 +366,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 {
                     try
                     {
-                        var persistedResult = await Task.Run<ManiaBeatmapAnalysisResult?>(() =>
+                        var persistedResult = await Task.Run<EzDifficultyResult?>(() =>
                         {
                             if (persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                             {
@@ -412,7 +411,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         // enter/exit high-priority work helpers removed; gating uses ManualResetEventSlim directly.
 
-        private ManiaBeatmapAnalysisResult? computeAnalysis(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken)
+        private EzDifficultyResult? computeAnalysis(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken)
         {
             try
             {
@@ -469,7 +468,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
 
-                var analysis = new ManiaBeatmapAnalysisResult(
+                var analysis = new EzDifficultyResult(
                     averageKps,
                     maxKps,
                     kpsList,
@@ -634,7 +633,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             highPriorityIdleEvent.Dispose();
         }
 
-        private class BindableManiaBeatmapAnalysis : Bindable<ManiaBeatmapAnalysisResult>
+        private class BindableManiaBeatmapAnalysis : Bindable<EzDifficultyResult>
         {
             public readonly IBeatmapInfo BeatmapInfo;
             public readonly CancellationToken CancellationToken;

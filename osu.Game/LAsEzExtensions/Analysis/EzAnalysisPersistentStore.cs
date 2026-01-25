@@ -191,10 +191,9 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
             }
         }
 
-        public bool TryGet(BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
+        public bool TryGet(BeatmapInfo beatmap, out EzDifficultyResult result)
         {
-            result = ManiaBeatmapAnalysisDefaults.EMPTY;
-            // missingRequiredXxySr = false;
+            result = default;
 
             if (!Enabled)
                 return false;
@@ -293,7 +292,7 @@ LIMIT 1;
                 int keyCount = columnCounts.Count;
                 string computedScratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
 
-                result = new ManiaBeatmapAnalysisResult(
+                result = new EzDifficultyResult(
                     averageKps,
                     maxKps,
                     kpsList,
@@ -330,7 +329,7 @@ LIMIT 1;
         /// - 如果 stored xxysr == null 而 computed 有值，说明需要补充 xxysr，更新
         /// - 如果都是 xxysr == null，说明是非 mania 模式数据，比较 KPS 数据是否相同
         /// </summary>
-        public void StoreIfDifferent(BeatmapInfo beatmap, ManiaBeatmapAnalysisResult analysis)
+        public void StoreIfDifferent(BeatmapInfo beatmap, EzDifficultyResult analysis)
         {
             if (!Enabled)
                 return;
@@ -376,9 +375,9 @@ LIMIT 1;
         /// <summary>
         /// 从数据库读取原始数据（不验证 hash/version）。
         /// </summary>
-        private bool tryGetRawData(SqliteConnection connection, BeatmapInfo beatmap, out ManiaBeatmapAnalysisResult result)
+        private bool tryGetRawData(SqliteConnection connection, BeatmapInfo beatmap, out EzDifficultyResult result)
         {
-            result = ManiaBeatmapAnalysisDefaults.EMPTY;
+            result = default;
 
             try
             {
@@ -411,7 +410,7 @@ LIMIT 1;
                     int keyCount = columnCounts.Count;
                     string scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
 
-                    result = new ManiaBeatmapAnalysisResult(
+                    result = new EzDifficultyResult(
                         averageKps,
                         maxKps,
                         kpsList,
@@ -433,7 +432,7 @@ LIMIT 1;
         /// 比较两个分析结果是否有差异。
         /// 关键字段：xxysr, averageKps, maxKps, ColumnCounts, HoldNoteCounts
         /// </summary>
-        private bool hasDifference(ManiaBeatmapAnalysisResult stored, ManiaBeatmapAnalysisResult computed)
+        private bool hasDifference(EzDifficultyResult stored, EzDifficultyResult computed)
         {
             // 检查 xxysr 差异（最重要）
             // 如果 stored 是 null 而 computed 有值，必须更新
@@ -474,7 +473,7 @@ LIMIT 1;
             return false;
         }
 
-        public void Store(BeatmapInfo beatmap, ManiaBeatmapAnalysisResult analysis)
+        public void Store(BeatmapInfo beatmap, EzDifficultyResult analysis)
         {
             if (!Enabled)
                 return;
@@ -886,7 +885,7 @@ FROM mania_analysis;
         /// <summary>
         /// Validates that the analysis result contains reasonable values.
         /// </summary>
-        private static bool isValidAnalysisResult(ManiaBeatmapAnalysisResult result)
+        private static bool isValidAnalysisResult(EzDifficultyResult result)
         {
             if (result.XxySr.HasValue && (double.IsNaN(result.XxySr.Value) || double.IsInfinity(result.XxySr.Value)))
                 return false;
