@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Buffers;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -60,8 +61,11 @@ namespace osu.Game.Screens.SelectV2
         private EzKpsDisplay ezKpsDisplay = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
         private EzDisplayXxySR displayXxySR = null!;
+        private Bindable<KpcDisplayMode> kpcMode = null!;
+
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
+
         private bool maniaWasVisible;
 
         private int keyCount;
@@ -231,15 +235,15 @@ namespace osu.Game.Screens.SelectV2
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        ezKpcDisplay = new EzKpcDisplay
-                                        {
-                                            Anchor = Anchor.CentreLeft,
-                                            Origin = Anchor.CentreLeft,
-                                        },
                                         spreadDisplay = new SpreadDisplay
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
+                                        },
+                                        ezKpcDisplay = new EzKpcDisplay
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
                                         },
                                     },
                                 }
@@ -249,7 +253,7 @@ namespace osu.Game.Screens.SelectV2
                 }
             };
 
-            var kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
             ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
         }
 
@@ -273,6 +277,8 @@ namespace osu.Game.Screens.SelectV2
                 Expanded.Value = s.NewValue;
                 spreadDisplay.Enabled.Value = s.NewValue;
             }, true);
+
+            // kpcMode.BindValueChanged(_ => maniaWasVisible = false);
         }
 
         protected override void PrepareForUse()
@@ -350,17 +356,27 @@ namespace osu.Game.Screens.SelectV2
 
             if (columnCounts != null)
             {
+                // Forward raw counts to EzKpcDisplay. Debounce, checksum and pooling
+                // are handled internally by EzKpcDisplay to avoid duplication.
                 ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
             }
         }
 
         private void computeManiaAnalysis()
         {
+            // Defer creating the heavy bindable until this panel becomes visible.
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = null;
+            maniaAnalysisBindable = null;
+        }
+
+        private void requestManiaAnalysisBindable()
+        {
+            if (maniaAnalysisBindable != null || Item == null)
+                return;
+
             maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisCancellationSource = new CancellationTokenSource();
-
-            if (Item == null)
-                return;
 
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             // Delay initial callback; we'll pull the current value when panel becomes visible.
@@ -409,13 +425,7 @@ namespace osu.Game.Screens.SelectV2
             if (!maniaWasVisible && Item?.IsVisible == true)
             {
                 maniaWasVisible = true;
-                var b = maniaAnalysisBindable;
-
-                if (b != null)
-                {
-                    var v = b.Value;
-                    updateKPS((v.AverageKps, v.MaxKps, v.KpsList), v.ColumnCounts, v.HoldNoteCounts);
-                }
+                requestManiaAnalysisBindable();
             }
 
             if (maniaWasVisible && Item?.IsVisible != true)

@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Buffers;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -14,7 +13,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Configuration;
 using osuTK;
 using osuTK.Graphics;
 
@@ -29,17 +27,22 @@ namespace osu.Game.Screens.SelectV2
         private readonly Box backgroundBox;
         private FillFlowContainer? columnNotesContainer;
         private OsuSpriteText? headerText;
+        private Container? modePlaceholder;
 
         private int currentColumnCount;
-        private bool modeChanged;
+        private Container? rootContainer;
+
+        // last received data so mode switches can immediately refresh
+        private int[]? lastKnownColumns;
+        private int[]? lastKnownHolds;
+        private int lastKnownCount;
 
         public EzKpcDisplay()
         {
-            // Match SpreadDisplay sizing: auto-size horizontally, fill vertically.
             AutoSizeAxes = Axes.X;
             RelativeSizeAxes = Axes.Y;
 
-            InternalChild = new Container
+            rootContainer = new Container
             {
                 Masking = true,
                 CornerRadius = 5,
@@ -54,71 +57,107 @@ namespace osu.Game.Screens.SelectV2
                     }
                 }
             };
+
+            InternalChild = rootContainer;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            AddInternal(new GridContainer
+            modePlaceholder = new Container
             {
-                AutoSizeAxes = Axes.Both,
                 Anchor = Anchor.CentreLeft,
                 Origin = Anchor.CentreLeft,
-                Padding = new MarginPadding { Horizontal = 5f },
-                ColumnDimensions = new[]
-                {
-                    new Dimension(GridSizeMode.AutoSize),
-                    new Dimension(GridSizeMode.Absolute, 3f),
-                    new Dimension(GridSizeMode.AutoSize),
-                },
-                RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
-                Content = new[]
-                {
-                    new[]
-                    {
-                        headerText = new OsuSpriteText
-                        {
-                            Text = "[Notes]",
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Colour4.GhostWhite,
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft
-                        },
-                        Empty(),
-                        columnNotesContainer = new FillFlowContainer
-                        {
-                            Direction = FillDirection.Horizontal,
-                            AutoSizeAxes = Axes.Both,
-                            Spacing = new Vector2(5), // align spacing with SpreadDisplay
-                            Padding = new MarginPadding { Horizontal = 0 },
-                            Anchor = Anchor.CentreLeft,
-                            Origin = Anchor.CentreLeft,
-                        },
-                    }
-                }
-            });
+                AutoSizeAxes = Axes.Both,
+            };
 
-            KpcDisplayModeBindable.BindValueChanged(mode =>
+            rootContainer?.Add(modePlaceholder);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            KpcDisplayModeBindable.BindValueChanged(e => buildForMode(e.NewValue), true);
+        }
+
+        private void buildForMode(KpcDisplayMode mode)
+        {
+            modePlaceholder?.Clear();
+            columnNotesContainer = null;
+            headerText = null;
+            numberEntries.Clear();
+            barEntries.Clear();
+            currentColumnCount = 0;
+
+            switch (mode)
             {
-                modeChanged = true;
-
-                switch (mode.NewValue)
+                case KpcDisplayMode.Numbers:
                 {
-                    case KpcDisplayMode.Numbers:
+                    columnNotesContainer = new FillFlowContainer
                     {
-                        headerText.Show();
-                        backgroundBox.Colour = Colour4.Black.Opacity(0.6f);
-                    }
-                        break;
+                        Direction = FillDirection.Horizontal,
+                        AutoSizeAxes = Axes.Both,
+                        Spacing = new Vector2(5),
+                        Padding = new MarginPadding { Horizontal = 0 },
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                    };
 
-                    case KpcDisplayMode.BarChart:
+                    headerText = new OsuSpriteText
                     {
-                        backgroundBox.Colour = Colour4.White.Opacity(0.6f);
-                        headerText?.Hide();
-                    }
-                        break;
+                        Text = "[Notes]",
+                        Font = OsuFont.GetFont(size: 14),
+                        Colour = Colour4.GhostWhite,
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                    };
+
+                    var grid = new GridContainer
+                    {
+                        AutoSizeAxes = Axes.Both,
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                        Padding = new MarginPadding { Horizontal = 5f },
+                        ColumnDimensions = new[]
+                        {
+                            new Dimension(GridSizeMode.AutoSize),
+                            new Dimension(GridSizeMode.Absolute, 3f),
+                            new Dimension(GridSizeMode.AutoSize),
+                        },
+                        RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
+                        Content = new[] { new[] { headerText, Empty(), columnNotesContainer } }
+                    };
+
+                    modePlaceholder?.Add(grid);
+
+                    if (lastKnownColumns != null)
+                        updateDisplay(lastKnownColumns, lastKnownHolds, lastKnownCount);
                 }
-            }, true);
+
+                    break;
+
+                case KpcDisplayMode.BarChart:
+                {
+                    columnNotesContainer = new FillFlowContainer
+                    {
+                        Direction = FillDirection.Horizontal,
+                        AutoSizeAxes = Axes.Both,
+                        Spacing = new Vector2(5),
+                        Padding = new MarginPadding { Horizontal = 0 },
+                        Margin = new MarginPadding { Horizontal = 5f },
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                    };
+
+                    modePlaceholder?.Add(columnNotesContainer);
+
+                    if (lastKnownColumns != null)
+                        updateDisplay(lastKnownColumns, lastKnownHolds, lastKnownCount);
+                }
+
+                    break;
+            }
         }
 
         /// <summary>
@@ -144,6 +183,13 @@ namespace osu.Game.Screens.SelectV2
                         normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
                     }
 
+                    // store a copy for immediate refresh on mode changes
+                    lastKnownColumns = new int[kc];
+                    lastKnownHolds = new int[kc];
+                    Array.Copy(normalized, lastKnownColumns, kc);
+                    Array.Copy(normalizedHold, lastKnownHolds, kc);
+                    lastKnownCount = kc;
+
                     updateDisplay(normalized, normalizedHold, kc);
                 }
                 finally
@@ -154,46 +200,71 @@ namespace osu.Game.Screens.SelectV2
 
                 return;
             }
-            else
+
+            // When keyCount is not provided, normalize sparse key dictionaries into
+            // a continuous 0..maxKey range so callers can index by column.
+            if (columnNoteCounts.Count > 0)
             {
-                // When keyCount is not provided, normalize sparse key dictionaries into
-                // a continuous 0..maxKey range so callers can index by column.
-                if (columnNoteCounts.Count > 0)
+                int maxKey = 0;
+
+                foreach (int k in columnNoteCounts.Keys)
                 {
-                    int maxKey = 0;
-
-                    foreach (int k in columnNoteCounts.Keys)
-                    {
-                        if (k > maxKey)
-                            maxKey = k;
-                    }
-
-                    int kc = maxKey + 1;
-                    var pool = ArrayPool<int>.Shared;
-                    int[] normalized = pool.Rent(Math.Max(1, kc));
-                    int[] normalizedHold = pool.Rent(Math.Max(1, kc));
-
-                    try
-                    {
-                        for (int i = 0; i < kc; i++)
-                        {
-                            normalized[i] = columnNoteCounts.GetValueOrDefault(i);
-                            normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
-                        }
-
-                        updateDisplay(normalized, normalizedHold, kc);
-                    }
-                    finally
-                    {
-                        pool.Return(normalized, clearArray: true);
-                        pool.Return(normalizedHold, clearArray: true);
-                    }
-
-                    return;
+                    if (k > maxKey)
+                        maxKey = k;
                 }
+
+                int kc = maxKey + 1;
+                var pool = ArrayPool<int>.Shared;
+                int[] normalized = pool.Rent(Math.Max(1, kc));
+                int[] normalizedHold = pool.Rent(Math.Max(1, kc));
+
+                try
+                {
+                    for (int i = 0; i < kc; i++)
+                    {
+                        normalized[i] = columnNoteCounts.GetValueOrDefault(i);
+                        normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                    }
+
+                    // store a copy for immediate refresh on mode changes
+                    lastKnownColumns = new int[kc];
+                    lastKnownHolds = new int[kc];
+                    Array.Copy(normalized, lastKnownColumns, kc);
+                    Array.Copy(normalizedHold, lastKnownHolds, kc);
+                    lastKnownCount = kc;
+
+                    updateDisplay(normalized, normalizedHold, kc);
+                }
+                finally
+                {
+                    pool.Return(normalized, clearArray: true);
+                    pool.Return(normalizedHold, clearArray: true);
+                }
+
+                return;
             }
 
             updateDisplay(columnNoteCounts, holdNoteCounts);
+        }
+
+        /// <summary>
+        /// Array-backed overload to avoid Dictionary allocations on hot paths when callers already have normalized buffers.
+        /// </summary>
+        public void UpdateColumnCounts(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        {
+            // store a copy for immediate refresh on mode changes
+            lastKnownColumns = new int[columns];
+            lastKnownHolds = new int[columns];
+
+            for (int i = 0; i < columns; i++)
+            {
+                lastKnownColumns[i] = i < columnNoteCounts.Length ? columnNoteCounts[i] : 0;
+                lastKnownHolds[i] = (holdNoteCounts != null && i < holdNoteCounts.Length) ? holdNoteCounts[i] : 0;
+            }
+
+            lastKnownCount = columns;
+
+            updateDisplay(columnNoteCounts, holdNoteCounts, columns);
         }
 
         private void updateDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
@@ -283,16 +354,6 @@ namespace osu.Game.Screens.SelectV2
 
         private void rebuildForModeIfNeeded(int columns)
         {
-            // If mode changed, recreate entries for the new mode (mode changes are rare).
-            if (modeChanged)
-            {
-                currentColumnCount = 0;
-                columnNotesContainer?.Clear();
-                numberEntries.Clear();
-                barEntries.Clear();
-                modeChanged = false;
-            }
-
             if (currentColumnCount == columns)
                 return;
 
@@ -440,10 +501,14 @@ namespace osu.Game.Screens.SelectV2
             }
         }
 
+        #region ColumnEntry
+
         private class NumberColumnEntry
         {
-            public readonly FillFlowContainer Container;
-            private readonly OsuSpriteText? valueText;
+            public readonly Container Container;
+
+            private readonly OsuSpriteText indexText;
+            private readonly OsuSpriteText valueText;
             private readonly OsuSpriteText holdText;
 
             private int lastTotal = int.MinValue;
@@ -451,34 +516,39 @@ namespace osu.Game.Screens.SelectV2
 
             public NumberColumnEntry(int index)
             {
-                Container = new FillFlowContainer
+                Container = new Container
                 {
-                    Direction = FillDirection.Horizontal,
                     AutoSizeAxes = Axes.Both,
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,
-                    Children = new Drawable[]
-                    {
-                        new OsuSpriteText
-                        {
-                            Text = $"{index + 1}/",
-                            Font = OsuFont.GetFont(size: 12),
-                            Colour = Color4.Gray,
-                        },
-                        valueText = new OsuSpriteText
-                        {
-                            Font = OsuFont.GetFont(size: 14),
-                            Colour = Color4.LightCoral,
-                        },
-                        holdText = new OsuSpriteText
-                        {
-                            Font = OsuFont.GetFont(size: 12),
-                            Colour = Color4.LightGoldenrodYellow.Darken(0.2f),
-                            Anchor = Anchor.BottomLeft,
-                            Origin = Anchor.BottomLeft,
-                        }
-                    }
                 };
+
+                indexText = new OsuSpriteText
+                {
+                    Text = $"{index + 1}/",
+                    Font = OsuFont.GetFont(size: 12),
+                    Colour = Color4.Gray,
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                };
+
+                valueText = new OsuSpriteText
+                {
+                    Font = OsuFont.GetFont(size: 14),
+                    Colour = Color4.LightCoral,
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                };
+
+                holdText = new OsuSpriteText
+                {
+                    Font = OsuFont.GetFont(size: 12),
+                    Colour = Color4.LightGoldenrodYellow.Darken(0.2f),
+                    Anchor = Anchor.CentreLeft,
+                    Origin = Anchor.CentreLeft,
+                };
+
+                Container.AddRange(new Drawable[] { indexText, valueText, holdText });
             }
 
             public void SetValues(int total, int hold)
@@ -486,7 +556,7 @@ namespace osu.Game.Screens.SelectV2
                 if (lastTotal != total)
                 {
                     lastTotal = total;
-                    if (valueText != null) valueText.Text = total.ToString(CultureInfo.InvariantCulture);
+                    valueText.Text = total.ToString(CultureInfo.InvariantCulture);
                 }
 
                 if (lastHold != hold)
@@ -494,6 +564,17 @@ namespace osu.Game.Screens.SelectV2
                     lastHold = hold;
                     holdText.Text = hold > 0 ? $"/{hold.ToString(CultureInfo.InvariantCulture)} " : " ";
                 }
+
+                // Manual lightweight layout: position texts horizontally based on measured widths.
+                // This avoids FillFlowContainer's per-frame layout overhead.
+                float x = 0f;
+                indexText.X = x;
+                x += indexText.DrawWidth;
+
+                valueText.X = x;
+                x += valueText.DrawWidth;
+
+                holdText.X = x + 2f; // small spacing
             }
         }
 
@@ -507,7 +588,8 @@ namespace osu.Game.Screens.SelectV2
             public readonly Container Container;
             private readonly Box regularBox;
             private readonly Box holdBox;
-            private readonly OsuSpriteText? valueText;
+
+            // private readonly OsuSpriteText? valueText;
 
             private int lastTotalNotes = int.MinValue;
             private int lastHoldNotes = int.MinValue;
@@ -566,36 +648,35 @@ namespace osu.Game.Screens.SelectV2
                     barArea,
                 };
 
-                if (showText)
-                {
-                    var idxText = new OsuSpriteText
-                    {
-                        Text = (index + 1).ToString(),
-                        Font = OsuFont.GetFont(size: 12),
-                        Colour = Color4.Gray,
-                        Anchor = Anchor.BottomCentre,
-                        Origin = Anchor.BottomCentre,
-                        Margin = new MarginPadding { Bottom = 2 }
-                    };
-
-                    valueText = new OsuSpriteText
-                    {
-                        Font = OsuFont.GetFont(size: 10),
-                        Colour = Color4.White,
-                        Anchor = Anchor.BottomCentre,
-                        Origin = Anchor.BottomCentre,
-                    };
-
-                    children.Add(idxText);
-                    children.Add(valueText);
-                }
+                // if (showText)
+                // {
+                //     var idxText = new OsuSpriteText
+                //     {
+                //         Text = (index + 1).ToString(),
+                //         Font = OsuFont.GetFont(size: 12),
+                //         Colour = Color4.Gray,
+                //         Anchor = Anchor.BottomCentre,
+                //         Origin = Anchor.BottomCentre,
+                //         Margin = new MarginPadding { Bottom = 2 }
+                //     };
+                //
+                //     valueText = new OsuSpriteText
+                //     {
+                //         Font = OsuFont.GetFont(size: 10),
+                //         Colour = Color4.White,
+                //         Anchor = Anchor.BottomCentre,
+                //         Origin = Anchor.BottomCentre,
+                //     };
+                //
+                //     children.Add(idxText);
+                //     children.Add(valueText);
+                // }
 
                 Container.Children = children.ToArray();
             }
 
             public void SetValues(int totalNotes, int holdNotes, int maxCount)
             {
-                // Avoid redundant work (and string allocations) when values are unchanged.
                 if (lastTotalNotes == totalNotes && lastHoldNotes == holdNotes && lastMaxCount == maxCount)
                     return;
 
@@ -608,23 +689,22 @@ namespace osu.Game.Screens.SelectV2
                 float totalHeight = maxCount > 0 ? (float)totalNotes / maxCount * max_bar_height : 0;
                 float regularHeight = maxCount > 0 ? (float)regularNotes / maxCount * max_bar_height : 0;
 
-                const float transition_duration = 200f;
-                regularBox.ResizeHeightTo(regularHeight, transition_duration, Easing.OutQuint);
-
                 float holdHeight = Math.Max(0, totalHeight - regularHeight);
-                holdBox.ResizeHeightTo(holdHeight, transition_duration, Easing.OutQuint);
-                // place holdBox above regular by animating its bottom margin inside the masked bar area
-                holdBox.TransformTo(nameof(Drawable.Margin), new MarginPadding { Bottom = regularHeight }, transition_duration, Easing.OutQuint);
+                regularBox.Height = regularHeight;
+                holdBox.Height = holdHeight;
+                holdBox.Margin = new MarginPadding { Bottom = regularHeight };
 
-                if (valueText != null)
-                {
-                    valueText.Text = holdNotes > 0
-                        ? $"{totalNotes.ToString(CultureInfo.InvariantCulture)}({holdNotes.ToString(CultureInfo.InvariantCulture)})"
-                        : totalNotes.ToString(CultureInfo.InvariantCulture);
-                    valueText.MoveToY(-(totalHeight + 6), transition_duration, Easing.OutQuint);
-                }
+                // if (valueText != null)
+                // {
+                //     valueText.Text = holdNotes > 0
+                //         ? $"{totalNotes.ToString(CultureInfo.InvariantCulture)}({holdNotes.ToString(CultureInfo.InvariantCulture)})"
+                //         : totalNotes.ToString(CultureInfo.InvariantCulture);
+                //     valueText.Y = -(totalHeight + 6);
+                // }
             }
         }
+
+#endregion
     }
 
     /// <summary>

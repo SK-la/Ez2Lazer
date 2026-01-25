@@ -52,7 +52,7 @@ namespace osu.Game.Screens.SelectV2
         private EzKeyModeSelector csSelector = null!;
         private ShearedToggleButton keySoundPreviewButton = null!;
         private ShearedToggleButton xxySrFilterButton = null!;
-        private ShearedToggleButton kpcDisplayModeButton = null!;
+        private ShearedDropdown<KpcDisplayMode> kpcDropdown = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -172,7 +172,7 @@ namespace osu.Game.Screens.SelectV2
                                 new Dimension(maxSize: 180),
                                 new Dimension(GridSizeMode.Absolute, 5),
                                 new Dimension(),
-                                new Dimension(GridSizeMode.AutoSize),
+                                new Dimension(maxSize: 120),
                                 new Dimension(GridSizeMode.AutoSize),
                             },
                             Content = new[]
@@ -194,6 +194,11 @@ namespace osu.Game.Screens.SelectV2
                                     collectionDropdown = new CollectionDropdown
                                     {
                                         RelativeSizeAxes = Axes.X,
+                                    },
+                                    kpcDropdown = new ShearedDropdown<KpcDisplayMode>("KPC")
+                                    {
+                                        RelativeSizeAxes = Axes.X,
+                                        Items = Enum.GetValues<KpcDisplayMode>(),
                                     },
                                     keySoundPreviewButton = new ShearedToggleButton
                                     {
@@ -256,6 +261,7 @@ namespace osu.Game.Screens.SelectV2
 
             difficultyRangeSlider.LowerBound = config.GetBindable<double>(OsuSetting.DisplayStarsMinimum);
             difficultyRangeSlider.UpperBound = config.GetBindable<double>(OsuSetting.DisplayStarsMaximum);
+            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, kpcDropdown.Current);
             ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
