@@ -74,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     transformColumnNum = keys;
                 }
 
-                var randomColumnSet = ManiaModHelper.SelectRandom(Enumerable.Range(0, keys), rng, transformColumnNum == 0 ? keys : transformColumnNum).ToHashSet();
+                var randomColumnSet = Enumerable.Range(0, keys).SelectRandom(rng, transformColumnNum == 0 ? keys : transformColumnNum).ToHashSet();
                 int gap = Gap.Value;
 
                 foreach (var timeGroup in oldObjects.GroupBy(x => x.StartTime))
@@ -100,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
                     if (gap <= 0)
                     {
-                        randomColumnSet = ManiaModHelper.SelectRandom(Enumerable.Range(0, keys), rng, transformColumnNum).ToHashSet();
+                        randomColumnSet = Enumerable.Range(0, keys).SelectRandom(rng, transformColumnNum).ToHashSet();
                         gap = Gap.Value;
                     }
                 }
@@ -256,27 +256,27 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
             }
 
-            double lastStartTime = locations[locations.Count - 1].startTime;
-            double lastEndTime = locations[locations.Count - 1].endTime;
+            double lastStartTime = locations[^1].startTime;
+            double lastEndTime = locations[^1].endTime;
 
             if (OriginalLN.Value && lastStartTime != lastEndTime)
             {
                 newColumnObjects.Add(new HoldNote
                 {
                     Column = column.Key,
-                    StartTime = locations[locations.Count - 1].startTime,
-                    EndTime = locations[locations.Count - 1].endTime,
-                    NodeSamples = [locations[locations.Count - 1].samples, Array.Empty<HitSampleInfo>()]
+                    StartTime = locations[^1].startTime,
+                    EndTime = locations[^1].endTime,
+                    NodeSamples = [locations[^1].samples, Array.Empty<HitSampleInfo>()]
                 });
-                originalLNObjects.AddNote(locations[locations.Count - 1].samples, column.Key, locations[locations.Count - 1].startTime, locations[locations.Count - 1].endTime);
+                originalLNObjects.AddNote(locations[^1].samples, column.Key, locations[^1].startTime, locations[^1].endTime);
             }
             else
             {
                 newColumnObjects.Add(new Note
                 {
                     Column = column.Key,
-                    StartTime = locations[locations.Count - 1].startTime,
-                    Samples = locations[locations.Count - 1].samples
+                    StartTime = locations[^1].startTime,
+                    Samples = locations[^1].samples
                 });
             }
 

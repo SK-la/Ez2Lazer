@@ -1,5 +1,8 @@
-// Universal loop play clip mod that applies to arbitrary rulesets using best-effort cloning.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
@@ -9,7 +12,7 @@ using osu.Game.Rulesets.Objects;
 namespace osu.Game.LAsEzExtensions.Mods
 {
     public class UniversalLoopPlayClip : ModLoopPlayClip,
-                                            IApplicableAfterBeatmapConversion
+                                         IApplicableAfterBeatmapConversion
     {
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -25,9 +28,10 @@ namespace osu.Game.LAsEzExtensions.Mods
             try
             {
                 var breaksProp = beatmap.GetType().GetProperty("Breaks");
+
                 if (breaksProp != null && breaksProp.CanWrite)
                 {
-                    var breaks = breaksProp.GetValue(beatmap) as System.Collections.IList;
+                    var breaks = breaksProp.GetValue(beatmap) as IList;
                     breaks?.Clear();
                 }
                 else
@@ -40,6 +44,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             }
 
             double breakTime;
+
             try
             {
                 var timing = beatmap.ControlPointInfo.TimingPointAt(cutTimeStart);
@@ -55,7 +60,7 @@ namespace osu.Game.LAsEzExtensions.Mods
 
             var newPart = new List<HitObject>();
 
-            var rng = seed.HasValue ? new Random((int)seed.Value) : new Random();
+            var rng = seed.HasValue ? new Random(seed.Value) : new Random();
 
             double length = cutTimeEnd - cutTimeStart;
 
@@ -84,6 +89,7 @@ namespace osu.Game.LAsEzExtensions.Mods
 
                             // Samples
                             var samplesProp = type.GetProperty("Samples");
+
                             if (samplesProp != null && samplesProp.CanWrite)
                             {
                                 try
@@ -123,10 +129,12 @@ namespace osu.Game.LAsEzExtensions.Mods
             }
 
             var propHitObjects = beatmap.GetType().GetProperty("HitObjects");
+
             if (propHitObjects != null && propHitObjects.CanWrite)
             {
                 // Ensure we assign a list whose element type matches the property's generic argument
                 var propType = propHitObjects.PropertyType;
+
                 if (propType.IsGenericType)
                 {
                     var elementType = propType.GetGenericArguments()[0];
@@ -140,13 +148,11 @@ namespace osu.Game.LAsEzExtensions.Mods
                     try
                     {
                         var listType = typeof(List<>).MakeGenericType(elementType);
-                        var listInstance = (System.Collections.IList)Activator.CreateInstance(listType)!;
+                        var listInstance = (IList)Activator.CreateInstance(listType)!;
 
                         foreach (var h in newPart)
                         {
-                            if (h == null) continue;
-
-                            if (elementType.IsAssignableFrom(h.GetType()))
+                            if (elementType.IsInstanceOfType(h))
                             {
                                 listInstance.Add(h);
                                 continue;
@@ -155,8 +161,7 @@ namespace osu.Game.LAsEzExtensions.Mods
                             // Attempt best-effort conversion: create instance of elementType and copy common fields.
                             try
                             {
-                                var target = Activator.CreateInstance(elementType) as HitObject;
-                                if (target != null)
+                                if (Activator.CreateInstance(elementType) is HitObject target)
                                 {
                                     var startProp = elementType.GetProperty("StartTime");
                                     if (startProp != null && startProp.CanWrite)
@@ -165,6 +170,7 @@ namespace osu.Game.LAsEzExtensions.Mods
                                         target.StartTime = h.StartTime;
 
                                     var samplesProp = elementType.GetProperty("Samples");
+
                                     if (samplesProp != null && samplesProp.CanWrite)
                                     {
                                         try { samplesProp.SetValue(target, h.Samples?.ToList()); }
@@ -176,7 +182,6 @@ namespace osu.Game.LAsEzExtensions.Mods
                                     }
 
                                     listInstance.Add(target);
-                                    continue;
                                 }
                             }
                             catch
@@ -215,8 +220,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             {
                 try
                 {
-                    var current = beatmap.HitObjects as IList<HitObject>;
-                    if (current != null)
+                    if (beatmap.HitObjects is IList<HitObject> current)
                     {
                         current.Clear();
                         foreach (var h in newPart) current.Add(h);

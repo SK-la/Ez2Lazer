@@ -17,14 +17,12 @@ using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
@@ -63,7 +61,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public BindableDouble OriginalOD = new BindableDouble();
 
-        [SettingSource("Score Multiplier")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ScoreMultiplier_Label))]
         public BindableNumber<double> ScoreMultiplierAdjust { get; } = new BindableDouble(1)
         {
             MinValue = 0,
@@ -83,8 +81,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.DrainRate
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustAccuracy_Label), nameof(EzManiaModStrings.AdjustAccuracy_Description),
-            SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustAccuracy_Label), nameof(EzManiaModStrings.AdjustAccuracy_Description), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable(0)
         {
             Precision = 0.1f,
@@ -102,13 +99,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.1
         };
 
-        [SettingSource("Custom HP")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomHP_Label))]
         public BindableBool CustomHP { get; } = new BindableBool(false);
 
-        [SettingSource("Custom OD")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomOD_Label))]
         public BindableBool CustomOD { get; } = new BindableBool(true);
 
-        [SettingSource("Custom Release")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomRelease_Label))]
         public BindableBool CustomRelease { get; } = new BindableBool();
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ExtendedLimits_Label), nameof(EzManiaModStrings.ExtendedLimits_Description))]
@@ -173,8 +170,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string ExtendedIconInformation => "";
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SpeedChange_Label), nameof(EzManiaModStrings.SpeedChange_Description),
-            SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.SpeedChange_Label), nameof(EzModStrings.SpeedChange_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
         public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.1,
@@ -182,7 +178,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.025
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustPitch_Label), nameof(EzManiaModStrings.AdjustPitch_Description))]
+        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.AdjustPitch_Label), nameof(EzModStrings.AdjustPitch_Description))]
         public virtual BindableBool AdjustPitch { get; } = new BindableBool();
 
         private readonly RateAdjustModHelper rateAdjustHelper;
@@ -275,7 +271,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Mirror_Label), nameof(EzManiaModStrings.Mirror_Description))]
+        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Mirror_Label), nameof(EzModStrings.Mirror_Description))]
         public BindableBool Mirror { get; } = new BindableBool();
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.RandomMirror_Label), nameof(EzManiaModStrings.RandomMirror_Description))]
@@ -293,7 +289,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.TrueRandom_Label), nameof(EzManiaModStrings.TrueRandom_Description))]
         public BindableBool TrueRandom { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Seed_Label), nameof(EzManiaModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         public void ApplyToBeatmap(IBeatmap beatmap)

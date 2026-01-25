@@ -9,6 +9,7 @@ using osu.Framework.Localisation;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
@@ -29,7 +30,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override string Acronym => "SB";
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => EzManiaModStrings.SpaceBody_Description;
+        public override LocalisableString Description => EzModStrings.SpaceBody_Description;
 
         public override ModType Type => ModType.LA_Mod;
 
@@ -38,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override bool ValidForFreestyleAsRequiredMod => false;
         public override Type[] IncompatibleMods => new[] { typeof(ManiaModHoldOff) };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SpaceBody_Label), nameof(EzManiaModStrings.SpaceBodyGap_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.SpaceBody_Label), nameof(EzModStrings.SpaceBodyGap_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> SpaceBeat { get; } = new BindableDouble(4)
         {
             MinValue = 1,
@@ -46,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AddShield_Label), nameof(EzManiaModStrings.AddShield_Description))]
+        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.AddShield_Label), nameof(EzModStrings.AddShield_Description))]
         public BindableBool Shield { get; } = new BindableBool();
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description), SettingControlType = typeof(SettingsNumberBox))]

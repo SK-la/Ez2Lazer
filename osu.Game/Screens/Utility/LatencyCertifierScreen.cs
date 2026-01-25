@@ -288,7 +288,7 @@ namespace osu.Game.Screens.Utility
             statusText.AddParagraph($"Input: {host.InputThread.Clock.FramesPerSecond} Hz "
                                     + $"Update: {host.UpdateThread.Clock.FramesPerSecond} Hz "
                                     + $"Draw: {host.DrawThread.Clock.FramesPerSecond} Hz"
-                , cp => cp.Font = OsuFont.Default.With(size: 15, weight: FontWeight.SemiBold));
+              , cp => cp.Font = OsuFont.Default.With(size: 15, weight: FontWeight.SemiBold));
 
             if (isCertifying && isPass)
             {
