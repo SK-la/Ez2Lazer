@@ -31,8 +31,10 @@ namespace osu.Game.LAsEzExtensions.Audio
     /// </summary>
     public partial class EzPreviewTrackManager : CompositeDrawable
     {
-        public static bool Enabled { get; set; }
+        // 单例/实例都可用，但我们使用实例级 Bindable 以便在 `SongSelect` 中直接 BindTo。
+        public BindableBool EnabledBindable { get; } = new BindableBool();
 
+        // 预览时，非重复音效必须大于此值才会激活hitsound预览，否则退回外部预览。
         private const int hitsound_threshold = 10;
         private const double preview_window_length = 20000; // 20s
         private const double scheduler_interval = 16; // ~60fps
@@ -99,7 +101,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         /// <param name="forceEnhanced">是否强制使用增强预览（忽略命中音效数量阈值）</param>
         public bool StartPreview(IWorkingBeatmap beatmap, bool forceEnhanced = false)
         {
-            if (!Enabled)
+            if (!EnabledBindable.Value)
                 return false;
 
             StopPreview();
@@ -112,12 +114,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             playback.ResetPlaybackProgress();
 
-            bool enableEnhanced = forceEnhanced || fastCheckShouldUseEnhanced(beatmap, hitsound_threshold);
-
-            if (!enableEnhanced)
-            {
-                return false;
-            }
+            if (!forceEnhanced && !fastCheckShouldUseEnhanced(beatmap, hitsound_threshold)) return false;
 
             startEnhancedPreview(beatmap);
             return true;
@@ -194,7 +191,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         /// </summary>
         private void startEnhancedPreview(IWorkingBeatmap beatmap)
         {
-            double longestHitTime = 0; // 修复作用域：提前声明
+            double longestHitTime = 0;
             double longestStoryboardTime = 0;
 
             void collectLongest(HitObject ho)
@@ -293,7 +290,6 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
         }
 
-        // 改为接受 endTime 参数
         private void prepareHitSounds(IBeatmap beatmap, double previewEndTime)
         {
             sampleScheduler.ScheduledHitSounds.Clear();

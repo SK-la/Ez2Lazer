@@ -409,8 +409,8 @@ namespace osu.Game.Screens.SelectV2
                 fetchOnlineInfo();
             });
 
-            keySoundPreview.BindValueChanged(v =>
-                EzPreviewTrackManager.Enabled = v.NewValue, true);
+            // 把配置直接绑定到实例 manager 的 Bindable，避免静态赋值与手动初始回调。
+            ezPreviewManager.EnabledBindable.BindTo(keySoundPreview);
         }
 
         protected override void Update()

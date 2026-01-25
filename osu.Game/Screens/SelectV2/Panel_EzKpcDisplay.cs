@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Buffers;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -31,9 +32,6 @@ namespace osu.Game.Screens.SelectV2
 
         private int currentColumnCount;
         private bool modeChanged;
-
-        [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         public EzKpcDisplay()
         {
@@ -100,7 +98,6 @@ namespace osu.Game.Screens.SelectV2
                 }
             });
 
-            KpcDisplayModeBindable.Value = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode).Value;
             KpcDisplayModeBindable.BindValueChanged(mode =>
             {
                 modeChanged = true;
@@ -122,8 +119,6 @@ namespace osu.Game.Screens.SelectV2
                         break;
                 }
             }, true);
-
-            KpcDisplayModeBindable.BindValueChanged(_ => modeChanged = true, true);
         }
 
         /// <summary>
@@ -137,17 +132,27 @@ namespace osu.Game.Screens.SelectV2
             if (keyCount.HasValue)
             {
                 int kc = keyCount.Value;
-                var normalized = new Dictionary<int, int>(Math.Max(0, kc));
-                var normalizedHold = new Dictionary<int, int>(Math.Max(0, kc));
+                var pool = ArrayPool<int>.Shared;
+                int[] normalized = pool.Rent(Math.Max(1, kc));
+                int[] normalizedHold = pool.Rent(Math.Max(1, kc));
 
-                for (int i = 0; i < kc; i++)
+                try
                 {
-                    normalized[i] = columnNoteCounts.GetValueOrDefault(i);
-                    normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                    for (int i = 0; i < kc; i++)
+                    {
+                        normalized[i] = columnNoteCounts.GetValueOrDefault(i);
+                        normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                    }
+
+                    updateDisplay(normalized, normalizedHold, kc);
+                }
+                finally
+                {
+                    pool.Return(normalized, clearArray: true);
+                    pool.Return(normalizedHold, clearArray: true);
                 }
 
-                columnNoteCounts = normalized;
-                holdNoteCounts = normalizedHold;
+                return;
             }
             else
             {
@@ -164,21 +169,102 @@ namespace osu.Game.Screens.SelectV2
                     }
 
                     int kc = maxKey + 1;
-                    var normalized = new Dictionary<int, int>(Math.Max(0, kc));
-                    var normalizedHold = new Dictionary<int, int>(Math.Max(0, kc));
+                    var pool = ArrayPool<int>.Shared;
+                    int[] normalized = pool.Rent(Math.Max(1, kc));
+                    int[] normalizedHold = pool.Rent(Math.Max(1, kc));
 
-                    for (int i = 0; i < kc; i++)
+                    try
                     {
-                        normalized[i] = columnNoteCounts.GetValueOrDefault(i);
-                        normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                        for (int i = 0; i < kc; i++)
+                        {
+                            normalized[i] = columnNoteCounts.GetValueOrDefault(i);
+                            normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                        }
+
+                        updateDisplay(normalized, normalizedHold, kc);
+                    }
+                    finally
+                    {
+                        pool.Return(normalized, clearArray: true);
+                        pool.Return(normalizedHold, clearArray: true);
                     }
 
-                    columnNoteCounts = normalized;
-                    holdNoteCounts = normalizedHold;
+                    return;
                 }
             }
 
             updateDisplay(columnNoteCounts, holdNoteCounts);
+        }
+
+        private void updateDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        {
+            switch (KpcDisplayModeBindable.Value)
+            {
+                case KpcDisplayMode.Numbers:
+                    updateNumbersDisplay(columnNoteCounts, holdNoteCounts, columns);
+                    break;
+
+                case KpcDisplayMode.BarChart:
+                    updateBarChartDisplay(columnNoteCounts, holdNoteCounts, columns);
+                    break;
+            }
+        }
+
+        private void updateNumbersDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        {
+            rebuildForModeIfNeeded(columns);
+
+            int visible = currentColumnCount;
+
+            for (int i = 0; i < visible; i++)
+            {
+                int total = i < columns ? columnNoteCounts[i] : 0;
+                int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
+                var c = numberEntries[i].Container;
+                if (c.Alpha < 0.99f) c.Show();
+                numberEntries[i].SetValues(total, hold);
+            }
+        }
+
+        private void updateBarChartDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        {
+            rebuildForModeIfNeeded(columns);
+
+            int visible = currentColumnCount;
+
+            int maxCount = 0;
+
+            for (int i = 0; i < visible; i++)
+            {
+                int total = i < columns ? columnNoteCounts[i] : 0;
+                int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
+                int sum = total + hold;
+                if (sum > maxCount)
+                    maxCount = sum;
+            }
+
+            if (maxCount == 0)
+            {
+                for (int i = 0; i < visible; i++)
+                {
+                    var c = barEntries[i].Container;
+                    if (c.Alpha < 0.99f) c.Show();
+                }
+
+                for (int i = 0; i < visible; i++)
+                    barEntries[i].SetValues(0, 0, 1);
+
+                return;
+            }
+
+            for (int i = 0; i < visible; i++)
+            {
+                int total = i < columns ? columnNoteCounts[i] : 0;
+                int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
+                var c = barEntries[i].Container;
+                if (c.Alpha < 0.99f) c.Show();
+                barEntries[i].SetValues(total, hold, maxCount);
+            }
         }
 
         private void updateDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
@@ -216,6 +302,8 @@ namespace osu.Game.Screens.SelectV2
                 switch (KpcDisplayModeBindable.Value)
                 {
                     case KpcDisplayMode.Numbers:
+                        numberEntries.EnsureCapacity(columns);
+
                         for (int i = currentColumnCount; i < columns; i++)
                         {
                             var entry = new NumberColumnEntry(i);
@@ -226,6 +314,8 @@ namespace osu.Game.Screens.SelectV2
                         break;
 
                     case KpcDisplayMode.BarChart:
+                        barEntries.EnsureCapacity(columns);
+
                         for (int i = currentColumnCount; i < columns; i++)
                         {
                             var entry = new BarChartColumnEntry(i);
@@ -270,7 +360,8 @@ namespace osu.Game.Screens.SelectV2
                 {
                     int total = columnNoteCounts.GetValueOrDefault(i);
                     int hold = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
-                    numberEntries[i].Container.Show();
+                    var c = numberEntries[i].Container;
+                    if (c.Alpha < 0.99f) c.Show();
                     numberEntries[i].SetValues(total, hold);
                 }
 
@@ -279,21 +370,30 @@ namespace osu.Game.Screens.SelectV2
 
             int idx = 0;
 
-            foreach (var kvp in columnNoteCounts.OrderBy(k => k.Key))
+            // Avoid LINQ allocations by sorting keys into a small array (columns are small).
+            int[] keys = new int[columnNoteCounts.Count];
+            int kptr = 0;
+            foreach (int k in columnNoteCounts.Keys)
+                keys[kptr++] = k;
+            Array.Sort(keys);
+
+            foreach (int key in keys)
             {
                 if (idx >= visible)
                     break;
 
-                int hold = holdNoteCounts?.GetValueOrDefault(kvp.Key) ?? 0;
-                numberEntries[idx].Container.Show();
-                numberEntries[idx].SetValues(kvp.Value, hold);
+                int hold = holdNoteCounts?.GetValueOrDefault(key) ?? 0;
+                var c = numberEntries[idx].Container;
+                if (c.Alpha < 0.99f) c.Show();
+                numberEntries[idx].SetValues(columnNoteCounts.GetValueOrDefault(key), hold);
                 idx++;
             }
 
             // Zero-fill remaining visible slots.
             for (int i = idx; i < visible; i++)
             {
-                numberEntries[i].Container.Show();
+                var c = numberEntries[i].Container;
+                if (c.Alpha < 0.99f) c.Show();
                 numberEntries[i].SetValues(0, 0);
             }
         }
@@ -319,7 +419,10 @@ namespace osu.Game.Screens.SelectV2
             {
                 // Nothing to show: zero-fill visible slots.
                 for (int i = 0; i < visible; i++)
-                    barEntries[i].Container.Show();
+                {
+                    var c = barEntries[i].Container;
+                    if (c.Alpha < 0.99f) c.Show();
+                }
 
                 for (int i = 0; i < visible; i++)
                     barEntries[i].SetValues(0, 0, 1);
@@ -331,7 +434,8 @@ namespace osu.Game.Screens.SelectV2
             {
                 int total = columnNoteCounts.GetValueOrDefault(i);
                 int hold = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
-                barEntries[i].Container.Show();
+                var c = barEntries[i].Container;
+                if (c.Alpha < 0.99f) c.Show();
                 barEntries[i].SetValues(total, hold, maxCount);
             }
         }

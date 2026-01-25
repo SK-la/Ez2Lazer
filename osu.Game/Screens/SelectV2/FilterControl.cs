@@ -52,6 +52,7 @@ namespace osu.Game.Screens.SelectV2
         private EzKeyModeSelector csSelector = null!;
         private ShearedToggleButton keySoundPreviewButton = null!;
         private ShearedToggleButton xxySrFilterButton = null!;
+        private ShearedToggleButton kpcDisplayModeButton = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;

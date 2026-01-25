@@ -3,12 +3,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.UserInterface;
@@ -21,13 +19,13 @@ using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Screens.SelectV2
 {
@@ -63,8 +61,8 @@ namespace osu.Game.Screens.SelectV2
         private EzKpcDisplay ezKpcDisplay = null!;
         private EzDisplayXxySR displayXxySR = null!;
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
-        private Bindable<KpcDisplayMode> kpcDisplayModeBindable = new Bindable<KpcDisplayMode>(KpcDisplayMode.BarChart);
         private CancellationTokenSource? maniaAnalysisCancellationSource;
+        private bool maniaWasVisible;
 
         private int keyCount;
         private string? scratchText;
@@ -103,7 +101,7 @@ namespace osu.Game.Screens.SelectV2
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(Ez2ConfigManager ezConfig)
         {
             Height = HEIGHT;
 
@@ -250,6 +248,9 @@ namespace osu.Game.Screens.SelectV2
                     }
                 }
             };
+
+            var kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
         }
 
         protected override void LoadComplete()
@@ -272,8 +273,6 @@ namespace osu.Game.Screens.SelectV2
                 Expanded.Value = s.NewValue;
                 spreadDisplay.Enabled.Value = s.NewValue;
             }, true);
-
-            kpcDisplayModeBindable.BindValueChanged(z => ezKpcDisplay.KpcDisplayModeBindable.Value = z.NewValue, true);
         }
 
         protected override void PrepareForUse()
@@ -364,9 +363,9 @@ namespace osu.Game.Screens.SelectV2
                 return;
 
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            // Delay initial callback; we'll pull the current value when panel becomes visible.
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                // Always update scratch text and key count; apply mania UI immediately when visible.
                 scratchText = result.NewValue.ScratchText;
                 Schedule(updateKeyCount);
                 if (Item?.IsVisible == true)
@@ -374,7 +373,7 @@ namespace osu.Game.Screens.SelectV2
 
                 if (result.NewValue.XxySr != null)
                     displayXxySR.Current.Value = result.NewValue.XxySr;
-            }, true);
+            }, false);
         }
 
         private void computeStarRating()
@@ -405,6 +404,22 @@ namespace osu.Game.Screens.SelectV2
                 maniaAnalysisCancellationSource?.Cancel();
                 maniaAnalysisCancellationSource = null;
             }
+
+            // If we just became visible, pull latest mania analysis value to initialise UI.
+            if (!maniaWasVisible && Item?.IsVisible == true)
+            {
+                maniaWasVisible = true;
+                var b = maniaAnalysisBindable;
+
+                if (b != null)
+                {
+                    var v = b.Value;
+                    updateKPS((v.AverageKps, v.MaxKps, v.KpsList), v.ColumnCounts, v.HoldNoteCounts);
+                }
+            }
+
+            if (maniaWasVisible && Item?.IsVisible != true)
+                maniaWasVisible = false;
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.
             // I can't find a better way to do this.

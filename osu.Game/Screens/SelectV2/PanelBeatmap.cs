@@ -62,6 +62,7 @@ namespace osu.Game.Screens.SelectV2
         private Bindable<bool> xxySrFilterSetting = null!;
         private IBindable<ManiaBeatmapAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
+        private bool maniaWasVisible;
 
         private int keyCount;
         private string? scratchText;
@@ -238,6 +239,9 @@ namespace osu.Game.Screens.SelectV2
                     }
                 }
             };
+
+            var kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
         }
 
         protected override void LoadComplete()
@@ -348,7 +352,7 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                // Always update scratch text and key count; apply mania UI immediately when visible.
+                // Always update scratch text and key count; apply mania UI only when visible.
                 scratchText = result.NewValue.ScratchText;
                 Schedule(updateKeyCount);
                 if (Item?.IsVisible == true)
@@ -356,7 +360,7 @@ namespace osu.Game.Screens.SelectV2
 
                 if (result.NewValue.XxySr != null)
                     displayXxySR.Current.Value = result.NewValue.XxySr;
-            }, true);
+            }, false);
         }
 
         private void computeStarRating()
@@ -409,6 +413,22 @@ namespace osu.Game.Screens.SelectV2
             {
                 difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
             }
+
+            // If we just became visible, pull latest mania analysis value to initialise UI.
+            if (!maniaWasVisible && Item?.IsVisible == true)
+            {
+                maniaWasVisible = true;
+                var b = maniaAnalysisBindable;
+
+                if (b != null)
+                {
+                    var v = b.Value;
+                    updateKPS((v.AverageKps, v.MaxKps, v.KpsList), v.ColumnCounts, v.HoldNoteCounts);
+                }
+            }
+
+            if (maniaWasVisible && Item?.IsVisible != true)
+                maniaWasVisible = false;
         }
 
         private void updateKeyCount()
