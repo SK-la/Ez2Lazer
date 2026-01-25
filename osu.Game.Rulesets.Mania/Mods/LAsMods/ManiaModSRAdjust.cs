@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource("LN Integral Multiplier", "LN 因子", SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> LnMultiplier { get; } = new BindableDouble(SRCalculator.LnIntegralMultiplier)
         {
-            MinValue = 4,
+            MinValue = 2,
             MaxValue = 8,
             Precision = 0.5
         };
