@@ -41,7 +41,7 @@ namespace osu.Game.LAsEzExtensions.Mods
         // LAsMods - Mod Descriptions
         // ====================================================================================================
 
-        public static readonly LocalisableString LoopPlayClip_Description = new EzLocalisableString("将谱面切割成片段用于循环练习。（原版是YuLiangSSS的Duplicate Mod）",
+        public static readonly LocalisableString LoopPlayClip_Description = new EzLocalisableString("将谱面切割成片段用于循环练习。",
             "Cut the beatmap into a clip for loop practice. (The original is YuLiangSSS's Duplicate Mod)");
 
         // SpaceBody

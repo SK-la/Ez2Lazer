@@ -28,7 +28,6 @@ using osu.Game.Rulesets.Osu.Configuration;
 using osu.Game.Rulesets.Osu.Difficulty;
 using osu.Game.Rulesets.Osu.Edit;
 using osu.Game.Rulesets.Osu.Edit.Setup;
-using osu.Game.Rulesets.Osu.EzOsu.Mods;
 using osu.Game.Rulesets.Osu.Mods;
 using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Replays;
@@ -167,7 +166,7 @@ namespace osu.Game.Rulesets.Osu
                     return new Mod[]
                     {
                         new ModNiceBPM(),
-                        new OsuModLoopPlayClip(),
+                        new UniversalLoopPlayClip(),
                     };
 
                 case ModType.DifficultyReduction:

@@ -12,6 +12,7 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Graphics;
+using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Catch.Beatmaps;
 using osu.Game.Rulesets.Catch.Difficulty;
@@ -113,6 +114,13 @@ namespace osu.Game.Rulesets.Catch
         {
             switch (type)
             {
+                case ModType.LA_Mod:
+                    return new Mod[]
+                    {
+                        new ModNiceBPM(),
+                        new UniversalLoopPlayClip(),
+                    };
+
                 case ModType.DifficultyReduction:
                     return new Mod[]
                     {
