@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
@@ -51,7 +52,10 @@ namespace osu.Game.Screens.Play
         private UserStatisticsWatcher userStatisticsWatcher { get; set; }
 
         [Resolved]
-        private osu.Framework.Audio.AudioManager audioManager { get; set; }
+        private Ez2ConfigManager ezConfig { get; set; }
+
+        [Resolved]
+        private AudioManager audioManager { get; set; }
 
         [CanBeNull]
         private InputAudioLatencyTracker latencyTracker;
@@ -65,7 +69,7 @@ namespace osu.Game.Screens.Play
         }
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig)
+        private void load()
         {
             if (DrawableRuleset == null)
             {
@@ -84,9 +88,10 @@ namespace osu.Game.Screens.Play
                 Origin = Anchor.CentreRight,
             });
 
-            // 初始化延迟追踪
+            // 保存配置实例并初始化延迟追踪
             latencyTracker = new InputAudioLatencyTracker(ezConfig);
             latencyTracker?.Initialize(ScoreProcessor);
+
             // Ensure tracker is started for testing scenarios in SubmittingPlayer
             try
             {
@@ -323,6 +328,15 @@ namespace osu.Game.Screens.Play
             if (masterClock?.PlaybackRateValid.Value != true)
             {
                 Logger.Log("Score submission cancelled due to audio playback rate discrepancy.");
+                return Task.CompletedTask;
+            }
+
+            // 如果当前所选的 HitMode 不是 Lazer，则强制跳过上传成绩
+            var hitMode = ezConfig.Get<EzMUGHitMode>(Ez2Setting.HitMode);
+
+            if (hitMode != EzMUGHitMode.Lazer)
+            {
+                // Logger.Log("非 Lazer 模式，跳过上传成绩");
                 return Task.CompletedTask;
             }
 
