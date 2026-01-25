@@ -29,6 +29,7 @@ namespace osu.Game.Rulesets.Mania.Objects
             {
                 case EzMUGHitMode.Lazer:
                 case EzMUGHitMode.Classic:
+                case EzMUGHitMode.O2Jam:
                     return new ManiaJudgement();
 
                 default:

@@ -169,6 +169,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
                     O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
                     O2HitModeExtension.PillActivated = true;
+                    O2HitModeExtension.PILL_COUNT.Value = 0;
                 }
             }, true);
             barLinesBindable.BindValueChanged(b =>
