@@ -113,11 +113,11 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 return HpMultiplierNormal * increase;
             }
 
-            if (mode == EnumHealthMode.O2JamHard)
+            if (mode == EnumHealthMode.O2JamHard || mode == EnumHealthMode.O2JamEasy || mode == EnumHealthMode.O2JamNormal)
             {
                 switch (hitObject)
                 {
-                    case HoldNote:
+                    case HoldNoteBody:
                         return 0;
                 }
             }
