@@ -78,9 +78,9 @@ namespace osu.Game.Screens.Select.Carousel
 
         private int keyCount;
 
-        private IBindable<EzDifficultyResult>? maniaAnalysisBindable;
+        private IBindable<EzAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
-        private string? cachedScratchText;
+        private string? scratchText;
 
         private Dictionary<int, int>? normalizedColumnCounts;
         private Dictionary<int, int>? normalizedHoldNoteCounts;
@@ -379,7 +379,7 @@ namespace osu.Game.Screens.Select.Carousel
             }
         }
 
-        private void updateKPs((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
+        private void updateKPS((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
             if (Item == null)
                 return;
@@ -399,6 +399,8 @@ namespace osu.Game.Screens.Select.Carousel
             if (columnCounts != null)
             {
                 ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+                Schedule(updateKeyCount);
             }
         }
 
@@ -416,10 +418,9 @@ namespace osu.Game.Screens.Select.Carousel
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 100);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                cachedScratchText = result.NewValue.ScratchText;
-                Schedule(updateKeyCount);
-                updateKPs((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
-                displayXxySR.Current.Value = result.NewValue.XxySr;
+                updateKPS((result.NewValue.Summary.AverageKps, result.NewValue.Summary.MaxKps, result.NewValue.Summary.KpsList),
+                    result.NewValue.Details.ColumnCounts, result.NewValue.Details.HoldNoteCounts);
+                displayXxySR.Current.Value = result.NewValue.Details.XxySr;
             }, true);
         }
 
@@ -436,7 +437,7 @@ namespace osu.Game.Screens.Select.Carousel
 
                 keyCount = legacyRuleset.GetKeyCount(beatmapInfo, mods.Value);
                 keyCountText.Alpha = 1;
-                keyCountText.Text = cachedScratchText ?? $"[{keyCount}K] ";
+                keyCountText.Text = scratchText ?? $"[{keyCount}K] ";
                 keyCountText.Colour = Colour4.LightPink.ToLinear();
             }
             else

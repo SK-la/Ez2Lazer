@@ -63,7 +63,7 @@ namespace osu.Game.Screens.SelectV2
         private EzDisplayXxySR displayXxySR = null!;
         private Bindable<KpcDisplayMode> kpcMode = null!;
 
-        private IBindable<EzDifficultyResult>? maniaAnalysisBindable;
+        private IBindable<EzAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
 
         private bool maniaWasVisible;
@@ -356,15 +356,14 @@ namespace osu.Game.Screens.SelectV2
 
             if (columnCounts != null)
             {
-                // Forward raw counts to EzKpcDisplay. Debounce, checksum and pooling
-                // are handled internally by EzKpcDisplay to avoid duplication.
                 ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+                Schedule(updateKeyCount);
             }
         }
 
         private void computeManiaAnalysis()
         {
-            // Defer creating the heavy bindable until this panel becomes visible.
             maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisCancellationSource = null;
             maniaAnalysisBindable = null;
@@ -379,16 +378,11 @@ namespace osu.Game.Screens.SelectV2
             maniaAnalysisCancellationSource = new CancellationTokenSource();
 
             maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
-            // Delay initial callback; we'll pull the current value when panel becomes visible.
             maniaAnalysisBindable.BindValueChanged(result =>
             {
-                scratchText = result.NewValue.ScratchText;
-                Schedule(updateKeyCount);
-                if (Item?.IsVisible == true)
-                    updateKPS((result.NewValue.AverageKps, result.NewValue.MaxKps, result.NewValue.KpsList), result.NewValue.ColumnCounts, result.NewValue.HoldNoteCounts);
-
-                if (result.NewValue.XxySr != null)
-                    displayXxySR.Current.Value = result.NewValue.XxySr;
+                updateKPS((result.NewValue.Summary.AverageKps, result.NewValue.Summary.MaxKps, result.NewValue.Summary.KpsList),
+                    result.NewValue.Details.ColumnCounts, result.NewValue.Details.HoldNoteCounts);
+                displayXxySR.Current.Value = result.NewValue.Details.XxySr;
             }, false);
         }
 
