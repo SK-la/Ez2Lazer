@@ -30,7 +30,7 @@ namespace osu.Game.Screens.SelectV2
         private Container? modePlaceholder;
 
         private int currentColumnCount;
-        private Container? rootContainer;
+        private readonly Container? rootContainer;
 
         // last received data so mode switches can immediately refresh
         private int[]? lastKnownColumns;

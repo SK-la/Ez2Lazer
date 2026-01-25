@@ -156,34 +156,34 @@ namespace osu.Game.LAsEzExtensions.Audio
             };
         }
 
-        // 快速判定：遍历命中对象直到达到阈值即返回 true，避免完整建立 HashSet 带来的额外分配
+        // 快速判定：遍历命中对象直到达到阈值即返回 true。
+        // 统计谱面中命中对象所使用的采样音频的唯一文件名数量（使用 HitSampleInfo.LookupNames 的首选值）。
         private bool fastCheckShouldUseEnhanced(IWorkingBeatmap beatmap, int threshold)
         {
-            try
-            {
-                var playable = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
-                var set = new HashSet<HitSampleInfo>();
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                foreach (var obj in playable.HitObjects)
+            foreach (var obj in beatmap.Beatmap.HitObjects)
+            {
+                var stack = new Stack<HitObject>();
+                stack.Push(obj);
+
+                while (stack.Count > 0)
                 {
-                    collect(obj, set);
-                    if (set.Count >= threshold)
-                        return true;
+                    var ho = stack.Pop();
+
+                    foreach (var sm in ho.Samples)
+                    {
+                        string? first = sm.LookupNames.FirstOrDefault();
+                        if (first != null && set.Add(first) && set.Count >= threshold)
+                            return true;
+                    }
+
+                    foreach (var n in ho.NestedHitObjects)
+                        stack.Push(n);
                 }
-
-                return set.Count >= threshold;
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"EzPreviewTrackManager: fastCheckShouldUseEnhanced error: {ex}");
-                return false;
             }
 
-            static void collect(HitObject ho, HashSet<HitSampleInfo> s)
-            {
-                foreach (var sm in ho.Samples) s.Add(sm);
-                foreach (var n in ho.NestedHitObjects) collect(n, s);
-            }
+            return set.Count >= threshold;
         }
 
         /// <summary>
@@ -525,7 +525,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             {
                 foreach (var info in samples)
                 {
-                    bool playedAny = false;
+                    // bool playedAny = false;
 
                     foreach (var sample in fetchSamplesForInfo(info))
                     {
@@ -543,14 +543,14 @@ namespace osu.Game.LAsEzExtensions.Audio
                         channelInner.Play();
                         // Logger.Log($"EzPreviewTrackManager: played channelHash={channelInner.GetHashCode()} volAfter={channelInner.Volume.Value:F3} playing={channelInner.Playing}");
                         sampleScheduler.ActiveChannels.Add(channelInner);
-                        playedAny = true;
+                        // playedAny = true;
                         break; // 只需播放命中链中的首个可用样本
                     }
 
-                    #if DEBUG
-                    if (!playedAny)
-                        Logger.Log($"EzPreviewTrackManager: Miss hitsound {info.Bank}-{info.Name}");
-                    #endif
+                    // #if DEBUG
+                    // if (!playedAny)
+                    //     Logger.Log($"EzPreviewTrackManager: Miss hitsound {info.Bank}-{info.Name}");
+                    // #endif
                 }
             }
             catch (Exception ex)

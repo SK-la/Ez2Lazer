@@ -34,7 +34,7 @@ namespace osu.Game.Screens.SelectV2
 {
     public partial class PanelBeatmap : Panel
     {
-        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT + 15f;
+        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT + 8f;
 
         private const int update_ms = 15;
 
@@ -219,17 +219,18 @@ namespace osu.Game.Screens.SelectV2
                                 {
                                     Direction = FillDirection.Horizontal,
                                     AutoSizeAxes = Axes.Both,
-                                    Padding = new MarginPadding { Bottom = 4 },
+                                    // Padding = new MarginPadding { Bottom = 2 },
                                     Children = new Drawable[]
                                     {
                                         ezKpsDisplay = new EzKpsDisplay
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
+                                            Scale = new Vector2(0.875f),
                                         },
                                         ezDisplayKpsGraph = new EzDisplayKpsGraph
                                         {
-                                            Size = new Vector2(300, 20),
+                                            Size = new Vector2(300, 15),
                                             Blending = BlendingParameters.Mixture,
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,

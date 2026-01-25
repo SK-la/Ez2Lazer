@@ -94,12 +94,12 @@ namespace osu.Game.Screens.Select
             if (csSelector == null)
                 return;
 
-            var selectedModeIds = csSelector.EzKeyModeFilter.SelectedModeIds;
+            var selectedModeIds = csSelector.SelectedModeIds;
 
-            if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
+            if (selectedModeIds.Count == 0)
                 return;
 
-            var selectedModes = CsItemIds.ALL
+            var selectedModes = CsItemIds.LIST
                                          .Where(m => selectedModeIds.Contains(m.Id) && m.CsValue.HasValue)
                                          .Select(m => m.CsValue!.Value)
                                          .ToList();

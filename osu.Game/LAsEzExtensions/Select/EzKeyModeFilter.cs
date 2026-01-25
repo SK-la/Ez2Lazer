@@ -12,14 +12,13 @@ namespace osu.Game.LAsEzExtensions.Select
         public required string Id { get; set; }
         public required string DisplayName { get; set; }
         public float? CsValue { get; set; }
-        public bool IsDefault { get; set; }
     }
 
     public static class CsItemIds
     {
         private const int mania_ruleset_id = 3;
 
-        public static readonly List<CsItemInfo> ALL = new List<CsItemInfo>
+        public static readonly List<CsItemInfo> LIST = new List<CsItemInfo>
         {
             // new CsItemInfo { Id = "All", DisplayName = "All", IsDefault = true },
             new CsItemInfo { Id = "CS1", DisplayName = "1", CsValue = 1 },
@@ -41,25 +40,11 @@ namespace osu.Game.LAsEzExtensions.Select
         public static List<CsItemInfo> GetModesForRuleset(int rulesetId)
         {
             if (rulesetId == mania_ruleset_id)
-                return ALL.Where(m => m.CsValue == null || m.CsValue >= 4).ToList();
+                return LIST.Where(m => m.CsValue == null || m.CsValue >= 4).ToList();
 
-            return ALL.Where(m => m.CsValue == null || m.CsValue <= 12).ToList();
+            return LIST.Where(m => m.CsValue == null || m.CsValue <= 12).ToList();
         }
 
-        public static CsItemInfo? GetById(string id) => ALL.FirstOrDefault(m => m.Id == id);
-    }
-
-    public class EzKeyModeFilter
-    {
-        public HashSet<string> SelectedModeIds { get; } = new HashSet<string>();
-
-        public event Action? SelectionChanged;
-
-        public void SetSelection(HashSet<string> modeIds)
-        {
-            SelectedModeIds.Clear();
-            SelectedModeIds.UnionWith(modeIds);
-            SelectionChanged?.Invoke();
-        }
+        public static CsItemInfo? GetById(string id) => LIST.FirstOrDefault(m => m.Id == id);
     }
 }

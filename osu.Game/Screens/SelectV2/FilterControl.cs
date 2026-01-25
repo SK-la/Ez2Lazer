@@ -138,6 +138,7 @@ namespace osu.Game.Screens.SelectV2
                                 new Dimension(),
                                 new Dimension(GridSizeMode.Absolute), // can probably be removed?
                                 new Dimension(GridSizeMode.AutoSize),
+                                new Dimension(GridSizeMode.AutoSize),
                             },
                             Content = new[]
                             {
@@ -154,6 +155,13 @@ namespace osu.Game.Screens.SelectV2
                                         Anchor = Anchor.Centre,
                                         Origin = Anchor.Centre,
                                         Text = UserInterfaceStrings.ShowConverts,
+                                        Height = 30f,
+                                    },
+                                    keySoundPreviewButton = new ShearedToggleButton
+                                    {
+                                        Anchor = Anchor.TopCentre,
+                                        Origin = Anchor.TopCentre,
+                                        Text = "kSound",
                                         Height = 30f,
                                     },
                                 },
@@ -200,13 +208,6 @@ namespace osu.Game.Screens.SelectV2
                                         RelativeSizeAxes = Axes.X,
                                         Items = Enum.GetValues<KpcDisplayMode>(),
                                     },
-                                    keySoundPreviewButton = new ShearedToggleButton
-                                    {
-                                        Anchor = Anchor.TopCentre,
-                                        Origin = Anchor.TopCentre,
-                                        Text = "kSound Preview",
-                                        Height = 30f,
-                                    },
                                 }
                             }
                         },
@@ -235,7 +236,7 @@ namespace osu.Game.Screens.SelectV2
                                     {
                                         Anchor = Anchor.Centre,
                                         Origin = Anchor.Centre,
-                                        Text = "xxy_SR Filter",
+                                        Text = "xxy_SR",
                                         TooltipText = "(NoActive)Filter, sort beatmaps by Xxy Star Rating",
                                         Height = 30f,
                                     },
@@ -271,20 +272,23 @@ namespace osu.Game.Screens.SelectV2
             ruleset.BindValueChanged(_ =>
             {
                 updateCriteria();
+                int id = ruleset.Value.OnlineID;
 
-                if (ruleset.Value.OnlineID == 1) // Taiko
+                if (id == 3)
+                {
+                    csSelector.Show();
+                    xxySrFilterButton.Show();
+                    kpcDropdown.Show();
+                }
+                else if (id == 1) // Taiko
                 {
                     csSelector.Hide();
                     xxySrFilterButton.Hide();
+                    kpcDropdown.Show();
                 }
                 else
                 {
                     csSelector.Show();
-
-                    if (ruleset.Value.OnlineID == 3)
-                    {
-                        xxySrFilterButton.Show();
-                    }
                 }
             });
             mods.BindValueChanged(m =>
@@ -329,16 +333,9 @@ namespace osu.Game.Screens.SelectV2
             ScopedBeatmapSet.BindValueChanged(_ => updateCriteria(clearScopedSet: false));
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
-            csSelector.EzKeyModeFilter.SelectionChanged += updateCriteria;
             xxySrFilterButton.Active.BindValueChanged(_ => updateCriteria());
 
             updateCriteria();
-        }
-
-        private void updateCriteria()
-        {
-            currentCriteria = CreateCriteria();
-            CriteriaChanged?.Invoke(currentCriteria);
         }
 
         protected override void Dispose(bool isDisposing)
@@ -384,12 +381,12 @@ namespace osu.Game.Screens.SelectV2
 
         private void applyCircleSizeFilter(FilterCriteria criteria)
         {
-            var selectedModeIds = csSelector.EzKeyModeFilter.SelectedModeIds;
+            var selectedModeIds = csSelector.SelectedModeIds;
 
-            if (selectedModeIds.Count == 0 || selectedModeIds.Contains("All"))
+            if (selectedModeIds.Count == 0)
                 return;
 
-            var selectedModes = CsItemIds.ALL
+            var selectedModes = CsItemIds.LIST
                                          .Where(m => selectedModeIds.Contains(m.Id) && m.CsValue.HasValue)
                                          .Select(m => m.CsValue!.Value)
                                          .ToList();

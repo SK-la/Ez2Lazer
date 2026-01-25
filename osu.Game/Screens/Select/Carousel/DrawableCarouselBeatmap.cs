@@ -181,21 +181,6 @@ namespace osu.Game.Screens.Select.Carousel
                                 new FillFlowContainer
                                 {
                                     Direction = FillDirection.Horizontal,
-                                    Spacing = new Vector2(3),
-                                    AutoSizeAxes = Axes.Both,
-                                    Children = new Drawable[]
-                                    {
-                                        ezDisplayKpsGraph = new EzDisplayKpsGraph
-                                        {
-                                            Size = new Vector2(300, 20),
-                                            Anchor = Anchor.BottomLeft,
-                                            Origin = Anchor.BottomLeft,
-                                        },
-                                    }
-                                },
-                                new FillFlowContainer
-                                {
-                                    Direction = FillDirection.Horizontal,
                                     Spacing = new Vector2(4, 0),
                                     AutoSizeAxes = Axes.Both,
                                     Children = new Drawable[]
@@ -241,7 +226,6 @@ namespace osu.Game.Screens.Select.Carousel
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
-                                            Scale = new Vector2(0.875f),
                                         },
                                         ezKpcDisplay = new EzKpcDisplay
                                         {
@@ -249,7 +233,22 @@ namespace osu.Game.Screens.Select.Carousel
                                             Origin = Anchor.CentreLeft,
                                         }
                                     }
-                                }
+                                },
+                                new FillFlowContainer
+                                {
+                                    Direction = FillDirection.Horizontal,
+                                    Spacing = new Vector2(3),
+                                    AutoSizeAxes = Axes.Both,
+                                    Children = new Drawable[]
+                                    {
+                                        ezDisplayKpsGraph = new EzDisplayKpsGraph
+                                        {
+                                            Size = new Vector2(300, 15),
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                        },
+                                    }
+                                },
                             }
                         }
                     }
@@ -338,7 +337,7 @@ namespace osu.Game.Screens.Select.Carousel
             }
 
             // Start/refresh mania analysis binding when visible
-            computeManiaAnalysis();
+            requestManiaAnalysisBindable();
 
             base.ApplyState();
         }
@@ -407,21 +406,25 @@ namespace osu.Game.Screens.Select.Carousel
         private void computeManiaAnalysis()
         {
             maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = null;
+            maniaAnalysisBindable = null;
+        }
+
+        private void requestManiaAnalysisBindable()
+        {
+            if (maniaAnalysisBindable != null || Item == null)
+                return;
+
+            maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisCancellationSource = new CancellationTokenSource();
 
-            if (Item == null)
-                return;
-
-            if (Item?.State.Value == CarouselItemState.Collapsed)
-                return;
-
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 100);
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmapInfo, maniaAnalysisCancellationSource.Token, computationDelay: 150);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
                 updateKPS((result.NewValue.Summary.AverageKps, result.NewValue.Summary.MaxKps, result.NewValue.Summary.KpsList),
                     result.NewValue.Details.ColumnCounts, result.NewValue.Details.HoldNoteCounts);
                 displayXxySR.Current.Value = result.NewValue.Details.XxySr;
-            }, true);
+            }, false);
         }
 
         private void updateKeyCount()
