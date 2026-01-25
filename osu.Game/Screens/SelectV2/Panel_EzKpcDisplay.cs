@@ -392,14 +392,28 @@ namespace osu.Game.Screens.SelectV2
                 switch (KpcDisplayModeBindable.Value)
                 {
                     case KpcDisplayMode.Numbers:
-                        for (int i = columns; i < numberEntries.Count; i++)
-                            numberEntries[i].Container.Hide();
+                        if (numberEntries.Count > columns)
+                        {
+                            for (int i = numberEntries.Count - 1; i >= columns; i--)
+                            {
+                                var toRemove = numberEntries[i];
+                                columnNotesContainer?.Remove(toRemove.Container, true);
+                                numberEntries.RemoveAt(i);
+                            }
+                        }
 
                         break;
 
                     case KpcDisplayMode.BarChart:
-                        for (int i = columns; i < barEntries.Count; i++)
-                            barEntries[i].Container.Hide();
+                        if (barEntries.Count > columns)
+                        {
+                            for (int i = barEntries.Count - 1; i >= columns; i--)
+                            {
+                                var toRemove = barEntries[i];
+                                columnNotesContainer?.Remove(toRemove.Container, true);
+                                barEntries.RemoveAt(i);
+                            }
+                        }
 
                         break;
                 }

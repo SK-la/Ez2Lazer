@@ -40,16 +40,6 @@ namespace osu.Game.LAsEzExtensions.Audio
         private const double scheduler_interval = 16; // ~60fps
         private const double trigger_tolerance = 15; // ms 容差
 
-        // 外部时钟驱动（gameplay）模式下，过短的切片会导致高频 Seek/Restart，音频听感会明显“撕裂”。
-        // 这里设置一个最小切片长度作为下限，避免 1ms 这类极端情况。
-        private const double min_loop_length = 100; // ms
-
-        // 在 gameplay 外部时钟驱动模式下，音频设备/解码缓冲会导致 Track.CurrentTime 与外部时钟存在微小漂移。
-        // 若仍按 15ms 容差每帧 Seek，会产生明显的“撕裂/卡带”听感。
-        // 因此对“音频轨道重同步”使用更宽容差，并加入冷却时间。
-        private const double audio_resync_tolerance = 50; // ms
-        private const double audio_resync_cooldown = 120; // ms
-
         private const double max_dynamic_preview_length = 60000; // 动态扩展最长 ms
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
         private readonly PlaybackState playback = new PlaybackState();
@@ -122,10 +112,10 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         public void StopPreview()
         {
-            StopPreviewInternal("manual");
+            StopPreviewInternal();
         }
 
-        protected void StopPreviewInternal(string reason)
+        protected void StopPreviewInternal()
         {
             playback.IsPlaying = false;
             updateDelegate?.Cancel();
@@ -154,6 +144,39 @@ namespace osu.Game.LAsEzExtensions.Audio
             {
                 RelativeSizeAxes = Axes.Both
             };
+
+            // 当启用开关变化时，重置循环状态并根据新状态重启或停止预览。
+            // 不在此处立即触发初始值（因此 useFire:false）。
+            EnabledBindable.BindValueChanged(e =>
+            {
+                // 在主调度线程执行 Stop/Start 操作以保证线程安全。
+                Schedule(() =>
+                {
+                    if (!e.NewValue)
+                    {
+                        StopPreviewInternal();
+                        return;
+                    }
+
+                    // enabled -> reset and restart if we currently have a beatmap
+                    ResetLoopState();
+
+                    if (currentBeatmap != null)
+                    {
+                        StopPreviewInternal();
+
+                        try
+                        {
+                            // 尝试以原始逻辑重启预览（不强制增强模式）
+                            StartPreview(currentBeatmap, forceEnhanced: false);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"EzPreviewTrackManager: restart on enable failed: {ex}");
+                        }
+                    }
+                });
+            }, false);
         }
 
         // 快速判定：遍历命中对象直到达到阈值即返回 true。
@@ -249,9 +272,14 @@ namespace osu.Game.LAsEzExtensions.Audio
                 playback.ShortBgmOneShotMode = false;
                 playback.ShortBgmMutedAfterFirstLoop = false;
 
-                // 判定一次性短BGM模式：原始音轨长度 <2s 且 谱面事件覆盖长度 > 10s
-                if (currentTrack != null && currentTrack.Length < 2000 && longestEventTime >= playback.PreviewStartTime + preview_window_length)
-                    playback.ShortBgmOneShotMode = true;
+                // 判定一次性短BGM模式：
+                // 若主音频非常短（<10s），则将其视为短 BGM，在循环时在第一次循环后静音（从而实现“播放一次可听，后续不再循环”的效果），
+                // 同时保留命中音效与故事板音效的触发逻辑。
+                if (currentTrack != null)
+                {
+                    if (currentTrack.Length < 10000 || longestEventTime > (currentTrack.Length + 5000))
+                        playback.ShortBgmOneShotMode = true;
+                }
 
                 prepareHitSounds(playableBeatmap, playback.PreviewEndTime);
 
@@ -541,16 +569,9 @@ namespace osu.Game.LAsEzExtensions.Audio
                         }
 
                         channelInner.Play();
-                        // Logger.Log($"EzPreviewTrackManager: played channelHash={channelInner.GetHashCode()} volAfter={channelInner.Volume.Value:F3} playing={channelInner.Playing}");
                         sampleScheduler.ActiveChannels.Add(channelInner);
-                        // playedAny = true;
                         break; // 只需播放命中链中的首个可用样本
                     }
-
-                    // #if DEBUG
-                    // if (!playedAny)
-                    //     Logger.Log($"EzPreviewTrackManager: Miss hitsound {info.Bank}-{info.Name}");
-                    // #endif
                 }
             }
             catch (Exception ex)
