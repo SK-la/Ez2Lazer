@@ -14,7 +14,7 @@ using osu.Game.Screens.Ranking.Statistics;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Analysis
+namespace osu.Game.LAsEzExtensions.Statistics
 {
     public partial class HitEventTimingDistributionDot : CompositeDrawable
     {

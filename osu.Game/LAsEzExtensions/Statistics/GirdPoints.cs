@@ -10,7 +10,7 @@ using osu.Framework.Graphics.Textures;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Analysis
+namespace osu.Game.LAsEzExtensions.Statistics
 {
     /// <summary>
     /// Batch-draw a set of coloured points (as small quads) to avoid creating thousands of Drawables.

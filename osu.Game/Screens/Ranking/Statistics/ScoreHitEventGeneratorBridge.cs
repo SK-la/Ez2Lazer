@@ -9,6 +9,7 @@ using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 

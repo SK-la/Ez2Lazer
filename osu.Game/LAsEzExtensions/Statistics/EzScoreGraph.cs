@@ -1,24 +1,14 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Lines;
-using osu.Framework.Graphics.Shapes;
-using osu.Framework.Logging;
-using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics;
-using osuTK;
-using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Analysis
+namespace osu.Game.LAsEzExtensions.Statistics
 {
     /// <summary>
     /// 创建每列偏移分布

@@ -12,6 +12,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
 using osu.Game.Rulesets.Scoring;
