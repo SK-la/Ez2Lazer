@@ -46,7 +46,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             {
                 r.Type = state;
 
-                // In O2Jam hit mode, Meh should break combo.
                 if (state == HitResult.Meh)
                     r.IsComboHit = false;
             }, result);
@@ -89,7 +88,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             {
                 r.Type = state;
 
-                // In O2Jam hit mode, Meh should break combo.
                 if (state == HitResult.Meh)
                     r.IsComboHit = false;
             }, result);

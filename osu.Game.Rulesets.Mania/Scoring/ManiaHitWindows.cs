@@ -11,12 +11,7 @@ using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
-    public readonly record struct ManiaModifyHitRange(double Perfect,
-                                                      double Great,
-                                                      double Good,
-                                                      double Ok,
-                                                      double Meh,
-                                                      double Miss);
+    public readonly record struct ManiaModifyHitRange(double Perfect, double Great, double Good, double Ok, double Meh, double Miss, double Poor = 0);
 
     public class ManiaHitWindows : HitWindows
     {
@@ -35,6 +30,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public static double OkRange;
         public static double MehRange;
         public static double MissRange;
+        public static double PoorRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -142,7 +138,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        public override bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
+        public bool AllowPoorEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -156,8 +152,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Miss:
                     return true;
 
-                case HitResult.Pool:
-                    return AllowPoolEnabled;
+                case HitResult.Poor:
+                    return AllowPoorEnabled;
 
                 default:
                     return false;
@@ -180,6 +176,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             OkRange = difficultyRangeArray[3];
             MehRange = difficultyRangeArray[4];
             MissRange = difficultyRangeArray[5];
+            PoorRange = difficultyRangeArray[6] == 0 ? MissRange : difficultyRangeArray[6];
             updateWindows();
         }
 
@@ -193,6 +190,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             OkRange = range.Ok;
             MehRange = range.Meh;
             MissRange = range.Miss;
+            PoorRange = range.Poor == 0 ? MissRange : range.Poor;
             updateWindows();
         }
 
@@ -227,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case EzMUGHitMode.IIDX_HD:
                 case EzMUGHitMode.LR2_HD:
                 case EzMUGHitMode.Raja_NM:
-                    modifyManiaHitRange(custom_helper.GetHitWindowsIIDX(HitMode));
+                    modifyManiaHitRange(custom_helper.GetHitWindowsBMS(HitMode));
                     break;
 
                 case EzMUGHitMode.Malody:
@@ -246,6 +244,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ok = OkRange;
                 meh = MehRange;
                 miss = MissRange;
+                pool = PoorRange;
             }
             else if (ClassicModActive && !ScoreV2Active)
             {
@@ -279,15 +278,15 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, meh_window_range) * totalMultiplier) + 0.5;
                 miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(overallDifficulty, miss_window_range) * totalMultiplier) + 0.5;
             }
-
-            // 这里的Pool区间只是用于显示，并不会影响实际判定；实际判定请见 HitWindows.ResultFor 方法
-            pool = miss + 150;
         }
 
         public override double WindowFor(HitResult result)
         {
             switch (result)
             {
+                case HitResult.Poor:
+                    return pool;
+
                 case HitResult.Perfect:
                     return perfect;
 
@@ -302,9 +301,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                 case HitResult.Meh:
                     return meh;
-
-                case HitResult.Pool:
-                    return pool;
 
                 case HitResult.Miss:
                     return miss;

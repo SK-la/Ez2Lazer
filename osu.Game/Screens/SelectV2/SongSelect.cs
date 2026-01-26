@@ -552,17 +552,12 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            if (this.IsCurrentScreen())
+            if (!ezPreviewManager.StartPreview(beatmap) && !keySoundPreview.Value)
             {
-                if (!ezPreviewManager.StartPreview(beatmap))
-                {
-                    ezPreviewManager.StopPreview();
-                }
+                ezPreviewManager.StopPreview();
             }
-            else
-            {
-                beatmap.PrepareTrackForPreview(true);
-            }
+
+            beatmap.PrepareTrackForPreview(true);
         }
 
         #endregion

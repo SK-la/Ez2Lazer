@@ -501,8 +501,19 @@ namespace osu.Game.Rulesets.UI
 
         private void onNewResult(DrawableHitObject drawable, JudgementResult result)
         {
-            Debug.Assert(result != null && drawable.Entry?.Result == result && result.RawTime != null);
-            judgedEntries.Push(drawable.Entry.AsNonNull());
+            if (result == null)
+                return;
+
+            // If this result corresponds to the drawable's stored entry result, treat it
+            // as the final applied result for the purposes of lifetime/rewind bookkeeping.
+            if (drawable.Entry?.Result == result)
+            {
+                Debug.Assert(result.RawTime != null);
+
+                // Only push final, non-transient results onto the judgedEntries stack.
+                if (result.IsFinal && result.HasResult)
+                    judgedEntries.Push(drawable.Entry.AsNonNull());
+            }
 
             NewResult?.Invoke(drawable, result);
         }

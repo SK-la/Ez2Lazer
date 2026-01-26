@@ -746,6 +746,47 @@ namespace osu.Game.Rulesets.Objects.Drawables
         }
 
         /// <summary>
+        /// 这个方法会触发 <see cref="OnNewResult"/> 事件，但不会将当前 <see cref="DrawableHitObject"/> 标记为已判定。
+        /// This is useful for rulesets which want to report intermediate results (e.g. "poor") that should be
+        /// counted by processors but should not terminate the object's lifecycle.
+        /// </summary>
+        /// <remarks>
+        /// This will populate timing information on the <see cref="Result"/> and invoke <see cref="OnNewResult"/>,
+        /// but will not call <see cref="UpdateState"/> or set the entry as judged.
+        /// </remarks>
+        protected void DispatchNewResult()
+        {
+            if (Result == null) return;
+
+            // Populate timing info so processors can compute offsets.
+            Result.RawTime = Time.Current;
+            Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
+
+            OnNewResult?.Invoke(this, Result);
+        }
+
+        /// <summary>
+        /// Dispatch a transient judgement result without mutating the stored <see cref="Result"/>.
+        /// Useful for reporting intermediate results (eg. poor) while keeping the object's lifecycle unchanged.
+        /// </summary>
+        /// <param name="transientType">The temporary <see cref="HitResult"/> to report.</param>
+        protected void DispatchNewResult(HitResult transientType)
+        {
+            var transient = CreateResult(HitObject.Judgement);
+            if (transient == null) return;
+
+            transient.Type = transientType;
+            transient.RawTime = Time.Current;
+            transient.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
+
+            // Mark this result as a non-final (transient) result so consumers can
+            // distinguish between intermediate reports (eg. Poor) and final applied results.
+            transient.IsFinal = false;
+
+            OnNewResult?.Invoke(this, transient);
+        }
+
+        /// <summary>
         /// Processes this <see cref="DrawableHitObject"/>, checking if a scoring result has occurred.
         /// </summary>
         /// <param name="userTriggered">Whether the user triggered this process.</param>

@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using osu.Framework.Extensions.EnumExtensions;
+using osu.Framework.Logging;
 using osu.Framework.Utils;
 
 namespace osu.Game.Rulesets.Scoring
@@ -23,15 +24,23 @@ namespace osu.Game.Rulesets.Scoring
         [Order(15)]
         None,
 
+        // /// <summary>
+        // /// mania专用，无note时的按键结果
+        // /// 不计分、不断连、轻度扣血（介于BAD-POOR）
+        // /// </summary>
+        // [Description(@"Empty Poor")]
+        // [EnumMember(Value = "empty_poor")]
+        // [Order(18)]
+        // EmptyPoor,
+
         /// <summary>
-        /// mania特殊专用，按键事件的未命中结果。
-        /// 禁止用在Judgement覆写上，这不属于note返回的判定结果
-        /// TODO: 这是一个错误拼写，为了突出这是一个临时解决方案。未来应当通过更好的方式实现可切换的空判机制，并改为正确的Poor。
+        /// mania BMS系列专用: 未命中，或错按其他轨道上，不计分、不断连、轻度扣血
+        /// BMS 系列中, poor ≈ HitResult.Miss, EmptyPoor ≈ HitResult.Poor
         /// </summary>
-        [Description(@"Pool")]
-        [EnumMember(Value = "pool")]
+        [Description(@"Poor")]
+        [EnumMember(Value = "poor")]
         [Order(17)]
-        Pool,
+        Poor,
 
         /// <summary>
         /// Indicates that the object has been judged as a miss.
@@ -228,7 +237,8 @@ namespace osu.Game.Rulesets.Scoring
                     return false;
 
                 // 不影响ACC
-                case HitResult.Pool:
+                // case HitResult.EmptyPoor:
+                case HitResult.Poor:
                     return false;
 
                 default:
@@ -252,7 +262,8 @@ namespace osu.Game.Rulesets.Scoring
                     return false;
 
                 // 有这个才能把Pool添加到计数器控件中
-                case HitResult.Pool:
+                // case HitResult.EmptyPoor:
+                case HitResult.Poor:
                     return true;
 
                 default:
@@ -310,7 +321,6 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.SmallTickMiss:
                 case HitResult.LargeTickMiss:
                 case HitResult.ComboBreak:
-                case HitResult.Pool:
                     return true;
 
                 default:
@@ -359,7 +369,7 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.SliderTailHit:
                     return true;
 
-                case HitResult.Pool:
+                case HitResult.Poor:
                     return false;
 
                 default:
@@ -388,9 +398,11 @@ namespace osu.Game.Rulesets.Scoring
             if (result == minResult || result == maxResult)
                 return true;
 
-            if (result == HitResult.Pool)
+            if (result == HitResult.Poor || result == HitResult.Meh)
                 return true;
-
+#if DEBUG
+            Logger.Log($"Checking hit result {result} against range {minResult} to {maxResult}", LoggingTarget.Runtime, LogLevel.Debug);
+#endif
             Debug.Assert(minResult <= maxResult);
             return result > minResult && result < maxResult;
         }
@@ -408,7 +420,7 @@ namespace osu.Game.Rulesets.Scoring
                 throw new ArgumentOutOfRangeException(nameof(maxResult), $"{maxResult} is not a valid maximum judgement result.");
 
             // Pool is a special result that can be both max and min
-            if (minResult == HitResult.Pool)
+            if (minResult == HitResult.Poor)
                 return;
 
             if (minResult == HitResult.None || IsHit(minResult))

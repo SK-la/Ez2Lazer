@@ -66,7 +66,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (userTriggered && (timeOffset < -500 || timeOffset > 200))
             {
-                ApplyResult(HitResult.Pool);
+                DispatchNewResult(HitResult.Poor);
+                return;
             }
 
             base.CheckForResult(userTriggered, timeOffset);

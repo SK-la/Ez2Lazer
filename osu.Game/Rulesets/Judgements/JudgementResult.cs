@@ -112,6 +112,13 @@ namespace osu.Game.Rulesets.Judgements
         public bool? IsComboHit;
 
         /// <summary>
+        /// Whether this <see cref="JudgementResult"/> represents a final judgement that should
+        /// be considered for lifetime/rewind bookkeeping. Transient results (eg. emitted via
+        /// `DrawableHitObject.DispatchNewResult`) will have this set to <c>false</c>.
+        /// </summary>
+        public bool IsFinal { get; set; } = true;
+
+        /// <summary>
         /// The increase in health resulting from this judgement result.
         /// </summary>
         public double HealthIncrease => Judgement.HealthIncreaseFor(this);

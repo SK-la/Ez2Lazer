@@ -32,8 +32,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
 
     public enum ManiaHitResult
     {
-        [Description("Pool")]
-        Pool,
+        [Description("Poor")]
+        Poor,
 
         [Description("Miss")]
         Miss,
