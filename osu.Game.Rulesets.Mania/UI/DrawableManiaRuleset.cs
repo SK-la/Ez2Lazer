@@ -164,12 +164,13 @@ namespace osu.Game.Rulesets.Mania.UI
 
             hitMode.BindValueChanged(h =>
             {
+                O2HitModeExtension.PILL_COUNT.Value = 0;
+
                 if (h.NewValue == EzMUGHitMode.O2Jam)
                 {
                     O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
                     O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
                     O2HitModeExtension.PillActivated = true;
-                    O2HitModeExtension.PILL_COUNT.Value = 0;
                 }
             }, true);
             barLinesBindable.BindValueChanged(b =>
