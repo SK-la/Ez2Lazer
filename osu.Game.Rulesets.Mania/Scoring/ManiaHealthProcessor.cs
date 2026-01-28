@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaHealthProcessor : LegacyDrainingHealthProcessor
     {
-        private static readonly double[,] health_settings =
+        public static readonly double[,] HEALTH_SETTINGS =
         {
             // Kool   Cool   Good     OK     Bad    Poor  空 Poor
             //  305    300    200    100      50    Miss    Poor
@@ -109,27 +109,27 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Poor:
-                    return health_settings[row, 6];
+                    return HEALTH_SETTINGS[row, 6];
 
                 case HitResult.Miss:
-                    return health_settings[row, 5];
+                    return HEALTH_SETTINGS[row, 5];
 
                 case HitResult.Meh:
-                    return health_settings[row, 4];
+                    return HEALTH_SETTINGS[row, 4];
 
                 case HitResult.Ok:
-                    return health_settings[row, 3];
+                    return HEALTH_SETTINGS[row, 3];
 
                 case HitResult.Good:
-                    increase = health_settings[row, 2];
+                    increase = HEALTH_SETTINGS[row, 2];
                     break;
 
                 case HitResult.Great:
-                    increase = health_settings[row, 1];
+                    increase = HEALTH_SETTINGS[row, 1];
                     break;
 
                 case HitResult.Perfect:
-                    increase = health_settings[row, 0];
+                    increase = HEALTH_SETTINGS[row, 0];
                     break;
             }
 
@@ -157,7 +157,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             int idx = (int)mode;
 
-            if (idx < 0 || idx >= health_settings.GetLength(0))
+            if (idx < 0 || idx >= HEALTH_SETTINGS.GetLength(0))
                 idx = 0;
 
             return idx;

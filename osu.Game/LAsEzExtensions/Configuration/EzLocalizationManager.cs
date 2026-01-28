@@ -213,7 +213,22 @@ namespace osu.Game.LAsEzExtensions.Configuration
             "(Mania) Hit Mode, get different rhythm game hit experiences, but not guaranteed to perfectly replicate all modes");
 
         public static readonly EzLocalisableString HealthMode = new EzLocalisableString("Mania 血量系统", "(Mania) Health Mode");
-        public static readonly EzLocalisableString HealthModeTooltip = new EzLocalisableString("目前主要用于O2Jam，其他模式图一乐", "Mainly used for O2Jam, other mode charts are for fun");
+
+        public static readonly EzLocalisableString HealthModeTooltip = new EzLocalisableString(
+            "\n————————————————————————————————————————————————————"
+            + "\n 305    300    200   100    50   Miss       -"
+            + "\n0.4%   0.3%   0.1%    0%   -1%   - 6%     -0%  Lazer"
+            + "\n————— ————— —————— ————— ————— ——————— ———————————————————"
+            + "\nKool      -   Good     -   Bad   Miss       -"
+            + "\n0.3%   0.0%   0.2%    0%   -1%   - 5%     -0%  O2 Easy"
+            + "\n0.2%   0.0%   0.1%    0%   -7%   - 4%     -0%  O2 Normal"
+            + "\n0.1%   0.0%   0.0%    0%   -5%   - 3%     -0%  O2 Hard"
+            + "\n————— ————— —————— ————— ————— ——————— ———————————————————"
+            + "\nKool   Cool   Good     -   Bad   Poor  []Poor"
+            + "\n0.4%   0.3%   0.1%    0%   -1%   - 5%     -5%  Ez2Ac"
+            + "\n1.6%   1.6%   0.0%    0%   -5%   - 9%     -5%  IIDX Hard"
+            + "\n1.0%   1.0%   0.5%    0%   -6%   -10%     -2%  LR2 Hard"
+            + "\n1.2%   1.2%   0.6%    0%   -3%   - 6%     -2%  raja normal");
 
         public static readonly EzLocalisableString PoorHitResult = new EzLocalisableString("Mania Poor 判定系统", "(Mania) Poor HitResult Mode");
 
