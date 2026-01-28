@@ -28,7 +28,6 @@ namespace osu.Game.Rulesets.Mania.Objects
             switch (hitMode)
             {
                 case EzMUGHitMode.EZ2AC:
-                case EzMUGHitMode.O2Jam:
                 case EzMUGHitMode.Malody:
                     return new HoldNoteBodyJudgement();
 
