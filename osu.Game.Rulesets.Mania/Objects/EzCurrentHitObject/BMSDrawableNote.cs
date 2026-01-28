@@ -28,10 +28,20 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
-                result = HitResult.Miss;
+                ApplyResult(HitResult.Miss);
+
+            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
+                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
+                result = HitResult.Poor;
 
             if (result == HitResult.None)
+                result = HitResult.Poor;
+
+            if (result == HitResult.Poor)
             {
+                if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
+                    return;
+
                 // Dispatch transient poor result to processors without ending lifecycle.
                 DispatchNewResult(HitResult.Poor);
                 return;
@@ -41,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             {
                 r.Type = state;
 
-                if (state == HitResult.Meh)
+                if (state == HitResult.Meh || state == HitResult.Miss)
                     r.IsComboHit = false;
             }, result);
         }
@@ -75,10 +85,20 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
-                result = HitResult.Miss;
+                ApplyResult(HitResult.Miss);
+
+            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
+                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
+                result = HitResult.None;
 
             if (result == HitResult.None)
+                result = HitResult.Poor;
+
+            if (result == HitResult.Poor)
             {
+                if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
+                    return;
+
                 DispatchNewResult(HitResult.Poor);
                 return;
             }
@@ -87,7 +107,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             {
                 r.Type = state;
 
-                if (state == HitResult.Meh)
+                if (state == HitResult.Meh || state == HitResult.Miss)
                     r.IsComboHit = false;
             }, result);
         }
@@ -112,7 +132,11 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
-                result = HitResult.Miss;
+                ApplyResult(HitResult.Miss);
+
+            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
+                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
+                result = HitResult.Poor;
 
             if (result == HitResult.None)
                 return;
@@ -127,6 +151,9 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             // Also populate RawTime and dispatch OnNewResult so processors (score/health) can count it.
             if (result == HitResult.Poor)
             {
+                if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
+                    return;
+
                 DispatchNewResult(HitResult.Poor);
                 return;
             }
@@ -136,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             {
                 r.Type = state;
 
-                if (state == HitResult.Meh)
+                if (state == HitResult.Meh || state == HitResult.Miss)
                     r.IsComboHit = false;
             }, result);
         }

@@ -377,7 +377,12 @@ namespace osu.Game.Rulesets.Mania.UI
                 return;
 
             judgements.Clear(false);
-            judgements.Add(judgementPooler.Get(result.Type, j => j.Apply(result, judgedObject))!);
+
+            var drawableJudgement = judgementPooler.Get(result.Type, j => j.Apply(result, judgedObject));
+            if (drawableJudgement == null)
+                return;
+
+            judgements.Add(drawableJudgement);
         }
 
         protected override void Update()
