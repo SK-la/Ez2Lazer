@@ -390,6 +390,11 @@ namespace osu.Game.LAsEzExtensions.Mods
             // 如果禁用了动态BPM，则不要处理结果以进行速率调整
             if (!EnableDynamicBPM.Value) return false;
 
+            // 只有超过Good的判定偏移才参与统计，Great和Perfect不影响统计
+            // Perfect和Great的精确度太高，不需要进行速度调整
+            if (result.Type == HitResult.Perfect || result.Type == HitResult.Great)
+                return false;
+
             return true;
         }
 
