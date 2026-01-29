@@ -271,7 +271,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     // 如果该新列需要贯穿的长按note
                     if (holdColumns.Contains(newColumn))
                     {
-                        newObjects.Add(new HoldNote
+                        newObjects.Add(new PunishmentHoldNote
                         {
                             Column = newColumn,
                             StartTime = minTime,
