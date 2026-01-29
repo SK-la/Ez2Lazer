@@ -84,13 +84,15 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
 
         public static readonly LocalisableString CustomReorderColumn_Description = new EzLocalisableString(
             "处理Column，自定义排序、复制、清空列中的note。"
-            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）, '-'表示该新列位置删除。"
+            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）, '-'表示该新列位置删除，'|'表示该新列位置放置贯穿整个谱面的长按note。"
             + "\n字符串长度决定新的列数（修改长度必须重新启用开关），每位数字代表该新列使用原谱面的哪一列内容。"
-            + "\n如5k谱面,输入'213-'转换为4k谱面：按顺序使用原谱中2、1、3列,第4列空白。",
+            + "\n如5k谱面,输入'213-'转换为4k谱面：按顺序使用原谱中2、1、3列,第4列空白。"
+            + "\n如5k谱面,输入'213|5'转换为5k谱面：新列1使用原列2，新列2使用原列1，新列3使用原列3，新列4贯穿长按，新列5使用原列4。",
             "Process Column, custom sort, copy, and clear notes in columns."
-            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10), '-' means delete the new column."
+            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10), '-' means delete the new column, '|' means place a hold note spanning the entire beatmap in that new column."
             + "\nString length determines the new column count (must re-enable when changing length), each digit represents the content of the new column."
-            + "Such as a 5k map, input '213-' converts to a 4k map: use column 2, 1, 3 in order, column 4 is blank.");
+            + "\nSuch as a 5k map, input '213-' converts to a 4k map: use column 2, 1, 3 in order, column 4 is blank."
+            + "\nSuch as a 5k map, input '213|5' converts to a 5k map: new col1 uses orig col2, new col2 uses orig col1, new col3 uses orig col3, new col4 has full hold note, new col5 uses orig col4.");
 
         // ====================================================================================================
         // YuLiangSSSMods - SettingSource Labels & Descriptions

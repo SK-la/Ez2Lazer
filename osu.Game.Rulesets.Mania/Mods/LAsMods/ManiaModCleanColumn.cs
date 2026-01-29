@@ -12,9 +12,9 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Objects;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
@@ -205,9 +205,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         /// 新格式：字符串长度决定新的列数，每位数字代表该新列使用原谱面的哪一列内容
         /// - 数字：该新列位置使用对应原列的note
         /// - '-'：该新列位置删除（清空）
+        /// - '|'：该新列位置放置贯穿整个谱面的长按note
         /// 例如对于5k谱面：
         ///   "213" → 转换为3k谱面：新列1使用原列2，新列2使用原列1，新列3使用原列3
-        ///   "1234555" → 转换为7k谱面：新列1-5使用原列1-5，新列6-7使用原列5
+        ///   "213|5" → 转换为5k谱面：新列1使用原列2，新列2使用原列1，新列3使用原列3，新列4贯穿长按，新列5使用原列4
         /// </summary>
         private void applyCustomReorder(ManiaBeatmap beatmap, string reorderRule, int totalColumns)
         {
@@ -217,9 +218,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 if (string.IsNullOrWhiteSpace(reorderRule))
                     return;
 
-                // 构建列映射和清空列表
+                // 构建列映射、清空列表和长按列表
                 Dictionary<int, int> columnMapping = new Dictionary<int, int>();
                 HashSet<int> clearColumns = new HashSet<int>();
+                HashSet<int> holdColumns = new HashSet<int>();
 
                 for (int targetPos = 0; targetPos < reorderRule.Length; targetPos++)
                 {
@@ -229,6 +231,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     {
                         // 该新列位置删除
                         clearColumns.Add(targetPos);
+                    }
+                    else if (c == '|')
+                    {
+                        // 该新列位置放置贯穿谱面的长按note
+                        holdColumns.Add(targetPos);
                     }
                     else if (char.IsDigit(c))
                     {
@@ -244,10 +251,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 }
 
                 // 如果没有有效的映射，则不进行任何操作
-                if (columnMapping.Count == 0 && clearColumns.Count == 0)
+                if (columnMapping.Count == 0 && clearColumns.Count == 0 && holdColumns.Count == 0)
                     return;
 
-                // 应用列映射和清空操作
+                // 计算谱面的时间范围，用于创建贯穿的长按note
+                double minTime = beatmap.HitObjects.Min(h => h.StartTime);
+                double maxTime = beatmap.HitObjects.Max(h => h.GetEndTime());
+
+                // 应用列映射、清空和长按操作
                 var newObjects = new List<ManiaHitObject>();
 
                 // 遍历每个新列位置
@@ -256,6 +267,19 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     // 如果该新列要被清空，跳过
                     if (clearColumns.Contains(newColumn))
                         continue;
+
+                    // 如果该新列需要贯穿的长按note
+                    if (holdColumns.Contains(newColumn))
+                    {
+                        newObjects.Add(new HoldNote
+                        {
+                            Column = newColumn,
+                            StartTime = minTime,
+                            Duration = maxTime - minTime,
+                            NodeSamples = HoldNote.CreateDefaultNodeSamples(new HitObject { Samples = new List<HitSampleInfo> { new HitSampleInfo(HitSampleInfo.HIT_NORMAL) } })
+                        });
+                        continue;
+                    }
 
                     // 找到该新列应该使用哪个原列的note
                     if (columnMapping.TryGetValue(newColumn, out int sourceColumn))
