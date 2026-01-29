@@ -15,6 +15,11 @@ namespace osu.Game.Rulesets.Mania.Objects
     /// </summary>
     public class PunishmentHoldNote : HoldNote
     {
+        /// <summary>
+        /// Whether to use health cap reduction instead of direct health deduction on combo breaks.
+        /// </summary>
+        public bool UseHealthCapReduction { get; set; }
+
         public PunishmentHoldNote()
         {
             // Mark this as a special punishment note

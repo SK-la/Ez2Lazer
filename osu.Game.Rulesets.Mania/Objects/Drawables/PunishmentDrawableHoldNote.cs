@@ -35,70 +35,59 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private ScoreProcessor scoreProcessor { get; set; }
 
         /// <summary>
-        /// Whether to use health cap reduction instead of direct health deduction on combo breaks.
-        /// When enabled, combo breaks reduce the maximum health cap by 15% each time, down to a minimum of 40%.
-        /// </summary>
-        private bool useHealthCapReduction = false;
-
-        /// <summary>
         /// Current health cap multiplier (1.0 = 100% cap, 0.4 = 40% cap minimum)
         /// </summary>
         private float currentHealthCap = 1.0f;
+
+        private PunishmentHoldNote PunishmentHitObject => (PunishmentHoldNote)HitObject;
 
         public PunishmentDrawableHoldNote(HoldNote hitObject)
             : base(hitObject)
         {
         }
 
-        /// <summary>
-        /// Enables or disables health cap reduction mode.
-        /// When enabled, combo breaks reduce the maximum health cap instead of direct health deduction.
-        /// </summary>
-        /// <param name="enabled">Whether to enable health cap reduction mode.</param>
-        public void SetHealthCapReductionMode(bool enabled)
-        {
-            useHealthCapReduction = enabled;
-            if (!enabled)
-            {
-                // Reset health cap when disabling
-                currentHealthCap = 1.0f;
-            }
-        }
-
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            // Listen for combo break events
-            if (scoreProcessor != null)
+            // Listen for holding state changes to detect when player releases the key
+            IsHolding.BindValueChanged(OnHoldingChanged);
+        }
+
+        private void OnHoldingChanged(ValueChangedEvent<bool> holding)
+        {
+            // Trigger punishment every time player releases the key during the note's duration
+            // Only trigger if:
+            // 1. Player was holding and now released (!holding.NewValue)
+            // 2. Current time is within the note's duration (after start but before end)
+            // 3. The note hasn't been fully judged yet (to avoid triggering on normal release at end)
+            if (!holding.NewValue && holding.OldValue &&
+                Time.Current >= HitObject.StartTime && Time.Current < HitObject.GetEndTime() &&
+                !AllJudged)
             {
-                scoreProcessor.Combo.ValueChanged += OnComboChanged;
+                TriggerPunishment();
             }
         }
 
-        private void OnComboChanged(ValueChangedEvent<int> combo)
+        private void TriggerPunishment()
         {
-            // If combo broke (went to 0 or decreased significantly)
-            if (combo.NewValue < combo.OldValue && combo.NewValue == 0)
+            if (healthProcessor != null)
             {
-                if (healthProcessor != null)
+                if (PunishmentHitObject.UseHealthCapReduction)
                 {
-                    if (useHealthCapReduction)
-                    {
-                        // Reduce health cap by 15%, minimum 40%
-                        currentHealthCap = Math.Max(0.4f, currentHealthCap - 0.15f);
+                    // Reduce health cap by 15%, minimum 40%
+                    currentHealthCap = Math.Max(0.4f, currentHealthCap - 0.15f);
 
-                        // If current health exceeds the new cap, reduce it to the cap
-                        if (healthProcessor.Health.Value > currentHealthCap)
-                        {
-                            healthProcessor.Health.Value = currentHealthCap;
-                        }
-                    }
-                    else
+                    // If current health exceeds the new cap, reduce it to the cap
+                    if (healthProcessor.Health.Value > currentHealthCap)
                     {
-                        // Apply punishment: deduct 25% health
-                        healthProcessor.Health.Value -= 0.25f;
+                        healthProcessor.Health.Value = currentHealthCap;
                     }
+                }
+                else
+                {
+                    // Apply punishment: deduct 25% health
+                    healthProcessor.Health.Value -= 0.25f;
                 }
             }
         }
@@ -107,10 +96,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.Dispose(isDisposing);
 
-            if (scoreProcessor != null)
-            {
-                scoreProcessor.Combo.ValueChanged -= OnComboChanged;
-            }
+            // No need to unsubscribe from combo changes anymore
         }
     }
 }

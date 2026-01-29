@@ -163,6 +163,11 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString ApplyOrder_Description = new EzLocalisableString("此mod在谱面转换后应用的顺序。数字越小越先运行。",
             "Apply Order. Order in which this mod is applied after beatmap conversion. Lower runs earlier.");
 
+        public static readonly LocalisableString UseHealthCapReduction_Label = new EzLocalisableString("血量上限降低模式", "Health Cap Reduction Mode");
+
+        public static readonly LocalisableString UseHealthCapReduction_Description = new EzLocalisableString("开启后锁手面的combo break降低血量上限15%而不是直接扣血，最低40%上限",
+            "When enabled, Lock LN's combo breaks reduce the maximum health cap by 15% instead of direct health deduction, down to a minimum of 40%.");
+
         // JudgmentsAdjust
         public static readonly LocalisableString CustomHitRange_Label = new EzLocalisableString("自定义打击范围", "Custom Hit Range");
         public static readonly LocalisableString CustomHitRange_Description = new EzLocalisableString("调整音符的打击范围", "Custom Hit Range. Adjust the hit range of notes.");
