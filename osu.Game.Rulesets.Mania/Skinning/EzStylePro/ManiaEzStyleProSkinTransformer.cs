@@ -159,6 +159,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     judgementPiece.Origin = Anchor.Centre;
                                     judgementPiece.Y = 100;
                                 }
+
+                                var O2PillBar = container.OfType<O2PillBar>().FirstOrDefault();
                             })
                             {
                                 new EzComComboSprite(),

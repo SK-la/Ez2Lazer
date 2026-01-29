@@ -14,11 +14,12 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
     {
         private static readonly double[,] hit_range_bms =
         {
-            //  305   300    200     100     50     Miss    Poor
-            { 16.67, 33.33, 116.67, 250, 250, 250, 500 }, // IIDX
-            { 15.00, 30.00, 060.00, 200, 200, 1000, 1000 }, // LR2 Hard
-            { 15.00, 45.00, 112.00, 165, 165, 500, 500 }, // raja normal (75%)
-            { 20.00, 60.00, 150.00, 220, 500, 500, 500 }, // raja easy (100%)
+            //                              Bad Poor  空Poor
+            //  305    300     200     100   50  Miss  Poor
+            { 16.67, 33.33, 116.67, 116.67, 250, 250, 500 }, // IIDX
+            { 15.00, 30.00, 060.00, 060.00, 200, 1000, 1000 }, // LR2 Hard
+            { 15.00, 45.00, 112.00, 112.00, 165, 500, 500 }, // raja normal (75%)
+            { 20.00, 60.00, 150.00, 150.00, 500, 500, 500 }, // raja easy (100%)
         };
 
         private EzMUGHitMode hitMode = EzMUGHitMode.Classic;
@@ -76,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         public double Range100 { get; private set; }
         public double Range050 { get; private set; }
         public double Range000 { get; private set; }
-        public double PoolRange { get; private set; }
+        public double PoorRange { get; private set; }
 
         private static readonly DifficultyRange perfect_window_range = new DifficultyRange(22.4D, 19.4D, 13.9D);
         private static readonly DifficultyRange great_window_range = new DifficultyRange(64, 49, 34);
@@ -84,7 +85,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         private static readonly DifficultyRange ok_window_range = new DifficultyRange(127, 112, 97);
         private static readonly DifficultyRange meh_window_range = new DifficultyRange(151, 136, 121);
         private static readonly DifficultyRange miss_window_range = new DifficultyRange(188, 173, 158);
-        private const double pool_offset = 150.0;
+        private const double poor_offset = 150.0;
 
         public CustomHitWindowsHelper()
             : this(GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Classic)
@@ -94,7 +95,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         public CustomHitWindowsHelper(EzMUGHitMode hitMode)
         {
             HitMode = hitMode;
-            // UpdateRanges is called by the property setter
         }
 
         public double[] GetHitWindowsClassic()
@@ -106,9 +106,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             Range100 = Math.Floor((97 + 3 * invertedOd) * TotalMultiplier) + 0.5;
             Range050 = Math.Floor((121 + 3 * invertedOd) * TotalMultiplier) + 0.5;
             Range000 = Math.Floor((158 + 3 * invertedOd) * TotalMultiplier) + 0.5;
-            PoolRange = Range000 + pool_offset;
 
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoolRange };
+            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, Range000 };
         }
 
         public double[] GetHitWindowsO2Jam(double setBpm)
@@ -120,9 +119,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             Range100 = Range200;
             Range050 = 31250.0 / bpm * TotalMultiplier;
             Range000 = Range050;
-            PoolRange = Range000 + pool_offset;
+            PoorRange = Range000 + poor_offset;
 
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoolRange };
+            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
         }
 
         public double[] GetHitWindowsEZ2AC()
@@ -133,12 +132,12 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             Range100 = 88.0 * TotalMultiplier;
             Range050 = 88.0 * TotalMultiplier;
             Range000 = 100.0 * TotalMultiplier;
-            PoolRange = pool_offset;
+            PoorRange = poor_offset;
 
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoolRange };
+            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
         }
 
-        public double[] GetHitWindowsIIDX(EzMUGHitMode mode)
+        public double[] GetHitWindowsBMS(EzMUGHitMode mode)
         {
             int row = 0;
 
@@ -163,9 +162,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             Range100 = hit_range_bms[row, 3] * TotalMultiplier;
             Range050 = hit_range_bms[row, 4] * TotalMultiplier;
             Range000 = hit_range_bms[row, 5] * TotalMultiplier;
-            PoolRange = hit_range_bms[row, 6] * TotalMultiplier;
+            PoorRange = hit_range_bms[row, 6] * TotalMultiplier;
 
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoolRange };
+            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
         }
 
         public double[] GetHitWindowsMelody()
@@ -176,19 +175,15 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             Range100 = 80.0 * TotalMultiplier;
             Range050 = 100.0 * TotalMultiplier;
             Range000 = 120.0 * TotalMultiplier;
-            PoolRange = Range000 + pool_offset;
+            PoorRange = Range000 + poor_offset;
 
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoolRange };
+            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
         }
 
         private void updateRanges()
         {
             switch (HitMode)
             {
-                case EzMUGHitMode.O2Jam:
-                    SetRanges(GetHitWindowsO2Jam(bpm));
-                    break;
-
                 case EzMUGHitMode.Lazer:
                     double perfect = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, perfect_window_range) * TotalMultiplier) + 0.5;
                     double great = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, great_window_range) * TotalMultiplier) + 0.5;
@@ -196,8 +191,12 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                     double ok = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, ok_window_range) * TotalMultiplier) + 0.5;
                     double meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, meh_window_range) * TotalMultiplier) + 0.5;
                     double miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, miss_window_range) * TotalMultiplier) + 0.5;
-                    double pool = miss + pool_offset;
-                    SetRanges(new[] { perfect, great, good, ok, meh, miss, pool });
+                    double poor = miss;
+                    SetRanges(new[] { perfect, great, good, ok, meh, miss, poor });
+                    break;
+
+                case EzMUGHitMode.O2Jam:
+                    SetRanges(GetHitWindowsO2Jam(bpm));
                     break;
 
                 case EzMUGHitMode.EZ2AC:
@@ -205,7 +204,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                     break;
 
                 case EzMUGHitMode.IIDX_HD:
-                    SetRanges(GetHitWindowsIIDX(0));
+                case EzMUGHitMode.LR2_HD:
+                case EzMUGHitMode.Raja_NM:
+                    SetRanges(GetHitWindowsBMS(0));
                     break;
 
                 case EzMUGHitMode.Malody:
@@ -222,22 +223,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         {
             timeOffset = Math.Abs(timeOffset);
 
-            if (AllowPoolEnabled)
-            {
-                if (IsHitResultAllowed(HitResult.Pool))
-                {
-                    double miss = WindowFor(HitResult.Miss);
-                    double poolEarlyWindow = miss + 50;
-                    double poolLateWindow = miss + 50;
-                    if (timeOffset > -poolEarlyWindow &&
-                        timeOffset < -miss ||
-                        timeOffset < poolLateWindow &&
-                        timeOffset > miss)
-                        return HitResult.Pool;
-                }
-            }
-
-            for (var result = HitResult.Perfect; result >= HitResult.Miss; --result)
+            for (var result = HitResult.Perfect; result >= HitResult.Poor; --result)
             {
                 if (IsHitResultAllowed(result) && timeOffset <= WindowFor(result))
                     return result;
@@ -246,7 +232,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             return HitResult.None;
         }
 
-        public virtual bool AllowPoolEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
+        public virtual bool AllowPoorEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
 
         public virtual bool IsHitResultAllowed(HitResult result)
         {
@@ -260,8 +246,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                 case HitResult.Miss:
                     return true;
 
-                case HitResult.Pool:
-                    return AllowPoolEnabled;
+                case HitResult.Poor:
+                    return AllowPoorEnabled;
 
                 default:
                     return false;
@@ -282,7 +268,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
 
                 case HitResult.Meh: return Range050;
 
-                case HitResult.Pool: return PoolRange;
+                case HitResult.Poor: return PoorRange;
 
                 case HitResult.Miss: return Range000;
 
@@ -305,12 +291,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                 Range100 = ranges[3];
                 Range050 = ranges[4];
                 Range000 = ranges[5];
+                PoorRange = ranges[6];
             }
-
-            if (ranges.Length >= 7)
-                PoolRange = ranges[6];
-            else
-                PoolRange = Range000 + pool_offset;
         }
 
         /// <summary>

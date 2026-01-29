@@ -27,13 +27,12 @@ namespace osu.Game.Rulesets.Mania.Objects
 
             switch (hitMode)
             {
-                case EzMUGHitMode.Lazer:
-                case EzMUGHitMode.Classic:
-                case EzMUGHitMode.O2Jam:
-                    return new ManiaJudgement();
+                case EzMUGHitMode.EZ2AC:
+                case EzMUGHitMode.Malody:
+                    return new HoldNoteBodyJudgement();
 
                 default:
-                    return new HoldNoteBodyJudgement();
+                    return new ManiaJudgement();
             }
         }
 

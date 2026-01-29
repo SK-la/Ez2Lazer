@@ -288,8 +288,13 @@ namespace osu.Game.LAsEzExtensions.Audio
                                                 {
                                                     try
                                                     {
-                                                        activeCandidateTrack.Seek(sliceStart);
-                                                        Logger.Log($"DuplicateVirtualTrack: seamless seek to {sliceStart}", LoggingTarget.Runtime);
+                                                        // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
+                                                        bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+                                                        if (!isUsingBeatmapTrack)
+                                                        {
+                                                            activeCandidateTrack.Seek(sliceStart);
+                                                            Logger.Log($"DuplicateVirtualTrack: seamless seek to {sliceStart}", LoggingTarget.Runtime);
+                                                        }
                                                     }
                                                     catch (Exception ex) { Logger.Log($"DuplicateVirtualTrack: seamless seek failed: {ex}", LoggingTarget.Runtime); }
                                                 }
@@ -393,8 +398,13 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                                                 if (now >= sliceEnd)
                                                 {
-                                                    activeCandidateTrack.Seek(sliceStart);
-                                                    Log($"seeked candidate to sliceStart on resume ({sliceStart})");
+                                                    // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
+                                                    bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+                                                    if (!isUsingBeatmapTrack)
+                                                    {
+                                                        activeCandidateTrack.Seek(sliceStart);
+                                                        Log($"seeked candidate to sliceStart on resume ({sliceStart})");
+                                                    }
                                                 }
                                             }
                                             catch { }
@@ -495,8 +505,13 @@ namespace osu.Game.LAsEzExtensions.Audio
                             {
                                 try
                                 {
-                                    activeCandidateTrack.Seek(sliceStart);
-                                    Log($"seamless seek to {sliceStart}");
+                                    // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
+                                    bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+                                    if (!isUsingBeatmapTrack)
+                                    {
+                                        activeCandidateTrack.Seek(sliceStart);
+                                        Log($"seamless seek to {sliceStart}");
+                                    }
                                 }
                                 catch (Exception ex) { Log($"seamless seek failed: {ex}"); }
                             }
@@ -787,7 +802,16 @@ namespace osu.Game.LAsEzExtensions.Audio
                 {
                     // Ensure seek to desired start time if provided
                     if (desiredCandidateStartTime != null)
-                        t.Seek(desiredCandidateStartTime.Value);
+                    {
+                        // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
+                        bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(t, pendingBeatmap.Track);
+
+                        if (!isUsingBeatmapTrack)
+                        {
+                            double seekTarget = desiredCandidateStartTime.Value;
+                            t.Seek(seekTarget);
+                        }
+                    }
 
                     // 如果需要将底层 Track 设置为循环（ForceLooping 且未指定 Duration），则切换 Looping
                     if (overrideForceLooping && overrideDuration == null)

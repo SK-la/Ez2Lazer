@@ -64,8 +64,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString JudgmentsAdjust_Description = new EzLocalisableString("修改你的判定", "Modify your judgement.");
         public static readonly LocalisableString JackAdjust_Description = new EzLocalisableString("Jack的模式", "Pattern of Jack");
 
-        public static readonly LocalisableString CleanColumn_Description = new EzLocalisableString("清理Column, 推荐搭配Column Type使用",
-            "Clean Column, use with Column Type.");
+        public static readonly LocalisableString CleanColumn_Description = new EzLocalisableString("整理Column, 排序、删除轨道中的note", "Clean Column, Sort, Delete notes in the column.");
 
         // CleanColumn
         public static readonly LocalisableString DeleteSColumn_Label = new EzLocalisableString("删除S列", "Delete S Column Type");
@@ -75,9 +74,25 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString DeleteEColumn_Label = new EzLocalisableString("删除E列", "Delete E Column Type");
         public static readonly LocalisableString DeleteEColumn_Description = new EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
         public static readonly LocalisableString EnableCustomDelete_Label = new EzLocalisableString("自定义删除列", "Enable Custom Delete");
-        public static readonly LocalisableString EnableCustomDelete_Description = new EzLocalisableString("开启后启用自定义删除列功能", "Enable custom column deletion when enabled");
-        public static readonly LocalisableString CustomDeleteColumn_Label = new EzLocalisableString("自定义删除列序号", "Custom Delete Column Index");
-        public static readonly LocalisableString CustomDeleteColumn_Description = new EzLocalisableString("按照输入的序号，删除谱面中对应编号的列", "Delete the column with the specified index");
+        public static readonly LocalisableString EnableCustomDelete_Description = new EzLocalisableString("开启后启用自定义删除列功能，支持与其他功能同时使用。输入多个数字如'2468'删除第2、4、6、8列", "Enable custom column deletion when enabled, can be used with other features. Input multiple digits like '2468' to delete columns 2, 4, 6, 8");
+        public static readonly LocalisableString CustomDeleteColumn_Label = new EzLocalisableString("删除列序号", "Delete Column Indexes");
+        public static readonly LocalisableString CustomDeleteColumn_Description = new EzLocalisableString("输入要删除的列序号，支持多个数字。如'2468'删除2、4、6、8列。超过谱面列数的数字将被忽略。支持最多10k（0表示第10列）", "Input the column indexes to delete, support multiple digits. E.g. '2468' deletes columns 2, 4, 6, 8. Indexes exceeding the beatmap's column count will be ignored. Support up to 10k (0 means column 10)");
+
+        public static readonly LocalisableString EnableCustomReorder_Label = new EzLocalisableString("自定义列重排", "Enable Custom Reorder");
+        public static readonly LocalisableString EnableCustomReorder_Description = new EzLocalisableString("开启后启用自定义列清洗Column功能，如果更改了列数，需要重开此功能才能正常生效", "Enable custom column reorder when enabled, if the column count is changed, you need to toggle this feature again to take effect");
+        public static readonly LocalisableString CustomReorderColumn_Label = new EzLocalisableString("列重排规则", "Column Reorder Rule");
+
+        public static readonly LocalisableString CustomReorderColumn_Description = new EzLocalisableString(
+            "处理Column，自定义排序、复制、清空列中的note。"
+            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）, '-'表示该新列位置删除，'|'表示该新列位置放置贯穿整个谱面的长按note。"
+            + "\n字符串长度决定新的列数（修改长度必须重新启用开关），每位数字代表该新列使用原谱面的哪一列内容。"
+            + "\n如5k谱面,输入'213-'转换为4k谱面：按顺序使用原谱中2、1、3列,第4列空白。"
+            + "\n如5k谱面,输入'213|5'转换为5k谱面：新列1使用原列2，新列2使用原列1，新列3使用原列3，新列4贯穿长按，新列5使用原列4。",
+            "Process Column, custom sort, copy, and clear notes in columns."
+            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10), '-' means delete the new column, '|' means place a hold note spanning the entire beatmap in that new column."
+            + "\nString length determines the new column count (must re-enable when changing length), each digit represents the content of the new column."
+            + "\nSuch as a 5k map, input '213-' converts to a 4k map: use column 2, 1, 3 in order, column 4 is blank."
+            + "\nSuch as a 5k map, input '213|5' converts to a 5k map: new col1 uses orig col2, new col2 uses orig col1, new col3 uses orig col3, new col4 has full hold note, new col5 uses orig col4.");
 
         // ====================================================================================================
         // YuLiangSSSMods - SettingSource Labels & Descriptions

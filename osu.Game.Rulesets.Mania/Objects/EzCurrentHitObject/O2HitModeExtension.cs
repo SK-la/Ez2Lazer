@@ -132,7 +132,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             double goodRange = GetGoodRangeAtTime(currentTime);
             double badRange = GetBadRangeAtTime(currentTime);
 
-            Logger.Log("[O2HitModeExtension] Ranges at time " + currentTime + ": Cool=" + coolRange + ", Good=" + goodRange + ", Bad=" + badRange);
+            // Logger.Log("[O2HitModeExtension] Ranges at time " + currentTime + ": Cool=" + coolRange + ", Good=" + goodRange + ", Bad=" + badRange);
 
             if (absOffset <= coolRange)
             {

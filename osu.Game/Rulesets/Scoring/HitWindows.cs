@@ -75,11 +75,6 @@ namespace osu.Game.Rulesets.Scoring
         public abstract void SetDifficulty(double difficulty);
 
         /// <summary>
-        /// Pool 判定是否启用
-        /// </summary>
-        public virtual bool AllowPoolEnabled { get; set; } = false;
-
-        /// <summary>
         /// Retrieves the <see cref="HitResult"/> for a time offset.
         /// </summary>
         /// <param name="timeOffset">The time offset.</param>
@@ -87,21 +82,6 @@ namespace osu.Game.Rulesets.Scoring
         public HitResult ResultFor(double timeOffset)
         {
             timeOffset = Math.Abs(timeOffset);
-
-            if (AllowPoolEnabled)
-            {
-                if (IsHitResultAllowed(HitResult.Pool))
-                {
-                    double miss = WindowFor(HitResult.Miss);
-                    double poolEarlyWindow = miss + 50;
-                    double poolLateWindow = miss + 15;
-                    if ((timeOffset > -poolEarlyWindow &&
-                         timeOffset < -miss) ||
-                        (timeOffset < poolLateWindow &&
-                         timeOffset > miss))
-                        return HitResult.Pool;
-                }
-            }
 
             for (var result = HitResult.Perfect; result >= HitResult.Miss; --result)
             {

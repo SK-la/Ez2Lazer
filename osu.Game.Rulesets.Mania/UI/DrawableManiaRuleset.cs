@@ -25,6 +25,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -164,12 +165,13 @@ namespace osu.Game.Rulesets.Mania.UI
 
             hitMode.BindValueChanged(h =>
             {
+                O2HitModeExtension.PILL_COUNT.Value = 0;
+
                 if (h.NewValue == EzMUGHitMode.O2Jam)
                 {
                     O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
                     O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
                     O2HitModeExtension.PillActivated = true;
-                    O2HitModeExtension.PILL_COUNT.Value = 0;
                 }
             }, true);
             barLinesBindable.BindValueChanged(b =>
@@ -304,7 +306,13 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override PassThroughInputManager CreateInputManager() => new ManiaInputManager(Ruleset.RulesetInfo, Variant);
 
-        public override DrawableHitObject<ManiaHitObject>? CreateDrawableRepresentation(ManiaHitObject h) => null;
+        public override DrawableHitObject<ManiaHitObject>? CreateDrawableRepresentation(ManiaHitObject h)
+        {
+            if (h is PunishmentHoldNote punishmentHoldNote)
+                return new PunishmentDrawableHoldNote(punishmentHoldNote);
+
+            return null;
+        }
 
         protected override ReplayInputHandler CreateReplayInputHandler(Replay replay) => new ManiaFramedReplayInputHandler(replay);
 

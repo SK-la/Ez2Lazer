@@ -218,7 +218,7 @@ namespace osu.Game.Rulesets.Mania.UI
             switch (hitMode)
             {
                 case EzMUGHitMode.EZ2AC:
-                    RegisterPool<Note, DrawableNote>(10, 50);
+                    RegisterPool<Note, Ez2AcDrawableNote>(10, 50);
                     RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
                     RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
                     RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
@@ -233,14 +233,13 @@ namespace osu.Game.Rulesets.Mania.UI
                     RegisterPool<HoldNoteBody, MalodyDrawableLNBody>(10, 50);
                     break;
 
-                // TODO: 暂时先用 EZ2AC 的物件池，以后根据使用反馈单独实现
                 case EzMUGHitMode.IIDX_HD:
                 case EzMUGHitMode.LR2_HD:
                 case EzMUGHitMode.Raja_NM:
-                    RegisterPool<Note, DrawableNote>(10, 50);
+                    RegisterPool<Note, BMSDrawableNote>(10, 50);
                     RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
-                    RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
+                    RegisterPool<HeadNote, BMSDrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, BMSDrawableHoldNoteTail>(10, 50);
                     RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
 

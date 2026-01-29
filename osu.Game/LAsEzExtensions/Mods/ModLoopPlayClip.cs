@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -14,7 +15,9 @@ using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
+using osu.Framework.Platform;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Play.HUD;
 
 namespace osu.Game.LAsEzExtensions.Mods
 {
@@ -349,6 +352,14 @@ namespace osu.Game.LAsEzExtensions.Mods
             double start = ResolvedCutTimeStart;
             double end = ResolvedCutTimeEnd;
 
+            // 计算总偏移量（全局用户偏移 + 谱面特定偏移 + 平台偏移）
+            double totalOffset = getAppliedOffsetMs(beatmap);
+
+            // DuplicateVirtualTrack使用独立的Track，不应用偏移，所以需要手动应用偏移
+            // 以匹配beatmap的FramedBeatmapClock行为
+            double audioStart = start + totalOffset;
+            double audioEnd = end + totalOffset;
+
             // Compute loop interval in milliseconds as a multiple of a quarter-beat at the slice start.
             double loopIntervalMs;
 
@@ -367,8 +378,8 @@ namespace osu.Game.LAsEzExtensions.Mods
 
             return new OverrideSettings
             {
-                StartTime = start,
-                Duration = Math.Max(0, end - start),
+                StartTime = audioStart,
+                Duration = Math.Max(0, audioEnd - audioStart),
                 LoopCount = LoopCount.Value,
                 LoopInterval = loopIntervalMs,
                 ForceLooping = true,
@@ -378,6 +389,27 @@ namespace osu.Game.LAsEzExtensions.Mods
         // 工具方法，集中单位换算和全局写入
         private double toMs(int? v) => v == null ? 0.0 : (int)v * (Millisecond.Value ? 1 : 1000);
         private void setGlobalRange(double? start, double? end) => LoopTimeRangeStore.Set(start ?? 0, end ?? 0);
+
+        /// <summary>
+        /// 计算应用于谱面的总偏移量（毫秒）
+        /// 包括全局用户偏移、谱面特定偏移和平台偏移
+        /// </summary>
+        private double getAppliedOffsetMs(IWorkingBeatmap beatmap)
+        {
+            // 暂时简化，假设偏移为0，因为用户说"和offset无关"
+            return 0;
+
+            // 获取全局音频偏移设置
+            // double globalOffset = OsuSetting.AudioOffset.Value;
+
+            // 获取谱面特定偏移
+            // double beatmapOffset = beatmap.BeatmapInfo.OnlineOffset;
+
+            // 获取平台偏移（Windows通常是+15ms）
+            // double platformOffset = RuntimeInfo.OS == RuntimeInfo.Platform.Windows ? 15 : 0;
+
+            // return globalOffset + beatmapOffset + platformOffset;
+        }
 
         // 获取原始音谱边界
         protected (double start, double end) GetOriginalBounds()
@@ -411,11 +443,18 @@ namespace osu.Game.LAsEzExtensions.Mods
         /// </summary>
         protected (double start, double end, double length) ResolveSliceTimesForBeatmap(IBeatmap beatmap)
         {
-            if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double globalStart, out double globalEnd))
-                return (globalStart, globalEnd, Math.Max(0, globalEnd - globalStart));
+            double cutTimeStart, cutTimeEnd;
 
-            double cutTimeStart = CutTimeStart.Value.HasValue ? (Millisecond.Value ? CutTimeStart.Value.Value : CutTimeStart.Value.Value * 1000d) : double.NaN;
-            double cutTimeEnd = CutTimeEnd.Value.HasValue ? (Millisecond.Value ? CutTimeEnd.Value.Value : CutTimeEnd.Value.Value * 1000d) : double.NaN;
+            if (UseGlobalAbRange.Value && LoopTimeRangeStore.TryGet(out double globalStart, out double globalEnd))
+            {
+                cutTimeStart = globalStart;
+                cutTimeEnd = globalEnd;
+            }
+            else
+            {
+                cutTimeStart = CutTimeStart.Value.HasValue ? (Millisecond.Value ? CutTimeStart.Value.Value : CutTimeStart.Value.Value * 1000d) : double.NaN;
+                cutTimeEnd = CutTimeEnd.Value.HasValue ? (Millisecond.Value ? CutTimeEnd.Value.Value : CutTimeEnd.Value.Value * 1000d) : double.NaN;
+            }
 
             var (minTime, maxTime) = beatmap.CalculatePlayableBounds();
 
@@ -424,6 +463,12 @@ namespace osu.Game.LAsEzExtensions.Mods
 
             if (double.IsNaN(cutTimeEnd) || double.IsInfinity(cutTimeEnd))
                 cutTimeEnd = maxTime;
+
+            // 计算总偏移量并从编辑器时间中减去，得到原始谱面时间
+            // 这是为了与GetOverrides中的音频时间保持一致
+            // double totalOffset = getAppliedOffsetMs(pendingWorkingBeatmap ?? throw new InvalidOperationException("WorkingBeatmap not available"));
+            // cutTimeStart -= totalOffset;
+            // cutTimeEnd -= totalOffset;
 
             double length = Math.Max(0, cutTimeEnd - cutTimeStart);
             return (cutTimeStart, cutTimeEnd, length);

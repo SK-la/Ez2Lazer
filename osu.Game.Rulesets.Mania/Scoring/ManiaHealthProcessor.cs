@@ -14,13 +14,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaHealthProcessor : LegacyDrainingHealthProcessor
     {
-        private static readonly double[,] health_settings =
+        public static readonly double[,] HEALTH_SETTINGS =
         {
-            //  305   300    200     100     50     Miss    Poor
+            // Kool   Cool   Good     OK     Bad    Poor  空 Poor
+            //  305    300    200    100      50    Miss    Poor
             { 0.004, 0.003, 0.001, 0.000, -0.010, -0.065, -0.000 }, // Lazer
-            { 0.003, 0.000, 0.002, 0.000, -0.010, -0.050, -0.060 }, // O2 Easy
-            { 0.002, 0.000, 0.001, 0.000, -0.070, -0.040, -0.050 }, // O2 Normal
-            { 0.001, 0.000, 0.000, 0.000, -0.050, -0.030, -0.040 }, // O2 Hard
+            { 0.003, 0.000, 0.002, 0.000, -0.010, -0.050, -0.000 }, // O2 Easy
+            { 0.002, 0.000, 0.001, 0.000, -0.070, -0.040, -0.000 }, // O2 Normal
+            { 0.001, 0.000, 0.000, 0.000, -0.050, -0.030, -0.000 }, // O2 Hard
             { 0.004, 0.003, 0.001, 0.000, -0.010, -0.050, -0.050 }, // Ez2Ac
             { 0.016, 0.016, 0.000, 0.000, -0.050, -0.090, -0.050 }, // IIDX Hard
             { 0.010, 0.010, 0.005, 0.000, -0.060, -0.100, -0.020 }, // LR2 Hard
@@ -29,9 +30,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private static EnumHealthMode mode = EnumHealthMode.Lazer;
         private static int row;
-
-        private HitResult lastResult = HitResult.None;
-        private int streak;
 
         public ManiaHealthProcessor(double drainStartTime)
             : base(drainStartTime)
@@ -60,23 +58,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
         // 特别强调：血量机制异常时会导致无法进入Gameplay，无限加载。
         protected override double GetHealthIncreaseFor(HitObject hitObject, HitResult result)
         {
-            if (result == lastResult)
-                streak++;
-            else
-            {
-                streak = 1;
-                lastResult = result;
-            }
-
             double increase = 0;
 
             if (mode == EnumHealthMode.Lazer)
             {
                 switch (result)
                 {
-                    case HitResult.Pool:
-                        return -getPoorHealthDelta(streak);
-
                     case HitResult.Miss:
                         switch (hitObject)
                         {
@@ -107,9 +94,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
                         break;
                 }
 
-                if (increase > 0)
-                    increase *= streak;
-                // Logger.Log($"ManiaHealthProcessor: raw health change {HpMultiplierNormal * increase} for mode {mode}");
                 return HpMultiplierNormal * increase;
             }
 
@@ -124,40 +108,31 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
             switch (result)
             {
-                case HitResult.Pool:
-                    return -getPoorHealthDelta(streak);
+                case HitResult.Poor:
+                    return HEALTH_SETTINGS[row, 6];
 
                 case HitResult.Miss:
-                    switch (hitObject)
-                    {
-                        case HeadNote:
-                        case TailNote:
-                            return health_settings[row, 5] / 5;
-
-                        default:
-                            return health_settings[row, 5];
-                    }
+                    return HEALTH_SETTINGS[row, 5];
 
                 case HitResult.Meh:
-                    return health_settings[row, 4];
+                    return HEALTH_SETTINGS[row, 4];
 
                 case HitResult.Ok:
-                    return health_settings[row, 3];
+                    return HEALTH_SETTINGS[row, 3];
 
                 case HitResult.Good:
-                    increase = health_settings[row, 2];
+                    increase = HEALTH_SETTINGS[row, 2];
                     break;
 
                 case HitResult.Great:
-                    increase = health_settings[row, 1];
+                    increase = HEALTH_SETTINGS[row, 1];
                     break;
 
                 case HitResult.Perfect:
-                    increase = health_settings[row, 0];
+                    increase = HEALTH_SETTINGS[row, 0];
                     break;
             }
 
-            // Non-default health modes use integer table values where the final value
             double scaled = Math.Clamp(increase, -0.00001, 0.01);
 
             // Suppress extremely small floating-point changes which are noise
@@ -182,15 +157,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             int idx = (int)mode;
 
-            if (idx < 0 || idx >= health_settings.GetLength(0))
+            if (idx < 0 || idx >= HEALTH_SETTINGS.GetLength(0))
                 idx = 0;
 
             return idx;
-        }
-
-        private static double getPoorHealthDelta(int streak)
-        {
-            return 0.075 + Math.Min(streak - 1, 4) * 0.0125;
         }
     }
 }

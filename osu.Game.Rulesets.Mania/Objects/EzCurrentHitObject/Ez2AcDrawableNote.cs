@@ -16,14 +16,32 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (!HoldNote.Head.IsHit)
+            if (!userTriggered)
             {
+                if (!HitObject.HitWindows.CanBeHit(timeOffset))
+                    ApplyResult(HitResult.Miss);
+
                 return;
             }
 
+            double adjustedOffset = Math.Abs(timeOffset);
+
+            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
+                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
+                ApplyResult(HitResult.Miss);
+
+            // Logger.Log($"Tail result: {result}, IsHolding: {HoldNote.IsHolding.Value}, HasHoldBreak: {HoldNote.Body.HasHoldBreak}");
+            // ApplyResult(static (r, state) =>
+            // {
+            //     r.Type = state;
+            //
+            //     if (state == HitResult.Meh || state == HitResult.Miss)
+            //         r.IsComboHit = false;
+            // }, result);
+
             if ((timeOffset >= 0 && HoldNote.IsHolding.Value) || (timeOffset <= 20 && HoldNote.Tail.IsHit))
             {
-                ApplyMaxResult();
+                ApplyResult(HitResult.IgnoreHit);
             }
             else if (timeOffset > 0)
             {
@@ -52,21 +70,23 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            // if (userTriggered && HitObject.HitWindows is ManiaHitWindows ezWindows)
-            // {
-            //     double missWindow = double.Abs(ezWindows.WindowFor(HitResult.Miss));
-            //     double poolEarlyWindow = missWindow + 500;
-            //     double poolLateWindow = missWindow + 150;
-            //
-            //     // 提前按下（timeOffset < 0）且在提前 Pool 窗口内
-            //     if ((timeOffset < 0 && missWindow <= poolEarlyWindow) ||
-            //         (timeOffset > 0 && timeOffset <= poolLateWindow))
-            //         ApplyResult(HitResult.Pool);
-            // }
-
-            if (userTriggered && (timeOffset < -500 || timeOffset > 200))
+            if (!userTriggered)
             {
-                ApplyResult(HitResult.Pool);
+                if (!HitObject.HitWindows.CanBeHit(timeOffset))
+                    ApplyResult(HitResult.Miss);
+
+                return;
+            }
+
+            if (timeOffset > -HitObject.HitWindows.WindowFor(HitResult.Miss) &&
+                timeOffset < -HitObject.HitWindows.WindowFor(HitResult.Poor))
+            {
+                if (HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
+                {
+                    DispatchNewResult(HitResult.Poor);
+                }
+
+                return;
             }
 
             base.CheckForResult(userTriggered, timeOffset);
