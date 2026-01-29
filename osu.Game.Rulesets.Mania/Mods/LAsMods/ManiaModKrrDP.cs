@@ -172,33 +172,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             maniaBeatmap.HitObjects.Clear();
             maniaBeatmap.HitObjects.AddRange(newObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column));
 
-            // Update metadata
-            var metadata = maniaBeatmap.BeatmapInfo.Metadata;
-            int targetKeys = EnableModifyKeys.Value ? ModifyKeys.Value * 2 : totalKeys;
-            string DPVersionName = $"[{originalKeys}to{targetKeys}DP]";
-
-            // Modify creator
-            metadata.Author.Username = AddTagToCreator(metadata.Author.Username, "DP");
-
-            // Modify version
-            metadata.Title = DPVersionName + " " + metadata.Title;
-
-            // Modify tags
-            var tags = metadata.Tags.Split(' ').Where(s => !string.IsNullOrEmpty(s)).ToList();
-            if (!tags.Contains("Converter")) tags.Add("Converter");
-            if (!tags.Contains("DP")) tags.Add("DP");
-            if (!tags.Contains("Krr")) tags.Add("Krr");
-            metadata.Tags = string.Join(" ", tags);
-
-            // Reset beatmap ID
-            maniaBeatmap.BeatmapInfo.OnlineID = -1;
+            // metadata handling intentionally omitted per request (do not modify metadata here)
         }
-
-        private string AddTagToCreator(string creator, string tag)
-        {
-            if (string.IsNullOrEmpty(creator)) return tag;
-            if (creator.Contains(tag)) return creator;
-            return $"{creator} ({tag})";
-        }
+        // Note: metadata modification methods removed — framework will handle metadata/setting UI.
     }
 }
