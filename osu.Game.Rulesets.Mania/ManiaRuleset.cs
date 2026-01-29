@@ -341,6 +341,7 @@ namespace osu.Game.Rulesets.Mania
                     {
                         new ManiaModEz2Settings(),
                         new ManiaModCleanColumn(),
+                        new ManiaModKrrDP(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
                         new ManiaModLoopPlayClip(),
