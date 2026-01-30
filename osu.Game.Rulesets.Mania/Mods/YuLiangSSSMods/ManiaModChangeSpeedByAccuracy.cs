@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -78,6 +79,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
             rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
+        }
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Target Accuracy", $"{Accuracy.Value}%");
+                yield return ("Max Speed", $"{MaxSpeed.Value:0.##}x");
+                yield return ("Min Speed", $"{MinSpeed.Value:0.##}x");
+                if (AdjustPitch.Value) yield return ("Adjust Pitch", "On");
+                yield return ("Speed Change", $"{SpeedChange.Value:0.###}x");
+            }
         }
 
         public void Update(Playfield playfield)

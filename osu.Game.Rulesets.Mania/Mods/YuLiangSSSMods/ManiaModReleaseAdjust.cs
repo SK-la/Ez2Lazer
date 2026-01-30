@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Framework.Bindables;
@@ -61,6 +62,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             maniaBeatmap.HitObjects = hitObjects;
 
             NoReleaseDrawableHoldNoteTail.ReleaseOffset = ReleaseOffset.Value;
+        }
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Offset", $"{ReleaseOffset.Value}ms");
+            }
         }
 
         public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
@@ -63,6 +64,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public void ApplyToManiaPlayfield(ManiaPlayfield playfield)
         {
             // No-op
+        }
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Min Scale", $"{MinScale.Value:0.##}");
+            }
         }
 
         public void Update(Playfield playfield)

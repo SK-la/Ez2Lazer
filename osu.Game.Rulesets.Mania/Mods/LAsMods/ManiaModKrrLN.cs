@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -101,6 +102,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Level", $"{Level.Value}");
+                yield return ("Long %", $"{LongPercentage.Value}%");
+                yield return ("Short %", $"{ShortPercentage.Value}%");
+                yield return ("Long Limit", $"{LongLimit.Value}");
+                yield return ("Short Limit", $"{ShortLimit.Value}");
+                if (Seed.Value is null) yield return ("Seed", "Null");
+                else yield return ("Seed", $"Seed {Seed.Value}");
+            }
+        }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {

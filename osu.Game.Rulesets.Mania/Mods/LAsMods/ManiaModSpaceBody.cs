@@ -137,5 +137,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             // 无休息时间
             maniaBeatmap.Breaks.Clear();
         }
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Space Beat", $"1/{SpaceBeat.Value}");
+                yield return ("Shield", Shield.Value ? "On" : "Off");
+            }
+        }
     }
 }

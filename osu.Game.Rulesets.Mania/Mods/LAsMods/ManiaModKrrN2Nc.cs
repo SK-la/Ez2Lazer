@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
@@ -74,6 +75,18 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         };
 
         public int ApplyOrder => ApplyOrderIndex.Value;
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Target Keys", $"{TargetKeys.Value}");
+                yield return ("Beat Speed", $"{BeatSpeed.Value}");
+                yield return ("Display Target Keys", DisplayTargetKeys.Value ? "On" : "Off");
+                if (Seed.Value is null) yield return ("Seed", "Null");
+                else yield return ("Seed", $"Seed {Seed.Value}");
+            }
+        }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {

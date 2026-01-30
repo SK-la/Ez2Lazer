@@ -38,6 +38,22 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public int ApplyOrder => 1000;
 
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                // 复用基础设置并补充一些本规则集特有显示
+                foreach (var (s, v) in base.SettingDescription)
+                    yield return (s, v);
+
+                // 基类中未包含的额外信息
+                // Seed 可能为 null
+                yield return ((LocalisableString)"Seed", Seed.Value.HasValue ? Seed.Value.Value.ToString() : "None");
+                yield return ((LocalisableString)"Randomize Columns", (Rand.Value ? "On" : "Off"));
+                yield return ((LocalisableString)"Mirror", (Mirror.Value ? "On" : "Off"));
+            }
+        }
+
         public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
         {
             if (!ConstantSpeed.Value)

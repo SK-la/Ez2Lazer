@@ -78,6 +78,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         private int keys2;
         private bool customReorderApplied;
 
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                if (DeleteSColumn.Value) yield return ("Delete S Column", "On");
+                if (DeletePColumn.Value) yield return ("Delete P Column", "On");
+                if (DeleteEColumn.Value) yield return ("Delete E Column", "On");
+                if (EnableCustomDelete.Value) yield return ("Custom Delete", string.IsNullOrWhiteSpace(CustomDeleteColumn.Value) ? "Enabled" : CustomDeleteColumn.Value);
+                if (EnableCustomReorder.Value) yield return ("Custom Reorder", string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
+                if (UseHealthCapReduction.Value) yield return ("Health Cap Reduction", "On");
+                yield break;
+            }
+        }
+
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
             try

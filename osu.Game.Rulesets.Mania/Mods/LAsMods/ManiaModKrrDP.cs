@@ -93,6 +93,18 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public int ApplyOrder => ApplyOrderIndex.Value;
 
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Enable Modify Keys", EnableModifyKeys.Value ? "On" : "Off");
+                yield return ("Target Keys", $"{TargetKeys.Value}");
+                yield return ("Left Mirror", LMirror.Value ? "On" : "Off");
+                yield return ("Right Mirror", RMirror.Value ? "On" : "Off");
+                yield return ("Display Target Keys", DisplayTargetKeys.Value ? "On" : "Off");
+            }
+        }
+
         private int originalKeys;
         private int finalKeys;
 

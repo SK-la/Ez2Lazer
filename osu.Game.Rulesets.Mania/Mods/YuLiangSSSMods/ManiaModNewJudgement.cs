@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -58,6 +59,19 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             {
                 updateHitRanges();
             });
+        }
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Divide", $"{Divide.Value}");
+                if (BPM.Value is null) yield return ("BPM", "Auto");
+                else yield return ("BPM", $"{BPM.Value}");
+                if (For14Jack.Value) yield return ("For 1/4 Jack", "On");
+                if (For16Stream.Value) yield return ("For 1/6 Stream", "On");
+                if (For13Jack.Value) yield return ("For 1/3 Jack", "On");
+            }
         }
 
         private void updateHitRanges()

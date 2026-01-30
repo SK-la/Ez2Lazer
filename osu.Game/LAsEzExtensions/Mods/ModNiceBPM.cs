@@ -123,6 +123,21 @@ namespace osu.Game.LAsEzExtensions.Mods
         private bool hasAppliedFreeBPM;
         private int currentMissCount;
 
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                yield return ("Free BPM", FreeBPM.Value.HasValue ? FreeBPM.Value.Value.ToString() : "Auto");
+                yield return ("Initial Rate", $"{InitialRate.Value:N2}");
+                yield return ("Dynamic BPM", EnableDynamicBPM.Value ? "On" : "Off");
+                yield return ("Adjust Pitch", AdjustPitch.Value ? "On" : "Off");
+                yield return ("Min Rate", $"{MinAllowableRate.Value:N2}");
+                yield return ("Max Rate", $"{MaxAllowableRate.Value:N2}");
+                yield return ("Miss Threshold", $"{MissThreshold.Value}");
+                yield return ("Rate Change On Miss", $"{RateChangeOnMiss.Value:N2}");
+            }
+        }
+
         public ModNiceBPM()
         {
             rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
