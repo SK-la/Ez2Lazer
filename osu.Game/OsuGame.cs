@@ -1621,6 +1621,20 @@ namespace osu.Game
 
                     SkinManager.SelectRandomSkin();
                     return true;
+
+                case GlobalAction.NextSkin:
+                    if (skinEditor.State.Value == Visibility.Visible)
+                        return false;
+
+                    SkinManager.SelectNextSkin();
+                    return true;
+
+                case GlobalAction.PreviousSkin:
+                    if (skinEditor.State.Value == Visibility.Visible)
+                        return false;
+
+                    SkinManager.SelectPreviousSkin();
+                    return true;
             }
 
             return false;
