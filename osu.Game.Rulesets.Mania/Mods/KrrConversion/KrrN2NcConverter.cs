@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
             int speedIndex = options?.BeatSpeed ?? 4;
             int seedValue = options?.Seed ?? KrrConversionHelper.ComputeSeedFromBeatmap(beatmap);
 
-            int originalKeys = KrrConversionHelper.InferOriginalKeys(beatmap, targetKeys);
+            int originalKeys = (int)beatmap.BeatmapInfo.Difficulty.CircleSize;
             if (originalKeys == targetKeys) return;
 
             var rng = new Random(seedValue);
@@ -254,17 +254,27 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
 
         private static Span<int> generateOrgColIndex(NoteMatrix matrix)
         {
-            var orgColIndex = new List<int>();
             int cols = matrix.Cols;
             Span<int> matrixSpan = matrix.AsSpan();
 
+            int maxIndex = -1;
+            for (int i = 0; i < matrixSpan.Length; i++)
+                maxIndex = Math.Max(maxIndex, matrixSpan[i]);
+
+            if (maxIndex < 0)
+                return CollectionsMarshal.AsSpan(new List<int>());
+
+            var orgColIndex = new int[maxIndex + 1];
+            Array.Fill(orgColIndex, -1);
+
             for (int i = 0; i < matrixSpan.Length; i++)
             {
-                if (matrixSpan[i] >= 0)
-                    orgColIndex.Add(i % cols);
+                int noteIndex = matrixSpan[i];
+                if (noteIndex >= 0 && noteIndex < orgColIndex.Length)
+                    orgColIndex[noteIndex] = i % cols;
             }
 
-            return CollectionsMarshal.AsSpan(orgColIndex);
+            return orgColIndex;
         }
 
         private static NoteMatrix doKeys(NoteMatrix matrix,

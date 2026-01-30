@@ -18,14 +18,14 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
         public static double ComputeConvertTime(int beatSpeedIndex, double bpm)
         {
             double speed = BEAT_SPEED_VALUES[Math.Clamp(beatSpeedIndex, 0, BEAT_SPEED_VALUES.Length - 1)];
-            return Math.Max(1, (speed * 60000 / bpm * 4) - 10);
+            return Math.Max(1, speed * 60000 / bpm * 4 - 10);
         }
 
         public static int ComputeSeedFromBeatmap(ManiaBeatmap beatmap)
         {
             try
             {
-                int val = (beatmap.HitObjects.Count) ^ (beatmap.TotalColumns);
+                int val = beatmap.HitObjects.Count ^ beatmap.TotalColumns;
                 return Math.Abs(val) + 1;
             }
             catch
@@ -39,9 +39,6 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
             double cs = beatmap.BeatmapInfo.Difficulty.CircleSize;
             if (cs > 0)
                 return Math.Max(1, (int)Math.Round(cs));
-
-            if (beatmap.HitObjects.Count > 0)
-                return beatmap.HitObjects.Max(h => h.Column) + 1;
 
             return fallback;
         }
@@ -60,9 +57,11 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
                 };
 
                 if (hold.NodeSamples != null)
+                {
                     clone.NodeSamples = hold.NodeSamples
-                                              .Select(list => (IList<HitSampleInfo>)list.ToList())
-                                              .ToList();
+                                            .Select(list => (IList<HitSampleInfo>)list.ToList())
+                                            .ToList();
+                }
 
                 return clone;
             }
@@ -111,8 +110,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
         }
 
         // 百分比筛选
-        public static List<(int index, double start, int length)> MarkByPercentagePerGroup(
-            List<(int index, double start, int length)> list, double percentage, Random r, Oscillator osc)
+        public static List<(int index, double start, int length)> MarkByPercentagePerGroup(List<(int index, double start, int length)> list, double percentage, Random r, Oscillator osc)
         {
             if (percentage >= 100) return list;
             if (percentage <= 0) return new List<(int, double, int)>();
@@ -181,15 +179,16 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
             var ordered = objects.OrderBy(o => o.StartTime).ToList();
             var result = new List<ManiaHitObject>();
 
-            var occupiedUntil = new double[targetKeys];
-            var occupyingIndex = new int[targetKeys];
+            double[] occupiedUntil = new double[targetKeys];
+            int[] occupyingIndex = new int[targetKeys];
+
             for (int i = 0; i < targetKeys; i++)
             {
                 occupiedUntil[i] = double.NegativeInfinity;
                 occupyingIndex[i] = -1;
             }
 
-            const double minHoldMs = 30.0; // 最小保留的长按长度
+            const double min_hold_ms = 30.0; // 最小保留的长按长度
 
             for (int i = 0; i < ordered.Count; i++)
             {
@@ -215,10 +214,12 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
                 // 列被占用：尝试截断占位的 Hold 来腾出空间
                 int occIdx = occupyingIndex[col];
                 bool freed = false;
+
                 if (occIdx >= 0 && occIdx < result.Count && result[occIdx] is HoldNote occHold && occHold.EndTime > obj.StartTime)
                 {
                     double newEnd = obj.StartTime - minGapMs;
-                    if (newEnd <= occHold.StartTime + minHoldMs)
+
+                    if (newEnd <= occHold.StartTime + min_hold_ms)
                     {
                         // 截断后太短，转换为短按
                         var note = new Note { StartTime = occHold.StartTime, Column = col, Samples = occHold.Samples.ToList() };
@@ -316,6 +317,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
                     {
                         var next = list[idx + 1];
                         double nextGap = next.StartTime - prevEnd;
+
                         if (nextGap >= minGapMs)
                         {
                             // drop cur, move to next (do not add cur)
@@ -330,15 +332,16 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
                     {
                         // if hold length would become too short relative to its own length when pushed, downgrade
                         double holdLen = hcur.EndTime - hcur.StartTime;
+
                         if (holdLen < minGapMs)
                         {
                             var note = new Note { StartTime = hcur.StartTime, Column = hcur.Column, Samples = hcur.Samples.ToList() };
                             // check gap between prevEnd and this note
                             double noteGap = note.StartTime - prevEnd;
+
                             if (noteGap >= minGapMs)
                             {
                                 kept.Add(note);
-                                continue;
                             }
                         }
                     }
@@ -359,11 +362,14 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
         public static bool ExistsAt(IEnumerable<ManiaHitObject> objects, int column, double startTime, double epsilonMs = 1.0)
         {
             int col = Math.Clamp(column, 0, int.MaxValue);
+
             foreach (var o in objects)
             {
                 if (o.Column != col) continue;
+
                 if (Math.Abs(o.StartTime - startTime) <= epsilonMs) return true;
             }
+
             return false;
         }
     }

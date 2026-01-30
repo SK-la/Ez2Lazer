@@ -143,18 +143,19 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public void ApplyToBeatmapConverter(IBeatmapConverter beatmapConverter)
         {
-            if (DisplayTargetKeys.Value)
-            {
-                var mbc = (ManiaBeatmapConverter)beatmapConverter;
-                int baseKeys = mbc.TotalColumns;
+            if (!DisplayTargetKeys.Value)
+                return;
 
-                if (EnableModifyKeys.Value)
-                    finalKeys = TargetKeys.Value * 2;
-                else
-                    finalKeys = baseKeys * 2;
+            var mbc = (ManiaBeatmapConverter)beatmapConverter;
 
-                mbc.TargetColumns = Math.Clamp(finalKeys, 1, 18);
-            }
+            int baseKeys = mbc.TotalColumns;
+
+            if (EnableModifyKeys.Value)
+                finalKeys = TargetKeys.Value * 2;
+            else
+                finalKeys = baseKeys * 2;
+
+            mbc.TargetColumns = Math.Clamp(finalKeys, 1, 18);
         }
     }
 }
