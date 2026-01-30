@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -74,6 +75,9 @@ namespace osu.Game.Screens.SelectV2
 
         [Resolved]
         private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+
+        [Resolved]
+        private BeatmapManager beatmaps { get; set; } = null!;
 
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
@@ -270,6 +274,19 @@ namespace osu.Game.Screens.SelectV2
                     ? FontAwesome.Solid.Moon
                     : FontAwesome.Solid.Star;
             }, true);
+
+            Selected.BindValueChanged(selected =>
+            {
+                if (selected.NewValue)
+                    requestManiaAnalysisFromWorkingBeatmap();
+                else
+                {
+                    maniaAnalysisCancellationSource?.Cancel();
+                    maniaAnalysisCancellationSource = null;
+                    maniaAnalysisBindable = null;
+                    maniaWasVisible = false;
+                }
+            }, true);
         }
 
         protected override void PrepareForUse()
@@ -369,6 +386,60 @@ namespace osu.Game.Screens.SelectV2
                     result.NewValue.Details.ColumnCounts, result.NewValue.Details.HoldNoteCounts);
                 displayXxySR.Current.Value = result.NewValue.Details.XxySr;
             }, false);
+        }
+
+        private void requestManiaAnalysisFromWorkingBeatmap()
+        {
+            if (maniaAnalysisBindable != null || Item == null)
+                return;
+
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = new CancellationTokenSource();
+            var localToken = maniaAnalysisCancellationSource.Token;
+
+            // Obtain a working beatmap and the playable beatmap for current ruleset/mods.
+            var working = beatmaps.GetWorkingBeatmap(beatmap);
+
+            // Attempt to create a playable beatmap (synchronous). This ensures any ruleset-specific
+            // transformations (eg. mania column mapping) happen before analysis.
+            try
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var playable = working.GetPlayableBeatmap(ruleset.Value, mods.Value);
+
+                        var res = await maniaAnalysisCache.GetAnalysisAsync(playable.BeatmapInfo, ruleset.Value, mods.Value, localToken, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE).ConfigureAwait(false);
+
+                        if (res.HasValue)
+                        {
+                            Schedule(() =>
+                            {
+                                var b = new Bindable<EzAnalysisResult>(res.Value);
+                                maniaAnalysisBindable = b;
+                                maniaAnalysisBindable.BindValueChanged(result =>
+                                {
+                                    updateKPS((result.NewValue.Summary.AverageKps, result.NewValue.Summary.MaxKps, result.NewValue.Summary.KpsList),
+                                        result.NewValue.Details.ColumnCounts, result.NewValue.Details.HoldNoteCounts);
+                                    displayXxySR.Current.Value = result.NewValue.Details.XxySr;
+                                }, false);
+
+                                // Apply once immediately
+                                updateKPS((res.Value.Summary.AverageKps, res.Value.Summary.MaxKps, res.Value.Summary.KpsList), res.Value.Details.ColumnCounts, res.Value.Details.HoldNoteCounts);
+                                displayXxySR.Current.Value = res.Value.Details.XxySr;
+                            });
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }, localToken);
+            }
+            catch
+            {
+                // Ignore failures from creating playable beatmap.
+            }
         }
 
         private void computeStarRating()
