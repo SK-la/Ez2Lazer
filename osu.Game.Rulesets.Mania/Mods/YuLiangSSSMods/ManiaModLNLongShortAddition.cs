@@ -143,7 +143,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 newObjects.AddRange(newColumnObjects);
             }
 
-            ManiaModHelper.AfterTransform(newObjects, originalLNObjects, maniaBeatmap, rng, OriginalLN.Value, Gap.Value, SelectColumn.Value, DurationLimit.Value, LineSpacing.Value,
+            ManiaModYuModHelper.AfterTransform(newObjects, originalLNObjects, maniaBeatmap, rng, OriginalLN.Value, Gap.Value, SelectColumn.Value, DurationLimit.Value, LineSpacing.Value,
                 InvertLineSpacing.Value);
 
             maniaBeatmap.Breaks.Clear();

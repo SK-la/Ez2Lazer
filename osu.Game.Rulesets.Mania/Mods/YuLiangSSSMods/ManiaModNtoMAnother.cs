@@ -117,8 +117,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         [SettingSource("Seed", "Use a custom seed instead of a random one.", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
-        [SettingSource("Apply Order", "Order in which this mod is applied after beatmap conversion. Lower runs earlier.", SettingControlType = typeof(SettingsNumberBox))]
-        public Bindable<int?> ApplyOrderSetting { get; } = new Bindable<int?>(0);
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(0)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         public void ApplyToBeatmapConverter(IBeatmapConverter converter)
         {
@@ -223,10 +229,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             foreach (var timingPoint in tempObjects.GroupBy(h => h.startTime))
             {
-                var newLocations = timingPoint.OfType<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>()
-                                              .Select(n => (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
+                var newLocations = timingPoint.Select(n =>
+                    (Column: n.column, StartTime: n.startTime, EndTime: n.endTime, Samples: n.samples)).OrderBy(h => h.Column).ToList();
 
-                List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> line = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
+                List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)> line =
+                    new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
 
                 foreach (var note in newLocations)
                 {
@@ -421,7 +428,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             foreach (var timingPoint in hitObjects.GroupBy(h => h.startTime))
             {
-                var locations = timingPoint.OfType<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>().ToList();
+                var locations = timingPoint.ToList();
                 var tempObjects = new List<ManiaHitObject>();
                 int length = copyColumn.Count;
 
@@ -456,19 +463,11 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     {
                         if (checkC.Contains(tempObjects[i].Column))
                         {
-                            if (clean != 0)
-                            {
-                                double beatLength = beatmap.ControlPointInfo.TimingPointAt(tempObjects[i].StartTime).BeatLength;
-                                double timeDivide = beatLength / clean;
-                                int index = checkC.IndexOf(tempObjects[i].Column);
+                            double beatLength = beatmap.ControlPointInfo.TimingPointAt(tempObjects[i].StartTime).BeatLength;
+                            double timeDivide = beatLength / clean;
+                            int index = checkC.IndexOf(tempObjects[i].Column);
 
-                                if (tempObjects[i].StartTime - checkS[index] < timeDivide + error)
-                                {
-                                    tempObjects.RemoveAt(i);
-                                    i--;
-                                }
-                            }
-                            else
+                            if (tempObjects[i].StartTime - checkS[index] < timeDivide + error)
                             {
                                 tempObjects.RemoveAt(i);
                                 i--;
@@ -486,7 +485,5 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             return (newObjects, checkColumn);
         }
-
-        public int ApplyOrder => ApplyOrderSetting.Value ?? 0;
     }
 }

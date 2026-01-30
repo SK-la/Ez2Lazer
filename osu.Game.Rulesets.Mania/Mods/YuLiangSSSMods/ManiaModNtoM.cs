@@ -22,7 +22,7 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public class ManiaModNtoM : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
+    public class ManiaModNtoM : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder, IApplicableToBeatmapConverter
     {
         public override string Name => "Nk to Mk Converter";
 
@@ -67,10 +67,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         };
 
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
-        public Bindable<int?> Seed { get; } = new Bindable<int?>();
+        public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description), SettingControlType = typeof(SettingsNumberBox))]
-        public Bindable<int?> ApplyOrderSetting { get; } = new Bindable<int?>(0);
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(0)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         public void ApplyToBeatmapConverter(IBeatmapConverter converter)
         {
@@ -227,15 +233,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         if (columnNum > emptyColumn) columnNum++;
                     }
 
-                    bool overlap = ManiaModHelper.FindOverlapInList(newColumnObjects, columnNum, locations[i].startTime, locations[i].endTime);
+                    bool overlap = ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum, locations[i].startTime, locations[i].endTime);
 
                     if (overlap)
                     {
                         for (int k = 0; k < keyValue; k++)
                         {
-                            if (!ManiaModHelper.FindOverlapInList(newColumnObjects, columnNum - k, locations[i].startTime, locations[i].endTime) && columnNum - k >= 0)
+                            if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum - k, locations[i].startTime, locations[i].endTime) && columnNum - k >= 0)
                                 columnNum -= k;
-                            else if (!ManiaModHelper.FindOverlapInList(newColumnObjects, columnNum + k, locations[i].startTime, locations[i].endTime) && columnNum + k <= keyValue - 1) columnNum += k;
+                            else if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum + k, locations[i].startTime, locations[i].endTime) && columnNum + k <= keyValue - 1) columnNum += k;
                         }
                     }
 
@@ -291,10 +297,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     {
                         for (int k = 0; k < keyValue; k++)
                         {
-                            if (!ManiaModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column - k).ToList())
+                            if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column - k).ToList())
                                 && newColumnObjects[i].Column - k >= 0)
                                 newColumnObjects[i].Column -= k;
-                            else if (!ManiaModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column + k).ToList())
+                            else if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects[i], newColumnObjects.Where(h => h.Column == newColumnObjects[i].Column + k).ToList())
                                      && newColumnObjects[i].Column + k <= keyValue - 1) newColumnObjects[i].Column += k;
                         }
 
@@ -334,7 +340,5 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             maniaBeatmap.HitObjects = newObjects;
         }
-
-        public int ApplyOrder => ApplyOrderSetting.Value ?? 0;
     }
 }

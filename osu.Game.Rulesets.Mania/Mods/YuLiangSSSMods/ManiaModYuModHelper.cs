@@ -12,7 +12,7 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 {
-    public static class ManiaModHelper
+    public static class ManiaModYuModHelper
     {
         public static readonly int[] DIVIDE_NUMBER = [2, 4, 8, 3, 6, 9, 5, 7, 12, 16, 48, 35, 64];
 

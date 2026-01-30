@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomReorderColumn_Label), nameof(EzManiaModStrings.CustomReorderColumn_Description), SettingControlType = typeof(SettingsTextBox))]
         public Bindable<string> CustomReorderColumn { get; } = new Bindable<string>(string.Empty);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {
             MinValue = 0,

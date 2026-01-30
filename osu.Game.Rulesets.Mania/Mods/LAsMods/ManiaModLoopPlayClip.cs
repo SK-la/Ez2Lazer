@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
     public class ManiaModLoopPlayClip : ModLoopPlayClip,
                                         IApplicableToDrawableRuleset<ManiaHitObject>,
-                                        IApplicableAfterBeatmapConversion
+                                        IApplicableAfterBeatmapConversion, IHasApplyOrder
     {
         public override Type[] IncompatibleMods => new[]
         {
@@ -35,6 +35,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             typeof(ManiaModConstantSpeed),
             typeof(ModNoFail),
         };
+
+        public int ApplyOrder => 1000;
 
         public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
         {

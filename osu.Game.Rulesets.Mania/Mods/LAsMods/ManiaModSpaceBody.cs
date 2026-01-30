@@ -50,8 +50,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.AddShield_Label), nameof(EzModStrings.AddShield_Description))]
         public BindableBool Shield { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description), SettingControlType = typeof(SettingsNumberBox))]
-        public Bindable<int?> ApplyOrderSetting { get; } = new Bindable<int?>(100);
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -131,9 +137,5 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             // 无休息时间
             maniaBeatmap.Breaks.Clear();
         }
-
-        // 确认此 Mod 在其他转换后 Mod 之后应用，返回更高的应用顺序。
-        // 没有此接口的 Mod 被视为顺序 0。
-        public int ApplyOrder => ApplyOrderSetting.Value ?? 100;
     }
 }

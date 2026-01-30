@@ -190,15 +190,15 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             {
                 if (notTransformColumn.Contains(column.Key))
                 {
-                    ManiaModHelper.AddOriginalNoteByColumn(newObjects, column);
+                    ManiaModYuModHelper.AddOriginalNoteByColumn(newObjects, column);
                     continue;
                 }
 
-                originalLNObjects = ManiaModHelper.Transform(rng, Mu1.Value, SigmaDouble.Value + SigmaInteger.Value, Divide1.Value, Percentage.Value, ERROR, OriginalLN.Value, beatmap, newObjects,
+                originalLNObjects = ManiaModYuModHelper.Transform(rng, Mu1.Value, SigmaDouble.Value + SigmaInteger.Value, Divide1.Value, Percentage.Value, ERROR, OriginalLN.Value, beatmap, newObjects,
                     column, Divide2.Value, Mu2.Value, Mu1DMu2.Value);
             }
 
-            ManiaModHelper.AfterTransform(newObjects, originalLNObjects, maniaBeatmap, rng, OriginalLN.Value, Gap.Value, SelectColumn.Value, DurationLimit.Value, LineSpacing.Value,
+            ManiaModYuModHelper.AfterTransform(newObjects, originalLNObjects, maniaBeatmap, rng, OriginalLN.Value, Gap.Value, SelectColumn.Value, DurationLimit.Value, LineSpacing.Value,
                 InvertLineSpacing.Value);
 
             maniaBeatmap.Breaks.Clear();
