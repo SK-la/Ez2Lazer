@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override string Acronym => "N2N";
 
-        public override LocalisableString Description => "[KrrTool] KeyCounts conversion (port stub).";
+        public override LocalisableString Description => "[KrrTool] KeyCounts conversion";
 
         public override double ScoreMultiplier => 1;
 
@@ -33,22 +33,22 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override bool ValidForMultiplayer => true;
 
-        [SettingSource("Target Keys", "目标键数（用于修改列数）")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrN2Nc_TargetKeys_Label), nameof(EzManiaModStrings.KrrN2Nc_TargetKeys_Description))]
         public BindableNumber<int> TargetKeys { get; } = new BindableInt(8)
         {
             MinValue = 1,
             MaxValue = 18,
         };
 
-        [SettingSource("Max Keys", "Density max (stub)")]
-        public BindableNumber<int> MaxKeys { get; } = new BindableInt(4)
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrN2Nc_MaxKeys_Label), nameof(EzManiaModStrings.KrrN2Nc_MaxKeys_Description))]
+        public BindableNumber<int> MaxKeys { get; } = new BindableInt(6)
         {
             MinValue = 0,
             MaxValue = 10
         };
 
-        [SettingSource("Min Keys", "Density min (stub)")]
-        public BindableNumber<int> MinKeys { get; } = new BindableInt(1)
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrN2Nc_MinKeys_Label), nameof(EzManiaModStrings.KrrN2Nc_MinKeys_Description))]
+        public BindableNumber<int> MinKeys { get; } = new BindableInt(2)
         {
             MinValue = 0,
             MaxValue = 10
@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
-        [SettingSource("Display Target Keys", "开启后，选歌界面上会按照转换后的键数显示(目前有bug，必须关闭才能进入游戏，否则程序崩溃)")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrN2Nc_DisplayTarget_Label), nameof(EzManiaModStrings.KrrN2Nc_DisplayTarget_Description))]
         public BindableBool DisplayTargetKeys { get; set; } = new BindableBool(false);
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
@@ -83,8 +83,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 yield return ("Target Keys", $"{TargetKeys.Value}");
                 yield return ("Beat Speed", $"{BeatSpeed.Value}");
                 yield return ("Display Target Keys", DisplayTargetKeys.Value ? "On" : "Off");
-                if (Seed.Value is null) yield return ("Seed", "Null");
-                else yield return ("Seed", $"Seed {Seed.Value}");
+
+                if (Seed.Value is null)
+                    yield return ("Seed", "Null");
+                else
+                    yield return ("Seed", $"Seed {Seed.Value}");
             }
         }
 

@@ -6,6 +6,7 @@ using osu.Game.LAsEzExtensions.Mods;
 
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
 {
+#pragma warning disable IDE1006
     public class EzManiaModStrings : EzModStrings
     {
         // Ez2Settings
@@ -84,6 +85,74 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
 
         public static readonly LocalisableString CleanColumn_Description = new EzLocalisableString("整理Column, 排序、删除轨道中的note", "Clean Column, Sort, Delete notes in the column.");
 
+        // ====================================================================================================
+        // Krr Mods - Labels & Descriptions
+        // ====================================================================================================
+
+        // Krr N2Nc
+        public static readonly LocalisableString KrrN2Nc_TargetKeys_Label = new EzLocalisableString("目标键数", "Target Keys");
+        public static readonly LocalisableString KrrN2Nc_TargetKeys_Description = new EzLocalisableString("目标键数（用于修改列数）", "Target key count (change columns).");
+        public static readonly LocalisableString KrrN2Nc_MaxKeys_Label = new EzLocalisableString("密度上限", "Density Max");
+        public static readonly LocalisableString KrrN2Nc_MaxKeys_Description = new EzLocalisableString("每行最大键数", "Max keys per row.");
+        public static readonly LocalisableString KrrN2Nc_MinKeys_Label = new EzLocalisableString("密度下限", "Density Min");
+        public static readonly LocalisableString KrrN2Nc_MinKeys_Description = new EzLocalisableString("每行最小键数", "Min keys per row.");
+        public static readonly LocalisableString KrrN2Nc_DisplayTarget_Label = new EzLocalisableString("显示目标键数", "Display Target Keys");
+        public static readonly LocalisableString KrrN2Nc_DisplayTarget_Description = new EzLocalisableString("选歌界面按转换后键数显示（存在已知问题）", "Display converted key count in song select (known issues).");
+
+        // Krr DP
+        public static readonly LocalisableString KrrDP_EnableModifyKeys_Label = new EzLocalisableString("启用键数修改", "Enable Modify Keys");
+        public static readonly LocalisableString KrrDP_EnableModifyKeys_Description = new EzLocalisableString("启用后可指定左右各自的键数", "Enable to set keys per side.");
+        public static readonly LocalisableString KrrDP_TargetKeys_Label = new EzLocalisableString("目标键数", "Target Keys");
+        public static readonly LocalisableString KrrDP_TargetKeys_Description = new EzLocalisableString("左右每侧的目标键数", "Target keys per side.");
+        public static readonly LocalisableString KrrDP_LeftMirror_Label = new EzLocalisableString("左侧镜像", "Left Mirror");
+        public static readonly LocalisableString KrrDP_LeftMirror_Description = new EzLocalisableString("左侧镜像翻转", "Mirror left side.");
+        public static readonly LocalisableString KrrDP_RightMirror_Label = new EzLocalisableString("右侧镜像", "Right Mirror");
+        public static readonly LocalisableString KrrDP_RightMirror_Description = new EzLocalisableString("右侧镜像翻转", "Mirror right side.");
+        public static readonly LocalisableString KrrDP_LeftDensity_Label = new EzLocalisableString("左侧密度", "Left Density");
+        public static readonly LocalisableString KrrDP_LeftDensity_Description = new EzLocalisableString("调整左侧密度", "Adjust left density.");
+        public static readonly LocalisableString KrrDP_RightDensity_Label = new EzLocalisableString("右侧密度", "Right Density");
+        public static readonly LocalisableString KrrDP_RightDensity_Description = new EzLocalisableString("调整右侧密度", "Adjust right density.");
+        public static readonly LocalisableString KrrDP_LeftRemove_Label = new EzLocalisableString("移除左侧", "Remove Left");
+        public static readonly LocalisableString KrrDP_LeftRemove_Description = new EzLocalisableString("移除左侧所有音符", "Remove left side.");
+        public static readonly LocalisableString KrrDP_RightRemove_Label = new EzLocalisableString("移除右侧", "Remove Right");
+        public static readonly LocalisableString KrrDP_RightRemove_Description = new EzLocalisableString("移除右侧所有音符", "Remove right side.");
+        public static readonly LocalisableString KrrDP_LeftMax_Label = new EzLocalisableString("左侧最大键数", "Left Max Keys");
+        public static readonly LocalisableString KrrDP_LeftMax_Description = new EzLocalisableString("左侧密度最大键数", "Left density max keys.");
+        public static readonly LocalisableString KrrDP_LeftMin_Label = new EzLocalisableString("左侧最小键数", "Left Min Keys");
+        public static readonly LocalisableString KrrDP_LeftMin_Description = new EzLocalisableString("左侧密度最小键数", "Left density min keys.");
+        public static readonly LocalisableString KrrDP_RightMax_Label = new EzLocalisableString("右侧最大键数", "Right Max Keys");
+        public static readonly LocalisableString KrrDP_RightMax_Description = new EzLocalisableString("右侧密度最大键数", "Right density max keys.");
+        public static readonly LocalisableString KrrDP_RightMin_Label = new EzLocalisableString("右侧最小键数", "Right Min Keys");
+        public static readonly LocalisableString KrrDP_RightMin_Description = new EzLocalisableString("右侧密度最小键数", "Right density min keys.");
+        public static readonly LocalisableString KrrDP_DisplayTarget_Label = new EzLocalisableString("显示目标键数", "Display Target Keys");
+        public static readonly LocalisableString KrrDP_DisplayTarget_Description = new EzLocalisableString("选歌界面按转换后键数显示（存在已知问题）", "Display converted key count in song select (known issues).");
+
+        // Krr LN
+        public static readonly LocalisableString KrrLN_LongLevel_Label = new EzLocalisableString("长按等级", "Long Level");
+        public static readonly LocalisableString KrrLN_LongLevel_Description = new EzLocalisableString("长按长度强度（0-100）", "Long length level (0-100).");
+        public static readonly LocalisableString KrrLN_ShortLevel_Label = new EzLocalisableString("短按等级", "Short Level");
+        public static readonly LocalisableString KrrLN_ShortLevel_Description = new EzLocalisableString("短按长度强度（0-256）", "Short length level (0-256).");
+        public static readonly LocalisableString KrrLN_ProcessOriginal_Label = new EzLocalisableString("处理原始LN", "Process Original LN");
+        public static readonly LocalisableString KrrLN_ProcessOriginal_Description = new EzLocalisableString("关闭时跳过原始LN", "Skip original LN when disabled.");
+        public static readonly LocalisableString KrrLN_LengthThreshold_Label = new EzLocalisableString("长度阈值", "Length Threshold");
+        public static readonly LocalisableString KrrLN_LengthThreshold_Description = new EzLocalisableString("长短按判定阈值", "Threshold between long/short.");
+        public static readonly LocalisableString KrrLN_LongPercentage_Label = new EzLocalisableString("长按比例", "Long Percentage");
+        public static readonly LocalisableString KrrLN_LongPercentage_Description = new EzLocalisableString("长按转换比例", "Percentage of long conversion.");
+        public static readonly LocalisableString KrrLN_ShortPercentage_Label = new EzLocalisableString("短按比例", "Short Percentage");
+        public static readonly LocalisableString KrrLN_ShortPercentage_Description = new EzLocalisableString("短按转换比例", "Percentage of short conversion.");
+        public static readonly LocalisableString KrrLN_LongLimit_Label = new EzLocalisableString("长按上限", "Long Limit");
+        public static readonly LocalisableString KrrLN_LongLimit_Description = new EzLocalisableString("每行长按上限", "Max long notes per row.");
+        public static readonly LocalisableString KrrLN_ShortLimit_Label = new EzLocalisableString("短按上限", "Short Limit");
+        public static readonly LocalisableString KrrLN_ShortLimit_Description = new EzLocalisableString("每行短按上限", "Max short notes per row.");
+        public static readonly LocalisableString KrrLN_LongRandom_Label = new EzLocalisableString("长按随机", "Long Random");
+        public static readonly LocalisableString KrrLN_LongRandom_Description = new EzLocalisableString("长按随机强度", "Randomness for long notes.");
+        public static readonly LocalisableString KrrLN_ShortRandom_Label = new EzLocalisableString("短按随机", "Short Random");
+        public static readonly LocalisableString KrrLN_ShortRandom_Description = new EzLocalisableString("短按随机强度", "Randomness for short notes.");
+        public static readonly LocalisableString KrrLN_Alignment_Label = new EzLocalisableString("对齐", "Alignment");
+        public static readonly LocalisableString KrrLN_Alignment_Description = new EzLocalisableString("普通音符对齐节拍", "Snap normal notes to beat grid.");
+        public static readonly LocalisableString KrrLN_LNAlignment_Label = new EzLocalisableString("LN对齐", "LN Alignment");
+        public static readonly LocalisableString KrrLN_LNAlignment_Description = new EzLocalisableString("长按尾部对齐节拍", "Snap hold tails to beat grid.");
+
         // CleanColumn
         public static readonly LocalisableString DeleteSColumn_Label = new EzLocalisableString("删除S列", "Delete S Column Type");
         public static readonly LocalisableString DeleteSColumn_Description = new EzLocalisableString("开启时删除标记了S Column Type的列", "Delete columns marked with S column type when enabled");
@@ -101,16 +170,28 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString CustomReorderColumn_Label = new EzLocalisableString("列重排规则", "Column Reorder Rule");
 
         public static readonly LocalisableString CustomReorderColumn_Description = new EzLocalisableString(
-            "处理Column，自定义排序、复制、清空列中的note。"
-            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）, '-'表示该新列位置删除，'|'表示该新列位置放置贯穿整个谱面的长按note。"
-            + "\n字符串长度决定新的列数（修改长度必须重新启用开关），每位数字代表该新列使用原谱面的哪一列内容。"
-            + "\n如5k谱面,输入'213-'转换为4k谱面：按顺序使用原谱中2、1、3列,第4列空白。"
-            + "\n如5k谱面,输入'213|5'转换为5k谱面：新列1使用原列2，新列2使用原列1，新列3使用原列3，新列4贯穿长按，新列5使用原列4。",
-            "Process Column, custom sort, copy, and clear notes in columns."
-            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10), '-' means delete the new column, '|' means place a hold note spanning the entire beatmap in that new column."
-            + "\nString length determines the new column count (must re-enable when changing length), each digit represents the content of the new column."
-            + "\nSuch as a 5k map, input '213-' converts to a 4k map: use column 2, 1, 3 in order, column 4 is blank."
-            + "\nSuch as a 5k map, input '213|5' converts to a 5k map: new col1 uses orig col2, new col2 uses orig col1, new col3 uses orig col3, new col4 has full hold note, new col5 uses orig col4.");
+            "处理Column，自定义排序、复制、删除或置空列中的note。"
+            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）；"
+            + "\n'-'表示该新列位置清空，"
+            + "\n'|'表示该新列位置放置贯穿全谱面的长按note，"
+            + "\n'?'表示该新列保持原列位置不变。"
+            + "\n字符串长度决定新的列数（修改长度必须重新启用开关）。每位数字代表新列使用原谱面的哪一列内容，可重复以复制列。"
+            + "\n如果输入包含超出原列数的数字，该位会被忽略并保持为空列。"
+            + "\n示例：原谱面5k，输入 2|30-? 转换为6k："
+            + "\n- 新列1=原列2；新列2=锁手长按；新列3=原列3；"
+            + "\n- 新列4=原列10（超出，忽略，空列）；新列5='-'清空；"
+            + "\n- 新列6=随机的原列",
+            "Process Column: custom reorder, copy, delete, or clear notes in columns."
+            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10); '-' clears the new column; '|' places a hold note spanning the entire beatmap in that new column; '?' keeps the original column in place."
+            + "\nString length determines the new column count (must re-enable when changing length). Each digit maps the new column to an original column; duplicates copy columns."
+            + "\nDigits exceeding the original column count are ignored and remain empty."
+            + "\nExample: original 5k, input " + '"' + "2|30-1" + '"' + " converts to 6k:"
+            + "\n- New col1 = orig col2;"
+            + "\n- New col2 = full-length hold;"
+            + "\n- New col3 = orig col3;"
+            + "\n- New col4 = orig col10 (ignored, empty);"
+            + "\n- New col5 = '-' cleared;"
+            + "\n- New col6 = orig col1.");
 
         // ====================================================================================================
         // YuLiangSSSMods - SettingSource Labels & Descriptions
@@ -258,6 +339,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString UseCustomOD_Description = new EzLocalisableString("低优先级", "Low Priority");
         public static readonly LocalisableString OD_Label = new EzLocalisableString("OD", "OD");
         public static readonly LocalisableString OD_Description = new EzLocalisableString("选择要重新计算的OD", "Choose the OD you want to recalculate.");
+    #pragma warning restore IDE1006
 
         // Adjust
         public static readonly LocalisableString ScoreMultiplier_Label = new EzLocalisableString("分数倍数", "Score Multiplier");
