@@ -256,6 +256,49 @@ namespace osu.Game.Rulesets.Mania
         {
             switch (type)
             {
+                case ModType.LA_Mod:
+                    return new Mod[]
+                    {
+                        new ManiaModEz2Settings(),
+                        new ManiaModCleanColumn(),
+                        new ManiaModNiceBPM(),
+                        new ManiaModSpaceBody(),
+                        new ManiaModLoopPlayClip(),
+                        new ManiaModSRAdjust(),
+                        new ManiaModKrrN2Nc(),
+                        new ManiaModKrrLN(),
+                        new ManiaModKrrDP(),
+                    };
+
+                case ModType.YuLiangSSS_Mod:
+                    return new Mod[]
+                    {
+                        new ManiaModAdjust(),
+                        new ManiaModNtoM(),
+                        new ManiaModNtoMAnother(),
+                        // new ManiaModChangeSpeedByAccuracy(), // 无法使用
+                        new ManiaModCleaner(),
+                        new ManiaModDoublePlay(),
+                        new ManiaModGracer(),
+                        new ManiaModJackAdjust(),
+                        new ManiaModJudgmentsAdjust(),
+                        // new ManiaModLN(),
+                        new ManiaModLNDoubleDistribution(),
+                        new ManiaModLNJudgementAdjust(),
+                        new ManiaModLNLongShortAddition(),
+                        new ManiaModLNSimplify(),
+                        new ManiaModLNTransformer(),
+                        new ManiaModMalodyStyleLN(),
+                        new ManiaModNewJudgement(),
+                        new ManiaModNoteAdjust(),
+                        new ManiaModO2Health(),
+                        new ManiaModO2Judgement(),
+                        new ManiaModPlayfieldTransformation(), //加载有问题
+                        new ManiaModReleaseAdjust(),
+                        new ManiaModRemedy(),
+                        new ModStarRatingRebirth(),
+                    };
+
                 case ModType.DifficultyReduction:
                     return new Mod[]
                     {
@@ -305,47 +348,6 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new MultiMod(new ManiaModAutoplay(), new ManiaModCinema()),
-                    };
-
-                case ModType.YuLiangSSS_Mod:
-                    return new Mod[]
-                    {
-                        new ManiaModAdjust(),
-                        new ManiaModNtoM(),
-                        new ManiaModNtoMAnother(),
-                        // new ManiaModChangeSpeedByAccuracy(), // 无法使用
-                        new ManiaModCleaner(),
-                        new ManiaModDoublePlay(),
-                        new ManiaModGracer(),
-                        new ManiaModJackAdjust(),
-                        new ManiaModJudgmentsAdjust(),
-                        // new ManiaModLN(),
-                        new ManiaModLNDoubleDistribution(),
-                        new ManiaModLNJudgementAdjust(),
-                        new ManiaModLNLongShortAddition(),
-                        new ManiaModLNSimplify(),
-                        new ManiaModLNTransformer(),
-                        new ManiaModMalodyStyleLN(),
-                        new ManiaModNewJudgement(),
-                        new ManiaModNoteAdjust(),
-                        new ManiaModO2Health(),
-                        new ManiaModO2Judgement(),
-                        new ManiaModPlayfieldTransformation(), //加载有问题
-                        new ManiaModReleaseAdjust(),
-                        new ManiaModRemedy(),
-                        new ModStarRatingRebirth(),
-                    };
-
-                case ModType.LA_Mod:
-                    return new Mod[]
-                    {
-                        new ManiaModEz2Settings(),
-                        new ManiaModCleanColumn(),
-                        new ManiaModKrrDP(),
-                        new ManiaModNiceBPM(),
-                        new ManiaModSpaceBody(),
-                        new ManiaModLoopPlayClip(),
-                        new ManiaModSRAdjust(),
                     };
 
                 case ModType.Fun:

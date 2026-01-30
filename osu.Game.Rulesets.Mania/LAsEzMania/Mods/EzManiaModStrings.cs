@@ -33,6 +33,24 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString TrueRandom_Description = new EzLocalisableString("随机排列所有音符（使用NoLN（LN转换器等级-3），否则可能会重叠）",
             "True Random. Shuffle all notes(Use NoLN(LN Transformer Level -3), or you will get overlapping notes otherwise).");
 
+        public static readonly LocalisableString BeatSpeed_Label = new EzLocalisableString("转换的节拍速度", "Transform Beat Speed");
+
+        public static readonly LocalisableString BeatSpeed_Description = new EzLocalisableString(
+            "选择转换节拍区间长度",
+            "Transform speed presets:\n\n" +
+            "| Index | Beat Length |\n" +
+            "|-------|-------------|\n" +
+            "| 0     | 1/8 Beat    |\n" +
+            "| 1     | 1/4 Beat    |\n" +
+            "| 2     | 1/2 Beat    |\n" +
+            "| 3     | 3/4 Beat    |\n" +
+            "| 4     | 1 Beat      |\n" +
+            "| 5     | 2 Beats     |\n" +
+            "| 6     | 3 Beats     |\n" +
+            "| 7     | 4 Beats     |\n" +
+            "| 8     | Free        |"
+        );
+
         // ====================================================================================================
         // YuLiangSSSMods - Mod Descriptions
         // ====================================================================================================

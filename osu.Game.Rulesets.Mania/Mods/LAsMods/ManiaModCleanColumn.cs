@@ -17,13 +17,12 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModCleanColumn : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasApplyOrder
+    public class ManiaModCleanColumn : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
     {
         public override string Name => "Clean Column";
 
@@ -59,36 +58,25 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.EnableCustomReorder_Label), nameof(EzManiaModStrings.EnableCustomReorder_Description))]
         public BindableBool EnableCustomReorder { get; } = new BindableBool();
 
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseHealthCapReduction_Label), nameof(EzManiaModStrings.UseHealthCapReduction_Description))]
+        public BindableBool UseHealthCapReduction { get; } = new BindableBool();
+
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomReorderColumn_Label), nameof(EzManiaModStrings.CustomReorderColumn_Description), SettingControlType = typeof(SettingsTextBox))]
         public Bindable<string> CustomReorderColumn { get; } = new Bindable<string>(string.Empty);
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description), SettingControlType = typeof(SettingsNumberBox))]
-        public Bindable<int?> ApplyOrderSetting { get; } = new Bindable<int?>(1000);
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseHealthCapReduction_Label), nameof(EzManiaModStrings.UseHealthCapReduction_Description))]
-        public BindableBool UseHealthCapReduction { get; } = new BindableBool();
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         private List<int>? columnsToDelete;
         private int keys1;
         private int keys2;
         private bool customReorderApplied;
-
-        public void ApplyToBeatmapConverter(IBeatmapConverter converter)
-        {
-            var mbc = (ManiaBeatmapConverter)converter;
-
-            if (!EnableCustomReorder.Value || string.IsNullOrWhiteSpace(CustomReorderColumn.Value))
-                return;
-
-            keys2 = CustomReorderColumn.Value.Length;
-
-            if ((keys2 < 1 || keys2 > 10))
-                return;
-
-            Logger.Log($"[ManiaModCleanColumn] ApplyToBeatmapConverter: desired target columns = {keys2} (will apply during post-conversion to preserve original source columns)");
-            // NOTE: 不在转换器阶段设置 mbc.TargetColumns，避免转换器先修改列号后导致后处理时无法以原始列为基准重建。
-            // mbc.TargetColumns = keys2;
-        }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -177,7 +165,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         /// <summary>
         /// 处理自定义列重排和清空note的逻辑
-        /// 新格式：字符串长度决定新的列数，每位数字代表该新列使用原谱面的哪一列内容
+        /// 新格式：字符串长度决定新列数，每位数字代表该新列使用原谱面的哪一列内容
         /// - 数字：该新列位置使用对应原列的note
         /// - '-'：该新列位置删除（清空）
         /// - '|'：该新列位置放置贯穿整个谱面的长按note
@@ -255,7 +243,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     }
                 }
 
-                // 如果没有有效的映射，则不进行任何操作
+                // 如果没有有效映射，则不进行任何操作
                 if (columnMapping.Count == 0 && clearColumns.Count == 0 && holdColumns.Count == 0)
                     return;
 
@@ -277,24 +265,25 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                 // 按时间重建：先把所有源 note 转为时间序列 locations，然后根据反向映射把 note 放到目标列
                 var locations = sourceHitObjects.OfType<Note>().Select(n => (
-                                            startTime: n.StartTime,
-                                            endTime: n.StartTime,
-                                            samples: n.Samples,
-                                            column: n.Column,
-                                            duration: 0.0,
-                                            isHold: false
-                                        ))
-                                        .Concat(sourceHitObjects.OfType<HoldNote>().Select(h => (
-                                            startTime: h.StartTime,
-                                            endTime: h.EndTime,
-                                            samples: h.Samples,
-                                            column: h.Column,
-                                            duration: h.Duration,
-                                            isHold: true
-                                        ))).OrderBy(x => x.startTime).ThenBy(x => x.column).ToList();
+                                                    startTime: n.StartTime,
+                                                    endTime: n.StartTime,
+                                                    samples: n.Samples,
+                                                    column: n.Column,
+                                                    duration: 0.0,
+                                                    isHold: false
+                                                ))
+                                                .Concat(sourceHitObjects.OfType<HoldNote>().Select(h => (
+                                                    startTime: h.StartTime,
+                                                    endTime: h.EndTime,
+                                                    samples: h.Samples,
+                                                    column: h.Column,
+                                                    duration: h.Duration,
+                                                    isHold: true
+                                                ))).OrderBy(x => x.startTime).ThenBy(x => x.column).ToList();
 
                 // 反向映射：源列 -> 目标列列表
                 var reverseMap = new Dictionary<int, List<int>>();
+
                 foreach (var kv in columnMapping)
                 {
                     if (!reverseMap.ContainsKey(kv.Value))
@@ -307,7 +296,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 {
                     if (reverseMap.TryGetValue(loc.column, out var targetCols))
                     {
-                        foreach (var target in targetCols)
+                        foreach (int target in targetCols)
                         {
                             if (loc.isHold)
                             {
@@ -317,8 +306,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                         Column = target,
                                         StartTime = loc.startTime,
                                         Duration = loc.endTime - loc.startTime,
+                                        NodeSamples = new List<IList<HitSampleInfo>> { loc.samples, new List<HitSampleInfo>() }
                                     };
-                                    hn.NodeSamples = new List<IList<HitSampleInfo>> { loc.samples, new List<HitSampleInfo>() };
                                     newObjects.Add(hn);
                                 }
                             }
@@ -336,7 +325,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 }
 
                 // 添加贯穿长按列
-                foreach (var hc in holdColumns)
+                foreach (int hc in holdColumns)
                 {
                     Logger.Log($"[ManiaModCleanColumn] Column {hc} gets punishment hold note");
                     newObjects.Add(new PunishmentHoldNote
@@ -358,8 +347,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                         info = "cleared (-)";
                     else if (holdColumns.Contains(t))
                         info = "hold (|)";
-                    else if (columnMapping.ContainsKey(t))
-                        info = $"mapped from source {columnMapping[t]}";
+                    else if (columnMapping.TryGetValue(t, out int value))
+                        info = $"mapped from source {value}";
                     else
                         info = "no mapping";
 
@@ -390,9 +379,5 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 // 如果处理失败，保持原谱面不变
             }
         }
-
-        // 确认此 Mod 在其他转换后 Mod 之后应用，返回更高的应用顺序。
-        // 没有此接口的 Mod 被视为顺序 0。
-        public int ApplyOrder => ApplyOrderSetting.Value ?? 1000;
     }
 }
