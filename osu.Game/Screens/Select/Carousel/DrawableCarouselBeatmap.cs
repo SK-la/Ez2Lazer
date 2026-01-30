@@ -321,6 +321,7 @@ namespace osu.Game.Screens.Select.Carousel
 
             starDifficultyCancellationSource?.Cancel();
             maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisBindable = null;
 
             // Only compute difficulty when the item is visible.
             if (Item?.State.Value != CarouselItemState.Collapsed)
@@ -397,8 +398,8 @@ namespace osu.Game.Screens.Select.Carousel
 
             if (columnCounts != null)
             {
-                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts);
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 Schedule(updateKeyCount);
             }
         }

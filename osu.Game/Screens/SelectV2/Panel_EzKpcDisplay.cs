@@ -165,86 +165,50 @@ namespace osu.Game.Screens.SelectV2
         /// </summary>
         /// <param name="columnNoteCounts">每列的音符数量</param>
         /// <param name="holdNoteCounts">面条数量</param>
-        /// <param name="keyCount"></param>
-        public void UpdateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null, int? keyCount = null)
+        public void UpdateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
-            if (keyCount.HasValue)
+            if (columnNoteCounts.Count == 0)
             {
-                int kc = keyCount.Value;
-                var pool = ArrayPool<int>.Shared;
-                int[] normalized = pool.Rent(Math.Max(1, kc));
-                int[] normalizedHold = pool.Rent(Math.Max(1, kc));
-
-                try
-                {
-                    for (int i = 0; i < kc; i++)
-                    {
-                        normalized[i] = columnNoteCounts.GetValueOrDefault(i);
-                        normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
-                    }
-
-                    // store a copy for immediate refresh on mode changes
-                    lastKnownColumns = new int[kc];
-                    lastKnownHolds = new int[kc];
-                    Array.Copy(normalized, lastKnownColumns, kc);
-                    Array.Copy(normalizedHold, lastKnownHolds, kc);
-                    lastKnownCount = kc;
-
-                    updateDisplay(normalized, normalizedHold, kc);
-                }
-                finally
-                {
-                    pool.Return(normalized, clearArray: true);
-                    pool.Return(normalizedHold, clearArray: true);
-                }
-
+                updateDisplay(columnNoteCounts, holdNoteCounts);
                 return;
             }
 
-            // When keyCount is not provided, normalize sparse key dictionaries into
-            // a continuous 0..maxKey range so callers can index by column.
-            if (columnNoteCounts.Count > 0)
+            // 从 columnNoteCounts 的最大 key + 1 推断列数
+            int maxKey = 0;
+
+            foreach (int k in columnNoteCounts.Keys)
             {
-                int maxKey = 0;
-
-                foreach (int k in columnNoteCounts.Keys)
-                {
-                    if (k > maxKey)
-                        maxKey = k;
-                }
-
-                int kc = maxKey + 1;
-                var pool = ArrayPool<int>.Shared;
-                int[] normalized = pool.Rent(Math.Max(1, kc));
-                int[] normalizedHold = pool.Rent(Math.Max(1, kc));
-
-                try
-                {
-                    for (int i = 0; i < kc; i++)
-                    {
-                        normalized[i] = columnNoteCounts.GetValueOrDefault(i);
-                        normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
-                    }
-
-                    // store a copy for immediate refresh on mode changes
-                    lastKnownColumns = new int[kc];
-                    lastKnownHolds = new int[kc];
-                    Array.Copy(normalized, lastKnownColumns, kc);
-                    Array.Copy(normalizedHold, lastKnownHolds, kc);
-                    lastKnownCount = kc;
-
-                    updateDisplay(normalized, normalizedHold, kc);
-                }
-                finally
-                {
-                    pool.Return(normalized, clearArray: true);
-                    pool.Return(normalizedHold, clearArray: true);
-                }
-
-                return;
+                if (k > maxKey)
+                    maxKey = k;
             }
 
-            updateDisplay(columnNoteCounts, holdNoteCounts);
+            int kc = maxKey + 1;
+            var pool = ArrayPool<int>.Shared;
+            int[] normalized = pool.Rent(Math.Max(1, kc));
+            int[] normalizedHold = pool.Rent(Math.Max(1, kc));
+
+            try
+            {
+                for (int i = 0; i < kc; i++)
+                {
+                    normalized[i] = columnNoteCounts.GetValueOrDefault(i);
+                    normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
+                }
+
+                // store a copy for immediate refresh on mode changes
+                lastKnownColumns = new int[kc];
+                lastKnownHolds = new int[kc];
+                Array.Copy(normalized, lastKnownColumns, kc);
+                Array.Copy(normalizedHold, lastKnownHolds, kc);
+                lastKnownCount = kc;
+
+                updateDisplay(normalized, normalizedHold, kc);
+            }
+            finally
+            {
+                pool.Return(normalized, clearArray: true);
+                pool.Return(normalizedHold, clearArray: true);
+            }
         }
 
         /// <summary>

@@ -269,6 +269,7 @@ namespace osu.Game.Screens.SelectV2
 
             mods.BindValueChanged(_ =>
             {
+                requestManiaAnalysisBindable();
                 updateKeyCount();
             }, true);
 
@@ -356,8 +357,8 @@ namespace osu.Game.Screens.SelectV2
 
             if (columnCounts != null)
             {
-                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts);
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 Schedule(updateKeyCount);
             }
         }
@@ -413,6 +414,7 @@ namespace osu.Game.Screens.SelectV2
 
                 maniaAnalysisCancellationSource?.Cancel();
                 maniaAnalysisCancellationSource = null;
+                maniaAnalysisBindable = null;
             }
 
             // If we just became visible, pull latest mania analysis value to initialise UI.

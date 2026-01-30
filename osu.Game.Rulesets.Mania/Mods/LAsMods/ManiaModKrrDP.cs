@@ -14,7 +14,7 @@ using osu.Game.Rulesets.Mania.Mods.KrrConversion;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModKrrDP : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder, IApplicableToBeatmapConverter
+    public class ManiaModKrrDP : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
     {
         public override string Name => "Krr DP";
         public override string Acronym => "DP";
@@ -81,9 +81,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             MaxValue = 5,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_DisplayTarget_Label), nameof(EzManiaModStrings.KrrDP_DisplayTarget_Description))]
-        public BindableBool DisplayTargetKeys { get; set; } = new BindableBool(false);
-
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {
@@ -101,7 +98,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 yield return ("Target Keys", $"{TargetKeys.Value}");
                 yield return ("Left Mirror", LMirror.Value ? "On" : "Off");
                 yield return ("Right Mirror", RMirror.Value ? "On" : "Off");
-                yield return ("Display Target Keys", DisplayTargetKeys.Value ? "On" : "Off");
             }
         }
 
@@ -139,23 +135,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             maniaBeatmap.Stages.Clear();
             maniaBeatmap.Stages.Add(new StageDefinition(finalKeys));
             maniaBeatmap.Difficulty.CircleSize = finalKeys;
-        }
-
-        public void ApplyToBeatmapConverter(IBeatmapConverter beatmapConverter)
-        {
-            if (!DisplayTargetKeys.Value)
-                return;
-
-            var mbc = (ManiaBeatmapConverter)beatmapConverter;
-
-            int baseKeys = mbc.TotalColumns;
-
-            if (EnableModifyKeys.Value)
-                finalKeys = TargetKeys.Value * 2;
-            else
-                finalKeys = baseKeys * 2;
-
-            mbc.TargetColumns = Math.Clamp(finalKeys, 1, 18);
         }
     }
 }

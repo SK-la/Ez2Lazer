@@ -74,11 +74,21 @@ namespace osu.Game.LAsEzExtensions.Analysis
         /// <summary>
         /// 复用外部已经计算好的 列统计与 KPS 数据，生成 Scratch 标签。
         /// 用于选歌面板：避免重复遍历 HitObjects / 重复计算 KPS。
+        /// keyCount 从 columnCounts 推断。
         /// </summary>
-        // TODO: 计算比较粗糙，后续可优化。
-        public static string GetScratchFromPrecomputed(Dictionary<int, int> columnCounts, double maxKps, List<double> kpsList, int keyCount)
+        public static string GetScratchFromPrecomputed(Dictionary<int, int> columnCounts, double maxKps, List<double> kpsList)
         {
-            if (keyCount <= 0) return "[?K] ";
+            if (columnCounts.Count == 0)
+                return "[?K] ";
+
+            // 从 columnCounts 的最大 key + 1 推断列数
+            int keyCount = 0;
+
+            foreach (int k in columnCounts.Keys)
+            {
+                if (k >= keyCount)
+                    keyCount = k + 1;
+            }
 
             if (maxKps == 0) return $"[{keyCount}K] ";
 
@@ -93,31 +103,26 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             var (isFirstLow, isFirstHigh, isLastLow, isLastHigh) = checkNotes(countsByColumn, keyCount);
 
-            // 去掉两侧列，计算“中间列”平均/最大。
-            // int[] middleCounts = keyCount > 2 ? countsByColumn.Skip(1).Take(keyCount - 2).ToArray() : Array.Empty<int>();
-            // double averageNotes = middleCounts.Length > 0 ? middleCounts.Average() : 0;
-            // int maxNotesInMiddle = middleCounts.Length > 0 ? middleCounts.Max() : 0;
-
             string result = $"[{keyCount}K] ";
 
-            if (keyCount == 6 || keyCount == 8)
+            if (keyCount >= 6)
             {
                 if (isFirstHigh || isLastHigh)
                     result = $"[{keyCount - 1}K1S] ";
-                else if (isFirstLow || isLastLow)
+
+                if (isFirstLow || isLastLow)
                     result = $"[{keyCount - 1}+1K] ";
-            }
-            else if (keyCount >= 7)
-            {
-                if (isFirstHigh || isLastHigh)
+
+                if (isFirstHigh && isLastHigh)
                     result = $"[{keyCount - 2}K2S] ";
-                else if (isFirstLow || isLastLow)
+
+                if (isFirstLow && isLastLow)
                     result = $"[{keyCount - 2}+2K] ";
             }
 
             int emptyColumns = countsByColumn.Count(c => c == 0);
             if (emptyColumns > 0)
-                result = $"[{keyCount - emptyColumns}K_{emptyColumns}Empty] ";
+                result = $"[{keyCount - emptyColumns}K_{emptyColumns}[]] ";
 
             return result;
         }

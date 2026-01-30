@@ -81,7 +81,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString MalodyStyleLN_Description = new EzLocalisableString("像Malody一样播放LN！", "Play LN like Malody!");
         public static readonly LocalisableString LNDoubleDistribution_Description = new EzLocalisableString("LN转换器另一个版本", "LN Transformer another version.");
         public static readonly LocalisableString JudgmentsAdjust_Description = new EzLocalisableString("修改你的判定", "Modify your judgement.");
-        public static readonly LocalisableString JackAdjust_Description = new EzLocalisableString("Jack的模式", "Pattern of Jack");
 
         public static readonly LocalisableString CleanColumn_Description = new EzLocalisableString("整理Column, 排序、删除轨道中的note", "Clean Column, Sort, Delete notes in the column.");
 
@@ -124,8 +123,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString KrrDP_RightMax_Description = new EzLocalisableString("右侧密度最大键数", "Right density max keys.");
         public static readonly LocalisableString KrrDP_RightMin_Label = new EzLocalisableString("右侧最小键数", "Right Min Keys");
         public static readonly LocalisableString KrrDP_RightMin_Description = new EzLocalisableString("右侧密度最小键数", "Right density min keys.");
-        public static readonly LocalisableString KrrDP_DisplayTarget_Label = new EzLocalisableString("显示目标键数", "Display Target Keys");
-        public static readonly LocalisableString KrrDP_DisplayTarget_Description = new EzLocalisableString("选歌界面按转换后键数显示（存在已知问题）", "Display converted key count in song select (known issues).");
 
         // Krr LN
         public static readonly LocalisableString KrrLN_LongLevel_Label = new EzLocalisableString("长按等级", "Long Level");
@@ -242,19 +239,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
 
         public static readonly LocalisableString Adjust4Speed_Description = new EzLocalisableString("（如300+ BPM 1/4 Speed）清理分割 * 2，用于1/4 Speed，避免额外的1/2 Jack。",
             "(Like 300+ BPM 1/4 Speed)Clean Divide * 2, for 1/4 Speed, avoiding additional 1/2 Jack.");
-
-        // JackAdjust
-        public static readonly LocalisableString ToStream_Label = new EzLocalisableString("转换为流", "To Stream");
-
-        public static readonly LocalisableString ToStream_Description = new EzLocalisableString("尽可能作为JumpJack（推荐使用中等概率50~80）",
-            "To Stream. As Jumpjack as possible(Recommend to use a medium(50~80) probability).");
-
-        public static readonly LocalisableString Line_Label = new EzLocalisableString("线", "Line");
-        public static readonly LocalisableString Line_Description = new EzLocalisableString("Jack的线", "Line. Line for Jack.");
-        public static readonly LocalisableString Alignment_Label = new EzLocalisableString("对齐", "Alignment");
-
-        public static readonly LocalisableString Alignment_Description = new EzLocalisableString("最后一行（false）或第一行（true），true会得到一些子弹，false会得到许多长jack",
-            "Alignment. Last line(false) or first line(true), true will get some bullet, false will get many long jack.");
 
         // NtoM, Gracer, JackAdjust, LNJudgementAdjust
         public static readonly LocalisableString ApplyOrder_Label = new EzLocalisableString("应用顺序", "Apply Order");

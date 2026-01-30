@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModKrrN2Nc : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder, IApplicableToBeatmapConverter
+    public class ManiaModKrrN2Nc : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
     {
         public override string Name => "Krr N2Nc";
 
@@ -82,7 +82,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 yield return ("Target Keys", $"{TargetKeys.Value}");
                 yield return ("Beat Speed", $"{BeatSpeed.Value}");
-                yield return ("Display Target Keys", DisplayTargetKeys.Value ? "On" : "Off");
 
                 if (Seed.Value is null)
                     yield return ("Seed", "Null");
@@ -117,15 +116,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             catch (Exception ex)
             {
                 Logger.Log($"[ManiaModKrrN2Nc] Failed to update stages: {ex.Message}");
-            }
-        }
-
-        public void ApplyToBeatmapConverter(IBeatmapConverter beatmapConverter)
-        {
-            if (DisplayTargetKeys.Value)
-            {
-                var mbc = (ManiaBeatmapConverter)beatmapConverter;
-                mbc.TargetColumns = TargetKeys.Value;
             }
         }
     }

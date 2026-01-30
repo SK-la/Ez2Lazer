@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -259,6 +260,7 @@ namespace osu.Game.Screens.SelectV2
 
             mods.BindValueChanged(_ =>
             {
+                requestManiaAnalysisBindable();
                 updateKeyCount();
             }, true);
 
@@ -341,8 +343,8 @@ namespace osu.Game.Screens.SelectV2
 
             if (columnCounts != null)
             {
-                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts, keyCount);
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList, keyCount);
+                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts);
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 Schedule(updateKeyCount);
             }
         }
@@ -398,6 +400,7 @@ namespace osu.Game.Screens.SelectV2
 
                 maniaAnalysisCancellationSource?.Cancel();
                 maniaAnalysisCancellationSource = null;
+                maniaAnalysisBindable = null;
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.

@@ -515,7 +515,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 foreach (var b in trackedBindables)
                 {
-                    // 只重算仍“活跃”的 bindable：离屏/回收的面板会取消 token。
+                    // 只重算仍"活跃"的 bindable：离屏/回收的面板会取消 token。
                     // 这样可以确保计算预算优先服务当前可见内容。
                     if (b.CancellationToken.IsCancellationRequested)
                         continue;
@@ -557,6 +557,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (cancellationToken.IsCancellationRequested)
                 return;
 
+            // Capture the bindable's own cancellation token for checking in the scheduled callback.
+            // We should only skip setting the value if the bindable itself is disposed/cancelled,
+            // not if a new mod change triggered another update cycle.
+            var bindableCancellationToken = bindable.CancellationToken;
+
             // Request the analysis. Apply the result only when the task completes successfully.
             _ = applyAsync();
 
@@ -570,7 +575,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                     Schedule(() =>
                     {
-                        if (cancellationToken.IsCancellationRequested)
+                        // Only check the bindable's own token, not the linked update token.
+                        // This ensures we always apply the latest result even if another update cycle started.
+                        if (bindableCancellationToken.IsCancellationRequested)
                             return;
 
                         bindable.Value = analysis.Value;
