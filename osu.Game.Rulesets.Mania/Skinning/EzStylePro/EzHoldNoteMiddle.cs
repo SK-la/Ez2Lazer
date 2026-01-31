@@ -35,6 +35,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private float tailHeight;
 
+        private float lastBodyContainerHeight = float.NaN;
+        private float lastBodyScaleY = float.NaN;
+
         public EzHoldNoteMiddle()
         {
             RelativeSizeAxes = Axes.Both;
@@ -190,6 +193,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // 重新初始化光效层
             OnLightChanged();
 
+            resetLayoutCache();
             Schedule(UpdateSize);
         }
 
@@ -225,14 +229,32 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 float drawHeightMinusHalf = DrawHeight - tailHeight;
                 float middleHeight = Math.Max(drawHeightMinusHalf, tailHeight);
 
-                bodyContainer.Height = tailMaskHeight.Value > 0
+                float targetBodyHeight = tailMaskHeight.Value > 0
                     ? middleHeight - (float)tailMaskHeight.Value + 1
                     : middleHeight + 2;
 
-                if (bodyScaleContainer != null)
+                if (layoutChanged(lastBodyContainerHeight, targetBodyHeight))
+                {
+                    bodyContainer.Height = targetBodyHeight;
+                    lastBodyContainerHeight = targetBodyHeight;
+                }
+
+                if (bodyScaleContainer != null && layoutChanged(lastBodyScaleY, drawHeightMinusHalf))
+                {
                     bodyScaleContainer.Scale = new Vector2(1, drawHeightMinusHalf);
+                    lastBodyScaleY = drawHeightMinusHalf;
+                }
             }
         }
+
+        private void resetLayoutCache()
+        {
+            lastBodyContainerHeight = float.NaN;
+            lastBodyScaleY = float.NaN;
+        }
+
+        private static bool layoutChanged(float oldValue, float newValue)
+            => float.IsNaN(oldValue) || MathF.Abs(oldValue - newValue) > 0.001f;
 
         protected override void Dispose(bool isDisposing)
         {
