@@ -1,19 +1,23 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.IO;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
+using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
@@ -32,13 +36,17 @@ namespace osu.Game.Rulesets.BMS.UI
         private OsuTextFlowContainer pathDisplay = null!;
         private OsuTextFlowContainer statusDisplay = null!;
         private RoundedButton scanButton = null!;
-        private ProgressBar progressBar = null!;
 
         [Resolved]
         private OsuGame? game { get; set; }
 
         [Resolved]
-        private BMSBeatmapManager? beatmapManager { get; set; }
+        private INotificationOverlay? notificationOverlay { get; set; }
+
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
+        private BMSBeatmapManager? beatmapManager;
 
         public BMSSettingsSubsection(Ruleset ruleset)
             : base(ruleset)
@@ -50,6 +58,11 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             bmsConfig = (BMSRulesetConfigManager)Config;
             rootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
+
+            // Create beatmap manager with proper cache directory
+            string cacheDir = storage.GetFullPath("bms_cache");
+            beatmapManager = new BMSBeatmapManager(cacheDir);
+            beatmapManager.LoadCache();
 
             Children = new Drawable[]
             {
@@ -78,12 +91,6 @@ namespace osu.Game.Rulesets.BMS.UI
                             Action = startScan,
                         },
                     }
-                },
-                progressBar = new ProgressBar(false)
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 5,
-                    Alpha = 0,
                 },
                 statusDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 12))
                 {
@@ -117,18 +124,10 @@ namespace osu.Game.Rulesets.BMS.UI
 
             rootPathBindable.BindValueChanged(e => updatePathDisplay(e.NewValue), true);
 
-            if (beatmapManager != null)
+            // Show initial cache status
+            if (beatmapManager?.LibraryCache != null)
             {
-                beatmapManager.StatusMessage.BindValueChanged(e => statusDisplay.Text = e.NewValue, true);
-                beatmapManager.ScanProgress.BindValueChanged(e =>
-                {
-                    progressBar.Current.Value = e.NewValue;
-                }, true);
-                beatmapManager.IsScanning.BindValueChanged(e =>
-                {
-                    scanButton.Enabled.Value = !e.NewValue;
-                    progressBar.Alpha = e.NewValue ? 1 : 0;
-                }, true);
+                statusDisplay.Text = $"已缓存 {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面";
             }
         }
 
@@ -148,7 +147,7 @@ namespace osu.Game.Rulesets.BMS.UI
             });
         }
 
-        private async void startScan()
+        private void startScan()
         {
             if (beatmapManager == null) return;
 
@@ -156,11 +155,64 @@ namespace osu.Game.Rulesets.BMS.UI
 
             if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
             {
-                statusDisplay.Text = "请先选择有效的 BMS 文件夹路径";
+                notificationOverlay?.Post(new SimpleErrorNotification
+                {
+                    Text = "请先选择有效的 BMS 文件夹路径"
+                });
                 return;
             }
 
-            await beatmapManager.ScanLibraryAsync(path).ConfigureAwait(false);
+            scanButton.Enabled.Value = false;
+            statusDisplay.Text = "正在扫描...";
+
+            var notification = new ProgressNotification
+            {
+                Text = "正在扫描 BMS 歌曲库...",
+                CompletionText = "BMS 歌曲库扫描完成!",
+                State = ProgressNotificationState.Active
+            };
+
+            notificationOverlay?.Post(notification);
+
+            // Subscribe to progress updates
+            beatmapManager.ScanProgress.BindValueChanged(e =>
+            {
+                Schedule(() => notification.Progress = (float)e.NewValue);
+            });
+
+            beatmapManager.StatusMessage.BindValueChanged(e =>
+            {
+                Schedule(() => notification.Text = e.NewValue);
+            });
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await beatmapManager.ScanLibraryAsync(path).ConfigureAwait(false);
+
+                    Schedule(() =>
+                    {
+                        notification.State = ProgressNotificationState.Completed;
+
+                        if (beatmapManager.LibraryCache != null)
+                        {
+                            statusDisplay.Text = $"扫描完成! {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面";
+                        }
+
+                        scanButton.Enabled.Value = true;
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Schedule(() =>
+                    {
+                        notification.State = ProgressNotificationState.Cancelled;
+                        statusDisplay.Text = $"扫描失败: {ex.Message}";
+                        scanButton.Enabled.Value = true;
+                    });
+                }
+            });
         }
     }
 

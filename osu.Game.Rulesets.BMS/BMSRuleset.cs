@@ -13,6 +13,7 @@ using osu.Game.Graphics;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.Difficulty;
 using osu.Game.Rulesets.BMS.Mods;
 using osu.Game.Rulesets.BMS.Scoring;
 using osu.Game.Rulesets.BMS.UI;
