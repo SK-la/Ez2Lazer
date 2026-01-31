@@ -48,15 +48,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             holdNote = (DrawableHoldNote)drawableObject;
             isHitting.BindTo(holdNote.IsHolding);
-
-            hitPosition = EzSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            tailMaskHeight = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
-            tailAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            hitPosition = Column.HitPositionBindable;
+            tailMaskHeight = Column.HoldTailMaskHeightBindable;
+            tailAlpha = Column.HoldTailAlphaBindable;
+
             isHitting.BindValueChanged(onIsHittingChanged, true);
 
             tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);

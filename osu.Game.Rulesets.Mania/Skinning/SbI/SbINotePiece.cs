@@ -84,7 +84,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 accentColour.BindValueChanged(onAccentChanged, true);
             }
 
-            NoteAccentRatio = EzSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            NoteAccentRatio = Column.NoteHeightScaleToWidthBindable;
+            UpdateSize();
         }
 
         protected override void UpdateSize()

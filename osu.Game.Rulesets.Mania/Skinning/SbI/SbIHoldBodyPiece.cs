@@ -60,7 +60,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 // ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHitting);
             }
 
-            tailMaskHeight = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            tailMaskHeight = Column.HoldTailMaskHeightBindable;
             tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
         }
 

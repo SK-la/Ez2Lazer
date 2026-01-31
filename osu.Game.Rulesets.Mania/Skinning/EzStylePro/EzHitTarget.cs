@@ -43,11 +43,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Origin = Anchor.BottomCentre;
 
             Alpha = (float)hitTargetAlpha.Value;
-            hitTargetAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha);
-            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
-
-            hitTargetFloatFixed = EzSkinConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed);
-            hitTargetFloatFixed.BindValueChanged(_ => updatePosition());
         }
 
         private double beatInterval;
@@ -56,6 +51,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            hitTargetAlpha = Column.HitTargetAlphaBindable;
+            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
+
+            hitTargetFloatFixed = Column.HitTargetFloatFixedBindable;
+            hitTargetFloatFixed.BindValueChanged(_ => updatePosition());
+
             calculateBeatInterval();
             requiresUpdate = true;
         }

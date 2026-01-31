@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -13,6 +14,8 @@ using osu.Framework.Platform;
 using osu.Game.Extensions;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
@@ -60,8 +63,22 @@ namespace osu.Game.Rulesets.Mania.UI
         public readonly bool IsSpecial;
 
         public readonly Bindable<Color4> AccentColour = new Bindable<Color4>(Color4.Black);
+        public readonly Bindable<Vector2> NoteSizeBindable = new Bindable<Vector2>();
+        public Bindable<string> NoteSetBindable { get; private set; } = null!;
+        public Bindable<bool> ColorEnabledBindable { get; private set; } = null!;
+        public Bindable<double> HitPositionBindable { get; private set; } = null!;
+        public Bindable<double> HoldTailAlphaBindable { get; private set; } = null!;
+        public Bindable<double> HoldTailMaskHeightBindable { get; private set; } = null!;
+        public Bindable<double> HitTargetAlphaBindable { get; private set; } = null!;
+        public Bindable<double> HitTargetFloatFixedBindable { get; private set; } = null!;
+        public Bindable<double> NoteHeightScaleToWidthBindable { get; private set; } = null!;
+        public event Action<ValueChangedEvent<string>>? NoteSetChanged;
+        public event Action? NoteColourChanged;
+        public event Action? NoteSizeChanged;
         private Bindable<EzMUGHitMode> hitModeBindable = null!;
         private IBindable<bool> touchOverlay = null!;
+
+        private Ez2ConfigManager ezConfig = null!;
 
         private float leftColumnSpacing;
         private float rightColumnSpacing;
@@ -85,9 +102,16 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private ISkinSource skin { get; set; } = null!;
 
+        [Resolved]
+        private EzLocalTextureFactory Factory { get; set; } = null!;
+
+        [Resolved]
+        private StageDefinition StageDefinition { get; set; } = null!;
+
         [BackgroundDependencyLoader]
         private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, Ez2ConfigManager ezConfig)
         {
+            this.ezConfig = ezConfig;
             SkinnableDrawable keyArea;
 
             skin.SourceChanged += onSourceChanged;
@@ -125,9 +149,43 @@ namespace osu.Game.Rulesets.Mania.UI
             RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
             RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
 
-            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
+
+            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            NoteSetBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+            ColorEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            HitPositionBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            HoldTailAlphaBindable = ezConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
+            HoldTailMaskHeightBindable = ezConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
+            HitTargetAlphaBindable = ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha);
+            HitTargetFloatFixedBindable = ezConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed);
+            NoteHeightScaleToWidthBindable = ezConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
+
+            NoteSizeBindable.BindTo(Factory.GetNoteSize(StageDefinition.Columns, Index));
+            NoteSizeBindable.BindValueChanged(_ => NoteSizeChanged?.Invoke(), true);
+
+            NoteSetBindable.BindValueChanged(onNoteSetChanged, true);
+            ezConfig.OnNoteColourChanged += onNoteColourChanged;
+            ezConfig.OnNoteSizeChanged += onNoteSizeChanged;
+        }
+
+        private void onNoteSetChanged(ValueChangedEvent<string> e)
+        {
+            NoteSetChanged?.Invoke(e);
+            // NoteSet 变化会影响尺寸与颜色（ratio/纹理变化），统一广播下发。
+            NoteSizeChanged?.Invoke();
+            NoteColourChanged?.Invoke();
+        }
+
+        private void onNoteColourChanged()
+        {
+            NoteColourChanged?.Invoke();
+        }
+
+        private void onNoteSizeChanged()
+        {
+            NoteSizeChanged?.Invoke();
         }
 
         private void onSourceChanged()
@@ -155,6 +213,18 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
+
+            if (isDisposing)
+                NoteSizeBindable.UnbindAll();
+
+            if (isDisposing && NoteSetBindable != null)
+                NoteSetBindable.ValueChanged -= onNoteSetChanged;
+
+            if (isDisposing && ezConfig != null)
+            {
+                ezConfig.OnNoteColourChanged -= onNoteColourChanged;
+                ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
+            }
 
             base.Dispose(isDisposing);
 

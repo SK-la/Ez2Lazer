@@ -44,8 +44,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
 
-            enabledColor = EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
-            tailAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            enabledColor = Column.ColorEnabledBindable;
+            tailAlpha = Column.HoldTailAlphaBindable;
             tailAlpha.BindValueChanged(alpha =>
             {
                 Alpha = (float)alpha.NewValue;

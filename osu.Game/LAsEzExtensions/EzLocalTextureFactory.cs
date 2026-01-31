@@ -134,11 +134,11 @@ namespace osu.Game.LAsEzExtensions
         public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex, bool? noSpecial = null)
         {
             var result = new Bindable<Vector2>();
-            float ratio = GetRatio();
             bool isSpecialColumn = noSpecial != true && ezSkinConfig.IsSpecialColumn(keyMode, columnIndex);
 
             void updateNoteSize()
             {
+                float ratio = GetRatio();
                 float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
                 float y = (float)noteHeightScaleToWidth.Value * ratio * x;
                 tempNoteSize.X = x;
@@ -149,6 +149,7 @@ namespace osu.Game.LAsEzExtensions
             columnWidth.BindValueChanged(_ => updateNoteSize());
             specialFactor.BindValueChanged(_ => updateNoteSize());
             noteHeightScaleToWidth.BindValueChanged(_ => updateNoteSize());
+            noteSetName.BindValueChanged(_ => updateNoteSize());
 
             updateNoteSize();
             return result;
