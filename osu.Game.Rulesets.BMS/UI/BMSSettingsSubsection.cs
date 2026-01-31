@@ -21,6 +21,7 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.BMS.UI.SongSelect;
 using osu.Game.Screens;
 using osuTK;
 
@@ -66,6 +67,11 @@ namespace osu.Game.Rulesets.BMS.UI
 
             Children = new Drawable[]
             {
+                new SettingsButton
+                {
+                    Text = "进入 BMS 选歌界面",
+                    Action = openBmsSongSelect,
+                },
                 new SettingsButton
                 {
                     Text = "选择 BMS 文件夹路径",
@@ -137,6 +143,14 @@ namespace osu.Game.Rulesets.BMS.UI
                 pathDisplay.Text = "未设置路径";
             else
                 pathDisplay.Text = $"当前路径: {path}";
+        }
+
+        private void openBmsSongSelect()
+        {
+            game?.PerformFromScreen(screen =>
+            {
+                screen.Push(new BMSSongSelectScreen());
+            });
         }
 
         private void selectPath()
