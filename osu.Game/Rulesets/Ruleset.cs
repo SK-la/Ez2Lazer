@@ -42,6 +42,8 @@ namespace osu.Game.Rulesets
 
         private static readonly ConcurrentDictionary<string, IMod[]> mod_reference_cache = new ConcurrentDictionary<string, IMod[]>();
 
+        private Mod[]? cached_all_mods;
+
         /// <summary>
         /// Version history:
         /// 2022.205.0   FramedReplayInputHandler.CollectPendingInputs renamed to FramedReplayHandler.CollectReplayInputs.
@@ -63,7 +65,7 @@ namespace osu.Game.Rulesets
         /// <summary>
         /// A queryable source containing all available mods.
         /// Call <see cref="IMod.CreateInstance"/> for consumption purposes.
-        /// </summary>
+        /// /// </summary>
         public IEnumerable<IMod> AllMods
         {
             get
@@ -86,15 +88,22 @@ namespace osu.Game.Rulesets
         /// This comes with considerable allocation overhead. If only accessing for reference purposes (ie. not changing bindables / settings)
         /// use <see cref="AllMods"/> instead.
         /// </remarks>
-        public IEnumerable<Mod> CreateAllMods() => Enum.GetValues<ModType>()
-                                                       // Confine all mods of each mod type into a single IEnumerable<Mod>
-                                                       .SelectMany(GetModsFor)
-                                                       // Filter out all null mods
-                                                       // This is to handle old rulesets which were doing mods bad. Can be removed at some point we are sure nulls will not appear here.
-                                                       // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-                                                       .Where(mod => mod != null)
-                                                       // Resolve MultiMods as their .Mods property
-                                                       .SelectMany(mod => (mod as MultiMod)?.Mods ?? new[] { mod });
+        public IEnumerable<Mod> CreateAllMods()
+        {
+            if (cached_all_mods != null)
+                return cached_all_mods;
+
+            return cached_all_mods = Enum.GetValues<ModType>()
+                                          // Confine all mods of each mod type into a single IEnumerable<Mod>
+                                          .SelectMany(GetModsFor)
+                                          // Filter out all null mods
+                                          // This is to handle old rulesets which were doing mods bad. Can be removed at some point we are sure nulls will not appear here.
+                                          // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                          .Where(mod => mod != null)
+                                          // Resolve MultiMods as their .Mods property
+                                          .SelectMany(mod => (mod as MultiMod)?.Mods ?? new[] { mod })
+                                          .ToArray();
+        }
 
         /// <summary>
         /// Returns a fresh instance of the mod matching the specified acronym.
