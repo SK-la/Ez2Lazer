@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Input.Events;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osuTK;
@@ -78,19 +79,17 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     Spacing = new Vector2(0, 2),
                     Children = new Drawable[]
                     {
-                        new OsuSpriteText
+                        new TruncatingSpriteText
                         {
                             Text = string.IsNullOrEmpty(Song.Title) ? "(无标题)" : Song.Title,
                             Font = OsuFont.GetFont(size: 16, weight: FontWeight.SemiBold),
-                            Truncate = true,
                             RelativeSizeAxes = Axes.X,
                         },
-                        new OsuSpriteText
+                        new TruncatingSpriteText
                         {
                             Text = string.IsNullOrEmpty(Song.Artist) ? "(未知艺术家)" : Song.Artist,
                             Font = OsuFont.GetFont(size: 12),
                             Colour = colours.Yellow,
-                            Truncate = true,
                             RelativeSizeAxes = Axes.X,
                         },
                         new OsuSpriteText

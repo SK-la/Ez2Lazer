@@ -25,6 +25,7 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.Configuration;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
@@ -53,6 +54,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private BMSSongCache? selectedSong;
         private BMSChartCache? selectedChart;
+        private Bindable<string> rootPathBindable = null!;
 
         [Resolved]
         private AudioManager audioManager { get; set; } = null!;
@@ -69,13 +71,34 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         [Resolved(canBeNull: true)]
         private IPerformFromScreenRunner? performer { get; set; }
 
+        [Resolved]
+        private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
+
         [BackgroundDependencyLoader]
         private void load(OsuColour colours)
         {
+            // Get config for BMS ruleset
+            var ruleset = new BMSRuleset();
+            var config = rulesetConfigCache.GetConfigFor(ruleset);
+            if (config is BMSRulesetConfigManager bmsConfig)
+            {
+                rootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
+            }
+            else
+            {
+                rootPathBindable = new Bindable<string>(string.Empty);
+            }
+
             // Initialize manager
             var cacheDir = storage.GetStorageForDirectory("bms").GetFullPath(string.Empty);
             beatmapManager = new BMSBeatmapManager(cacheDir);
             beatmapManager.LoadCache();
+
+            // Sync root path from config to manager
+            if (!string.IsNullOrEmpty(rootPathBindable.Value))
+            {
+                beatmapManager.RootPath.Value = rootPathBindable.Value;
+            }
 
             InternalChildren = new Drawable[]
             {

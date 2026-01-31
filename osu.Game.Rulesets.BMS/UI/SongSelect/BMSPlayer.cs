@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -12,6 +13,11 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.Objects;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens;
@@ -23,26 +29,25 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
     /// <summary>
     /// The BMS game player screen.
+    /// Uses Mania's DrawableRuleset for rendering.
     /// </summary>
     public partial class BMSPlayer : OsuScreen
     {
         protected override bool InitialBackButtonVisibility => false;
 
         private readonly BMSWorkingBeatmap workingBeatmap;
-        private readonly BMSRuleset ruleset;
         private DrawableRuleset? drawableRuleset;
         private OsuSpriteText debugText = null!;
 
         public BMSPlayer(BMSWorkingBeatmap workingBeatmap, BMSRuleset ruleset)
         {
             this.workingBeatmap = workingBeatmap;
-            this.ruleset = ruleset;
         }
 
         [BackgroundDependencyLoader]
         private void load(OsuColour colours)
         {
-            var beatmap = workingBeatmap.Beatmap;
+            var bmsBeatmap = workingBeatmap.Beatmap;
 
             InternalChildren = new Drawable[]
             {
@@ -75,7 +80,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                             },
                             debugText = new OsuSpriteText
                             {
-                                Text = $"Notes: {beatmap.HitObjects.Count} | Press ESC to exit",
+                                Text = $"Notes: {bmsBeatmap.HitObjects.Count} | Press ESC to exit",
                                 Font = OsuFont.GetFont(size: 14),
                                 Colour = colours.Gray9,
                             },
@@ -84,10 +89,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 },
             };
 
-            // Try to create the drawable ruleset
+            // Convert BMS beatmap to Mania beatmap
             try
             {
-                drawableRuleset = ruleset.CreateDrawableRulesetWith(beatmap, new List<Mod>());
+                var maniaBeatmap = ConvertToManiaBeatmap(bmsBeatmap);
+                var maniaRuleset = new ManiaRuleset();
+
+                drawableRuleset = maniaRuleset.CreateDrawableRulesetWith(maniaBeatmap, new List<Mod>());
                 drawableRuleset.RelativeSizeAxes = Axes.Both;
 
                 AddInternal(new Container
@@ -99,6 +107,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     Height = 0.9f,
                     Child = drawableRuleset,
                 });
+
+                debugText.Text = $"Notes: {maniaBeatmap.HitObjects.Count} | Using Mania renderer | Press ESC to exit";
             }
             catch (System.Exception ex)
             {
@@ -106,16 +116,61 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
         }
 
+        /// <summary>
+        /// Convert BMS beatmap to Mania beatmap format.
+        /// </summary>
+        private ManiaBeatmap ConvertToManiaBeatmap(IBeatmap bmsBeatmap)
+        {
+            // Determine column count from difficulty settings or hit objects
+            int columnCount = (int)bmsBeatmap.Difficulty.CircleSize;
+            if (columnCount <= 0)
+            {
+                columnCount = bmsBeatmap.HitObjects.OfType<BMSHitObject>().Select(h => h.Column).DefaultIfEmpty(0).Max() + 1;
+            }
+            if (columnCount <= 0) columnCount = 7;
+
+            var maniaBeatmap = new ManiaBeatmap(new StageDefinition(columnCount));
+
+            // Copy metadata
+            maniaBeatmap.BeatmapInfo = bmsBeatmap.BeatmapInfo;
+            maniaBeatmap.Difficulty = bmsBeatmap.Difficulty;
+            maniaBeatmap.ControlPointInfo = bmsBeatmap.ControlPointInfo;
+
+            // Convert hit objects
+            foreach (var hitObject in bmsBeatmap.HitObjects)
+            {
+                if (hitObject is BMSHoldNote holdNote)
+                {
+                    maniaBeatmap.HitObjects.Add(new HoldNote
+                    {
+                        Column = holdNote.Column,
+                        StartTime = holdNote.StartTime,
+                        Duration = holdNote.Duration,
+                        Samples = holdNote.Samples,
+                    });
+                }
+                else if (hitObject is BMSNote note)
+                {
+                    maniaBeatmap.HitObjects.Add(new Note
+                    {
+                        Column = note.Column,
+                        StartTime = note.StartTime,
+                        Samples = note.Samples,
+                    });
+                }
+            }
+
+            return maniaBeatmap;
+        }
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            // Start the track
+            // Load and start the track
+            workingBeatmap.LoadTrack();
             var track = workingBeatmap.Track;
-            if (track != null)
-            {
-                track.Start();
-            }
+            track?.Start();
         }
 
         protected override bool OnKeyDown(KeyDownEvent e)
