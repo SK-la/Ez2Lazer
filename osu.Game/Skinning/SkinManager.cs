@@ -158,7 +158,9 @@ namespace osu.Game.Skinning
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.TRIANGLES_SKIN).ToLive(Realm));
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.CLASSIC_SKIN).ToLive(Realm));
                 skins.Add(realm.Find<SkinInfo>(SkinInfo.RETRO_SKIN).ToLive(Realm));
-
+                skins.Add(realm.Find<SkinInfo>(SkinInfo.EZ2_SKIN).ToLive(Realm));
+                skins.Add(realm.Find<SkinInfo>(SkinInfo.EZ_STYLE_PRO_SKIN).ToLive(Realm));
+                skins.Add(realm.Find<SkinInfo>(SkinInfo.SBI_SKIN).ToLive(Realm));
                 skins.Add(random_skin_info);
 
                 var userSkins = realm.All<SkinInfo>()
@@ -448,9 +450,6 @@ namespace osu.Game.Skinning
 
             if (skinInfo == null)
             {
-                if (guid == SkinInfo.EZ_STYLE_PRO_SKIN)
-                    skinInfo = ezProSkin.SkinInfo;
-
                 if (guid == SkinInfo.CLASSIC_SKIN)
                     skinInfo = DefaultClassicSkin.SkinInfo;
 

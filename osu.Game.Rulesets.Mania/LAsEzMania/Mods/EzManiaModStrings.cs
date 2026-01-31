@@ -37,19 +37,17 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString BeatSpeed_Label = new EzLocalisableString("转换的节拍速度", "Transform Beat Speed");
 
         public static readonly LocalisableString BeatSpeed_Description = new EzLocalisableString(
-            "选择转换节拍区间长度",
-            "Transform speed presets:\n\n" +
             "| Index | Beat Length |\n" +
             "|-------|-------------|\n" +
-            "| 0     | 1/8 Beat    |\n" +
-            "| 1     | 1/4 Beat    |\n" +
-            "| 2     | 1/2 Beat    |\n" +
-            "| 3     | 3/4 Beat    |\n" +
-            "| 4     | 1 Beat      |\n" +
-            "| 5     | 2 Beats     |\n" +
-            "| 6     | 3 Beats     |\n" +
-            "| 7     | 4 Beats     |\n" +
-            "| 8     | Free        |"
+            "| 0        | 1/8 Beat    |\n" +
+            "| 1        | 1/4 Beat    |\n" +
+            "| 2        | 1/2 Beat    |\n" +
+            "| 3        | 3/4 Beat    |\n" +
+            "| 4        | 1 Beat      |\n" +
+            "| 5        | 2 Beats     |\n" +
+            "| 6        | 3 Beats     |\n" +
+            "| 7        | 4 Beats     |\n" +
+            "| 8        | Free        |"
         );
 
         // ====================================================================================================
@@ -95,8 +93,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString KrrN2Nc_MaxKeys_Description = new EzLocalisableString("每行最大键数", "Max keys per row.");
         public static readonly LocalisableString KrrN2Nc_MinKeys_Label = new EzLocalisableString("密度下限", "Density Min");
         public static readonly LocalisableString KrrN2Nc_MinKeys_Description = new EzLocalisableString("每行最小键数", "Min keys per row.");
-        public static readonly LocalisableString KrrN2Nc_DisplayTarget_Label = new EzLocalisableString("显示目标键数", "Display Target Keys");
-        public static readonly LocalisableString KrrN2Nc_DisplayTarget_Description = new EzLocalisableString("选歌界面按转换后键数显示（存在已知问题）", "Display converted key count in song select (known issues).");
 
         // Krr DP
         public static readonly LocalisableString KrrDP_EnableModifyKeys_Label = new EzLocalisableString("启用键数修改", "Enable Modify Keys");

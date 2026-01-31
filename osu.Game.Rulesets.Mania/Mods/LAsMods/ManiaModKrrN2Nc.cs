@@ -64,9 +64,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrN2Nc_DisplayTarget_Label), nameof(EzManiaModStrings.KrrN2Nc_DisplayTarget_Description))]
-        public BindableBool DisplayTargetKeys { get; set; } = new BindableBool(false);
-
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {

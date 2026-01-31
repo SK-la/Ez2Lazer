@@ -260,7 +260,7 @@ namespace osu.Game.Screens.Backgrounds
                     if (tryGetRandomStorageFile(relativePath, out string resourcePath, out string _, new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff" }))
                         return new Background(resourcePath);
 
-                    return new Background($@"Menu/Ez-background-{currentDisplay % 6 + 1}");
+                    return new Background($@"Backgrounds/bg{RNG.Next(0, 5) % 5 + 1}");
                 }
             }
 

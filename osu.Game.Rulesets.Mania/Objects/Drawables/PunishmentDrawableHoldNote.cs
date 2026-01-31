@@ -29,17 +29,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
     public partial class PunishmentDrawableHoldNote : DrawableHoldNote
     {
         [Resolved]
-        private HealthProcessor healthProcessor { get; set; }
+        private HealthProcessor? healthProcessor { get; set; }
 
-        [Resolved]
-        private ScoreProcessor scoreProcessor { get; set; }
-
-        /// <summary>
-        /// Current health cap multiplier (1.0 = 100% cap, 0.4 = 40% cap minimum)
-        /// </summary>
         private float currentHealthCap = 1.0f;
 
-        private PunishmentHoldNote PunishmentHitObject => (PunishmentHoldNote)HitObject;
+        private PunishmentHoldNote punishmentHitObject => (PunishmentHoldNote)HitObject;
 
         public PunishmentDrawableHoldNote(HoldNote hitObject)
             : base(hitObject)
@@ -50,35 +44,33 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.LoadComplete();
 
-            // Listen for holding state changes to detect when player releases the key
             IsHolding.BindValueChanged(OnHoldingChanged);
         }
 
         private void OnHoldingChanged(ValueChangedEvent<bool> holding)
         {
-            // Trigger punishment every time player releases the key during the note's duration
-            // Only trigger if:
-            // 1. Player was holding and now released (!holding.NewValue)
-            // 2. Current time is within the note's duration (after start but before end)
-            // 3. The note hasn't been fully judged yet (to avoid triggering on normal release at end)
+            // 追踪长按松开，只在以下情况触发：
+            // 1. 正在长按中松开 (!holding.NewValue)
+            // 2. 当前时间在音符持续时间内（在开始之后但在结束之前）
+            // 3. 音符尚未完全判定（以避免在正常结束时触发）
             if (!holding.NewValue && holding.OldValue &&
                 Time.Current >= HitObject.StartTime && Time.Current < HitObject.GetEndTime() &&
                 !AllJudged)
             {
-                TriggerPunishment();
+                triggerPunishment();
             }
         }
 
-        private void TriggerPunishment()
+        private void triggerPunishment()
         {
             if (healthProcessor != null)
             {
-                if (PunishmentHitObject.UseHealthCapReduction)
+                if (punishmentHitObject.UseHealthCapReduction)
                 {
-                    // Reduce health cap by 15%, minimum 40%
+                    // 每次扣上限，最低40%
                     currentHealthCap = Math.Max(0.4f, currentHealthCap - 0.15f);
 
-                    // If current health exceeds the new cap, reduce it to the cap
+                    // 降低上限
                     if (healthProcessor.Health.Value > currentHealthCap)
                     {
                         healthProcessor.Health.Value = currentHealthCap;
@@ -86,17 +78,10 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 }
                 else
                 {
-                    // Apply punishment: deduct 25% health
+                    // 只扣血
                     healthProcessor.Health.Value -= 0.25f;
                 }
             }
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            // No need to unsubscribe from combo changes anymore
         }
     }
 }
