@@ -37,6 +37,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Box separator = null!;
 
         private Bindable<Color4> accentColour = null!;
+        private bool shouldDrawSeparator;
 
         [Resolved]
         protected Column Column { get; private set; } = null!;
@@ -83,6 +84,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Alpha = 0,
             };
 
+            // 计算 drawSeparator 结果（基于不变的列数和列索引）
+            shouldDrawSeparator = drawSeparatorImpl(Column.Index, stageDefinition);
+
             accentColour = new Bindable<Color4>(ezSkinConfig.GetColumnColor(stageDefinition.Columns, Column.Index));
             accentColour.BindValueChanged(colour =>
             {
@@ -116,7 +120,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             hitOverlay.Y = -(float)hitPosition.Value;
             hitOverlay.Height = h;
             separator.Height = h;
-            separator.Alpha = drawSeparator(Column.Index, stageDefinition) ? 0.25f : 0;
+            separator.Alpha = shouldDrawSeparator ? 0.25f : 0;
         }
 
         protected virtual Color4 NoteColor => ezSkinConfig.GetColumnColor(stageDefinition.Columns, Column.Index);
@@ -141,8 +145,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 hitOverlay.FadeTo(0, 250, Easing.OutQuint);
         }
 
-        //TODO: 这里的逻辑可以优化，避免重复计算
-        private bool drawSeparator(int columnIndex, StageDefinition stage) => stage.Columns switch
+        // 基于不变的列数和列索引预计算分隔符显示
+        private bool drawSeparatorImpl(int columnIndex, StageDefinition stage) => stage.Columns switch
         {
             12 => columnIndex is 0 or 10,
             14 => columnIndex is 0 or 5 or 6 or 11,

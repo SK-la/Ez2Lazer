@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -158,11 +159,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             float actualPanelWidth = factory.GetNoteSize(keyMode, columnIndex, true).Value.X;
             float baseWidth = 410f / keyMode;
-            float scale = actualPanelWidth / baseWidth;
+            float newScale = 2f * (actualPanelWidth / baseWidth);
+            float newY = 768f - (float)hitPositonBindable.Value + 2f;
 
-            sprite.Scale = new Vector2(2f, 2 * scale);
+            // 只在值实际改变时更新
+            if (MathF.Abs(sprite.Scale.X - newScale) > 0.001f)
+            {
+                sprite.Scale = new Vector2(newScale, newScale);
+            }
 
-            sprite.Y = 768f - (float)hitPositonBindable.Value + 2f;
+            if (MathF.Abs(sprite.Y - newY) > 0.001f)
+            {
+                sprite.Y = newY;
+            }
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)

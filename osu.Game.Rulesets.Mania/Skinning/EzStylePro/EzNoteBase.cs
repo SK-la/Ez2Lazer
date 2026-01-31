@@ -113,6 +113,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         protected bool UpdatedColor;
+        private Colour4 lastNoteColor = Colour4.White;
+        private bool lastNoteColorCached;
 
         private void OnNoteChanged(ValueChangedEvent<string> obj)
         {
@@ -120,6 +122,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
 
             MainContainer?.Clear();
+            lastNoteColorCached = false;
 
             Scheduler.AddOnce(OnDrawableChanged);
         }
@@ -135,6 +138,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected virtual void UpdateSize()
         {
             NoteSize = Factory.GetNoteSize(KeyMode, ColumnIndex);
+            lastNoteColorCached = false;
             UpdateColor();
         }
 
@@ -146,7 +150,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 // 或者单独做一个着色拓展设置，比如“仅着色面身”“着色面头和面身”“不着色”等等。
                 // 或者，不着色时，使用新的开关拓展，在Middle中进一步单独管理着色
                 if (MainContainer != null)
-                    MainContainer.Colour = NoteColor;
+                {
+                    Colour4 targetColor = NoteColor;
+
+                    if (!lastNoteColorCached || lastNoteColor != targetColor)
+                    {
+                        MainContainer.Colour = targetColor;
+                        lastNoteColor = targetColor;
+                        lastNoteColorCached = true;
+                    }
+                }
 
                 if (LineContainer?.Children != null)
                 {
@@ -197,3 +210,4 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
     }
 }
+
