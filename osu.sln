@@ -26,7 +26,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Rulesets.Osu.Tests
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "osu.Game.Tournament", "osu.Game.Tournament\osu.Game.Tournament.csproj", "{5672CA4D-1B37-425B-A118-A8DA26E78938}"
 EndProject
-
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{10DF8F12-50FD-45D8-8A38-17BA764BF54D}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
@@ -37,8 +36,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		osu.TestProject.props = osu.TestProject.props
 	EndProjectSection
 EndProject
-
-
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CodeAnalysis", "CodeAnalysis", "{FB156649-D457-4D1A-969C-D3A23FD31513}"
 	ProjectSection(SolutionItems) = preProject
 		CodeAnalysis\BannedSymbols.txt = CodeAnalysis\BannedSymbols.txt
@@ -50,6 +47,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Framework", "..\osu-framework\osu.Framework\osu.Framework.csproj", "{E46405B5-643D-400C-A1F2-F770FBCC54B8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Framework.NativeLibs", "..\osu-framework\osu.Framework.NativeLibs\osu.Framework.NativeLibs.csproj", "{F5037F74-E137-4940-8CE7-4D3E5DF0FB39}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osu.Game.Rulesets.BMS", "osu.Game.Rulesets.BMS\osu.Game.Rulesets.BMS.csproj", "{DA53BD59-58E3-4BCC-81B1-EF77C30B9191}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -105,7 +104,6 @@ Global
 		{6A2D5D58-0261-4A75-BE84-2BE8B076B7C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6A2D5D58-0261-4A75-BE84-2BE8B076B7C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6A2D5D58-0261-4A75-BE84-2BE8B076B7C2}.Release|Any CPU.Build.0 = Release|Any CPU
-
 		{18ED4ABC-6064-46F1-9A05-4E0BE88A635A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{18ED4ABC-6064-46F1-9A05-4E0BE88A635A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{18ED4ABC-6064-46F1-9A05-4E0BE88A635A}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -125,6 +123,10 @@ Global
 		{5672CA4D-1B37-425B-A118-A8DA26E78938}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5672CA4D-1B37-425B-A118-A8DA26E78938}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5672CA4D-1B37-425B-A118-A8DA26E78938}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{DA53BD59-58E3-4BCC-81B1-EF77C30B9191}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA53BD59-58E3-4BCC-81B1-EF77C30B9191}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA53BD59-58E3-4BCC-81B1-EF77C30B9191}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA53BD59-58E3-4BCC-81B1-EF77C30B9191}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -162,18 +164,18 @@ Global
 		$2.scope = text/x-csharp
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-
-
-
-
-
-
-
-
-
-
-
-
-
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 	EndGlobalSection
 EndGlobal
