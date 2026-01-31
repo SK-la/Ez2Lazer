@@ -262,6 +262,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModEz2Settings(),
                         new ManiaModCleanColumn(),
                         new ManiaModNiceBPM(),
+                        new ManiaModReconcile(),
                         new ManiaModSpaceBody(),
                         new ManiaModLoopPlayClip(),
                         new ManiaModSRAdjust(),

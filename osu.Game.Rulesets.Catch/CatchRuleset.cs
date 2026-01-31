@@ -118,6 +118,7 @@ namespace osu.Game.Rulesets.Catch
                     return new Mod[]
                     {
                         new ModNiceBPM(),
+                        new ModReconcile(),
                         new UniversalLoopPlayClip(),
                     };
 

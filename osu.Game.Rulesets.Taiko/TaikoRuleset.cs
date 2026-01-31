@@ -136,6 +136,7 @@ namespace osu.Game.Rulesets.Taiko
                     return new Mod[]
                     {
                         new ModNiceBPM(),
+                        new ModReconcile(),
                         new UniversalLoopPlayClip(),
                     };
 

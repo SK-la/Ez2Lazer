@@ -166,6 +166,7 @@ namespace osu.Game.Rulesets.Osu
                     return new Mod[]
                     {
                         new ModNiceBPM(),
+                        new ModReconcile(),
                         new UniversalLoopPlayClip(),
                     };
 
