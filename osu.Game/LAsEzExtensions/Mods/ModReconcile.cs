@@ -1,7 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
@@ -15,7 +18,7 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.LAsEzExtensions.Mods
 {
-    public class ModReconcile : Mod, IApplicableToPlayer, IApplicableToScoreProcessor, IApplicableToHealthProcessor, IUpdatableByPlayfield
+    public class ModReconcile : Mod, IApplicableToHUD
     {
         public override string Name => "Reconcile";
         public override string Acronym => "RC";
@@ -26,6 +29,9 @@ namespace osu.Game.LAsEzExtensions.Mods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
         public override IconUsage? Icon => FontAwesome.Solid.Handshake;
+
+        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Reconcile_RewindEnabled_Label), nameof(EzModStrings.Reconcile_RewindEnabled_Description))]
+        public BindableBool RewindEnabled { get; } = new BindableBool(false);
 
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Reconcile_EnableMiss_Label), nameof(EzModStrings.Reconcile_EnableMiss_Description))]
         public BindableBool EnableMissCondition { get; } = new BindableBool(false);
@@ -62,55 +68,81 @@ namespace osu.Game.LAsEzExtensions.Mods
             MaxValue = 90,
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Reconcile_RewindEnabled_Label), nameof(EzModStrings.Reconcile_RewindEnabled_Description))]
-        public BindableBool RewindEnabled { get; } = new BindableBool(false);
+        public void ApplyToHUD(HUDOverlay overlay)
+        {
+            overlay.Add(new ReconcileClockProvider(this));
+        }
+    }
 
-        private Player? player;
-        private ScoreProcessor? scoreProcessor;
-        private HealthProcessor? healthProcessor;
+    public sealed partial class ReconcileClockProvider : CompositeDrawable
+    {
+        private readonly ModReconcile mod;
+
+        public ReconcileClockProvider(ModReconcile mod)
+        {
+            this.mod = mod;
+        }
+
+        [Resolved]
+        private GameplayClockContainer gameplayClockContainer { get; set; } = null!;
+
+        [Resolved]
+        private Player player { get; set; } = null!;
+
+        [Resolved]
+        private ScoreProcessor scoreProcessor { get; set; } = null!;
+
+        [Resolved]
+        private HealthProcessor healthProcessor { get; set; } = null!;
+
+        private IBindable<HitResult> missJudgement = null!;
+        private IBindable<int> missCountThreshold = null!;
+        private IBindable<double> accThresholdPercent = null!;
+        private IBindable<int> healthThresholdPercent = null!;
+        private IBindable<bool> rewindEnabled = null!;
+        private IBindable<bool> enableMissCondition = null!;
+        private IBindable<bool> enableAccCondition = null!;
+        private IBindable<bool> enableHealthCondition = null!;
 
         private int currentJudgementCount;
         private double? lastJudgementTargetTime;
         private double? lastAccTargetTime;
         private double? lastHealthTargetTime;
         private double? cooldownUntilTime;
+        private bool pauseAfterSeek;
 
-        private const double pause_cooldown_ms = 5000;
+        private const double pause_cooldown_ms = 1000;
 
-        public void ApplyToPlayer(Player player)
+        protected override void LoadComplete()
         {
-            this.player = player;
-
-            player.GameplayState.PlayingState.BindValueChanged(_ =>
-            {
-                if (player.GameplayState.PlayingState.Value == LocalUserPlayingState.NotPlaying)
-                    resetCounts();
-            });
-        }
-
-        public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
-        {
-            this.scoreProcessor = scoreProcessor;
+            base.LoadComplete();
+            missJudgement = mod.MissJudgement.GetBoundCopy();
+            missCountThreshold = mod.MissCountThreshold.GetBoundCopy();
+            accThresholdPercent = mod.AccThresholdPercent.GetBoundCopy();
+            healthThresholdPercent = mod.HealthThresholdPercent.GetBoundCopy();
+            rewindEnabled = mod.RewindEnabled.GetBoundCopy();
+            enableMissCondition = mod.EnableMissCondition.GetBoundCopy();
+            enableAccCondition = mod.EnableAccCondition.GetBoundCopy();
+            enableHealthCondition = mod.EnableHealthCondition.GetBoundCopy();
 
             scoreProcessor.NewJudgement += onNewJudgement;
             scoreProcessor.JudgementReverted += onJudgementReverted;
             scoreProcessor.OnResetFromReplayFrame += resetCounts;
 
-            MissJudgement.BindValueChanged(_ => resetJudgementTracking(), true);
-            AccThresholdPercent.BindValueChanged(_ => lastAccTargetTime = null);
+            missJudgement.BindValueChanged(_ => resetJudgementTracking(), true);
+            accThresholdPercent.BindValueChanged(_ => lastAccTargetTime = null);
+            player.GameplayState.PlayingState.BindValueChanged(_ =>
+            {
+                if (player.GameplayState.PlayingState.Value == LocalUserPlayingState.NotPlaying)
+                    resetCounts();
+            });
+
+            gameplayClockContainer.OnSeek += onSeekCompleted;
         }
 
-        public ScoreRank AdjustRank(ScoreRank rank, double accuracy) => rank;
-
-        public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
+        protected override void Update()
         {
-            this.healthProcessor = healthProcessor;
-        }
-
-        public void Update(Playfield playfield)
-        {
-            if (player == null || scoreProcessor == null || healthProcessor == null)
-                return;
+            base.Update();
 
             if (player.GameplayState.HasCompleted)
                 return;
@@ -118,47 +150,63 @@ namespace osu.Game.LAsEzExtensions.Mods
             if (player.GameplayState.PlayingState.Value != LocalUserPlayingState.Playing)
                 return;
 
-            if (!playfield.Clock.IsRunning)
-                return;
-
-            double currentTime = playfield.Clock.CurrentTime;
+            double currentTime = gameplayClockContainer.CurrentTime;
 
             if (cooldownUntilTime is { } cooldownUntil && currentTime < cooldownUntil)
                 return;
 
-            var triggerState = getTriggerState(scoreProcessor, healthProcessor);
+            var triggerState = getTriggerState();
 
             if (triggerState.ShouldTrigger)
-                handleTrigger(playfield, currentTime, triggerState);
+                handleTrigger(currentTime, triggerState);
         }
 
-        private TriggerState getTriggerState(ScoreProcessor scoreProcessor, HealthProcessor healthProcessor)
+        private TriggerState getTriggerState()
         {
-            bool missTriggered = EnableMissCondition.Value && MissCountThreshold.Value > 0 && currentJudgementCount >= MissCountThreshold.Value;
-            bool accTriggered = EnableAccCondition.Value && scoreProcessor.Accuracy.Value * 100 < AccThresholdPercent.Value;
-            bool healthTriggered = EnableHealthCondition.Value && healthProcessor.Health.Value * 100 < HealthThresholdPercent.Value;
+            bool missTriggered = enableMissCondition.Value && missCountThreshold.Value > 0 && currentJudgementCount >= missCountThreshold.Value;
+            bool accTriggered = enableAccCondition.Value && scoreProcessor.Accuracy.Value * 100 < accThresholdPercent.Value;
+            bool healthTriggered = enableHealthCondition.Value && healthProcessor.Health.Value * 100 < healthThresholdPercent.Value;
 
             return new TriggerState(missTriggered, accTriggered, healthTriggered);
         }
 
-        private void handleTrigger(Playfield playfield, double currentTime, TriggerState triggerState)
+        private void handleTrigger(double currentTime, TriggerState triggerState)
         {
-            if (player == null)
-                return;
-
-            if (RewindEnabled.Value)
+            if (rewindEnabled.Value)
             {
                 double? targetTime = getRewindTargetTime(triggerState);
 
                 if (targetTime is { } target && target <= currentTime)
+                {
+                    gameplayClockContainer.Stop();
+                    pauseAfterSeek = true;
                     player.Seek(target);
+                    return;
+                }
             }
 
-            if (!player.Pause())
+            if (player.Pause())
+            {
+                resetCounts();
+                cooldownUntilTime = gameplayClockContainer.CurrentTime + pause_cooldown_ms;
+            }
+        }
+
+        private void onSeekCompleted()
+        {
+            if (!pauseAfterSeek)
                 return;
 
+            pauseAfterSeek = false;
+
+            if (!player.Pause())
+            {
+                gameplayClockContainer.Start();
+                return;
+            }
+
             resetCounts();
-            cooldownUntilTime = currentTime + pause_cooldown_ms;
+            cooldownUntilTime = gameplayClockContainer.CurrentTime + pause_cooldown_ms;
         }
 
         private void onNewJudgement(JudgementResult result)
@@ -166,7 +214,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             if (!result.IsFinal)
                 return;
 
-            if (result.Type != HitResult.None && result.Type == MissJudgement.Value)
+            if (result.Type != HitResult.None && result.Type == missJudgement.Value)
             {
                 currentJudgementCount++;
 
@@ -175,17 +223,11 @@ namespace osu.Game.LAsEzExtensions.Mods
                     lastJudgementTargetTime = result.TimeAbsolute;
             }
 
-            if (scoreProcessor != null)
-            {
-                if (scoreProcessor.Accuracy.Value * 100 >= getRelaxedAccThreshold())
-                    lastAccTargetTime = result.TimeAbsolute;
-            }
+            if (scoreProcessor.Accuracy.Value * 100 >= getRelaxedAccThreshold())
+                lastAccTargetTime = result.TimeAbsolute;
 
-            if (healthProcessor != null)
-            {
-                if (healthProcessor.Health.Value * 100 >= getRelaxedHealthThreshold())
-                    lastHealthTargetTime = result.TimeAbsolute;
-            }
+            if (healthProcessor.Health.Value * 100 >= getRelaxedHealthThreshold())
+                lastHealthTargetTime = result.TimeAbsolute;
         }
 
         private void onJudgementReverted(JudgementResult result)
@@ -193,7 +235,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             if (!result.IsFinal)
                 return;
 
-            if (result.Type != HitResult.None && result.Type == MissJudgement.Value)
+            if (result.Type != HitResult.None && result.Type == missJudgement.Value)
             {
                 currentJudgementCount = currentJudgementCount > 0 ? currentJudgementCount - 1 : 0;
 
@@ -215,19 +257,19 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         private int getRelaxedMissCount()
         {
-            int threshold = MissCountThreshold.Value;
-            return (int)System.Math.Ceiling(threshold * (2d / 3d));
+            int threshold = missCountThreshold.Value;
+            return (int)System.Math.Ceiling(threshold / 3d);
         }
 
         private double getRelaxedAccThreshold()
         {
-            double threshold = AccThresholdPercent.Value;
+            double threshold = accThresholdPercent.Value;
             return threshold + (100 - threshold) / 3d;
         }
 
         private double getRelaxedHealthThreshold()
         {
-            double threshold = HealthThresholdPercent.Value;
+            double threshold = healthThresholdPercent.Value;
             return threshold + (100 - threshold) * 0.8d;
         }
 
