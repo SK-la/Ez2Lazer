@@ -266,7 +266,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 bool hasLongNotes = false;
                 bool hasScratch = false;
                 int noteCount = 0;
-                double lastNoteTime = 0;
+                int maxMeasure = 0;
 
                 // For BPM calculation
                 double baseBpm = 130;
@@ -343,10 +343,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     {
                         hasLongNotes = true;
                     }
-                    // Parse channel data for note count
+                    // Parse channel data for note count and max measure
                     else if (line.Length > 6 && line[6] == ':')
                     {
                         // Format: #MMCCC:DATA
+                        // Try to get measure number
+                        if (int.TryParse(line.Substring(1, 3), out int measureNum))
+                        {
+                            if (measureNum > maxMeasure)
+                                maxMeasure = measureNum;
+                        }
+
                         string channelStr = line.Substring(4, 2);
 
                         // Note channels
@@ -373,6 +380,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 cache.HasScratch = hasScratch;
                 cache.HasLongNotes = hasLongNotes;
                 cache.KeysoundFiles = keysoundFiles.ToList();
+
+                // Calculate duration from max measure and BPM
+                // Standard: 4 beats per measure, duration = measures * 4 * 60000 / BPM
+                if (baseBpm > 0 && maxMeasure > 0)
+                {
+                    cache.Duration = (maxMeasure + 1) * 4.0 * 60000.0 / baseBpm;
+                }
 
                 // Determine key count based on channels used
                 // This is simplified - would need full parse for accuracy

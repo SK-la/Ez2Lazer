@@ -15,6 +15,14 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            // Null safety check for HitWindows
+            if (HitObject?.HitWindows == null)
+            {
+                if (!userTriggered)
+                    ApplyResult(HitResult.Miss);
+                return;
+            }
+
             if (!userTriggered)
             {
                 if (!HitObject.HitWindows.CanBeHit(timeOffset))

@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private DrawableRuleset? drawableRuleset;
         private OsuSpriteText debugText = null!;
 
-        public BMSPlayer(BMSWorkingBeatmap workingBeatmap, BMSRuleset ruleset)
+        public BMSPlayer(BMSWorkingBeatmap workingBeatmap)
         {
             this.workingBeatmap = workingBeatmap;
         }
@@ -139,25 +139,35 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             // Convert hit objects
             foreach (var hitObject in bmsBeatmap.HitObjects)
             {
+                ManiaHitObject maniaHitObject;
+
                 if (hitObject is BMSHoldNote holdNote)
                 {
-                    maniaBeatmap.HitObjects.Add(new HoldNote
+                    maniaHitObject = new HoldNote
                     {
                         Column = holdNote.Column,
                         StartTime = holdNote.StartTime,
                         Duration = holdNote.Duration,
                         Samples = holdNote.Samples,
-                    });
+                    };
                 }
                 else if (hitObject is BMSNote note)
                 {
-                    maniaBeatmap.HitObjects.Add(new Note
+                    maniaHitObject = new Note
                     {
                         Column = note.Column,
                         StartTime = note.StartTime,
                         Samples = note.Samples,
-                    });
+                    };
                 }
+                else
+                {
+                    continue;
+                }
+
+                // Apply defaults to initialize HitWindows
+                maniaHitObject.ApplyDefaults(maniaBeatmap.ControlPointInfo, maniaBeatmap.Difficulty);
+                maniaBeatmap.HitObjects.Add(maniaHitObject);
             }
 
             return maniaBeatmap;

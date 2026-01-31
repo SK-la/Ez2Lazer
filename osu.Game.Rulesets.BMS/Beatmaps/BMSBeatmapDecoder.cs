@@ -265,6 +265,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             beatmap.BeatmapInfo.Metadata.TitleUnicode = title;
             beatmap.BeatmapInfo.Metadata.Artist = artist;
             beatmap.BeatmapInfo.Metadata.ArtistUnicode = artist;
+            beatmap.BeatmapInfo.Metadata.Author.Username = "Ez2Lazer BMSDecoder";
             beatmap.BeatmapInfo.Metadata.Source = "BMS Import";
             beatmap.BeatmapInfo.Metadata.Tags = $"bms {genre}";
             beatmap.BeatmapInfo.DifficultyName = getDifficultyName();

@@ -35,6 +35,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private BMSBeatmap? cachedBeatmap;
         private readonly Dictionary<string, Track> keysoundCache = new();
 
+        /// <summary>
+        /// Gets the folder path containing the BMS file.
+        /// </summary>
+        public string FolderPath => folderPath;
+
         public BMSWorkingBeatmap(
             string bmsFilePath,
             AudioManager audioManager,

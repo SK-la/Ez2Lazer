@@ -2,17 +2,18 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
-using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
@@ -21,7 +22,8 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
     /// <summary>
-    /// Loader screen that prepares and starts BMS gameplay.
+    /// Loader screen that prepares and starts BMS gameplay using Mania's standard Player.
+    /// Converts BMS beatmap to Mania format and uses osu!'s standard Player flow.
     /// </summary>
     public partial class BMSPlayerLoader : OsuScreen
     {
@@ -31,6 +33,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private LoadingSpinner loadingSpinner = null!;
         private OsuSpriteText statusText = null!;
         private OsuSpriteText titleText = null!;
+
+        [Resolved]
+        private AudioManager audioManager { get; set; } = null!;
 
         public BMSPlayerLoader(BMSWorkingBeatmap workingBeatmap)
         {
@@ -142,9 +147,17 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             try
             {
-                var ruleset = new BMSRuleset();
-                var player = new BMSPlayer(workingBeatmap, ruleset);
-                this.Push(player);
+                // Convert BMS beatmap to Mania beatmap and create a working beatmap wrapper
+                var maniaWorkingBeatmap = new ManiaConvertedWorkingBeatmap(workingBeatmap, audioManager);
+                var maniaRuleset = new ManiaRuleset();
+
+                // Set the global beatmap and ruleset to the converted Mania beatmap
+                Beatmap.Value = maniaWorkingBeatmap;
+                Ruleset.Value = maniaRuleset.RulesetInfo;
+
+                // Use osu!'s standard PlayerLoader which will create SoloPlayer
+                var playerLoader = new PlayerLoader(() => new SoloPlayer());
+                this.Push(playerLoader);
             }
             catch (System.Exception ex)
             {
