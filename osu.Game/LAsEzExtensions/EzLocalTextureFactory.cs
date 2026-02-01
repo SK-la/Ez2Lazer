@@ -253,7 +253,7 @@ namespace osu.Game.LAsEzExtensions
 
                     if (texture == null) break;
 
-                    if (texture.Width < 500) texture.ScaleAdjust = 0.5f; // 大纹理缩小加载，防止内存暴涨
+                    texture.ScaleAdjust = 2f;
 
                     frames.Add(texture);
                 }
