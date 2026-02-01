@@ -14,12 +14,10 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
@@ -113,6 +111,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             if (HealthScratch.Value && HealthTemplate.TryGetValue(keys, out var moveTargets))
             {
+                // 预先按列分组并对每列按时间排序，避免在每次判断中重复扫描整个 HitObjects 列表。
+                var columnGroups = maniaBeatmap.HitObjects
+                                               .GroupBy(h => h.Column)
+                                               .ToDictionary(g => g.Key, g => g.OrderBy(h => h.StartTime).ToList());
+
                 var notesToMove = maniaBeatmap.HitObjects
                                               .Where(h => h is ManiaHitObject maniaHitObject && moveTargets.Contains(maniaHitObject.Column))
                                               .OrderBy(h => h.StartTime)
@@ -131,10 +134,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                             int newColumn = targetColumn;
                             note.Column = newColumn % keys;
 
-                            var targetColumnNotes = maniaBeatmap.HitObjects
-                                                                .Where(h => h is ManiaHitObject maniaHitObject && maniaHitObject.Column == newColumn)
-                                                                .OrderBy(h => h.StartTime)
-                                                                .ToList();
+                            // 从预先分组的字典中获取目标列已排序的 notes，避免每次都遍历全表
+                            var targetColumnNotes = columnGroups.TryGetValue(newColumn, out var list) ? list : new List<ManiaHitObject>();
                             bool isValid = true;
 
                             for (int i = 0; i < targetColumnNotes.Count - 1; i++)
@@ -179,10 +180,17 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                                        .OrderBy(h => h.StartTime)
                                                        .ToList();
 
-                foreach (var note in scratchNotesToRemove)
+                if (scratchNotesToRemove.Count > 0)
                 {
-                    maniaBeatmap.HitObjects.Remove(note);
-                    applySamples(note);
+                    // 先对被移除的音符应用样本修改，然后一次性过滤出未被移除的集合，避免多次 Remove
+                    var toRemoveSet = new HashSet<HitObject>(scratchNotesToRemove);
+
+                    foreach (var note in scratchNotesToRemove)
+                        applySamples(note);
+
+                    maniaBeatmap.HitObjects = maniaBeatmap.HitObjects
+                                                          .Where(h => !toRemoveSet.Contains(h))
+                                                          .ToList();
                 }
             }
 
@@ -193,10 +201,16 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                                      .OrderBy(h => h.StartTime)
                                                      .ToList();
 
-                foreach (var note in panelNotesToRemove)
+                if (panelNotesToRemove.Count > 0)
                 {
-                    maniaBeatmap.HitObjects.Remove(note);
-                    applySamples(note);
+                    var toRemoveSet = new HashSet<HitObject>(panelNotesToRemove);
+
+                    foreach (var note in panelNotesToRemove)
+                        applySamples(note);
+
+                    maniaBeatmap.HitObjects = maniaBeatmap.HitObjects
+                                                          .Where(h => !toRemoveSet.Contains(h))
+                                                          .ToList();
                 }
             }
         }

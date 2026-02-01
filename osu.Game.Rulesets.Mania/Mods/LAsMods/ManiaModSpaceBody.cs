@@ -12,9 +12,8 @@ using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
@@ -70,20 +69,27 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 var newColumnObjects = new List<ManiaHitObject>();
 
-                var locations = Shield.Value
-                    ? column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples))
-                            .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                            {
-                                (startTime: h.StartTime, samples: h.GetNodeSamples(0)),
-                                (startTime: h.EndTime, samples: h.GetNodeSamples(1))
-                            }))
-                            .OrderBy(h => h.startTime).ToList()
-                    : column.OfType<Note>().Select(n => (startTime: n.StartTime, samples: n.Samples))
-                            .Concat(column.OfType<HoldNote>().SelectMany(h => new[]
-                            {
-                                (startTime: h.StartTime, samples: h.GetNodeSamples(0)),
-                            }))
-                            .OrderBy(h => h.startTime).ToList();
+                // 手动构建 locations 并排序，避免使用 Concat/OrderBy 链式 LINQ 的大量中间分配
+                var locations = new List<(double startTime, IList<HitSampleInfo> samples)>();
+
+                foreach (var n in column.OfType<Note>())
+                    locations.Add((n.StartTime, n.Samples));
+
+                if (Shield.Value)
+                {
+                    foreach (var h in column.OfType<HoldNote>())
+                    {
+                        locations.Add((h.StartTime, h.GetNodeSamples(0)));
+                        locations.Add((h.EndTime, h.GetNodeSamples(1)));
+                    }
+                }
+                else
+                {
+                    foreach (var h in column.OfType<HoldNote>())
+                        locations.Add((h.StartTime, h.GetNodeSamples(0)));
+                }
+
+                locations.Sort((a, b) => a.startTime.CompareTo(b.startTime));
 
                 for (int i = 0; i < locations.Count - 1; i++)
                 {
