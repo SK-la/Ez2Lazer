@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -14,6 +15,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -36,6 +38,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private CircularContainer topIcon = null!;
         private Box? topIconBox;
         private Bindable<Color4> accentColour = null!;
+
+        [Resolved(canBeNull: true)]
+        private SkinEditorOverlay? skinEditorOverlay { get; set; }
+
+        private Action<ValueChangedEvent<Color4>>? accentColourHandler;
+        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -172,12 +180,30 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             // Use the column's shared bindable to avoid per-instance allocations from GetBoundCopy()
             accentColour = column.AccentColour;
-            accentColour.BindValueChanged(colour =>
+
+            void applyAccent(Color4 c)
+            {
+                background.Colour = c.Darken(0.2f);
+                bottomIcon.Colour = c;
+            }
+
+            // apply current value immediately; only subscribe to changes while skin editor is visible
+            applyAccent(accentColour.Value);
+
+            if (skinEditorOverlay != null)
+            {
+                accentColourHandler = e => applyAccent(e.NewValue);
+
+                skinEditorStateHandler = state =>
                 {
-                    background.Colour = colour.NewValue.Darken(0.2f);
-                    bottomIcon.Colour = colour.NewValue;
-                },
-                true);
+                    if (state.NewValue == Visibility.Visible)
+                        accentColour.BindValueChanged(accentColourHandler!, true);
+                    else
+                        accentColour.ValueChanged -= accentColourHandler!;
+                };
+
+                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
+            }
 
             column.TopLevelContainer.Add(CreateProxy());
         }
@@ -299,5 +325,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         }
 
         private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColour.Value, Color4.White, 0, 1);
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                if (skinEditorOverlay != null && skinEditorStateHandler != null)
+                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
+
+                if (accentColourHandler != null)
+                    accentColour.ValueChanged -= accentColourHandler;
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }

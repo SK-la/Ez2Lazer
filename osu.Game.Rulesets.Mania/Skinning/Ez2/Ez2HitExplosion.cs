@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -8,6 +9,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Utils;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -28,6 +30,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private Container largeFaint = null!;
 
         private Bindable<Color4> accentColour = null!;
+
+        [Resolved(canBeNull: true)]
+        private SkinEditorOverlay? skinEditorOverlay { get; set; }
+
+        private Action<ValueChangedEvent<Color4>>? accentColourHandler;
+        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
 
         public Ez2HitExplosion()
         {
@@ -75,18 +83,37 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             // Use shared column bindable to prevent per-instance allocation via GetBoundCopy().
             accentColour = column.AccentColour;
-            accentColour.BindValueChanged(colour =>
+
+            void applyAccent(Color4 c)
             {
-                largeFaint.Colour = Interpolation.ValueAt(0.8f, colour.NewValue, Color4.White, 0, 1);
+                largeFaint.Colour = Interpolation.ValueAt(0.8f, c, Color4.White, 0, 1);
 
                 largeFaint.EdgeEffect = new EdgeEffectParameters
                 {
                     Type = EdgeEffectType.Glow,
-                    Colour = colour.NewValue,
+                    Colour = c,
                     Roundness = NoteHeight,
                     Radius = 50,
                 };
-            }, true);
+            }
+
+            // apply current value immediately; only subscribe to changes while skin editor is visible
+            applyAccent(accentColour.Value);
+
+            if (skinEditorOverlay != null)
+            {
+                accentColourHandler = e => applyAccent(e.NewValue);
+
+                skinEditorStateHandler = state =>
+                {
+                    if (state.NewValue == osu.Framework.Graphics.Containers.Visibility.Visible)
+                        accentColour.BindValueChanged(accentColourHandler!, true);
+                    else
+                        accentColour.ValueChanged -= accentColourHandler!;
+                };
+
+                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
+            }
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
@@ -97,6 +124,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         public void Animate(JudgementResult result)
         {
             this.FadeOutFromOne(PoolableHitExplosion.DURATION, Easing.Out);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                if (skinEditorOverlay != null && skinEditorStateHandler != null)
+                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
+
+                if (accentColourHandler != null)
+                    accentColour.ValueChanged -= accentColourHandler;
+            }
+
+            base.Dispose(isDisposing);
         }
     }
 }

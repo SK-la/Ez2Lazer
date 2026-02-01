@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
     {
-        private readonly IBindable<bool> isHitting = new Bindable<bool>();
+        private IBindable<bool>? isHitting;
         private DrawableHoldNote holdNote = null!;
 
         private Container? topContainer;
@@ -28,8 +28,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Container? bodyInnerContainer;
 
         private Bindable<double> tailAlpha = null!;
-        private Bindable<double> tailMaskHeight = new Bindable<double>();
-        private IBindable<double> hitPosition = new Bindable<double>();
+        private IBindable<double> tailMaskHeight = null!;
+        private IBindable<double> hitPosition = null!;
         private EzHoldNoteHittingLayer? hittingLayer;
         private Drawable? lightContainer;
 
@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load(DrawableHitObject drawableObject)
         {
             holdNote = (DrawableHoldNote)drawableObject;
-            isHitting.BindTo(holdNote.IsHolding);
+            isHitting = holdNote.IsHolding;
         }
 
         protected override void LoadComplete()
@@ -58,6 +58,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             tailMaskHeight = Column.HoldTailMaskHeightBindable;
             tailAlpha = Column.HoldTailAlphaBindable;
 
+            isHitting ??= holdNote.IsHolding;
             isHitting.BindValueChanged(onIsHittingChanged, true);
 
             tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
@@ -78,8 +79,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             hittingLayer = new EzHoldNoteHittingLayer
             {
-                Alpha = 0,
-                IsHitting = { BindTarget = isHitting }
+                Alpha = 0
             };
 
             lightContainer = new HitTargetInsetContainer
@@ -88,6 +88,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Alpha = 0,
                 Child = hittingLayer
             };
+
+            if (isHitting != null)
+                ((IBindable<bool>)hittingLayer.IsHitting).BindTo(isHitting);
 
             hittingLayer.HitPosition.BindTo(hitPosition);
         }

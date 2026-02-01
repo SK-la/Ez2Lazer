@@ -27,6 +27,7 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
+using osu.Game.Overlays.SkinEditor;
 using osuTK;
 using osuTK.Graphics;
 
@@ -80,6 +81,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private Ez2ConfigManager ezConfig = null!;
 
+        [Resolved(canBeNull: true)]
+        private SkinEditorOverlay? skinEditorOverlay { get; set; }
+
+        private Action<ValueChangedEvent<Color4>>? accentColourHandler;
+        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
+
+        private bool subscribedToEzConfig;
+
         private float leftColumnSpacing;
         private float rightColumnSpacing;
 
@@ -103,10 +112,10 @@ namespace osu.Game.Rulesets.Mania.UI
         private ISkinSource skin { get; set; } = null!;
 
         [Resolved]
-        private EzLocalTextureFactory Factory { get; set; } = null!;
+        private EzLocalTextureFactory factory { get; set; } = null!;
 
         [Resolved]
-        private StageDefinition StageDefinition { get; set; } = null!;
+        private StageDefinition stageDefinition { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, Ez2ConfigManager ezConfig)
@@ -143,16 +152,13 @@ namespace osu.Game.Rulesets.Mania.UI
             BackgroundContainer.Add(background);
             TopLevelContainer.Add(HitObjectArea.Explosions.CreateProxy());
 
-            RegisterPool<Note, DrawableNote>(10, 50);
-            RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-            RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
-            RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
-            RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
+            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+
+            configurePools(hitModeBindable.Value);
 
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
-            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
             NoteSetBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             ColorEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             HitPositionBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
@@ -162,12 +168,47 @@ namespace osu.Game.Rulesets.Mania.UI
             HitTargetFloatFixedBindable = ezConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed);
             NoteHeightScaleToWidthBindable = ezConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
 
-            NoteSizeBindable.BindTo(Factory.GetNoteSize(StageDefinition.Columns, Index));
+            NoteSizeBindable.BindTo(factory.GetNoteSize(stageDefinition.Columns, Index));
             NoteSizeBindable.BindValueChanged(_ => NoteSizeChanged?.Invoke(), true);
 
             NoteSetBindable.BindValueChanged(onNoteSetChanged, true);
-            ezConfig.OnNoteColourChanged += onNoteColourChanged;
-            ezConfig.OnNoteSizeChanged += onNoteSizeChanged;
+
+            // If a SkinEditorOverlay exists, only subscribe to ezConfig editor events while the editor is visible
+            if (skinEditorOverlay != null)
+            {
+                skinEditorStateHandler = state =>
+                {
+                    if (state.NewValue == Visibility.Visible)
+                    {
+                        if (!subscribedToEzConfig)
+                        {
+                            ezConfig.OnNoteColourChanged += onNoteColourChanged;
+                            ezConfig.OnNoteSizeChanged += onNoteSizeChanged;
+                            // Apply current values immediately when entering editor
+                            onNoteColourChanged();
+                            onNoteSizeChanged();
+                            subscribedToEzConfig = true;
+                        }
+                    }
+                    else
+                    {
+                        if (subscribedToEzConfig)
+                        {
+                            ezConfig.OnNoteColourChanged -= onNoteColourChanged;
+                            ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
+                            subscribedToEzConfig = false;
+                        }
+                    }
+                };
+
+                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
+            }
+            else
+            {
+                ezConfig.OnNoteColourChanged += onNoteColourChanged;
+                ezConfig.OnNoteSizeChanged += onNoteSizeChanged;
+                subscribedToEzConfig = true;
+            }
         }
 
         private void onNoteSetChanged(ValueChangedEvent<string> e)
@@ -206,7 +247,7 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
             NewResult += OnNewResult;
 
-            hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue), true);
+            hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue));
         }
 
         protected override void Dispose(bool isDisposing)
@@ -222,8 +263,14 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (isDisposing && ezConfig != null)
             {
-                ezConfig.OnNoteColourChanged -= onNoteColourChanged;
-                ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
+                if (subscribedToEzConfig)
+                {
+                    ezConfig.OnNoteColourChanged -= onNoteColourChanged;
+                    ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
+                }
+
+                if (skinEditorOverlay != null && skinEditorStateHandler != null)
+                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
             }
 
             base.Dispose(isDisposing);
@@ -318,6 +365,14 @@ namespace osu.Game.Rulesets.Mania.UI
                     RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
                     RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);
                     RegisterPool<TailNote, O2DrawableHoldNoteTail>(10, 50);
+                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
+                    break;
+
+                default:
+                    RegisterPool<Note, DrawableNote>(10, 50);
+                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
                     RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
             }

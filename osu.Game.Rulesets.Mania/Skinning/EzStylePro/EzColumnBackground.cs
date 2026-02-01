@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -15,6 +16,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens;
@@ -37,6 +39,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Box separator = null!;
 
         private Bindable<Color4> accentColour = null!;
+
+        [Resolved(canBeNull: true)]
+        private SkinEditorOverlay? skinEditorOverlay { get; set; }
+
+        private Action<ValueChangedEvent<Color4>>? accentColourHandler;
+        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
         private bool shouldDrawSeparator;
 
         [Resolved]
@@ -89,16 +97,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             // 使用 Column 提供的共享 bindable，避免为每个列背景构建新的 Bindable 实例
             accentColour = Column.AccentColour;
-            accentColour.BindValueChanged(colour =>
+
+            void applyAccent(Color4 baseCol)
             {
-                var baseCol = colour.NewValue;
                 var newColour = baseCol.Darken(3);
                 if (newColour.A != 0)
                     newColour = newColour.Opacity(0.8f);
                 hitOverlay.Colour = newColour;
                 brightColour = baseCol.Opacity(0.6f);
                 dimColour = baseCol.Opacity(0);
-            }, true);
+            }
+
+            // 立即应用当前值，但仅在皮肤编辑器可见时才订阅后续变更以避免运行时订阅开销
+            applyAccent(accentColour.Value);
+
+            if (skinEditorOverlay != null)
+            {
+                accentColourHandler = e => applyAccent(e.NewValue);
+
+                skinEditorStateHandler = state =>
+                {
+                    if (state.NewValue == Visibility.Visible)
+                        accentColour.BindValueChanged(accentColourHandler!, true);
+                    else
+                        accentColour.ValueChanged -= accentColourHandler!;
+                };
+
+                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
+            }
         }
 
         protected override void LoadComplete()
@@ -165,5 +191,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             16 => columnIndex is 0 or 5 or 9 or 14,
             _ => false
         };
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                if (skinEditorOverlay != null && skinEditorStateHandler != null)
+                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
+
+                if (accentColourHandler != null)
+                    accentColour.ValueChanged -= accentColourHandler;
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }

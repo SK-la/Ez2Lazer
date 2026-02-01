@@ -20,6 +20,7 @@ using osu.Game.Screens.Play;
 using osuTK;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Overlays.SkinEditor;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -51,6 +52,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private Bindable<string> stageName = null!;
         private Bindable<double> hitPositonBindable = null!;
+
+        [Resolved(canBeNull: true)]
+        private SkinEditorOverlay? skinEditorOverlay { get; set; }
+
+        private Action? noteSizeChangedHandler;
+        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
 
         private double bpm;
         private double beatInterval;
@@ -105,7 +112,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             stageName.BindValueChanged(_ => loadAnimation(), true);
             hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
-            ezSkinConfig.OnNoteSizeChanged += OnConfigChanged;
+
+            // Only subscribe to global Ez config changes (editor-driven) while skin editor is visible.
+            noteSizeChangedHandler = OnConfigChanged;
+
+            if (skinEditorOverlay != null)
+            {
+                skinEditorStateHandler = state =>
+                {
+                    if (state.NewValue == Visibility.Visible)
+                        ezSkinConfig.OnNoteSizeChanged += noteSizeChangedHandler!;
+                    else
+                        ezSkinConfig.OnNoteSizeChanged -= noteSizeChangedHandler!;
+                };
+
+                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
+            }
         }
 
         protected virtual string KeySuffix
@@ -192,6 +214,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 upSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(1);
                 downSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
             }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                if (skinEditorOverlay != null && skinEditorStateHandler != null)
+                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
+
+                if (noteSizeChangedHandler != null)
+                    ezSkinConfig.OnNoteSizeChanged -= noteSizeChangedHandler;
+            }
+
+            base.Dispose(isDisposing);
         }
 
         private static readonly HashSet<string> free_size_stages = new HashSet<string>
