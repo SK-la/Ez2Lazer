@@ -1,6 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -101,9 +104,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             NoteSetName = Column.NoteSetBindable;
             NoteSize = Column.NoteSizeBindable;
 
-            Column.NoteSetChanged += OnNoteSetChanged;
-            Column.NoteColourChanged += OnColourChanged;
-            Column.NoteSizeChanged += OnNoteSizeChanged;
+            // Use a per-column watcher to avoid creating an event handler delegate per-note.
+            ColumnWatcher.GetOrCreate(Column).Add(this);
 
             UpdateSize();
         }
@@ -153,7 +155,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         sideLine.UpdateGlowEffect(NoteColor);
                 }
             }
-
         }
 
         private void OnColourChanged()
@@ -197,12 +198,121 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (isDisposing)
             {
-                Column.NoteSetChanged -= OnNoteSetChanged;
-                Column.NoteColourChanged -= OnColourChanged;
-                Column.NoteSizeChanged -= OnNoteSizeChanged;
+                ColumnWatcher.Remove(Column, this);
             }
 
             base.Dispose(isDisposing);
+        }
+
+        // Forwarders used by ColumnWatcher when broadcasting per-column changes to instances.
+        internal void ForwardOnNoteSetChanged(ValueChangedEvent<string> e) => OnNoteSetChanged(e);
+        internal void ForwardOnColourChanged() => OnColourChanged();
+        internal void ForwardOnNoteSizeChanged() => OnNoteSizeChanged();
+
+        private class ColumnWatcher
+        {
+            private readonly Column column;
+            private readonly List<WeakReference<EzNoteBase>> notes = new List<WeakReference<EzNoteBase>>();
+
+            public ColumnWatcher(Column column)
+            {
+                this.column = column;
+                column.NoteSetChanged += onNoteSetChanged;
+                column.NoteColourChanged += onNoteColourChanged;
+                column.NoteSizeChanged += onNoteSizeChanged;
+            }
+
+            public void Add(EzNoteBase note)
+            {
+                // store weak reference to avoid preventing note GC if removed elsewhere
+                notes.Add(new WeakReference<EzNoteBase>(note));
+            }
+
+            public void Remove(EzNoteBase note)
+            {
+                notes.RemoveAll(wr => !wr.TryGetTarget(out var target) || ReferenceEquals(target, note));
+            }
+
+            private void onNoteSetChanged(ValueChangedEvent<string> e)
+            {
+                // iterate backwards and remove dead weak references in-place to avoid
+                // allocating a large temporary array when the column has many notes.
+                for (int i = notes.Count - 1; i >= 0; i--)
+                {
+                    var wr = notes[i];
+                    if (wr.TryGetTarget(out var target))
+                        target.ForwardOnNoteSetChanged(e);
+                    else
+                        notes.RemoveAt(i);
+                }
+            }
+
+            private void onNoteColourChanged()
+            {
+                for (int i = notes.Count - 1; i >= 0; i--)
+                {
+                    var wr = notes[i];
+                    if (wr.TryGetTarget(out var target))
+                        target.ForwardOnColourChanged();
+                    else
+                        notes.RemoveAt(i);
+                }
+            }
+
+            private void onNoteSizeChanged()
+            {
+                for (int i = notes.Count - 1; i >= 0; i--)
+                {
+                    var wr = notes[i];
+                    if (wr.TryGetTarget(out var target))
+                        target.ForwardOnNoteSizeChanged();
+                    else
+                        notes.RemoveAt(i);
+                }
+            }
+
+            public void Unsubscribe()
+            {
+                column.NoteSetChanged -= onNoteSetChanged;
+                column.NoteColourChanged -= onNoteColourChanged;
+                column.NoteSizeChanged -= onNoteSizeChanged;
+            }
+
+            public bool IsEmpty => notes.All(wr => !wr.TryGetTarget(out _));
+
+            private static readonly Dictionary<Column, ColumnWatcher> watchers = new Dictionary<Column, ColumnWatcher>();
+            private static readonly object watcher_lock = new object();
+
+            public static ColumnWatcher GetOrCreate(Column c)
+            {
+                lock (watcher_lock)
+                {
+                    if (!watchers.TryGetValue(c, out var w))
+                    {
+                        w = new ColumnWatcher(c);
+                        watchers[c] = w;
+                    }
+
+                    return w;
+                }
+            }
+
+            public static void Remove(Column c, EzNoteBase note)
+            {
+                lock (watcher_lock)
+                {
+                    if (!watchers.TryGetValue(c, out var w))
+                        return;
+
+                    w.Remove(note);
+
+                    if (w.IsEmpty)
+                    {
+                        w.Unsubscribe();
+                        watchers.Remove(c);
+                    }
+                }
+            }
         }
     }
 }

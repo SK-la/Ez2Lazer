@@ -34,6 +34,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         private Container<Circle> bottomIcon = null!;
         private CircularContainer topIcon = null!;
+        private Box? topIconBox;
         private Bindable<Color4> accentColour = null!;
 
         [Resolved]
@@ -162,12 +163,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             // double bpm = beatmap.BeatmapInfo.BPM;
             double bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
-            applyBlinkingEffect(topIcon, bpm);
+            // cache inner box once to avoid repeated LINQ allocation inside scheduled callback
+            topIconBox = topIcon.Children.OfType<Box>().FirstOrDefault();
+            applyBlinkingEffect(topIconBox, bpm);
 
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
-            accentColour = column.AccentColour.GetBoundCopy();
+            // Use the column's shared bindable to avoid per-instance allocations from GetBoundCopy()
+            accentColour = column.AccentColour;
             accentColour.BindValueChanged(colour =>
                 {
                     background.Colour = colour.NewValue.Darken(0.2f);
@@ -178,13 +182,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             column.TopLevelContainer.Add(CreateProxy());
         }
 
-        private void applyBlinkingEffect(CircularContainer container, double bpm)
+        private void applyBlinkingEffect(Box? box, double bpm)
         {
+            if (box == null) return;
+
             double interval = 60000 / bpm;
 
             Scheduler.AddDelayed(() =>
             {
-                container.Children.OfType<Box>().First().FadeTo(1, interval / 2).Then().FadeTo(0, interval / 2);
+                box.FadeTo(1, interval / 2).Then().FadeTo(0, interval / 2);
             }, interval, true);
         }
 

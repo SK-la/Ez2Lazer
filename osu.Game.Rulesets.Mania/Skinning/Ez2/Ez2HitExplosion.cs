@@ -73,7 +73,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
-            accentColour = column.AccentColour.GetBoundCopy();
+            // Use shared column bindable to prevent per-instance allocation via GetBoundCopy().
+            accentColour = column.AccentColour;
             accentColour.BindValueChanged(colour =>
             {
                 largeFaint.Colour = Interpolation.ValueAt(0.8f, colour.NewValue, Color4.White, 0, 1);

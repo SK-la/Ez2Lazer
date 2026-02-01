@@ -87,7 +87,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
             shouldDrawSeparator = drawSeparatorImpl(Column.Index, stageDefinition);
 
-            accentColour = new Bindable<Color4>(ezSkinConfig.GetColumnColor(stageDefinition.Columns, Column.Index));
+            // 使用 Column 提供的共享 bindable，避免为每个列背景构建新的 Bindable 实例
+            accentColour = Column.AccentColour;
             accentColour.BindValueChanged(colour =>
             {
                 var baseCol = colour.NewValue;
@@ -104,7 +105,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
 
-            if (Column.BackgroundContainer.Children.OfType<Box>().All(b => b.Name != "Separator"))
+            bool hasSeparator = false;
+
+            foreach (var child in Column.BackgroundContainer.Children)
+            {
+                if (child is Box b && b.Name == "Separator")
+                {
+                    hasSeparator = true;
+                    break;
+                }
+            }
+
+            if (!hasSeparator)
                 Column.BackgroundContainer.Add(separator);
 
             if (!Column.BackgroundContainer.Children.Contains(hitOverlay))

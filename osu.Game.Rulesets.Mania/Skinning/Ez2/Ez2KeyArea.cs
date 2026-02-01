@@ -35,6 +35,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private Circle hitTargetLine = null!;
 
         private CircularContainer? topIcon;
+        private Box? topIconBox;
         private Bindable<Color4> accentColour = null!;
 
         [Resolved]
@@ -123,7 +124,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(onDirectionChanged, true);
 
-            accentColour = column.AccentColour.GetBoundCopy();
+            // Use the column's shared bindable to avoid per-instance allocations from GetBoundCopy()
+            accentColour = column.AccentColour;
             accentColour.BindValueChanged(colour =>
                 {
                     background.Colour = colour.NewValue.Darken(0.2f);
@@ -142,13 +144,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             double bpm = beatmap.BeatmapInfo.BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm;
+            // cache reference to inner box to avoid LINQ allocations during Update
+            topIconBox = topIcon?.Children.OfType<Box>().FirstOrDefault();
         }
 
         protected override void Update()
         {
             base.Update();
 
-            if (topIcon == null || !topIcon.Children.Any())
+            if (topIconBox == null)
                 return;
 
             double progress = (gameplayClock.CurrentTime % beatInterval) / beatInterval;
@@ -156,7 +160,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             if (progress < gameplayClock.ElapsedFrameTime / beatInterval)
             {
                 double fadeTime = Math.Max(1, beatInterval / 2);
-                var box = topIcon.Children.OfType<Box>().FirstOrDefault();
+                var box = topIconBox;
 
                 box?.FadeTo(1, fadeTime)
                    .Then()
