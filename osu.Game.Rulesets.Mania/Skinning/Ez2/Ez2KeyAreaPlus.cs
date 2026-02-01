@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     public partial class Ez2KeyAreaPlus : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
+        private readonly IBindable<ScrollingDirection> directionLocal = new Bindable<ScrollingDirection>();
 
         private Container directionContainer = null!;
         private Drawable background = null!;
@@ -37,13 +37,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private Container<Circle> bottomIcon = null!;
         private CircularContainer topIcon = null!;
         private Box? topIconBox;
-        private Bindable<Color4> accentColour = null!;
-
-        [Resolved(canBeNull: true)]
-        private SkinEditorOverlay? skinEditorOverlay { get; set; }
-
-        private Action<ValueChangedEvent<Color4>>? accentColourHandler;
-        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
+        private readonly IBindable<Color4> accentColourLocal = new Bindable<Color4>();
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -169,41 +163,26 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 }
             };
 
+            directionLocal.BindTo(scrollingInfo.Direction);
+            directionLocal.BindValueChanged(onDirectionChanged, true);
+
             // double bpm = beatmap.BeatmapInfo.BPM;
             double bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             // cache inner box once to avoid repeated LINQ allocation inside scheduled callback
             topIconBox = topIcon.Children.OfType<Box>().FirstOrDefault();
             applyBlinkingEffect(topIconBox, bpm);
 
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
-
-            // Use the column's shared bindable to avoid per-instance allocations from GetBoundCopy()
-            accentColour = column.AccentColour;
+            // Use a local bindable bound to the column's shared bindable so we can safely unbind later.
+            accentColourLocal.BindTo(column.AccentColour);
 
             void applyAccent(Color4 c)
             {
                 background.Colour = c.Darken(0.2f);
                 bottomIcon.Colour = c;
             }
-
-            // apply current value immediately; only subscribe to changes while skin editor is visible
-            applyAccent(accentColour.Value);
-
-            if (skinEditorOverlay != null)
-            {
-                accentColourHandler = e => applyAccent(e.NewValue);
-
-                skinEditorStateHandler = state =>
-                {
-                    if (state.NewValue == Visibility.Visible)
-                        accentColour.BindValueChanged(accentColourHandler!, true);
-                    else
-                        accentColour.ValueChanged -= accentColourHandler!;
-                };
-
-                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
-            }
+            // apply current value immediately and subscribe to future changes via local bindable
+            applyAccent(accentColourLocal.Value);
+            accentColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);
 
             column.TopLevelContainer.Add(CreateProxy());
         }
@@ -246,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             Color4 lightingColour = getLightingColour();
 
             background
-                .FlashColour(accentColour.Value.Lighten(0.8f), 200, Easing.OutQuint)
+                .FlashColour(accentColourLocal.Value.Lighten(0.8f), 200, Easing.OutQuint)
                 .FadeTo(1, lighting_fade_in_duration, Easing.OutQuint)
                 .Then()
                 .FadeTo(0.8f, 500);
@@ -311,7 +290,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 Radius = 25,
             }, lighting_fade_out_duration, Easing.OutQuint);
 
-            bottomIcon.FadeColour(accentColour.Value, lighting_fade_out_duration, Easing.OutQuint);
+            bottomIcon.FadeColour(accentColourLocal.Value, lighting_fade_out_duration, Easing.OutQuint);
 
             foreach (var circle in bottomIcon)
             {
@@ -324,17 +303,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             }
         }
 
-        private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColour.Value, Color4.White, 0, 1);
+        private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColourLocal.Value, Color4.White, 0, 1);
 
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
             {
-                if (skinEditorOverlay != null && skinEditorStateHandler != null)
-                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
-
-                if (accentColourHandler != null)
-                    accentColour.ValueChanged -= accentColourHandler;
+                accentColourLocal.UnbindBindings();
+                directionLocal.UnbindBindings();
             }
 
             base.Dispose(isDisposing);

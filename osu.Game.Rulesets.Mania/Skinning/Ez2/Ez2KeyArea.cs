@@ -14,8 +14,8 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Graphics;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -28,8 +28,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     public partial class Ez2KeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly Bindable<float> hitPosition = new Bindable<float>();
+        private readonly IBindable<ScrollingDirection> directionLocal = new Bindable<ScrollingDirection>();
+        private readonly IBindable<double> hitPositionLocal = new BindableDouble();
         private Container directionContainer = null!;
         private Drawable background = null!;
 
@@ -37,16 +37,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         private CircularContainer? topIcon;
         private Box? topIconBox;
-        private Bindable<Color4> accentColour = null!;
-
-        [Resolved(canBeNull: true)]
-        private SkinEditorOverlay? skinEditorOverlay { get; set; }
-
-        private Action<ValueChangedEvent<Color4>>? accentColourHandler;
-        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
+        private readonly IBindable<Color4> accentColourLocal = new Bindable<Color4>();
 
         [Resolved]
         private Column column { get; set; } = null!;
+
 
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
@@ -54,23 +49,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
 
-        [Resolved]
-        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
-
         public Ez2KeyArea()
         {
             RelativeSizeAxes = Axes.Both;
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo)
+        private void load(IScrollingInfo scrollingInfo, IEzSkinInfo ezSkinInfo)
         {
-            hitPosition.Value = (float)ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition).Value;
-
             InternalChild = directionContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
-                Height = hitPosition.Value,
                 Children = new Drawable[]
                 {
                     new Container
@@ -128,11 +117,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 }
             };
 
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
+            hitPositionLocal.BindTo(ezSkinInfo.HitPosition);
+            hitPositionLocal.BindValueChanged(_ => updateHitPosition(), true);
 
-            // Use the column's shared bindable to avoid per-instance allocations from GetBoundCopy()
-            accentColour = column.AccentColour;
+            accentColourLocal.BindTo(column.AccentColour);
 
             void applyAccent(Color4 c)
             {
@@ -140,25 +128,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 topIcon.Colour = c;
             }
 
-            // apply current value immediately; only subscribe to changes while skin editor is visible
-            applyAccent(accentColour.Value);
-
-            if (skinEditorOverlay != null)
-            {
-                accentColourHandler = e => applyAccent(e.NewValue);
-
-                skinEditorStateHandler = state =>
-                {
-                    if (state.NewValue == Visibility.Visible)
-                        accentColour.BindValueChanged(accentColourHandler!, true);
-                    else
-                        accentColour.ValueChanged -= accentColourHandler!;
-                };
-
-                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
-            }
+            applyAccent(accentColourLocal.Value);
+            accentColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);
 
             column.TopLevelContainer.Add(CreateProxy());
+        }
+
+        private void updateHitPosition()
+        {
+            directionContainer.Height = (float)hitPositionLocal.Value;
         }
 
         private double beatInterval;
@@ -219,7 +197,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             Color4 lightingColour = getLightingColour();
 
             background
-                .FlashColour(accentColour.Value.Lighten(0.8f), 200, Easing.OutQuint)
+                .FlashColour(accentColourLocal.Value.Lighten(0.8f), 200, Easing.OutQuint)
                 .FadeTo(1, lighting_fade_in_duration, Easing.OutQuint)
                 .Then()
                 .FadeTo(0.8f, 500);
@@ -273,20 +251,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 Radius = 25,
             }, lighting_fade_out_duration, Easing.OutQuint);
 
-            topIcon.FadeColour(accentColour.Value, lighting_fade_out_duration, Easing.OutQuint);
+            topIcon.FadeColour(accentColourLocal.Value, lighting_fade_out_duration, Easing.OutQuint);
         }
 
-        private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColour.Value, Color4.White, 0, 1);
+        private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColourLocal.Value, Color4.White, 0, 1);
 
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
             {
-                if (skinEditorOverlay != null && skinEditorStateHandler != null)
-                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
-
-                if (accentColourHandler != null)
-                    accentColour.ValueChanged -= accentColourHandler;
+                // Unbind local bindables to avoid leaking subscriptions and avoid touching shared bindables.
+                accentColourLocal.UnbindBindings();
+                hitPositionLocal.UnbindBindings();
+                directionLocal.UnbindBindings();
             }
 
             base.Dispose(isDisposing);

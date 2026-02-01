@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Layout;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
@@ -20,10 +21,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzJudgementLine : CompositeDrawable
     {
-        private Container sprite = null!;
+        private readonly IBindable<double> hitPositonBindable = new BindableDouble();
+        private readonly IBindable<double> columnWidth = new BindableDouble();
+        private readonly IBindable<string> noteSetName = new Bindable<string>();
+        // private readonly LayoutValue layout = new LayoutValue(Invalidation.DrawSize);
 
-        // [Resolved]
-        // private StageDefinition stageDefinition { get; set; } = null!;
+        private Container sprite = null!;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
@@ -31,12 +34,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        private Bindable<double> hitPositonBindable = null!;
-        private Bindable<double> columnWidth = null!;
-        private Bindable<string> noteSetName = null!;
+        public EzJudgementLine()
+        {
+            // AddLayout(layout);
+        }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             RelativeSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
@@ -54,9 +58,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             };
 
-            noteSetName = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            noteSetName.BindTo(ezSkinInfo.NoteSetName);
+            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
+            columnWidth.BindTo(ezSkinInfo.ColumnWidth);
         }
 
         protected override void LoadComplete()
@@ -64,14 +68,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.LoadComplete();
             noteSetName.BindValueChanged(_ => OnDrawableChanged(), true);
 
-            hitPositonBindable.BindValueChanged(_ => updateSizes(), true);
-            columnWidth.BindValueChanged(_ => updateSizes(), true);
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-            updateSizes();
+            // hitPositonBindable.BindValueChanged(_ => invalidateLayout(), true);
+            // columnWidth.BindValueChanged(_ => invalidateLayout(), true);
         }
 
         protected void OnDrawableChanged()
@@ -80,8 +78,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             var container = factory.CreateAnimation("JudgementLine");
             sprite.Add(container);
-
-            // updateSizes();
+            // invalidateLayout();
         }
 
         private void updateSizes()
@@ -92,5 +89,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             sprite.Scale = new Vector2(scale);
             sprite.Y = 384f + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
         }
+
+        // protected override void Update()
+        // {
+        //     base.Update();
+        //
+        //     if (!layout.IsValid)
+        //     {
+        //         updateSizes();
+        //         layout.Validate();
+        //     }
+        // }
+
+        // private void invalidateLayout() => layout.Invalidate();
     }
 }

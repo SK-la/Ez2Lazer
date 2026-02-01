@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
+using osu.Game.LAsEzExtensions.Configuration;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -16,7 +17,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
         private TextureAnimation? animation;
 
-        public IBindable<double> HitPosition { get; } = new Bindable<double>();
+        public readonly IBindable<double> HitPosition = new BindableDouble();
 
         public EzHoldNoteHittingLayer()
         {
@@ -27,18 +28,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezProSkinInfo)
         {
+            HitPosition.BindTo(ezProSkinInfo.HitPosition);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            // HitPosition is bound in BackgroundDependencyLoader; ensure UpdateSize reacts to changes
+            HitPosition.BindValueChanged(_ => UpdateSize(), true);
+
             if (animation == null)
                 OnDrawableChanged();
-
-            HitPosition.BindValueChanged(_ => UpdateSize(), true);
-            IsHitting.BindValueChanged(hitting =>
+                IsHitting.BindValueChanged(hitting =>
             {
                 ClearTransforms();
 
@@ -94,6 +97,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.UpdateSize();
             float v = -(float)HitPosition.Value - NoteSize.Value.Y / 2;
             Position = new Vector2(0, v);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                HitPosition.UnbindBindings();
+            }
+
+            base.Dispose(isDisposing);
         }
     }
 }

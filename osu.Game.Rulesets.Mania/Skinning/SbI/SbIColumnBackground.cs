@@ -101,7 +101,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             if (e.Action == column.Action.Value)
             {
-                var noteColour = column.AccentColour.Value;
+                var c = column.EzColumnColourBindable.Value;
+                var noteColour = new Color4(c.R, c.G, c.B, c.A);
                 brightColour = noteColour.Opacity(1f);
                 dimColour = noteColour.Opacity(0);
 

@@ -39,19 +39,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        // private IBindable<Colour4> columnColorBindable = null!;
-        protected Bindable<bool> EnabledColor = null!;
-        protected Bindable<Vector2> NoteSize = null!;
-        protected Bindable<string> NoteSetName = null!;
+        protected readonly IBindable<Colour4> columnColorBindable = new Bindable<Colour4>();
+        protected readonly IBindable<string> NoteSetName = new Bindable<string>();
+        protected readonly IBindable<bool> EnabledColor = new Bindable<bool>();
+        protected readonly IBindable<Vector2> NoteSize = new Bindable<Vector2>();
         protected int KeyMode;
         protected int ColumnIndex;
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             KeyMode = StageDefinition.Columns;
             ColumnIndex = Column.Index;
-            // bindables are assigned in LoadComplete to ensure Column has initialised them
 
             createSeparators();
             MainContainer = new Container
@@ -99,10 +98,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
 
-            EnabledColor = Column.ColorEnabledBindable;
-            // columnColorBindable = EzSkinConfig.GetColumnColorBindable(KeyMode, ColumnIndex);
-            NoteSetName = Column.NoteSetBindable;
-            NoteSize = Column.NoteSizeBindable;
+            EnabledColor.BindTo(EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled));
+            NoteSetName.BindTo(Column.NoteSetBindable);
+            NoteSize.BindTo(Column.NoteSizeBindable);
 
             // Use a per-column watcher to avoid creating an event handler delegate per-note.
             ColumnWatcher.GetOrCreate(Column).Add(this);
@@ -113,9 +111,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Colour4 lastNoteColor = Colour4.White;
         private bool lastNoteColorCached;
 
-        private void OnNoteSetChanged(ValueChangedEvent<string> obj)
+        private void OnNoteSetChanged()
         {
-            if (string.IsNullOrEmpty(obj.NewValue))
+            if (string.IsNullOrEmpty(NoteSetName.Value))
                 return;
 
             MainContainer?.Clear();
@@ -128,6 +126,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             lastNoteColorCached = false;
             UpdateColor();
+            if (LineContainer?.Children != null)
+            {
+                foreach (var child in LineContainer.Children)
+                {
+                    if (child is EzNoteSideLine sideLine)
+                        sideLine.UpdateTrackLineHeight();
+                }
+            }
         }
 
         protected virtual void UpdateColor()
@@ -169,7 +175,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         protected virtual Colour4 NoteColor => (EnabledColor.Value && UseColorization)
-            ? EzSkinConfig.GetColumnColor(KeyMode, ColumnIndex)
+            ? Column.EzColumnColourBindable.Value
             : Colour4.White;
 
         protected virtual string ColorPrefix
@@ -205,7 +211,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         // Forwarders used by ColumnWatcher when broadcasting per-column changes to instances.
-        internal void ForwardOnNoteSetChanged(ValueChangedEvent<string> e) => OnNoteSetChanged(e);
+        internal void ForwardOnNoteSetChanged() => OnNoteSetChanged();
         internal void ForwardOnColourChanged() => OnColourChanged();
         internal void ForwardOnNoteSizeChanged() => OnNoteSizeChanged();
 
@@ -233,7 +239,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 notes.RemoveAll(wr => !wr.TryGetTarget(out var target) || ReferenceEquals(target, note));
             }
 
-            private void onNoteSetChanged(ValueChangedEvent<string> e)
+            private void onNoteSetChanged()
             {
                 // iterate backwards and remove dead weak references in-place to avoid
                 // allocating a large temporary array when the column has many notes.
@@ -241,7 +247,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 {
                     var wr = notes[i];
                     if (wr.TryGetTarget(out var target))
-                        target.ForwardOnNoteSetChanged(e);
+                        target.ForwardOnNoteSetChanged();
                     else
                         notes.RemoveAt(i);
                 }

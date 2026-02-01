@@ -22,8 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }
 
-        private Bindable<bool> enabledColor = null!;
-        private Bindable<double> tailAlpha = null!;
+        private IBindable<double> tailAlpha = null!;
 
         // private SbIHoldNoteHittingLayer hittingLayer { get; set; }
 
@@ -46,15 +45,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             {
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
-
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            enabledColor = Column.ColorEnabledBindable;
-            tailAlpha = Column.HoldTailAlphaBindable;
+            tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
             tailAlpha.BindValueChanged(alpha =>
             {
                 Alpha = (float)alpha.NewValue;

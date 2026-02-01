@@ -178,6 +178,8 @@ namespace osu.Game
 
         protected Ez2ConfigManager Ez2ConfigManager { get; private set; }
 
+        protected EzSkinInfo EzSkinInfo { get; private set; }
+
         protected EzLocalTextureFactory NoteFactory { get; private set; }
 
         /// <summary>
@@ -290,6 +292,8 @@ namespace osu.Game
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
+            EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);
+            dependencies.CacheAs<IEzSkinInfo>(EzSkinInfo);
             dependencies.Cache(NoteFactory = new EzLocalTextureFactory(
                 Ez2ConfigManager,
                 Host.Renderer,

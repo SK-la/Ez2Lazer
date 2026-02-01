@@ -26,6 +26,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
+        private readonly IBindable<string> stageName = new Bindable<string>();
+        private readonly IBindable<double> hitPositonBindable = new BindableDouble();
+        private readonly Bindable<Vector2> noteSize = new Bindable<Vector2>();
+
         private Container sprite = null!;
         private TextureAnimation? upSprite;
         private TextureAnimation? downSprite;
@@ -50,14 +54,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        private Bindable<string> stageName = null!;
-        private Bindable<double> hitPositonBindable = null!;
-
-        [Resolved(canBeNull: true)]
-        private SkinEditorOverlay? skinEditorOverlay { get; set; }
-
         private Action? noteSizeChangedHandler;
-        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
 
         private double bpm;
         private double beatInterval;
@@ -70,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             sprite = new Container
             {
@@ -83,8 +80,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             keyMode = stageDefinition.Columns;
             columnIndex = column.Index;
 
-            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            stageName.BindTo(ezSkinInfo.StageName);
+            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
+            column.NoteSizeBindable.BindTo(noteSize);
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm * 64;
@@ -113,21 +111,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             stageName.BindValueChanged(_ => loadAnimation(), true);
             hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
 
-            // Only subscribe to global Ez config changes (editor-driven) while skin editor is visible.
+            // Subscribe to global Ez config changes.
             noteSizeChangedHandler = OnConfigChanged;
-
-            if (skinEditorOverlay != null)
-            {
-                skinEditorStateHandler = state =>
-                {
-                    if (state.NewValue == Visibility.Visible)
-                        ezSkinConfig.OnNoteSizeChanged += noteSizeChangedHandler!;
-                    else
-                        ezSkinConfig.OnNoteSizeChanged -= noteSizeChangedHandler!;
-                };
-
-                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
-            }
+            ezSkinConfig.OnNoteSizeChanged += noteSizeChangedHandler;
         }
 
         protected virtual string KeySuffix
@@ -179,7 +165,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
-            float actualPanelWidth = factory.GetNoteSize(keyMode, columnIndex, true).Value.X;
+            float actualPanelWidth = noteSize.Value.X;
             float baseWidth = 410f / keyMode;
             float newScale = 2f * (actualPanelWidth / baseWidth);
             float newY = 768f - (float)hitPositonBindable.Value + 2f;
@@ -220,9 +206,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (isDisposing)
             {
-                if (skinEditorOverlay != null && skinEditorStateHandler != null)
-                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
-
                 if (noteSizeChangedHandler != null)
                     ezSkinConfig.OnNoteSizeChanged -= noteSizeChangedHandler;
             }

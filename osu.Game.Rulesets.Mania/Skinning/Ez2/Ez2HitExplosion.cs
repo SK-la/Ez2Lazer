@@ -25,17 +25,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private Column column { get; set; } = null!;
 
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-
         private Container largeFaint = null!;
 
-        private Bindable<Color4> accentColour = null!;
-
-        [Resolved(canBeNull: true)]
-        private SkinEditorOverlay? skinEditorOverlay { get; set; }
-
-        private Action<ValueChangedEvent<Color4>>? accentColourHandler;
-        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
+        private readonly IBindable<Color4> accentColourLocal = new Bindable<Color4>();
 
         public Ez2HitExplosion()
         {
@@ -78,42 +70,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 },
             };
 
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
-
-            // Use shared column bindable to prevent per-instance allocation via GetBoundCopy().
-            accentColour = column.AccentColour;
+            accentColourLocal.BindTo(column.AccentColour);
 
             void applyAccent(Color4 c)
             {
-                largeFaint.Colour = Interpolation.ValueAt(0.8f, c, Color4.White, 0, 1);
+                largeFaint.Colour = Interpolation.ValueAt(0.8f, accentColourLocal.Value, Color4.White, 0, 1);
 
                 largeFaint.EdgeEffect = new EdgeEffectParameters
                 {
                     Type = EdgeEffectType.Glow,
-                    Colour = c,
+                    Colour = accentColourLocal.Value,
                     Roundness = NoteHeight,
                     Radius = 50,
                 };
             }
 
-            // apply current value immediately; only subscribe to changes while skin editor is visible
-            applyAccent(accentColour.Value);
-
-            if (skinEditorOverlay != null)
-            {
-                accentColourHandler = e => applyAccent(e.NewValue);
-
-                skinEditorStateHandler = state =>
-                {
-                    if (state.NewValue == osu.Framework.Graphics.Containers.Visibility.Visible)
-                        accentColour.BindValueChanged(accentColourHandler!, true);
-                    else
-                        accentColour.ValueChanged -= accentColourHandler!;
-                };
-
-                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
-            }
+            applyAccent(accentColourLocal.Value);
+            accentColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
@@ -130,11 +103,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             if (isDisposing)
             {
-                if (skinEditorOverlay != null && skinEditorStateHandler != null)
-                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
-
-                if (accentColourHandler != null)
-                    accentColour.ValueChanged -= accentColourHandler;
+                accentColourLocal.UnbindBindings();
             }
 
             base.Dispose(isDisposing);

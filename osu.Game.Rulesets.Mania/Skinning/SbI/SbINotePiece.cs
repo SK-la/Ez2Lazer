@@ -19,11 +19,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     public partial class SbINotePiece : EzNoteBase
     {
-        public Bindable<double> NoteAccentRatio = new Bindable<double>(1f);
+        public IBindable<double> NoteAccentRatio = new Bindable<double>(1f);
         public Bindable<double> NoteHeight = new Bindable<double>(8);
-        public Bindable<double> CORNER_RADIUS = new Bindable<double>(0);
+        public Bindable<double> CornerRadiusBindable = new Bindable<double>(0);
 
-        private readonly IBindable<Color4> accentColour = new Bindable<Color4>();
+        private readonly IBindable<Colour4> columnColour = new Bindable<Colour4>();
 
         private Box colouredBox = null!;
 
@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [BackgroundDependencyLoader(true)]
         private void load(DrawableHitObject? drawableObject)
         {
-            CornerRadius = (float)CORNER_RADIUS.Value;
+            CornerRadius = (float)CornerRadiusBindable.Value;
 
             if (MainContainer != null)
             {
@@ -66,7 +66,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         Origin = Anchor.Centre,
                         RelativeSizeAxes = Axes.Both,
                         // Masking = true,
-                        // CornerRadius = CORNER_RADIUS,
+                        // CornerRadius = CornerRadiusBindable,
                         Children = new Drawable[]
                         {
                             colouredBox = new Box
@@ -78,19 +78,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 };
             }
 
-            if (drawableObject != null)
-            {
-                accentColour.BindTo(drawableObject.AccentColour);
-                accentColour.BindValueChanged(onAccentChanged, true);
-            }
-
+            columnColour.BindTo(Column.EzColumnColourBindable);
+            columnColour.BindValueChanged(onAccentChanged, true);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            NoteAccentRatio = Column.NoteHeightScaleToWidthBindable;
+            NoteAccentRatio = Column.EzSkinInfo.NoteHeightScaleToWidth;
             UpdateSize();
         }
 
@@ -107,11 +103,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             Height = (float)NoteHeight.Value * fixedA;
         }
 
-        private void onAccentChanged(ValueChangedEvent<Color4> accent)
+        private void onAccentChanged(ValueChangedEvent<Colour4> accent)
         {
+            var c = accent.NewValue;
+            var color = new Color4(c.R, c.G, c.B, c.A);
             colouredBox.Colour = ColourInfo.GradientVertical(
-                accent.NewValue.Lighten(0.1f),
-                accent.NewValue
+                color.Lighten(0.1f),
+                color
             );
         }
     }

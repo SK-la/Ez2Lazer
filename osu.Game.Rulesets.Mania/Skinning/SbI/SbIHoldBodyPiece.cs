@@ -19,8 +19,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     public partial class SbIHoldBodyPiece : EzNoteBase, IHoldNoteBody
     {
-        private readonly Bindable<Color4> accentColour = new Bindable<Color4>();
-        private Bindable<double> tailMaskHeight = new Bindable<double>();
+        private IBindable<double> tailMaskHeight = null!;
 
         private Container? topContainer;
         private Container? bodyContainer;
@@ -51,14 +50,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 };
             }
 
-            if (drawableObject != null)
-            {
-                var holdNote = (DrawableHoldNote)drawableObject;
-
-                accentColour.BindTo(holdNote.AccentColour);
-                // hittingLayer.AccentColour.BindTo(holdNote.AccentColour);
-                // ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHitting);
-            }
+            // colour is driven by ez column colours via EzNoteBase
 
         }
 
@@ -66,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             base.LoadComplete();
 
-            tailMaskHeight = Column.HoldTailMaskHeightBindable;
+            tailMaskHeight = Column.EzSkinInfo.HoldTailMaskHeight;
             tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
         }
 

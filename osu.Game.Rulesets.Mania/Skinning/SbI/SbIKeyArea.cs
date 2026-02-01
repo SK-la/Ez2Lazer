@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         private Container directionContainer = null!;
         private Drawable background = null!;
 
-        private Bindable<Color4> accentColour = null!;
+        private IBindable<Colour4> columnColour = null!;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -46,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     {
                         Masking = true,
                         RelativeSizeAxes = Axes.Both,
-                        CornerRadius = (float)CORNER_RADIUS.Value,
+                        CornerRadius = (float)CornerRadiusBindable.Value,
                         Child = background = new Box
                         {
                             Name = "Key gradient",
@@ -57,10 +57,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 }
             };
 
-            accentColour = column.AccentColour.GetBoundCopy();
-            accentColour.BindValueChanged(colour =>
+            columnColour = column.EzColumnColourBindable;
+            columnColour.BindValueChanged(colour =>
                 {
-                    background.Colour = colour.NewValue.Darken(0.2f);
+                    var c = colour.NewValue;
+                    background.Colour = new Color4(c.R, c.G, c.B, c.A).Darken(0.2f);
                 },
                 true);
 

@@ -27,7 +27,6 @@ using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
-using osu.Game.Overlays.SkinEditor;
 using osuTK;
 using osuTK.Graphics;
 
@@ -64,30 +63,8 @@ namespace osu.Game.Rulesets.Mania.UI
         public readonly bool IsSpecial;
 
         public readonly Bindable<Color4> AccentColour = new Bindable<Color4>(Color4.Black);
-        public readonly Bindable<Vector2> NoteSizeBindable = new Bindable<Vector2>();
-        public Bindable<string> NoteSetBindable { get; private set; } = null!;
-        public Bindable<bool> ColorEnabledBindable { get; private set; } = null!;
-        public Bindable<double> HitPositionBindable { get; private set; } = null!;
-        public Bindable<double> HoldTailAlphaBindable { get; private set; } = null!;
-        public Bindable<double> HoldTailMaskHeightBindable { get; private set; } = null!;
-        public Bindable<double> HitTargetAlphaBindable { get; private set; } = null!;
-        public Bindable<double> HitTargetFloatFixedBindable { get; private set; } = null!;
-        public Bindable<double> NoteHeightScaleToWidthBindable { get; private set; } = null!;
-        public event Action<ValueChangedEvent<string>>? NoteSetChanged;
-        public event Action? NoteColourChanged;
-        public event Action? NoteSizeChanged;
-        private Bindable<EzMUGHitMode> hitModeBindable = null!;
+
         private IBindable<bool> touchOverlay = null!;
-
-        private Ez2ConfigManager ezConfig = null!;
-
-        [Resolved(canBeNull: true)]
-        private SkinEditorOverlay? skinEditorOverlay { get; set; }
-
-        private Action<ValueChangedEvent<Color4>>? accentColourHandler;
-        private Action<ValueChangedEvent<Visibility>>? skinEditorStateHandler;
-
-        private bool subscribedToEzConfig;
 
         private float leftColumnSpacing;
         private float rightColumnSpacing;
@@ -112,17 +89,33 @@ namespace osu.Game.Rulesets.Mania.UI
         private ISkinSource skin { get; set; } = null!;
 
         [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
 
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
-        [BackgroundDependencyLoader]
-        private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, Ez2ConfigManager ezConfig)
-        {
-            this.ezConfig = ezConfig;
-            SkinnableDrawable keyArea;
+        public IEzSkinInfo EzSkinInfo => ezSkinInfo;
 
+        [Cached(Type = typeof(IEzSkinInfo))]
+        private readonly EzSkinInfo ezSkinInfo = new EzSkinInfo();
+
+        public readonly IBindable<string> NoteSetBindable = new Bindable<string>();
+        public readonly Bindable<Vector2> NoteSizeBindable = new Bindable<Vector2>();
+        public Bindable<Colour4> EzColumnColourBindable = null!;
+        private Bindable<EzMUGHitMode> hitModeBindable = null!;
+
+        public event Action? NoteSetChanged;
+        public event Action? NoteSizeChanged;
+        public event Action? NoteColourChanged;
+
+        [BackgroundDependencyLoader]
+        private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig)
+        {
+            SkinnableDrawable keyArea;
+            ezSkinInfo.BindTo(ezConfig);
             skin.SourceChanged += onSourceChanged;
             onSourceChanged();
 
@@ -152,69 +145,22 @@ namespace osu.Game.Rulesets.Mania.UI
             BackgroundContainer.Add(background);
             TopLevelContainer.Add(HitObjectArea.Explosions.CreateProxy());
 
-            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
-
-            configurePools(hitModeBindable.Value);
-
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
-            NoteSetBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
-            ColorEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
-            HitPositionBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            HoldTailAlphaBindable = ezConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
-            HoldTailMaskHeightBindable = ezConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
-            HitTargetAlphaBindable = ezConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha);
-            HitTargetFloatFixedBindable = ezConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed);
-            NoteHeightScaleToWidthBindable = ezConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
-
+            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            configurePools(hitModeBindable.Value);
+            NoteSetBindable.BindTo(EzSkinInfo.NoteSetName);
             NoteSizeBindable.BindTo(factory.GetNoteSize(stageDefinition.Columns, Index));
-            NoteSizeBindable.BindValueChanged(_ => NoteSizeChanged?.Invoke(), true);
-
-            NoteSetBindable.BindValueChanged(onNoteSetChanged, true);
-
-            // If a SkinEditorOverlay exists, only subscribe to ezConfig editor events while the editor is visible
-            if (skinEditorOverlay != null)
-            {
-                skinEditorStateHandler = state =>
-                {
-                    if (state.NewValue == Visibility.Visible)
-                    {
-                        if (!subscribedToEzConfig)
-                        {
-                            ezConfig.OnNoteColourChanged += onNoteColourChanged;
-                            ezConfig.OnNoteSizeChanged += onNoteSizeChanged;
-                            // Apply current values immediately when entering editor
-                            onNoteColourChanged();
-                            onNoteSizeChanged();
-                            subscribedToEzConfig = true;
-                        }
-                    }
-                    else
-                    {
-                        if (subscribedToEzConfig)
-                        {
-                            ezConfig.OnNoteColourChanged -= onNoteColourChanged;
-                            ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
-                            subscribedToEzConfig = false;
-                        }
-                    }
-                };
-
-                skinEditorOverlay.State.BindValueChanged(skinEditorStateHandler, true);
-            }
-            else
-            {
-                ezConfig.OnNoteColourChanged += onNoteColourChanged;
-                ezConfig.OnNoteSizeChanged += onNoteSizeChanged;
-                subscribedToEzConfig = true;
-            }
+            EzColumnColourBindable = ezConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
         }
 
         private void onNoteSetChanged(ValueChangedEvent<string> e)
         {
-            NoteSetChanged?.Invoke(e);
-            // NoteSet 变化会影响尺寸与颜色（ratio/纹理变化），统一广播下发。
+            if (string.IsNullOrEmpty(e.NewValue))
+                return;
+
+            NoteSetChanged?.Invoke();
             NoteSizeChanged?.Invoke();
             NoteColourChanged?.Invoke();
         }
@@ -227,6 +173,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private void onNoteSizeChanged()
         {
             NoteSizeChanged?.Invoke();
+            NoteColourChanged?.Invoke();
         }
 
         private void onSourceChanged()
@@ -247,6 +194,9 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
             NewResult += OnNewResult;
 
+            NoteSetBindable.BindValueChanged(onNoteSetChanged);
+            ezConfig.OnNoteColourChanged += onNoteColourChanged;
+            ezConfig.OnNoteSizeChanged += onNoteSizeChanged;
             hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue));
         }
 
@@ -256,21 +206,10 @@ namespace osu.Game.Rulesets.Mania.UI
             NewResult -= OnNewResult;
 
             if (isDisposing)
-                NoteSizeBindable.UnbindAll();
-
-            if (isDisposing && NoteSetBindable != null)
-                NoteSetBindable.ValueChanged -= onNoteSetChanged;
-
-            if (isDisposing && ezConfig != null)
             {
-                if (subscribedToEzConfig)
-                {
-                    ezConfig.OnNoteColourChanged -= onNoteColourChanged;
-                    ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
-                }
-
-                if (skinEditorOverlay != null && skinEditorStateHandler != null)
-                    skinEditorOverlay.State.ValueChanged -= skinEditorStateHandler;
+                NoteSetBindable.ValueChanged -= onNoteSetChanged;
+                ezConfig.OnNoteColourChanged -= onNoteColourChanged;
+                ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
             }
 
             base.Dispose(isDisposing);
@@ -283,6 +222,8 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
             dependencies.CacheAs<IBindable<ManiaAction>>(Action);
+            dependencies.CacheAs(EzSkinInfo);
+
             return dependencies;
         }
 

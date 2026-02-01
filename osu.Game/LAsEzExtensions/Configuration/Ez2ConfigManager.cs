@@ -12,6 +12,7 @@ using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Screens.SelectV2;
+using osuTK.Graphics;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
@@ -84,7 +85,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             #region 列类型、着色系统
 
-            SetDefault(Ez2Setting.ColorSettingsEnabled, true);
             SetDefault(Ez2Setting.ColumnBlur, 0.7, 0.0, 1, 0.01);
             SetDefault(Ez2Setting.ColumnDim, 0.7, 0.0, 1, 0.01);
 
@@ -225,7 +225,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             return Get<Colour4>(Ez2Setting.ColumnTypeA);
         }
 
-        public IBindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
+        public Bindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
         {
             EzColumnType colorType = GetColumnType(keyMode, columnIndex);
 
@@ -363,10 +363,12 @@ namespace osu.Game.LAsEzExtensions.Configuration
             var columnWidthBindable = GetBindable<double>(Ez2Setting.ColumnWidth);
             var specialFactorBindable = GetBindable<double>(Ez2Setting.SpecialFactor);
             var columnWidthStyleBindable = GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
+            var noteHeightScaleBindable = GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
 
             columnWidthBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
             specialFactorBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
             columnWidthStyleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+            noteHeightScaleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
 
             var colorSettingsEnabledBindable = GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             var colorABindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
@@ -455,26 +457,26 @@ namespace osu.Game.LAsEzExtensions.Configuration
         ColumnWidthStyle,
         GlobalHitPosition, //TODO:未来改成下拉栏，补充虚拟判定线
 
-        // 全局设置
+        // 皮肤设置
         ColumnWidth,
         SpecialFactor,
 
-        // Ez专属皮肤设置
+        // Ez专属
         HitPosition,
         HitTargetFloatFixed,
         HitTargetAlpha,
         VisualHitPosition,
         NoteHeightScaleToWidth,
         NoteTrackLineHeight,
+        NoteSetName,
+        StageName,
+
+        GlobalTextureName,
+        GameThemeName,
 
         // Mania 长按尾部相关（EzSkinEditor 用）
         ManiaHoldTailAlpha,
         ManiaHoldTailMaskGradientHeight,
-
-        GlobalTextureName,
-        NoteSetName,
-        StageName,
-        GameThemeName,
 
         // 着色系统
         ColorSettingsEnabled,
@@ -491,7 +493,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         ColumnTypeOf18K,
 
         // 列类型
-        // ColumnTypeBase = 500,
         ColumnTypeA,
         ColumnTypeB,
         ColumnTypeS,

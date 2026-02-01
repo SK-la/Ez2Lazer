@@ -19,19 +19,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
     {
-        private IBindable<bool>? isHitting;
-        private DrawableHoldNote holdNote = null!;
+        private IBindable<bool> isHitting = null!;
+        private IBindable<double> tailAlpha = null!;
+        private IBindable<double> tailMaskHeight = null!;
 
         private Container? topContainer;
         private Container? bodyContainer;
         private Container? bodyScaleContainer;
         private Container? bodyInnerContainer;
 
-        private Bindable<double> tailAlpha = null!;
-        private IBindable<double> tailMaskHeight = null!;
-        private IBindable<double> hitPosition = null!;
-        private EzHoldNoteHittingLayer? hittingLayer;
+        private DrawableHoldNote holdNote = null!;
         private Drawable? lightContainer;
+        private EzHoldNoteHittingLayer? hittingLayer;
 
         private float tailHeight;
 
@@ -54,15 +53,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
 
-            hitPosition = Column.HitPositionBindable;
-            tailMaskHeight = Column.HoldTailMaskHeightBindable;
-            tailAlpha = Column.HoldTailAlphaBindable;
+            tailMaskHeight = Column.EzSkinInfo.HoldTailMaskHeight;
+            tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
 
             isHitting ??= holdNote.IsHolding;
             isHitting.BindValueChanged(onIsHittingChanged, true);
 
-            tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
-            tailAlpha.BindValueChanged(_ => UpdateSize(), true);
+            // Column will notify notes about EzSkinInfo-driven size changes via NoteSizeChanged; avoid per-note BindValueChanged
+            // ensure initial size/state matches current config
+            UpdateSize();
             // 确保光效层被正确初始化
             if (lightContainer == null)
                 OnLightChanged();
@@ -91,8 +90,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (isHitting != null)
                 ((IBindable<bool>)hittingLayer.IsHitting).BindTo(isHitting);
-
-            hittingLayer.HitPosition.BindTo(hitPosition);
         }
 
         private void onIsHittingChanged(ValueChangedEvent<bool> isHitting)
