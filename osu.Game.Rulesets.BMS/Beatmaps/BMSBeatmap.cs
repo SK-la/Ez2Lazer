@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
 using osu.Game.Beatmaps;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
@@ -24,5 +25,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// Whether this is a Double Play beatmap (14K).
         /// </summary>
         public bool IsDoublePlay => TotalColumns > 9;
+
+        /// <summary>
+        /// Background sound events (non-note audio).
+        /// </summary>
+        public List<BmsBackgroundSoundEvent> BackgroundSoundEvents { get; } = new List<BmsBackgroundSoundEvent>();
     }
 }

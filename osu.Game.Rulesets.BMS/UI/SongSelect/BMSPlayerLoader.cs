@@ -155,8 +155,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 Beatmap.Value = maniaWorkingBeatmap;
                 Ruleset.Value = maniaRuleset.RulesetInfo;
 
-                // Use osu!'s standard PlayerLoader which will create SoloPlayer
-                var playerLoader = new PlayerLoader(() => new SoloPlayer());
+                // Use BmsPlayer for keysound integration
+                var playerLoader = new PlayerLoader(() => new BmsPlayer());
                 this.Push(playerLoader);
             }
             catch (System.Exception ex)
