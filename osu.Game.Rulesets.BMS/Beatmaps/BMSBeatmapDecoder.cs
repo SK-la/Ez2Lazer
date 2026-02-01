@@ -4,10 +4,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
+using osu.Framework.Logging;
+using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Formats;
@@ -22,6 +22,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </summary>
     public class BMSBeatmapDecoder : Decoder<Beatmap>
     {
+        private const string BMS_LOG_PREFIX = "[BMS]";
+
         protected override Beatmap CreateTemplateObject() => new BMSBeatmap();
 
         // BMS channel definitions
@@ -88,16 +90,18 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             measureLengths.Clear();
             events.Clear();
 
+            Logger.Log($"{BMS_LOG_PREFIX} Starting BMS beatmap decoding");
+
             string? line;
 
             while ((line = stream.ReadLine()) != null)
             {
                 line = line.Trim();
 
-                if (string.IsNullOrEmpty(line) || line.StartsWith("*", StringComparison.Ordinal))
+                if (string.IsNullOrEmpty(line) || line.StartsWith('*'))
                     continue;
 
-                if (line.StartsWith("#", StringComparison.Ordinal))
+                if (line.StartsWith('#'))
                     parseLine(line);
             }
 
@@ -107,17 +111,35 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         private void parseLine(string line)
         {
-            // Match header commands like #TITLE, #ARTIST, #WAV01, etc.
-            var headerMatch = Regex.Match(line, @"^#([A-Za-z]+)(\d{0,2})\s+(.*)$", RegexOptions.IgnoreCase);
-
-            if (headerMatch.Success)
+            // Match header commands like #TITLE, #ARTIST, #WAV01/#WAVAA, etc.
+            // BMS uses base36 (0-9, A-Z) indices, but many headers have no index.
+            if (line.StartsWith('#'))
             {
-                string command = headerMatch.Groups[1].Value.ToUpperInvariant();
-                string index = headerMatch.Groups[2].Value;
-                string value = headerMatch.Groups[3].Value.Trim();
+                int spaceIndex = line.IndexOfAny(new[] { ' ', '\t' }, 1);
 
-                parseHeader(command, index, value);
-                return;
+                if (spaceIndex > 1)
+                {
+                    string header = line.Substring(1, spaceIndex - 1).Trim();
+                    string value = line.Substring(spaceIndex + 1).Trim();
+
+                    string command = header;
+                    string index = string.Empty;
+
+                    if (header.Length > 2)
+                    {
+                        string possibleIndex = header.Substring(header.Length - 2, 2);
+                        string possibleCommand = header.Substring(0, header.Length - 2);
+
+                        if (possibleIndex.All(char.IsLetterOrDigit) && possibleCommand.All(char.IsLetter))
+                        {
+                            command = possibleCommand;
+                            index = possibleIndex;
+                        }
+                    }
+
+                    parseHeader(command.ToUpperInvariant(), index, value);
+                    return;
+                }
             }
 
             // Match channel data like #00111:01020304
@@ -170,6 +192,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double bpm))
                             bpmDefinitions[index] = bpm;
                     }
+
                     break;
 
                 case "WAV":
@@ -260,6 +283,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         private void buildBeatmap(Beatmap beatmap)
         {
+            // Log for debugging
+            Logger.Log($"[BMS] Loaded {wavDefinitions.Count} WAV definitions, {bmpDefinitions.Count} BMP definitions", LoggingTarget.Runtime, LogLevel.Debug);
+
             // Set metadata
             beatmap.BeatmapInfo.Metadata.Title = title;
             beatmap.BeatmapInfo.Metadata.TitleUnicode = title;
@@ -281,6 +307,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             // Create hit objects
             var hitObjects = createHitObjects(timingPoints);
             beatmap.HitObjects.AddRange(hitObjects);
+
+            // Store background (non-note) sound events
+            if (beatmap is BMSBeatmap bmsBeatmap)
+            {
+                var backgroundEvents = createBackgroundSoundEvents(timingPoints);
+                bmsBeatmap.BackgroundSoundEvents.AddRange(backgroundEvents);
+                Logger.Log($"[BMS] Background sound events: {backgroundEvents.Count}", LoggingTarget.Runtime, LogLevel.Debug);
+            }
 
             // Set difficulty
             beatmap.Difficulty.CircleSize = totalKeys;
@@ -322,20 +356,21 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         private List<TimingPointData> calculateTimingPoints()
         {
-            var result = new List<TimingPointData>();
-
-            // Add initial BPM
-            result.Add(new TimingPointData
+            var result = new List<TimingPointData>
             {
-                Time = 0,
-                ControlPoint = new TimingControlPoint { BeatLength = 60000 / initialBpm }
-            });
+                // Add initial BPM
+                new TimingPointData
+                {
+                    Time = 0,
+                    ControlPoint = new TimingControlPoint { BeatLength = 60000 / initialBpm }
+                }
+            };
 
             // Sort events by time
             var sortedEvents = events
-                .OrderBy(e => e.Measure)
-                .ThenBy(e => e.Position)
-                .ToList();
+                               .OrderBy(e => e.Measure)
+                               .ThenBy(e => e.Position)
+                               .ToList();
 
             // Process BPM changes
             foreach (var evt in sortedEvents)
@@ -400,10 +435,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             var activeHolds = new Dictionary<int, BMSEvent>(); // For LN processing
 
             var noteEvents = events
-                .Where(e => isNoteChannel(e.Channel))
-                .OrderBy(e => e.Measure)
-                .ThenBy(e => e.Position)
-                .ToList();
+                             .Where(e => isNoteChannel(e.Channel))
+                             .OrderBy(e => e.Measure)
+                             .ThenBy(e => e.Position)
+                             .ToList();
+
+            Logger.Log($"{BMS_LOG_PREFIX} Found {noteEvents.Count} note events", LoggingTarget.Runtime, LogLevel.Debug);
 
             foreach (var evt in noteEvents)
             {
@@ -413,7 +450,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 double time = calculateTime(evt.Measure, evt.Position, timingPoints);
 
                 // Get keysound sample
-                var samples = new List<Audio.HitSampleInfo>();
+                var samples = new List<HitSampleInfo>();
+
                 if (wavDefinitions.TryGetValue(evt.Value, out string? wavFile))
                 {
                     samples.Add(new ConvertHitObjectParser.FileHitSampleInfo(wavFile, 100));
@@ -458,6 +496,35 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (result.Count > 0)
             {
                 totalKeys = result.Max(h => h.Column) + 1;
+
+                // Log first note's samples for debugging
+                var firstNote = result.First();
+                string sampleInfo = firstNote.Samples.Count > 0
+                    ? string.Join(", ", firstNote.Samples.Select(s => s is ConvertHitObjectParser.FileHitSampleInfo fs ? fs.Filename : s.Name))
+                    : "(no samples)";
+                Logger.Log($"[BMS] Created {result.Count} hit objects, first note samples: {sampleInfo}", LoggingTarget.Runtime, LogLevel.Debug);
+            }
+
+            return result;
+        }
+
+        private List<BmsBackgroundSoundEvent> createBackgroundSoundEvents(List<TimingPointData> timingPoints)
+        {
+            var result = new List<BmsBackgroundSoundEvent>();
+
+            var backgroundEvents = events
+                                   .Where(e => isBackgroundSoundChannel(e.Channel))
+                                   .OrderBy(e => e.Measure)
+                                   .ThenBy(e => e.Position)
+                                   .ToList();
+
+            foreach (var evt in backgroundEvents)
+            {
+                if (!wavDefinitions.TryGetValue(evt.Value, out string? wavFile))
+                    continue;
+
+                double time = calculateTime(evt.Measure, evt.Position, timingPoints);
+                result.Add(new BmsBackgroundSoundEvent(time, wavFile));
             }
 
             return result;
@@ -467,16 +534,35 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         {
             // 1P visible: 11-19, 1P LN: 51-59
             // 2P visible: 21-29, 2P LN: 61-69
-            return (channel >= 11 && channel <= 19) ||
-                   (channel >= 21 && channel <= 29) ||
-                   (channel >= 51 && channel <= 59) ||
-                   (channel >= 61 && channel <= 69);
+            return channel >= 11 && channel <= 19 ||
+                   channel >= 21 && channel <= 29 ||
+                   channel >= 51 && channel <= 59 ||
+                   channel >= 61 && channel <= 69;
+        }
+
+        private bool isBackgroundSoundChannel(int channel)
+        {
+            if (isNoteChannel(channel))
+                return false;
+
+            if (channel == channel_measure_length ||
+                channel == channel_bpm_change ||
+                channel == channel_extended_bpm ||
+                channel == channel_stop)
+                return false;
+
+            if (channel == channel_bga_base ||
+                channel == channel_bga_poor ||
+                channel == channel_bga_layer)
+                return false;
+
+            return true;
         }
 
         private bool isLongNoteChannel(int channel)
         {
-            return (channel >= 51 && channel <= 59) ||
-                   (channel >= 61 && channel <= 69);
+            return channel >= 51 && channel <= 59 ||
+                   channel >= 61 && channel <= 69;
         }
 
         private bool isScratchChannel(int channel)
@@ -494,18 +580,18 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return channel switch
             {
                 // 1P side (channels 11-19, 51-59)
-                16 or 56 => 0,  // Scratch
-                11 or 51 => 1,  // Key 1
-                12 or 52 => 2,  // Key 2
-                13 or 53 => 3,  // Key 3
-                14 or 54 => 4,  // Key 4
-                15 or 55 => 5,  // Key 5
-                18 or 58 => 6,  // Key 6
-                19 or 59 => 7,  // Key 7
+                16 or 56 => 0, // Scratch
+                11 or 51 => 1, // Key 1
+                12 or 52 => 2, // Key 2
+                13 or 53 => 3, // Key 3
+                14 or 54 => 4, // Key 4
+                15 or 55 => 5, // Key 5
+                18 or 58 => 6, // Key 6
+                19 or 59 => 7, // Key 7
 
                 // 2P side (channels 21-29, 61-69)
-                26 or 66 => 8,  // Scratch 2
-                21 or 61 => 9,  // Key 8
+                26 or 66 => 8, // Scratch 2
+                21 or 61 => 9, // Key 8
                 22 or 62 => 10, // Key 9
                 23 or 63 => 11, // Key 10
                 24 or 64 => 12, // Key 11

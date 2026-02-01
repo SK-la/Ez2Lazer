@@ -11,7 +11,9 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
@@ -31,6 +33,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private readonly string folderPath;
         private readonly AudioManager audioManager;
         private readonly TextureStore? textures;
+        private readonly IResourceStore<TextureUpload>? backgroundTextureLoader;
 
         private BMSBeatmap? cachedBeatmap;
         private readonly Dictionary<string, Track> keysoundCache = new();
@@ -50,6 +53,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             this.folderPath = Path.GetDirectoryName(bmsFilePath) ?? string.Empty;
             this.audioManager = audioManager;
             this.textures = textures;
+
+            if (this.textures != null && Directory.Exists(folderPath))
+            {
+                var storage = new NativeStorage(folderPath);
+                backgroundTextureLoader = new TextureLoaderStore(new StorageBackedResourceStore(storage));
+                this.textures.AddTextureSource(backgroundTextureLoader);
+            }
         }
 
         /// <summary>
@@ -113,9 +123,22 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public override Texture? GetBackground()
         {
-            // For now, return null - background loading requires more complex texture loading
-            // TODO: Implement proper background loading from BMS folder
-            return null;
+            if (textures == null)
+                return null;
+
+            string backgroundFile = BeatmapInfo.Metadata.BackgroundFile;
+            if (string.IsNullOrEmpty(backgroundFile))
+                return null;
+
+            var texture = textures.Get(backgroundFile);
+
+            if (texture == null)
+            {
+                Logger.Log($"BMS background not found: {backgroundFile}", LoggingTarget.Runtime, LogLevel.Debug);
+                return null;
+            }
+
+            return texture;
         }
 
         protected override Track GetBeatmapTrack()
