@@ -54,6 +54,10 @@ namespace osu.Game.LAsEzExtensions.Configuration
             initializeEvents();
         }
 
+        // Cache of bindables returned by GetBindable to avoid creating multiple instances
+        private readonly object bindableCacheLock = new object();
+        private readonly Dictionary<Ez2Setting, object> bindableCache = new Dictionary<Ez2Setting, object>();
+
         protected override void InitialiseDefaults()
         {
             #region 皮肤类
@@ -383,7 +387,15 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         public new Bindable<T> GetBindable<T>(Ez2Setting setting)
         {
-            return base.GetBindable<T>(setting);
+            lock (bindableCacheLock)
+            {
+                if (bindableCache.TryGetValue(setting, out object? existing))
+                    return (Bindable<T>)existing;
+
+                var b = base.GetBindable<T>(setting);
+                bindableCache[setting] = b!;
+                return b;
+            }
         }
 
         public new void SetValue<T>(Ez2Setting lookup, T value)

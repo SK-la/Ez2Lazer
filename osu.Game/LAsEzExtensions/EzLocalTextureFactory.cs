@@ -45,6 +45,9 @@ namespace osu.Game.LAsEzExtensions
         private readonly Bindable<double> hitPositonBindable;
         private readonly Bindable<double> noteHeightScaleToWidth;
 
+        // scheduling guard to batch multiple bindable changes into one refresh
+        private bool textureRefreshScheduled;
+
         private Vector2 tempNoteSize;
 
         private readonly struct CacheEntry : IEquatable<CacheEntry>
@@ -103,14 +106,28 @@ namespace osu.Game.LAsEzExtensions
             hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
             noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
 
-            // noteSetName.BindValueChanged(e =>
-            // {
-            //     clearRelatedCache(e.OldValue);
-            // });
+            // Batch refresh: subscribe once and schedule a single refresh per frame when any relevant config changes.
+            void scheduleTextureRefresh()
+            {
+                if (textureRefreshScheduled) return;
+                textureRefreshScheduled = true;
+                Schedule(() =>
+                {
+                    textureRefreshScheduled = false;
+                    // Clear caches and let consumers lazily reload textures on next access.
+                    ClearGlobalCache();
+                    lock (loaderStoreCache)
+                        loaderStoreCache.Clear();
+                });
+            }
 
-            // stageName.BindValueChanged(e =>
-            // {
-            // });
+            // Subscribe and reuse the same schedule lambda for different generic Bindable<T>
+            noteSetName.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            stageName.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            columnWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            specialFactor.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            hitPositonBindable.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
         }
 
         #region 工具方法
@@ -485,6 +502,19 @@ namespace osu.Game.LAsEzExtensions
         {
             if (isDisposing)
             {
+                // Unbind to avoid leaking handlers
+                try
+                {
+                    noteSetName.UnbindAll();
+                    stageName.UnbindAll();
+                    columnWidth.UnbindAll();
+                    specialFactor.UnbindAll();
+                    hitPositonBindable.UnbindAll();
+                    noteHeightScaleToWidth.UnbindAll();
+                }
+                catch
+                {
+                }
                 // 只清理实例级别的缓存，全局缓存留给 ClearGlobalCache 处理
                 foreach (var loader in loaderStoreCache.Values)
                     loader.Dispose();
