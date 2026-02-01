@@ -112,6 +112,12 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var maniaBeatmap = (ManiaBeatmap)beatmap;
             originalKeys = (int)maniaBeatmap.Difficulty.CircleSize;
 
+            if (EnableModifyKeys.Value)
+                finalKeys = TargetKeys.Value * 2;
+            else if (originalKeys <= 9)
+                finalKeys = originalKeys * 2;
+            else return;
+
             var options = new KrrDpOptions
             {
                 ModifyKeys = EnableModifyKeys.Value ? TargetKeys.Value : null,
@@ -128,11 +134,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             };
 
             KrrDpConverter.Transform(maniaBeatmap, options);
-
-            if (EnableModifyKeys.Value)
-                finalKeys = TargetKeys.Value * 2;
-            else
-                finalKeys = originalKeys * 2;
 
             finalKeys = Math.Clamp(finalKeys, 1, 18);
             maniaBeatmap.Stages.Clear();
