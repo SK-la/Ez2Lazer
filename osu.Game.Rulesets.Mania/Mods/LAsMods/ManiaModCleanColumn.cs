@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public int ApplyOrder => ApplyOrderIndex.Value;
 
-        private List<int>? columnsToDelete;
+        private HashSet<int>? columnsToDelete;
         private int keys1;
         private int keys2;
         private bool customReorderApplied;
@@ -88,7 +88,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 if (EnableCustomDelete.Value) yield return ("Custom Delete", string.IsNullOrWhiteSpace(CustomDeleteColumn.Value) ? "Enabled" : CustomDeleteColumn.Value);
                 if (EnableCustomReorder.Value) yield return ("Custom Reorder", string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
                 if (UseHealthCapReduction.Value) yield return ("Health Cap Reduction", "On");
-                yield break;
             }
         }
 
@@ -108,7 +107,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     customReorderApplied = true;
                 }
 
-                columnsToDelete = new List<int>();
+                columnsToDelete = new HashSet<int>();
 
                 // 获取列类型（仅用于 S/P/E 列删除）
                 if (GlobalConfigStore.EzConfig != null)
@@ -157,18 +156,12 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     }
                 }
 
-                // 执行删除操作（后执行删除）
+                // 执行删除操作（后执行删除） —— 一次性过滤以避免大量 Remove 调用导致的 O(n*m) 行为
                 if (columnsToDelete.Any())
                 {
-                    var notesToRemove = maniaBeatmap.HitObjects
-                                                    .Where(h => h is ManiaHitObject maniaHitObject && columnsToDelete.Contains(maniaHitObject.Column))
-                                                    .OrderBy(h => h.StartTime)
-                                                    .ToList();
-
-                    foreach (var note in notesToRemove)
-                    {
-                        maniaBeatmap.HitObjects.Remove(note);
-                    }
+                    maniaBeatmap.HitObjects = maniaBeatmap.HitObjects
+                                                          .Where(h => !(h is ManiaHitObject maniaHitObject && columnsToDelete.Contains(maniaHitObject.Column)))
+                                                          .ToList();
                 }
             }
             catch
@@ -266,14 +259,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 double maxTime = sourceHitObjects.Max(h => h.GetEndTime());
 
                 // 应用列映射、清空和长按操作
-                var newObjects = new List<ManiaHitObject>();
+                // 预分配容量以减少重复分配
+                var newObjects = new List<ManiaHitObject>(sourceHitObjects.Count);
 
-                // 显示实际源列的 note 分布
-                for (int i = 0; i < sourceColumns; i++)
+                // 显示实际源列的 note 分布（一次遍历统计以避免每列重复遍历）
+                int[] counts = new int[sourceColumns];
+
+                foreach (var h in sourceHitObjects)
                 {
-                    int noteCount = sourceHitObjects.Count(h => h.Column == i);
-                    Logger.Log($"[ManiaModCleanColumn] Original column {i} has {noteCount} notes");
+                    if (h.Column >= 0 && h.Column < sourceColumns)
+                        counts[h.Column]++;
                 }
+
+                for (int i = 0; i < sourceColumns; i++)
+                    Logger.Log($"[ManiaModCleanColumn] Original column {i} has {counts[i]} notes");
 
                 Logger.Log($"[ManiaModCleanColumn] Column mapping: {string.Join(", ", columnMapping.Select(kv => $"{kv.Key}->{kv.Value}"))}");
 
