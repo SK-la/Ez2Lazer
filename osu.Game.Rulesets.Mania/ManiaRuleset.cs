@@ -280,6 +280,8 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModCleaner(),
                         new ManiaModNewJudgement(),
                         new ManiaModNoteAdjust(),
+                        new ManiaModHealthAdaptive(),
+                        new ManiaModAccuracyAdaptive(),
                         new ManiaModDoublePlay(),
                         new ManiaModGracer(),
                         new ManiaModJudgmentsAdjust(),
