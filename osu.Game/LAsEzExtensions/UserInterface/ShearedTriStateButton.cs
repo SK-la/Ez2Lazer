@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Game.Graphics.UserInterface;
 
 namespace osu.Game.LAsEzExtensions.UserInterface
@@ -49,11 +50,9 @@ namespace osu.Game.LAsEzExtensions.UserInterface
 
                 case 2:
                 default:
-                    // 米黄色（beige）用于开启2，保持文字颜色为 Content1 以保证可读性
-                    var beige = new osu.Framework.Graphics.Colour4(0.961f, 0.961f, 0.863f, 1f);
-                    DarkerColour = beige;
-                    LighterColour = beige.Lighten(0.12f);
-                    TextColour = ColourProvider.Content1;
+                    DarkerColour = Colour4.PaleGoldenrod;
+                    LighterColour = Colour4.LightGoldenrodYellow;
+                    TextColour = ColourProvider.Background6;
                     break;
             }
         }

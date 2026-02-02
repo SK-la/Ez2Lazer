@@ -253,8 +253,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
             + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
 
         public static readonly EzLocalisableString KeySoundPreview_Tooltip = new EzLocalisableString(
-            "按键音预览：0 关闭; 1 开启 (按键触发样本播放); 2 开启2 (选歌保留预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",
-            "Key sound preview: 0 Off; 1 On (keypress triggers samples); 2 On2 (preserve preview in song select; in gameplay auto-play note samples, keypresses no longer trigger sample playback)");
+            "按键音预览：\n0 关闭; \n1 蓝灯开启 (全量音效预览); \n2 黄灯开启 (全量音效预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",
+            "Key sound preview: \n0 Off; \n1 On (keypress triggers samples); \n2 On2 (preserve preview in song select; in gameplay auto-play note samples, keypresses no longer trigger sample playback)");
 
         public static readonly LocalisableString ManiaBarLinesBool = new EzLocalisableString("Mania 强制小节线显示开关", "(Mania) BarLines Boolean Toggle");
         public static readonly LocalisableString ManiaBarLinesBoolTooltip = new EzLocalisableString("强制显示Mania小节线功能的开关, 关闭后仅由皮肤控制", "(Mania) Toggle to force display of bar lines, when off only controlled by skin");
