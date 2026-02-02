@@ -11,7 +11,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
-using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -20,7 +19,7 @@ using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osuTK;
 
-namespace osu.Game.LAsEzExtensions.Select
+namespace osu.Game.LAsEzExtensions.UserInterface
 {
     public partial class EzKeyModeSelector : CompositeDrawable
     {

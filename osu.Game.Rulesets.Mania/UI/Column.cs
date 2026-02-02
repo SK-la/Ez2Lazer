@@ -65,6 +65,7 @@ namespace osu.Game.Rulesets.Mania.UI
         public readonly Bindable<Color4> AccentColour = new Bindable<Color4>(Color4.Black);
 
         private IBindable<bool> touchOverlay = null!;
+        private Bindable<int> keySoundPreviewMode = null!;
 
         private float leftColumnSpacing;
         private float rightColumnSpacing;
@@ -147,6 +148,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
+
+            keySoundPreviewMode = ezConfig.GetBindable<int>(Ez2Setting.KeySoundPreviewMode);
 
             hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
             configurePools(hitModeBindable.Value);
@@ -256,7 +259,9 @@ namespace osu.Game.Rulesets.Mania.UI
             // 记录延迟追踪按键输入
             InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
 
-            sampleTriggerSource.Play();
+            // If KeySoundPreviewMode == 2, suppress keypress-driven sample playback (samples will be auto-played instead).
+            if (keySoundPreviewMode.Value != 2)
+                sampleTriggerSource.Play();
             return true;
         }
 

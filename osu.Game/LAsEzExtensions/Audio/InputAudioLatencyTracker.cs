@@ -3,6 +3,7 @@
 
 using System;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Audio;
 using osu.Framework.Audio.EzLatency;
 using osu.Framework.Graphics.Sprites;
@@ -33,6 +34,8 @@ namespace osu.Game.LAsEzExtensions.Audio
         private ScoreProcessor? scoreProcessor;
 
         private EzLatencyManager latencyManager;
+        private Bindable<bool>? inputAudioLatencyConfigBindable;
+        private Action<ValueChangedEvent<bool>>? inputAudioLatencyConfigHandler;
 
         /// <summary>
         /// Global instance for unified access
@@ -54,8 +57,11 @@ namespace osu.Game.LAsEzExtensions.Audio
             scoreProcessor = processor;
 
             // 将 Ez2Setting 的启用状态绑定到 EzLatencyManager
-            var configBindable = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker);
-            latencyManager.Enabled.BindTo(configBindable);
+            inputAudioLatencyConfigBindable = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker);
+            // Avoid BindTo here to prevent repeated double-binding errors when Initialize is called multiple times.
+            // Use a one-way update from config -> latencyManager instead.
+            inputAudioLatencyConfigHandler = v => latencyManager.Enabled.Value = v.NewValue;
+            inputAudioLatencyConfigBindable.BindValueChanged(inputAudioLatencyConfigHandler, true);
 
             // 订阅延迟记录事件，用于日志输出
             latencyManager.OnNewRecord += OnLatencyRecordGenerated;
@@ -190,6 +196,9 @@ namespace osu.Game.LAsEzExtensions.Audio
                 latencyManager.OnNewRecord -= OnLatencyRecordGenerated;
                 latencyManager.Dispose();
             }
+
+            if (inputAudioLatencyConfigBindable != null && inputAudioLatencyConfigHandler != null)
+                inputAudioLatencyConfigBindable.ValueChanged -= inputAudioLatencyConfigHandler;
 
             Instance = null;
         }

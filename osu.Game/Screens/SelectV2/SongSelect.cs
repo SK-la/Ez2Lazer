@@ -164,7 +164,7 @@ namespace osu.Game.Screens.SelectV2
 
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
-        private Bindable<bool> keySoundPreview = null!;
+        private Bindable<int> keySoundPreview = null!;
         private EzPreviewTrackManager ezPreviewManager = null!;
 
         private IDisposable? modSelectOverlayRegistration;
@@ -320,7 +320,7 @@ namespace osu.Game.Screens.SelectV2
 
             ezPreviewManager = new EzPreviewTrackManager();
             AddInternal(ezPreviewManager);
-            keySoundPreview = ezConfig.GetBindable<bool>(Ez2Setting.KeySoundPreview);
+            keySoundPreview = ezConfig.GetBindable<int>(Ez2Setting.KeySoundPreviewMode);
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
         }
 
@@ -411,7 +411,7 @@ namespace osu.Game.Screens.SelectV2
 
             keySoundPreview.BindValueChanged(e =>
             {
-                ezPreviewManager.EnabledBindable.Value = e.NewValue;
+                ezPreviewManager.EnabledBindable.Value = e.NewValue != 0;
                 ensureTrackLooping(Beatmap.Value, TrackChangeDirection.None);
                 ensurePlayingSelected();
             });
@@ -552,7 +552,7 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            if (!ezPreviewManager.StartPreview(beatmap) && !keySoundPreview.Value)
+            if (!ezPreviewManager.StartPreview(beatmap) && keySoundPreview.Value == 0)
             {
                 ezPreviewManager.StopPreview();
             }

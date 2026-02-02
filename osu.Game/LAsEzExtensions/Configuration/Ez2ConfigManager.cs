@@ -122,7 +122,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         {
             SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
             SetDefault(Ez2Setting.XxySRFilter, false);
-            SetDefault(Ez2Setting.KeySoundPreview, false);
+            SetDefault(Ez2Setting.KeySoundPreviewMode, 0);
             SetDefault(Ez2Setting.EzSelectCsMode, "");
 
             SetDefault(Ez2Setting.HitMode, EzMUGHitMode.Lazer);
@@ -443,7 +443,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
     public enum Ez2Setting
     {
         // 界面设置
-        KeySoundPreview,
+        KeySoundPreviewMode,
         XxySRFilter,
         KpcDisplayMode,
 
