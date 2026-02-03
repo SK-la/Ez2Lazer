@@ -26,6 +26,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
+using osu.Game.LAsEzExtensions.Configuration;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Objects.Drawables
@@ -156,6 +157,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
         [Resolved(CanBeNull = true)]
         private IPooledHitObjectProvider pooledObjectProvider { get; set; }
 
+        private Ez2ConfigManager ezConfig;
+
+        [Resolved(CanBeNull = true)]
+        private DrawableRuleset drawableRuleset { get; set; }
+
+        private IBindable<double>? offsetBindable;
+
         /// <summary>
         /// Whether the initialization logic in <see cref="Playfield" /> has applied.
         /// </summary>
@@ -197,7 +205,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
         }
 
         [BackgroundDependencyLoader]
-        private void load(IGameplaySettings gameplaySettings, ISkinSource skinSource)
+        private void load(IGameplaySettings gameplaySettings, ISkinSource skinSource, Ez2ConfigManager ezConfig)
         {
             positionalHitsoundsLevel.BindTo(gameplaySettings.PositionalHitsoundsLevel);
             comboColourBrightness.BindTo(gameplaySettings.ComboColourNormalisationAmount);
@@ -210,6 +218,18 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             CurrentSkin = skinSource;
             CurrentSkin.SourceChanged += skinSourceChanged;
+
+            this.ezConfig = ezConfig;
+
+            // Choose the appropriate offset bindable once during load to avoid runtime reflection/namespace checks.
+            if (ezConfig != null && drawableRuleset != null)
+            {
+                var onlineId = drawableRuleset.Ruleset.RulesetInfo.OnlineID;
+                if (onlineId == 3) // Mania legacy ruleset id
+                    offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+                else
+                    offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+            }
         }
 
         protected override void LoadAsyncComplete()
@@ -800,7 +820,12 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (Judged)
                 return false;
 
-            CheckForResult(userTriggered, Time.Current - HitObject.GetEndTime());
+            double timeOffset = Time.Current - HitObject.GetEndTime();
+
+            if (offsetBindable != null)
+                timeOffset += offsetBindable.Value;
+
+            CheckForResult(userTriggered, timeOffset);
 
             return Judged;
         }

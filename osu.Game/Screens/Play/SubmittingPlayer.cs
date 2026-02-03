@@ -340,6 +340,16 @@ namespace osu.Game.Screens.Play
                 return Task.CompletedTask;
             }
 
+            // 如果任一 offsetPlus 设置非0，则禁止上传成绩以防止不公平的分数提交
+            double offsetMania = ezConfig.Get<double>(Ez2Setting.OffsetPlusMania);
+            double offsetNonStd = ezConfig.Get<double>(Ez2Setting.OffsetPlusNonMania);
+
+            if (offsetMania != 0.0 || offsetNonStd != 0.0)
+            {
+                Logger.Log("OffsetPlus 设置非0，已禁止上传成绩以保证公平性.");
+                return Task.CompletedTask;
+            }
+
             // token may be null if the request failed but gameplay was still allowed (see HandleTokenRetrievalFailure).
             if (token == null)
             {

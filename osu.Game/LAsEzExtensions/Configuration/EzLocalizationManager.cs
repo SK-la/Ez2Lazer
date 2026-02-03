@@ -258,6 +258,22 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         public static readonly LocalisableString ManiaBarLinesBool = new EzLocalisableString("Mania 强制小节线显示开关", "(Mania) BarLines Boolean Toggle");
         public static readonly LocalisableString ManiaBarLinesBoolTooltip = new EzLocalisableString("强制显示Mania小节线功能的开关, 关闭后仅由皮肤控制", "(Mania) Toggle to force display of bar lines, when off only controlled by skin");
+
+        public static readonly LocalisableString OffsetPlusMania = new EzLocalisableString("高阶Offset修正(Mania)", "Advanced Offset Plus (Mania)");
+
+        public static readonly LocalisableString OffsetPlusManiaTooltip = new EzLocalisableString(
+            "直接修正输入结果的偏移值, 不改变音频、谱面的时间轴。"
+            + "\n可以根绝所有输入延迟。（测试性功能！锁定成绩上传）",
+            "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
+            + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
+
+        public static readonly LocalisableString OffsetPlusNonMania = new EzLocalisableString("高阶Offset修正(非Mania)", "Advanced Offset Plus (Non-Mania)");
+
+        public static readonly LocalisableString OffsetPlusNonManiaTooltip = new EzLocalisableString(
+            "直接修正输入结果的偏移值, 不改变音频、谱面的时间轴。"
+            + "\n可以根绝所有输入延迟。（测试性功能！锁定成绩上传）",
+            "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
+            + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
     }
 
     public static class EzLocalizationExtensions

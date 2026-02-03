@@ -116,6 +116,10 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
 
             initializeManiaDefaults();
+
+            // 判定偏移修正（以毫秒计）
+            SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
+            SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
         }
 
         private void initializeManiaDefaults()
@@ -509,6 +513,10 @@ namespace osu.Game.LAsEzExtensions.Configuration
         GameplayDisableCmdSpace,
 
         // Mania游戏专属设置
+        // 判定偏移修正（以毫秒计）
+        OffsetPlusMania,
+        OffsetPlusNonMania,
+
         HitMode,
         CustomHealthMode,
         CustomPoorHitResultBool,
