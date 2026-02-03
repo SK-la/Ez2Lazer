@@ -1,19 +1,18 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Logging;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions.UserInterface
 {
-    /// <summary>
-    /// A sheared button that cycles through three states (0,1,2).
-    /// Provides a BindableInt `State` for external binding.
-    /// </summary>
     public partial class ShearedTriStateButton : ShearedButton
     {
-        public Bindable<int> State { get; } = new BindableInt();
+        public Bindable<KeySoundPreviewMode> State = new Bindable<KeySoundPreviewMode>();
 
         public ShearedTriStateButton(float? width = null)
             : base(width)
@@ -22,9 +21,8 @@ namespace osu.Game.LAsEzExtensions.UserInterface
 
         protected override void LoadComplete()
         {
-            // clicking cycles 0 -> 1 -> 2 -> 0
-            Action = () => State.Value = (State.Value + 1) % 3;
-
+            Action = () => State.Value = (KeySoundPreviewMode)(((int)State.Value + 1) % 3);
+            Logger.Log(State.Value.ToString());
             State.BindValueChanged(_ => UpdateState(), true);
 
             base.LoadComplete();
@@ -36,19 +34,19 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             // 0 = off, 1 = on (default highlight), 2 = alt-on (distinct beige colour)
             switch (State.Value)
             {
-                case 0:
+                case KeySoundPreviewMode.Off:
                     DarkerColour = ColourProvider.Background3;
                     LighterColour = ColourProvider.Background1;
                     TextColour = ColourProvider.Content1;
                     break;
 
-                case 1:
+                case KeySoundPreviewMode.AutoPreview:
                     DarkerColour = ColourProvider.Highlight1;
                     LighterColour = ColourProvider.Colour0;
                     TextColour = ColourProvider.Background6;
                     break;
 
-                case 2:
+                case KeySoundPreviewMode.AutoPlayPlus:
                 default:
                     DarkerColour = Colour4.PaleGoldenrod;
                     LighterColour = Colour4.LightGoldenrodYellow;

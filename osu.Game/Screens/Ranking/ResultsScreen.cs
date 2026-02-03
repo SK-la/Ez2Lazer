@@ -70,7 +70,9 @@ namespace osu.Game.Screens.Ranking
 
         private Bindable<EzMUGHitMode> hitModeBindable = new Bindable<EzMUGHitMode>();
         private Bindable<double> offsetPlusMania = new Bindable<double>();
-        private ScheduledDelegate? offsetPlusManiaScheduled;
+
+        // private ScheduledDelegate? offsetPlusManiaScheduled;
+
         private bool skipExitTransition;
 
         protected StatisticsPanel StatisticsPanel { get; private set; } = null!;

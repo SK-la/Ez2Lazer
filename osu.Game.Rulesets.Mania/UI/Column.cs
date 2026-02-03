@@ -55,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly OrderedHitPolicy hitPolicy;
         public Container UnderlayElements => HitObjectArea.UnderlayElements;
 
-        private GameplaySampleTriggerSource sampleTriggerSource = null!;
+        public GameplaySampleTriggerSource SampleTriggerSource { get; private set; } = null!;
 
         /// <summary>
         /// Whether this is a special (ie. scratch) column.
@@ -65,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.UI
         public readonly Bindable<Color4> AccentColour = new Bindable<Color4>(Color4.Black);
 
         private IBindable<bool> touchOverlay = null!;
-        private Bindable<int> keySoundPreviewMode = null!;
+        private KeySoundPreviewMode keySoundPreviewMode;
 
         private float leftColumnSpacing;
         private float rightColumnSpacing;
@@ -123,7 +123,7 @@ namespace osu.Game.Rulesets.Mania.UI
             InternalChildren = new Drawable[]
             {
                 hitExplosionPool = new DrawablePool<PoolableHitExplosion>(5),
-                sampleTriggerSource = new GameplaySampleTriggerSource(HitObjectContainer),
+                SampleTriggerSource = new GameplaySampleTriggerSource(HitObjectContainer),
                 HitObjectArea,
                 keyArea = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
                 {
@@ -149,8 +149,7 @@ namespace osu.Game.Rulesets.Mania.UI
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
-            keySoundPreviewMode = ezConfig.GetBindable<int>(Ez2Setting.KeySoundPreviewMode);
-
+            keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
             hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
             configurePools(hitModeBindable.Value);
             NoteSetBindable.BindTo(EzSkinInfo.NoteSetName);
@@ -208,17 +207,17 @@ namespace osu.Game.Rulesets.Mania.UI
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
 
-            if (isDisposing)
+            base.Dispose(isDisposing);
+
+            if (skin.IsNotNull())
+                skin.SourceChanged -= onSourceChanged;
+
+            if (ezConfig.IsNotNull())
             {
                 NoteSetBindable.ValueChanged -= onNoteSetChanged;
                 ezConfig.OnNoteColourChanged -= onNoteColourChanged;
                 ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
             }
-
-            base.Dispose(isDisposing);
-
-            if (skin.IsNotNull())
-                skin.SourceChanged -= onSourceChanged;
         }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
@@ -259,9 +258,8 @@ namespace osu.Game.Rulesets.Mania.UI
             // 记录延迟追踪按键输入
             InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
 
-            // If KeySoundPreviewMode == 2, suppress keypress-driven sample playback (samples will be auto-played instead).
-            if (keySoundPreviewMode.Value != 2)
-                sampleTriggerSource.Play();
+            if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
+                SampleTriggerSource.Play();
             return true;
         }
 

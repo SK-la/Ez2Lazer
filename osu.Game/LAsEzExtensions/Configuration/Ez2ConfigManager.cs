@@ -12,7 +12,6 @@ using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Screens.SelectV2;
-using osuTK.Graphics;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
@@ -115,6 +114,10 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.AsioSampleRate, 48000);
             SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
 
+            SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
+            SetDefault(Ez2Setting.XxySRFilter, false);
+            SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
+            SetDefault(Ez2Setting.EzSelectCsMode, "");
             initializeManiaDefaults();
 
             // 判定偏移修正（以毫秒计）
@@ -124,11 +127,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
-            SetDefault(Ez2Setting.XxySRFilter, false);
-            SetDefault(Ez2Setting.KeySoundPreviewMode, 0);
-            SetDefault(Ez2Setting.EzSelectCsMode, "");
-
             SetDefault(Ez2Setting.HitMode, EzMUGHitMode.Lazer);
             SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.Lazer);
             SetDefault(Ez2Setting.CustomPoorHitResultBool, true);
