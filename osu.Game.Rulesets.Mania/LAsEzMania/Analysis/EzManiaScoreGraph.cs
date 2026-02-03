@@ -33,6 +33,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
         private readonly CustomHitWindowsHelper hitWindows1;
         private readonly CustomHitWindowsHelper hitWindows2;
         private Bindable<EzMUGHitMode> hitModeBindable = null!;
+        private readonly Bindable<double> offsetPlusMania = new Bindable<double>();
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -49,7 +50,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
-            return Score.HitEvents.Where(e => maniaHitWindows.IsHitResultAllowed(e.Result)).ToList();
+            var events = Score.HitEvents.Where(e => maniaHitWindows.IsHitResultAllowed(e.Result));
+
+            // If no offset is set, return original events to avoid allocations.
+            if (offsetPlusMania.Value == 0)
+                return events.ToList();
+
+            // Otherwise, return a new list with adjusted TimeOffset so visualisations (point cloud) reflect the correction.
+            return events.Select(e => new HitEvent(e.TimeOffset + offsetPlusMania.Value, e.GameplayRate, e.Result, e.HitObject, e.LastHitObject, e.Position)).ToList();
         }
 
         protected override double UpdateBoundary(HitResult result)
@@ -74,6 +82,10 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 // Recalculate and redraw.
                 Refresh();
             }, true);
+
+            // Bind to OffsetPlusMania so analysis reflects runtime correction and redraws when changed.
+            offsetPlusMania.BindTo(ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania));
+            offsetPlusMania.BindValueChanged(_ => Refresh());
         }
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
@@ -84,6 +96,23 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)
         {
             return maniaHitWindows.ResultFor(hitEvent.TimeOffset);
+        }
+
+        protected override void UpdateDisplay()
+        {
+            base.UpdateDisplay();
+
+            if (offsetPlusMania.Value != 0)
+            {
+                AddInternal(new OsuSpriteText
+                {
+                    Text = $"Fake Offset Fixing: {offsetPlusMania.Value:+0;-0;0} ms",
+                    Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
+                    Colour = Color4.OrangeRed,
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
+                });
+            }
         }
 
         protected override void UpdateText()

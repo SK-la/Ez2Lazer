@@ -19,16 +19,19 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
+using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Volume;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
@@ -66,7 +69,8 @@ namespace osu.Game.Screens.Ranking
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private Bindable<EzMUGHitMode> hitModeBindable = new Bindable<EzMUGHitMode>();
-
+        private Bindable<double> offsetPlusMania = new Bindable<double>();
+        private ScheduledDelegate? offsetPlusManiaScheduled;
         private bool skipExitTransition;
 
         protected StatisticsPanel StatisticsPanel { get; private set; } = null!;
@@ -255,6 +259,18 @@ namespace osu.Game.Screens.Ranking
                      /* TODO: show settings menu */
                 }
             });
+
+            // 添加一个与 OffsetPlusMania 双向绑定的滑条，显示在齿轮右侧
+            offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+            buttons.Add(new SettingsSlider<double>
+            {
+                // 只自动适应高度，避免与父容器的相对宽度冲突
+                AutoSizeAxes = Axes.Y,
+                // 不使用相对大小，使用固定宽度以避免与父容器 AutoSize 冲突
+                RelativeSizeAxes = Axes.None,
+                Width = 220,
+                Current = offsetPlusMania,
+            });
         }
 
         protected override void LoadComplete()
@@ -266,6 +282,18 @@ namespace osu.Game.Screens.Ranking
                 Score?.HitEvents.Clear();
                 StatisticsPanel.Score.TriggerChange();
             });
+
+            // offsetPlusMania.BindValueChanged(v =>
+            // {
+            //     // debounce/defer handling by 100ms to avoid thrash when slider is dragged rapidly.
+            //     offsetPlusManiaScheduled?.Cancel();
+            //     offsetPlusManiaScheduled = Scheduler.AddDelayed(() =>
+            //     {
+            //         // 会引起重绘，除非以后实现更全面的影响，否则会先注释掉，让分析组件内部自己绑定回调
+            //         Score?.HitEvents.Clear();
+            //         StatisticsPanel.Score.TriggerChange();
+            //     }, 100);
+            // });
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
 
