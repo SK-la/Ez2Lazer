@@ -4,6 +4,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Game.Audio;
@@ -36,6 +38,10 @@ namespace osu.Game.Rulesets.UI
         [Resolved]
         private IGameplayClock? gameplayClock { get; set; }
 
+        private KeySoundPreviewMode keySoundPreviewMode;
+
+        private HitObject? lastAutoPlayedObject;
+
         protected readonly AudioContainer AudioContainer;
 
         public GameplaySampleTriggerSource(HitObjectContainer hitObjectContainer)
@@ -53,6 +59,15 @@ namespace osu.Game.Rulesets.UI
                     })
                 }
             };
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(Ez2ConfigManager? ezConfig)
+        {
+            if (ezConfig != null)
+            {
+                keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
+            }
         }
 
         /// <summary>
@@ -74,6 +89,17 @@ namespace osu.Game.Rulesets.UI
 
         protected virtual void PlaySamples(ISampleInfo[] samples) => Schedule(() =>
         {
+            var existing = hitSounds.FirstOrDefault(h => h.IsPlaying && h.Samples.SequenceEqual(samples));
+
+            if (existing != null)
+            {
+                // 如果相同的音效正在播放，打断并重放
+                existing.Stop();
+                ApplySampleInfo(existing, samples);
+                existing.Play();
+                return;
+            }
+
             var hitSound = GetNextSample();
             ApplySampleInfo(hitSound, samples);
             hitSound.Play();
@@ -96,6 +122,27 @@ namespace osu.Game.Rulesets.UI
 
             if (gameplayClock?.IsRewinding == true)
                 mostValidObject = null;
+            // reset auto-play state on rewind
+            if (gameplayClock?.IsRewinding == true)
+                lastAutoPlayedObject = null;
+
+            // Auto-play notes when KeySoundPreviewMode == 2
+            if (keySoundPreviewMode == KeySoundPreviewMode.AutoPlayPlus)
+            {
+                double referenceTime = getReferenceTime();
+                var obj = GetMostValidObject();
+
+                if (obj != null && obj != lastAutoPlayedObject)
+                {
+                    // Play when we've reached or passed the object's start time
+                    if (referenceTime >= obj.StartTime)
+                    {
+                        var samples = obj.Samples.Cast<ISampleInfo>().ToArray();
+                        PlaySamples(samples);
+                        lastAutoPlayedObject = obj;
+                    }
+                }
+            }
         }
 
         protected HitObject? GetMostValidObject()
