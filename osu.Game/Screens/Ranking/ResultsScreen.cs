@@ -23,6 +23,7 @@ using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
@@ -267,14 +268,27 @@ namespace osu.Game.Screens.Ranking
 
             // 添加一个与 OffsetPlusMania 双向绑定的滑条，显示在齿轮右侧
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-            buttons.Add(new SettingsSlider<double>
+            buttons.Add(new FillFlowContainer
             {
-                // 只自动适应高度，避免与父容器的相对宽度冲突
-                AutoSizeAxes = Axes.Y,
-                // 不使用相对大小，使用固定宽度以避免与父容器 AutoSize 冲突
-                RelativeSizeAxes = Axes.None,
-                Width = 220,
-                Current = offsetPlusMania,
+                AutoSizeAxes = Axes.Both,
+                Children = new Drawable[]
+                {
+                    new OsuSpriteText
+                    {
+                        Text = "HitResult Offset",
+                        Font = OsuFont.Default.With(size: 14),
+                        Margin = new MarginPadding { Left = 5 },
+                    },
+                    new SettingsSlider<double>
+                    {
+                        // 只自动适应高度，避免与父容器的相对宽度冲突
+                        AutoSizeAxes = Axes.Y,
+                        // 不使用相对大小，使用固定宽度以避免与父容器 AutoSize 冲突
+                        RelativeSizeAxes = Axes.None,
+                        Width = 220,
+                        Current = offsetPlusMania,
+                    }
+                }
             });
         }
 
