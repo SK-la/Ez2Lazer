@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
@@ -28,32 +27,36 @@ using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
+using osu.Game.Tests.Visual;
 using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
     /// <summary>
-    /// Independent song select screen for BMS ruleset.
-    /// Loads songs from BMSBeatmapManager cache instead of Realm database.
+    /// V2-style song select screen for BMS ruleset.
+    /// Loads songs from BMSBeatmapManager cache with improved layout.
+    /// Left panel: Song info + difficulty selector + scores
+    /// Right panel: Song list
+    ///
+    /// Usage: Access this screen through:
+    /// 1. BMS Settings (in game settings) -> "Select BMS Root Path" button -> After setting path, use button to open
+    /// 2. Direct code: game.PerformFromScreen(s => s.Push(new BMSSongSelectScreen()));
     /// </summary>
     public partial class BMSSongSelectScreen : OsuScreen
     {
         protected override bool InitialBackButtonVisibility => true;
 
         private BMSBeatmapManager beatmapManager = null!;
-        private FillFlowContainer<BMSSongCard> songList = null!;
         private OsuScrollContainer scrollContainer = null!;
-        private Container detailPanel = null!;
-        private OsuSpriteText titleText = null!;
-        private OsuSpriteText artistText = null!;
         private OsuSpriteText statusText = null!;
-        private FillFlowContainer<BMSChartCard> chartList = null!;
+        private FillFlowContainer<BMSSongCardV2> songList = null!;
         private LoadingSpinner loadingSpinner = null!;
         private SearchTextBox searchBox = null!;
+        private BMSInfoPanel infoPanel = null!;
 
-        private BMSSongCache? selectedSong;
-        private BMSChartCache? selectedChart;
+        private readonly Bindable<BMSSongCache?> selectedSong = new Bindable<BMSSongCache?>();
+        private readonly Bindable<BMSChartCache?> selectedChart = new Bindable<BMSChartCache?>();
         private Bindable<string> rootPathBindable = null!;
 
         [Resolved]
@@ -73,6 +76,16 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+
+            // Create and cache OverlayColourProvider for child components (required for BMSInfoPanel)
+            dependencies.Cache(new OverlayColourProvider(OverlayColourScheme.Blue));
+
+            return dependencies;
+        }
 
         [BackgroundDependencyLoader]
         private void load(OsuColour colours)
@@ -100,135 +113,65 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 beatmapManager.RootPath.Value = rootPathBindable.Value;
             }
 
+            // Register OverlayColourProvider for child components (required for BMSInfoPanel)
+            var colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
+            var childDependencies = new DependencyContainer(Dependencies);
+            childDependencies.CacheAs(colourProvider);
+
+            // V2风格布局 - 左侧信息面板，右侧歌曲列表
             InternalChildren = new Drawable[]
             {
-                new Box
+                new DependencyProvidingContainer
                 {
+                    CachedDependencies = new[] { (typeof(OverlayColourProvider), (object)colourProvider) },
                     RelativeSizeAxes = Axes.Both,
-                    Colour = Colour4.Black.Opacity(0.9f),
-                },
-                new GridContainer
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    ColumnDimensions = new[]
+                    Children = new Drawable[]
                     {
-                        new Dimension(GridSizeMode.Relative, 0.4f),
-                        new Dimension(),
-                    },
-                    Content = new[]
-                    {
-                        new Drawable[]
+                        new Box
                         {
-                            // Left panel - Song list
-                            new Container
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = Colour4.Black.Opacity(0.9f),
+                        },
+                        new GridContainer
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            ColumnDimensions = new[]
                             {
-                                RelativeSizeAxes = Axes.Both,
-                                Padding = new MarginPadding(10),
-                                Children = new Drawable[]
+                                new Dimension(GridSizeMode.Absolute, 450), // 左侧信息面板固定宽度
+                                new Dimension(), // 右侧列表占据剩余空间
+                            },
+                            Content = new[]
+                            {
+                                new Drawable[]
                                 {
-                                    new Box
+                                    // Left panel - 谱面信息、难度选择器和成绩
+                                    new Container
                                     {
                                         RelativeSizeAxes = Axes.Both,
-                                        Colour = colours.Gray2,
-                                    },
-                                    new FillFlowContainer
-                                    {
-                                        RelativeSizeAxes = Axes.Both,
-                                        Direction = FillDirection.Vertical,
-                                        Padding = new MarginPadding(10),
-                                        Spacing = new Vector2(0, 10),
+                                        Padding = new MarginPadding { Left = 10, Top = 10, Bottom = 10, Right = 5 },
                                         Children = new Drawable[]
                                         {
-                                            new OsuSpriteText
-                                            {
-                                                Text = "BMS 曲库",
-                                                Font = OsuFont.GetFont(size: 24, weight: FontWeight.Bold),
-                                            },
-                                            searchBox = new SearchTextBox
-                                            {
-                                                RelativeSizeAxes = Axes.X,
-                                                Height = 40,
-                                                PlaceholderText = "搜索歌曲...",
-                                            },
-                                            statusText = new OsuSpriteText
-                                            {
-                                                Text = beatmapManager.StatusMessage.Value,
-                                                Font = OsuFont.GetFont(size: 14),
-                                                Colour = colours.Yellow,
-                                            },
-                                            scrollContainer = new OsuScrollContainer
+                                            infoPanel = new BMSInfoPanel
                                             {
                                                 RelativeSizeAxes = Axes.Both,
-                                                Child = songList = new FillFlowContainer<BMSSongCard>
-                                                {
-                                                    RelativeSizeAxes = Axes.X,
-                                                    AutoSizeAxes = Axes.Y,
-                                                    Direction = FillDirection.Vertical,
-                                                    Spacing = new Vector2(0, 5),
-                                                },
+                                                SelectedSong = { BindTarget = selectedSong },
+                                                SelectedChart = { BindTarget = selectedChart },
                                             },
-                                        },
-                                    },
-                                },
-                            },
-                            // Right panel - Detail view
-                            new Container
-                            {
-                                RelativeSizeAxes = Axes.Both,
-                                Padding = new MarginPadding(10),
-                                Child = detailPanel = new Container
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Children = new Drawable[]
-                                    {
-                                        new Box
-                                        {
-                                            RelativeSizeAxes = Axes.Both,
-                                            Colour = colours.Gray3,
-                                        },
-                                        new FillFlowContainer
-                                        {
-                                            RelativeSizeAxes = Axes.Both,
-                                            Direction = FillDirection.Vertical,
-                                            Padding = new MarginPadding(20),
-                                            Spacing = new Vector2(0, 10),
-                                            Children = new Drawable[]
+                                            // 游戏按钮覆盖层
+                                            new Container
                                             {
-                                                titleText = new OsuSpriteText
+                                                Anchor = Anchor.BottomCentre,
+                                                Origin = Anchor.BottomCentre,
+                                                RelativeSizeAxes = Axes.X,
+                                                AutoSizeAxes = Axes.Y,
+                                                Padding = new MarginPadding { Bottom = 20 },
+                                                Child = new FillFlowContainer
                                                 {
-                                                    Text = "选择一首歌曲",
-                                                    Font = OsuFont.GetFont(size: 32, weight: FontWeight.Bold),
-                                                },
-                                                artistText = new OsuSpriteText
-                                                {
-                                                    Text = "",
-                                                    Font = OsuFont.GetFont(size: 20),
-                                                    Colour = colours.Yellow,
-                                                },
-                                                new OsuSpriteText
-                                                {
-                                                    Text = "难度列表",
-                                                    Font = OsuFont.GetFont(size: 18, weight: FontWeight.SemiBold),
-                                                    Margin = new MarginPadding { Top = 20 },
-                                                },
-                                                new OsuScrollContainer
-                                                {
-                                                    RelativeSizeAxes = Axes.X,
-                                                    Height = 300,
-                                                    Child = chartList = new FillFlowContainer<BMSChartCard>
-                                                    {
-                                                        RelativeSizeAxes = Axes.X,
-                                                        AutoSizeAxes = Axes.Y,
-                                                        Direction = FillDirection.Vertical,
-                                                        Spacing = new Vector2(0, 5),
-                                                    },
-                                                },
-                                                new FillFlowContainer
-                                                {
+                                                    Anchor = Anchor.Centre,
+                                                    Origin = Anchor.Centre,
                                                     AutoSizeAxes = Axes.Both,
                                                     Direction = FillDirection.Horizontal,
                                                     Spacing = new Vector2(10, 0),
-                                                    Margin = new MarginPadding { Top = 20 },
                                                     Children = new Drawable[]
                                                     {
                                                         new RoundedButton
@@ -250,16 +193,80 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                                             },
                                         },
                                     },
-                                },
-                            },
+                                    // Right panel - 歌曲列表
+                                    new Container
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                        Padding = new MarginPadding { Left = 5, Top = 10, Bottom = 10, Right = 10 },
+                                        Children = new Drawable[]
+                                        {
+                                            new Box
+                                            {
+                                                RelativeSizeAxes = Axes.Both,
+                                                Colour = colours.Gray2,
+                                                Alpha = 0.5f,
+                                            },
+                                            new FillFlowContainer
+                                            {
+                                                RelativeSizeAxes = Axes.Both,
+                                                Direction = FillDirection.Vertical,
+                                                Padding = new MarginPadding(10),
+                                                Spacing = new Vector2(0, 10),
+                                                Children = new Drawable[]
+                                                {
+                                                    new FillFlowContainer
+                                                    {
+                                                        RelativeSizeAxes = Axes.X,
+                                                        AutoSizeAxes = Axes.Y,
+                                                        Direction = FillDirection.Vertical,
+                                                        Spacing = new Vector2(0, 8),
+                                                        Children = new Drawable[]
+                                                        {
+                                                            new OsuSpriteText
+                                                            {
+                                                                Text = "BMS曲库",
+                                                                Font = OsuFont.GetFont(size: 24, weight: FontWeight.Bold),
+                                                            },
+                                                            searchBox = new SearchTextBox
+                                                            {
+                                                                RelativeSizeAxes = Axes.X,
+                                                                Height = 40,
+                                                                PlaceholderText = "搜索歌曲...",
+                                                            },
+                                                            statusText = new OsuSpriteText
+                                                            {
+                                                                Text = beatmapManager.StatusMessage.Value,
+                                                                Font = OsuFont.GetFont(size: 14),
+                                                                Colour = colours.Yellow,
+                                                            },
+                                                        }
+                                                    },
+                                                    scrollContainer = new OsuScrollContainer
+                                                    {
+                                                        RelativeSizeAxes = Axes.Both,
+                                                        Child = songList = new FillFlowContainer<BMSSongCardV2>
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            AutoSizeAxes = Axes.Y,
+                                                            Direction = FillDirection.Vertical,
+                                                            Spacing = new Vector2(0, 5),
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                }
+                            }
                         },
-                    },
-                },
-                loadingSpinner = new LoadingSpinner
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Size = new Vector2(60),
+                        // Loading spinner overlay
+                        loadingSpinner = new LoadingSpinner(true)
+                        {
+                            Anchor = Anchor.Centre,
+                            Origin = Anchor.Centre,
+                            State = { Value = Visibility.Hidden },
+                        },
+                    }
                 },
             };
 
@@ -283,7 +290,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             foreach (var song in beatmapManager.LibraryCache.Songs.OrderBy(s => s.Title))
             {
-                songList.Add(new BMSSongCard(song)
+                songList.Add(new BMSSongCardV2(song)
                 {
                     Action = () => SelectSong(song),
                 });
@@ -307,43 +314,22 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private void SelectSong(BMSSongCache song)
         {
-            selectedSong = song;
-            selectedChart = null;
-
-            titleText.Text = string.IsNullOrEmpty(song.Title) ? "(无标题)" : song.Title;
-            artistText.Text = string.IsNullOrEmpty(song.Artist) ? "(未知艺术家)" : song.Artist;
-
-            chartList.Clear();
-
-            foreach (var chart in song.Charts.OrderBy(c => c.PlayLevel))
-            {
-                chartList.Add(new BMSChartCard(chart)
-                {
-                    Action = () => SelectChart(chart),
-                });
-            }
+            selectedSong.Value = song;
 
             // Auto-select first chart
             if (song.Charts.Count > 0)
             {
-                SelectChart(song.Charts[0]);
+                selectedChart.Value = song.Charts[0];
+            }
+            else
+            {
+                selectedChart.Value = null;
             }
 
             // Update song card selection state
             foreach (var card in songList)
             {
                 card.Selected = card.Song == song;
-            }
-        }
-
-        private void SelectChart(BMSChartCache chart)
-        {
-            selectedChart = chart;
-
-            // Update chart card selection state
-            foreach (var card in chartList)
-            {
-                card.Selected = card.Chart == chart;
             }
         }
 
@@ -392,7 +378,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private void StartGame()
         {
-            if (selectedChart == null)
+            if (selectedChart.Value == null)
             {
                 notifications?.Post(new SimpleNotification
                 {
@@ -405,7 +391,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             try
             {
                 var workingBeatmap = new BMSWorkingBeatmap(
-                    selectedChart.FullPath,
+                    selectedChart.Value.FullPath,
                     audioManager,
                     textures);
 
@@ -433,6 +419,145 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             this.FadeOut(200);
             return base.OnExiting(e);
+        }
+    }
+
+    /// <summary>
+    /// V2-style song card for song list.
+    /// Simplified card with title, artist, and chart count.
+    /// </summary>
+    public partial class BMSSongCardV2 : CompositeDrawable
+    {
+        public BMSSongCache Song { get; }
+        public Action? Action { get; set; }
+
+        private bool selected;
+
+        public bool Selected
+        {
+            get => selected;
+            set
+            {
+                if (selected == value)
+                    return;
+
+                selected = value;
+
+                if (IsLoaded)
+                    updateState();
+            }
+        }
+
+        private Box background = null!;
+        private Box hoverBox = null!;
+
+        [Resolved]
+        private OverlayColourProvider colourProvider { get; set; } = null!;
+
+        public BMSSongCardV2(BMSSongCache song)
+        {
+            Song = song;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            RelativeSizeAxes = Axes.X;
+            Height = 70;
+            Masking = true;
+            CornerRadius = 5;
+
+            InternalChildren = new Drawable[]
+            {
+                background = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = colourProvider.Background4,
+                },
+                hoverBox = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = colourProvider.Light1,
+                    Alpha = 0,
+                },
+                new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Padding = new MarginPadding { Horizontal = 15, Vertical = 10 },
+                    Child = new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(0, 5),
+                        Children = new Drawable[]
+                        {
+                            new OsuSpriteText
+                            {
+                                Text = string.IsNullOrEmpty(Song.Title) ? "(无标题)" : Song.Title,
+                                Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
+                                Truncate = true,
+                            },
+                            new FillFlowContainer
+                            {
+                                AutoSizeAxes = Axes.Both,
+                                Direction = FillDirection.Horizontal,
+                                Spacing = new Vector2(15, 0),
+                                Children = new Drawable[]
+                                {
+                                    new OsuSpriteText
+                                    {
+                                        Text = string.IsNullOrEmpty(Song.Artist) ? "(未知艺术家)" : Song.Artist,
+                                        Font = OsuFont.GetFont(size: 14),
+                                        Colour = colourProvider.Content2,
+                                    },
+                                    new OsuSpriteText
+                                    {
+                                        Text = $"{Song.Charts.Count} 个难度",
+                                        Font = OsuFont.GetFont(size: 14),
+                                        Colour = colourProvider.Content2,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            updateState();
+        }
+
+        protected override bool OnHover(HoverEvent e)
+        {
+            hoverBox.FadeTo(0.1f, 200);
+            return base.OnHover(e);
+        }
+
+        protected override void OnHoverLost(HoverLostEvent e)
+        {
+            hoverBox.FadeOut(200);
+            base.OnHoverLost(e);
+        }
+
+        protected override bool OnClick(ClickEvent e)
+        {
+            Action?.Invoke();
+            return true;
+        }
+
+        private void updateState()
+        {
+            if (Selected)
+            {
+                background.FadeColour(colourProvider.Highlight1, 200);
+            }
+            else
+            {
+                background.FadeColour(colourProvider.Background4, 200);
+            }
         }
     }
 }
