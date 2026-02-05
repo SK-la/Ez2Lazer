@@ -4,7 +4,12 @@
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Skinning;
+using osu.Game.Rulesets.Mania.Skinning.Default;
+using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BMS.UI
@@ -27,10 +32,9 @@ namespace osu.Game.Rulesets.BMS.UI
             InternalChildren = new Drawable[]
             {
                 // Background
-                new Box
+                new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.ColumnBackground), _ => new DefaultColumnBackground())
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Colour = GetColumnColour(columnIndex),
                     Alpha = 0.3f,
                 },
                 // Border
@@ -51,12 +55,15 @@ namespace osu.Game.Rulesets.BMS.UI
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
                     Y = -100, // Position from bottom
-                    Child = new Box
+                    Child = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HitTarget), _ => new DefaultHitTarget())
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = Color4.White,
-                        Alpha = 0.5f,
                     }
+                },
+                new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Alpha = 0.15f,
                 },
                 // Hit object container
                 HitObjectContainer,

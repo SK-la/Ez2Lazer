@@ -161,6 +161,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     maniaHitObject = new BmsManiaHoldNote
                     {
                         Column = column,
+                        IsScratch = holdNote.IsScratch,
                         StartTime = holdNote.StartTime,
                         Duration = holdNote.Duration,
                         KeysoundSamples = holdNote.Samples.ToList(),
@@ -172,6 +173,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     maniaHitObject = new BmsManiaNote
                     {
                         Column = column,
+                        IsScratch = bmsHitObject.IsScratch,
                         StartTime = bmsHitObject.StartTime,
                         KeysoundSamples = bmsHitObject.Samples.ToList(),
                         Samples = new List<HitSampleInfo>(),
@@ -263,7 +265,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// </summary>
         public BmsKeysoundManager? KeysoundManager { get; }
 
-        protected override ISkin GetSkin() => new BMSSkin(SourceBeatmap.FolderPath, audioManager);
+        protected override ISkin GetSkin() => null;
 
         public override Stream? GetStream(string storagePath) => SourceBeatmap.GetStream(storagePath);
 

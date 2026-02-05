@@ -4,15 +4,18 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Game.Beatmaps;
 using osu.Game.Input.Handlers;
 using osu.Game.Replays;
-using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.BMS.Objects.Drawables;
 using osu.Game.Rulesets.BMS.Replays;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI;
@@ -23,7 +26,15 @@ namespace osu.Game.Rulesets.BMS.UI
     [Cached]
     public partial class DrawableBMSRuleset : DrawableScrollingRuleset<BMSHitObject>
     {
+        private const double default_time_range = 1500;
+
         private int? cachedTotalColumns;
+        private readonly BindableDouble maniaScrollSpeed = new BindableDouble();
+        private readonly BindableDouble maniaBaseSpeed = new BindableDouble();
+        private readonly BindableDouble maniaTimePerSpeed = new BindableDouble();
+        private readonly Bindable<ManiaScrollingDirection> maniaDirection = new Bindable<ManiaScrollingDirection>();
+
+        protected override bool RelativeScaleBeatLengths => true;
 
         public int TotalColumns
         {
@@ -33,7 +44,7 @@ namespace osu.Game.Rulesets.BMS.UI
                     return cachedTotalColumns.Value;
 
                 // Calculate from hit objects
-                var maxColumn = Beatmap.HitObjects.Select(h => h.Column).DefaultIfEmpty(0).Max();
+                int maxColumn = Beatmap.HitObjects.Select(h => h.Column).DefaultIfEmpty(0).Max();
                 cachedTotalColumns = maxColumn + 1;
                 return cachedTotalColumns.Value;
             }
@@ -43,7 +54,33 @@ namespace osu.Game.Rulesets.BMS.UI
             : base(ruleset, beatmap, mods)
         {
             Direction.Value = ScrollingDirection.Down;
-            TimeRange.Value = 1500;
+            TimeRange.Value = default_time_range;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(IRulesetConfigCache rulesetConfigCache)
+        {
+            var maniaConfig = rulesetConfigCache.GetConfigFor(new ManiaRuleset()) as ManiaRulesetConfigManager;
+
+            if (maniaConfig == null)
+                return;
+
+            maniaConfig.BindWith(ManiaRulesetSetting.ScrollDirection, maniaDirection);
+            maniaDirection.BindValueChanged(direction => Direction.Value = (ScrollingDirection)direction.NewValue, true);
+
+            maniaConfig.BindWith(ManiaRulesetSetting.ScrollBaseSpeed, maniaBaseSpeed);
+            maniaConfig.BindWith(ManiaRulesetSetting.ScrollTimePerSpeed, maniaTimePerSpeed);
+            maniaConfig.BindWith(ManiaRulesetSetting.ScrollSpeed, maniaScrollSpeed);
+
+            maniaScrollSpeed.BindValueChanged(speed =>
+            {
+                if (!AllowScrollSpeedAdjustment)
+                    return;
+
+                TimeRange.Value = DrawableManiaRuleset.ComputeScrollTime(speed.NewValue, maniaBaseSpeed.Value, maniaTimePerSpeed.Value);
+            });
+
+            TimeRange.Value = DrawableManiaRuleset.ComputeScrollTime(maniaScrollSpeed.Value, maniaBaseSpeed.Value, maniaTimePerSpeed.Value);
         }
 
         protected override Playfield CreatePlayfield() => new BMSPlayfield(TotalColumns);
@@ -67,5 +104,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
         protected override PassThroughInputManager CreateInputManager() =>
             new BMSInputManager(Ruleset.RulesetInfo, TotalColumns, SimultaneousBindingMode.Unique);
+
+        protected override void AdjustScrollSpeed(int amount) => maniaScrollSpeed.Value += amount;
     }
 }

@@ -2,8 +2,10 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -18,6 +20,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private readonly int totalColumns;
         private readonly Container<BMSColumn> columns;
+        private readonly BindableDouble dpStageSpacing = new BindableDouble();
 
         public BMSPlayfield(int totalColumns)
         {
@@ -36,7 +39,12 @@ namespace osu.Game.Rulesets.BMS.UI
 
             for (int i = 0; i < totalColumns; i++)
             {
-                bool isScratch = i == 0 || i == totalColumns / 2;
+                bool isScratch = totalColumns switch
+                {
+                    6 or 8 => i == 0,
+                    12 or 16 => i == 0 || i == totalColumns / 2,
+                    _ => false,
+                };
                 float width = isScratch ? SCRATCH_WIDTH : COLUMN_WIDTH;
 
                 columns.Add(new BMSColumn(i)
@@ -46,12 +54,29 @@ namespace osu.Game.Rulesets.BMS.UI
                 });
             }
 
-            // Position columns
+            updateColumnLayout();
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(BMSRulesetConfigManager config)
+        {
+            config.BindWith(BMSRulesetSetting.DpStageSpacing, dpStageSpacing);
+            dpStageSpacing.BindValueChanged(_ => updateColumnLayout(), true);
+        }
+
+        private void updateColumnLayout()
+        {
             float x = 0;
-            foreach (var column in columns)
+            int midpoint = totalColumns / 2;
+            bool isDpLayout = totalColumns is 10 or 14 or 16 or 18;
+
+            for (int i = 0; i < columns.Count; i++)
             {
-                column.X = x;
-                x += column.Width;
+                columns[i].X = x;
+                x += columns[i].Width;
+
+                if (isDpLayout && i == midpoint - 1)
+                    x += (float)dpStageSpacing.Value;
             }
         }
 
