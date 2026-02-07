@@ -260,6 +260,13 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
+                        new ManiaModPatternShift(),
+                        new ManiaModPatternShiftDelay(),
+                        new ManiaModPatternShiftCut(),
+                        new ManiaModPatternShiftDump(),
+                        new ManiaModPatternShiftCross(),
+                        new ManiaModPatternShiftJack(),
+                        new ManiaModPatternShiftBeat(),
                         new ManiaModCleanColumn(),
                         new ManiaModNiceBPM(),
                         new ManiaModReconcile(),

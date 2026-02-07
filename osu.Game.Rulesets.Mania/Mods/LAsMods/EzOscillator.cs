@@ -7,7 +7,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
     // 简单振荡器生成器，支持多种波形。
     // 默认正弦波，确定性输出。
-    public sealed class Oscillator
+    public sealed class EzOscillator
     {
         public enum Waveform
         {
@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         private readonly Waveform waveform;
         private long counter;
 
-        public Oscillator(int seed, double frequency = 1.0, double phase = 0.0, double step = 1.0, Waveform waveform = Waveform.Sine)
+        public EzOscillator(int seed, double frequency = 1.0, double phase = 0.0, double step = 1.0, Waveform waveform = Waveform.Sine)
         {
             // frequency: cycles per step unit
             // phase: initial phase in radians

@@ -20,6 +20,47 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString MaxBeat_Label = new EzLocalisableString("最大节拍", "Max Beat");
         public static readonly LocalisableString MaxBeat_Description = new EzLocalisableString("盘子密度的最大节拍间隔, 1/? 拍", "Scratch MAX Beat Space, MAX 1/? Beat");
 
+        // CleanColumn
+        public static readonly LocalisableString CleanColumn_Description = new EzLocalisableString("整理Column, 排序、删除轨道中的note", "Clean Column, Sort, Delete notes in the column.");
+        public static readonly LocalisableString DeleteSColumn_Label = new EzLocalisableString("删除S列", "Delete S Column Type");
+        public static readonly LocalisableString DeleteSColumn_Description = new EzLocalisableString("开启时删除标记了S Column Type的列", "Delete columns marked with S column type when enabled");
+        public static readonly LocalisableString DeletePColumn_Label = new EzLocalisableString("删除P列", "Delete P Column Type");
+        public static readonly LocalisableString DeletePColumn_Description = new EzLocalisableString("开启时删除标记了P Column Type的列", "Delete columns marked with P column type when enabled");
+        public static readonly LocalisableString DeleteEColumn_Label = new EzLocalisableString("删除E列", "Delete E Column Type");
+        public static readonly LocalisableString DeleteEColumn_Description = new EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
+        public static readonly LocalisableString EnableCustomDelete_Label = new EzLocalisableString("自定义删除列", "Enable Custom Delete");
+        public static readonly LocalisableString EnableCustomDelete_Description = new EzLocalisableString("开启后启用自定义删除列功能，支持与其他功能同时使用。输入多个数字如'2468'删除第2、4、6、8列", "Enable custom column deletion when enabled, can be used with other features. Input multiple digits like '2468' to delete columns 2, 4, 6, 8");
+        public static readonly LocalisableString CustomDeleteColumn_Label = new EzLocalisableString("删除列序号", "Delete Column Indexes");
+        public static readonly LocalisableString CustomDeleteColumn_Description = new EzLocalisableString("输入要删除的列序号，支持多个数字。如'2468'删除2、4、6、8列。超过谱面列数的数字将被忽略。支持最多10k（0表示第10列）", "Input the column indexes to delete, support multiple digits. E.g. '2468' deletes columns 2, 4, 6, 8. Indexes exceeding the beatmap's column count will be ignored. Support up to 10k (0 means column 10)");
+
+        public static readonly LocalisableString EnableCustomReorder_Label = new EzLocalisableString("自定义列重排", "Enable Custom Reorder");
+        public static readonly LocalisableString EnableCustomReorder_Description = new EzLocalisableString("开启后启用自定义列清洗Column功能，如果更改了列数，需要重开此功能才能正常生效", "Enable custom column reorder when enabled, if the column count is changed, you need to toggle this feature again to take effect");
+        public static readonly LocalisableString CustomReorderColumn_Label = new EzLocalisableString("列重排规则", "Column Reorder Rule");
+
+        public static readonly LocalisableString CustomReorderColumn_Description = new EzLocalisableString(
+            "处理Column，自定义排序、复制、删除或置空列中的note。"
+            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）；"
+            + "\n'-'表示该新列位置清空，"
+            + "\n'|'表示该新列位置放置贯穿全谱面的长按note，"
+            + "\n'?'表示该新列保持原列位置不变。"
+            + "\n字符串长度决定新的列数（修改长度必须重新启用开关）。每位数字代表新列使用原谱面的哪一列内容，可重复以复制列。"
+            + "\n如果输入包含超出原列数的数字，该位会被忽略并保持为空列。"
+            + "\n示例：原谱面5k，输入 2|30-? 转换为6k："
+            + "\n- 新列1=原列2；新列2=锁手长按；新列3=原列3；"
+            + "\n- 新列4=原列10（超出，忽略，空列）；新列5='-'清空；"
+            + "\n- 新列6=随机的原列",
+            "Process Column: custom reorder, copy, delete, or clear notes in columns."
+            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10); '-' clears the new column; '|' places a hold note spanning the entire beatmap in that new column; '?' keeps the original column in place."
+            + "\nString length determines the new column count (must re-enable when changing length). Each digit maps the new column to an original column; duplicates copy columns."
+            + "\nDigits exceeding the original column count are ignored and remain empty."
+            + "\nExample: original 5k, input " + '"' + "2|30-1" + '"' + " converts to 6k:"
+            + "\n- New col1 = orig col2;"
+            + "\n- New col2 = full-length hold;"
+            + "\n- New col3 = orig col3;"
+            + "\n- New col4 = orig col10 (ignored, empty);"
+            + "\n- New col5 = '-' cleared;"
+            + "\n- New col6 = orig col1.");
+
         // Additional Adjust mod settings
         public static readonly LocalisableString RandomMirror_Label = new EzLocalisableString("随机镜像", "Random Mirror");
         public static readonly LocalisableString RandomMirror_Description = new EzLocalisableString("随机决定是否镜像音符", "Random Mirror. Mirror or not mirror notes by random.");
@@ -80,7 +121,17 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString LNDoubleDistribution_Description = new EzLocalisableString("LN转换器另一个版本", "LN Transformer another version.");
         public static readonly LocalisableString JudgmentsAdjust_Description = new EzLocalisableString("修改你的判定", "Modify your judgement.");
 
-        public static readonly LocalisableString CleanColumn_Description = new EzLocalisableString("整理Column, 排序、删除轨道中的note", "Clean Column, Sort, Delete notes in the column.");
+        public static readonly LocalisableString PatternShift_Description = new EzLocalisableString("重构谱面列数、密度与多压", "Rebuild the beatmap with new column count, density and chord limit.");
+        public static readonly LocalisableString PatternShift_KeyCount_Label = new EzLocalisableString("目标列数", "Target Columns");
+        public static readonly LocalisableString PatternShift_KeyCount_Description = new EzLocalisableString("设置生成后的列数", "Set the output column count.");
+        public static readonly LocalisableString PatternShift_Density_Label = new EzLocalisableString("密度", "Density");
+        public static readonly LocalisableString PatternShift_Density_Description = new EzLocalisableString("密度强度（1-10）", "Density strength (1-10).");
+        public static readonly LocalisableString PatternShift_MaxChord_Label = new EzLocalisableString("和弦上限", "Max Chord");
+        public static readonly LocalisableString PatternShift_MaxChord_Description = new EzLocalisableString("每一排最多保留的note数量", "Maximum notes per row.");
+        public static readonly LocalisableString PatternShift_AlignDivisor_Label = new EzLocalisableString("对齐", "Align");
+        public static readonly LocalisableString PatternShift_AlignDivisor_Description = new EzLocalisableString("对齐到节拍网格，0=关闭，1=1/1，2=1/2，4=1/4，8=1/8，16=1/16", "Snap to beat grid. 0=off, 1=1/1, 2=1/2, 4=1/4, 8=1/8, 16=1/16.");
+        public static readonly LocalisableString PatternShift_DelayLevel_Label = new EzLocalisableString("Delay", "Delay");
+        public static readonly LocalisableString PatternShift_DelayLevel_Description = new EzLocalisableString("随机将部分note前后偏移，0=关闭，1-10级；同一等级段内，等级越高，偏移从1/16提升到1/8", "Randomly offset some notes. 0=off, levels 1-10. Within each tier, higher level increases offset from 1/16 to 1/8.");
 
         // ====================================================================================================
         // Krr Mods - Labels & Descriptions
@@ -145,46 +196,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString KrrLN_Alignment_Description = new EzLocalisableString("普通音符对齐节拍", "Snap normal notes to beat grid.");
         public static readonly LocalisableString KrrLN_LNAlignment_Label = new EzLocalisableString("LN对齐", "LN Alignment");
         public static readonly LocalisableString KrrLN_LNAlignment_Description = new EzLocalisableString("长按尾部对齐节拍", "Snap hold tails to beat grid.");
-
-        // CleanColumn
-        public static readonly LocalisableString DeleteSColumn_Label = new EzLocalisableString("删除S列", "Delete S Column Type");
-        public static readonly LocalisableString DeleteSColumn_Description = new EzLocalisableString("开启时删除标记了S Column Type的列", "Delete columns marked with S column type when enabled");
-        public static readonly LocalisableString DeletePColumn_Label = new EzLocalisableString("删除P列", "Delete P Column Type");
-        public static readonly LocalisableString DeletePColumn_Description = new EzLocalisableString("开启时删除标记了P Column Type的列", "Delete columns marked with P column type when enabled");
-        public static readonly LocalisableString DeleteEColumn_Label = new EzLocalisableString("删除E列", "Delete E Column Type");
-        public static readonly LocalisableString DeleteEColumn_Description = new EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
-        public static readonly LocalisableString EnableCustomDelete_Label = new EzLocalisableString("自定义删除列", "Enable Custom Delete");
-        public static readonly LocalisableString EnableCustomDelete_Description = new EzLocalisableString("开启后启用自定义删除列功能，支持与其他功能同时使用。输入多个数字如'2468'删除第2、4、6、8列", "Enable custom column deletion when enabled, can be used with other features. Input multiple digits like '2468' to delete columns 2, 4, 6, 8");
-        public static readonly LocalisableString CustomDeleteColumn_Label = new EzLocalisableString("删除列序号", "Delete Column Indexes");
-        public static readonly LocalisableString CustomDeleteColumn_Description = new EzLocalisableString("输入要删除的列序号，支持多个数字。如'2468'删除2、4、6、8列。超过谱面列数的数字将被忽略。支持最多10k（0表示第10列）", "Input the column indexes to delete, support multiple digits. E.g. '2468' deletes columns 2, 4, 6, 8. Indexes exceeding the beatmap's column count will be ignored. Support up to 10k (0 means column 10)");
-
-        public static readonly LocalisableString EnableCustomReorder_Label = new EzLocalisableString("自定义列重排", "Enable Custom Reorder");
-        public static readonly LocalisableString EnableCustomReorder_Description = new EzLocalisableString("开启后启用自定义列清洗Column功能，如果更改了列数，需要重开此功能才能正常生效", "Enable custom column reorder when enabled, if the column count is changed, you need to toggle this feature again to take effect");
-        public static readonly LocalisableString CustomReorderColumn_Label = new EzLocalisableString("列重排规则", "Column Reorder Rule");
-
-        public static readonly LocalisableString CustomReorderColumn_Description = new EzLocalisableString(
-            "处理Column，自定义排序、复制、删除或置空列中的note。"
-            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）；"
-            + "\n'-'表示该新列位置清空，"
-            + "\n'|'表示该新列位置放置贯穿全谱面的长按note，"
-            + "\n'?'表示该新列保持原列位置不变。"
-            + "\n字符串长度决定新的列数（修改长度必须重新启用开关）。每位数字代表新列使用原谱面的哪一列内容，可重复以复制列。"
-            + "\n如果输入包含超出原列数的数字，该位会被忽略并保持为空列。"
-            + "\n示例：原谱面5k，输入 2|30-? 转换为6k："
-            + "\n- 新列1=原列2；新列2=锁手长按；新列3=原列3；"
-            + "\n- 新列4=原列10（超出，忽略，空列）；新列5='-'清空；"
-            + "\n- 新列6=随机的原列",
-            "Process Column: custom reorder, copy, delete, or clear notes in columns."
-            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10); '-' clears the new column; '|' places a hold note spanning the entire beatmap in that new column; '?' keeps the original column in place."
-            + "\nString length determines the new column count (must re-enable when changing length). Each digit maps the new column to an original column; duplicates copy columns."
-            + "\nDigits exceeding the original column count are ignored and remain empty."
-            + "\nExample: original 5k, input " + '"' + "2|30-1" + '"' + " converts to 6k:"
-            + "\n- New col1 = orig col2;"
-            + "\n- New col2 = full-length hold;"
-            + "\n- New col3 = orig col3;"
-            + "\n- New col4 = orig col10 (ignored, empty);"
-            + "\n- New col5 = '-' cleared;"
-            + "\n- New col6 = orig col1.");
 
         // ====================================================================================================
         // YuLiangSSSMods - SettingSource Labels & Descriptions

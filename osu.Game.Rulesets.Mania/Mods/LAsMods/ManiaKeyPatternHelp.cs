@@ -12,16 +12,17 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     public enum KeyPatternType
     {
         Cut,
-        Stair,
+        Dump,
         Cross,
-        Stack,
-        Beat
+        Jack,
+        Beat,
+        Delay
     }
 
     public class KeyPatternSettings
     {
         public int MinK { get; set; } = 1;
-        public int MaxK { get; set; } = 4;
+        public int MaxK { get; set; } = 5;
     }
 
     public static class ManiaKeyPatternHelp
@@ -154,6 +155,75 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
+        public static void ProcessRollingWindowWithOscillator(ManiaBeatmap beatmap,
+                                                              KeyPatternType patternType,
+                                                              int level,
+                                                              EzOscillator oscillator,
+                                                              int seed,
+                                                              int oscillationBeats,
+                                                              int windowQuarterBeats = 2,
+                                                              int intervalQuarterBeats = 4)
+        {
+            if (level <= 0)
+                return;
+
+            var objects = beatmap.HitObjects
+                                 .OrderBy(h => h.StartTime)
+                                 .ToList();
+
+            if (objects.Count == 0)
+                return;
+
+            double currentTime = objects.Min(h => h.StartTime);
+            double endTime = objects.Max(h => h is HoldNote hold ? hold.EndTime : h.StartTime);
+
+            int windowQuarterBeatsSafe = Math.Max(1, windowQuarterBeats);
+            int intervalQuarterBeatsSafe = Math.Max(1, intervalQuarterBeats);
+
+            while (currentTime <= endTime)
+            {
+                double beatLength = beatmap.ControlPointInfo.TimingPointAt(currentTime).BeatLength;
+                double windowDuration = beatLength / 4.0 * windowQuarterBeatsSafe;
+                double stepDuration = windowDuration * (intervalQuarterBeatsSafe / 4.0);
+
+                double windowEnd = currentTime + windowDuration;
+
+                var windowObjects = objects.Where(h => h.StartTime >= currentTime && h.StartTime < windowEnd)
+                                           .ToList();
+
+                if (windowObjects.Count > 0)
+                {
+                    int oscillationBeatsSafe = Math.Max(1, oscillationBeats);
+                    long beatIndex = beatLength > 0 ? (long)Math.Round(currentTime / beatLength) : (long)Math.Round(currentTime);
+                    long oscillationIndex = beatIndex / oscillationBeatsSafe;
+                    oscillator.Reset(unchecked(seed + oscillationIndex));
+                    double oscValue = oscillator.NextSigned();
+                    var settings = getPatternSettingsFromLevel(level, beatmap.TotalColumns, oscValue);
+
+                    if (settings.MaxK > 0)
+                    {
+                        int windowSeed = unchecked(seed * 397) ^ (int)Math.Round(currentTime);
+                        var rng = new Random(windowSeed);
+
+                        if (patternType == KeyPatternType.Delay)
+                        {
+                            double fraction = getDelayBeatFraction(level);
+                            applyDelayPattern(windowObjects, beatmap, settings.MinK, settings.MaxK, fraction, rng);
+                        }
+                        else
+                        {
+                            applyIncrementalPattern(windowObjects, patternType, beatmap, currentTime, windowEnd, windowDuration, settings, rng);
+                        }
+                    }
+                }
+
+                if (stepDuration <= 0)
+                    break;
+
+                currentTime += stepDuration;
+            }
+        }
+
         private static void applyPattern(List<ManiaHitObject> windowObjects, KeyPatternType patternType, ManiaBeatmap beatmap)
         {
             switch (patternType)
@@ -162,7 +232,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     // TODO: 切
                     break;
 
-                case KeyPatternType.Stair:
+                case KeyPatternType.Dump:
                     // TODO: 楼梯
                     break;
 
@@ -170,12 +240,16 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     // TODO: 叉
                     break;
 
-                case KeyPatternType.Stack:
+                case KeyPatternType.Jack:
                     // TODO: 叠
                     break;
 
                 case KeyPatternType.Beat:
                     // TODO: 拍
+                    break;
+
+                case KeyPatternType.Delay:
+                    // TODO: 延迟
                     break;
 
                 default:
@@ -191,6 +265,19 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                                     double windowDuration,
                                                     KeyPatternSettings? settings)
         {
+            var rng = new Random((int)Math.Round(windowStart));
+            applyIncrementalPattern(windowObjects, patternType, beatmap, windowStart, windowEnd, windowDuration, settings, rng);
+        }
+
+        private static void applyIncrementalPattern(List<ManiaHitObject> windowObjects,
+                                                    KeyPatternType patternType,
+                                                    ManiaBeatmap beatmap,
+                                                    double windowStart,
+                                                    double windowEnd,
+                                                    double windowDuration,
+                                                    KeyPatternSettings? settings,
+                                                    Random rng)
+        {
             var patternSettings = settings ?? new KeyPatternSettings();
 
             double activeBeatFraction = getActiveBeatFraction(windowObjects, beatmap, 1.0 / 4);
@@ -203,7 +290,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 return;
 
             const double time_tolerance = 0.5;
-            var rng = new Random((int)Math.Round(windowStart));
 
             for (double t = windowStart + subStep; t < windowEnd; t += subStep)
             {
@@ -227,22 +313,45 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                         applyCrossWeightedIncremental(beatmap, prevColumns, nextColumns, t, minK, maxK, rng);
                         break;
 
-                    case KeyPatternType.Stair:
-                        applyStairIncremental(beatmap, windowObjects, prevLine, nextLine, mainStep, subStep, t, time_tolerance, rng);
+                    case KeyPatternType.Dump:
+                        applyDumpIncremental(beatmap, windowObjects, prevLine, nextLine, mainStep, subStep, t, time_tolerance, rng);
                         break;
 
-                    case KeyPatternType.Stack:
-                        applyStackIncremental(beatmap, prevColumns, nextColumns, t, minK, maxK, rng);
+                    case KeyPatternType.Jack:
+                        applyJackIncremental(beatmap, prevColumns, nextColumns, t, minK, maxK, rng);
                         break;
 
                     case KeyPatternType.Beat:
                         applyBeatIncremental(beatmap, t, minK, maxK, rng);
                         break;
 
+                    case KeyPatternType.Delay:
+                        applyDelayPattern(windowObjects, beatmap, minK, maxK, 1.0 / 16.0, rng);
+                        break;
+
                     default:
                         throw new ArgumentOutOfRangeException(nameof(patternType), patternType, null);
                 }
             }
+        }
+
+        private static KeyPatternSettings getPatternSettingsFromLevel(int level, int totalColumns, double oscValue)
+        {
+            if (level <= 0 || totalColumns <= 0)
+                return new KeyPatternSettings { MinK = 0, MaxK = 0 };
+
+            int reserve = level <= 3 ? level : level <= 6 ? 1 : 0;
+            int maxCount = Math.Clamp(Math.Min(level, totalColumns - reserve), 0, totalColumns);
+
+            if (maxCount <= 0)
+                return new KeyPatternSettings { MinK = 0, MaxK = 0 };
+
+            int minCount = Math.Max(0, maxCount - 1);
+            double normalized = (oscValue + 1.0) * 0.5;
+            int count = minCount + (int)Math.Round(normalized * (maxCount - minCount));
+            count = Math.Clamp(count, 0, maxCount);
+
+            return new KeyPatternSettings { MinK = count, MaxK = count };
         }
 
         private static double getActiveBeatFraction(List<ManiaHitObject> windowObjects, ManiaBeatmap beatmap, double defaultFraction)
@@ -303,17 +412,83 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 case KeyPatternType.Cross:
                     return Math.Max(active, 1.0 / 8);
 
-                case KeyPatternType.Stack:
+                case KeyPatternType.Jack:
                     return Math.Max(active, 1.0 / 4);
 
                 case KeyPatternType.Beat:
                     return Math.Max(active, 1.0 / 2);
 
-                case KeyPatternType.Stair:
+                case KeyPatternType.Delay:
+                    return Math.Max(active, 1.0 / 4);
+
+                case KeyPatternType.Dump:
                     return active;
 
                 default:
                     return active;
+            }
+        }
+
+        private static double getDelayBeatFraction(int level)
+        {
+            double t;
+
+            if (level <= 3)
+                t = (level - 1) / 2.0;
+            else if (level <= 6)
+                t = (level - 4) / 2.0;
+            else
+                t = (level - 7) / 3.0;
+
+            return (1.0 / 16.0) * (1 + t);
+        }
+
+        private static void applyDelayPattern(List<ManiaHitObject> windowObjects,
+                                              ManiaBeatmap beatmap,
+                                              int minK,
+                                              int maxK,
+                                              double beatFraction,
+                                              Random rng)
+        {
+            var groups = windowObjects.GroupBy(o => o.StartTime).ToList();
+
+            foreach (var group in groups)
+            {
+                var list = group.ToList();
+                int noteCount = list.Count;
+
+                if (noteCount == 0)
+                    continue;
+
+                int count = rng.Next(minK, maxK + 1);
+                count = Math.Clamp(count, 0, noteCount);
+
+                if (count == 0)
+                    continue;
+
+                double beatLength = beatmap.ControlPointInfo.TimingPointAt(list[0].StartTime).BeatLength;
+                double offsetAmount = beatLength * beatFraction;
+
+                var indexes = Enumerable.Range(0, noteCount).OrderBy(_ => rng.Next()).Take(count).ToList();
+
+                foreach (int index in indexes)
+                {
+                    var obj = list[index];
+                    double direction = rng.NextDouble() < 0.5 ? -1 : 1;
+                    double offset = direction * offsetAmount;
+
+                    if (obj is HoldNote hold)
+                    {
+                        double newStart = Math.Max(0, hold.StartTime + offset);
+                        double newEnd = Math.Max(newStart, hold.EndTime + offset);
+                        hold.StartTime = newStart;
+                        hold.EndTime = newEnd;
+                    }
+                    else
+                    {
+                        obj.StartTime = Math.Max(0, obj.StartTime + offset);
+                    }
+                }
             }
         }
 
@@ -356,10 +531,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             int count = rng.Next(minK, maxK + 1);
             count = Math.Clamp(count, 0, availableColumns.Count);
 
-            shuffle(availableColumns, rng);
-
             for (int i = 0; i < count; i++)
-                beatmap.HitObjects.Add(new Note { Column = availableColumns[i], StartTime = time });
+                tryAddNoteFromCandidates(beatmap, availableColumns, null, rng, time);
         }
 
         private static void applyCutWeightedIncremental(ManiaBeatmap beatmap,
@@ -390,9 +563,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             if (avoid.Count == 0)
             {
-                shuffle(available, rng);
                 for (int i = 0; i < count; i++)
-                    beatmap.HitObjects.Add(new Note { Column = available[i], StartTime = time });
+                    tryAddNoteFromCandidates(beatmap, available, null, rng, time);
                 return;
             }
 
@@ -400,13 +572,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var weights = available.Select(c => Math.Max(0.001, Math.Abs(c - median))).ToList();
 
             for (int i = 0; i < count; i++)
-            {
-                int picked = pickWeightedIndex(weights, rng);
-                beatmap.HitObjects.Add(new Note { Column = available[picked], StartTime = time });
-
-                available.RemoveAt(picked);
-                weights.RemoveAt(picked);
-            }
+                tryAddNoteFromCandidates(beatmap, available, weights, rng, time);
         }
 
         private static void applyCrossWeightedIncremental(ManiaBeatmap beatmap,
@@ -437,9 +603,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             if (avoid.Count == 0)
             {
-                shuffle(available, rng);
                 for (int i = 0; i < count; i++)
-                    beatmap.HitObjects.Add(new Note { Column = available[i], StartTime = time });
+                    tryAddNoteFromCandidates(beatmap, available, null, rng, time);
                 return;
             }
 
@@ -453,16 +618,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }).ToList();
 
             for (int i = 0; i < count; i++)
-            {
-                int picked = pickWeightedIndex(weights, rng);
-                beatmap.HitObjects.Add(new Note { Column = available[picked], StartTime = time });
-
-                available.RemoveAt(picked);
-                weights.RemoveAt(picked);
-            }
+                tryAddNoteFromCandidates(beatmap, available, weights, rng, time);
         }
 
-        private static void applyStackIncremental(ManiaBeatmap beatmap,
+        private static void applyJackIncremental(ManiaBeatmap beatmap,
                                                   HashSet<int> prevColumns,
                                                   HashSet<int> nextColumns,
                                                   double time,
@@ -480,10 +639,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             count = Math.Clamp(count, 0, available.Count);
 
             var list = available.ToList();
-            shuffle(list, rng);
-
             for (int i = 0; i < count; i++)
-                beatmap.HitObjects.Add(new Note { Column = list[i], StartTime = time });
+                tryAddNoteFromCandidates(beatmap, list, null, rng, time);
         }
 
         private static void applyBeatIncremental(ManiaBeatmap beatmap, double time, int minK, int maxK, Random rng)
@@ -494,13 +651,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             int count = rng.Next(minK, maxK + 1);
             count = Math.Clamp(count, 0, columns.Count);
 
-            shuffle(columns, rng);
-
             for (int i = 0; i < count; i++)
-                beatmap.HitObjects.Add(new Note { Column = columns[i], StartTime = time });
+                tryAddNoteFromCandidates(beatmap, columns, null, rng, time);
         }
 
-        private static void applyStairIncremental(ManiaBeatmap beatmap,
+        private static void applyDumpIncremental(ManiaBeatmap beatmap,
                                                   List<ManiaHitObject> windowObjects,
                                                   double prevLine,
                                                   double nextLine,
@@ -538,9 +693,114 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             for (int i = 0; i < steps; i++)
             {
                 double time = prevLine + subStep * (i + 1);
-                int column = betweenCols[i];
+                int column = pickNearestAvailableStairColumn(betweenCols, i, beatmap, time);
+                if (column < 0 || hasNoteAtTime(beatmap, column, time))
+                    continue;
+
                 beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
             }
+        }
+
+        private static int pickNearestAvailableStairColumn(IReadOnlyList<int> columns, int index, ManiaBeatmap beatmap, double time)
+        {
+            int count = columns.Count;
+            if (count == 0)
+                return -1;
+
+            for (int offset = 0; offset < count; offset++)
+            {
+                int left = index - offset;
+                if (left >= 0)
+                {
+                    int column = columns[left];
+                    if (!isHoldOccupyingColumn(beatmap, column, time))
+                        return column;
+                }
+
+                int right = index + offset;
+                if (right < count)
+                {
+                    int column = columns[right];
+                    if (!isHoldOccupyingColumn(beatmap, column, time))
+                        return column;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool tryAddNoteFromCandidates(ManiaBeatmap beatmap,
+                                                     List<int> candidates,
+                                                     List<double>? weights,
+                                                     Random rng,
+                                                     double time)
+        {
+            int pickedIndex = pickIndexAvoidingHolds(beatmap, candidates, weights, rng, time);
+            if (pickedIndex < 0)
+                return false;
+
+            int column = candidates[pickedIndex];
+            candidates.RemoveAt(pickedIndex);
+            if (weights != null)
+                weights.RemoveAt(pickedIndex);
+
+            if (hasNoteAtTime(beatmap, column, time))
+                return false;
+
+            beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
+            return true;
+        }
+
+        private static int pickIndexAvoidingHolds(ManiaBeatmap beatmap,
+                                                  List<int> candidates,
+                                                  List<double>? weights,
+                                                  Random rng,
+                                                  double time)
+        {
+            while (candidates.Count > 0)
+            {
+                int picked = weights != null
+                    ? pickWeightedIndex(weights, rng)
+                    : rng.Next(candidates.Count);
+
+                int column = candidates[picked];
+                if (!isHoldOccupyingColumn(beatmap, column, time))
+                    return picked;
+
+                candidates.RemoveAt(picked);
+                if (weights != null)
+                    weights.RemoveAt(picked);
+            }
+
+            return -1;
+        }
+
+        private static bool hasNoteAtTime(ManiaBeatmap beatmap, int column, double time, double tolerance = 0.5)
+        {
+            foreach (var obj in beatmap.HitObjects)
+            {
+                if (obj.Column != column)
+                    continue;
+
+                if (obj is Note && Math.Abs(obj.StartTime - time) <= tolerance)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool isHoldOccupyingColumn(ManiaBeatmap beatmap, int column, double time, double tolerance = 0.5)
+        {
+            foreach (var obj in beatmap.HitObjects)
+            {
+                if (obj.Column != column)
+                    continue;
+
+                if (obj is HoldNote hold && time >= hold.StartTime - tolerance && time <= hold.EndTime + tolerance)
+                    return true;
+            }
+
+            return false;
         }
 
         private static void shuffle<T>(IList<T> list, Random rng)
