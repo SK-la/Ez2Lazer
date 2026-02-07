@@ -264,7 +264,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
             if (maxIndex < 0)
                 return CollectionsMarshal.AsSpan(new List<int>());
 
-            var orgColIndex = new int[maxIndex + 1];
+            int[] orgColIndex = new int[maxIndex + 1];
             Array.Fill(orgColIndex, -1);
 
             for (int i = 0; i < matrixSpan.Length; i++)
@@ -326,7 +326,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
             {
                 for (int col = 0; col < turn; col++)
                 {
-                    var oldIndex = new OscillatorGenerator(originalKeys - 1, random);
+                    var oldIndex = new KrrOscillator(originalKeys - 1, random);
                     double timeCounter = 0;
                     int lastTime = timeAxis[0];
 
@@ -351,7 +351,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
 
             for (int col = 0; col < turn; col++)
             {
-                var insertIndex = new OscillatorGenerator(originalKeys + col, random);
+                var insertIndex = new KrrOscillator(originalKeys + col, random);
                 double timeCounter = 0;
                 int lastTime = timeAxis[0];
 
@@ -1122,73 +1122,6 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
             {
                 int j = random.Next(i + 1);
                 (list[i], list[j]) = (list[j], list[i]);
-            }
-        }
-
-        private class OscillatorGenerator
-        {
-            private readonly int maxValue;
-            private int currentValue;
-            private int direction;
-            private readonly bool isSpecialCase;
-
-            public OscillatorGenerator(int maxValue, Random? random = null)
-            {
-                if (maxValue < 0) throw new ArgumentException("maxValue 必须不小于零");
-
-                this.maxValue = maxValue;
-
-                if (maxValue == 0)
-                {
-                    currentValue = 0;
-                    isSpecialCase = true;
-                }
-                else if (maxValue == 1)
-                {
-                    Random rnd = random ?? new Random();
-                    currentValue = rnd.Next(0, 2);
-                    direction = rnd.Next(0, 2) == 0 ? -1 : 1;
-                    isSpecialCase = true;
-                }
-                else
-                {
-                    Random rnd = random ?? new Random();
-                    currentValue = rnd.Next(1, maxValue);
-                    direction = rnd.Next(0, 2) == 0 ? -1 : 1;
-                    isSpecialCase = false;
-                }
-            }
-
-            public int GetCurrent() => currentValue;
-
-            public void Next()
-            {
-                if (isSpecialCase)
-                {
-                    if (maxValue == 0)
-                    {
-                        currentValue = 0;
-                    }
-                    else if (maxValue == 1)
-                    {
-                        currentValue = 1 - currentValue;
-                    }
-                }
-                else
-                {
-                    currentValue += direction;
-
-                    if (currentValue > maxValue)
-                    {
-                        currentValue = maxValue - 1;
-                        direction = -1;
-                    }
-                    else if (currentValue < 0)
-                    {
-                        currentValue = 1;
-                        direction = 1;
-                    }
-                }
             }
         }
     }

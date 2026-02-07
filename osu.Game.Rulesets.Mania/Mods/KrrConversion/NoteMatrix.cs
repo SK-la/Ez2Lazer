@@ -69,9 +69,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
 
             for (int row = 0; row < Rows; row++)
             {
-                int temp = data[row, colA];
-                data[row, colA] = data[row, colB];
-                data[row, colB] = temp;
+                (data[row, colA], data[row, colB]) = (data[row, colB], data[row, colA]);
             }
         }
     }
