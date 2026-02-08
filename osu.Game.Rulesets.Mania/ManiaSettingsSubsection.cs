@@ -42,20 +42,20 @@ namespace osu.Game.Rulesets.Mania
 
             Children = new Drawable[]
             {
-                new SettingsItemV2(new FormEnumDropdown<EzMUGHitMode>
+                new SettingsItemV2(new FormEnumDropdown<EzEnumHitMode>
                 {
                     Caption = EzLocalizationManager.HitMode,
                     HintText = EzLocalizationManager.HitModeTooltip,
-                    Current = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode),
+                    Current = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode),
                 })
                 {
                     Keywords = new[] { "mania" }
                 },
-                new SettingsItemV2(new FormEnumDropdown<EnumHealthMode>
+                new SettingsItemV2(new FormEnumDropdown<EzEnumHealthMode>
                 {
                     Caption = EzLocalizationManager.HealthMode,
                     HintText = EzLocalizationManager.HealthModeTooltip,
-                    Current = ezConfig.GetBindable<EnumHealthMode>(Ez2Setting.CustomHealthMode),
+                    Current = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.CustomHealthMode),
                 })
                 {
                     Keywords = new[] { "mania" }

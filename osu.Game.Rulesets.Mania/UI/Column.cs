@@ -106,7 +106,7 @@ namespace osu.Game.Rulesets.Mania.UI
         public readonly IBindable<string> NoteSetBindable = new Bindable<string>();
         public readonly Bindable<Vector2> NoteSizeBindable = new Bindable<Vector2>();
         public Bindable<Colour4> EzColumnColourBindable = null!;
-        private Bindable<EzMUGHitMode> hitModeBindable = null!;
+        private Bindable<EzEnumHitMode> hitModeBindable = null!;
 
         public event Action? NoteSetChanged;
         public event Action? NoteSizeChanged;
@@ -150,7 +150,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
             configurePools(hitModeBindable.Value);
             NoteSetBindable.BindTo(EzSkinInfo.NoteSetName);
             NoteSizeBindable.BindTo(factory.GetNoteSize(stageDefinition.Columns, Index));
@@ -274,11 +274,11 @@ namespace osu.Game.Rulesets.Mania.UI
             return DrawRectangle.Inflate(spacingInflation).Contains(ToLocalSpace(screenSpacePos));
         }
 
-        private void configurePools(EzMUGHitMode hitMode)
+        private void configurePools(EzEnumHitMode hitMode)
         {
             switch (hitMode)
             {
-                case EzMUGHitMode.EZ2AC:
+                case EzEnumHitMode.EZ2AC:
                     RegisterPool<Note, Ez2AcDrawableNote>(10, 50);
                     RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
                     RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
@@ -286,7 +286,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
-                case EzMUGHitMode.Malody:
+                case EzEnumHitMode.Malody:
                     RegisterPool<Note, DrawableNote>(10, 50);
                     RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
                     RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
@@ -294,9 +294,9 @@ namespace osu.Game.Rulesets.Mania.UI
                     RegisterPool<HoldNoteBody, MalodyDrawableLNBody>(10, 50);
                     break;
 
-                case EzMUGHitMode.IIDX_HD:
-                case EzMUGHitMode.LR2_HD:
-                case EzMUGHitMode.Raja_NM:
+                case EzEnumHitMode.IIDX_HD:
+                case EzEnumHitMode.LR2_HD:
+                case EzEnumHitMode.Raja_NM:
                     RegisterPool<Note, BMSDrawableNote>(10, 50);
                     RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
                     RegisterPool<HeadNote, BMSDrawableHoldNoteHead>(10, 50);
@@ -304,7 +304,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
 
-                case EzMUGHitMode.O2Jam:
+                case EzEnumHitMode.O2Jam:
                     RegisterPool<Note, O2DrawableNote>(10, 50);
                     RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
                     RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);

@@ -69,7 +69,7 @@ namespace osu.Game.Screens.Ranking
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private Bindable<EzMUGHitMode> hitModeBindable = new Bindable<EzMUGHitMode>();
+        private Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
         private Bindable<double> offsetPlusMania = new Bindable<double>();
 
         // private ScheduledDelegate? offsetPlusManiaScheduled;
@@ -253,7 +253,7 @@ namespace osu.Game.Screens.Ranking
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
 
             // 底部增加按钮
-            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
             buttons.Add(new HitModeButton(hitModeBindable));
 
             // Add settings button (placeholder)

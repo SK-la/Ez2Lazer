@@ -332,9 +332,9 @@ namespace osu.Game.Screens.Play
             }
 
             // 如果当前所选的 HitMode 不是 Lazer，则强制跳过上传成绩
-            var hitMode = ezConfig.Get<EzMUGHitMode>(Ez2Setting.HitMode);
+            var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode);
 
-            if (hitMode != EzMUGHitMode.Lazer)
+            if (hitMode != EzEnumHitMode.Lazer)
             {
                 // Logger.Log("非 Lazer 模式，跳过上传成绩");
                 return Task.CompletedTask;

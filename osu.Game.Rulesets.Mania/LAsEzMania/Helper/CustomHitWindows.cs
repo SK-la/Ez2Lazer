@@ -22,9 +22,9 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             { 20.00, 60.00, 150.00, 150.00, 500, 500, 500 }, // raja easy (100%)
         };
 
-        private EzMUGHitMode hitMode = EzMUGHitMode.Classic;
+        private EzEnumHitMode hitMode = EzEnumHitMode.Classic;
 
-        public EzMUGHitMode HitMode
+        public EzEnumHitMode HitMode
         {
             get => hitMode;
             set
@@ -88,11 +88,11 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         private const double poor_offset = 150.0;
 
         public CustomHitWindowsHelper()
-            : this(GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Classic)
+            : this(GlobalConfigStore.EzConfig?.Get<EzEnumHitMode>(Ez2Setting.HitMode) ?? EzEnumHitMode.Classic)
         {
         }
 
-        public CustomHitWindowsHelper(EzMUGHitMode hitMode)
+        public CustomHitWindowsHelper(EzEnumHitMode hitMode)
         {
             HitMode = hitMode;
         }
@@ -137,21 +137,21 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
         }
 
-        public double[] GetHitWindowsBMS(EzMUGHitMode mode)
+        public double[] GetHitWindowsBMS(EzEnumHitMode mode)
         {
             int row = 0;
 
             switch (mode)
             {
-                case EzMUGHitMode.IIDX_HD:
+                case EzEnumHitMode.IIDX_HD:
                     row = 0;
                     break;
 
-                case EzMUGHitMode.LR2_HD:
+                case EzEnumHitMode.LR2_HD:
                     row = 1;
                     break;
 
-                case EzMUGHitMode.Raja_NM:
+                case EzEnumHitMode.Raja_NM:
                     row = 2;
                     break;
             }
@@ -184,7 +184,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         {
             switch (HitMode)
             {
-                case EzMUGHitMode.Lazer:
+                case EzEnumHitMode.Lazer:
                     double perfect = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, perfect_window_range) * TotalMultiplier) + 0.5;
                     double great = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, great_window_range) * TotalMultiplier) + 0.5;
                     double good = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, good_window_range) * TotalMultiplier) + 0.5;
@@ -195,21 +195,21 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                     SetRanges(new[] { perfect, great, good, ok, meh, miss, poor });
                     break;
 
-                case EzMUGHitMode.O2Jam:
+                case EzEnumHitMode.O2Jam:
                     SetRanges(GetHitWindowsO2Jam(bpm));
                     break;
 
-                case EzMUGHitMode.EZ2AC:
+                case EzEnumHitMode.EZ2AC:
                     SetRanges(GetHitWindowsEZ2AC());
                     break;
 
-                case EzMUGHitMode.IIDX_HD:
-                case EzMUGHitMode.LR2_HD:
-                case EzMUGHitMode.Raja_NM:
+                case EzEnumHitMode.IIDX_HD:
+                case EzEnumHitMode.LR2_HD:
+                case EzEnumHitMode.Raja_NM:
                     SetRanges(GetHitWindowsBMS(0));
                     break;
 
-                case EzMUGHitMode.Malody:
+                case EzEnumHitMode.Malody:
                     SetRanges(GetHitWindowsMelody());
                     break;
 

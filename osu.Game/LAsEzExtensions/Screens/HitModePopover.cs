@@ -18,9 +18,9 @@ namespace osu.Game.LAsEzExtensions.Screens
 {
     public partial class HitModeButton : RoundedButton, IHasPopover
     {
-        private readonly Bindable<EzMUGHitMode> hitModeBindable;
+        private readonly Bindable<EzEnumHitMode> hitModeBindable;
 
-        public HitModeButton(Bindable<EzMUGHitMode> hitModeBindable)
+        public HitModeButton(Bindable<EzEnumHitMode> hitModeBindable)
         {
             this.hitModeBindable = hitModeBindable;
 
@@ -36,7 +36,7 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private partial class HitModePopover : OsuPopover
         {
-            private readonly Bindable<EzMUGHitMode> hitModeBindable = new Bindable<EzMUGHitMode>();
+            private readonly Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
 
             public HitModePopover()
                 : base(false)
@@ -50,12 +50,12 @@ namespace osu.Game.LAsEzExtensions.Screens
             [BackgroundDependencyLoader]
             private void load(Ez2ConfigManager ezConfig)
             {
-                hitModeBindable.BindTo(ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode));
+                hitModeBindable.BindTo(ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode));
                 Children = new[]
                 {
                     new OsuMenu(Direction.Vertical, true)
                     {
-                        Items = Enum.GetValues<EzMUGHitMode>().Select(mode =>
+                        Items = Enum.GetValues<EzEnumHitMode>().Select(mode =>
                             new OsuMenuItem(mode.ToString(), MenuItemType.Standard, () => ezConfig.SetValue(Ez2Setting.HitMode, mode))).ToArray(),
                         MaxHeight = 375,
                     },

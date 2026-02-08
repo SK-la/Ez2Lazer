@@ -115,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             // if (!IsLegacyScore) return;
 
-            var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
+            var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
             {
                 OverallDifficulty = od
             };
@@ -154,7 +154,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override void RemoveScoreChange(JudgementResult judgement)
         {
-            var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
+            var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
             {
                 OverallDifficulty = od
             };

@@ -87,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private Bindable<bool> globalHitPosition = new Bindable<bool>();
         private Bindable<bool> barLinesBindable = new Bindable<bool>();
-        private Bindable<EzMUGHitMode> hitMode = new Bindable<EzMUGHitMode>();
+        private Bindable<EzEnumHitMode> hitMode = new Bindable<EzEnumHitMode>();
 
         //自定义判定系统
         private Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
@@ -156,7 +156,7 @@ namespace osu.Game.Rulesets.Mania.UI
             globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
             barLinesBindable = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool);
-            hitMode = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
         }
 
         protected override void LoadComplete()
@@ -167,7 +167,7 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 O2HitModeExtension.PILL_COUNT.Value = 0;
 
-                if (h.NewValue == EzMUGHitMode.O2Jam)
+                if (h.NewValue == EzEnumHitMode.O2Jam)
                 {
                     O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
                     O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);

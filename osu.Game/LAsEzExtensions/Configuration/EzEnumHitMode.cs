@@ -5,7 +5,7 @@ using System.ComponentModel;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
-    public enum EzMUGHitMode
+    public enum EzEnumHitMode
     {
         [Description("Lazer Style")]
         Lazer = 0,

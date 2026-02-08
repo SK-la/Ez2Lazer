@@ -127,8 +127,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.HitMode, EzMUGHitMode.Lazer);
-            SetDefault(Ez2Setting.CustomHealthMode, EnumHealthMode.Lazer);
+            SetDefault(Ez2Setting.HitMode, EzEnumHitMode.Lazer);
+            SetDefault(Ez2Setting.CustomHealthMode, EzEnumHealthMode.Lazer);
             SetDefault(Ez2Setting.CustomPoorHitResultBool, true);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 
@@ -428,18 +428,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         {
             return ColumnTotalWidth;
         }
-    }
-
-    public enum ColumnWidthStyle
-    {
-        [Description("EzStylePro Only")]
-        EzStyleProOnly,
-
-        [Description("Global (全局)")]
-        GlobalWidth,
-
-        [Description("Global Total (全局总宽度)")]
-        GlobalTotalWidth,
     }
 
     public enum Ez2Setting

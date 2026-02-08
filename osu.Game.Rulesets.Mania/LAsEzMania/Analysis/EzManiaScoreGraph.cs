@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
         private readonly CustomHitWindowsHelper hitWindows1;
         private readonly CustomHitWindowsHelper hitWindows2;
-        private Bindable<EzMUGHitMode> hitModeBindable = null!;
+        private Bindable<EzEnumHitMode> hitModeBindable = null!;
         private readonly Bindable<double> offsetPlusMania = new Bindable<double>();
 
         [Resolved]
@@ -69,7 +69,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
         private void load()
         {
             // Bind to the global hit mode setting so that switching hit modes updates our helpers and redraws.
-            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
             hitModeBindable.BindValueChanged(v =>
             {
                 hitWindows1.HitMode = v.NewValue;

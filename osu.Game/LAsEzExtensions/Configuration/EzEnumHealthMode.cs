@@ -5,7 +5,7 @@ using System.ComponentModel;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
-    public enum EnumHealthMode
+    public enum EzEnumHealthMode
     {
         [Description("Lazer")]
         Lazer = 0,
