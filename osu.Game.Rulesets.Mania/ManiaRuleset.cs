@@ -260,22 +260,22 @@ namespace osu.Game.Rulesets.Mania
                     return new Mod[]
                     {
                         new ManiaModEz2Settings(),
-                        new ManiaModPatternShift(),
-                        new ManiaModPatternShiftDelay(),
-                        new ManiaModPatternShiftCut(),
-                        new ManiaModPatternShiftDump(),
-                        new ManiaModPatternShiftCross(),
-                        new ManiaModPatternShiftJack(),
-                        new ManiaModPatternShiftJump(),
                         new ManiaModCleanColumn(),
                         new ManiaModNiceBPM(),
-                        new ManiaModReconcile(),
                         new ManiaModSpaceBody(),
-                        new ManiaModLoopPlayClip(),
-                        new ManiaModSRAdjust(),
+                        new ManiaModPatternShift(),
+                        new ManiaModPatternShiftCut(),
+                        new ManiaModPatternShiftCross(),
+                        new ManiaModPatternShiftDelay(),
+                        new ManiaModPatternShiftDump(),
+                        new ManiaModPatternShiftJack(),
+                        new ManiaModPatternShiftJump(),
                         new ManiaModKrrN2Nc(),
                         new ManiaModKrrLN(),
                         new ManiaModKrrDP(),
+                        new ManiaModReconcile(),
+                        new ManiaModLoopPlayClip(),
+                        new ManiaModSRAdjust(),
                     };
 
                 case ModType.YuLiangSSS_Mod:

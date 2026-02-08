@@ -7,20 +7,30 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
-using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
     public abstract class ManiaModPatternShiftPatternBase : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
     {
+        protected const double TIME_TOLERANCE = 10.0;
+
         protected abstract KeyPatternType PatternType { get; }
         protected abstract string PatternName { get; }
         protected abstract string PatternAcronym { get; }
+
+        protected abstract void ApplyPatternForWindow(List<ManiaHitObject> windowObjects,
+                                                      ManiaBeatmap beatmap,
+                                                      double windowStart,
+                                                      double windowEnd,
+                                                      KeyPatternSettings settings,
+                                                      Random rng,
+                                                      int maxIterationsPerWindow);
 
         protected virtual int DefaultLevel => 0;
         protected virtual EzOscillator.Waveform DefaultWaveform => EzOscillator.Waveform.Sine;
@@ -128,7 +138,16 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var oscillator = new EzOscillator(Seed.Value.Value, waveform: Waveform.Value);
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
-            ManiaKeyPatternHelp.ProcessRollingWindowWithOscillator(maniaBeatmap, PatternType, Level.Value, oscillator, Seed.Value.Value, OscillationBeats.Value, WindowProcessInterval, WindowProcessOffset, MaxIterationsPerWindow);
+            ManiaKeyPatternHelp.ProcessRollingWindowWithOscillator(maniaBeatmap,
+                PatternType,
+                Level.Value,
+                oscillator,
+                Seed.Value.Value,
+                OscillationBeats.Value,
+                WindowProcessInterval,
+                WindowProcessOffset,
+                MaxIterationsPerWindow,
+                ApplyPatternForWindow);
             ManiaNoteCleanupTool.CleanupBeatmap(maniaBeatmap, seed: Seed.Value.Value);
         }
     }
