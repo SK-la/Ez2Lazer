@@ -131,7 +131,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString PatternShift_AlignDivisor_Label = new EzLocalisableString("对齐", "Align");
         public static readonly LocalisableString PatternShift_AlignDivisor_Description = new EzLocalisableString("对齐到节拍网格，0=关闭，1=1/1，2=1/2，4=1/4，8=1/8，16=1/16", "Snap to beat grid. 0=off, 1=1/1, 2=1/2, 4=1/4, 8=1/8, 16=1/16.");
         public static readonly LocalisableString PatternShift_DelayLevel_Label = new EzLocalisableString("Delay", "Delay");
-        public static readonly LocalisableString PatternShift_DelayLevel_Description = new EzLocalisableString("随机将部分note前后偏移，0=关闭，1-10级；同一等级段内，等级越高，偏移从1/16提升到1/8", "Randomly offset some notes. 0=off, levels 1-10. Within each tier, higher level increases offset from 1/16 to 1/8.");
+        public static readonly LocalisableString PatternShift_DelayLevel_Description = new EzLocalisableString(
+            "随机将部分note前后偏移，0=关闭。1-3: 偏移1/16、3/32、1/8；偏移数量<=等级，且至少保留等级数量不偏移。4-6: 同样偏移；至少保留1个不偏移。7-10: 偏移1/16、1/12、5/48、1/8；偏移数量<=等级，不强制保留。",
+            "Randomly offset some notes. 0=off. 1-3: offsets 1/16, 3/32, 1/8; shift up to level, keep at least level unshifted. 4-6: same offsets; keep at least 1 unshifted. 7-10: offsets 1/16, 1/12, 5/48, 1/8; shift up to level, no minimum unshifted.");
 
         // ====================================================================================================
         // Krr Mods - Labels & Descriptions

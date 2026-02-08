@@ -3,11 +3,11 @@
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModPatternShiftCross : ManiaModPatternShiftPatternBase
+    public class ManiaModPatternShiftJump : ManiaModPatternShiftPatternBase
     {
-        protected override KeyPatternType PatternType => KeyPatternType.Cross;
-        protected override string PatternName => "Cross";
-        protected override string PatternAcronym => "PSX";
+        protected override KeyPatternType PatternType => KeyPatternType.Jump;
+        protected override string PatternName => "Jump";
+        protected override string PatternAcronym => "PSJ";
 
         protected override int DefaultLevel => 4;
         protected override EzOscillator.Waveform DefaultWaveform => EzOscillator.Waveform.Sine;

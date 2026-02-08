@@ -266,7 +266,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModPatternShiftDump(),
                         new ManiaModPatternShiftCross(),
                         new ManiaModPatternShiftJack(),
-                        new ManiaModPatternShiftBeat(),
+                        new ManiaModPatternShiftJump(),
                         new ManiaModCleanColumn(),
                         new ManiaModNiceBPM(),
                         new ManiaModReconcile(),

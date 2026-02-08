@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -21,6 +22,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         protected abstract string PatternName { get; }
         protected abstract string PatternAcronym { get; }
 
+        protected virtual int DefaultLevel => 0;
+        protected virtual EzOscillator.Waveform DefaultWaveform => EzOscillator.Waveform.Sine;
+        protected virtual int DefaultOscillationBeats => 1;
+        protected virtual int DefaultWindowProcessInterval => 1;
+        protected virtual int DefaultWindowProcessOffset => 1;
+        protected virtual int DefaultApplyOrder => 50;
+
         public override string Name => $"Pattern Shift {PatternName}";
 
         public override string Acronym => PatternAcronym;
@@ -34,7 +42,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override ModType Type => ModType.LA_Mod;
 
         public override bool Ranked => false;
-        public override bool ValidForMultiplayer => true;
+        public override bool ValidForMultiplayer => false;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
         [SettingSource("Level", "0=off, 1-10. Controls how many notes are generated per window.")]
@@ -49,10 +57,26 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public Bindable<EzOscillator.Waveform> Waveform { get; } = new Bindable<EzOscillator.Waveform>(EzOscillator.Waveform.Sine);
 
         [SettingSource("Oscillation Beats", "Beat interval for oscillator changes. 1=every beat.")]
-        public BindableNumber<int> OscillationBeats { get; } = new BindableInt(1)
+        public BindableNumber<int> OscillationBeats { get; } = new BindableInt(2)
         {
             MinValue = 1,
-            MaxValue = 16,
+            MaxValue = 8,
+            Precision = 1
+        };
+
+        [SettingSource("Window Interval", "Process every N windows. 1=every window.")]
+        public BindableNumber<int> WindowInterval { get; } = new BindableInt(2)
+        {
+            MinValue = 1,
+            MaxValue = 8,
+            Precision = 1
+        };
+
+        [SettingSource("Window Start Offset", "0-3: first to fourth window.")]
+        public BindableNumber<int> WindowStartOffset { get; } = new BindableInt(1)
+        {
+            MinValue = 0,
+            MaxValue = 3,
             Precision = 1
         };
 
@@ -75,8 +99,24 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 yield return ("Level", $"{Level.Value}");
                 yield return ("Waveform", Waveform.Value.ToString());
                 yield return ("Oscillation Beats", $"{OscillationBeats.Value}");
+                yield return ("Window Interval", $"{WindowInterval.Value}");
+                yield return ("Window Start Offset", $"{WindowStartOffset.Value}");
                 yield return ("Seed", Seed.Value?.ToString() ?? "Random");
             }
+        }
+
+        protected virtual int WindowProcessInterval => Math.Max(1, WindowInterval.Value);
+        protected virtual int WindowProcessOffset => Math.Clamp(WindowStartOffset.Value, 0, 3);
+        protected virtual int MaxIterationsPerWindow => 1;
+
+        protected ManiaModPatternShiftPatternBase()
+        {
+            Level.Value = DefaultLevel;
+            Waveform.Value = DefaultWaveform;
+            OscillationBeats.Value = DefaultOscillationBeats;
+            WindowInterval.Value = DefaultWindowProcessInterval;
+            WindowStartOffset.Value = DefaultWindowProcessOffset;
+            ApplyOrderIndex.Value = DefaultApplyOrder;
         }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
@@ -88,8 +128,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var oscillator = new EzOscillator(Seed.Value.Value, waveform: Waveform.Value);
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
-            ManiaKeyPatternHelp.ProcessRollingWindowWithOscillator(maniaBeatmap, PatternType, Level.Value, oscillator, Seed.Value.Value, OscillationBeats.Value);
-            ManiaNoteCleanupTool.CleanupBeatmap(maniaBeatmap, Level.Value, 2, seed: Seed.Value.Value);
+            ManiaKeyPatternHelp.ProcessRollingWindowWithOscillator(maniaBeatmap, PatternType, Level.Value, oscillator, Seed.Value.Value, OscillationBeats.Value, WindowProcessInterval, WindowProcessOffset, MaxIterationsPerWindow);
+            ManiaNoteCleanupTool.CleanupBeatmap(maniaBeatmap, seed: Seed.Value.Value);
         }
     }
 }

@@ -84,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(50)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(0)
         {
             MinValue = 0,
             MaxValue = 100

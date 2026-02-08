@@ -12,7 +12,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
     public static class ManiaNoteCleanupTool
     {
-        public static void CleanupBeatmap(ManiaBeatmap beatmap, int maxNotesPerWindow, int windowQuarterBeats = 2, double? minGapMs = null, int? seed = null)
+        public static void CleanupBeatmap(ManiaBeatmap beatmap, double? minGapMs = null, int? seed = null)
         {
             if (beatmap.HitObjects.Count == 0)
                 return;
@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             // 2) Remove overlaps and reduce density.
             CleanOverlaps(beatmap);
-            SimplifyDenseNotes(beatmap, maxNotesPerWindow, windowQuarterBeats);
+            SimplifyDenseNotes(beatmap);
 
             // 3) Enforce minimum gaps between objects in the same column.
             if (gap > 0)
@@ -75,34 +75,26 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 beatmap.HitObjects.Remove(obj);
         }
 
-        public static void SimplifyDenseNotes(ManiaBeatmap beatmap, int maxNotesPerWindow, int windowQuarterBeats = 2)
+        public static void SimplifyDenseNotes(ManiaBeatmap beatmap)
         {
-            if (beatmap.HitObjects.Count == 0 || maxNotesPerWindow <= 0)
+            if (beatmap.HitObjects.Count == 0)
                 return;
 
-            var objects = beatmap.HitObjects
-                                 .OrderBy(h => h.StartTime)
-                                 .ToList();
-
             var toRemove = new HashSet<ManiaHitObject>();
-            var window = new Queue<ManiaHitObject>();
-            int windowQuarterBeatsSafe = Math.Max(1, windowQuarterBeats);
 
-            foreach (var obj in objects)
+            foreach (var group in beatmap.HitObjects.GroupBy(h => h.Column))
             {
-                double beatLength = beatmap.ControlPointInfo.TimingPointAt(obj.StartTime).BeatLength;
-                double windowDuration = beatLength / 4.0 * windowQuarterBeatsSafe;
+                var list = group.OrderBy(h => h.StartTime).ToList();
 
-                while (window.Count > 0 && obj.StartTime - window.Peek().StartTime > windowDuration)
-                    window.Dequeue();
-
-                window.Enqueue(obj);
-
-                while (window.Count > maxNotesPerWindow)
+                for (int i = 1; i < list.Count; i++)
                 {
-                    var remove = window.Last();
-                    toRemove.Add(remove);
-                    window = new Queue<ManiaHitObject>(window.Where(o => o != remove));
+                    var prev = list[i - 1];
+                    var curr = list[i];
+                    double beatLength = beatmap.ControlPointInfo.TimingPointAt(prev.StartTime).BeatLength;
+                    double minGap = beatLength / 6.0;
+
+                    if (curr.StartTime - prev.StartTime < minGap)
+                        toRemove.Add(curr);
                 }
             }
 
