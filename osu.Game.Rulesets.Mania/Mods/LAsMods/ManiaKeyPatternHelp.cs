@@ -45,18 +45,19 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                                 bool incrementalMode = false,
                                                 KeyPatternSettings? settings = null)
         {
-            var objects = beatmap.HitObjects
-                                 .OrderBy(h => h.StartTime)
-                                 .ToList();
+            var objects = beatmap.HitObjects.ToList();
+            objects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
 
             if (objects.Count == 0)
                 return;
 
-            double currentTime = objects.Min(h => h.StartTime);
-            double endTime = objects.Max(h => h is HoldNote hold ? hold.EndTime : h.StartTime);
+            double currentTime = objects[0].StartTime;
+            double endTime = getMaxEndTime(objects);
 
             int windowQuarterBeatsSafe = Math.Max(1, windowQuarterBeats);
             int intervalQuarterBeatsSafe = Math.Max(1, intervalQuarterBeats);
+            int startIndex = 0;
+            int endIndex = 0;
 
             while (currentTime <= endTime)
             {
@@ -66,11 +67,18 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                 double windowEnd = currentTime + windowDuration;
 
-                var windowObjects = objects.Where(h => h.StartTime >= currentTime && h.StartTime < windowEnd)
-                                           .ToList();
+                while (startIndex < objects.Count && objects[startIndex].StartTime < currentTime)
+                    startIndex++;
 
-                if (windowObjects.Count > 0)
+                while (endIndex < objects.Count && objects[endIndex].StartTime < windowEnd)
+                    endIndex++;
+
+                int windowCount = endIndex - startIndex;
+
+                if (windowCount > 0)
                 {
+                    var windowObjects = buildWindowObjects(objects, startIndex, endIndex);
+
                     if (incrementalMode)
                         applyIncrementalPattern(windowObjects, patternType, beatmap, currentTime, windowEnd, windowDuration, settings);
                     else
@@ -96,18 +104,19 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (level <= 0)
                 return;
 
-            var objects = beatmap.HitObjects
-                                 .OrderBy(h => h.StartTime)
-                                 .ToList();
+            var objects = beatmap.HitObjects.ToList();
+            objects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
 
             if (objects.Count == 0)
                 return;
 
-            double currentTime = objects.Min(h => h.StartTime);
-            double endTime = objects.Max(h => h is HoldNote hold ? hold.EndTime : h.StartTime);
+            double currentTime = objects[0].StartTime;
+            double endTime = getMaxEndTime(objects);
 
             int windowQuarterBeatsSafe = Math.Max(1, windowQuarterBeats);
             int intervalQuarterBeatsSafe = Math.Max(1, intervalQuarterBeats);
+            int startIndex = 0;
+            int endIndex = 0;
 
             while (currentTime <= endTime)
             {
@@ -117,10 +126,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                 double windowEnd = currentTime + windowDuration;
 
-                var windowObjects = objects.Where(h => h.StartTime >= currentTime && h.StartTime < windowEnd)
-                                           .ToList();
+                while (startIndex < objects.Count && objects[startIndex].StartTime < currentTime)
+                    startIndex++;
 
-                if (windowObjects.Count > 0)
+                while (endIndex < objects.Count && objects[endIndex].StartTime < windowEnd)
+                    endIndex++;
+
+                int windowCount = endIndex - startIndex;
+
+                if (windowCount > 0)
                 {
                     int oscillationBeatsSafe = Math.Max(1, oscillationBeats);
                     long beatIndex = beatLength > 0 ? (long)Math.Round(currentTime / beatLength) : (long)Math.Round(currentTime);
@@ -134,6 +148,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                         int windowSeed = unchecked(seed * 397) ^ (int)Math.Round(currentTime);
                         var rng = new Random(windowSeed);
 
+                        var windowObjects = buildWindowObjects(objects, startIndex, endIndex);
                         applyIncrementalPattern(windowObjects, patternType, beatmap, currentTime, windowEnd, windowDuration, settings, rng);
                     }
                 }
@@ -319,19 +334,18 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         private static double getActiveBeatFraction(List<ManiaHitObject> windowObjects, ManiaBeatmap beatmap, double defaultFraction)
         {
-            var ordered = windowObjects.OrderBy(h => h.StartTime).ToList();
-            if (ordered.Count < 2)
+            if (windowObjects.Count < 2)
                 return defaultFraction;
 
-            double beatLength = beatmap.ControlPointInfo.TimingPointAt(ordered[0].StartTime).BeatLength;
+            double beatLength = beatmap.ControlPointInfo.TimingPointAt(windowObjects[0].StartTime).BeatLength;
             if (beatLength <= 0)
                 return defaultFraction;
 
             var gaps = new List<double>();
 
-            for (int i = 1; i < ordered.Count; i++)
+            for (int i = 1; i < windowObjects.Count; i++)
             {
-                double gap = ordered[i].StartTime - ordered[i - 1].StartTime;
+                double gap = windowObjects[i].StartTime - windowObjects[i - 1].StartTime;
                 if (gap > 0)
                     gaps.Add(gap / beatLength);
             }
@@ -411,7 +425,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                               int level,
                                               Random rng)
         {
-            var groups = windowObjects.GroupBy(o => o.StartTime).ToList();
+            var groups = buildGroupsByStartTime(windowObjects);
 
             foreach (var group in groups)
             {
@@ -429,11 +443,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 double beatLength = beatmap.ControlPointInfo.TimingPointAt(list[0].StartTime).BeatLength;
                 double offsetAmount = beatLength * GetDelayBeatFraction(level);
 
-                var indexes = Enumerable.Range(0, noteCount).OrderBy(_ => rng.Next()).Take(count).ToList();
+                var indexes = new List<int>(noteCount);
+                for (int i = 0; i < noteCount; i++)
+                    indexes.Add(i);
 
-                foreach (int index in indexes)
+                shuffle(indexes, rng);
+
+                for (int i = 0; i < count; i++)
                 {
-                    var obj = list[index];
+                    var obj = list[indexes[i]];
                     double direction = rng.NextDouble() < 0.5 ? -1 : 1;
                     double offset = direction * offsetAmount;
 
@@ -444,6 +462,77 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                         TryApplyDelayOffset(beatmap, obj, -offset, out _);
                 }
             }
+        }
+
+        private static double getMaxEndTime(List<ManiaHitObject> objects)
+        {
+            double maxEnd = objects[0].StartTime;
+
+            for (int i = 0; i < objects.Count; i++)
+            {
+                var obj = objects[i];
+                double end = obj is HoldNote hold ? hold.EndTime : obj.StartTime;
+                if (end > maxEnd)
+                    maxEnd = end;
+            }
+
+            return maxEnd;
+        }
+
+        private static int lowerBoundByTime(List<ManiaHitObject> objects, double time)
+        {
+            int left = 0;
+            int right = objects.Count;
+
+            while (left < right)
+            {
+                int mid = left + (right - left) / 2;
+                if (objects[mid].StartTime < time)
+                    left = mid + 1;
+                else
+                    right = mid;
+            }
+
+            return left;
+        }
+
+        private static List<ManiaHitObject> buildWindowObjects(List<ManiaHitObject> objects, int startIndex, int endIndex)
+        {
+            int count = Math.Max(0, endIndex - startIndex);
+            var windowObjects = new List<ManiaHitObject>(count);
+
+            for (int i = startIndex; i < endIndex; i++)
+                windowObjects.Add(objects[i]);
+
+            return windowObjects;
+        }
+
+        private static List<List<ManiaHitObject>> buildGroupsByStartTime(List<ManiaHitObject> objects)
+        {
+            var groups = new List<List<ManiaHitObject>>();
+
+            if (objects.Count == 0)
+                return groups;
+
+            double currentTime = objects[0].StartTime;
+            var currentGroup = new List<ManiaHitObject> { objects[0] };
+
+            for (int i = 1; i < objects.Count; i++)
+            {
+                var obj = objects[i];
+
+                if (obj.StartTime != currentTime)
+                {
+                    groups.Add(currentGroup);
+                    currentTime = obj.StartTime;
+                    currentGroup = new List<ManiaHitObject>();
+                }
+
+                currentGroup.Add(obj);
+            }
+
+            groups.Add(currentGroup);
+            return groups;
         }
 
         internal static int GetDelayMaxShiftCount(int level, int noteCount)
@@ -464,9 +553,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             var cols = new HashSet<int>();
 
-            foreach (var obj in objects)
+            if (objects.Count == 0)
+                return cols;
+
+            double minTime = time - tolerance;
+            double maxTime = time + tolerance;
+            int startIndex = lowerBoundByTime(objects, minTime);
+
+            for (int i = startIndex; i < objects.Count; i++)
             {
-                if (Math.Abs(obj.StartTime - time) <= tolerance)
+                var obj = objects[i];
+                if (obj.StartTime > maxTime)
+                    break;
+
+                if (obj.StartTime >= minTime)
                     cols.Add(obj.Column);
             }
 
@@ -537,7 +637,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             double median = getMedianFromList(available);
-            var weights = available.Select(c => Math.Max(0.001, Math.Abs(c - median))).ToList();
+            var weights = new List<double>(available.Count);
+
+            for (int i = 0; i < available.Count; i++)
+            {
+                int column = available[i];
+                weights.Add(Math.Max(0.001, Math.Abs(column - median)));
+            }
 
             for (int i = 0; i < count; i++)
                 tryAddNoteFromCandidates(beatmap, available, weights, rng, time);
@@ -577,13 +683,24 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             double median = getMedian(avoid);
-            double maxDistance = available.Select(c => distanceToNearest(avoid, c)).DefaultIfEmpty(1).Max();
-            var weights = available.Select(c =>
+            double maxDistance = 1;
+
+            for (int i = 0; i < available.Count; i++)
             {
-                double dist = distanceToNearest(avoid, c);
-                double medianBias = maxDistance - Math.Abs(c - median);
-                return Math.Max(0.001, dist * 2.0 + medianBias);
-            }).ToList();
+                double dist = distanceToNearest(avoid, available[i]);
+                if (dist > maxDistance)
+                    maxDistance = dist;
+            }
+
+            var weights = new List<double>(available.Count);
+
+            for (int i = 0; i < available.Count; i++)
+            {
+                int column = available[i];
+                double dist = distanceToNearest(avoid, column);
+                double medianBias = maxDistance - Math.Abs(column - median);
+                weights.Add(Math.Max(0.001, dist * 2.0 + medianBias));
+            }
 
             for (int i = 0; i < count; i++)
                 tryAddNoteFromCandidates(beatmap, available, weights, rng, time);
@@ -614,7 +731,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         private static void applyBeatIncremental(ManiaBeatmap beatmap, double time, int minK, int maxK, Random rng)
         {
             int totalColumns = Math.Max(1, beatmap.TotalColumns);
-            var columns = Enumerable.Range(0, totalColumns).ToList();
+            var columns = new List<int>(totalColumns);
+
+            for (int i = 0; i < totalColumns; i++)
+                columns.Add(i);
 
             int count = rng.Next(minK, maxK + 1);
             count = Math.Clamp(count, 0, columns.Count);
@@ -633,8 +753,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                                  double tolerance,
                                                  Random rng)
         {
-            var prevCols = getColumnsAtTime(windowObjects, prevLine, tolerance).OrderBy(c => c).ToList();
-            var nextCols = getColumnsAtTime(windowObjects, nextLine, tolerance).OrderBy(c => c).ToList();
+            var prevCols = getColumnsAtTime(windowObjects, prevLine, tolerance).ToList();
+            prevCols.Sort();
+            var nextCols = getColumnsAtTime(windowObjects, nextLine, tolerance).ToList();
+            nextCols.Sort();
 
             if (prevCols.Count == 0 || nextCols.Count == 0)
                 return;
