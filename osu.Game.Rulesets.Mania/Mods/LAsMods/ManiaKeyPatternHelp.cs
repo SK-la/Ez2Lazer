@@ -23,6 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     {
         public int MinK { get; set; } = 1;
         public int MaxK { get; set; } = 5;
+        public int Level { get; set; }
     }
 
     public static class ManiaKeyPatternHelp
@@ -36,78 +37,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             1.0, 1.0 / 3, 1.0 / 6, 1.0 / 9, 1.0 / 12
         };
-
-        public static void CleanOverlaps(ManiaBeatmap beatmap)
-        {
-            if (beatmap.HitObjects.Count == 0)
-                return;
-
-            var toRemove = new HashSet<ManiaHitObject>();
-
-            foreach (var group in beatmap.HitObjects.GroupBy(h => h.Column))
-            {
-                double currentEnd = double.MinValue;
-                ManiaHitObject? current = null;
-
-                foreach (var obj in group.OrderBy(h => h.StartTime))
-                {
-                    double objEnd = obj is HoldNote hold ? hold.EndTime : obj.StartTime;
-
-                    if (current != null && obj.StartTime < currentEnd)
-                    {
-                        toRemove.Add(obj);
-                        continue;
-                    }
-
-                    current = obj;
-                    currentEnd = Math.Max(currentEnd, objEnd);
-                }
-            }
-
-            if (toRemove.Count == 0)
-                return;
-
-            foreach (var obj in toRemove)
-                beatmap.HitObjects.Remove(obj);
-        }
-
-        public static void SimplifyDenseNotes(ManiaBeatmap beatmap, int maxNotesPerWindow, int windowQuarterBeats = 2)
-        {
-            if (beatmap.HitObjects.Count == 0 || maxNotesPerWindow <= 0)
-                return;
-
-            var objects = beatmap.HitObjects
-                                 .OrderBy(h => h.StartTime)
-                                 .ToList();
-
-            var toRemove = new HashSet<ManiaHitObject>();
-            var window = new Queue<ManiaHitObject>();
-            int windowQuarterBeatsSafe = Math.Max(1, windowQuarterBeats);
-
-            foreach (var obj in objects)
-            {
-                double beatLength = beatmap.ControlPointInfo.TimingPointAt(obj.StartTime).BeatLength;
-                double windowDuration = beatLength / 4.0 * windowQuarterBeatsSafe;
-
-                while (window.Count > 0 && obj.StartTime - window.Peek().StartTime > windowDuration)
-                    window.Dequeue();
-
-                window.Enqueue(obj);
-
-                while (window.Count > maxNotesPerWindow)
-                {
-                    var remove = window.Last();
-                    toRemove.Add(remove);
-                    window = new Queue<ManiaHitObject>(window.Where(o => o != remove));
-                }
-            }
-
-            if (toRemove.Count == 0)
-                return;
-
-            foreach (var obj in toRemove)
-                beatmap.HitObjects.Remove(obj);
-        }
 
         public static void ProcessRollingWindow(ManiaBeatmap beatmap,
                                                 KeyPatternType patternType,
@@ -198,22 +127,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     long oscillationIndex = beatIndex / oscillationBeatsSafe;
                     oscillator.Reset(unchecked(seed + oscillationIndex));
                     double oscValue = oscillator.NextSigned();
-                    var settings = getPatternSettingsFromLevel(level, beatmap.TotalColumns, oscValue);
+                    var settings = getPatternSettingsFromLevel(level, beatmap.TotalColumns, oscValue, patternType);
 
                     if (settings.MaxK > 0)
                     {
                         int windowSeed = unchecked(seed * 397) ^ (int)Math.Round(currentTime);
                         var rng = new Random(windowSeed);
 
-                        if (patternType == KeyPatternType.Delay)
-                        {
-                            double fraction = getDelayBeatFraction(level);
-                            applyDelayPattern(windowObjects, beatmap, settings.MinK, settings.MaxK, fraction, rng);
-                        }
-                        else
-                        {
-                            applyIncrementalPattern(windowObjects, patternType, beatmap, currentTime, windowEnd, windowDuration, settings, rng);
-                        }
+                        applyIncrementalPattern(windowObjects, patternType, beatmap, currentTime, windowEnd, windowDuration, settings, rng);
                     }
                 }
 
@@ -326,7 +247,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                         break;
 
                     case KeyPatternType.Delay:
-                        applyDelayPattern(windowObjects, beatmap, minK, maxK, 1.0 / 16.0, rng);
+                        applyDelayPattern(windowObjects, beatmap, patternSettings.Level, rng);
                         break;
 
                     default:
@@ -335,23 +256,65 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        private static KeyPatternSettings getPatternSettingsFromLevel(int level, int totalColumns, double oscValue)
+        private static KeyPatternSettings getPatternSettingsFromLevel(int level, int totalColumns, double oscValue, KeyPatternType patternType)
         {
             if (level <= 0 || totalColumns <= 0)
-                return new KeyPatternSettings { MinK = 0, MaxK = 0 };
+                return new KeyPatternSettings { MinK = 0, MaxK = 0, Level = level };
 
-            int reserve = level <= 3 ? level : level <= 6 ? 1 : 0;
-            int maxCount = Math.Clamp(Math.Min(level, totalColumns - reserve), 0, totalColumns);
+            var range = getPatternRangeFromLevel(patternType, level, totalColumns);
+            if (range.max <= 0)
+                return new KeyPatternSettings { MinK = 0, MaxK = 0, Level = level };
 
-            if (maxCount <= 0)
-                return new KeyPatternSettings { MinK = 0, MaxK = 0 };
-
-            int minCount = Math.Max(0, maxCount - 1);
             double normalized = (oscValue + 1.0) * 0.5;
-            int count = minCount + (int)Math.Round(normalized * (maxCount - minCount));
-            count = Math.Clamp(count, 0, maxCount);
+            int count = range.min + (int)Math.Round(normalized * (range.max - range.min));
+            count = Math.Clamp(count, range.min, range.max);
 
-            return new KeyPatternSettings { MinK = count, MaxK = count };
+            int minCount = Math.Max(range.min, count - 1);
+            int maxCount = Math.Min(range.max, count + 1);
+
+            return new KeyPatternSettings { MinK = minCount, MaxK = maxCount, Level = level };
+        }
+
+        private static (int min, int max) getPatternRangeFromLevel(KeyPatternType patternType, int level, int totalColumns)
+        {
+            int maxCount;
+            int minCount;
+
+            switch (patternType)
+            {
+                case KeyPatternType.Jack:
+                    maxCount = Math.Clamp((int)Math.Ceiling(level * 0.6), 1, totalColumns);
+                    minCount = Math.Max(1, maxCount - 1);
+                    break;
+
+                case KeyPatternType.Beat:
+                    maxCount = Math.Clamp(level, 1, totalColumns);
+                    minCount = Math.Max(1, maxCount - 2);
+                    break;
+
+                case KeyPatternType.Dump:
+                    maxCount = Math.Clamp(level + 1, 1, totalColumns);
+                    minCount = Math.Max(1, maxCount - 2);
+                    break;
+
+                case KeyPatternType.Cut:
+                case KeyPatternType.Cross:
+                    maxCount = Math.Clamp(level, 1, totalColumns);
+                    minCount = Math.Max(1, maxCount - 1);
+                    break;
+
+                case KeyPatternType.Delay:
+                    maxCount = Math.Clamp(level, 1, totalColumns);
+                    minCount = Math.Max(1, maxCount - 1);
+                    break;
+
+                default:
+                    maxCount = Math.Clamp(level, 1, totalColumns);
+                    minCount = Math.Max(1, maxCount - 1);
+                    break;
+            }
+
+            return (minCount, maxCount);
         }
 
         private static double getActiveBeatFraction(List<ManiaHitObject> windowObjects, ManiaBeatmap beatmap, double defaultFraction)
@@ -429,7 +392,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        private static double getDelayBeatFraction(int level)
+        internal static double GetDelayBeatFraction(int level)
         {
             double t;
 
@@ -440,14 +403,12 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             else
                 t = (level - 7) / 3.0;
 
-            return (1.0 / 16.0) * (1 + t);
+            return 1.0 / 16.0 * (1 + t);
         }
 
         private static void applyDelayPattern(List<ManiaHitObject> windowObjects,
                                               ManiaBeatmap beatmap,
-                                              int minK,
-                                              int maxK,
-                                              double beatFraction,
+                                              int level,
                                               Random rng)
         {
             var groups = windowObjects.GroupBy(o => o.StartTime).ToList();
@@ -460,14 +421,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 if (noteCount == 0)
                     continue;
 
-                int count = rng.Next(minK, maxK + 1);
-                count = Math.Clamp(count, 0, noteCount);
+                int count = GetDelayMaxShiftCount(level, noteCount);
 
                 if (count == 0)
                     continue;
 
                 double beatLength = beatmap.ControlPointInfo.TimingPointAt(list[0].StartTime).BeatLength;
-                double offsetAmount = beatLength * beatFraction;
+                double offsetAmount = beatLength * GetDelayBeatFraction(level);
 
                 var indexes = Enumerable.Range(0, noteCount).OrderBy(_ => rng.Next()).Take(count).ToList();
 
@@ -477,19 +437,27 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     double direction = rng.NextDouble() < 0.5 ? -1 : 1;
                     double offset = direction * offsetAmount;
 
-                    if (obj is HoldNote hold)
-                    {
-                        double newStart = Math.Max(0, hold.StartTime + offset);
-                        double newEnd = Math.Max(newStart, hold.EndTime + offset);
-                        hold.StartTime = newStart;
-                        hold.EndTime = newEnd;
-                    }
-                    else
-                    {
-                        obj.StartTime = Math.Max(0, obj.StartTime + offset);
-                    }
+                    if (TryApplyDelayOffset(beatmap, obj, offset, out bool holdConflict))
+                        continue;
+
+                    if (holdConflict)
+                        TryApplyDelayOffset(beatmap, obj, -offset, out _);
                 }
             }
+        }
+
+        internal static int GetDelayMaxShiftCount(int level, int noteCount)
+        {
+            if (noteCount <= 0)
+                return 0;
+
+            if (level <= 3)
+                return Math.Max(0, Math.Min(level, noteCount - level));
+
+            if (level <= 6)
+                return Math.Max(0, Math.Min(level, noteCount - 1));
+
+            return Math.Min(level, noteCount);
         }
 
         private static HashSet<int> getColumnsAtTime(List<ManiaHitObject> objects, double time, double tolerance)
@@ -622,12 +590,12 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         }
 
         private static void applyJackIncremental(ManiaBeatmap beatmap,
-                                                  HashSet<int> prevColumns,
-                                                  HashSet<int> nextColumns,
-                                                  double time,
-                                                  int minK,
-                                                  int maxK,
-                                                  Random rng)
+                                                 HashSet<int> prevColumns,
+                                                 HashSet<int> nextColumns,
+                                                 double time,
+                                                 int minK,
+                                                 int maxK,
+                                                 Random rng)
         {
             var available = new HashSet<int>(prevColumns);
             available.UnionWith(nextColumns);
@@ -656,14 +624,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         }
 
         private static void applyDumpIncremental(ManiaBeatmap beatmap,
-                                                  List<ManiaHitObject> windowObjects,
-                                                  double prevLine,
-                                                  double nextLine,
-                                                  double mainStep,
-                                                  double subStep,
-                                                  double currentTime,
-                                                  double tolerance,
-                                                  Random rng)
+                                                 List<ManiaHitObject> windowObjects,
+                                                 double prevLine,
+                                                 double nextLine,
+                                                 double mainStep,
+                                                 double subStep,
+                                                 double currentTime,
+                                                 double tolerance,
+                                                 Random rng)
         {
             var prevCols = getColumnsAtTime(windowObjects, prevLine, tolerance).OrderBy(c => c).ToList();
             var nextCols = getColumnsAtTime(windowObjects, nextLine, tolerance).OrderBy(c => c).ToList();
@@ -693,40 +661,47 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             for (int i = 0; i < steps; i++)
             {
                 double time = prevLine + subStep * (i + 1);
-                int column = pickNearestAvailableStairColumn(betweenCols, i, beatmap, time);
-                if (column < 0 || hasNoteAtTime(beatmap, column, time))
-                    continue;
-
-                beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
+                var candidates = buildNearestCandidates(betweenCols, i);
+                tryAddNoteFromOrderedCandidates(beatmap, candidates, time);
             }
         }
 
-        private static int pickNearestAvailableStairColumn(IReadOnlyList<int> columns, int index, ManiaBeatmap beatmap, double time)
+        private static List<int> buildNearestCandidates(IReadOnlyList<int> columns, int index)
         {
             int count = columns.Count;
-            if (count == 0)
-                return -1;
+            var ordered = new List<int>(count);
 
             for (int offset = 0; offset < count; offset++)
             {
                 int left = index - offset;
                 if (left >= 0)
-                {
-                    int column = columns[left];
-                    if (!isHoldOccupyingColumn(beatmap, column, time))
-                        return column;
-                }
+                    ordered.Add(columns[left]);
 
                 int right = index + offset;
-                if (right < count)
-                {
-                    int column = columns[right];
-                    if (!isHoldOccupyingColumn(beatmap, column, time))
-                        return column;
-                }
+                if (right < count && right != left)
+                    ordered.Add(columns[right]);
             }
 
-            return -1;
+            return ordered;
+        }
+
+        private static bool tryAddNoteFromOrderedCandidates(ManiaBeatmap beatmap, IReadOnlyList<int> candidates, double time)
+        {
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                int column = candidates[i];
+
+                if (isHoldOccupyingColumn(beatmap, column, time))
+                    continue;
+
+                if (hasNoteAtTime(beatmap, column, time))
+                    return false;
+
+                beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
+                return true;
+            }
+
+            return false;
         }
 
         private static bool tryAddNoteFromCandidates(ManiaBeatmap beatmap,
@@ -741,8 +716,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             int column = candidates[pickedIndex];
             candidates.RemoveAt(pickedIndex);
-            if (weights != null)
-                weights.RemoveAt(pickedIndex);
+            weights?.RemoveAt(pickedIndex);
 
             if (hasNoteAtTime(beatmap, column, time))
                 return false;
@@ -768,17 +742,21 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     return picked;
 
                 candidates.RemoveAt(picked);
-                if (weights != null)
-                    weights.RemoveAt(picked);
+                weights?.RemoveAt(picked);
             }
 
             return -1;
         }
 
-        private static bool hasNoteAtTime(ManiaBeatmap beatmap, int column, double time, double tolerance = 0.5)
+        // Placement helpers (shared rule: hold occupied -> reselect, note exists -> skip).
+
+        private static bool hasNoteAtTime(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
         {
             foreach (var obj in beatmap.HitObjects)
             {
+                if (ReferenceEquals(obj, ignore))
+                    continue;
+
                 if (obj.Column != column)
                     continue;
 
@@ -789,10 +767,74 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return false;
         }
 
-        private static bool isHoldOccupyingColumn(ManiaBeatmap beatmap, int column, double time, double tolerance = 0.5)
+        private static bool isHoldOverlappingColumn(ManiaBeatmap beatmap, int column, double startTime, double endTime, ManiaHitObject? ignore = null, double tolerance = 0.5)
         {
             foreach (var obj in beatmap.HitObjects)
             {
+                if (ReferenceEquals(obj, ignore))
+                    continue;
+
+                if (obj.Column != column)
+                    continue;
+
+                if (obj is HoldNote hold)
+                {
+                    double holdStart = hold.StartTime - tolerance;
+                    double holdEnd = hold.EndTime + tolerance;
+                    if (holdStart <= endTime && holdEnd >= startTime)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static bool TryApplyDelayOffset(ManiaBeatmap beatmap, ManiaHitObject obj, double offset, out bool holdConflict)
+        {
+            holdConflict = false;
+
+            if (obj is HoldNote hold)
+            {
+                double duration = hold.EndTime - hold.StartTime;
+                double newStart = Math.Max(0, hold.StartTime + offset);
+                double newEnd = Math.Max(newStart, newStart + duration);
+
+                if (hasNoteAtTime(beatmap, hold.Column, newStart, hold))
+                    return false;
+
+                if (isHoldOverlappingColumn(beatmap, hold.Column, newStart, newEnd, hold))
+                {
+                    holdConflict = true;
+                    return false;
+                }
+
+                hold.StartTime = newStart;
+                hold.EndTime = newEnd;
+                return true;
+            }
+
+            double targetTime = Math.Max(0, obj.StartTime + offset);
+
+            if (hasNoteAtTime(beatmap, obj.Column, targetTime, obj))
+                return false;
+
+            if (isHoldOccupyingColumn(beatmap, obj.Column, targetTime, obj))
+            {
+                holdConflict = true;
+                return false;
+            }
+
+            obj.StartTime = targetTime;
+            return true;
+        }
+
+        private static bool isHoldOccupyingColumn(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
+        {
+            foreach (var obj in beatmap.HitObjects)
+            {
+                if (ReferenceEquals(obj, ignore))
+                    continue;
+
                 if (obj.Column != column)
                     continue;
 

@@ -253,13 +253,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             foreach (var chord in chords)
             {
                 int noteCount = chord.Notes.Count;
-                int maxShift = getMaxShiftCount(delayLevel, noteCount);
+                int maxShift = ManiaKeyPatternHelp.GetDelayMaxShiftCount(delayLevel, noteCount);
 
                 if (maxShift <= 0)
                     continue;
 
                 double beatLength = controlPoints.TimingPointAt(chord.Time).BeatLength;
-                double offsetAmount = beatLength * getDelayBeatFraction(delayLevel);
+                double offsetAmount = beatLength * ManiaKeyPatternHelp.GetDelayBeatFraction(delayLevel);
 
                 var indexes = Enumerable.Range(0, noteCount).OrderBy(_ => rng.Next()).Take(maxShift).ToList();
 
@@ -275,37 +275,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        private static int getMaxShiftCount(int level, int noteCount)
-        {
-            if (noteCount <= 0)
-                return 0;
-
-            if (level <= 3)
-                return Math.Max(0, Math.Min(level, noteCount - level));
-
-            if (level <= 6)
-                return Math.Max(0, Math.Min(level, noteCount - 1));
-
-            return Math.Min(level, noteCount);
-        }
-
-        private static double getDelayBeatFraction(int level)
-        {
-            double t;
-
-            if (level <= 3)
-                t = (level - 1) / 2.0;
-            else if (level <= 6)
-                t = (level - 4) / 2.0;
-            else
-                t = (level - 7) / 3.0;
-
-            return (1.0 / 16.0) * (1 + t);
-        }
-
         private static void assignColumns(List<PatternShiftChord> chords, int keyCount, Random rng)
         {
             double[] lastColumnTime = new double[keyCount];
+            var placedNotes = new List<PatternShiftNote>();
 
             for (int i = 0; i < keyCount; i++)
                 lastColumnTime[i] = -1000;
@@ -315,15 +288,30 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             foreach (var chord in chords)
             {
                 chord.Notes = chord.Notes.OrderBy(n => n.SourceColumn).ToList();
+                var usedColumns = new HashSet<int>();
+                var assigned = new List<PatternShiftNote>();
 
                 foreach (var note in chord.Notes)
                 {
                     int column = chooseColumn(keyCount, lastColumnTime, lastNote, rng, note.StartTime);
+                    if (column < 0)
+                        continue;
+
+                    if (usedColumns.Contains(column))
+                        continue;
+
+                    if (hasAssignedNoteAtTime(placedNotes, column, note.StartTime))
+                        continue;
 
                     note.AssignedColumn = column;
                     lastNote = column;
                     lastColumnTime[column] = note.IsHold ? note.EndTime : note.StartTime;
+                    usedColumns.Add(column);
+                    assigned.Add(note);
+                    placedNotes.Add(note);
                 }
+
+                chord.Notes = assigned;
             }
         }
 
@@ -338,10 +326,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             if (candidates.Count == 0)
-            {
-                for (int i = 0; i < keys; i++)
-                    candidates.Add(i);
-            }
+                return -1;
 
             double minTime = double.MaxValue;
             var minIndexList = new List<int>();
@@ -371,7 +356,22 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 minIndexList = minIndexList.Where(i => lastOnLeft ? i >= ((keys + 1) / 2) : i < (keys / 2)).ToList();
             }
 
-            return minIndexList[rng.Next(minIndexList.Count)];
+            return minIndexList.Count > 0 ? minIndexList[rng.Next(minIndexList.Count)] : -1;
+        }
+
+        private static bool hasAssignedNoteAtTime(List<PatternShiftNote> notes, int column, double time, double tolerance = 0.5)
+        {
+            for (int i = 0; i < notes.Count; i++)
+            {
+                var note = notes[i];
+                if (note.AssignedColumn != column)
+                    continue;
+
+                if (!note.IsHold && Math.Abs(note.StartTime - time) <= tolerance)
+                    return true;
+            }
+
+            return false;
         }
 
         private class PatternShiftNote

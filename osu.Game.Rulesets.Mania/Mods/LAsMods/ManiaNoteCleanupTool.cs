@@ -19,6 +19,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             double gap = minGapMs ?? getDefaultMinimumGapMs(beatmap);
 
+            // 1) Resolve column conflicts first (hold-aware).
             if (beatmap.TotalColumns > 0)
             {
                 int usedSeed = seed ?? KrrConversionHelper.ComputeSeedFromBeatmap(beatmap);
@@ -28,11 +29,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 beatmap.HitObjects.AddRange(resolved);
             }
 
+            // 2) Remove overlaps and reduce density.
             CleanOverlaps(beatmap);
             SimplifyDenseNotes(beatmap, maxNotesPerWindow, windowQuarterBeats);
+
+            // 3) Enforce minimum gaps between objects in the same column.
             if (gap > 0)
                 EnforceMinimumGaps(beatmap, gap);
 
+            // 4) Enforce hold-release gap and convert too-short holds to notes.
             EnforceHoldReleaseGap(beatmap, 1.0 / 8.0);
         }
 
@@ -155,6 +160,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                         continue;
 
                     double newEnd = next.StartTime - minGapMs;
+
                     if (newEnd <= hold.StartTime)
                     {
                         var note = new Note { StartTime = hold.StartTime, Column = hold.Column, Samples = hold.Samples.ToList() };
