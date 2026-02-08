@@ -42,7 +42,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private Column column { get; set; } = null!;
 
-
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
 
@@ -55,10 +54,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo, IEzSkinInfo ezSkinInfo)
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             InternalChild = directionContainer = new Container
             {
+                Anchor = Anchor.BottomCentre,
+                Origin = Anchor.BottomCentre,
                 RelativeSizeAxes = Axes.X,
                 Children = new Drawable[]
                 {
@@ -168,24 +169,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 box?.FadeTo(1, fadeTime)
                    .Then()
                    .FadeTo(0, fadeTime);
-            }
-        }
-
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
-        {
-            switch (direction.NewValue)
-            {
-                case ScrollingDirection.Up:
-                    directionContainer.Scale = new Vector2(1, -1);
-                    directionContainer.Anchor = Anchor.TopCentre;
-                    directionContainer.Origin = Anchor.BottomCentre;
-                    break;
-
-                case ScrollingDirection.Down:
-                    directionContainer.Scale = new Vector2(1, 1);
-                    directionContainer.Anchor = Anchor.BottomCentre;
-                    directionContainer.Origin = Anchor.BottomCentre;
-                    break;
             }
         }
 
