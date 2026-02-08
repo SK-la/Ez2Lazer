@@ -32,6 +32,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             SimplifyDenseNotes(beatmap, maxNotesPerWindow, windowQuarterBeats);
             if (gap > 0)
                 EnforceMinimumGaps(beatmap, gap);
+
+            EnforceHoldReleaseGap(beatmap, 1.0 / 8.0);
         }
 
         public static void CleanOverlaps(ManiaBeatmap beatmap)
@@ -114,6 +116,57 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var cleaned = KrrConversionHelper.EnforceMinimumGaps(beatmap.HitObjects.ToList(), beatmap.TotalColumns, minGapMs);
             beatmap.HitObjects.Clear();
             beatmap.HitObjects.AddRange(cleaned);
+        }
+
+        public static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, double minGapBeats)
+        {
+            if (beatmap.HitObjects.Count == 0 || minGapBeats <= 0)
+                return;
+
+            var groups = beatmap.HitObjects.GroupBy(o => o.Column).ToList();
+
+            foreach (var group in groups)
+            {
+                var list = group.OrderBy(o => o.StartTime).ToList();
+
+                for (int i = 0; i < list.Count - 1; i++)
+                {
+                    if (list[i] is not HoldNote hold)
+                        continue;
+
+                    double holdBeatLength = beatmap.ControlPointInfo.TimingPointAt(hold.StartTime).BeatLength;
+                    double minHoldMs = holdBeatLength * minGapBeats;
+
+                    if (hold.EndTime - hold.StartTime < minHoldMs)
+                    {
+                        var note = new Note { StartTime = hold.StartTime, Column = hold.Column, Samples = hold.Samples.ToList() };
+                        beatmap.HitObjects.Remove(hold);
+                        beatmap.HitObjects.Add(note);
+                        list[i] = note;
+                        continue;
+                    }
+
+                    var next = list[i + 1];
+                    double beatLength = beatmap.ControlPointInfo.TimingPointAt(hold.EndTime).BeatLength;
+                    double minGapMs = beatLength * minGapBeats;
+                    double gap = next.StartTime - hold.EndTime;
+
+                    if (gap >= minGapMs)
+                        continue;
+
+                    double newEnd = next.StartTime - minGapMs;
+                    if (newEnd <= hold.StartTime)
+                    {
+                        var note = new Note { StartTime = hold.StartTime, Column = hold.Column, Samples = hold.Samples.ToList() };
+                        beatmap.HitObjects.Remove(hold);
+                        beatmap.HitObjects.Add(note);
+                        list[i] = note;
+                        continue;
+                    }
+
+                    hold.EndTime = newEnd;
+                }
+            }
         }
 
         private static double getDefaultMinimumGapMs(ManiaBeatmap beatmap)

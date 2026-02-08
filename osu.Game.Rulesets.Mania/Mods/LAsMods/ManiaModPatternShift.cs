@@ -188,6 +188,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             maniaBeatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToList();
+            ManiaNoteCleanupTool.EnforceHoldReleaseGap(maniaBeatmap, 1.0 / 8.0);
         }
 
         private static List<PatternShiftChord> buildChords(List<PatternShiftNote> notes)
@@ -317,31 +318,47 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                 foreach (var note in chord.Notes)
                 {
-                    int column = chooseColumn(keyCount, lastColumnTime, lastNote, rng);
+                    int column = chooseColumn(keyCount, lastColumnTime, lastNote, rng, note.StartTime);
 
                     note.AssignedColumn = column;
                     lastNote = column;
-                    lastColumnTime[column] = chord.Time;
+                    lastColumnTime[column] = note.IsHold ? note.EndTime : note.StartTime;
                 }
             }
         }
 
-        private static int chooseColumn(int keys, double[] lastUsedTime, int lastNote, Random rng)
+        private static int chooseColumn(int keys, double[] lastUsedTime, int lastNote, Random rng, double currentTime)
         {
-            double minTime = lastUsedTime[0] + 1;
-            var minIndexList = new List<int>();
+            var candidates = new List<int>();
 
             for (int i = 0; i < keys; i++)
             {
-                if (lastUsedTime[i] < minTime)
+                if (lastUsedTime[i] <= currentTime)
+                    candidates.Add(i);
+            }
+
+            if (candidates.Count == 0)
+            {
+                for (int i = 0; i < keys; i++)
+                    candidates.Add(i);
+            }
+
+            double minTime = double.MaxValue;
+            var minIndexList = new List<int>();
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                int index = candidates[i];
+
+                if (lastUsedTime[index] < minTime)
                 {
                     minIndexList.Clear();
-                    minTime = lastUsedTime[i];
-                    minIndexList.Add(i);
+                    minTime = lastUsedTime[index];
+                    minIndexList.Add(index);
                 }
-                else if (lastUsedTime[i] <= minTime + 24 && lastUsedTime[i] >= minTime - 24)
+                else if (lastUsedTime[index] <= minTime + 24 && lastUsedTime[index] >= minTime - 24)
                 {
-                    minIndexList.Add(i);
+                    minIndexList.Add(index);
                 }
             }
 
