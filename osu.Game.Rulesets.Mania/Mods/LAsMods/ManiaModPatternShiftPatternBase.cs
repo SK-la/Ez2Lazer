@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
     public abstract class ManiaModPatternShiftPatternBase : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
     {
-        protected const double TIME_TOLERANCE = 10.0;
+        protected const double TIME_TOLERANCE = 3;
 
         protected abstract KeyPatternType PatternType { get; }
         protected abstract string PatternName { get; }

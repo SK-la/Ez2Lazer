@@ -10,27 +10,6 @@ using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public enum KeyPatternType
-    {
-        // 切
-        Cut,
-
-        // 叉
-        Cross,
-
-        // 高分偏移
-        Delay,
-
-        // 楼梯
-        Dump,
-
-        // 叠
-        Jack,
-
-        // 拍
-        Jump,
-    }
-
     public class KeyPatternSettings
     {
         public int MinK { get; set; } = 1;
@@ -40,6 +19,32 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
     public static class ManiaKeyPatternHelp
     {
+        internal readonly struct WindowContext
+        {
+            public readonly double BeatLength;
+            public readonly double WindowStart;
+            public readonly double WindowEnd;
+            public readonly double WindowDuration;
+            public readonly double StepDuration;
+            public readonly int StartIndex;
+            public readonly int EndIndex;
+            public readonly int TotalColumns;
+            public readonly double Tolerance;
+
+            public WindowContext(double beatLength, double windowStart, double windowDuration, double stepDuration, int startIndex, int endIndex, int totalColumns, double tolerance)
+            {
+                BeatLength = beatLength;
+                WindowStart = windowStart;
+                WindowDuration = windowDuration;
+                WindowEnd = windowStart + windowDuration;
+                StepDuration = stepDuration;
+                StartIndex = startIndex;
+                EndIndex = endIndex;
+                TotalColumns = totalColumns;
+                Tolerance = tolerance;
+            }
+        }
+
         private static readonly double[] even_beat_fractions =
         {
             1.0, 1.0 / 2, 1.0 / 4, 1.0 / 8, 1.0 / 12, 1.0 / 16, 1.0 / 24, 1.0 / 32
@@ -51,7 +56,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         };
 
         // Pools to reduce per-window allocations
-        private static readonly Stack<List<ManiaHitObject>> windowObjectsPool = new Stack<List<ManiaHitObject>>(16);
+        private static readonly Stack<List<ManiaHitObject>> window_objects_pool = new Stack<List<ManiaHitObject>>(16);
 
         public static void ProcessRollingWindow(ManiaBeatmap beatmap,
                                                 KeyPatternType patternType,
@@ -106,22 +111,25 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                 long skipWindowIndex = windowDuration > 0 ? (long)Math.Floor(currentTime / windowDuration) : (long)Math.Floor(currentTime);
 
+                var ctx = new WindowContext(beatLength, currentTime, windowDuration, stepDuration, startIndex, endIndex, beatmap.TotalColumns, 5.0);
+
                 if (!skipCache.TryGetValue(skipWindowIndex, out bool skip))
                 {
-                    skip = shouldSkipDenseWindow(patternType, objects, currentTime, windowDuration, beatLength, beatmap.TotalColumns);
+                    skip = shouldSkipDenseWindow(patternType, objects, ctx);
                     skipCache[skipWindowIndex] = skip;
                 }
 
-                if (!skip && windowCount > 0 && (skipWindowIndex % processIntervalSafe) == processOffsetSafe)
+                if (!skip && windowCount > 0 && skipWindowIndex % processIntervalSafe == processOffsetSafe)
                 {
                     var windowObjects = buildWindowObjects(objects, startIndex, endIndex);
+
                     try
                     {
                         int windowSeed = unchecked(seed.Value * 397) ^ (int)Math.Round(currentTime);
                         var rng = new Random(windowSeed);
                         var patternSettings = settings ?? new KeyPatternSettings();
 
-                        if (!shouldSkipDenseWindow(patternType, objects, currentTime, windowDuration, beatLength, beatmap.TotalColumns))
+                        if (!shouldSkipDenseWindow(patternType, objects, ctx))
                             applyPattern(windowObjects, beatmap, currentTime, windowEnd, patternSettings, rng, 1);
                     }
                     finally
@@ -192,13 +200,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 // 按窗口索引缓存，避免整拍级别缓存造成误跳过
                 long skipWindowIndex = windowDuration > 0 ? (long)Math.Floor(currentTime / windowDuration) : (long)Math.Floor(currentTime);
 
+                var ctx = new WindowContext(beatLength, currentTime, windowDuration, stepDuration, startIndex, endIndex, beatmap.TotalColumns, 5.0);
+
                 if (!skipCache.TryGetValue(skipWindowIndex, out bool skip))
                 {
-                    skip = shouldSkipDenseWindow(patternType, objects, currentTime, windowDuration, beatLength, beatmap.TotalColumns);
+                    skip = shouldSkipDenseWindow(patternType, objects, ctx);
                     skipCache[skipWindowIndex] = skip;
                 }
 
-                if (!skip && windowCount > 0 && (skipWindowIndex % processIntervalSafe) == processOffsetSafe)
+                if (!skip && windowCount > 0 && skipWindowIndex % processIntervalSafe == processOffsetSafe)
                 {
                     int oscillationBeatsSafe = Math.Max(1, oscillationBeats);
                     long beatIndex = beatLength > 0 ? (long)Math.Round(currentTime / beatLength) : (long)Math.Round(currentTime);
@@ -209,9 +219,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     int windowSeed = unchecked(seed * 397) ^ (int)Math.Round(currentTime);
                     var rng = new Random(windowSeed);
                     var windowObjects = buildWindowObjects(objects, startIndex, endIndex);
+
                     try
                     {
-                        if (!shouldSkipDenseWindow(patternType, objects, currentTime, windowDuration, beatLength, beatmap.TotalColumns))
+                        if (!shouldSkipDenseWindow(patternType, objects, ctx))
                         {
                             bool useLevelFallback = patternType == KeyPatternType.Jack
                                                     || patternType == KeyPatternType.Jump
@@ -267,95 +278,87 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         private static bool shouldSkipDenseWindow(KeyPatternType patternType,
                                                   List<ManiaHitObject> objects,
-                                                  double windowStart,
-                                                  double windowDuration,
-                                                  double beatLength,
-                                                  int totalColumns)
+                                                  WindowContext ctx)
         {
             if (patternType == KeyPatternType.Delay || patternType == KeyPatternType.Dump)
                 return false;
-
-            if (objects.Count == 0 || beatLength <= 0)
+            if (objects.Count == 0 || ctx.BeatLength <= 0)
                 return false;
-
-            const double tolerance = 5.0; // ms
 
             bool isOnDivisionLocal(double time, int divisor)
             {
                 if (divisor <= 0)
                     return false;
 
-                double interval = beatLength / divisor;
+                double interval = ctx.BeatLength / divisor;
                 if (interval <= 0)
                     return false;
 
                 double mod = time % interval;
-                return mod <= tolerance || Math.Abs(interval - mod) <= tolerance;
+                return mod <= ctx.Tolerance || Math.Abs(interval - mod) <= ctx.Tolerance;
             }
 
-            bool isOn1To4(double time)
-            {
-                return isOnDivisionLocal(time, 1)
-                       || isOnDivisionLocal(time, 2)
-                       || isOnDivisionLocal(time, 3)
-                       || isOnDivisionLocal(time, 4);
-            }
+            bool isOn1To4(double time) => isOnDivisionLocal(time, 1)
+                                          || isOnDivisionLocal(time, 2)
+                                          || isOnDivisionLocal(time, 3)
+                                          || isOnDivisionLocal(time, 4);
 
-            bool isQuarterOrFiner(double time)
-            {
-                return isOnDivisionLocal(time, 4) || !isOn1To4(time);
-            }
+            bool isQuarterOrFiner(double time) => isOnDivisionLocal(time, 4) || !isOn1To4(time);
 
             // 半窗口内：1/4 以上（不含 1/4）的 note 数量 >= 2 => 跳过
-            if (windowDuration > 0)
+            // 检查前后两半拍：任意一半满足条件即跳过
+            if (ctx.WindowDuration > 0)
             {
-                double halfWindowEnd = windowStart + (windowDuration / 2.0);
+                double halfWindowMid = ctx.WindowStart + ctx.WindowDuration / 2.0;
+                double halfStarts = ctx.WindowStart;
+                double halfEnds = halfWindowMid;
+                double secondHalfStarts = halfWindowMid;
+                double secondHalfEnds = ctx.WindowStart + ctx.WindowDuration;
 
-                if (halfWindowEnd > windowStart)
+                bool checkHalf(double halfStart, double halfEnd)
                 {
-                    int halfIndex = lowerBoundByTime(objects, windowStart);
-                    int fineCount = 0;
+                    if (!(halfEnd > halfStart))
+                        return false;
 
-                    for (int i = halfIndex; i < objects.Count; i++)
+                    int halfIndexLocal = lowerBoundByTime(objects, halfStart);
+
+                    int fineCountLocal = 0;
+
+                    for (int i = halfIndexLocal; i < objects.Count; i++)
                     {
                         var obj = objects[i];
-                        if (obj.StartTime >= halfWindowEnd)
+                        if (obj.StartTime >= halfEnd)
                             break;
 
                         if (!isOn1To4(obj.StartTime))
                         {
-                            fineCount++;
-                            if (fineCount >= 2)
+                            fineCountLocal++;
+                            if (fineCountLocal >= 2)
                                 return true;
                         }
                     }
 
-                    // 半窗口内：检查是否存在 >=3 个 note 且列位置单调（滑梯）
-                    // 这里包含所有节拍细分（包括 1/1,1/2,1/3,1/4 等），
-                    // 按时间顺序构建每个时间点的列集合；同一时间点若存在多个不同列视为不确定并重置单调判断。
                     var halfGroups = new List<(double time, List<int> cols)>();
 
-                    for (int i = halfIndex; i < objects.Count; i++)
+                    for (int i = halfIndexLocal; i < objects.Count; i++)
                     {
                         var obj = objects[i];
-                        if (obj.StartTime >= halfWindowEnd)
+                        if (obj.StartTime >= halfEnd)
                             break;
 
-                        if (halfGroups.Count == 0 || Math.Abs(halfGroups[^1].time - obj.StartTime) > tolerance)
+                        if (halfGroups.Count == 0 || Math.Abs(halfGroups[^1].time - obj.StartTime) > ctx.Tolerance)
                         {
                             var cols = new List<int> { obj.Column };
                             halfGroups.Add((obj.StartTime, cols));
                         }
                         else
-                        {
                             halfGroups[^1].cols.Add(obj.Column);
-                        }
                     }
 
                     if (halfGroups.Count >= 3)
                     {
-                        // 构建按时间排序的列序列；若同一时间点有多个不同列，标记为不确定（使用 int.MinValue）
                         var seq = new List<int>(halfGroups.Count);
+
                         foreach (var g in halfGroups)
                         {
                             var distinct = g.cols.Distinct().ToList();
@@ -367,41 +370,44 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                         int incRun = 1;
                         int decRun = 1;
-                        int prev = seq[0];
+                        int prevLocal = seq[0];
 
                         for (int i = 1; i < seq.Count; i++)
                         {
                             int cur = seq[i];
-                            if (cur == int.MinValue || prev == int.MinValue)
+
+                            if (cur == int.MinValue || prevLocal == int.MinValue)
                             {
-                                // 不确定点：重置计数器并继续
                                 incRun = decRun = 1;
-                                prev = cur;
+                                prevLocal = cur;
                                 continue;
                             }
 
-                            if (cur > prev)
+                            if (cur > prevLocal)
                             {
                                 incRun++;
                                 decRun = 1;
                             }
-                            else if (cur < prev)
+                            else if (cur < prevLocal)
                             {
                                 decRun++;
                                 incRun = 1;
                             }
                             else
-                            {
                                 incRun = decRun = 1;
-                            }
 
                             if (incRun >= 3 || decRun >= 3)
                                 return true;
 
-                            prev = cur;
+                            prevLocal = cur;
                         }
                     }
+
+                    return false;
                 }
+
+                if (checkHalf(halfStarts, halfEnds) || checkHalf(secondHalfStarts, secondHalfEnds))
+                    return true;
             }
 
             // Jack/Jump/Cut/Cross: 窗口内出现 1/4 及以上（含 1/4）单调变化则跳过
@@ -411,8 +417,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 || patternType == KeyPatternType.Cross)
             {
                 var grouped = new List<(double time, double avgCol)>();
-                int monoIndex = lowerBoundByTime(objects, windowStart);
-                double windowEndLocal = windowDuration > 0 ? windowStart + windowDuration : windowStart + beatLength;
+                int monoIndex = lowerBoundByTime(objects, ctx.WindowStart);
+                double windowEndLocal = ctx.WindowDuration > 0 ? ctx.WindowStart + ctx.WindowDuration : ctx.WindowStart + ctx.BeatLength;
 
                 for (int i = monoIndex; i < objects.Count; i++)
                 {
@@ -423,7 +429,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     if (!isQuarterOrFiner(obj.StartTime))
                         continue;
 
-                    if (grouped.Count == 0 || Math.Abs(grouped[^1].time - obj.StartTime) > tolerance)
+                    if (grouped.Count == 0 || Math.Abs(grouped[^1].time - obj.StartTime) > ctx.Tolerance)
                         grouped.Add((obj.StartTime, obj.Column));
                     else
                     {
@@ -555,8 +561,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 return mod <= tolerance || Math.Abs(interval - mod) <= tolerance;
             }
 
-            const int max_fine_divisor = 64;
-
             for (int start = 0; start + 1 < windowObjects.Count; start++)
             {
                 double anchorTime = windowObjects[start].StartTime;
@@ -575,7 +579,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                     int countQuarter = 0;
                     int countOther = 0;
-                    int mixedThreshold = Math.Max(1, totalColumns / 4);
+                    int mixedThreshold = Math.Max(2, totalColumns / 3);
 
                     for (int i = start + 1; i < end; i++)
                     {
@@ -609,7 +613,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             while (left < right)
             {
-                int mid = left + ((right - left) / 2);
+                int mid = left + (right - left) / 2;
                 if (objects[mid].StartTime < time)
                     left = mid + 1;
                 else
@@ -650,17 +654,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             int count = Math.Max(0, endIndex - startIndex);
             List<ManiaHitObject> windowObjects;
 
-            if (windowObjectsPool.Count > 0)
+            if (window_objects_pool.Count > 0)
             {
-                windowObjects = windowObjectsPool.Pop();
+                windowObjects = window_objects_pool.Pop();
                 windowObjects.Clear();
                 if (windowObjects.Capacity < count)
                     windowObjects.Capacity = count;
             }
             else
-            {
                 windowObjects = new List<ManiaHitObject>(count);
-            }
 
             for (int i = startIndex; i < endIndex; i++)
                 windowObjects.Add(objects[i]);
@@ -674,10 +676,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 return;
 
             // keep pool bounded to avoid unbounded memory usage
-            if (windowObjectsPool.Count < 64)
+            if (window_objects_pool.Count < 64)
             {
                 list.Clear();
-                windowObjectsPool.Push(list);
+                window_objects_pool.Push(list);
             }
         }
 
@@ -847,7 +849,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             foreach (var pair in counts)
             {
-                if (pair.Value > bestCount || (pair.Value == bestCount && pair.Key > bestFraction))
+                if (pair.Value > bestCount || pair.Value == bestCount && pair.Key > bestFraction)
                 {
                     bestCount = pair.Value;
                     bestFraction = pair.Key;
@@ -880,15 +882,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             const double eps = 1e-6;
 
-            if (Math.Abs(activeFraction - (1.0 / 3.0)) < eps)
+            if (Math.Abs(activeFraction - 1.0 / 3.0) < eps)
             {
                 baseFraction = 1.0 / 3.0;
                 return true;
             }
 
             if (Math.Abs(activeFraction - 1.0) < eps
-                || Math.Abs(activeFraction - (1.0 / 2.0)) < eps
-                || Math.Abs(activeFraction - (1.0 / 4.0)) < eps)
+                || Math.Abs(activeFraction - 1.0 / 2.0) < eps
+                || Math.Abs(activeFraction - 1.0 / 4.0) < eps)
             {
                 baseFraction = 1.0 / 4.0;
                 return true;
@@ -1060,6 +1062,50 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return true;
         }
 
+        /// <summary>
+        /// 在给定的 quarter 时间点及其前后 quarter 时间范围内，寻找最接近原列且在这三个时间点上均无冲突的列。
+        /// 返回找到的列索引，找不到则返回 null。
+        /// </summary>
+        internal static int? FindNearestAvailableColumnForQuarter(ManiaBeatmap beatmap,
+                                                                  int originalCol,
+                                                                  double qTime,
+                                                                  double prevTime,
+                                                                  double nextTime,
+                                                                  int totalColumns,
+                                                                  double tolerance)
+        {
+            if (totalColumns <= 0)
+                return null;
+
+            int chosen = -1;
+            int bestOffset = int.MaxValue;
+
+            for (int col = 0; col < totalColumns; col++)
+            {
+                if (HasNoteAtTime(beatmap, col, qTime, null, tolerance))
+                    continue;
+
+                if (IsHoldOccupyingColumn(beatmap, col, qTime, null, tolerance))
+                    continue;
+
+                bool pv = HasNoteAtTime(beatmap, col, prevTime, null, tolerance);
+                bool nx = HasNoteAtTime(beatmap, col, nextTime, null, tolerance);
+
+                if (!pv && !nx)
+                {
+                    int offsetCol = Math.Abs(col - originalCol);
+
+                    if (offsetCol < bestOffset)
+                    {
+                        bestOffset = offsetCol;
+                        chosen = col;
+                    }
+                }
+            }
+
+            return chosen >= 0 ? chosen : null;
+        }
+
         internal static bool IsHoldOccupyingColumn(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
         {
             foreach (var obj in beatmap.HitObjects)
@@ -1105,7 +1151,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (count % 2 == 1)
                 return ordered[count / 2];
 
-            return (ordered[(count / 2) - 1] + ordered[count / 2]) / 2.0;
+            return (ordered[count / 2 - 1] + ordered[count / 2]) / 2.0;
         }
 
         internal static double GetMedianFromList(IReadOnlyList<int> values)
@@ -1119,7 +1165,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (count % 2 == 1)
                 return ordered[count / 2];
 
-            return (ordered[(count / 2) - 1] + ordered[count / 2]) / 2.0;
+            return (ordered[count / 2 - 1] + ordered[count / 2]) / 2.0;
         }
 
         internal static int PickWeightedIndex(IReadOnlyList<double> weights, Random rng)

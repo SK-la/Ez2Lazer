@@ -139,6 +139,26 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             double windowStart = windowObjects.Count > 0 ? windowObjects[0].StartTime : time;
             double windowEnd = windowObjects.Count > 0 ? windowObjects[^1].StartTime : time;
 
+            // 对于已经位于 1/4 网格的 note：若其前后 quarter 时间在该列存在 note，则尝试横向移动到最近的无冲突列。
+
+            foreach (var obj in windowObjects)
+            {
+                // 只处理位于 1/4 网格的 note（在本函数里 windowObjects 都是粗网格）
+                double qTime = Math.Round(obj.StartTime / quarter) * quarter;
+                double prevTime = qTime - quarter;
+                double nextTime = qTime + quarter;
+
+                bool conflictPrev = ManiaKeyPatternHelp.HasNoteAtTime(beatmap, obj.Column, prevTime, null, TIME_TOLERANCE);
+                bool conflictNext = ManiaKeyPatternHelp.HasNoteAtTime(beatmap, obj.Column, nextTime, null, TIME_TOLERANCE);
+
+                if (!conflictPrev && !conflictNext)
+                    continue;
+
+                int? chosen = ManiaKeyPatternHelp.FindNearestAvailableColumnForQuarter(beatmap, obj.Column, qTime, prevTime, nextTime, totalColumns, TIME_TOLERANCE);
+                if (chosen.HasValue)
+                    obj.Column = chosen.Value;
+            }
+
             double? chosenCandidate = null;
             int[] tries = { 0, -1, 1, -2, 2 };
 
