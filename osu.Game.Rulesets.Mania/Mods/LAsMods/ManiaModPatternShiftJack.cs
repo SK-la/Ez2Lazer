@@ -134,8 +134,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     break;
 
                 double t = timePoints[i];
-                applyJackWithFallbackAtTime(windowObjects, beatmap, t, quarter, level, rng, TIME_TOLERANCE);
-                processed++;
+                if (applyJackWithFallbackAtTime(windowObjects, beatmap, t, quarter, level, rng, TIME_TOLERANCE))
+                    processed++;
             }
 
             // 恢复原始时间（新增的 note 不在 originalTimes 中，因此不会影响新添加的 note）。

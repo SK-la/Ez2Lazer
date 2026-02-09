@@ -74,19 +74,19 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource("Window Interval", "Process every N windows. 1=every window.")]
+        [SettingSource("Window Interval", "Process every N half-beats. 1=every half-beat.")]
         public BindableNumber<int> WindowInterval { get; } = new BindableInt(2)
         {
             MinValue = 1,
-            MaxValue = 8,
+            MaxValue = 4,
             Precision = 1
         };
 
-        [SettingSource("Window Start Offset", "0-3: first to fourth window.")]
+        [SettingSource("Window Start Offset", "1-4: first to fourth half-beat.")]
         public BindableNumber<int> WindowStartOffset { get; } = new BindableInt(1)
         {
-            MinValue = 0,
-            MaxValue = 3,
+            MinValue = 1,
+            MaxValue = 4,
             Precision = 1
         };
 
@@ -115,8 +115,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        protected virtual int WindowProcessInterval => Math.Max(1, WindowInterval.Value);
-        protected virtual int WindowProcessOffset => Math.Clamp(WindowStartOffset.Value, 0, 3);
+        protected virtual int WindowProcessInterval => Math.Clamp(WindowInterval.Value, 1, 4);
+        protected virtual int WindowProcessOffset => Math.Clamp(WindowStartOffset.Value - 1, 0, WindowProcessInterval - 1);
         protected virtual int MaxIterationsPerWindow => 1;
 
         protected ManiaModPatternShiftPatternBase()

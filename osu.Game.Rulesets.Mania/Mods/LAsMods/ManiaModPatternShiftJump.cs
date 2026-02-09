@@ -52,14 +52,136 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             int minK = Math.Max(0, settings.MinK);
             int maxK = Math.Max(minK, settings.MaxK);
 
-            remapFineNotes(windowObjects, beatmap, beatLength);
-
-            double targetTime = getJumpTargetTime(windowObjects, t, beatLength);
-            applyJumpPattern(beatmap, targetTime, minK, maxK, rng);
+            relocateNotesToHalfOrBeat(windowObjects, beatmap, beatLength, windowStart, windowEnd, rng);
+            applyJumpPattern(beatmap, t, beatLength, windowStart, windowEnd, minK, maxK, rng);
         }
 
-        private static void applyJumpPattern(ManiaBeatmap beatmap, double time, int minK, int maxK, Random rng)
+        private static void relocateNotesToHalfOrBeat(List<ManiaHitObject> windowObjects,
+                                                      ManiaBeatmap beatmap,
+                                                      double beatLength,
+                                                      double windowStart,
+                                                      double windowEnd,
+                                                      Random rng)
         {
+            if (beatLength <= 0)
+                return;
+
+            bool isOnDivisionLocal(double t, int divisor)
+            {
+                if (divisor <= 0 || beatLength <= 0)
+                    return false;
+
+                double interval = beatLength / divisor;
+                double mod = t % interval;
+                return mod <= TIME_TOLERANCE || Math.Abs(interval - mod) <= TIME_TOLERANCE;
+            }
+
+            bool isOnHalfOrBeat(double t) => isOnDivisionLocal(t, 1) || isOnDivisionLocal(t, 2);
+
+            bool isFinerThanQuarter(double t)
+            {
+                bool on1to4 = isOnDivisionLocal(t, 1)
+                               || isOnDivisionLocal(t, 2)
+                               || isOnDivisionLocal(t, 3)
+                               || isOnDivisionLocal(t, 4);
+                return !on1to4;
+            }
+
+            double getBeatAnchor(double t)
+            {
+                double anchor = Math.Floor(t / beatLength) * beatLength;
+                return anchor < 0 ? 0 : anchor;
+            }
+
+            int countAtTime(double time)
+            {
+                var cols = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, time, TIME_TOLERANCE);
+                return cols.Count;
+            }
+
+            foreach (var obj in windowObjects)
+            {
+                if (isOnHalfOrBeat(obj.StartTime))
+                    continue;
+
+                double anchor = getBeatAnchor(obj.StartTime);
+                double half = anchor + (beatLength / 2.0);
+
+                if (anchor < windowStart - TIME_TOLERANCE || anchor > windowEnd + TIME_TOLERANCE)
+                    continue;
+
+                if (half < windowStart - TIME_TOLERANCE || half > windowEnd + TIME_TOLERANCE)
+                    continue;
+
+                double primary = anchor;
+                double secondary = half;
+
+                if (isFinerThanQuarter(obj.StartTime))
+                {
+                    int countAnchor = countAtTime(anchor);
+                    int countHalf = countAtTime(half);
+
+                    if (countHalf < countAnchor)
+                    {
+                        primary = half;
+                        secondary = anchor;
+                    }
+                    else if (countHalf == countAnchor)
+                    {
+                        double dAnchor = Math.Abs(obj.StartTime - anchor);
+                        double dHalf = Math.Abs(obj.StartTime - half);
+
+                        if (dHalf < dAnchor)
+                        {
+                            primary = half;
+                            secondary = anchor;
+                        }
+                    }
+                }
+                else
+                {
+                    double dAnchor = Math.Abs(obj.StartTime - anchor);
+                    double dHalf = Math.Abs(obj.StartTime - half);
+
+                    if (dHalf < dAnchor)
+                    {
+                        primary = half;
+                        secondary = anchor;
+                    }
+                }
+
+                if (Math.Abs(obj.StartTime - primary) <= TIME_TOLERANCE)
+                    continue;
+
+                double offset = primary - obj.StartTime;
+
+                if (!ManiaKeyPatternHelp.TryApplyDelayOffset(beatmap, obj, offset, out _))
+                {
+                    double secondaryOffset = secondary - obj.StartTime;
+                    ManiaKeyPatternHelp.TryApplyDelayOffset(beatmap, obj, secondaryOffset, out _);
+                }
+            }
+        }
+
+        private static void applyJumpPattern(ManiaBeatmap beatmap,
+                                             double time,
+                                             double beatLength,
+                                             double windowStart,
+                                             double windowEnd,
+                                             int minK,
+                                             int maxK,
+                                             Random rng)
+        {
+            if (beatLength <= 0)
+                return;
+
+            double anchor = Math.Floor(time / beatLength) * beatLength;
+            double half = anchor + (beatLength / 2.0);
+
+            double candidateTime = Math.Abs(time - half) < Math.Abs(time - anchor) ? half : anchor;
+            if (candidateTime < windowStart - TIME_TOLERANCE || candidateTime > windowEnd + TIME_TOLERANCE)
+                return;
+
             int totalColumns = Math.Max(1, beatmap.TotalColumns);
             var columns = new List<int>(totalColumns);
 
@@ -70,105 +192,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             count = Math.Clamp(count, 0, columns.Count);
 
             for (int i = 0; i < count; i++)
-                ManiaKeyPatternHelp.TryAddNoteFromCandidates(beatmap, columns, null, rng, time);
-        }
-
-        private static void remapFineNotes(List<ManiaHitObject> windowObjects, ManiaBeatmap beatmap, double beatLength)
-        {
-            if (beatLength <= 0)
-                return;
-
-            bool isOnDivisionLocal(double t, int divisor)
-            {
-                if (divisor <= 0)
-                    return false;
-
-                double interval = beatLength / divisor;
-                double mod = t % interval;
-                return mod <= TIME_TOLERANCE || Math.Abs(interval - mod) <= TIME_TOLERANCE;
-            }
-
-            foreach (var obj in windowObjects)
-            {
-                if (obj is not Note note)
-                    continue;
-
-                bool isOn1To4 = isOnDivisionLocal(note.StartTime, 1)
-                                || isOnDivisionLocal(note.StartTime, 2)
-                                || isOnDivisionLocal(note.StartTime, 3)
-                                || isOnDivisionLocal(note.StartTime, 4);
-
-                if (isOn1To4)
-                    continue;
-
-                double beatStart = Math.Floor(note.StartTime / beatLength) * beatLength;
-                if (beatStart < 0)
-                    beatStart = 0;
-
-                double half = beatStart + (beatLength / 2.0);
-                double beatEnd = beatStart + beatLength;
-
-                int leftCount = 0;
-                int rightCount = 0;
-
-                foreach (var other in windowObjects)
-                {
-                    if (other.StartTime < beatStart - TIME_TOLERANCE || other.StartTime > beatEnd + TIME_TOLERANCE)
-                        continue;
-
-                    if (other.StartTime < half - TIME_TOLERANCE)
-                        leftCount++;
-                    else
-                        rightCount++;
-                }
-
-                double primaryTarget = leftCount <= rightCount ? beatStart : half;
-                double secondaryTarget = leftCount <= rightCount ? half : beatStart;
-
-                if (!tryMoveNoteToTime(beatmap, note, primaryTarget))
-                    tryMoveNoteToTime(beatmap, note, secondaryTarget);
-            }
-        }
-
-        private static bool tryMoveNoteToTime(ManiaBeatmap beatmap, Note note, double targetTime)
-        {
-            if (ManiaKeyPatternHelp.HasNoteAtTime(beatmap, note.Column, targetTime, note, TIME_TOLERANCE))
-                return false;
-
-            if (ManiaKeyPatternHelp.IsHoldOccupyingColumn(beatmap, note.Column, targetTime, note, TIME_TOLERANCE))
-                return false;
-
-            note.StartTime = targetTime;
-            return true;
-        }
-
-        private static double getJumpTargetTime(List<ManiaHitObject> windowObjects, double time, double beatLength)
-        {
-            if (beatLength <= 0)
-                return time;
-
-            double beatStart = Math.Floor(time / beatLength) * beatLength;
-            if (beatStart < 0)
-                beatStart = 0;
-
-            double half = beatStart + (beatLength / 2.0);
-            double beatEnd = beatStart + beatLength;
-
-            int leftCount = 0;
-            int rightCount = 0;
-
-            foreach (var obj in windowObjects)
-            {
-                if (obj.StartTime < beatStart - TIME_TOLERANCE || obj.StartTime > beatEnd + TIME_TOLERANCE)
-                    continue;
-
-                if (obj.StartTime < half - TIME_TOLERANCE)
-                    leftCount++;
-                else
-                    rightCount++;
-            }
-
-            return leftCount <= rightCount ? beatStart : half;
+                ManiaKeyPatternHelp.TryAddNoteFromCandidates(beatmap, columns, null, rng, candidateTime);
         }
     }
 }
