@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 
@@ -67,8 +68,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             1.0, 1.0 / 3, 1.0 / 6, 1.0 / 9, 1.0 / 12
         };
 
-        // Pools to reduce per-window allocations
-        private static readonly Stack<List<ManiaHitObject>> window_objects_pool = new Stack<List<ManiaHitObject>>(32);
+        // Pools to reduce per-window allocations (thread-local to avoid cross-thread corruption)
+        private static readonly ThreadLocal<Stack<List<ManiaHitObject>>> window_objects_pool =
+            new ThreadLocal<Stack<List<ManiaHitObject>>>(() => new Stack<List<ManiaHitObject>>(32));
 
         // 可改为重载振荡器，预处理跳过检查剥离、前置（仅传入 beatmap），返回标记传入振荡处理器
         // 窗口重构：
@@ -145,7 +147,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 int startIndex = lowerBoundByTime(objects, info.start);
                 int endIndex = lowerBoundByTime(objects, info.end);
                 int windowCount = Math.Max(0, endIndex - startIndex);
-                if (windowCount <= 0)
+                // 如果窗口在处理时变得过于稀疏（<=2 个 note），跳过处理以避免向 applyPattern 传入空或过少数据
+                if (windowCount <= 2)
                     continue;
 
                 int oscillationBeatsSafe = Math.Max(1, psSettings.OscillationBeats);
@@ -386,7 +389,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (windowObjects.Count < 2)
                 return defaultFraction;
 
-            double beatLength = beatmap.ControlPointInfo.TimingPointAt(windowObjects[0].StartTime).BeatLength;
+            double startTime = beatmap.HitObjects.Min(h => h.StartTime);
+            double beatLength = beatmap.ControlPointInfo.TimingPointAt(startTime).BeatLength;
             if (beatLength <= 0)
                 return defaultFraction;
 
@@ -936,9 +940,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             int count = Math.Max(0, endIndex - startIndex);
             List<ManiaHitObject> windowObjects;
 
-            if (window_objects_pool.Count > 0)
+            var pool = window_objects_pool.Value;
+            if (pool.Count > 0)
             {
-                windowObjects = window_objects_pool.Pop();
+                windowObjects = pool.Pop();
                 windowObjects.Clear();
                 if (windowObjects.Capacity < count)
                     windowObjects.Capacity = count;
@@ -954,11 +959,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         private static void returnWindowObjectsToPool(List<ManiaHitObject> list)
         {
+            var pool = window_objects_pool.Value;
+
             // keep pool bounded to avoid unbounded memory usage
-            if (window_objects_pool.Count < 128)
+            if (pool.Count < 128)
             {
                 list.Clear();
-                window_objects_pool.Push(list);
+                pool.Push(list);
             }
         }
 
