@@ -32,8 +32,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                                       Random rng,
                                                       int maxIterationsPerWindow);
 
-        protected virtual int DefaultLevel => 0;
         protected virtual EzOscillator.Waveform DefaultWaveform => EzOscillator.Waveform.Sine;
+
+        protected virtual int DefaultLevel => 0;
         protected virtual int DefaultOscillationBeats => 1;
         protected virtual int DefaultWindowProcessInterval => 1;
         protected virtual int DefaultWindowProcessOffset => 1;
@@ -55,6 +56,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override bool ValidForMultiplayer => false;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
+        [SettingSource("Waveform", "Oscillator waveform used to vary pattern intensity.\n振荡器波形，影响键型局部处理时的循环周期")]
+        public Bindable<EzOscillator.Waveform> Waveform { get; } = new Bindable<EzOscillator.Waveform>(EzOscillator.Waveform.Sine);
+
         [SettingSource("Level", "0=off, 1-10. Controls how many notes are generated per window.")]
         public BindableNumber<int> Level { get; } = new BindableInt(0)
         {
@@ -62,9 +66,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             MaxValue = 10,
             Precision = 1
         };
-
-        [SettingSource("Waveform", "Oscillator waveform used to vary pattern intensity.")]
-        public Bindable<EzOscillator.Waveform> Waveform { get; } = new Bindable<EzOscillator.Waveform>(EzOscillator.Waveform.Sine);
 
         [SettingSource("Oscillation Beats", "Beat interval for oscillator changes. 1=every beat.")]
         public BindableNumber<int> OscillationBeats { get; } = new BindableInt(2)

@@ -58,94 +58,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         // Pools to reduce per-window allocations
         private static readonly Stack<List<ManiaHitObject>> window_objects_pool = new Stack<List<ManiaHitObject>>(16);
 
-        public static void ProcessRollingWindow(ManiaBeatmap beatmap,
-                                                KeyPatternType patternType,
-                                                int windowQuarterBeats = 2,
-                                                int intervalQuarterBeats = 4,
-                                                bool incrementalMode = false,
-                                                KeyPatternSettings? settings = null,
-                                                int? seed = null,
-                                                int windowProcessInterval = 1,
-                                                int windowProcessOffset = 0,
-                                                Action<List<ManiaHitObject>, ManiaBeatmap, double, double, KeyPatternSettings, Random, int>? applyPattern = null)
-        {
-            var objects = beatmap.HitObjects.ToList();
-            objects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
-
-            if (objects.Count == 0)
-                return;
-
-            if (applyPattern == null)
-                return;
-
-            double currentTime = getRedLineStart(beatmap, objects[0].StartTime);
-            double endTime = getMaxEndTime(objects);
-
-            int windowQuarterBeatsSafe = Math.Max(1, windowQuarterBeats);
-            int intervalQuarterBeatsSafe = Math.Max(1, intervalQuarterBeats);
-            int startIndex = 0;
-            int endIndex = 0;
-            seed ??= RNG.Next();
-
-            int windowIndex = 0;
-
-            int processIntervalSafe = Math.Clamp(windowProcessInterval, 1, 4);
-            int processOffsetSafe = Math.Clamp(windowProcessOffset - 1, 0, processIntervalSafe - 1);
-            var skipCache = new Dictionary<long, bool>();
-
-            while (currentTime <= endTime)
-            {
-                double beatLength = beatmap.ControlPointInfo.TimingPointAt(currentTime).BeatLength;
-                double windowDuration = beatLength / 4.0 * windowQuarterBeatsSafe;
-                double stepDuration = windowDuration * (intervalQuarterBeatsSafe / 4.0);
-
-                double windowEnd = currentTime + windowDuration;
-
-                while (startIndex < objects.Count && objects[startIndex].StartTime < currentTime)
-                    startIndex++;
-
-                while (endIndex < objects.Count && objects[endIndex].StartTime < windowEnd)
-                    endIndex++;
-
-                int windowCount = endIndex - startIndex;
-
-                long skipWindowIndex = windowDuration > 0 ? (long)Math.Floor(currentTime / windowDuration) : (long)Math.Floor(currentTime);
-
-                var ctx = new WindowContext(beatLength, currentTime, windowDuration, stepDuration, startIndex, endIndex, beatmap.TotalColumns, 5.0);
-
-                if (!skipCache.TryGetValue(skipWindowIndex, out bool skip))
-                {
-                    skip = shouldSkipDenseWindow(patternType, objects, ctx);
-                    skipCache[skipWindowIndex] = skip;
-                }
-
-                if (!skip && windowCount > 0 && skipWindowIndex % processIntervalSafe == processOffsetSafe)
-                {
-                    var windowObjects = buildWindowObjects(objects, startIndex, endIndex);
-
-                    try
-                    {
-                        int windowSeed = unchecked(seed.Value * 397) ^ (int)Math.Round(currentTime);
-                        var rng = new Random(windowSeed);
-                        var patternSettings = settings ?? new KeyPatternSettings();
-
-                        if (!shouldSkipDenseWindow(patternType, objects, ctx))
-                            applyPattern(windowObjects, beatmap, currentTime, windowEnd, patternSettings, rng, 1);
-                    }
-                    finally
-                    {
-                        returnWindowObjectsToPool(windowObjects);
-                    }
-                }
-
-                if (stepDuration <= 0)
-                    break;
-
-                windowIndex++;
-                currentTime += stepDuration;
-            }
-        }
-
+        // 可改为重载振荡器，预处理跳过检查剥离、前置（仅传入 beatmap），返回标记传入振荡处理器
+        // 窗口重构：
+        // 1、提前划分好 Beat 序号片段；
+        // 2、无参步进跳过，记录跳过序号数组；
+        // 3、有参步进处理，半拍切块，传入键型处理2次。参数：ManiaBeatmap, Type, PSSettings, lamda覆写
+        // 4、apply方法内部实现具体逻辑，重复处理次数
+        // 5、最终统一清洗
         public static void ProcessRollingWindowWithOscillator(ManiaBeatmap beatmap,
                                                               KeyPatternType patternType,
                                                               int level,
@@ -178,7 +97,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             int processIntervalSafe = Math.Clamp(windowProcessInterval, 1, 4);
             int processOffsetSafe = Math.Clamp(windowProcessOffset - 1, 0, processIntervalSafe - 1);
-            int windowIndex = 0;
             var skipCache = new Dictionary<long, bool>();
 
             while (currentTime <= endTime)
@@ -271,7 +189,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 if (stepDuration <= 0)
                     break;
 
-                windowIndex++;
                 currentTime += stepDuration;
             }
         }

@@ -188,7 +188,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             maniaBeatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToList();
-            ManiaNoteCleanupTool.EnforceHoldReleaseGap(maniaBeatmap, 1.0 / 8.0);
+            ManiaNoteCleanupTool.EnforceHoldReleaseGap(maniaBeatmap);
         }
 
         private static List<PatternShiftChord> buildChords(List<PatternShiftNote> notes)

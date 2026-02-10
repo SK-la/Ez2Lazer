@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.ComponentModel;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
@@ -11,10 +12,17 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     {
         public enum Waveform
         {
-            Sine, // 正弦波
-            Square, // 方波
-            Triangle, // 三角波
-            Sawtooth // 锯齿波
+            [Description("正弦波")]
+            Sine = 0,
+
+            [Description("方波")]
+            Square,
+
+            [Description("三角波")]
+            Triangle,
+
+            [Description("锯齿波")]
+            Sawtooth
         }
 
         private readonly double frequency;
