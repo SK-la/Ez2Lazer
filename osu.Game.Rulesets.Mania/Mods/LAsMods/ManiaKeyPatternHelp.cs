@@ -123,13 +123,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 var ctx = new WindowContext(beatLength, wstart, windowDuration, stepDuration, 0, 0, beatmap.TotalColumns, 5.0);
                 bool skip = shouldSkipDenseWindow(patternType, objects, ctx);
 
-                // 如果窗口内音符总数 <= 2，则跳过处理（太稀疏，不需要模式应用）
-                int sidx = lowerBoundByTime(objects, wstart);
-                int eidx = lowerBoundByTime(objects, wend);
-                int wcount = Math.Max(0, eidx - sidx);
-                if (wcount <= 2)
-                    skip = true;
-
                 windowInfos.Add((wi, wstart, wend, skip));
             }
 
@@ -145,10 +138,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                 // 计算当前对象范围（使用最新的 objects 列表）
                 int startIndex = lowerBoundByTime(objects, info.start);
-                int endIndex = lowerBoundByTime(objects, info.end);
+                int endIndex = upperBoundByTime(objects, info.end);
                 int windowCount = Math.Max(0, endIndex - startIndex);
-                // 如果窗口在处理时变得过于稀疏（<=2 个 note），跳过处理以避免向 applyPattern 传入空或过少数据
-                if (windowCount <= 2)
+                // 仅跳过空窗口，避免传入空列表
+                if (windowCount <= 1)
                     continue;
 
                 int oscillationBeatsSafe = Math.Max(1, psSettings.OscillationBeats);
@@ -927,6 +920,24 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             {
                 int mid = left + (right - left) / 2;
                 if (objects[mid].StartTime < time)
+                    left = mid + 1;
+                else
+                    right = mid;
+            }
+
+            return left;
+        }
+
+        // 返回第一个 StartTime > time 的位置（用于包含窗口 end 边界）
+        private static int upperBoundByTime(List<ManiaHitObject> objects, double time)
+        {
+            int left = 0;
+            int right = objects.Count;
+
+            while (left < right)
+            {
+                int mid = left + (right - left) / 2;
+                if (objects[mid].StartTime <= time)
                     left = mid + 1;
                 else
                     right = mid;
