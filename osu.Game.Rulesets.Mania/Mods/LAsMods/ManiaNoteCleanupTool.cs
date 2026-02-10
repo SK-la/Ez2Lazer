@@ -87,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             double startTime = beatmap.HitObjects.Min(h => h.StartTime);
             double beatLength = beatmap.ControlPointInfo.TimingPointAt(startTime).BeatLength;
             double gap = beatLength / beat;
-            return Math.Clamp(gap, 30, beatLength / beat / 2);
+            return Math.Clamp(gap, 30, beatLength / beat * 2);
         }
 
         /// <summary>
