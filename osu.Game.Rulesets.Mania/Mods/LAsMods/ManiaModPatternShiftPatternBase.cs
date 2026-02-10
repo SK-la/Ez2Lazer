@@ -136,18 +136,25 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 return;
 
             Seed.Value ??= RNG.Next();
+
             var oscillator = new EzOscillator(Seed.Value.Value, waveform: Waveform.Value);
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
+
+            var psSettings = new KeyPatternSettings
+            {
+                Level = Level.Value,
+                OscillationBeats = OscillationBeats.Value,
+                WindowProcessInterval = WindowProcessInterval,
+                WindowProcessOffset = WindowProcessOffset,
+                MaxIterationsPerWindow = MaxIterationsPerWindow,
+                Seed = Seed.Value.Value
+            };
+
             ManiaKeyPatternHelp.ProcessRollingWindowWithOscillator(maniaBeatmap,
                 PatternType,
-                Level.Value,
+                psSettings,
                 oscillator,
-                Seed.Value.Value,
-                OscillationBeats.Value,
-                WindowProcessInterval,
-                WindowProcessOffset,
-                MaxIterationsPerWindow,
                 ApplyPatternForWindow);
             ManiaNoteCleanupTool.CleanupBeatmap(maniaBeatmap, seed: Seed.Value.Value);
         }

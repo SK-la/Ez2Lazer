@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using osu.Framework.Utils;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 
@@ -14,7 +13,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     {
         public int MinK { get; set; } = 1;
         public int MaxK { get; set; } = 5;
+
         public int Level { get; set; }
+
+        // 以下为窗口/振荡相关参数，已合并入设置以便统一传递与配置
+        public int OscillationBeats { get; set; } = 1;
+        public int WindowProcessInterval { get; set; } = 1;
+        public int WindowProcessOffset { get; set; } // 0-based
+        public int MaxIterationsPerWindow { get; set; } = 1;
+        public int WindowQuarterBeats { get; set; } = 2;
+
+        public int IntervalQuarterBeats { get; set; } = 4;
+
+        // 指定用于振荡器与随机的确定性种子（必须为非空）
+        public int Seed { get; set; }
     }
 
     public static class ManiaKeyPatternHelp
@@ -56,7 +68,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         };
 
         // Pools to reduce per-window allocations
-        private static readonly Stack<List<ManiaHitObject>> window_objects_pool = new Stack<List<ManiaHitObject>>(16);
+        private static readonly Stack<List<ManiaHitObject>> window_objects_pool = new Stack<List<ManiaHitObject>>(32);
 
         // 可改为重载振荡器，预处理跳过检查剥离、前置（仅传入 beatmap），返回标记传入振荡处理器
         // 窗口重构：
@@ -67,18 +79,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         // 5、最终统一清洗
         public static void ProcessRollingWindowWithOscillator(ManiaBeatmap beatmap,
                                                               KeyPatternType patternType,
-                                                              int level,
-                                                              EzOscillator oscillator,
-                                                              int seed,
-                                                              int oscillationBeats,
-                                                              int windowProcessInterval,
-                                                              int windowProcessOffset,
-                                                              int maxIterationsPerWindow,
-                                                              Action<List<ManiaHitObject>, ManiaBeatmap, double, double, KeyPatternSettings, Random, int> applyPattern,
-                                                              int windowQuarterBeats = 2,
-                                                              int intervalQuarterBeats = 4)
+                                                              KeyPatternSettings psSettings,
+                                                              IEzOscillator oscillator,
+                                                              Action<List<ManiaHitObject>, ManiaBeatmap, double, double, KeyPatternSettings, Random, int> applyPattern)
         {
-            if (level <= 0)
+            if (psSettings.Level <= 0)
                 return;
 
             var objects = beatmap.HitObjects.ToList();
@@ -90,107 +95,605 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             double currentTime = getRedLineStart(beatmap, objects[0].StartTime);
             double endTime = getMaxEndTime(objects);
 
-            int windowQuarterBeatsSafe = Math.Max(1, windowQuarterBeats);
-            int intervalQuarterBeatsSafe = Math.Max(1, intervalQuarterBeats);
-            int startIndex = 0;
-            int endIndex = 0;
+            // 使用首个 timing point 的 beatLength 作为固定参考，忽略中途的 timing point 变化（视觉变速不影响 note 对齐）
+            double fixedBeatLength = beatmap.ControlPointInfo.TimingPointAt(objects[0].StartTime).BeatLength;
 
-            int processIntervalSafe = Math.Clamp(windowProcessInterval, 1, 4);
-            int processOffsetSafe = Math.Clamp(windowProcessOffset - 1, 0, processIntervalSafe - 1);
-            var skipCache = new Dictionary<long, bool>();
+            int windowQuarterBeatsSafe = Math.Max(1, psSettings.WindowQuarterBeats);
+            int intervalQuarterBeatsSafe = Math.Max(1, psSettings.IntervalQuarterBeats);
 
-            while (currentTime <= endTime)
+            int processIntervalSafe = Math.Clamp(psSettings.WindowProcessInterval, 1, 4);
+            int processOffsetSafe = Math.Clamp(psSettings.WindowProcessOffset, 0, processIntervalSafe - 1);
+            // 预先划分窗口（仅缓存窗口时间与 skip 决策），避免在主循环中重复计算节拍边界。
+            double beatLength = fixedBeatLength;
+            double windowDuration = beatLength / 4.0 * windowQuarterBeatsSafe;
+            double stepDuration = windowDuration * (intervalQuarterBeatsSafe / 4.0);
+
+            if (stepDuration <= 0)
+                return;
+
+            var windowInfos = new List<(long index, double start, double end, bool skip)>();
+            long totalWindows = Math.Max(0, (long)Math.Ceiling((endTime - currentTime) / stepDuration));
+
+            for (long wi = 0; wi <= totalWindows; wi++)
             {
-                double beatLength = beatmap.ControlPointInfo.TimingPointAt(currentTime).BeatLength;
-                double windowDuration = beatLength / 4.0 * windowQuarterBeatsSafe;
-                double stepDuration = windowDuration * (intervalQuarterBeatsSafe / 4.0);
+                double wstart = currentTime + wi * stepDuration;
+                double wend = wstart + windowDuration;
+                var ctx = new WindowContext(beatLength, wstart, windowDuration, stepDuration, 0, 0, beatmap.TotalColumns, 5.0);
+                bool skip = shouldSkipDenseWindow(patternType, objects, ctx);
 
-                double windowEnd = currentTime + windowDuration;
+                // 如果窗口内音符总数 <= 2，则跳过处理（太稀疏，不需要模式应用）
+                int sidx = lowerBoundByTime(objects, wstart);
+                int eidx = lowerBoundByTime(objects, wend);
+                int wcount = Math.Max(0, eidx - sidx);
+                if (wcount <= 2)
+                    skip = true;
 
-                while (startIndex < objects.Count && objects[startIndex].StartTime < currentTime)
-                    startIndex++;
+                windowInfos.Add((wi, wstart, wend, skip));
+            }
 
-                while (endIndex < objects.Count && objects[endIndex].StartTime < windowEnd)
-                    endIndex++;
+            // 处理窗口：在需要时再计算 startIndex/endIndex 与构建 windowObjects，以便 applyPattern 修改后可重建 objects
+            for (int wi = 0; wi < windowInfos.Count; wi++)
+            {
+                var info = windowInfos[wi];
+                if (info.skip)
+                    continue;
 
-                int windowCount = endIndex - startIndex;
+                if (info.index % processIntervalSafe != processOffsetSafe)
+                    continue;
 
-                // 按窗口索引缓存，避免整拍级别缓存造成误跳过
-                long skipWindowIndex = windowDuration > 0 ? (long)Math.Floor(currentTime / windowDuration) : (long)Math.Floor(currentTime);
+                // 计算当前对象范围（使用最新的 objects 列表）
+                int startIndex = lowerBoundByTime(objects, info.start);
+                int endIndex = lowerBoundByTime(objects, info.end);
+                int windowCount = Math.Max(0, endIndex - startIndex);
+                if (windowCount <= 0)
+                    continue;
 
-                var ctx = new WindowContext(beatLength, currentTime, windowDuration, stepDuration, startIndex, endIndex, beatmap.TotalColumns, 5.0);
+                int oscillationBeatsSafe = Math.Max(1, psSettings.OscillationBeats);
+                long beatIndex = beatLength > 0 ? (long)Math.Round(info.start / beatLength) : (long)Math.Round(info.start);
+                long oscillationIndex = beatIndex / oscillationBeatsSafe;
 
-                if (!skipCache.TryGetValue(skipWindowIndex, out bool skip))
+                resetOscillator(oscillator, psSettings.Seed, oscillationIndex);
+                double oscValue = oscillator.NextSigned();
+
+                int windowSeed = unchecked(psSettings.Seed * 397) ^ (int)info.index;
+                var rng = new Random(windowSeed);
+
+                var windowObjects = buildWindowObjects(objects, startIndex, endIndex);
+
+                try
                 {
-                    skip = shouldSkipDenseWindow(patternType, objects, ctx);
-                    skipCache[skipWindowIndex] = skip;
-                }
+                    bool useLevelFallback = patternType == KeyPatternType.Jack
+                                            || patternType == KeyPatternType.Jump
+                                            || patternType == KeyPatternType.Cut
+                                            || patternType == KeyPatternType.Cross;
 
-                if (!skip && windowCount > 0 && skipWindowIndex % processIntervalSafe == processOffsetSafe)
-                {
-                    int oscillationBeatsSafe = Math.Max(1, oscillationBeats);
-                    long beatIndex = beatLength > 0 ? (long)Math.Round(currentTime / beatLength) : (long)Math.Round(currentTime);
-                    long oscillationIndex = beatIndex / oscillationBeatsSafe;
-                    oscillator.Reset(unchecked(seed + oscillationIndex));
-                    double oscValue = oscillator.NextSigned();
-
-                    int windowSeed = unchecked(seed * 397) ^ (int)Math.Round(currentTime);
-                    var rng = new Random(windowSeed);
-                    var windowObjects = buildWindowObjects(objects, startIndex, endIndex);
-
-                    try
+                    if (!useLevelFallback)
                     {
-                        if (!shouldSkipDenseWindow(patternType, objects, ctx))
+                        var settings = getPatternSettingsFromLevel(psSettings.Level, beatmap.TotalColumns, oscValue, patternType);
+                        if (settings.MaxK > 0)
+                            applyPattern(windowObjects, beatmap, info.start, info.end, settings, rng, psSettings.MaxIterationsPerWindow);
+                    }
+                    else
+                    {
+                        int beforeCount = beatmap.HitObjects.Count;
+
+                        for (int current = psSettings.Level; current >= 1; current--)
                         {
-                            bool useLevelFallback = patternType == KeyPatternType.Jack
-                                                    || patternType == KeyPatternType.Jump
-                                                    || patternType == KeyPatternType.Cut
-                                                    || patternType == KeyPatternType.Cross;
+                            var settings = getPatternSettingsFromLevel(current, beatmap.TotalColumns, oscValue, patternType);
+                            if (settings.MaxK <= 0)
+                                continue;
 
-                            if (!useLevelFallback)
-                            {
-                                var settings = getPatternSettingsFromLevel(level, beatmap.TotalColumns, oscValue, patternType);
-                                if (settings.MaxK > 0)
-                                    applyPattern(windowObjects, beatmap, currentTime, windowEnd, settings, rng, maxIterationsPerWindow);
-                            }
-                            else
-                            {
-                                int beforeCount = beatmap.HitObjects.Count;
-                                bool applied = false;
+                            applyPattern(windowObjects, beatmap, info.start, info.end, settings, rng, psSettings.MaxIterationsPerWindow);
 
-                                for (int current = level; current >= 1; current--)
-                                {
-                                    var settings = getPatternSettingsFromLevel(current, beatmap.TotalColumns, oscValue, patternType);
-                                    if (settings.MaxK <= 0)
-                                        continue;
-
-                                    applyPattern(windowObjects, beatmap, currentTime, windowEnd, settings, rng, maxIterationsPerWindow);
-
-                                    if (beatmap.HitObjects.Count > beforeCount)
-                                    {
-                                        applied = true;
-                                        break;
-                                    }
-                                }
-
-                                if (!applied)
-                                {
-                                    // No changes; keep window as-is.
-                                }
-                            }
+                            if (beatmap.HitObjects.Count > beforeCount)
+                                break;
                         }
                     }
-                    finally
-                    {
-                        returnWindowObjectsToPool(windowObjects);
-                    }
                 }
+                finally
+                {
+                    // 若 applyPattern 修改了 beatmap，则重建 objects 以便后续窗口使用最新数据
+                    bool changed = beatmap.HitObjects.Count != objects.Count;
 
-                if (stepDuration <= 0)
+                    if (changed)
+                    {
+                        objects = beatmap.HitObjects.ToList();
+                        objects.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
+                    }
+
+                    returnWindowObjectsToPool(windowObjects);
+                }
+            }
+        }
+
+        internal static double GetDelayBeatFraction(int level)
+        {
+            double t;
+
+            if (level <= 3)
+                t = (level - 1) / 2.0;
+            else if (level <= 6)
+                t = (level - 4) / 2.0;
+            else
+                t = (level - 7) / 3.0;
+
+            return 1.0 / 16.0 * (1 + t);
+        }
+
+        internal static int GetDelayMaxShiftCount(int level, int noteCount)
+        {
+            if (noteCount <= 0)
+                return 0;
+
+            if (level <= 3)
+                return Math.Max(0, Math.Min(level, noteCount - level));
+
+            if (level <= 6)
+                return Math.Max(0, Math.Min(level, noteCount - 1));
+
+            return Math.Min(level, noteCount);
+        }
+
+        internal static bool HasDenseBurstBetweenQuarterNotes(List<ManiaHitObject> windowObjects,
+                                                              double beatLength,
+                                                              int totalColumns)
+        {
+            double anchorInterval = beatLength;
+            if (anchorInterval <= 0)
+                return false;
+
+            const double tolerance = 10.0;
+            double quarter = beatLength / 4.0;
+
+            if (quarter <= 0)
+                return false;
+
+            bool isOnAnchor(double time)
+            {
+                double mod = time % anchorInterval;
+                return mod <= tolerance || Math.Abs(anchorInterval - mod) <= tolerance;
+            }
+
+            bool isOnQuarter(double time)
+            {
+                double mod = time % quarter;
+                return mod <= tolerance || Math.Abs(quarter - mod) <= tolerance;
+            }
+
+            bool isOnDivision(double time, int divisor)
+            {
+                if (divisor <= 0)
+                    return false;
+
+                double interval = beatLength / divisor;
+                if (interval <= 0)
+                    return false;
+
+                double mod = time % interval;
+                return mod <= tolerance || Math.Abs(interval - mod) <= tolerance;
+            }
+
+            for (int start = 0; start + 1 < windowObjects.Count; start++)
+            {
+                double anchorTime = windowObjects[start].StartTime;
+
+                if (!isOnAnchor(anchorTime))
+                    continue;
+
+                for (int end = start + 1; end < windowObjects.Count; end++)
+                {
+                    double span = windowObjects[end].StartTime - anchorTime;
+                    if (span < anchorInterval)
+                        continue;
+
+                    if (!isOnAnchor(windowObjects[end].StartTime))
+                        continue;
+
+                    int countQuarter = 0;
+                    int countOther = 0;
+                    int mixedThreshold = Math.Max(2, totalColumns / 3);
+
+                    for (int i = start + 1; i < end; i++)
+                    {
+                        double time = windowObjects[i].StartTime;
+
+                        // 忽略落在 1/1、1/2、1/3 线上的 note
+                        if (isOnDivision(time, 1) || isOnDivision(time, 2) || isOnDivision(time, 3))
+                            continue;
+
+                        // 落在 1/4 线（只计为 quarter）
+                        if (isOnQuarter(time))
+                            countQuarter++;
+                        else
+                            countOther++;
+
+                        if (countQuarter + countOther >= mixedThreshold)
+                            return true;
+                    }
+
+                    break;
+                }
+            }
+
+            return false;
+        }
+
+        internal static bool HasObjectsInColumnRange(List<ManiaHitObject> objects,
+                                                     int minColumn,
+                                                     int maxColumn,
+                                                     double startTime,
+                                                     double endTime)
+        {
+            if (minColumn > maxColumn)
+                return false;
+
+            double minTime = Math.Min(startTime, endTime);
+            double maxTime = Math.Max(startTime, endTime);
+            int startIndex = lowerBoundByTime(objects, minTime);
+
+            for (int i = startIndex; i < objects.Count; i++)
+            {
+                var obj = objects[i];
+                if (obj.StartTime > maxTime)
                     break;
 
-                currentTime += stepDuration;
+                if (obj.Column >= minColumn && obj.Column <= maxColumn)
+                    return true;
             }
+
+            return false;
+        }
+
+        internal static HashSet<int> GetColumnsAtTime(List<ManiaHitObject> objects, double time, double tolerance)
+        {
+            var cols = new HashSet<int>();
+
+            if (objects.Count == 0)
+                return cols;
+
+            double minTime = time - tolerance;
+            double maxTime = time + tolerance;
+            int startIndex = lowerBoundByTime(objects, minTime);
+
+            for (int i = startIndex; i < objects.Count; i++)
+            {
+                var obj = objects[i];
+                if (obj.StartTime > maxTime)
+                    break;
+
+                if (obj.StartTime >= minTime)
+                    cols.Add(obj.Column);
+            }
+
+            return cols;
+        }
+
+        internal static List<Note> GetNotesAtTime(List<ManiaHitObject> objects, double time, double tolerance)
+        {
+            var notes = new List<Note>();
+
+            for (int i = 0; i < objects.Count; i++)
+            {
+                if (objects[i] is Note note && Math.Abs(note.StartTime - time) <= tolerance)
+                    notes.Add(note);
+            }
+
+            return notes;
+        }
+
+        internal static double GetActiveBeatFraction(List<ManiaHitObject> windowObjects, ManiaBeatmap beatmap, double defaultFraction)
+        {
+            if (windowObjects.Count < 2)
+                return defaultFraction;
+
+            double beatLength = beatmap.ControlPointInfo.TimingPointAt(windowObjects[0].StartTime).BeatLength;
+            if (beatLength <= 0)
+                return defaultFraction;
+
+            var counts = new Dictionary<double, int>();
+
+            for (int i = 1; i < windowObjects.Count; i++)
+            {
+                double gap = windowObjects[i].StartTime - windowObjects[i - 1].StartTime;
+                if (gap <= 0)
+                    continue;
+
+                double gapFraction = gap / beatLength;
+                double evenNearest = getNearestFraction(gapFraction, even_beat_fractions);
+                double oddNearest = getNearestFraction(gapFraction, odd_beat_fractions);
+                double snapped = Math.Abs(gapFraction - evenNearest) <= Math.Abs(gapFraction - oddNearest)
+                    ? evenNearest
+                    : oddNearest;
+
+                if (counts.TryGetValue(snapped, out int count))
+                    counts[snapped] = count + 1;
+                else
+                    counts[snapped] = 1;
+            }
+
+            if (counts.Count == 0)
+                return defaultFraction;
+
+            double bestFraction = defaultFraction;
+            int bestCount = -1;
+
+            foreach (var pair in counts)
+            {
+                if (pair.Value > bestCount || (pair.Value == bestCount && pair.Key > bestFraction))
+                {
+                    bestCount = pair.Value;
+                    bestFraction = pair.Key;
+                }
+            }
+
+            return bestFraction;
+        }
+
+        internal static bool TryGetCutJackBaseFraction(double activeFraction, out double baseFraction)
+        {
+            const double eps = 1e-6;
+
+            if (Math.Abs(activeFraction - 1.0 / 3.0) < eps)
+            {
+                baseFraction = 1.0 / 3.0;
+                return true;
+            }
+
+            if (Math.Abs(activeFraction - 1.0) < eps
+                || Math.Abs(activeFraction - 1.0 / 2.0) < eps
+                || Math.Abs(activeFraction - 1.0 / 4.0) < eps)
+            {
+                baseFraction = 1.0 / 4.0;
+                return true;
+            }
+
+            baseFraction = 0;
+            return false;
+        }
+
+        internal static List<int> BuildNearestCandidates(IReadOnlyList<int> columns, int index)
+        {
+            int count = columns.Count;
+            var ordered = new List<int>(count);
+
+            for (int offset = 0; offset < count; offset++)
+            {
+                int left = index - offset;
+                if (left >= 0)
+                    ordered.Add(columns[left]);
+
+                int right = index + offset;
+                if (right < count && right != left)
+                    ordered.Add(columns[right]);
+            }
+
+            return ordered;
+        }
+
+        internal static bool TryAddNoteFromOrderedCandidates(ManiaBeatmap beatmap, IReadOnlyList<int> candidates, double time)
+        {
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                int column = candidates[i];
+
+                if (IsHoldOccupyingColumn(beatmap, column, time))
+                    continue;
+
+                if (HasNoteAtTime(beatmap, column, time))
+                    return false;
+
+                beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
+                return true;
+            }
+
+            return false;
+        }
+
+        internal static bool TryAddNoteFromCandidates(ManiaBeatmap beatmap,
+                                                      List<int> candidates,
+                                                      List<double>? weights,
+                                                      Random rng,
+                                                      double time)
+        {
+            int pickedIndex = pickIndexAvoidingHolds(beatmap, candidates, weights, rng, time);
+            if (pickedIndex < 0)
+                return false;
+
+            int column = candidates[pickedIndex];
+            candidates.RemoveAt(pickedIndex);
+            weights?.RemoveAt(pickedIndex);
+
+            if (HasNoteAtTime(beatmap, column, time))
+                return false;
+
+            beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
+            return true;
+        }
+
+        // Placement helpers (shared rule: hold occupied -> reselect, note exists -> skip).
+
+        internal static bool HasNoteAtTime(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
+        {
+            foreach (var obj in beatmap.HitObjects)
+            {
+                if (ReferenceEquals(obj, ignore))
+                    continue;
+
+                if (obj.Column != column)
+                    continue;
+
+                if (obj is Note && Math.Abs(obj.StartTime - time) <= tolerance)
+                    return true;
+            }
+
+            return false;
+        }
+
+        internal static bool TryApplyDelayOffset(ManiaBeatmap beatmap, ManiaHitObject obj, double offset, out bool holdConflict)
+        {
+            holdConflict = false;
+
+            if (obj is HoldNote hold)
+            {
+                double duration = hold.EndTime - hold.StartTime;
+                double newStart = Math.Max(0, hold.StartTime + offset);
+                double newEnd = Math.Max(newStart, newStart + duration);
+
+                if (HasNoteAtTime(beatmap, hold.Column, newStart, hold))
+                    return false;
+
+                if (isHoldOverlappingColumn(beatmap, hold.Column, newStart, newEnd, hold))
+                {
+                    holdConflict = true;
+                    return false;
+                }
+
+                hold.StartTime = newStart;
+                hold.EndTime = newEnd;
+                return true;
+            }
+
+            double targetTime = Math.Max(0, obj.StartTime + offset);
+
+            if (HasNoteAtTime(beatmap, obj.Column, targetTime, obj))
+                return false;
+
+            if (IsHoldOccupyingColumn(beatmap, obj.Column, targetTime, obj))
+            {
+                holdConflict = true;
+                return false;
+            }
+
+            obj.StartTime = targetTime;
+            return true;
+        }
+
+        /// <summary>
+        ///     在给定的 quarter 时间点及其前后 quarter 时间范围内，寻找最接近原列且在这三个时间点上均无冲突的列。
+        ///     返回找到的列索引，找不到则返回 null。
+        /// </summary>
+        internal static int? FindNearestAvailableColumnForQuarter(ManiaBeatmap beatmap,
+                                                                  int originalCol,
+                                                                  double qTime,
+                                                                  double prevTime,
+                                                                  double nextTime,
+                                                                  int totalColumns,
+                                                                  double tolerance)
+        {
+            if (totalColumns <= 0)
+                return null;
+
+            int chosen = -1;
+            int bestOffset = int.MaxValue;
+
+            for (int col = 0; col < totalColumns; col++)
+            {
+                if (HasNoteAtTime(beatmap, col, qTime, null, tolerance))
+                    continue;
+
+                if (IsHoldOccupyingColumn(beatmap, col, qTime, null, tolerance))
+                    continue;
+
+                bool pv = HasNoteAtTime(beatmap, col, prevTime, null, tolerance);
+                bool nx = HasNoteAtTime(beatmap, col, nextTime, null, tolerance);
+
+                if (!pv && !nx)
+                {
+                    int offsetCol = Math.Abs(col - originalCol);
+
+                    if (offsetCol < bestOffset)
+                    {
+                        bestOffset = offsetCol;
+                        chosen = col;
+                    }
+                }
+            }
+
+            return chosen >= 0 ? chosen : null;
+        }
+
+        internal static bool IsHoldOccupyingColumn(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
+        {
+            foreach (var obj in beatmap.HitObjects)
+            {
+                if (ReferenceEquals(obj, ignore))
+                    continue;
+
+                if (obj.Column != column)
+                    continue;
+
+                if (obj is HoldNote hold && time >= hold.StartTime - tolerance && time <= hold.EndTime + tolerance)
+                    return true;
+            }
+
+            return false;
+        }
+
+        internal static void Shuffle<T>(IList<T> list, Random rng)
+        {
+            for (int i = list.Count - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (list[i], list[j]) = (list[j], list[i]);
+            }
+        }
+
+        internal static double DistanceToNearest(HashSet<int> occupied, int col)
+        {
+            double best = double.MaxValue;
+            foreach (int o in occupied)
+                best = Math.Min(best, Math.Abs(col - o));
+            return best == double.MaxValue ? 0 : best;
+        }
+
+        internal static double GetMedian(HashSet<int> values)
+        {
+            var ordered = values.OrderBy(v => v).ToList();
+            int count = ordered.Count;
+
+            if (count == 0)
+                return 0;
+
+            if (count % 2 == 1)
+                return ordered[count / 2];
+
+            return (ordered[count / 2 - 1] + ordered[count / 2]) / 2.0;
+        }
+
+        internal static double GetMedianFromList(IReadOnlyList<int> values)
+        {
+            if (values.Count == 0)
+                return 0;
+
+            var ordered = values.OrderBy(v => v).ToList();
+            int count = ordered.Count;
+
+            if (count % 2 == 1)
+                return ordered[count / 2];
+
+            return (ordered[count / 2 - 1] + ordered[count / 2]) / 2.0;
+        }
+
+        internal static int PickWeightedIndex(IReadOnlyList<double> weights, Random rng)
+        {
+            double total = 0;
+            for (int i = 0; i < weights.Count; i++)
+                total += weights[i];
+
+            if (total <= 0)
+                return rng.Next(weights.Count);
+
+            double roll = rng.NextDouble() * total;
+            double acc = 0;
+
+            for (int i = 0; i < weights.Count; i++)
+            {
+                acc += weights[i];
+                if (roll <= acc)
+                    return i;
+            }
+
+            return weights.Count - 1;
         }
 
         private static bool shouldSkipDenseWindow(KeyPatternType patternType,
@@ -387,34 +890,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return false;
         }
 
-        internal static double GetDelayBeatFraction(int level)
-        {
-            double t;
-
-            if (level <= 3)
-                t = (level - 1) / 2.0;
-            else if (level <= 6)
-                t = (level - 4) / 2.0;
-            else
-                t = (level - 7) / 3.0;
-
-            return 1.0 / 16.0 * (1 + t);
-        }
-
-        internal static int GetDelayMaxShiftCount(int level, int noteCount)
-        {
-            if (noteCount <= 0)
-                return 0;
-
-            if (level <= 3)
-                return Math.Max(0, Math.Min(level, noteCount - level));
-
-            if (level <= 6)
-                return Math.Max(0, Math.Min(level, noteCount - 1));
-
-            return Math.Min(level, noteCount);
-        }
-
         private static double getRedLineStart(ManiaBeatmap beatmap, double fallbackTime)
         {
             var timingPoints = beatmap.ControlPointInfo.TimingPoints;
@@ -439,90 +914,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return maxEnd;
         }
 
-        internal static bool HasDenseBurstBetweenQuarterNotes(List<ManiaHitObject> windowObjects,
-                                                              double beatLength,
-                                                              int totalColumns)
-        {
-            double anchorInterval = beatLength;
-            if (anchorInterval <= 0)
-                return false;
-
-            const double tolerance = 10.0;
-            double quarter = beatLength / 4.0;
-
-            if (quarter <= 0)
-                return false;
-
-            bool isOnAnchor(double time)
-            {
-                double mod = time % anchorInterval;
-                return mod <= tolerance || Math.Abs(anchorInterval - mod) <= tolerance;
-            }
-
-            bool isOnQuarter(double time)
-            {
-                double mod = time % quarter;
-                return mod <= tolerance || Math.Abs(quarter - mod) <= tolerance;
-            }
-
-            bool isOnDivision(double time, int divisor)
-            {
-                if (divisor <= 0)
-                    return false;
-
-                double interval = beatLength / divisor;
-                if (interval <= 0)
-                    return false;
-
-                double mod = time % interval;
-                return mod <= tolerance || Math.Abs(interval - mod) <= tolerance;
-            }
-
-            for (int start = 0; start + 1 < windowObjects.Count; start++)
-            {
-                double anchorTime = windowObjects[start].StartTime;
-
-                if (!isOnAnchor(anchorTime))
-                    continue;
-
-                for (int end = start + 1; end < windowObjects.Count; end++)
-                {
-                    double span = windowObjects[end].StartTime - anchorTime;
-                    if (span < anchorInterval)
-                        continue;
-
-                    if (!isOnAnchor(windowObjects[end].StartTime))
-                        continue;
-
-                    int countQuarter = 0;
-                    int countOther = 0;
-                    int mixedThreshold = Math.Max(2, totalColumns / 3);
-
-                    for (int i = start + 1; i < end; i++)
-                    {
-                        double time = windowObjects[i].StartTime;
-
-                        // 忽略落在 1/1、1/2、1/3 线上的 note
-                        if (isOnDivision(time, 1) || isOnDivision(time, 2) || isOnDivision(time, 3))
-                            continue;
-
-                        // 落在 1/4 线（只计为 quarter）
-                        if (isOnQuarter(time))
-                            countQuarter++;
-                        else
-                            countOther++;
-
-                        if (countQuarter + countOther >= mixedThreshold)
-                            return true;
-                    }
-
-                    break;
-                }
-            }
-
-            return false;
-        }
-
         private static int lowerBoundByTime(List<ManiaHitObject> objects, double time)
         {
             int left = 0;
@@ -538,32 +929,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             return left;
-        }
-
-        internal static bool HasObjectsInColumnRange(List<ManiaHitObject> objects,
-                                                     int minColumn,
-                                                     int maxColumn,
-                                                     double startTime,
-                                                     double endTime)
-        {
-            if (minColumn > maxColumn)
-                return false;
-
-            double minTime = Math.Min(startTime, endTime);
-            double maxTime = Math.Max(startTime, endTime);
-            int startIndex = lowerBoundByTime(objects, minTime);
-
-            for (int i = startIndex; i < objects.Count; i++)
-            {
-                var obj = objects[i];
-                if (obj.StartTime > maxTime)
-                    break;
-
-                if (obj.Column >= minColumn && obj.Column <= maxColumn)
-                    return true;
-            }
-
-            return false;
         }
 
         private static List<ManiaHitObject> buildWindowObjects(List<ManiaHitObject> objects, int startIndex, int endIndex)
@@ -589,52 +954,17 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         private static void returnWindowObjectsToPool(List<ManiaHitObject> list)
         {
-            if (list == null)
-                return;
-
             // keep pool bounded to avoid unbounded memory usage
-            if (window_objects_pool.Count < 64)
+            if (window_objects_pool.Count < 128)
             {
                 list.Clear();
                 window_objects_pool.Push(list);
             }
         }
 
-        internal static HashSet<int> GetColumnsAtTime(List<ManiaHitObject> objects, double time, double tolerance)
+        private static void resetOscillator(IEzOscillator oscillator, int seed, long oscillationIndex)
         {
-            var cols = new HashSet<int>();
-
-            if (objects.Count == 0)
-                return cols;
-
-            double minTime = time - tolerance;
-            double maxTime = time + tolerance;
-            int startIndex = lowerBoundByTime(objects, minTime);
-
-            for (int i = startIndex; i < objects.Count; i++)
-            {
-                var obj = objects[i];
-                if (obj.StartTime > maxTime)
-                    break;
-
-                if (obj.StartTime >= minTime)
-                    cols.Add(obj.Column);
-            }
-
-            return cols;
-        }
-
-        internal static List<Note> GetNotesAtTime(List<ManiaHitObject> objects, double time, double tolerance)
-        {
-            var notes = new List<Note>();
-
-            for (int i = 0; i < objects.Count; i++)
-            {
-                if (objects[i] is Note note && Math.Abs(note.StartTime - time) <= tolerance)
-                    notes.Add(note);
-            }
-
-            return notes;
+            oscillator.Reset(unchecked(seed + oscillationIndex));
         }
 
         private static void applyAvoidColumnsIncremental(ManiaBeatmap beatmap,
@@ -728,54 +1058,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return (minCount, maxCount);
         }
 
-        internal static double GetActiveBeatFraction(List<ManiaHitObject> windowObjects, ManiaBeatmap beatmap, double defaultFraction)
-        {
-            if (windowObjects.Count < 2)
-                return defaultFraction;
-
-            double beatLength = beatmap.ControlPointInfo.TimingPointAt(windowObjects[0].StartTime).BeatLength;
-            if (beatLength <= 0)
-                return defaultFraction;
-
-            var counts = new Dictionary<double, int>();
-
-            for (int i = 1; i < windowObjects.Count; i++)
-            {
-                double gap = windowObjects[i].StartTime - windowObjects[i - 1].StartTime;
-                if (gap <= 0)
-                    continue;
-
-                double gapFraction = gap / beatLength;
-                double evenNearest = getNearestFraction(gapFraction, even_beat_fractions);
-                double oddNearest = getNearestFraction(gapFraction, odd_beat_fractions);
-                double snapped = Math.Abs(gapFraction - evenNearest) <= Math.Abs(gapFraction - oddNearest)
-                    ? evenNearest
-                    : oddNearest;
-
-                if (counts.TryGetValue(snapped, out int count))
-                    counts[snapped] = count + 1;
-                else
-                    counts[snapped] = 1;
-            }
-
-            if (counts.Count == 0)
-                return defaultFraction;
-
-            double bestFraction = defaultFraction;
-            int bestCount = -1;
-
-            foreach (var pair in counts)
-            {
-                if (pair.Value > bestCount || pair.Value == bestCount && pair.Key > bestFraction)
-                {
-                    bestCount = pair.Value;
-                    bestFraction = pair.Key;
-                }
-            }
-
-            return bestFraction;
-        }
-
         private static double getNearestFraction(double value, IReadOnlyList<double> candidates)
         {
             double best = candidates[0];
@@ -793,87 +1075,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             return best;
-        }
-
-        internal static bool TryGetCutJackBaseFraction(double activeFraction, out double baseFraction)
-        {
-            const double eps = 1e-6;
-
-            if (Math.Abs(activeFraction - 1.0 / 3.0) < eps)
-            {
-                baseFraction = 1.0 / 3.0;
-                return true;
-            }
-
-            if (Math.Abs(activeFraction - 1.0) < eps
-                || Math.Abs(activeFraction - 1.0 / 2.0) < eps
-                || Math.Abs(activeFraction - 1.0 / 4.0) < eps)
-            {
-                baseFraction = 1.0 / 4.0;
-                return true;
-            }
-
-            baseFraction = 0;
-            return false;
-        }
-
-        internal static List<int> BuildNearestCandidates(IReadOnlyList<int> columns, int index)
-        {
-            int count = columns.Count;
-            var ordered = new List<int>(count);
-
-            for (int offset = 0; offset < count; offset++)
-            {
-                int left = index - offset;
-                if (left >= 0)
-                    ordered.Add(columns[left]);
-
-                int right = index + offset;
-                if (right < count && right != left)
-                    ordered.Add(columns[right]);
-            }
-
-            return ordered;
-        }
-
-        internal static bool TryAddNoteFromOrderedCandidates(ManiaBeatmap beatmap, IReadOnlyList<int> candidates, double time)
-        {
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                int column = candidates[i];
-
-                if (IsHoldOccupyingColumn(beatmap, column, time))
-                    continue;
-
-                if (HasNoteAtTime(beatmap, column, time))
-                    return false;
-
-                beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
-                return true;
-            }
-
-            return false;
-        }
-
-        internal static bool TryAddNoteFromCandidates(ManiaBeatmap beatmap,
-                                                      List<int> candidates,
-                                                      List<double>? weights,
-                                                      Random rng,
-                                                      double time)
-        {
-            int pickedIndex = pickIndexAvoidingHolds(beatmap, candidates, weights, rng, time);
-            if (pickedIndex < 0)
-                return false;
-
-            int column = candidates[pickedIndex];
-            candidates.RemoveAt(pickedIndex);
-            weights?.RemoveAt(pickedIndex);
-
-            if (HasNoteAtTime(beatmap, column, time))
-                return false;
-
-            beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
-            return true;
         }
 
         private static int pickIndexAvoidingHolds(ManiaBeatmap beatmap,
@@ -899,25 +1100,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return -1;
         }
 
-        // Placement helpers (shared rule: hold occupied -> reselect, note exists -> skip).
-
-        internal static bool HasNoteAtTime(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
-        {
-            foreach (var obj in beatmap.HitObjects)
-            {
-                if (ReferenceEquals(obj, ignore))
-                    continue;
-
-                if (obj.Column != column)
-                    continue;
-
-                if (obj is Note && Math.Abs(obj.StartTime - time) <= tolerance)
-                    return true;
-            }
-
-            return false;
-        }
-
         private static bool isHoldOverlappingColumn(ManiaBeatmap beatmap, int column, double startTime, double endTime, ManiaHitObject? ignore = null, double tolerance = 0.5)
         {
             foreach (var obj in beatmap.HitObjects)
@@ -938,173 +1120,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             return false;
-        }
-
-        internal static bool TryApplyDelayOffset(ManiaBeatmap beatmap, ManiaHitObject obj, double offset, out bool holdConflict)
-        {
-            holdConflict = false;
-
-            if (obj is HoldNote hold)
-            {
-                double duration = hold.EndTime - hold.StartTime;
-                double newStart = Math.Max(0, hold.StartTime + offset);
-                double newEnd = Math.Max(newStart, newStart + duration);
-
-                if (HasNoteAtTime(beatmap, hold.Column, newStart, hold))
-                    return false;
-
-                if (isHoldOverlappingColumn(beatmap, hold.Column, newStart, newEnd, hold))
-                {
-                    holdConflict = true;
-                    return false;
-                }
-
-                hold.StartTime = newStart;
-                hold.EndTime = newEnd;
-                return true;
-            }
-
-            double targetTime = Math.Max(0, obj.StartTime + offset);
-
-            if (HasNoteAtTime(beatmap, obj.Column, targetTime, obj))
-                return false;
-
-            if (IsHoldOccupyingColumn(beatmap, obj.Column, targetTime, obj))
-            {
-                holdConflict = true;
-                return false;
-            }
-
-            obj.StartTime = targetTime;
-            return true;
-        }
-
-        /// <summary>
-        /// 在给定的 quarter 时间点及其前后 quarter 时间范围内，寻找最接近原列且在这三个时间点上均无冲突的列。
-        /// 返回找到的列索引，找不到则返回 null。
-        /// </summary>
-        internal static int? FindNearestAvailableColumnForQuarter(ManiaBeatmap beatmap,
-                                                                  int originalCol,
-                                                                  double qTime,
-                                                                  double prevTime,
-                                                                  double nextTime,
-                                                                  int totalColumns,
-                                                                  double tolerance)
-        {
-            if (totalColumns <= 0)
-                return null;
-
-            int chosen = -1;
-            int bestOffset = int.MaxValue;
-
-            for (int col = 0; col < totalColumns; col++)
-            {
-                if (HasNoteAtTime(beatmap, col, qTime, null, tolerance))
-                    continue;
-
-                if (IsHoldOccupyingColumn(beatmap, col, qTime, null, tolerance))
-                    continue;
-
-                bool pv = HasNoteAtTime(beatmap, col, prevTime, null, tolerance);
-                bool nx = HasNoteAtTime(beatmap, col, nextTime, null, tolerance);
-
-                if (!pv && !nx)
-                {
-                    int offsetCol = Math.Abs(col - originalCol);
-
-                    if (offsetCol < bestOffset)
-                    {
-                        bestOffset = offsetCol;
-                        chosen = col;
-                    }
-                }
-            }
-
-            return chosen >= 0 ? chosen : null;
-        }
-
-        internal static bool IsHoldOccupyingColumn(ManiaBeatmap beatmap, int column, double time, ManiaHitObject? ignore = null, double tolerance = 0.5)
-        {
-            foreach (var obj in beatmap.HitObjects)
-            {
-                if (ReferenceEquals(obj, ignore))
-                    continue;
-
-                if (obj.Column != column)
-                    continue;
-
-                if (obj is HoldNote hold && time >= hold.StartTime - tolerance && time <= hold.EndTime + tolerance)
-                    return true;
-            }
-
-            return false;
-        }
-
-        internal static void Shuffle<T>(IList<T> list, Random rng)
-        {
-            for (int i = list.Count - 1; i > 0; i--)
-            {
-                int j = rng.Next(i + 1);
-                (list[i], list[j]) = (list[j], list[i]);
-            }
-        }
-
-        internal static double DistanceToNearest(HashSet<int> occupied, int col)
-        {
-            double best = double.MaxValue;
-            foreach (int o in occupied)
-                best = Math.Min(best, Math.Abs(col - o));
-            return best == double.MaxValue ? 0 : best;
-        }
-
-        internal static double GetMedian(HashSet<int> values)
-        {
-            var ordered = values.OrderBy(v => v).ToList();
-            int count = ordered.Count;
-
-            if (count == 0)
-                return 0;
-
-            if (count % 2 == 1)
-                return ordered[count / 2];
-
-            return (ordered[count / 2 - 1] + ordered[count / 2]) / 2.0;
-        }
-
-        internal static double GetMedianFromList(IReadOnlyList<int> values)
-        {
-            if (values.Count == 0)
-                return 0;
-
-            var ordered = values.OrderBy(v => v).ToList();
-            int count = ordered.Count;
-
-            if (count % 2 == 1)
-                return ordered[count / 2];
-
-            return (ordered[count / 2 - 1] + ordered[count / 2]) / 2.0;
-        }
-
-        internal static int PickWeightedIndex(IReadOnlyList<double> weights, Random rng)
-        {
-            double total = 0;
-            for (int i = 0; i < weights.Count; i++)
-                total += weights[i];
-
-            if (total <= 0)
-                return rng.Next(weights.Count);
-
-            double roll = rng.NextDouble() * total;
-            double acc = 0;
-
-            for (int i = 0; i < weights.Count; i++)
-            {
-                acc += weights[i];
-                if (roll <= acc)
-                    return i;
-            }
-
-            return weights.Count - 1;
         }
     }
 }

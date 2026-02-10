@@ -8,7 +8,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
     // 简单振荡器生成器，支持多种波形。
     // 默认正弦波，确定性输出。
-    public sealed class EzOscillator
+    public sealed class EzOscillator : IEzOscillator
     {
         public enum Waveform
         {
