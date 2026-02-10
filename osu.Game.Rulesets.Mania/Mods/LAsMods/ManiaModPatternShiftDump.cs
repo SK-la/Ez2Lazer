@@ -49,76 +49,182 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (availableSteps <= 0)
                 return;
 
-            double t = windowStart + subStep;
-            double lineOffset = Math.Floor((t - windowStart) / mainStep) * mainStep;
-            double prevLine = windowStart + lineOffset;
-            double nextLine = prevLine + mainStep;
-
-            applyDumpPattern(beatmap, windowObjects, prevLine, nextLine, mainStep, subStep, t, TIME_TOLERANCE, rng);
+            applyDumpPattern(beatmap, windowObjects, windowStart, windowEnd, beatLength, rng);
         }
 
         private static void applyDumpPattern(ManiaBeatmap beatmap,
                                              List<ManiaHitObject> windowObjects,
-                                             double prevLine,
-                                             double nextLine,
-                                             double mainStep,
-                                             double subStep,
-                                             double currentTime,
-                                             double tolerance,
+                                             double windowStart,
+                                             double windowEnd,
+                                             double beatLength,
                                              Random rng)
         {
-            double mainGap = nextLine - prevLine;
-            if (mainGap < mainStep)
+            // Dump=滑梯: 在窗口内按时间就近横向移动 note, 形成单调的列序列
+            if (windowObjects.Count < 3)
                 return;
 
-            double mainBeatLength = beatmap.ControlPointInfo.TimingPointAt(prevLine).BeatLength;
-            if (mainBeatLength <= 0)
+            var groups = new List<(double time, ManiaHitObject obj)>();
+            int i = 0;
+
+            while (i < windowObjects.Count)
+            {
+                var obj = windowObjects[i];
+                double time = obj.StartTime;
+                int j = i + 1;
+                int count = 1;
+
+                while (j < windowObjects.Count && Math.Abs(windowObjects[j].StartTime - time) <= TIME_TOLERANCE)
+                {
+                    count++;
+                    j++;
+                }
+
+                if (count == 1 && obj is Note)
+                    groups.Add((time, obj));
+
+                i = j;
+            }
+
+            if (groups.Count < 3)
                 return;
 
-            if (mainGap / mainBeatLength < 0.25)
+            int totalColumns = Math.Max(1, beatmap.TotalColumns);
+            int firstCol = groups[0].obj.Column;
+            int lastCol = groups[^1].obj.Column;
+
+            int direction = lastCol == firstCol ? (rng.Next(0, 2) == 0 ? -1 : 1) : (lastCol > firstCol ? 1 : -1);
+            int prevTarget = firstCol;
+
+            for (int g = 1; g < groups.Count; g++)
+            {
+                var (time, cur) = groups[g];
+                if (time < windowStart - TIME_TOLERANCE || time > windowEnd + TIME_TOLERANCE)
+                    continue;
+
+                int minCol = direction > 0 ? prevTarget + 1 : 0;
+                int maxCol = direction > 0 ? totalColumns - 1 : prevTarget - 1;
+
+                if (!tryPickNearestColumn(beatmap, cur, time, minCol, maxCol, out int chosen))
+                {
+                    // 允许保持不下降的单调（非严格）
+                    minCol = direction > 0 ? prevTarget : 0;
+                    maxCol = direction > 0 ? totalColumns - 1 : prevTarget;
+
+                    if (!tryPickNearestColumn(beatmap, cur, time, minCol, maxCol, out chosen))
+                        continue;
+                }
+
+                cur.Column = chosen;
+                prevTarget = chosen;
+            }
+
+            // 大间隙单调滑梯：首尾间隔至少 1/2 拍才添加
+            tryAddLargeGapSlide(beatmap, windowObjects, groups, beatLength, rng);
+        }
+
+        private static void tryAddLargeGapSlide(ManiaBeatmap beatmap,
+                                                List<ManiaHitObject> windowObjects,
+                                                List<(double time, ManiaHitObject obj)> groups,
+                                                double beatLength,
+                                                Random rng)
+        {
+            if (groups.Count < 2 || beatLength <= 0)
                 return;
 
-            if (ManiaKeyPatternHelp.HasDenseBurstBetweenQuarterNotes(windowObjects, mainBeatLength, beatmap.TotalColumns))
+            double firstTime = groups[0].time;
+            double lastTime = groups[^1].time;
+            double gap = lastTime - firstTime;
+
+            if (gap < beatLength / 2.0)
                 return;
 
-            var prevCols = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, prevLine, tolerance).ToList();
-            prevCols.Sort();
-            var nextCols = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, nextLine, tolerance).ToList();
-            nextCols.Sort();
-
-            if (prevCols.Count == 0 || nextCols.Count == 0)
+            if (ManiaKeyPatternHelp.HasDenseBurstBetweenQuarterNotes(windowObjects, beatLength, beatmap.TotalColumns))
                 return;
+
+            var firstCols = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, firstTime, TIME_TOLERANCE).ToList();
+            var lastCols = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, lastTime, TIME_TOLERANCE).ToList();
+
+            if (firstCols.Count == 0 || lastCols.Count == 0)
+                return;
+
+            firstCols.Sort();
+            lastCols.Sort();
 
             bool useLeft = rng.Next(0, 2) == 0;
-            int prevCol = useLeft ? prevCols.First() : prevCols.Last();
-            int nextCol = useLeft ? nextCols.Last() : nextCols.First();
+            int firstCol = useLeft ? firstCols.First() : firstCols.Last();
+            int lastCol = useLeft ? lastCols.Last() : lastCols.First();
 
-            if (prevCol == nextCol)
+            if (firstCol == lastCol)
                 return;
 
-            int direction = prevCol < nextCol ? 1 : -1;
+            int direction = firstCol < lastCol ? 1 : -1;
             var betweenCols = new List<int>();
 
-            for (int c = prevCol + direction; c != nextCol; c += direction)
+            for (int c = firstCol + direction; c != lastCol; c += direction)
                 betweenCols.Add(c);
 
             if (betweenCols.Count == 0)
                 return;
 
-            int minBetween = Math.Min(prevCol, nextCol) + 1;
-            int maxBetween = Math.Max(prevCol, nextCol) - 1;
-            if (ManiaKeyPatternHelp.HasObjectsInColumnRange(windowObjects, minBetween, maxBetween, prevLine, nextLine))
+            int minBetween = Math.Min(firstCol, lastCol) + 1;
+            int maxBetween = Math.Max(firstCol, lastCol) - 1;
+            if (ManiaKeyPatternHelp.HasObjectsInColumnRange(windowObjects, minBetween, maxBetween, firstTime, lastTime))
                 return;
 
             int steps = betweenCols.Count;
-            double stepDuration = mainGap / (steps + 1.0);
+            double stepDuration = gap / (steps + 1.0);
 
             for (int i = 0; i < steps; i++)
             {
-                double time = prevLine + (stepDuration * (i + 1));
+                double time = firstTime + (stepDuration * (i + 1));
                 var candidates = ManiaKeyPatternHelp.BuildNearestCandidates(betweenCols, i);
                 ManiaKeyPatternHelp.TryAddNoteFromOrderedCandidates(beatmap, candidates, time);
             }
+        }
+
+        private static bool tryPickNearestColumn(ManiaBeatmap beatmap,
+                                                 ManiaHitObject obj,
+                                                 double time,
+                                                 int minCol,
+                                                 int maxCol,
+                                                 out int chosen)
+        {
+            int totalColumns = Math.Max(1, beatmap.TotalColumns);
+            int clampedMin = Math.Clamp(minCol, 0, totalColumns - 1);
+            int clampedMax = Math.Clamp(maxCol, 0, totalColumns - 1);
+            chosen = -1;
+
+            if (clampedMin > clampedMax)
+                return false;
+
+            int bestDist = int.MaxValue;
+
+            for (int col = clampedMin; col <= clampedMax; col++)
+            {
+                if (!isColumnAvailable(beatmap, obj, col, time))
+                    continue;
+
+                int dist = Math.Abs(col - obj.Column);
+
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    chosen = col;
+                }
+            }
+
+            return chosen >= 0;
+        }
+
+        private static bool isColumnAvailable(ManiaBeatmap beatmap, ManiaHitObject obj, int column, double time)
+        {
+            if (ManiaKeyPatternHelp.HasNoteAtTime(beatmap, column, time, obj, TIME_TOLERANCE))
+                return false;
+
+            if (ManiaKeyPatternHelp.IsHoldOccupyingColumn(beatmap, column, time, obj, TIME_TOLERANCE))
+                return false;
+
+            return true;
         }
     }
 }

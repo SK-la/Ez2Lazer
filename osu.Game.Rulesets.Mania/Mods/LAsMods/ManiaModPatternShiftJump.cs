@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (windowObjects.Count == 0)
                 return;
 
-            double beatLength = beatmap.ControlPointInfo.TimingPointAt(windowStart).BeatLength;
+            double beatLength = getFixedBeatLength(beatmap, windowStart);
             if (beatLength <= 0)
                 return;
 
@@ -53,11 +53,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             int minK = Math.Max(0, settings.MinK);
             int maxK = Math.Max(minK, settings.MaxK);
 
-            relocateNotesToHalfOrBeat(windowObjects, beatmap, beatLength, windowStart, windowEnd, rng);
+            relocateNotesToCoarseGrid(windowObjects, beatmap, beatLength, windowStart, windowEnd, rng);
             applyJumpPattern(beatmap, t, beatLength, windowStart, windowEnd, minK, maxK, rng);
         }
 
-        private static void relocateNotesToHalfOrBeat(List<ManiaHitObject> windowObjects,
+        private static void relocateNotesToCoarseGrid(List<ManiaHitObject> windowObjects,
                                                       ManiaBeatmap beatmap,
                                                       double beatLength,
                                                       double windowStart,
@@ -115,54 +115,54 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 if (half < windowStart - TIME_TOLERANCE || half > windowEnd + TIME_TOLERANCE)
                     continue;
 
-                    // If note is finer than quarter, try promoting it to the nearest coarse grid
-                    // (beat / half / quarter) ordered by proximity, instead of forcing to quarter only.
-                    if (isFinerThanQuarter(obj.StartTime))
+                // If note is finer than quarter, try promoting it to the nearest coarse grid
+                // (beat / half / quarter) ordered by proximity.
+                if (isFinerThanQuarter(obj.StartTime))
+                {
+                    double[] coarseIntervals = new[] { beatLength, beatLength / 2.0, beatLength / 4.0 };
+                    var candidates = new List<double>(8);
+
+                    foreach (double interval in coarseIntervals)
                     {
-                        double[] coarseIntervals = new[] { beatLength, beatLength / 2.0, beatLength / 4.0 };
-                        var candidates = new List<double>(8);
-
-                        foreach (double interval in coarseIntervals)
-                        {
-                            if (interval <= 0)
-                                continue;
-
-                            double nearest = Math.Round(obj.StartTime / interval) * interval;
-                            candidates.Add(nearest);
-
-                            const int max_steps = 2;
-
-                            for (int i = 1; i <= max_steps; i++)
-                            {
-                                candidates.Add(nearest - i * interval);
-                                candidates.Add(nearest + i * interval);
-                            }
-                        }
-
-                        // Filter to window and dedupe, then try closest candidates first.
-                        var distinctCandidates = candidates
-                                                 .Where(c => c >= windowStart - TIME_TOLERANCE && c <= windowEnd + TIME_TOLERANCE)
-                                                 .Distinct()
-                                                 .ToList();
-
-                        distinctCandidates.Sort((a, b) => Math.Abs(a - obj.StartTime).CompareTo(Math.Abs(b - obj.StartTime)));
-
-                        bool moved = false;
-
-                        foreach (double c in distinctCandidates)
-                        {
-                            double offset = c - obj.StartTime;
-
-                            if (ManiaKeyPatternHelp.TryApplyDelayOffset(beatmap, obj, offset, out _))
-                            {
-                                moved = true;
-                                break;
-                            }
-                        }
-
-                        if (moved)
+                        if (interval <= 0)
                             continue;
+
+                        double nearest = Math.Round(obj.StartTime / interval) * interval;
+                        candidates.Add(nearest);
+
+                        const int max_steps = 2;
+
+                        for (int i = 1; i <= max_steps; i++)
+                        {
+                            candidates.Add(nearest - i * interval);
+                            candidates.Add(nearest + i * interval);
+                        }
                     }
+
+                    // Filter to window and dedupe, then try closest candidates first.
+                    var distinctCandidates = candidates
+                                             .Where(c => c >= windowStart - TIME_TOLERANCE && c <= windowEnd + TIME_TOLERANCE)
+                                             .Distinct()
+                                             .ToList();
+
+                    distinctCandidates.Sort((a, b) => Math.Abs(a - obj.StartTime).CompareTo(Math.Abs(b - obj.StartTime)));
+
+                    bool moved = false;
+
+                    foreach (double c in distinctCandidates)
+                    {
+                        double offset = c - obj.StartTime;
+
+                        if (ManiaKeyPatternHelp.TryApplyDelayOffset(beatmap, obj, offset, out _))
+                        {
+                            moved = true;
+                            break;
+                        }
+                    }
+
+                    if (moved)
+                        continue;
+                }
 
                 // obj is on quarter grid. If surrounding quarter-range (previous/next quarter within half-beat) has notes,
                 // try to move this note horizontally (column) to a nearby column that is free in both prev and next quarter times.
@@ -223,11 +223,46 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var existingCols = ManiaKeyPatternHelp.GetColumnsAtTime(beatmap.HitObjects.ToList(), candidateTime, TIME_TOLERANCE);
             columns.RemoveAll(c => existingCols.Contains(c));
 
+            // 禁止产生 1/4 间隙的叠键：若同列在前后 1/4 内已有 note，则不在该列添加
+            double quarter = beatLength / 4.0;
+
+            if (quarter > 0)
+            {
+                columns.RemoveAll(c => hasNoteWithinQuarterGap(beatmap, c, candidateTime, quarter));
+            }
+
             int count = rng.Next(minK, maxK + 1);
             count = Math.Clamp(count, 0, columns.Count);
 
             for (int i = 0; i < count; i++)
                 ManiaKeyPatternHelp.TryAddNoteFromCandidates(beatmap, columns, null, rng, candidateTime);
+        }
+
+        private static bool hasNoteWithinQuarterGap(ManiaBeatmap beatmap, int column, double time, double quarter)
+        {
+            double minTime = time - quarter - TIME_TOLERANCE;
+            double maxTime = time + quarter + TIME_TOLERANCE;
+
+            foreach (var obj in beatmap.HitObjects)
+            {
+                if (obj.Column != column)
+                    continue;
+
+                double objTime = obj.StartTime;
+                if (objTime >= minTime && objTime <= maxTime)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static double getFixedBeatLength(ManiaBeatmap beatmap, double fallbackTime)
+        {
+            var timingPoints = beatmap.ControlPointInfo.TimingPoints;
+            if (timingPoints.Count > 0)
+                return timingPoints[0].BeatLength;
+
+            return beatmap.ControlPointInfo.TimingPointAt(fallbackTime).BeatLength;
         }
     }
 }
