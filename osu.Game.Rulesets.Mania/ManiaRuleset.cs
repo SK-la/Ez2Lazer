@@ -14,7 +14,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
@@ -436,7 +435,7 @@ namespace osu.Game.Rulesets.Mania
             return (PlayfieldType)Enum.GetValues(typeof(PlayfieldType)).Cast<int>().OrderDescending().First(v => variant >= v);
         }
 
-        protected override IEnumerable<HitResult> GetValidHitResults()
+        public override IEnumerable<HitResult> GetValidHitResults()
         {
             return new[]
             {
@@ -445,13 +444,11 @@ namespace osu.Game.Rulesets.Mania
                 HitResult.Good,
                 HitResult.Ok,
                 HitResult.Meh,
-                HitResult.IgnoreHit,
-                HitResult.IgnoreMiss,
-                HitResult.ComboBreak,
+                HitResult.Miss,
                 HitResult.Poor,
-
-                // HitResult.SmallBonus is used for awarding perfect bonus score but is not included here as
-                // it would be a bit redundant to show this to the user.
+                HitResult.IgnoreHit,
+                HitResult.ComboBreak,
+                HitResult.IgnoreMiss,
             };
         }
 
