@@ -61,7 +61,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Waveform_Label), nameof(EzManiaModStrings.PatternShift_Waveform_Description))]
         public Bindable<EzOscillator.Waveform> Waveform { get; } = new Bindable<EzOscillator.Waveform>(EzOscillator.Waveform.Sine);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Level_Label), nameof(EzManiaModStrings.PatternShift_Level_Description))]
         public BindableNumber<int> Level { get; } = new BindableInt(0)
         {
             MinValue = 0,

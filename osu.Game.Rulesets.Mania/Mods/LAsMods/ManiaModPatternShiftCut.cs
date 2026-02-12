@@ -4,7 +4,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Bindables;
+using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
@@ -21,6 +24,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         protected override int DefaultWindowProcessInterval => 2;
         protected override int DefaultWindowProcessOffset => 1;
         protected override int DefaultApplyOrder => 50;
+
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Level_Label), nameof(EzManiaModStrings.PatternShift_Level_Description))]
+        public new BindableNumber<int> Level => base.Level;
 
         protected override void ApplyPatternForWindow(List<ManiaHitObject> windowObjects,
                                                       ManiaBeatmap beatmap,
