@@ -160,8 +160,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 {
                     bool useLevelFallback = patternType == KeyPatternType.Jack
                                             || patternType == KeyPatternType.Jump
-                                            || patternType == KeyPatternType.Cut
-                                            || patternType == KeyPatternType.Cross;
+                                            || patternType == KeyPatternType.Stream;
 
                     if (!useLevelFallback)
                     {
@@ -827,11 +826,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     return true;
             }
 
-            // Jack/Jump/Cut/Cross: 窗口内出现 1/4 及以上（含 1/4）单调变化则跳过
+            // Jack/Jump/Stream: 窗口内出现 1/4 及以上（含 1/4）单调变化则跳过
             if (patternType == KeyPatternType.Jack
                 || patternType == KeyPatternType.Jump
-                || patternType == KeyPatternType.Cut
-                || patternType == KeyPatternType.Cross)
+                || patternType == KeyPatternType.Stream)
             {
                 var grouped = new List<(double time, double avgCol)>();
                 int monoIndex = lowerBoundByTime(objects, ctx.WindowStart);
@@ -1056,8 +1054,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     minCount = Math.Max(1, maxCount - 2);
                     break;
 
-                case KeyPatternType.Cut:
-                case KeyPatternType.Cross:
+                case KeyPatternType.Stream:
                     maxCount = Math.Clamp(level, 1, totalColumns);
                     minCount = Math.Max(1, maxCount - 1);
                     break;

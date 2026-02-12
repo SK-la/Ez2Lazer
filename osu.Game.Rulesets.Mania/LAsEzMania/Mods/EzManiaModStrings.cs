@@ -156,7 +156,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
             "Jack level description:\n1: 1/2 sources, move, one-side columns.\n2: 1/2 sources, move, both-sides only (fallback to lower levels on fail).\n3: 1/4 sources, move, one-side columns.\n4: 1/4 sources, move, both-sides only (fallback).\n5: 1/2 sources, add, one-side columns.\n6: 1/2 sources, add, both-sides only (fallback).\n7: 1/4 sources, add, one-side columns.\n8: 1/4 sources, add, both-sides only (fallback).\n9: level 5 + level 7.\n10: level 6 + level 8.");
 
         public static readonly LocalisableString PatternShift_WindowMaxIterations_Label = new EzLocalisableString("窗口最大迭代", "Window Max Iterations");
-        public static readonly LocalisableString PatternShift_WindowMaxIterations_Description = new EzLocalisableString("每个窗口的最大迭代次数 (1-4)", "Max iterations per window (1-4).");
+        public static readonly LocalisableString PatternShift_WindowMaxIterations_Description = new EzLocalisableString("每个窗口的最大迭代次数", "Max iterations per window.");
 
         // SR Adjust
         public static readonly LocalisableString SRAdjust_RescaleThreshold_Label = new EzLocalisableString("重缩放阈值", "Rescale Threshold");

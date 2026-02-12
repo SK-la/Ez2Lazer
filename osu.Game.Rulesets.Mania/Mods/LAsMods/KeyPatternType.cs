@@ -5,11 +5,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
     public enum KeyPatternType
     {
-        // 切
-        Cut,
-
-        // 叉
-        Cross,
+        // 合并的流（原 Cut / Cross）
+        Stream,
 
         // 高分偏移
         Delay,
