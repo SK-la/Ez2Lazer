@@ -12,7 +12,10 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         // Ez2Settings
         public static readonly LocalisableString Ez2Settings_Description = new EzLocalisableString("按固定模版，移除盘子和踏板", "Remove Scratch, Panel.");
         public static readonly LocalisableString NoScratch_Label = new EzLocalisableString("无盘", "No Scratch");
-        public static readonly LocalisableString NoScratch_Description = new EzLocalisableString("按固定模版，去除Ez街机谱面中的盘子. 用于: 6-9k L-S; 12\\14\\16k LR-S", "No (EZ)Scratch. For: 6-9k L-S; 12\\14\\16k LR-S");
+
+        public static readonly LocalisableString NoScratch_Description =
+            new EzLocalisableString("按固定模版，去除Ez街机谱面中的盘子. 用于: 6-9k L-S; 12\\14\\16k LR-S", "No (EZ)Scratch. For: 6-9k L-S; 12\\14\\16k LR-S");
+
         public static readonly LocalisableString NoPanel_Label = new EzLocalisableString("无踏板", "No Panel");
         public static readonly LocalisableString NoPanel_Description = new EzLocalisableString("按固定模版，去除Ez街机谱面中的脚踏. 用于: 7\\14\\18k", "No (EZ)Panel. For: 7\\14\\18k");
         public static readonly LocalisableString HealthyScratch_Label = new EzLocalisableString("健康盘子", "Healthy Scratch");
@@ -29,12 +32,20 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString DeleteEColumn_Label = new EzLocalisableString("删除E列", "Delete E Column Type");
         public static readonly LocalisableString DeleteEColumn_Description = new EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
         public static readonly LocalisableString EnableCustomDelete_Label = new EzLocalisableString("自定义删除列", "Enable Custom Delete");
-        public static readonly LocalisableString EnableCustomDelete_Description = new EzLocalisableString("开启后启用自定义删除列功能，支持与其他功能同时使用。输入多个数字如'2468'删除第2、4、6、8列", "Enable custom column deletion when enabled, can be used with other features. Input multiple digits like '2468' to delete columns 2, 4, 6, 8");
+
+        public static readonly LocalisableString EnableCustomDelete_Description = new EzLocalisableString("开启后启用自定义删除列功能，支持与其他功能同时使用。输入多个数字如'2468'删除第2、4、6、8列",
+            "Enable custom column deletion when enabled, can be used with other features. Input multiple digits like '2468' to delete columns 2, 4, 6, 8");
+
         public static readonly LocalisableString CustomDeleteColumn_Label = new EzLocalisableString("删除列序号", "Delete Column Indexes");
-        public static readonly LocalisableString CustomDeleteColumn_Description = new EzLocalisableString("输入要删除的列序号，支持多个数字。如'2468'删除2、4、6、8列。超过谱面列数的数字将被忽略。支持最多10k（0表示第10列）", "Input the column indexes to delete, support multiple digits. E.g. '2468' deletes columns 2, 4, 6, 8. Indexes exceeding the beatmap's column count will be ignored. Support up to 10k (0 means column 10)");
+
+        public static readonly LocalisableString CustomDeleteColumn_Description = new EzLocalisableString("输入要删除的列序号，支持多个数字。如'2468'删除2、4、6、8列。超过谱面列数的数字将被忽略。支持最多10k（0表示第10列）",
+            "Input the column indexes to delete, support multiple digits. E.g. '2468' deletes columns 2, 4, 6, 8. Indexes exceeding the beatmap's column count will be ignored. Support up to 10k (0 means column 10)");
 
         public static readonly LocalisableString EnableCustomReorder_Label = new EzLocalisableString("自定义列重排", "Enable Custom Reorder");
-        public static readonly LocalisableString EnableCustomReorder_Description = new EzLocalisableString("开启后启用自定义列清洗Column功能，如果更改了列数，需要重开此功能才能正常生效", "Enable custom column reorder when enabled, if the column count is changed, you need to toggle this feature again to take effect");
+
+        public static readonly LocalisableString EnableCustomReorder_Description = new EzLocalisableString("开启后启用自定义列清洗Column功能，如果更改了列数，需要重开此功能才能正常生效",
+            "Enable custom column reorder when enabled, if the column count is changed, you need to toggle this feature again to take effect");
+
         public static readonly LocalisableString CustomReorderColumn_Label = new EzLocalisableString("列重排规则", "Column Reorder Rule");
 
         public static readonly LocalisableString CustomReorderColumn_Description = new EzLocalisableString(
@@ -129,11 +140,50 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString PatternShift_MaxChord_Label = new EzLocalisableString("和弦上限", "Max Chord");
         public static readonly LocalisableString PatternShift_MaxChord_Description = new EzLocalisableString("每一排最多保留的note数量", "Maximum notes per row.");
         public static readonly LocalisableString PatternShift_AlignDivisor_Label = new EzLocalisableString("对齐", "Align");
-        public static readonly LocalisableString PatternShift_AlignDivisor_Description = new EzLocalisableString("对齐到节拍网格，0=关闭，1=1/1，2=1/2，4=1/4，8=1/8，16=1/16", "Snap to beat grid. 0=off, 1=1/1, 2=1/2, 4=1/4, 8=1/8, 16=1/16.");
+
+        public static readonly LocalisableString PatternShift_AlignDivisor_Description =
+            new EzLocalisableString("对齐到节拍网格，0=关闭，1=1/1，2=1/2，4=1/4，8=1/8，16=1/16", "Snap to beat grid. 0=off, 1=1/1, 2=1/2, 4=1/4, 8=1/8, 16=1/16.");
+
         public static readonly LocalisableString PatternShift_DelayLevel_Label = new EzLocalisableString("Delay", "Delay");
+
         public static readonly LocalisableString PatternShift_DelayLevel_Description = new EzLocalisableString(
-            "随机将部分note前后偏移，0=关闭。1-3: 偏移1/16、3/32、1/8；偏移数量<=等级，且至少保留等级数量不偏移。4-6: 同样偏移；至少保留1个不偏移。7-10: 偏移1/16、1/12、5/48、1/8；偏移数量<=等级，不强制保留。",
-            "Randomly offset some notes. 0=off. 1-3: offsets 1/16, 3/32, 1/8; shift up to level, keep at least level unshifted. 4-6: same offsets; keep at least 1 unshifted. 7-10: offsets 1/16, 1/12, 5/48, 1/8; shift up to level, no minimum unshifted.");
+            "随机将部分note前后偏移，0=关闭。\n1-3: 偏移1/16、3/32、1/8；偏移数量<=等级，且至少保留等级数量不偏移。\n4-6: 同样偏移；至少保留1个不偏移。\n7-10: 偏移1/16、1/12、5/48、1/8；偏移数量<=等级，不强制保留。",
+            "Randomly offset some notes. 0=off.\n1-3: offsets 1/16, 3/32, 1/8; shift up to level, keep at least level unshifted.\n4-6: same offsets; keep at least 1 unshifted.\n7-10: offsets 1/16, 1/12, 5/48, 1/8; shift up to level, no minimum unshifted.");
+
+        // Additional labels for PatternShift variants
+        public static readonly LocalisableString PatternShift_JackLevel_Description = new EzLocalisableString(
+            "Jack 等级说明：\n1: 1/2 源，移动，单侧列。\n2: 1/2 源，移动，仅双侧列（失败时回退到较低等级）。\n3: 1/4 源，移动，单侧列。\n4: 1/4 源，移动，仅双侧列（失败时回退）。\n5: 1/2 源，添加，单侧列。\n6: 1/2 源，添加，仅双侧列（失败时回退）。\n7: 1/4 源，添加，单侧列。\n8: 1/4 源，添加，仅双侧列（失败时回退）。\n9: 等级5 + 等级7。\n10: 等级6 + 等级8.",
+            "Jack level description:\n1: 1/2 sources, move, one-side columns.\n2: 1/2 sources, move, both-sides only (fallback to lower levels on fail).\n3: 1/4 sources, move, one-side columns.\n4: 1/4 sources, move, both-sides only (fallback).\n5: 1/2 sources, add, one-side columns.\n6: 1/2 sources, add, both-sides only (fallback).\n7: 1/4 sources, add, one-side columns.\n8: 1/4 sources, add, both-sides only (fallback).\n9: level 5 + level 7.\n10: level 6 + level 8.");
+
+        public static readonly LocalisableString PatternShift_WindowMaxIterations_Label = new EzLocalisableString("窗口最大迭代", "Window Max Iterations");
+        public static readonly LocalisableString PatternShift_WindowMaxIterations_Description = new EzLocalisableString("每个窗口的最大迭代次数 (1-4)", "Max iterations per window (1-4).");
+
+        // SR Adjust
+        public static readonly LocalisableString SRAdjust_RescaleThreshold_Label = new EzLocalisableString("重缩放阈值", "Rescale Threshold");
+        public static readonly LocalisableString SRAdjust_RescaleThreshold_Description = new EzLocalisableString("超过此阈值后将降低难度膨胀速度", "Reduce difficulty inflation speed when above this threshold.");
+
+        public static readonly LocalisableString SRAdjust_LnMultiplier_Label = new EzLocalisableString("LN 因子", "LN Integral Multiplier");
+        public static readonly LocalisableString SRAdjust_LnMultiplier_Description = new EzLocalisableString("LN 因子", "LN integral multiplier.");
+
+        public static readonly LocalisableString PatternShift_Waveform_Label = new EzLocalisableString("波形", "Waveform");
+        public static readonly LocalisableString PatternShift_Waveform_Description = new EzLocalisableString("振荡器波形，影响键型局部处理时的循环周期", "Oscillator waveform used to vary pattern intensity.");
+
+        public static readonly LocalisableString PatternShift_Level_Label = new EzLocalisableString("等级", "Level");
+
+        public static readonly LocalisableString PatternShift_Level_Description =
+            new EzLocalisableString("0=off, 1-10。控制每个窗口生成的音符数量", "0=off, 1-10. Controls how many notes are generated per window.");
+
+        public static readonly LocalisableString PatternShift_OscillationBeats_Label = new EzLocalisableString("振荡节拍", "Oscillation Beats");
+        public static readonly LocalisableString PatternShift_OscillationBeats_Description = new EzLocalisableString("振荡器变化的节拍间隔。1=每拍。", "Beat interval for oscillator changes. 1=every beat.");
+
+        public static readonly LocalisableString PatternShift_WindowInterval_Label = new EzLocalisableString("窗口间隔", "Window Interval");
+        public static readonly LocalisableString PatternShift_WindowInterval_Description = new EzLocalisableString("每N半拍处理一次。1=每半拍。", "Process every N half-beats. 1=every half-beat.");
+
+        public static readonly LocalisableString PatternShift_WindowStartOffset_Label = new EzLocalisableString("窗口起始偏移", "Window Start Offset");
+        public static readonly LocalisableString PatternShift_WindowStartOffset_Description = new EzLocalisableString("1-4：第一到第四个半拍。", "1-4: first to fourth half-beat.");
+
+        public static readonly LocalisableString PatternShift_Seed_Label = new EzLocalisableString("种子", "Seed");
+        public static readonly LocalisableString PatternShift_Seed_Description = new EzLocalisableString("使用自定义种子代替随机种子", "Use a custom seed instead of a random one");
 
         // ====================================================================================================
         // Krr Mods - Labels & Descriptions
@@ -332,7 +382,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString UseCustomOD_Description = new EzLocalisableString("低优先级", "Low Priority");
         public static readonly LocalisableString OD_Label = new EzLocalisableString("OD", "OD");
         public static readonly LocalisableString OD_Description = new EzLocalisableString("选择要重新计算的OD", "Choose the OD you want to recalculate.");
-    #pragma warning restore IDE1006
+#pragma warning restore IDE1006
 
         // Adjust
         public static readonly LocalisableString ScoreMultiplier_Label = new EzLocalisableString("分数倍数", "Score Multiplier");

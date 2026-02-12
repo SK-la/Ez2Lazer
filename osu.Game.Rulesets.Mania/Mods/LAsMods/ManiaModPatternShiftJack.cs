@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
@@ -24,10 +25,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         protected override int DefaultWindowProcessOffset => 0;
         protected override int DefaultApplyOrder => 50;
 
-        [SettingSource("Level", "0=off. 1-2: 1/2 move (one-side/both). 3-4: 1/4 move (one-side/both). 5-6: 1/2 add (one-side/both). 7-8: 1/4 add (one-side/both). 9: 5+7. 10: 6+8.")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Level_Label), nameof(EzManiaModStrings.PatternShift_JackLevel_Description))]
         public new BindableNumber<int> Level => base.Level;
 
-        [SettingSource("Window Max Iterations", "Max iterations per window (1-4).")]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_WindowMaxIterations_Label), nameof(EzManiaModStrings.PatternShift_WindowMaxIterations_Description))]
         public BindableNumber<int> WindowMaxIterations { get; } = new BindableInt(2)
         {
             MinValue = 1,

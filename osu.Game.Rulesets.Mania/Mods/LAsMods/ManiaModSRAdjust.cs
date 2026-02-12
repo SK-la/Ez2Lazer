@@ -10,6 +10,7 @@ using osu.Game.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
@@ -27,7 +28,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override bool Ranked => false;
 
-        [SettingSource("Rescale Threshold", "超过此阈值后将降低难度膨胀速度", SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SRAdjust_RescaleThreshold_Label), nameof(EzManiaModStrings.SRAdjust_RescaleThreshold_Description),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> RescaleThreshold { get; } = new BindableDouble(SRCalculator.RescaleHighThreshold)
         {
             MinValue = 5,
@@ -35,7 +37,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource("LN Integral Multiplier", "LN 因子", SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SRAdjust_LnMultiplier_Label), nameof(EzManiaModStrings.SRAdjust_LnMultiplier_Description),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> LnMultiplier { get; } = new BindableDouble(SRCalculator.LnIntegralMultiplier)
         {
             MinValue = 2,
@@ -53,8 +56,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             get
             {
-                yield return ("Rescale Threshold", new LocalisableString(RescaleThreshold.Value.ToString(CultureInfo.InvariantCulture)));
-                yield return ("LN Integral Multiplier", new LocalisableString(LnMultiplier.Value.ToString(CultureInfo.InvariantCulture)));
+                yield return (EzManiaModStrings.SRAdjust_RescaleThreshold_Label, new LocalisableString(RescaleThreshold.Value.ToString(CultureInfo.InvariantCulture)));
+                yield return (EzManiaModStrings.SRAdjust_LnMultiplier_Label, new LocalisableString(LnMultiplier.Value.ToString(CultureInfo.InvariantCulture)));
             }
         }
 
