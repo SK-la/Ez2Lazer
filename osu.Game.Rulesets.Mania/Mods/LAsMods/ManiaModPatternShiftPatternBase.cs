@@ -34,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                                       Random rng,
                                                       int maxIterationsPerWindow);
 
-        protected virtual EzOscillator.Waveform DefaultWaveform => EzOscillator.Waveform.Sine;
+        protected virtual EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
 
         protected virtual int DefaultLevel => 0;
         protected virtual int DefaultOscillationBeats => 1;
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override bool ValidForFreestyleAsRequiredMod => false;
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Waveform_Label), nameof(EzManiaModStrings.PatternShift_Waveform_Description))]
-        public Bindable<EzOscillator.Waveform> Waveform { get; } = new Bindable<EzOscillator.Waveform>(EzOscillator.Waveform.Sine);
+        public Bindable<EzOscillator.EzWaveform> Waveform { get; } = new Bindable<EzOscillator.EzWaveform>(EzOscillator.EzWaveform.Sine);
 
         public BindableNumber<int> Level { get; } = new BindableInt(0)
         {
@@ -138,7 +138,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             Seed.Value ??= RNG.Next();
 
-            var oscillator = new EzOscillator(Seed.Value.Value, waveform: Waveform.Value);
+            var oscillator = new EzOscillator(Seed.Value.Value, ezWaveform: Waveform.Value);
 
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 

@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
@@ -18,7 +20,6 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
@@ -65,7 +66,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         };
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_AlignDivisor_Label), nameof(EzManiaModStrings.PatternShift_AlignDivisor_Description))]
-        public BindableNumber<int> AlignDivisor { get; } = new BindableInt(0)
+        public BindableNumber<int> AlignDivisor { get; } = new BindableInt
         {
             MinValue = 0,
             MaxValue = 16,
@@ -73,9 +74,20 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         };
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_DelayLevel_Label), nameof(EzManiaModStrings.PatternShift_DelayLevel_Description))]
-        public BindableNumber<int> DelayLevel { get; } = new BindableInt(0)
+        public BindableNumber<int> DelayLevel { get; } = new BindableInt
         {
             MinValue = 0,
+            MaxValue = 10,
+            Precision = 1
+        };
+
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Regenerate_Label), nameof(EzManiaModStrings.PatternShift_Regenerate_Description))]
+        public BindableBool Regenerate { get; } = new BindableBool();
+
+        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_RegenerateDifficulty_Label), nameof(EzManiaModStrings.PatternShift_RegenerateDifficulty_Description))]
+        public BindableNumber<int> RegenerateDifficulty { get; } = new BindableInt(5)
+        {
+            MinValue = 2,
             MaxValue = 10,
             Precision = 1
         };
@@ -84,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ApplyOrder_Label), nameof(EzManiaModStrings.ApplyOrder_Description))]
-        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(0)
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt
         {
             MinValue = 0,
             MaxValue = 100
@@ -101,6 +113,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 yield return ("Max Chord", $"{MaxChord.Value}");
                 yield return ("Align Divisor", AlignDivisor.Value == 0 ? "Off" : $"1/{AlignDivisor.Value}");
                 yield return ("Delay Level", $"{DelayLevel.Value}");
+                yield return ("Regenerate", Regenerate.Value ? "On" : "Off");
+                yield return ("Regenerate Difficulty", $"{RegenerateDifficulty.Value}");
                 yield return ("Seed", Seed.Value?.ToString() ?? "Random");
             }
         }
@@ -113,82 +127,26 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            Seed.Value ??= RNG.Next();
-            var rng = new Random(Seed.Value.Value);
+            ApplyToBeatmapInternal((ManiaBeatmap)beatmap, null);
+        }
 
-            var maniaBeatmap = (ManiaBeatmap)beatmap;
+        public void ApplyToWorkingBeatmap(WorkingBeatmap workingBeatmap)
+        {
+            ArgumentNullException.ThrowIfNull(workingBeatmap);
 
-            int targetColumns = Math.Clamp(KeyCount.Value, 2, ManiaRuleset.MAX_STAGE_KEYS);
-            int maxChord = Math.Clamp(MaxChord.Value, 1, targetColumns);
-            int difficulty = Math.Clamp(Density.Value, 1, 10);
+            double trackLength = 0;
 
-            if (maniaBeatmap.HitObjects.Count == 0)
-                return;
-
-            maniaBeatmap.Stages.Clear();
-            maniaBeatmap.Stages.Add(new StageDefinition(targetColumns));
-            maniaBeatmap.Difficulty.CircleSize = targetColumns;
-
-            double snap(double time)
+            try
             {
-                if (AlignDivisor.Value <= 0)
-                    return time;
-
-                return beatmap.ControlPointInfo.GetClosestSnappedTime(time, AlignDivisor.Value);
+                if (workingBeatmap.TrackLoaded)
+                    trackLength = workingBeatmap.Track.Length;
+            }
+            catch
+            {
+                trackLength = 0;
             }
 
-            var notes = maniaBeatmap.HitObjects.Select(h =>
-            {
-                if (h is HoldNote hold)
-                {
-                    double start = snap(hold.StartTime);
-                    double end = snap(hold.EndTime);
-
-                    if (end < start)
-                        end = start;
-
-                    return new PatternShiftNote(start, end, hold.GetNodeSamples(0), hold.Column, end > start);
-                }
-
-                double time = snap(h.StartTime);
-                return new PatternShiftNote(time, time, h.Samples, h.Column, false);
-            }).OrderBy(n => n.StartTime).ThenBy(n => n.SourceColumn).ToList();
-
-            var chords = buildChords(notes);
-            applyDelay(chords, beatmap.ControlPointInfo, DelayLevel.Value, rng);
-            reduceAllChords(chords, maxChord, difficulty);
-            assignColumns(chords, targetColumns, rng);
-
-            var newObjects = new List<ManiaHitObject>(notes.Count);
-
-            foreach (var chord in chords)
-            {
-                foreach (var note in chord.Notes)
-                {
-                    if (note.IsHold && note.EndTime > note.StartTime)
-                    {
-                        newObjects.Add(new HoldNote
-                        {
-                            Column = note.AssignedColumn,
-                            StartTime = note.StartTime,
-                            Duration = note.EndTime - note.StartTime,
-                            NodeSamples = new List<IList<HitSampleInfo>> { note.Samples, Array.Empty<HitSampleInfo>() }
-                        });
-                    }
-                    else
-                    {
-                        newObjects.Add(new Note
-                        {
-                            Column = note.AssignedColumn,
-                            StartTime = note.StartTime,
-                            Samples = note.Samples
-                        });
-                    }
-                }
-            }
-
-            maniaBeatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToList();
-            ManiaNoteCleanupTool.EnforceHoldReleaseGap(maniaBeatmap);
+            ApplyToBeatmapInternal((ManiaBeatmap)workingBeatmap.Beatmap, workingBeatmap.Waveform, trackLength);
         }
 
         private static List<PatternShiftChord> buildChords(List<PatternShiftNote> notes)
@@ -341,19 +299,16 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     minTime = lastUsedTime[index];
                     minIndexList.Add(index);
                 }
-                else if (lastUsedTime[index] <= minTime + 24 && lastUsedTime[index] >= minTime - 24)
-                {
-                    minIndexList.Add(index);
-                }
+                else if (lastUsedTime[index] <= minTime + 24 && lastUsedTime[index] >= minTime - 24) minIndexList.Add(index);
             }
 
-            int noteLeft = minIndexList.Count(i => i < (keys / 2));
-            int noteRight = minIndexList.Count(i => i >= ((keys + 1) / 2));
+            int noteLeft = minIndexList.Count(i => i < keys / 2);
+            int noteRight = minIndexList.Count(i => i >= (keys + 1) / 2);
 
             if (noteRight > 0 && noteLeft > 0)
             {
-                bool lastOnLeft = lastNote < (keys / 2);
-                minIndexList = minIndexList.Where(i => lastOnLeft ? i >= ((keys + 1) / 2) : i < (keys / 2)).ToList();
+                bool lastOnLeft = lastNote < keys / 2;
+                minIndexList = minIndexList.Where(i => lastOnLeft ? i >= (keys + 1) / 2 : i < keys / 2).ToList();
             }
 
             return minIndexList.Count > 0 ? minIndexList[rng.Next(minIndexList.Count)] : -1;
@@ -374,13 +329,245 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return false;
         }
 
+        private List<PatternShiftNote> ModifyNotesByDifficulty(List<PatternShiftNote> originalNotes, ManiaBeatmap beatmap, int targetColumns, int stars, Random rng)
+        {
+            // Default behavior: stars==5 => minimal change. stars<5 remove notes; stars>5 add notes.
+            var notes = new List<PatternShiftNote>(originalNotes);
+
+            if (notes.Count == 0)
+                return notes;
+
+            int center = 5;
+            int delta = stars - center;
+
+            var oscSeed = Seed.Value ?? RNG.Next();
+            var osc = new EzOscillator((int)oscSeed);
+
+            if (delta < 0)
+            {
+                double removalRatio = Math.Min(0.95, -delta / (double)(center - 1));
+                int targetRemove = (int)Math.Round(notes.Count * removalRatio);
+
+                var remaining = new List<PatternShiftNote>();
+                int removed = 0;
+
+                for (int i = 0; i < notes.Count; i++)
+                {
+                    double oscVal = osc.Next(); // 0..1
+                    double p = removalRatio * (0.6 + 0.8 * (1.0 - oscVal));
+
+                    if (removed < targetRemove && rng.NextDouble() < p)
+                    {
+                        removed++;
+                        continue;
+                    }
+
+                    remaining.Add(notes[i]);
+                }
+
+                // if still need to remove, remove from tail
+                while (removed < targetRemove && remaining.Count > 0)
+                {
+                    remaining.RemoveAt(remaining.Count - 1);
+                    removed++;
+                }
+
+                return remaining.OrderBy(n => n.StartTime).ThenBy(n => n.SourceColumn).ToList();
+            }
+
+            if (delta > 0)
+            {
+                double insertRatio = Math.Min(2.0, delta / (double)center); // allow up to doubling local density
+                int targetAdd = (int)Math.Round(notes.Count * insertRatio * 0.25); // conservative additions
+
+                var result = new List<PatternShiftNote>(notes);
+
+                for (int i = 0; i < targetAdd; i++)
+                {
+                    int idx = rng.Next(0, notes.Count);
+                    var anchor = notes[idx];
+                    var tp = beatmap.ControlPointInfo.TimingPointAt(anchor.StartTime);
+                    double beatLength = tp.BeatLength;
+
+                    int[] allowedSubdiv = new[] { 2, 4, 8, 16 };
+                    int subdiv = allowedSubdiv[rng.Next(allowedSubdiv.Length)];
+
+                    double offset = (rng.NextDouble() - 0.5) * (beatLength / subdiv);
+                    double newTime = Math.Max(0, anchor.StartTime + offset);
+
+                    int col = rng.Next(0, targetColumns);
+
+                    // avoid duplicate at same time+col within tolerance
+                    bool exists = result.Any(n => n.SourceColumn == col && Math.Abs(n.StartTime - newTime) <= 3);
+
+                    if (exists)
+                    {
+                        // try different column
+                        for (int t = 0; t < 6 && exists; t++)
+                        {
+                            col = (col + 1) % targetColumns;
+                            exists = result.Any(n => n.SourceColumn == col && Math.Abs(n.StartTime - newTime) <= 3);
+                        }
+
+                        if (exists) continue;
+                    }
+
+                    result.Add(new PatternShiftNote(newTime, newTime, Array.Empty<HitSampleInfo>(), col, false));
+                }
+
+                return result.OrderBy(n => n.StartTime).ThenBy(n => n.SourceColumn).ToList();
+            }
+
+            return notes;
+        }
+
+        // audio-based regeneration removed; use ModifyNotesByDifficulty to adjust original notes
+
+        private static int MaxChordDefault(int targetColumns)
+        {
+            // heuristic: more keys allow slightly larger chords
+            return Math.Min(5, Math.Max(1, targetColumns / 2));
+        }
+
+        // In-place Cooley-Tukey FFT (radix-2)
+        private static void FFT(Complex[] buffer, bool inverse)
+        {
+            int n = buffer.Length;
+            int bits = (int)Math.Log(n, 2);
+
+            // bit-reverse permutation
+            for (int i = 0; i < n; i++)
+            {
+                int j = 0;
+                int x = i;
+
+                for (int k = 0; k < bits; k++)
+                {
+                    j = (j << 1) | (x & 1);
+                    x >>= 1;
+                }
+
+                if (j > i)
+                {
+                    (buffer[i], buffer[j]) = (buffer[j], buffer[i]);
+                }
+            }
+
+            for (int len = 2; len <= n; len <<= 1)
+            {
+                double angle = 2 * Math.PI / len * (inverse ? 1 : -1);
+                var wlen = new Complex(Math.Cos(angle), Math.Sin(angle));
+
+                for (int i = 0; i < n; i += len)
+                {
+                    var w = Complex.One;
+
+                    for (int j = 0; j < len / 2; j++)
+                    {
+                        var u = buffer[i + j];
+                        var v = buffer[i + j + len / 2] * w;
+                        buffer[i + j] = u + v;
+                        buffer[i + j + len / 2] = u - v;
+                        w *= wlen;
+                    }
+                }
+            }
+
+            if (inverse)
+            {
+                for (int i = 0; i < n; i++)
+                    buffer[i] /= n;
+            }
+        }
+
+        private void ApplyToBeatmapInternal(ManiaBeatmap maniaBeatmap, Waveform? waveform, double? trackLength = null)
+        {
+            Seed.Value ??= RNG.Next();
+            var rng = new Random(Seed.Value.Value);
+
+            int targetColumns = Math.Clamp(KeyCount.Value, 2, ManiaRuleset.MAX_STAGE_KEYS);
+            int maxChord = Math.Clamp(MaxChord.Value, 1, targetColumns);
+            int difficulty = Math.Clamp(Density.Value, 1, 10);
+
+            if (maniaBeatmap.HitObjects.Count == 0 && !Regenerate.Value)
+                return;
+
+            maniaBeatmap.Stages.Clear();
+            maniaBeatmap.Stages.Add(new StageDefinition(targetColumns));
+            maniaBeatmap.Difficulty.CircleSize = targetColumns;
+
+            double snap(double time)
+            {
+                if (AlignDivisor.Value <= 0)
+                    return time;
+
+                return maniaBeatmap.ControlPointInfo.GetClosestSnappedTime(time, AlignDivisor.Value);
+            }
+
+            var notes = maniaBeatmap.HitObjects.Select(h =>
+            {
+                if (h is HoldNote hold)
+                {
+                    double start = snap(hold.StartTime);
+                    double end = snap(hold.EndTime);
+
+                    if (end < start)
+                        end = start;
+
+                    return new PatternShiftNote(start, end, hold.GetNodeSamples(0), hold.Column, end > start);
+                }
+
+                double time = snap(h.StartTime);
+                return new PatternShiftNote(time, time, h.Samples, h.Column, false);
+            }).OrderBy(n => n.StartTime).ThenBy(n => n.SourceColumn).ToList();
+
+            if (Regenerate.Value)
+                notes = ModifyNotesByDifficulty(notes, maniaBeatmap, targetColumns, RegenerateDifficulty.Value, rng);
+
+            var chords = buildChords(notes);
+            applyDelay(chords, maniaBeatmap.ControlPointInfo, DelayLevel.Value, rng);
+            reduceAllChords(chords, maxChord, difficulty);
+            assignColumns(chords, targetColumns, rng);
+
+            var newObjects = new List<ManiaHitObject>(notes.Count);
+
+            foreach (var chord in chords)
+            {
+                foreach (var note in chord.Notes)
+                {
+                    if (note.IsHold && note.EndTime > note.StartTime)
+                    {
+                        newObjects.Add(new HoldNote
+                        {
+                            Column = note.AssignedColumn,
+                            StartTime = note.StartTime,
+                            Duration = note.EndTime - note.StartTime,
+                            NodeSamples = new List<IList<HitSampleInfo>> { note.Samples, Array.Empty<HitSampleInfo>() }
+                        });
+                    }
+                    else
+                    {
+                        newObjects.Add(new Note
+                        {
+                            Column = note.AssignedColumn,
+                            StartTime = note.StartTime,
+                            Samples = note.Samples
+                        });
+                    }
+                }
+            }
+
+            maniaBeatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ThenBy(h => h.Column).ToList();
+            ManiaNoteCleanupTool.EnforceHoldReleaseGap(maniaBeatmap);
+        }
+
         private class PatternShiftNote
         {
-            public double StartTime { get; set; }
-            public double EndTime { get; set; }
             public IList<HitSampleInfo> Samples { get; }
             public int SourceColumn { get; }
             public bool IsHold { get; }
+            public double StartTime { get; set; }
+            public double EndTime { get; set; }
             public int AssignedColumn { get; set; }
 
             public PatternShiftNote(double startTime, double endTime, IList<HitSampleInfo> samples, int sourceColumn, bool isHold)

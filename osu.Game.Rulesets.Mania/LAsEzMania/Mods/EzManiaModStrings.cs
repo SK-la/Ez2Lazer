@@ -185,6 +185,16 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString PatternShift_Seed_Label = new EzLocalisableString("种子", "Seed");
         public static readonly LocalisableString PatternShift_Seed_Description = new EzLocalisableString("使用自定义种子代替随机种子", "Use a custom seed instead of a random one");
 
+        public static readonly LocalisableString PatternShift_Regenerate_Label = new EzLocalisableString("重生成", "Regenerate");
+
+        public static readonly LocalisableString PatternShift_Regenerate_Description =
+            new EzLocalisableString("在转换时根据音频重新生成完整谱面，而不是使用原始音符", "Regenerate the full beatmap from audio during conversion instead of using original hit objects.");
+
+        public static readonly LocalisableString PatternShift_RegenerateDifficulty_Label = new EzLocalisableString("重生成难度", "Regenerate Difficulty");
+
+        public static readonly LocalisableString PatternShift_RegenerateDifficulty_Description =
+            new EzLocalisableString("控制重生成的目标难度（星级），范围 2-10", "Target difficulty (stars) for regeneration, range 2-10.");
+
         // ====================================================================================================
         // Krr Mods - Labels & Descriptions
         // ====================================================================================================

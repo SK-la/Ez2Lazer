@@ -10,7 +10,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     // 默认正弦波，确定性输出。
     public sealed class EzOscillator : IEzOscillator
     {
-        public enum Waveform
+        public enum EzWaveform
         {
             [Description("正弦波")]
             Sine = 0,
@@ -28,10 +28,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         private readonly double frequency;
         private readonly double phase;
         private readonly double step;
-        private readonly Waveform waveform;
+        private readonly EzWaveform ezWaveform;
         private long counter;
 
-        public EzOscillator(int seed, double frequency = 1.0, double phase = 0.0, double step = 1.0, Waveform waveform = Waveform.Sine)
+        public EzOscillator(int seed, double frequency = 1.0, double phase = 0.0, double step = 1.0, EzWaveform ezWaveform = EzWaveform.Sine)
         {
             // frequency: cycles per step unit
             // phase: initial phase in radians
@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             this.frequency = frequency;
             this.phase = phase;
             this.step = step;
-            this.waveform = waveform;
+            this.ezWaveform = ezWaveform;
             counter = seed;
         }
 
@@ -51,18 +51,18 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             double sine = Math.Sin(2.0 * Math.PI * frequency * t + phase);
 
-            switch (waveform)
+            switch (ezWaveform)
             {
-                case Waveform.Sine:
+                case EzWaveform.Sine:
                     return sine;
 
-                case Waveform.Square:
+                case EzWaveform.Square:
                     return sine >= 0 ? 1.0 : -1.0;
 
-                case Waveform.Triangle:
+                case EzWaveform.Triangle:
                     return 2.0 / Math.PI * Math.Asin(sine);
 
-                case Waveform.Sawtooth:
+                case EzWaveform.Sawtooth:
                     double frac = (t * frequency + phase / (2.0 * Math.PI)) % 1.0;
                     return 2.0 * frac - 1.0;
 

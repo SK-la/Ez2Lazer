@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         protected override string PatternAcronym => "PSJ";
 
         protected override int DefaultLevel => 4;
-        protected override EzOscillator.Waveform DefaultWaveform => EzOscillator.Waveform.Sine;
+        protected override EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
         protected override int DefaultOscillationBeats => 1;
         protected override int DefaultWindowProcessInterval => 1;
         protected override int DefaultWindowProcessOffset => 0;
