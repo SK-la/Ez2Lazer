@@ -159,8 +159,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 try
                 {
                     bool useLevelFallback = patternType == KeyPatternType.Jack
-                                            || patternType == KeyPatternType.Jump
-                                            || patternType == KeyPatternType.Stream;
+                                            || patternType == KeyPatternType.Chord
+                                            || patternType == KeyPatternType.Bracket;
 
                     if (!useLevelFallback)
                     {
@@ -828,8 +828,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             // Jack/Jump/Stream: 窗口内出现 1/4 及以上（含 1/4）单调变化则跳过
             if (patternType == KeyPatternType.Jack
-                || patternType == KeyPatternType.Jump
-                || patternType == KeyPatternType.Stream)
+                || patternType == KeyPatternType.Chord
+                || patternType == KeyPatternType.Bracket)
             {
                 var grouped = new List<(double time, double avgCol)>();
                 int monoIndex = lowerBoundByTime(objects, ctx.WindowStart);
@@ -1044,7 +1044,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     minCount = Math.Max(1, maxCount - 1);
                     break;
 
-                case KeyPatternType.Jump:
+                case KeyPatternType.Chord:
                     maxCount = Math.Clamp(level, 1, totalColumns);
                     minCount = Math.Max(1, maxCount - 2);
                     break;
@@ -1054,7 +1054,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     minCount = Math.Max(1, maxCount - 2);
                     break;
 
-                case KeyPatternType.Stream:
+                case KeyPatternType.Bracket:
                     maxCount = Math.Clamp(level, 1, totalColumns);
                     minCount = Math.Max(1, maxCount - 1);
                     break;

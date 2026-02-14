@@ -13,11 +13,11 @@ using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 {
-    public class ManiaModPatternShiftStream : ManiaModPatternShiftPatternBase
+    public class ManiaModPatternShiftBracket : ManiaModPatternShiftPatternBase
     {
-        protected override KeyPatternType PatternType => KeyPatternType.Stream;
-        protected override string PatternName => "Stream";
-        protected override string PatternAcronym => "PSS";
+        protected override KeyPatternType PatternType => KeyPatternType.Bracket;
+        protected override string PatternName => "Bracket";
+        protected override string PatternAcronym => "PSB";
 
         protected override int DefaultLevel => 4;
         protected override EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
@@ -109,19 +109,18 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var prevColumns2 = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, prevLine2, TIME_TOLERANCE);
             var nextColumns2 = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, nextLine2, TIME_TOLERANCE);
 
-            applyCrossPattern(beatmap, windowObjects, prevColumns2, nextColumns2, t2, Math.Max(0, settings.MinK), Math.Max(0, settings.MaxK), rng, maxIterationsPerWindow);
+            applyBracketPattern(beatmap, windowObjects, prevColumns2, nextColumns2, t2, Math.Max(0, settings.MinK), Math.Max(0, settings.MaxK), rng, maxIterationsPerWindow);
         }
 
-        // Cross logic (来源于 ManiaModPatternShiftCross)
-        private static void applyCrossPattern(ManiaBeatmap beatmap,
-                                              List<ManiaHitObject> windowObjects,
-                                              HashSet<int> prevColumns,
-                                              HashSet<int> nextColumns,
-                                              double time,
-                                              int minK,
-                                              int maxK,
-                                              Random rng,
-                                              int maxIterationsPerWindow)
+        private static void applyBracketPattern(ManiaBeatmap beatmap,
+                                                List<ManiaHitObject> windowObjects,
+                                                HashSet<int> prevColumns,
+                                                HashSet<int> nextColumns,
+                                                double time,
+                                                int minK,
+                                                int maxK,
+                                                Random rng,
+                                                int maxIterationsPerWindow)
         {
             int totalColumns = Math.Max(1, beatmap.TotalColumns);
             var avoid = new HashSet<int>(prevColumns);

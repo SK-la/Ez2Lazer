@@ -6,7 +6,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
     public enum KeyPatternType
     {
         // 合并的流（原 Cut / Cross）
-        Stream,
+        Bracket,
+
+        // 拍
+        Chord,
 
         // 高分偏移
         Delay,
@@ -16,8 +19,5 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         // 叠
         Jack,
-
-        // 拍
-        Jump
     }
 }
