@@ -334,14 +334,32 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             // Default behavior: stars==5 => minimal change. stars<5 remove notes; stars>5 add notes.
             var notes = new List<PatternShiftNote>(originalNotes);
 
-            if (notes.Count == 0)
-                return notes;
-
-            int center = 5;
+            const int center = 5;
             int delta = stars - center;
 
-            var oscSeed = Seed.Value ?? RNG.Next();
-            var osc = new EzOscillator((int)oscSeed);
+            int oscSeed = Seed.Value ?? RNG.Next();
+            var osc = new EzOscillator(oscSeed);
+
+            if (notes.Count == 0)
+            {
+                if (delta <= 0)
+                    return notes;
+
+                // If there are no notes but user asked to increase difficulty, generate a few seed notes
+                var tp0 = beatmap.ControlPointInfo.TimingPoints.FirstOrDefault();
+                double beatLen0 = tp0?.BeatLength ?? 500;
+                int initialAdd = Math.Min(8, Math.Max(1, (int)Math.Round(3 * (delta / (double)center))));
+                var seedList = new List<PatternShiftNote>();
+
+                for (int i = 0; i < initialAdd; i++)
+                {
+                    double t = i * beatLen0 * (1.0 + 0.25 * osc.Next());
+                    int col = rng.Next(0, Math.Max(1, targetColumns));
+                    seedList.Add(new PatternShiftNote(Math.Max(0, t), Math.Max(0, t), Array.Empty<HitSampleInfo>(), col, false));
+                }
+
+                return seedList.OrderBy(n => n.StartTime).ThenBy(n => n.SourceColumn).ToList();
+            }
 
             if (delta < 0)
             {
@@ -382,6 +400,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                 var result = new List<PatternShiftNote>(notes);
 
+                // First: conservative local additions around existing notes (as before)
                 for (int i = 0; i < targetAdd; i++)
                 {
                     int idx = rng.Next(0, notes.Count);
@@ -392,13 +411,13 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     int[] allowedSubdiv = new[] { 2, 4, 8, 16 };
                     int subdiv = allowedSubdiv[rng.Next(allowedSubdiv.Length)];
 
-                    double offset = (rng.NextDouble() - 0.5) * (beatLength / subdiv);
+                    double offset = (rng.NextDouble() - 0.5) * (beatLength / subdiv) * (1.0 + 0.5 * (1.0 - osc.Next()));
                     double newTime = Math.Max(0, anchor.StartTime + offset);
 
-                    int col = rng.Next(0, targetColumns);
+                    int col = rng.Next(0, Math.Max(1, targetColumns));
 
                     // avoid duplicate at same time+col within tolerance
-                    bool exists = result.Any(n => n.SourceColumn == col && Math.Abs(n.StartTime - newTime) <= 3);
+                    bool exists = result.Any(n => n.SourceColumn == col && Math.Abs(n.StartTime - newTime) <= 48);
 
                     if (exists)
                     {
@@ -406,13 +425,62 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                         for (int t = 0; t < 6 && exists; t++)
                         {
                             col = (col + 1) % targetColumns;
-                            exists = result.Any(n => n.SourceColumn == col && Math.Abs(n.StartTime - newTime) <= 3);
+                            exists = result.Any(n => n.SourceColumn == col && Math.Abs(n.StartTime - newTime) <= 48);
                         }
 
                         if (exists) continue;
                     }
 
                     result.Add(new PatternShiftNote(newTime, newTime, Array.Empty<HitSampleInfo>(), col, false));
+                }
+
+                // Second: fill larger gaps between existing notes to create notes in previously empty regions
+                int remainingGapAdds = targetAdd; // allow similar amount for gaps
+
+                for (int i = 0; i < notes.Count - 1 && remainingGapAdds > 0; i++)
+                {
+                    double left = notes[i].StartTime;
+                    double right = notes[i + 1].StartTime;
+                    double gap = right - left;
+
+                    var tpLeft = beatmap.ControlPointInfo.TimingPointAt(left);
+                    double localBeat = tpLeft.BeatLength;
+
+                    // consider gaps larger than ~1.5 beats
+                    if (gap > Math.Max(300, localBeat * 1.5))
+                    {
+                        // number of potential inserts proportional to gap size and difficulty
+                        int inserts = Math.Min(2, Math.Max(1, (int)Math.Floor(gap / (localBeat * 2.0))));
+
+                        for (int j = 0; j < inserts && remainingGapAdds > 0; j++)
+                        {
+                            double t = left + (osc.Next() * 0.75 + 0.125) * gap; // biased away from edges
+
+                            // snap to a subdivision of local beat
+                            int[] allowedSubdiv = new[] { 2, 4, 8 };
+                            int subdiv = allowedSubdiv[rng.Next(allowedSubdiv.Length)];
+                            double step = localBeat / subdiv;
+                            double snapped = Math.Round(t / step) * step;
+
+                            int col = rng.Next(0, Math.Max(1, targetColumns));
+                            bool exists = result.Any(n => n.SourceColumn == col && Math.Abs(n.StartTime - snapped) <= 48);
+
+                            if (exists)
+                            {
+                                // try other columns quickly
+                                for (int c = 0; c < Math.Min(6, targetColumns) && exists; c++)
+                                {
+                                    col = (col + 1) % targetColumns;
+                                    exists = result.Any(n => n.SourceColumn == col && Math.Abs(n.StartTime - snapped) <= 48);
+                                }
+
+                                if (exists) continue;
+                            }
+
+                            result.Add(new PatternShiftNote(Math.Max(0, snapped), Math.Max(0, snapped), Array.Empty<HitSampleInfo>(), col, false));
+                            remainingGapAdds--;
+                        }
+                    }
                 }
 
                 return result.OrderBy(n => n.StartTime).ThenBy(n => n.SourceColumn).ToList();
