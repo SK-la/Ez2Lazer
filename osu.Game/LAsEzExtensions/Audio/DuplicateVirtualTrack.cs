@@ -19,20 +19,29 @@ namespace osu.Game.LAsEzExtensions.Audio
     {
         private const string log_prefix = "[LAsEz/DuplicateVirtualTrack]";
 
+        // Enable diagnostic logging for loop timing investigation.
+        private readonly bool diagnosticsEnabled = true;
+
         private void log(string message)
         {
-            try
+            // Suppress informational logs by default. Only forward messages
+            // that contain failure/error keywords to reduce verbosity in normal runs.
+            if (!diagnosticsEnabled)
             {
-                // Suppress informational logs by default. Only forward messages
-                // that contain failure/error keywords to reduce verbosity in normal runs.
                 if (!message.Contains("failed", StringComparison.OrdinalIgnoreCase)
                     && !message.Contains("error", StringComparison.OrdinalIgnoreCase)
                     && !message.Contains("exception", StringComparison.OrdinalIgnoreCase))
                     return;
-
-                Logger.Log($"{log_prefix} {message}", LoggingTarget.Runtime);
             }
-            catch { }
+
+            Logger.Log($"{log_prefix} {message}", LoggingTarget.Runtime);
+        }
+
+        private void debug(string message)
+        {
+            if (!diagnosticsEnabled) return;
+
+            Logger.Log($"{log_prefix} [DEBUG] {message}", LoggingTarget.Runtime);
         }
 
         private bool startRequested;
@@ -55,6 +64,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         private bool? prevCandidateLooping;
         private ScheduledDelegate? loopDelayDelegate;
         private ScheduledDelegate? loopCheckerDelegate;
+        private double? lastLoopStartGameplayTime;
         private BindableDouble? candidateMuteAdjustment;
         private bool inLoopDelay;
 
@@ -63,6 +73,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         private bool? prevGameplayClockRunning;
         private Action<ValueChangedEvent<bool>>? pausedChangedHandler;
+        private Action? seekHandler;
 
         [Resolved(canBeNull: true)]
         private GameplayClockContainer? gameplayClockContainer { get; set; }
@@ -107,12 +118,8 @@ namespace osu.Game.LAsEzExtensions.Audio
                     beatmap.Track.AddAdjustment(AdjustableProperty.Volume, beatmapTrackMuteAdjustment);
                     mutedOriginalTrack = beatmap.Track;
 
-                    try
-                    {
-                        log(
-                            $"StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}");
-                    }
-                    catch { }
+                    log(
+                        $"StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}");
                 }
             }
 
@@ -129,12 +136,8 @@ namespace osu.Game.LAsEzExtensions.Audio
             overrideLoopInterval = overrides.LoopInterval;
             overrideForceLooping = overrides.ForceLooping ?? false;
 
-            try
-            {
-                log(
-                    $"StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}");
-            }
-            catch { }
+            log(
+                $"StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}");
 
             // 计算初始循环计数与片段边界（若提供）
             sliceStart = desiredCandidateStartTime ?? 0;
@@ -166,13 +169,14 @@ namespace osu.Game.LAsEzExtensions.Audio
                 ownsCandidateTrack = false;
             }
 
+            lastLoopStartGameplayTime = null;
+
             // Unbind paused handler if we've bound it.
-            try
-            {
-                if (pausedChangedHandler != null && gameplayClockContainer != null)
-                    gameplayClockContainer.IsPaused.ValueChanged -= pausedChangedHandler;
-            }
-            catch { }
+            if (pausedChangedHandler != null && gameplayClockContainer != null)
+                gameplayClockContainer.IsPaused.ValueChanged -= pausedChangedHandler;
+
+            if (seekHandler != null && gameplayClockContainer != null)
+                gameplayClockContainer.OnSeek -= seekHandler;
 
             base.Dispose(isDisposing);
         }
@@ -183,142 +187,120 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             // Always handle pause/resume for an active candidate track so that
             // playback is suspended together with the gameplay clock.
-            try
+            if (activeCandidateTrack != null && gameplayClock != null)
             {
-                if (activeCandidateTrack != null && gameplayClock != null)
+                bool running = gameplayClock.IsRunning;
+                prevGameplayClockRunning ??= running;
+
+                if (running != prevGameplayClockRunning)
                 {
-                    bool running = gameplayClock.IsRunning;
-                    prevGameplayClockRunning ??= running;
-
-                    if (running != prevGameplayClockRunning)
+                    if (!running)
                     {
-                        if (!running)
-                        {
-                            try
-                            {
-                                activeCandidateTrack.Stop();
-                                log("paused candidate due to gameplayClock.IsRunning=false");
-                            }
-                            catch { }
-
-                            // Pause loop checking while paused to avoid triggering seeks while stopped.
-                            try { loopCheckerDelegate?.Cancel(); }
-                            catch { }
-                        }
-                        else
-                        {
-                            try
-                            {
-                                // Resume playback from current time.
-                                activeCandidateTrack.Start();
-                                log("resumed candidate due to gameplayClock.IsRunning=true");
-                            }
-                            catch { }
-
-                            // If we have a duration-based loop configured, ensure the loopChecker is running again.
-                            try
-                            {
-                                if (overrideDuration != null && loopCheckerDelegate == null && activeCandidateTrack != null)
-                                {
-                                    loopCheckerDelegate = Scheduler.AddDelayed(() =>
-                                    {
-                                        try
-                                        {
-                                            if (activeCandidateTrack == null) return;
-
-                                            double now = activeCandidateTrack.CurrentTime;
-                                            const double epsilon = 2.0;
-
-                                            if (now + epsilon >= sliceEnd)
-                                            {
-                                                log($"loopChecker triggered now={now} sliceEnd={sliceEnd} loopsRemaining={loopsRemaining}");
-
-                                                if (loopsRemaining <= 1)
-                                                {
-                                                    stopPreviewInternal("loops_finished");
-                                                    return;
-                                                }
-
-                                                loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
-
-                                                if (overrideLoopInterval > 0)
-                                                {
-                                                    try
-                                                    {
-                                                        // Prevent further loopChecker triggers while in delay window.
-                                                        try { loopCheckerDelegate?.Cancel(); }
-                                                        catch { }
-
-                                                        loopCheckerDelegate = null;
-
-                                                        // Mute the candidate during the interval instead of stopping it,
-                                                        // which some Track implementations may still advance in time when stopped.
-                                                        candidateMuteAdjustment ??= new BindableDouble(0);
-
-                                                        try { activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment); }
-                                                        catch { }
-
-                                                        inLoopDelay = true;
-                                                    }
-                                                    catch { }
-
-                                                    loopDelayDelegate?.Cancel();
-                                                    int delayMs = (int)Math.Max(0, overrideLoopInterval.Value);
-                                                    loopDelayDelegate = Scheduler.AddDelayed(() =>
-                                                    {
-                                                        try
-                                                        {
-                                                            activeCandidateTrack?.Seek(sliceStart);
-
-                                                            if (candidateMuteAdjustment != null)
-                                                                activeCandidateTrack?.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
-
-                                                            activeCandidateTrack?.Start();
-                                                            inLoopDelay = false;
-
-                                                            ensureLoopCheckerRunning();
-                                                        }
-                                                        catch (Exception ex)
-                                                        {
-                                                            log($"delayed restart failed: {ex}");
-                                                        }
-                                                    }, delayMs);
-                                                }
-                                                else
-                                                {
-                                                    try
-                                                    {
-                                                        // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
-                                                        bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
-
-                                                        if (!isUsingBeatmapTrack)
-                                                        {
-                                                            activeCandidateTrack.Seek(sliceStart);
-                                                            Logger.Log($"DuplicateVirtualTrack: seamless seek to {sliceStart}", LoggingTarget.Runtime);
-                                                        }
-                                                    }
-                                                    catch (Exception ex) { Logger.Log($"DuplicateVirtualTrack: seamless seek failed: {ex}", LoggingTarget.Runtime); }
-                                                }
-                                            }
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Logger.Log($"DuplicateVirtualTrack: loopChecker error: {ex}", LoggingTarget.Runtime);
-                                        }
-                                    }, 30, true);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Log($"DuplicateVirtualTrack: failed to restart loopChecker on resume: {ex}", LoggingTarget.Runtime);
-                            }
-                        }
-
-                        prevGameplayClockRunning = running;
+                        activeCandidateTrack.Stop();
+                        loopCheckerDelegate?.Cancel();
                     }
+                    else
+                    {
+                        activeCandidateTrack.Start();
+
+                        if (overrideDuration != null && loopCheckerDelegate == null && activeCandidateTrack != null)
+                        {
+                            // Initialize or resume loop handling. prefer gameplay-clock driven scheduling
+                            if (gameplayClock != null)
+                            {
+                                lastLoopStartGameplayTime ??= gameplayClock.CurrentTime;
+                            }
+
+                            // Delegate to shared helper which will choose gameplayClock-driven scheduling when available,
+                            // or fallback to the previous polling-based checker when not.
+                            ensureLoopCheckerRunning();
+                        }
+                    }
+
+                    prevGameplayClockRunning = running;
                 }
             }
-            catch { }
+
+                // Gameplay-clock driven loop check: perform loop transitions precisely when the gameplay clock crosses the expected boundary.
+                try
+                {
+                    if (activeCandidateTrack != null && gameplayClock != null && overrideDuration != null && !inLoopDelay)
+                    {
+                        double sliceLength = sliceEnd - sliceStart;
+
+                        if (sliceLength > 0)
+                        {
+                            lastLoopStartGameplayTime ??= gameplayClock.CurrentTime;
+
+                            double expectedNext = lastLoopStartGameplayTime.Value + sliceLength;
+
+                            // If we've reached or passed the expected loop end, trigger the loop.
+                            if (gameplayClock.CurrentTime >= expectedNext)
+                            {
+                                // prevent double triggers from scheduled delegates
+                                loopCheckerDelegate?.Cancel();
+                                loopCheckerDelegate = null;
+
+                                debug($"gameplay-driven trigger: gameplayNow={gameplayClock.CurrentTime} trackNow={activeCandidateTrack.CurrentTime} expectedNext={expectedNext} loopsRemaining={loopsRemaining}");
+
+                                if (loopsRemaining <= 1)
+                                {
+                                    stopPreviewInternal("loops_finished");
+                                }
+                                else
+                                {
+                                    loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
+
+                                    double interval = overrideLoopInterval ?? 0.0;
+
+                                    if (interval > 0)
+                                    {
+                                        candidateMuteAdjustment ??= new BindableDouble(0);
+                                        activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+                                        inLoopDelay = true;
+
+                                        loopDelayDelegate?.Cancel();
+                                        loopDelayDelegate = Scheduler.AddDelayed(() =>
+                                        {
+                                            try
+                                            {
+                                                activeCandidateTrack?.Seek(sliceStart);
+                                                if (candidateMuteAdjustment != null)
+                                                    activeCandidateTrack?.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+                                                activeCandidateTrack?.Start();
+                                                inLoopDelay = false;
+
+                                                // advance baseline to next loop start
+                                                lastLoopStartGameplayTime = expectedNext + interval;
+                                                debug($"delayed restart: newBaseline={lastLoopStartGameplayTime}");
+                                                ensureLoopCheckerRunning();
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                log($"delayed restart failed: {ex}");
+                                            }
+                                        }, (int)interval);
+                                    }
+                                    else
+                                    {
+                                        bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+                                        if (!isUsingBeatmapTrack)
+                                            activeCandidateTrack.Seek(sliceStart);
+
+                                        // advance baseline to next loop start
+                                        lastLoopStartGameplayTime = expectedNext;
+                                        debug($"seamless restart: newBaseline={lastLoopStartGameplayTime}");
+                                        ensureLoopCheckerRunning();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log($"gameplay-driven loop check failed: {ex}");
+                }
 
             if (started || !startRequested || pendingBeatmap == null)
                 return;
@@ -337,18 +319,11 @@ namespace osu.Game.LAsEzExtensions.Audio
             waitingForClockLogged = false;
             started = true;
 
-            try
+            if (pendingBeatmap != null)
             {
-                if (pendingBeatmap != null)
-                {
-                    startCandidatePlayback(pendingBeatmap);
-                    startRequested = false;
-                    pendingBeatmap = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                log($"failed to start candidate playback: {ex}");
+                startCandidatePlayback(pendingBeatmap);
+                startRequested = false;
+                pendingBeatmap = null;
             }
         }
 
@@ -357,82 +332,120 @@ namespace osu.Game.LAsEzExtensions.Audio
             base.LoadComplete();
 
             // Bind to gameplay pause state changes for more reliable pause/resume handling.
-            try
+            if (gameplayClockContainer != null)
             {
-                if (gameplayClockContainer != null)
+                pausedChangedHandler = e =>
                 {
-                    pausedChangedHandler = e =>
+                    if (e.NewValue)
                     {
-                        try
+                        if (activeCandidateTrack != null)
                         {
-                            if (e.NewValue)
-                            {
-                                if (activeCandidateTrack != null)
-                                {
-                                    try
-                                    {
-                                        activeCandidateTrack.Stop();
-                                        Logger.Log("DuplicateVirtualTrack: paused candidate via IsPaused=true", LoggingTarget.Runtime);
-                                    }
-                                    catch { }
+                            activeCandidateTrack.Stop();
 
-                                    try
+                            loopCheckerDelegate?.Cancel();
+                            loopCheckerDelegate = null;
+                        }
+                    }
+                    else
+                    {
+                        if (activeCandidateTrack != null)
+                        {
+                            // If we've progressed past the slice while paused, seek back to start to preserve looping behavior.
+                            if (overrideDuration != null)
+                            {
+                                double now = activeCandidateTrack.CurrentTime;
+
+                                if (now >= sliceEnd)
+                                {
+                                    // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
+                                    bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+
+                                    if (!isUsingBeatmapTrack)
                                     {
-                                        loopCheckerDelegate?.Cancel();
-                                        loopCheckerDelegate = null;
+                                        activeCandidateTrack.Seek(sliceStart);
+                                        log($"seeked candidate to sliceStart on resume ({sliceStart})");
                                     }
-                                    catch { }
                                 }
+                            }
+
+                            activeCandidateTrack.Start();
+                            ensureLoopCheckerRunning();
+                        }
+                    }
+                };
+            }
+
+            gameplayClockContainer?.IsPaused.BindValueChanged(pausedChangedHandler, true);
+
+            // Bind to seek events so we can reposition independent candidate tracks
+            // when gameplay time is jumped (skip intro / timeline seek).
+            seekHandler = () =>
+            {
+                if (activeCandidateTrack == null) return;
+
+                // If candidate is the underlying beatmap track, do not seek it here.
+                bool isUsingBeatmapTrack = mutedOriginalTrack != null && ReferenceEquals(activeCandidateTrack, mutedOriginalTrack);
+
+                if (!isUsingBeatmapTrack)
+                {
+                    double seekTarget = getInitialSeekTarget();
+                    log($"OnSeek handler: seekTarget={seekTarget} activeHash={activeCandidateTrack?.GetHashCode()} isUsingBeatmapTrack={isUsingBeatmapTrack} currentBefore={activeCandidateTrack?.CurrentTime}");
+
+                    // Cancel any pending loop logic to avoid it fighting our manual seek.
+                    loopDelayDelegate?.Cancel();
+                    loopDelayDelegate = null;
+
+                    loopCheckerDelegate?.Cancel();
+                    loopCheckerDelegate = null;
+
+                    // If we muted the candidate during a loop delay, restore volume.
+                    if (candidateMuteAdjustment != null)
+                    {
+                        activeCandidateTrack?.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+
+                        candidateMuteAdjustment = null;
+                    }
+
+                    activeCandidateTrack?.Stop();
+                    activeCandidateTrack?.Seek(seekTarget);
+
+                    if (gameplayClock == null || gameplayClock.IsRunning)
+                    {
+                        activeCandidateTrack?.Start();
+                        ensureLoopCheckerRunning();
+                    }
+
+                    // Update gameplay-clock baseline so next loop timing remains accurate after manual seek.
+                    try
+                    {
+                        if (gameplayClock != null && overrideDuration != null)
+                        {
+                            double sliceLength = sliceEnd - sliceStart;
+
+                            if (sliceLength > 0)
+                            {
+                                // Prefer using the actual active track time if available (handles cases where
+                                // the active track is the underlying beatmap.Track which we do not seek).
+                                double currentTrackTime = activeCandidateTrack?.CurrentTime ?? seekTarget;
+                                double offsetWithin = ((currentTrackTime - sliceStart) % sliceLength + sliceLength) % sliceLength;
+                                lastLoopStartGameplayTime = gameplayClock.CurrentTime - offsetWithin;
                             }
                             else
                             {
-                                if (activeCandidateTrack != null)
-                                {
-                                    try
-                                    {
-                                        // If we've progressed past the slice while paused, seek back to start to preserve looping behavior.
-                                        if (overrideDuration != null)
-                                        {
-                                            try
-                                            {
-                                                double now = activeCandidateTrack.CurrentTime;
-
-                                                if (now >= sliceEnd)
-                                                {
-                                                    // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
-                                                    bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
-
-                                                    if (!isUsingBeatmapTrack)
-                                                    {
-                                                        activeCandidateTrack.Seek(sliceStart);
-                                                        log($"seeked candidate to sliceStart on resume ({sliceStart})");
-                                                    }
-                                                }
-                                            }
-                                            catch { }
-                                        }
-
-                                        activeCandidateTrack.Start();
-                                        log("resumed candidate via IsPaused=false");
-                                    }
-                                    catch { }
-
-                                    // Restart loopChecker if needed.
-                                    try { ensureLoopCheckerRunning(); }
-                                    catch { }
-                                }
+                                lastLoopStartGameplayTime = gameplayClock.CurrentTime;
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            log($"error handling IsPaused change: {ex}");
-                        }
-                    };
+                    }
+                    catch { }
 
-                    gameplayClockContainer.IsPaused.BindValueChanged(pausedChangedHandler, true);
+                    log($"OnSeek handler: currentAfter={activeCandidateTrack?.CurrentTime}");
+
+                    // Restart loop checker if needed.
+                    ensureLoopCheckerRunning();
                 }
-            }
-            catch { }
+            };
+
+            if (gameplayClockContainer != null) gameplayClockContainer.OnSeek += seekHandler;
         }
 
         private void ensureLoopCheckerRunning()
@@ -441,24 +454,31 @@ namespace osu.Game.LAsEzExtensions.Audio
             {
                 if (overrideDuration == null || activeCandidateTrack == null)
                     return;
-                // Cancel existing checker if any, then add a new repeating checker using mute-based interval handling.
+                // Prefer precise scheduling driven by the gameplay clock to avoid cumulative drift.
                 loopCheckerDelegate?.Cancel();
-                loopCheckerDelegate = Scheduler.AddDelayed(() =>
+
+                // If a gameplay clock is available, schedule a single delayed callback based on that clock.
+                if (gameplayClock != null)
                 {
-                    try
+                    // Ensure we have a baseline for the last loop start time.
+                    lastLoopStartGameplayTime ??= gameplayClock.CurrentTime;
+
+                    double sliceLength = sliceEnd - sliceStart;
+                    double interval = overrideLoopInterval ?? 0.0;
+
+                    // Time remaining until next loop in gameplay-clock space.
+                    double elapsedSinceLastLoop = gameplayClock.CurrentTime - lastLoopStartGameplayTime.Value;
+                    double timeUntilNextLoop = Math.Max(0, sliceLength + interval - elapsedSinceLastLoop);
+
+                    // Schedule a one-shot delayed delegate relative to scheduler (ms).
+                    debug($"scheduling gameplay-driven loop in {timeUntilNextLoop}ms (sliceLength={sliceLength} interval={interval}) lastLoopStartGameplayTime={lastLoopStartGameplayTime}");
+                    loopCheckerDelegate = Scheduler.AddDelayed(() =>
                     {
-                        if (activeCandidateTrack == null) return;
-
-                        // If we're currently in a loop delay, ignore checks.
-                        if (inLoopDelay)
-                            return;
-
-                        double now = activeCandidateTrack.CurrentTime;
-                        const double epsilon = 2.0;
-
-                        if (now + epsilon >= sliceEnd)
+                        try
                         {
-                            Logger.Log($"DuplicateVirtualTrack: loopChecker triggered now={now} sliceEnd={sliceEnd} loopsRemaining={loopsRemaining}", LoggingTarget.Runtime);
+                            if (activeCandidateTrack == null) return;
+
+                            debug($"gameplay-loop-callback: gameplayNow={gameplayClock.CurrentTime} trackNow={activeCandidateTrack.CurrentTime} expectedNext={(lastLoopStartGameplayTime ?? gameplayClock.CurrentTime) + sliceLength}");
 
                             if (loopsRemaining <= 1)
                             {
@@ -468,26 +488,93 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                             loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
 
-                            if (overrideLoopInterval > 0)
+                            // Perform the loop restart using track.Seek and Start.
+                            try
                             {
-                                // Enter delay: cancel checker, mark inLoopDelay and mute candidate instead of stopping it.
-                                try { loopCheckerDelegate?.Cancel(); }
-                                catch { }
-
-                                loopCheckerDelegate = null;
-
-                                candidateMuteAdjustment ??= new BindableDouble(0);
-
-                                try { activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment); }
-                                catch { }
-
-                                inLoopDelay = true;
-
-                                loopDelayDelegate?.Cancel();
-                                int delayMs = (int)Math.Max(0, overrideLoopInterval.Value);
-                                loopDelayDelegate = Scheduler.AddDelayed(() =>
+                                // If we are in an interval (interval>0), perform mute/delay behaviour to preserve Track progression.
+                                if (interval > 0)
                                 {
-                                    try
+                                    candidateMuteAdjustment ??= new BindableDouble(0);
+                                    activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+
+                                    inLoopDelay = true;
+
+                                    loopDelayDelegate?.Cancel();
+                                    loopDelayDelegate = Scheduler.AddDelayed(() =>
+                                    {
+                                        activeCandidateTrack?.Seek(sliceStart);
+                                        if (candidateMuteAdjustment != null)
+                                            activeCandidateTrack?.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+                                        activeCandidateTrack?.Start();
+                                        inLoopDelay = false;
+
+                                        // Update baseline and reschedule next loop.
+                                        lastLoopStartGameplayTime = (lastLoopStartGameplayTime ?? gameplayClock.CurrentTime) + sliceLength + interval;
+                                        ensureLoopCheckerRunning();
+                                    }, (int)interval);
+                                }
+                                else
+                                {
+                                    activeCandidateTrack.Seek(sliceStart);
+                                    // update baseline for the next loop
+                                    lastLoopStartGameplayTime = (lastLoopStartGameplayTime ?? gameplayClock.CurrentTime) + sliceLength;
+                                    debug($"gameplay-loop-callback: seamless seek performed; newBaseline={lastLoopStartGameplayTime}");
+                                    ensureLoopCheckerRunning();
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                log($"loop restart failed: {ex}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            log($"loopChecker error: {ex}");
+                        }
+                    }, timeUntilNextLoop);
+                }
+                else
+                {
+                    // Fallback: Cancel existing checker if any, then add a new repeating checker using mute-based interval handling.
+                    loopCheckerDelegate = Scheduler.AddDelayed(() =>
+                    {
+                        try
+                        {
+                            if (activeCandidateTrack == null) return;
+
+                            // If we're currently in a loop delay, ignore checks.
+                            if (inLoopDelay)
+                                return;
+
+                            double now = activeCandidateTrack.CurrentTime;
+                            const double epsilon = 2.0;
+
+                            if (now + epsilon >= sliceEnd)
+                            {
+                                if (loopsRemaining <= 1)
+                                {
+                                    stopPreviewInternal("loops_finished");
+                                    return;
+                                }
+
+                                loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
+
+                                if (overrideLoopInterval > 0)
+                                {
+                                    // Enter delay: cancel checker, mark inLoopDelay and mute candidate instead of stopping it.
+                                    loopCheckerDelegate?.Cancel();
+
+                                    loopCheckerDelegate = null;
+
+                                    candidateMuteAdjustment ??= new BindableDouble(0);
+
+                                    activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+
+                                    inLoopDelay = true;
+
+                                    loopDelayDelegate?.Cancel();
+                                    int delayMs = (int)Math.Max(0, overrideLoopInterval.Value);
+                                    loopDelayDelegate = Scheduler.AddDelayed(() =>
                                     {
                                         activeCandidateTrack?.Seek(sliceStart);
 
@@ -496,35 +583,25 @@ namespace osu.Game.LAsEzExtensions.Audio
                                         activeCandidateTrack?.Start();
                                         inLoopDelay = false;
                                         ensureLoopCheckerRunning();
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Logger.Log($"DuplicateVirtualTrack: delayed restart failed: {ex}", LoggingTarget.Runtime);
-                                    }
-                                }, delayMs);
-                            }
-                            else
-                            {
-                                try
+                                    }, delayMs);
+                                }
+                                else
                                 {
-                                    // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
-                                    bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
-
-                                    if (!isUsingBeatmapTrack)
+                                    try
                                     {
                                         activeCandidateTrack.Seek(sliceStart);
                                         log($"seamless seek to {sliceStart}");
                                     }
+                                    catch (Exception ex) { log($"seamless seek failed: {ex}"); }
                                 }
-                                catch (Exception ex) { log($"seamless seek failed: {ex}"); }
                             }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        log($"loopChecker error: {ex}");
-                    }
-                }, 30, true);
+                        catch (Exception ex)
+                        {
+                            log($"loopChecker error: {ex}");
+                        }
+                    }, 30, true);
+                }
             }
             catch (Exception ex)
             {
@@ -550,7 +627,6 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             if (string.IsNullOrEmpty(audioFile) || beatmap.BeatmapInfo.BeatmapSet is not BeatmapSetInfo beatmapSet)
             {
-                Logger.Log("DuplicateVirtualTrack: no audio metadata or beatmap set, falling back to original track", LoggingTarget.Runtime);
                 return null;
             }
 
@@ -665,57 +741,40 @@ namespace osu.Game.LAsEzExtensions.Audio
         private void stopPreviewInternal(string reason)
         {
             // 停止并释放候选轨，优先停止 duplicate 以避免两轨同时播放。
-            try
+            if (activeCandidateTrack != null)
             {
-                if (activeCandidateTrack != null)
+                try
                 {
-                    try
-                    {
-                        activeCandidateTrack.Stop();
-                    }
-                    catch (Exception ex)
-                    {
-                        log($"failed to stop active candidate track on StopPreview: {ex}");
-                    }
-
-                    // If we applied a candidate mute adjustment during a loop delay, remove it now.
-                    try
-                    {
-                        if (candidateMuteAdjustment != null)
-                        {
-                            try { activeCandidateTrack.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment); }
-                            catch { }
-
-                            candidateMuteAdjustment = null;
-                        }
-                    }
-                    catch { }
-
-                    // Restore underlying track looping if we changed it earlier.
-                    try
-                    {
-                        if (prevCandidateLooping != null)
-                        {
-                            try { activeCandidateTrack.Looping = prevCandidateLooping.Value; }
-                            catch { }
-
-                            log($"restored candidate track.Looping to {prevCandidateLooping.Value}");
-                        }
-                    }
-                    catch { }
-
-                    if (ownsCandidateTrack)
-                    {
-                        // do any necessary cleanup for owned track instances if required
-                    }
-
-                    activeCandidateTrack = null;
-                    ownsCandidateTrack = false;
+                    activeCandidateTrack.Stop();
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"DuplicateVirtualTrack: error while stopping candidate track: {ex}", LoggingTarget.Runtime);
+                catch (Exception ex)
+                {
+                    log($"failed to stop active candidate track on StopPreview: {ex}");
+                }
+
+                // If we applied a candidate mute adjustment during a loop delay, remove it now.
+                if (candidateMuteAdjustment != null)
+                {
+                    activeCandidateTrack.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+
+                    candidateMuteAdjustment = null;
+                }
+
+                // Restore underlying track looping if we changed it earlier.
+                if (prevCandidateLooping != null)
+                {
+                    activeCandidateTrack.Looping = prevCandidateLooping.Value;
+
+                    log($"restored candidate track.Looping to {prevCandidateLooping.Value}");
+                }
+
+                if (ownsCandidateTrack)
+                {
+                    // do any necessary cleanup for owned track instances if required
+                }
+
+                activeCandidateTrack = null;
+                ownsCandidateTrack = false;
             }
 
             // 恢复之前添加的音量调整（如果存在）。
@@ -723,22 +782,14 @@ namespace osu.Game.LAsEzExtensions.Audio
             {
                 if (beatmapTrackMuteAdjustment != null && mutedOriginalTrack != null)
                 {
-                    try
-                    {
-                        log(
-                            $"removing mute adjustment from original track (hash={mutedOriginalTrack.GetHashCode()}) on StopPreview. pre: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
-                    }
-                    catch { }
+                    log(
+                        $"removing mute adjustment from original track (hash={mutedOriginalTrack.GetHashCode()}) on StopPreview. pre: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
 
                     try
                     {
                         mutedOriginalTrack.RemoveAdjustment(AdjustableProperty.Volume, beatmapTrackMuteAdjustment);
 
-                        try
-                        {
-                            log($"removed mute adjustment on StopPreview. post: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
-                        }
-                        catch { }
+                        log($"removed mute adjustment on StopPreview. post: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
                     }
                     catch (Exception ex)
                     {
@@ -755,19 +806,13 @@ namespace osu.Game.LAsEzExtensions.Audio
             mutedOriginalTrack = null;
 
             // 取消任何挂起的延迟重启或检测器
-            try
-            {
-                loopDelayDelegate?.Cancel();
-                loopDelayDelegate = null;
-            }
-            catch { }
+            loopDelayDelegate?.Cancel();
+            loopDelayDelegate = null;
 
-            try
-            {
-                loopCheckerDelegate?.Cancel();
-                loopCheckerDelegate = null;
-            }
-            catch { }
+            loopCheckerDelegate?.Cancel();
+            loopCheckerDelegate = null;
+
+            lastLoopStartGameplayTime = null;
 
             // (已在停止前尝试恢复底层 track.Looping 与移除候选静音调整)
 
@@ -787,79 +832,57 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         private void startCandidatePlayback(IWorkingBeatmap beatmap)
         {
-            try
+            bool owns;
+            var t = createTrack(beatmap, out owns) ?? beatmap.Track;
+
+            if (t == null)
             {
-                bool owns;
-                var t = createTrack(beatmap, out owns) ?? beatmap.Track;
-
-                if (t == null)
-                {
-                    Logger.Log("DuplicateVirtualTrack: no track available to play", LoggingTarget.Runtime);
-                    return;
-                }
-
-                activeCandidateTrack = t;
-                ownsCandidateTrack = owns;
-
-                try
-                {
-                    // Ensure seek to desired start time if provided
-                    if (desiredCandidateStartTime != null)
-                    {
-                        // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
-                        bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(t, pendingBeatmap.Track);
-
-                        if (!isUsingBeatmapTrack)
-                        {
-                            double seekTarget = desiredCandidateStartTime.Value;
-                            t.Seek(seekTarget);
-                        }
-                    }
-
-                    // 如果需要将底层 Track 设置为循环（ForceLooping 且未指定 Duration），则切换 Looping
-                    if (overrideForceLooping && overrideDuration == null)
-                    {
-                        try
-                        {
-                            prevCandidateLooping = t.Looping;
-                            t.Looping = true;
-                            Logger.Log($"DuplicateVirtualTrack: enabled underlying track.Looping for candidate (hash={t.GetHashCode()})", LoggingTarget.Runtime);
-                        }
-                        catch { }
-                    }
-
-                    t.Start();
-                    Logger.Log($"DuplicateVirtualTrack: started candidate track (hash={t.GetHashCode()}) at {t.CurrentTime}", LoggingTarget.Runtime);
-
-                    // 启动或确保短周期检测器（切片/拼接）运行。
-                    try
-                    {
-                        // Cancel any existing checker; ensureLoopCheckerRunning will recreate if needed.
-                        try { loopCheckerDelegate?.Cancel(); }
-                        catch { }
-
-                        loopCheckerDelegate = null;
-
-                        // Let the shared helper create the loopChecker using consistent logic.
-                        try { ensureLoopCheckerRunning(); }
-                        catch (Exception ex)
-                        {
-                            Logger.Log($"DuplicateVirtualTrack: failed to start loopChecker: {ex}", LoggingTarget.Runtime);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"DuplicateVirtualTrack: failed to initialize loopChecker: {ex}", LoggingTarget.Runtime);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"DuplicateVirtualTrack: failed to start candidate track: {ex}", LoggingTarget.Runtime);
-                }
+                return;
             }
-            catch (Exception ex)
+
+            activeCandidateTrack = t;
+            ownsCandidateTrack = owns;
+
+            debug($"startCandidatePlayback: trackHash={t.GetHashCode()} owns={owns} isBeatmapTrack={ReferenceEquals(t, pendingBeatmap?.Track)} desiredStart={desiredCandidateStartTime}");
+
             {
-                Logger.Log($"DuplicateVirtualTrack: StartCandidatePlayback failed: {ex}", LoggingTarget.Runtime);
+                // Ensure seek to desired start time if provided
+                if (desiredCandidateStartTime != null)
+                {
+                    // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
+                    bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(t, pendingBeatmap.Track);
+
+                    if (!isUsingBeatmapTrack)
+                    {
+                        double seekTarget = getInitialSeekTarget();
+                        t.Seek(seekTarget);
+                        debug($"startCandidatePlayback: seeked candidate to {seekTarget} (trackHash={t.GetHashCode()})");
+                    }
+                }
+
+                // 如果需要将底层 Track 设置为循环（ForceLooping 且未指定 Duration），则切换 Looping
+                if (overrideForceLooping && overrideDuration == null)
+                {
+                    prevCandidateLooping = t.Looping;
+                    t.Looping = true;
+                }
+
+                t.Start();
+
+                // 启动或确保短周期检测器（切片/拼接）运行。
+                {
+                    // Cancel any existing checker; ensureLoopCheckerRunning will recreate if needed.
+                    loopCheckerDelegate?.Cancel();
+
+                    loopCheckerDelegate = null;
+
+                    // Let the shared helper create the loopChecker using consistent logic.
+                    // Initialize gameplay-clock baseline for loop scheduling to avoid drift.
+                    if (gameplayClock != null && overrideDuration != null)
+                        lastLoopStartGameplayTime = gameplayClock.CurrentTime;
+
+                    ensureLoopCheckerRunning();
+                }
             }
         }
 
@@ -873,7 +896,27 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             if (gameplayClock != null)
             {
-                seekTarget += gameplayClock.CurrentTime;
+                // Use the gameplay clock container's StartTime as the baseline so that
+                // seeking the gameplay timeline maps correctly to the candidate track's
+                // absolute audio time.
+                double baseline = gameplayClockContainer?.StartTime ?? 0;
+                double delta = gameplayClock.CurrentTime - baseline;
+
+                // If we have a configured slice length (duration-based looping), map the
+                // delta into the slice via modulo so that arbitrary seeks land inside
+                // the slice instead of placing the track past the slice end which would
+                // immediately trigger the loop logic and jump to slice start.
+                double segmentLength = (sliceEnd > sliceStart) ? (sliceEnd - sliceStart) : (overrideDuration ?? double.NaN);
+
+                if (!double.IsNaN(segmentLength) && segmentLength > 0)
+                {
+                    double offsetWithin = ((delta % segmentLength) + segmentLength) % segmentLength;
+                    seekTarget = sliceStart + offsetWithin;
+                }
+                else
+                {
+                    seekTarget += delta;
+                }
             }
 
             return seekTarget;

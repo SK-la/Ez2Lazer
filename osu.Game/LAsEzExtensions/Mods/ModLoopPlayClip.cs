@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -15,9 +14,7 @@ using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
-using osu.Framework.Platform;
 using osu.Game.Screens.Play;
-using osu.Game.Screens.Play.HUD;
 
 namespace osu.Game.LAsEzExtensions.Mods
 {
@@ -51,7 +48,6 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         public bool RestartOnFail => false;
 
-        // LP 内置变速（复刻 HT 的实现）后，为避免叠加导致体验混乱，直接与其它变速 Mod 互斥。
         public override Type[] IncompatibleMods => new[]
         {
             typeof(ModRateAdjust),
@@ -66,7 +62,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             {
                 yield return ($"Speed x{SpeedChange.Value:N2}", AdjustPitch.Value ? "Pitch Adjusted" : "Pitch Unchanged");
                 yield return ($"{LoopCount.Value}", "Loop Count");
-                yield return ("Break", $"{BreakQuarter.Value} × 1/4 beat");
+                yield return ("Break", $"{BreakQuarter.Value} × 1/2 beat");
                 yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : Millisecond.Value ? $"{CutTimeStart.Value} ms" : GetStringTime((int)CutTimeStart.Value))}");
                 yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : Millisecond.Value ? $"{CutTimeEnd.Value} ms" : GetStringTime((int)CutTimeEnd.Value))}");
                 yield return ("Infinite Loop", InfiniteLoop.Value ? "Enabled" : "Disabled");
@@ -135,7 +131,7 @@ namespace osu.Game.LAsEzExtensions.Mods
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.BreakTime_Label), nameof(EzModStrings.BreakTime_Description))]
         public BindableInt BreakQuarter { get; set; } = new BindableInt(4)
         {
-            MinValue = 1,
+            MinValue = 0,
             MaxValue = 12,
             Precision = 1
         };
@@ -362,29 +358,14 @@ namespace osu.Game.LAsEzExtensions.Mods
             double start = ResolvedCutTimeStart;
             double end = ResolvedCutTimeEnd;
 
-            // 计算总偏移量（全局用户偏移 + 谱面特定偏移 + 平台偏移）
+            // 计算总偏移量（全局用户偏移 + 谱面特定偏移 + 平台偏移），实际多数情况为0
             double totalOffset = getAppliedOffsetMs(beatmap);
+            double audioStart = start - totalOffset;
+            double audioEnd = end - totalOffset;
 
-            // DuplicateVirtualTrack使用独立的Track，不应用偏移，所以需要手动应用偏移
-            // 以匹配beatmap的FramedBeatmapClock行为
-            double audioStart = start + totalOffset;
-            double audioEnd = end + totalOffset;
-
-            // Compute loop interval in milliseconds as a multiple of a quarter-beat at the slice start.
-            double loopIntervalMs;
-
-            try
-            {
-                var timing = beatmap.Beatmap.ControlPointInfo.TimingPointAt(start);
-                // BeatLength is ms per beat; quarter-beat is BeatLength / 4.
-                double quarterMs = timing.BeatLength / 4.0;
-                loopIntervalMs = quarterMs * Math.Max(1, BreakQuarter.Value);
-            }
-            catch
-            {
-                // Fallback: treat quarter as 250ms (i.e. 60 BPM) if timing unavailable.
-                loopIntervalMs = 250 * Math.Max(1, BreakQuarter.Value);
-            }
+            var timing = beatmap.Beatmap.ControlPointInfo.TimingPointAt(start);
+            double halfBeatMs = timing.BeatLength / 2.0;
+            double loopIntervalMs = halfBeatMs * Math.Max(1, BreakQuarter.Value);
 
             return new OverrideSettings
             {
@@ -406,19 +387,11 @@ namespace osu.Game.LAsEzExtensions.Mods
         /// </summary>
         private double getAppliedOffsetMs(IWorkingBeatmap beatmap)
         {
-            // 暂时简化，假设偏移为0，因为用户说"和offset无关"
-            return 0;
-
-            // 获取全局音频偏移设置
-            // double globalOffset = OsuSetting.AudioOffset.Value;
-
             // 获取谱面特定偏移
-            // double beatmapOffset = beatmap.BeatmapInfo.OnlineOffset;
-
-            // 获取平台偏移（Windows通常是+15ms）
-            // double platformOffset = RuntimeInfo.OS == RuntimeInfo.Platform.Windows ? 15 : 0;
-
-            // return globalOffset + beatmapOffset + platformOffset;
+            double audioLeadIn = beatmap.Beatmap.AudioLeadIn;
+            double beatmapOffset = beatmap.Beatmap.CountdownOffset;
+            Logger.Log($"[ModLoopPlayClip] AudioLeadIn = {audioLeadIn}, Beatmap CountdownOffset = {beatmapOffset}");
+            return audioLeadIn + beatmapOffset;
         }
 
         // 获取原始音谱边界

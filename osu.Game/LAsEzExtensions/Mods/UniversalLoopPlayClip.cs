@@ -31,6 +31,9 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
+            if (beatmap == null || beatmap.HitObjects.Count == 0)
+                return;
+
             if (!appliedToConverter)
             {
                 var (cutTimeStart, cutTimeEnd, _) = ResolveSliceTimesForBeatmap(beatmap);
@@ -44,6 +47,10 @@ namespace osu.Game.LAsEzExtensions.Mods
         public void ApplyToBeatmapConverter(IBeatmapConverter beatmapConverter)
         {
             var beatmap = beatmapConverter.Beatmap;
+
+            // 保留，可以防止开启mod并切换规则集时出现 beatmapConverter.Beatmap 变为 null 导致的崩溃。
+            if (beatmap == null || beatmap.HitObjects.Count == 0)
+                return;
 
             converterBeatmap = beatmap;
             originalHitObjects = beatmap.HitObjects.ToList();
@@ -61,7 +68,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             if (beatmap == null) return;
 
             // 禁用倒计时，LP mod 不需要倒计时
-            beatmap.Countdown = CountdownType.None;
+            // beatmap.Countdown = CountdownType.None;
             beatmap.Breaks.Clear();
 
             double breakTime;
@@ -69,8 +76,8 @@ namespace osu.Game.LAsEzExtensions.Mods
             try
             {
                 var timing = beatmap.ControlPointInfo.TimingPointAt(cutTimeStart);
-                double quarterMs = timing.BeatLength / 4.0;
-                breakTime = quarterMs * Math.Max(1, breakQuarter);
+                double halfBeatMs = timing.BeatLength / 2.0;
+                breakTime = halfBeatMs * Math.Max(1, breakQuarter);
             }
             catch
             {
@@ -114,12 +121,57 @@ namespace osu.Game.LAsEzExtensions.Mods
 
             foreach (var h in newPart)
             {
-                try
+                h.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+            }
+
+            // 在每次循环之间仅在间隙足够且不会与任何 HitObject 重叠时插入休息段（breaks），
+            // 以避免出现：已经开始打 note，但主时钟仍显示休息提示的情况。
+
+            beatmap.Breaks.Clear();
+
+            if (loopCount > 1 && breakTime > 0 && newPart.Count > 0)
+            {
+                for (int i = 0; i < loopCount - 1; i++)
                 {
-                    h.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
-                }
-                catch
-                {
+                    double loopStart = cutTimeStart + i * (length + breakTime);
+                    double loopEnd = loopStart + length;
+                    double nextLoopStart = cutTimeStart + (i + 1) * (length + breakTime);
+
+                    double bStart = Math.Max(0, loopEnd);
+                    double bEnd = Math.Max(bStart, nextLoopStart);
+
+                    // 如果间隙长度小于 breakTime，跳过（谨慎判断，避免在 note 存在情况下显示 break）。
+                    if (bEnd - bStart < 1.0) // 1 ms 最小阈值
+                        continue;
+
+                    // 检查 newPart 中是否有任何 HitObject 与该 break 区间相交（[bStart, bEnd)）
+                    bool overlaps = false;
+
+                    foreach (var ho in newPart)
+                    {
+                        try
+                        {
+                            double hs = ho.StartTime;
+                            double he = ho.GetEndTime();
+
+                            if (hs < bEnd && he > bStart)
+                            {
+                                overlaps = true;
+                                break;
+                            }
+                        }
+                        catch
+                        {
+                            // 若获取时间失败，则保守地认为可能有重叠，跳过添加。
+                            overlaps = true;
+                            break;
+                        }
+                    }
+
+                    if (overlaps)
+                        continue;
+
+                    beatmap.Breaks.Add(new BreakPeriod(bStart, bEnd));
                 }
             }
 
@@ -140,91 +192,54 @@ namespace osu.Game.LAsEzExtensions.Mods
                         return;
                     }
 
-                    try
+                    var listType = typeof(List<>).MakeGenericType(elementType);
+                    var listInstance = (IList)Activator.CreateInstance(listType)!;
+
+                    foreach (var h in newPart)
                     {
-                        var listType = typeof(List<>).MakeGenericType(elementType);
-                        var listInstance = (IList)Activator.CreateInstance(listType)!;
-
-                        foreach (var h in newPart)
+                        if (elementType.IsInstanceOfType(h))
                         {
-                            if (elementType.IsInstanceOfType(h))
-                            {
-                                listInstance.Add(h);
-                                continue;
-                            }
-
-                            // Attempt best-effort conversion: create instance of elementType and copy common fields.
-                            try
-                            {
-                                if (Activator.CreateInstance(elementType) is HitObject target)
-                                {
-                                    var startProp = elementType.GetProperty("StartTime");
-                                    if (startProp != null && startProp.CanWrite)
-                                        startProp.SetValue(target, h.StartTime);
-                                    else
-                                        target.StartTime = h.StartTime;
-
-                                    var samplesProp = elementType.GetProperty("Samples");
-
-                                    if (samplesProp != null && samplesProp.CanWrite)
-                                    {
-                                        try { samplesProp.SetValue(target, h.Samples?.ToList()); }
-                                        catch { target.Samples = h.Samples?.ToList(); }
-                                    }
-                                    else
-                                    {
-                                        target.Samples = h.Samples?.ToList();
-                                    }
-
-                                    listInstance.Add(target);
-                                }
-                            }
-                            catch
-                            {
-                                // ignore conversion failure for this element
-                            }
+                            listInstance.Add(h);
+                            continue;
                         }
 
-                        propHitObjects.SetValue(beatmap, listInstance);
-                        return;
+                        // Attempt best-effort conversion: create instance of elementType and copy common fields.
+                        if (Activator.CreateInstance(elementType) is HitObject target)
+                        {
+                            var startProp = elementType.GetProperty("StartTime");
+                            if (startProp != null && startProp.CanWrite)
+                                startProp.SetValue(target, h.StartTime);
+                            else
+                                target.StartTime = h.StartTime;
+
+                            var samplesProp = elementType.GetProperty("Samples");
+
+                            if (samplesProp != null && samplesProp.CanWrite)
+                            {
+                                try { samplesProp.SetValue(target, h.Samples?.ToList()); }
+                                catch { target.Samples = h.Samples?.ToList(); }
+                            }
+                            else
+                            {
+                                target.Samples = h.Samples?.ToList();
+                            }
+
+                            listInstance.Add(target);
+                        }
                     }
-                    catch
-                    {
-                        // fallthrough to generic assignment attempt below
-                    }
+
+                    propHitObjects.SetValue(beatmap, listInstance);
+                    return;
                 }
 
                 // Last resort: try to set directly (may fail if types mismatch)
-                try
-                {
-                    propHitObjects.SetValue(beatmap, newPart);
-                    return;
-                }
-                catch
-                {
-                    // continue to other fallbacks
-                }
+                propHitObjects.SetValue(beatmap, newPart);
+                return;
             }
 
-            try
-            {
-                dynamic dyn = beatmap;
-                dyn.HitObjects = newPart;
-            }
-            catch
-            {
-                try
-                {
-                    if (beatmap.HitObjects is IList<HitObject> current)
-                    {
-                        current.Clear();
-                        foreach (var h in newPart) current.Add(h);
-                    }
-                }
-                catch
-                {
-                }
-            }
+            // Fallback: use dynamic assignment
+            dynamic dyn = beatmap;
+            dyn.HitObjects = newPart;
         }
 
         private static IList<HitSampleInfo>? copySamples(IList<HitSampleInfo>? samples)
@@ -259,37 +274,65 @@ namespace osu.Game.LAsEzExtensions.Mods
             resetCloneState(clone, source);
 
             // Apply start time offset
-            try
-            {
-                double newStart = source.StartTime + baseOffset;
-                clone.StartTime = newStart;
-            }
-            catch { clone.StartTime = source.StartTime + baseOffset; }
+            double newStart = source.StartTime + baseOffset;
+            clone.StartTime = newStart;
 
             // Deep copy samples if present
-            try { clone.Samples = copySamples(source.Samples) ?? new List<HitSampleInfo>(); }
-            catch { }
+            clone.Samples = copySamples(source.Samples) ?? new List<HitSampleInfo>();
 
             // Copy end/duration where possible
-            try
+            double srcEnd = source.GetEndTime();
+            var endProp = source.GetType().GetProperty("EndTime");
+
+            if (endProp != null && endProp.CanWrite)
             {
-                double srcEnd = source.GetEndTime();
-                var endProp = source.GetType().GetProperty("EndTime");
-
-                if (endProp != null && endProp.CanWrite)
-                    endProp.SetValue(clone, srcEnd + baseOffset);
-                else
+                try
                 {
-                    var durProp = source.GetType().GetProperty("Duration") ?? source.GetType().GetProperty("Length");
+                    endProp.SetValue(clone, srcEnd + baseOffset);
+                }
+                catch
+                {
+                    // Some objects (e.g., ConvertSlider) may not support EndTime setter
+                }
+            }
+            else
+            {
+                var durProp = source.GetType().GetProperty("Duration") ?? source.GetType().GetProperty("Length");
 
-                    if (durProp != null && durProp.CanWrite)
+                if (durProp != null && durProp.CanWrite)
+                {
+                    try
                     {
                         double dur = srcEnd - source.StartTime;
                         durProp.SetValue(clone, Convert.ChangeType(dur, durProp.PropertyType));
                     }
+                    catch
+                    {
+                        // Some objects (e.g., ConvertSlider) require alternative methods (RepeatCount) to adjust duration
+                    }
                 }
             }
-            catch { }
+
+            // // Recursively clone nested hit objects (important for rulesets like Mania which rely on nested objects for sample triggering)
+            // try
+            // {
+            //     var nested = source.NestedHitObjects;
+            //
+            //     if (nested.Count > 0)
+            //     {
+            //         var clonedNested = new List<HitObject>(nested.Count);
+            //
+            //         foreach (var n in nested)
+            //         {
+            //             var cn = createDeepClone(n, baseOffset);
+            //             if (cn != null)
+            //                 clonedNested.Add(cn);
+            //         }
+            //
+            //         nested_hit_objects_field?.SetValue(clone, clonedNested);
+            //     }
+            // }
+            // catch { }
 
             return clone;
         }
