@@ -323,10 +323,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
             "(Like 300+ BPM 1/4 Speed)Clean Divide * 2, for 1/4 Speed, avoiding additional 1/2 Jack.");
 
         // NtoM, Gracer, JackAdjust, LNJudgementAdjust
-        public static readonly LocalisableString ApplyOrder_Label = new EzLocalisableString("应用顺序", "Apply Order");
-
-        public static readonly LocalisableString ApplyOrder_Description = new EzLocalisableString("此mod在谱面转换后应用的顺序。数字越小越先运行。",
-            "Apply Order. Order in which this mod is applied after beatmap conversion. Lower runs earlier.");
 
         public static readonly LocalisableString UseHealthCapReduction_Label = new EzLocalisableString("血量上限降低模式", "Health Cap Reduction Mode");
 

@@ -30,7 +30,8 @@ namespace osu.Game.LAsEzExtensions.Mods
                                    IApplicableToPlayer,
                                    IApplicableToHUD,
                                    IApplicableFailOverride,
-                                   IApplicableToRate
+                                   IApplicableToRate,
+                                   IHasApplyOrder
     {
         public override string Name => "Loop Play Clip (No Fail)";
 
@@ -169,6 +170,15 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
+
+        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         private readonly DuplicateVirtualTrack duplicateTrack;
         private IWorkingBeatmap? pendingWorkingBeatmap;

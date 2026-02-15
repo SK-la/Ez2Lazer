@@ -40,6 +40,10 @@ namespace osu.Game.LAsEzExtensions.Mods
         // ====================================================================================================
         // LAsMods - Mod Descriptions
         // ====================================================================================================
+        public static readonly LocalisableString ApplyOrder_Label = new EzLocalisableString("应用顺序", "Apply Order");
+
+        public static readonly LocalisableString ApplyOrder_Description = new EzLocalisableString("此mod在谱面转换后应用的顺序。数字越小越先运行。",
+            "Apply Order. Order in which this mod is applied after beatmap conversion. Lower runs earlier.");
 
         public static readonly LocalisableString LoopPlayClip_Description = new EzLocalisableString("将谱面切割成片段用于循环练习。",
             "Cut the beatmap into a clip for loop practice. (The original is YuLiangSSS's Duplicate Mod)");
