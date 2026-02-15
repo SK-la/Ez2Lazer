@@ -12,6 +12,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
     {
         public const int DEFAULT_KPS_GRAPH_POINTS = 256;
 
+        // 防止在极端 BPM/Mod 情况下分配过大集合导致 OOM。
+        private const int max_estimated_intervals = 100_000;
+
         public static List<double> DownsampleToFixedCount(IReadOnlyList<double> source, int targetCount)
         {
             if (source.Count == 0)
@@ -62,6 +65,25 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (double.IsNaN(songEndTime) || double.IsInfinity(songEndTime) || double.IsNaN(interval) || double.IsInfinity(interval))
                 estimatedIntervals = 0;
             estimatedIntervals = Math.Max(0, estimatedIntervals);
+
+            // Diagnostic logging: 当估算的桶数异常时记录关键信息以便追踪问题来源（bpm/interval/songEndTime/objects）
+            const int log_estimated_threshold = 10_000;
+
+            if (estimatedIntervals > log_estimated_threshold)
+            {
+                try
+                {
+                    Logger.Log($"[OptimizedBeatmapCalculator] large estimatedIntervals={estimatedIntervals} bpm={beatmap.BeatmapInfo.BPM} interval={interval} songEndTime={songEndTime} hitObjects={hitObjects.Count}");
+                }
+                catch
+                {
+                    // Ignore logging failures
+                }
+            }
+
+            if (estimatedIntervals > max_estimated_intervals)
+                estimatedIntervals = max_estimated_intervals;
+
             var kpsList = new List<double>(estimatedIntervals);
 
             // 缓存hitObjects数组以提高访问性能
@@ -86,6 +108,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 int hits = endIdx - startIdx;
                 double kps = hits / (interval / 1000.0); // 转换为每秒
                 kpsList.Add(kps);
+                // 防护：在极端情况下限制桶数，避免无限迭代导致 OOM
+                if (kpsList.Count >= max_estimated_intervals)
+                    break;
 
                 currentTime += interval;
                 currentIndex = startIdx; // 下次从这个位置开始
@@ -248,6 +273,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
             if (double.IsNaN(songEndTime) || double.IsInfinity(songEndTime) || double.IsNaN(interval) || double.IsInfinity(interval))
                 estimatedIntervals = 0;
             estimatedIntervals = Math.Max(0, estimatedIntervals);
+            if (estimatedIntervals > max_estimated_intervals)
+                estimatedIntervals = max_estimated_intervals;
+
             var kpsList = new List<double>(estimatedIntervals);
             var columnCounts = new Dictionary<int, int>();
             var holdNoteCounts = new Dictionary<int, int>();
@@ -289,6 +317,10 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 int hits = endIdx - startIdx;
                 kpsList.Add(hits / (interval / 1000.0));
+
+                // 防护：在极端情况下限制桶数，避免无限迭代导致 OOM
+                if (kpsList.Count >= max_estimated_intervals)
+                    break;
 
                 currentTime += interval;
                 currentIndex = startIdx;

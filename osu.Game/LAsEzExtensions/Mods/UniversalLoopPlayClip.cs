@@ -5,14 +5,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.LAsEzExtensions.Mods
 {
-    public class UniversalLoopPlayClip : ModLoopPlayClip,
-                                         IApplicableAfterBeatmapConversion
+    public class UniversalLoopPlayClip : ModLoopPlayClip, IApplicableAfterBeatmapConversion
     {
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
@@ -62,6 +62,20 @@ namespace osu.Game.LAsEzExtensions.Mods
 
             double length = cutTimeEnd - cutTimeStart;
 
+            // 防护：避免在 selectedPart 较大时通过 loopCount 复制产生过多 HitObject 导致内存暴涨。
+            const int max_total_hitobjects = 200_000;
+
+            if (selectedPart.Count > 0)
+            {
+                long total = (long)selectedPart.Count * loopCount;
+
+                if (total > max_total_hitobjects)
+                {
+                    int adjustedLoopCount = Math.Max(1, max_total_hitobjects / selectedPart.Count);
+                    loopCount = adjustedLoopCount;
+                }
+            }
+
             for (int timeIndex = 0; timeIndex < loopCount; timeIndex++)
             {
                 double offset = timeIndex * (breakTime + length);
@@ -74,43 +88,63 @@ namespace osu.Game.LAsEzExtensions.Mods
 
                     try
                     {
-                        var inst = (HitObject?)Activator.CreateInstance(type);
+                        HitObject? inst;
+
+                        // 先尝试公共构造器，然后尝试调用非公共的无参构造器（若存在）。
+                        try
+                        {
+                            inst = (HitObject?)Activator.CreateInstance(type);
+                        }
+                        catch
+                        {
+                            try
+                            {
+                                inst = (HitObject?)Activator.CreateInstance(type, nonPublic: true);
+                            }
+                            catch
+                            {
+                                inst = null;
+                            }
+                        }
 
                         if (inst != null)
                         {
-                            // StartTime
-                            var startProp = type.GetProperty("StartTime");
-                            if (startProp != null && startProp.CanWrite)
-                                startProp.SetValue(inst, note.StartTime + baseOffset);
-                            else
+                            // 尽力复制字段以保留对象内部状态
+                            try
+                            {
+                                var fields = type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+
+                                foreach (var f in fields)
+                                {
+                                    try { f.SetValue(inst, f.GetValue(note)); }
+                                    catch { }
+                                }
+                            }
+                            catch { }
+
+                            // 确保时间与样本被正确设置为偏移后的值
+                            try
+                            {
+                                var startProp = type.GetProperty("StartTime");
+                                if (startProp != null && startProp.CanWrite)
+                                    startProp.SetValue(inst, note.StartTime + baseOffset);
+                                else
+                                    inst.StartTime = note.StartTime + baseOffset;
+                            }
+                            catch
+                            {
                                 inst.StartTime = note.StartTime + baseOffset;
-
-                            // Samples
-                            var samplesProp = type.GetProperty("Samples");
-
-                            if (samplesProp != null && samplesProp.CanWrite)
-                            {
-                                try
-                                {
-                                    var s = note.Samples?.ToList();
-                                    samplesProp.SetValue(inst, s);
-                                }
-                                catch
-                                {
-                                    inst.Samples = note.Samples?.ToList();
-                                }
                             }
-                            else
-                            {
-                                inst.Samples = note.Samples?.ToList();
-                            }
+
+                            try { inst.Samples = note.Samples?.ToList(); }
+                            catch { }
 
                             newPart.Add(inst);
                         }
                     }
                     catch
                     {
-                        // skip
+                        // skip on unexpected errors
                     }
                 }
             }
