@@ -610,7 +610,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                         {
                             t.Stop();
                             // Seek to desired candidate start time if provided, otherwise to 0.
-                            double seekTarget = desiredCandidateStartTime ?? 0;
+                            double seekTarget = getInitialSeekTarget();
                             t.Seek(seekTarget);
                             log($"prepared independent candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.");
                         }
@@ -644,7 +644,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                     try
                     {
                         t.Stop();
-                        double seekTarget = desiredCandidateStartTime ?? 0;
+                        double seekTarget = getInitialSeekTarget();
                         t.Seek(seekTarget);
                         log($"prepared fallback candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.");
                     }
@@ -861,6 +861,22 @@ namespace osu.Game.LAsEzExtensions.Audio
             {
                 Logger.Log($"DuplicateVirtualTrack: StartCandidatePlayback failed: {ex}", LoggingTarget.Runtime);
             }
+        }
+
+        private double getInitialSeekTarget()
+        {
+            // 计算音频应该 seek 到的位置
+            // 考虑倒计时期间 gameplayClock.CurrentTime 是负数
+            // 音频需要从 audioStart + gameplayClock.CurrentTime 开始，
+            // 这样当 gameplayClock 推进到 0 时，音频正好在 audioStart
+            double seekTarget = desiredCandidateStartTime ?? 0;
+
+            if (gameplayClock != null)
+            {
+                seekTarget += gameplayClock.CurrentTime;
+            }
+
+            return seekTarget;
         }
     }
 
