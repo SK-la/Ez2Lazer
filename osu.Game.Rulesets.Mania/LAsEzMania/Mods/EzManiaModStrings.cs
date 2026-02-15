@@ -182,8 +182,21 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString PatternShift_WindowStartOffset_Label = new EzLocalisableString("窗口起始偏移", "Window Start Offset");
         public static readonly LocalisableString PatternShift_WindowStartOffset_Description = new EzLocalisableString("1-4：第一到第四个半拍。", "1-4: first to fourth half-beat.");
 
-        public static readonly LocalisableString PatternShift_Seed_Label = new EzLocalisableString("种子", "Seed");
-        public static readonly LocalisableString PatternShift_Seed_Description = new EzLocalisableString("使用自定义种子代替随机种子", "Use a custom seed instead of a random one");
+        public static readonly LocalisableString PatternShift_Skip_FineThreshold_Label = new EzLocalisableString(
+            "Bypass高分节拍跳过阈值",
+            "Bypass high-density beat skip threshold");
+
+        public static readonly LocalisableString PatternShift_Skip_FineThreshold_Description = new EzLocalisableString(
+            "在1/2节拍之间出现1/4以上（不含1/4）线的note数量阈值，超过则跳过处理。高星图需适当增加。",
+            "Threshold for notes finer than 1/4 within a half-window; exceeding this skips processing. Default = 2.");
+
+        public static readonly LocalisableString PatternShift_Skip_QuarterDivisor_Label = new EzLocalisableString(
+            "Bypass 1/4线跳过阈值 (1/n)",
+            "Bypass Quarter-line threshold divisor (1/n)");
+
+        public static readonly LocalisableString PatternShift_Skip_QuarterDivisor_Description = new EzLocalisableString(
+            "1/4线上的note数量阈值按谱面总列数的1/n计算，默认 n=2，即 k/2 阈值。",
+            "Quarter-line note threshold is totalColumns / n. Default n=2 (k/2).");
 
         public static readonly LocalisableString PatternShift_Regenerate_Label = new EzLocalisableString("重生成", "Regenerate");
 

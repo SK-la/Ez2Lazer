@@ -55,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (availableSteps <= 0)
                 return;
 
-            applyDumpPattern(beatmap, windowObjects, windowStart, windowEnd, beatLength, rng);
+            applyDumpPattern(beatmap, windowObjects, windowStart, windowEnd, beatLength, rng, settings);
         }
 
         private static void applyDumpPattern(ManiaBeatmap beatmap,
@@ -63,7 +63,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                                              double windowStart,
                                              double windowEnd,
                                              double beatLength,
-                                             Random rng)
+                                             Random rng,
+                                             KeyPatternSettings settings)
         {
             // Dump=滑梯: 在窗口内按时间就近横向移动 note, 形成单调的列序列
             if (windowObjects.Count < 3)
@@ -125,14 +126,15 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
 
             // 大间隙单调滑梯：首尾间隔至少 1/2 拍才添加
-            tryAddLargeGapSlide(beatmap, windowObjects, groups, beatLength, rng);
+            tryAddLargeGapSlide(beatmap, windowObjects, groups, beatLength, rng, settings);
         }
 
         private static void tryAddLargeGapSlide(ManiaBeatmap beatmap,
                                                 List<ManiaHitObject> windowObjects,
                                                 List<(double time, ManiaHitObject obj)> groups,
                                                 double beatLength,
-                                                Random rng)
+                                                Random rng,
+                                                KeyPatternSettings settings)
         {
             if (groups.Count < 2 || beatLength <= 0)
                 return;
@@ -144,7 +146,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             if (gap < beatLength / 2.0)
                 return;
 
-            if (ManiaKeyPatternHelp.HasDenseBurstBetweenQuarterNotes(windowObjects, beatLength, beatmap.TotalColumns))
+            if (ManiaKeyPatternHelp.HasDenseBurstBetweenQuarterNotes(windowObjects, beatLength, beatmap.TotalColumns, settings))
                 return;
 
             var firstCols = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, firstTime, TIME_TOLERANCE).ToList();

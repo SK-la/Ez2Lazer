@@ -17,6 +17,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public int Level { get; set; }
 
+        // 新增：用于控制预处理跳过判定的两个阈值
+        public int FineCountThreshold { get; set; } = 2;
+        public int QuarterLineDivisor { get; set; } = 2;
+
         // 以下为窗口/振荡相关参数，已合并入设置以便统一传递与配置
         public int OscillationBeats { get; set; } = 1;
         public int WindowProcessInterval { get; set; } = 1;
@@ -80,10 +84,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         // 4、apply方法内部实现具体逻辑，重复处理次数
         // 5、最终统一清洗
         public static void ProcessRollingWindowWithOscillator(ManiaBeatmap beatmap,
-                                                              KeyPatternType patternType,
-                                                              KeyPatternSettings psSettings,
-                                                              IEzOscillator oscillator,
-                                                              Action<List<ManiaHitObject>, ManiaBeatmap, double, double, KeyPatternSettings, Random, int> applyPattern)
+                                      KeyPatternType patternType,
+                                      KeyPatternSettings psSettings,
+                                      IEzOscillator oscillator,
+                                      Action<List<ManiaHitObject>, ManiaBeatmap, double, double, KeyPatternSettings, Random, int> applyPattern)
         {
             if (psSettings.Level <= 0)
                 return;
@@ -121,7 +125,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 double wstart = currentTime + wi * stepDuration;
                 double wend = wstart + windowDuration;
                 var ctx = new WindowContext(beatLength, wstart, windowDuration, stepDuration, 0, 0, beatmap.TotalColumns, 5.0);
-                bool skip = shouldSkipDenseWindow(patternType, objects, ctx);
+                bool skip = shouldSkipDenseWindow(patternType, objects, ctx, psSettings);
 
                 windowInfos.Add((wi, wstart, wend, skip));
             }
@@ -230,8 +234,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         }
 
         internal static bool HasDenseBurstBetweenQuarterNotes(List<ManiaHitObject> windowObjects,
-                                                              double beatLength,
-                                                              int totalColumns)
+                                      double beatLength,
+                                      int totalColumns,
+                                      KeyPatternSettings? psSettings = null)
         {
             double anchorInterval = beatLength;
             if (anchorInterval <= 0)
@@ -286,7 +291,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                     int countQuarter = 0;
                     int countOther = 0;
-                    int mixedThreshold = Math.Max(2, totalColumns / 3);
+                    int fineThresholdDefault = 2;
+                    int quarterDivDefault = 3;
+                    int fineThreshold = psSettings?.FineCountThreshold ?? fineThresholdDefault;
+                    int quarterDiv = psSettings?.QuarterLineDivisor ?? quarterDivDefault;
+                    int mixedThreshold = Math.Max(fineThreshold, totalColumns / Math.Max(1, quarterDiv));
 
                     for (int i = start + 1; i < end; i++)
                     {
@@ -693,8 +702,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         }
 
         private static bool shouldSkipDenseWindow(KeyPatternType patternType,
-                                                  List<ManiaHitObject> objects,
-                                                  WindowContext ctx)
+                              List<ManiaHitObject> objects,
+                              WindowContext ctx,
+                              KeyPatternSettings? psSettings)
         {
             if (patternType == KeyPatternType.Delay || patternType == KeyPatternType.Dump)
                 return false;
@@ -739,6 +749,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                     int halfIndexLocal = lowerBoundByTime(objects, halfStart);
 
                     int fineCountLocal = 0;
+                    int fineThresholdLocal = psSettings?.FineCountThreshold ?? 2;
 
                     for (int i = halfIndexLocal; i < objects.Count; i++)
                     {
@@ -749,7 +760,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                         if (!isOn1To4(obj.StartTime))
                         {
                             fineCountLocal++;
-                            if (fineCountLocal >= 2)
+                            if (fineCountLocal >= fineThresholdLocal)
                                 return true;
                         }
                     }
