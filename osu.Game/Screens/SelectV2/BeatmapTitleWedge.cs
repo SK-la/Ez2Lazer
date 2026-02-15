@@ -171,6 +171,7 @@ namespace osu.Game.Screens.SelectV2
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
                                     Size = new Vector2(300, 30),
+                                    HoverValueEnabled = true,
                                     Margin = new MarginPadding { Left = 5f },
                                 },
                             },

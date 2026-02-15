@@ -8,8 +8,13 @@ using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
+using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Input.Events;
 using osu.Framework.Layout;
+using osu.Game.Graphics;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.Graphics.Sprites;
 using osuTK;
 
 namespace osu.Game.LAsEzExtensions.UserInterface
@@ -34,6 +39,30 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         private readonly Container<Path> maskingContainer;
         private int valuesCount;
 
+        /// <summary>
+        /// 是否启用悬浮显示当前横坐标的 KPS 值（仅在外部显式开启时创建相关容器）。
+        /// </summary>
+        public bool HoverValueEnabled
+        {
+            get => hoverValueEnabled;
+            set
+            {
+                if (value == hoverValueEnabled) return;
+
+                hoverValueEnabled = value;
+                if (hoverValueEnabled)
+                    Schedule(createHoverContainers);
+            }
+        }
+
+        private bool hoverValueEnabled;
+
+        // hover 相关控件（仅在启用时创建）
+        private Container hoverRoot = null!;
+        private Container hoverLabel = null!;
+        private OsuSpriteText hoverText = null!;
+        private bool hoverCreated;
+
         public EzDisplayKpsGraph()
         {
             AddInternal(maskingContainer = new Container<Path>
@@ -50,6 +79,42 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             });
 
             AddLayout(pathCached);
+        }
+
+        private void createHoverContainers()
+        {
+            if (hoverCreated) return;
+
+            hoverRoot = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Alpha = 0,
+                Children = new Drawable[]
+                {
+                    hoverLabel = new Container
+                    {
+                        AutoSizeAxes = Axes.Both,
+                        Origin = Anchor.TopCentre,
+                        Position = new Vector2(0, -4),
+                        Masking = true,
+                        CornerRadius = 4,
+                        Children = new Drawable[]
+                        {
+                            new Box { RelativeSizeAxes = Axes.Both, Colour = Colour4.Black, Alpha = 0.8f },
+                            hoverText = new OsuSpriteText
+                            {
+                                Anchor = Anchor.Centre,
+                                Origin = Anchor.Centre,
+                                Font = OsuFont.GetFont(size: 12, weight: FontWeight.Bold),
+                                Colour = Colour4.White,
+                            }
+                        }
+                    }
+                }
+            };
+
+            AddInternal(hoverRoot);
+            hoverCreated = true;
         }
 
         public void SetPoints(IReadOnlyList<double> source)
@@ -103,6 +168,73 @@ namespace osu.Game.LAsEzExtensions.UserInterface
                 applyPath();
                 pathCached.Validate();
             }
+        }
+
+        protected override bool OnHover(HoverEvent e)
+        {
+            if (!HoverValueEnabled)
+                return base.OnHover(e);
+
+            if (valuesCount <= 0)
+                return base.OnHover(e);
+
+            if (!hoverCreated)
+                createHoverContainers();
+
+            updateHover(e.ScreenSpaceMousePosition);
+            hoverRoot.FadeIn(100, Easing.Out);
+            return true;
+        }
+
+        protected override bool OnMouseMove(MouseMoveEvent e)
+        {
+            if (HoverValueEnabled && hoverCreated && IsHovered)
+            {
+                updateHover(e.ScreenSpaceMousePosition);
+                return true;
+            }
+
+            return base.OnMouseMove(e);
+        }
+
+        protected override void OnHoverLost(HoverLostEvent e)
+        {
+            if (hoverCreated)
+                hoverRoot.FadeOut(100, Easing.Out);
+
+            base.OnHoverLost(e);
+        }
+
+        private void updateHover(Vector2 screenSpaceMousePos)
+        {
+            if (!hoverCreated) return;
+
+            if (valuesCount <= 0)
+            {
+                hoverText.Text = string.Empty;
+                return;
+            }
+
+            // 将屏幕空间坐标转换到 path 的本地坐标，以考虑 path 的实际绘制宽度与 PathRadius
+            var thisLocal = ToLocalSpace(screenSpaceMousePos);
+            var pathLocal = path.ToLocalSpace(screenSpaceMousePos);
+
+            float availableWidth = Math.Max(0, path.DrawWidth - 2 * path.PathRadius);
+            if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth - 2 * path.PathRadius);
+
+            float xInAvailable = Math.Clamp(pathLocal.X - path.PathRadius, 0, availableWidth);
+
+            int denom = Math.Max(1, valuesCount - 1);
+            int index = 0;
+            if (availableWidth > 0)
+                index = (int)Math.Clamp(MathF.Round(xInAvailable / availableWidth * denom), 0, valuesCount - 1);
+
+            float value = values[index];
+            hoverText.Text = value.ToString("0.##");
+
+            // 将标签置于当前控件的本地 X 位置，并略微抬高于图表顶部
+            hoverLabel.X = Math.Clamp(thisLocal.X, 0, DrawWidth);
+            hoverLabel.Y = -(hoverLabel.DrawHeight + 4);
         }
 
         private void applyPath()
