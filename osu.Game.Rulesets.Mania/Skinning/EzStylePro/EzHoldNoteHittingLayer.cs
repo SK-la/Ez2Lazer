@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             if (animation == null)
                 OnDrawableChanged();
-                IsHitting.BindValueChanged(hitting =>
+            IsHitting.BindValueChanged(hitting =>
             {
                 ClearTransforms();
 

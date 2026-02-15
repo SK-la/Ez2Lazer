@@ -21,7 +21,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             ApplyLoopToBeatmapStatic(beatmap, LoopCount.Value, cutTimeStart, cutTimeEnd, BreakQuarter.Value, Seed.Value);
         }
 
-        public static void ApplyLoopToBeatmapStatic(IBeatmap beatmap, int loopCount, double cutTimeStart, double cutTimeEnd, int breakQuarter, int? seed = null)
+        public static void ApplyLoopToBeatmapStatic(IBeatmap? beatmap, int loopCount, double cutTimeStart, double cutTimeEnd, int breakQuarter, int? seed = null)
         {
             if (beatmap == null) return;
 
@@ -59,8 +59,6 @@ namespace osu.Game.LAsEzExtensions.Mods
             var selectedPart = beatmap.HitObjects.Where(h => h.StartTime > cutTimeStart && h.GetEndTime() < cutTimeEnd).ToList();
 
             var newPart = new List<HitObject>();
-
-            var rng = seed.HasValue ? new Random(seed.Value) : new Random();
 
             double length = cutTimeEnd - cutTimeStart;
 

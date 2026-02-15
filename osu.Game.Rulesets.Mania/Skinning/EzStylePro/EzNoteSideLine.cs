@@ -64,8 +64,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         public void UpdateTrackLineHeight()
         {
-            if (separator != null)
-                separator.Height = (float)column.EzSkinInfo.NoteTrackLineHeight.Value;
+            separator.Height = (float)column.EzSkinInfo.NoteTrackLineHeight.Value;
         }
 
         protected override void LoadComplete()

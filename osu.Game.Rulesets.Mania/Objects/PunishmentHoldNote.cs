@@ -20,11 +20,6 @@ namespace osu.Game.Rulesets.Mania.Objects
         /// </summary>
         public bool UseHealthCapReduction { get; set; }
 
-        public PunishmentHoldNote()
-        {
-            // Mark this as a special punishment note
-        }
-
         public override Judgement CreateJudgement() => new IgnoreJudgement();
 
         protected override HitWindows CreateHitWindows() => HitWindows.Empty;

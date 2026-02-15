@@ -4,6 +4,7 @@
 using System;
 using System.Linq;
 using System.Threading;
+using JetBrains.Annotations;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -113,6 +114,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             LNHoldNote.TailJudgementSwitch = TailJudgementSwitch.Value;
         }
 
+        [UsedImplicitly]
         private class NoLNNote : Note
         {
             public NoLNNote(Note note)
@@ -127,6 +129,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
+        [UsedImplicitly]
         private class NoLNHeadNote : HeadNote
         {
         }

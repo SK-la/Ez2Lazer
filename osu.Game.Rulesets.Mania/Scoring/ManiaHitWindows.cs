@@ -205,14 +205,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void setHitMode()
         {
-            EzEnumHitMode HitMode = GlobalConfigStore.EzConfig?.Get<EzEnumHitMode>(Ez2Setting.HitMode) ?? EzEnumHitMode.Lazer;
+            EzEnumHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzEnumHitMode>(Ez2Setting.HitMode) ?? EzEnumHitMode.Lazer;
 
-            if (HitMode == EzEnumHitMode.Lazer)
+            if (hitMode == EzEnumHitMode.Lazer)
             {
                 return;
             }
 
-            switch (HitMode)
+            switch (hitMode)
             {
                 case EzEnumHitMode.O2Jam:
                     modifyManiaHitRange(custom_helper.GetHitWindowsO2Jam(BPM));
@@ -225,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case EzEnumHitMode.IIDX_HD:
                 case EzEnumHitMode.LR2_HD:
                 case EzEnumHitMode.Raja_NM:
-                    modifyManiaHitRange(custom_helper.GetHitWindowsBMS(HitMode));
+                    modifyManiaHitRange(custom_helper.GetHitWindowsBMS(hitMode));
                     break;
 
                 case EzEnumHitMode.Malody:

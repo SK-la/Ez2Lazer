@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override bool ValidForFreestyleAsRequiredMod => false;
         public readonly int[] DivideNumber = [2, 4, 8, 3, 6, 9, 5, 7, 12, 16, 48, 35, 64];
 
-        public readonly double ERROR = 2;
+        public readonly double Error = 2;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -194,7 +194,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     continue;
                 }
 
-                originalLNObjects = ManiaModYuModHelper.Transform(rng, Mu1.Value, SigmaDouble.Value + SigmaInteger.Value, Divide1.Value, Percentage.Value, ERROR, OriginalLN.Value, beatmap, newObjects,
+                originalLNObjects = ManiaModYuModHelper.Transform(rng, Mu1.Value, SigmaDouble.Value + SigmaInteger.Value, Divide1.Value, Percentage.Value, Error, OriginalLN.Value, beatmap, newObjects,
                     column, Divide2.Value, Mu2.Value, Mu1DMu2.Value);
             }
 

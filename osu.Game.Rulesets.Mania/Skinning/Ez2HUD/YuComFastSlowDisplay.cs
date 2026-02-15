@@ -137,7 +137,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         private string fastTextLNString = string.Empty;
         private string slowTextLNString = string.Empty;
 
-        private BindableNumber<float> gap = new BindableNumber<float>();
+        private readonly BindableNumber<float> gap = new BindableNumber<float>();
 
         private (HitResult result, double length)[] hitWindows = null!;
 

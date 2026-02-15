@@ -38,7 +38,6 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
         }
 
         // 公共属性定义本地化字符串，直接指定中文和英文
-        public static readonly EzLocalisableString Mania_Specific_Key = new EzLocalisableString("Mania特定中文");
-        // 添加更多属性...
+        public static readonly EzLocalisableString MANIA_SPECIFIC_KEY = new EzLocalisableString("Mania特定中文");
     }
 }

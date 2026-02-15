@@ -137,9 +137,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
             // Suppress extremely small floating-point changes which are noise
             // and can cause issues (e.g. infinite loading) when treated as non-zero.
-            const double EPSILON = 1e-6;
+            const double epsilon = 1e-6;
 
-            if (Math.Abs(scaled) < EPSILON)
+            if (Math.Abs(scaled) < epsilon)
             {
                 scaled = 0;
             }

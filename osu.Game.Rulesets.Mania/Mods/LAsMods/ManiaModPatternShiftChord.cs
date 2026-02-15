@@ -100,11 +100,11 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 return anchor < 0 ? 0 : anchor;
             }
 
-            int countAtTime(double time)
-            {
-                var cols = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, time, TIME_TOLERANCE);
-                return cols.Count;
-            }
+            // int countAtTime(double time)
+            // {
+            //     var cols = ManiaKeyPatternHelp.GetColumnsAtTime(windowObjects, time, TIME_TOLERANCE);
+            //     return cols.Count;
+            // }
 
             foreach (var obj in windowObjects)
             {

@@ -31,9 +31,9 @@ namespace osu.Game.Rulesets.Mania.Tests
         private ScoreInfo testScore;
         private IBeatmap testBeatmap;
 
-        private const int RANDOM_SEED = 1234; // Fixed seed for consistent random data
-        private const int COLUMNS = 7; // 7k
-        private const int NOTES_PER_COLUMN = 50; // 50 notes per column
+        private const int random_seed = 1234; // Fixed seed for consistent random data
+        private const int columns = 7; // 7k
+        private const int notes_per_column = 50; // 50 notes per column
 
         [SetUp]
         public void SetUp()
@@ -121,7 +121,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         /// </summary>
         private IBeatmap createTestBeatmap()
         {
-            var beatmap = new ManiaBeatmap(new StageDefinition(COLUMNS))
+            var beatmap = new ManiaBeatmap(new StageDefinition(columns))
             {
                 BeatmapInfo = new BeatmapInfo
                 {
@@ -137,12 +137,12 @@ namespace osu.Game.Rulesets.Mania.Tests
                 ControlPointInfo = new ControlPointInfo()
             };
 
-            var random = new Random(RANDOM_SEED);
+            var random = new Random(random_seed);
 
             // Create 50 notes per column
-            for (int column = 0; column < COLUMNS; column++)
+            for (int column = 0; column < columns; column++)
             {
-                for (int i = 0; i < NOTES_PER_COLUMN; i++)
+                for (int i = 0; i < notes_per_column; i++)
                 {
                     // Use fixed seed random for note timing within each column
                     double timeOffset = random.NextDouble() * 500; // Random offset between 0-500ms for each note
@@ -168,7 +168,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         private ScoreInfo createTestScore(IBeatmap beatmap)
         {
             var hitEvents = new List<HitEvent>();
-            var random = new Random(RANDOM_SEED);
+            var random = new Random(random_seed);
 
             // Initialize hit windows based on beatmap difficulty
             var hitWindows = new ManiaHitWindows();
@@ -181,7 +181,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             // Normal distribution centered at 0ms with σ=20ms (symmetric around 0)
             for (int i = 0; i < 200; i++)
             {
-                double offset = GenerateNormalOffset(random, 0, 20);
+                double offset = generateNormalOffset(random, 0, 20);
                 // Clamp to [-40, 40] range
                 offset = Math.Max(-40, Math.Min(40, offset));
 
@@ -197,7 +197,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             for (int i = 0; i < 25; i++)
             {
                 // Positive side [40, 100]
-                double offset = GenerateNormalOffset(random, 40, 30);
+                double offset = generateNormalOffset(random, 40, 30);
                 offset = Math.Max(40, Math.Min(100, offset));
 
                 HitResult result = hitWindows.ResultFor(offset);
@@ -210,7 +210,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             for (int i = 0; i < 25; i++)
             {
                 // Negative side [-100, -40]
-                double offset = GenerateNormalOffset(random, -40, 30);
+                double offset = generateNormalOffset(random, -40, 30);
                 offset = Math.Max(-100, Math.Min(-40, offset));
 
                 HitResult result = hitWindows.ResultFor(offset);
@@ -225,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             for (int i = 0; i < 10; i++)
             {
                 // Positive side [100, 150]
-                double offset = GenerateNormalOffset(random, 100, 25);
+                double offset = generateNormalOffset(random, 100, 25);
                 offset = Math.Max(100, Math.Min(150, offset));
 
                 HitResult result = hitWindows.ResultFor(offset);
@@ -238,7 +238,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             for (int i = 0; i < 10; i++)
             {
                 // Negative side [-150, -100]
-                double offset = GenerateNormalOffset(random, -100, 25);
+                double offset = generateNormalOffset(random, -100, 25);
                 offset = Math.Max(-150, Math.Min(-100, offset));
 
                 HitResult result = hitWindows.ResultFor(offset);
@@ -253,7 +253,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             for (int i = 0; i < 5; i++)
             {
                 // Positive side [150, 200]
-                double offset = GenerateNormalOffset(random, 150, 25);
+                double offset = generateNormalOffset(random, 150, 25);
                 offset = Math.Max(150, Math.Min(200, offset));
 
                 HitResult result = hitWindows.ResultFor(offset);
@@ -266,7 +266,7 @@ namespace osu.Game.Rulesets.Mania.Tests
             for (int i = 0; i < 5; i++)
             {
                 // Negative side [-200, -150]
-                double offset = GenerateNormalOffset(random, -150, 25);
+                double offset = generateNormalOffset(random, -150, 25);
                 offset = Math.Max(-200, Math.Min(-150, offset));
 
                 HitResult result = hitWindows.ResultFor(offset);
@@ -287,12 +287,12 @@ namespace osu.Game.Rulesets.Mania.Tests
                 switch (segment)
                 {
                     case 0: // [-40, 40]ms
-                        offset = GenerateNormalOffset(random, 0, 20);
+                        offset = generateNormalOffset(random, 0, 20);
                         offset = Math.Max(-40, Math.Min(40, offset));
                         break;
 
                     case 1: // [±40, ±100]ms
-                        offset = GenerateNormalOffset(random, isNegative ? -40 : 40, 30);
+                        offset = generateNormalOffset(random, isNegative ? -40 : 40, 30);
                         if (isNegative)
                             offset = Math.Max(-100, Math.Min(-40, offset));
                         else
@@ -300,7 +300,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                         break;
 
                     case 2: // [±100, ±150]ms
-                        offset = GenerateNormalOffset(random, isNegative ? -100 : 100, 25);
+                        offset = generateNormalOffset(random, isNegative ? -100 : 100, 25);
                         if (isNegative)
                             offset = Math.Max(-150, Math.Min(-100, offset));
                         else
@@ -308,7 +308,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                         break;
 
                     case 3: // [±150, ±200]ms
-                        offset = GenerateNormalOffset(random, isNegative ? -150 : 150, 25);
+                        offset = generateNormalOffset(random, isNegative ? -150 : 150, 25);
                         if (isNegative)
                             offset = Math.Max(-200, Math.Min(-150, offset));
                         else
@@ -338,7 +338,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                 hitEvents.Add(new HitEvent(timeOffset, null, result, beatmap.HitObjects[i], null, null));
             }
 
-            double accuracy = CalculateAccuracy(hitEvents);
+            double accuracy = calculateAccuracy(hitEvents);
 
             return new ScoreInfo
             {
@@ -355,7 +355,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         /// <summary>
         /// Generate a random value from normal distribution using Box-Muller transform.
         /// </summary>
-        private double GenerateNormalOffset(Random random, double mean, double stdDev)
+        private double generateNormalOffset(Random random, double mean, double stdDev)
         {
             double u1 = random.NextDouble();
             double u2 = random.NextDouble();
@@ -366,7 +366,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         /// <summary>
         /// Calculate accuracy based on hit event results.
         /// </summary>
-        private double CalculateAccuracy(List<HitEvent> hitEvents)
+        private double calculateAccuracy(List<HitEvent> hitEvents)
         {
             double totalPoints = 0;
             double maxPoints = 0;
@@ -414,17 +414,18 @@ namespace osu.Game.Rulesets.Mania.Tests
             var hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
 
+            const double time_offset = 0;
+
             foreach (var hitObject in beatmap.HitObjects)
             {
                 // Perfect timing offset (0ms)
-                double timeOffset = 0;
 
                 // Calculate the correct hit result based on hit windows at perfect timing
-                HitResult result = hitWindows.ResultFor(timeOffset);
+                HitResult result = hitWindows.ResultFor(time_offset);
                 if (result == HitResult.None)
                     result = HitResult.Miss;
 
-                hitEvents.Add(new HitEvent(timeOffset, null, result, hitObject, null, null));
+                hitEvents.Add(new HitEvent(time_offset, null, result, hitObject, null, null));
             }
 
             return new ScoreInfo

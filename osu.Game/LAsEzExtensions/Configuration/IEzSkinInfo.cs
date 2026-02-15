@@ -59,7 +59,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SpecialFactorBindable.BindTo(config.GetBindable<double>(Ez2Setting.SpecialFactor));
 
             HitPositionBindable.BindTo(config.GetBindable<double>(Ez2Setting.HitPosition));
-            VisualHitPositionBindable.BindTo(config.GetBindable<double>(Ez2Setting.VisualHitPosition));
 
             NoteHeightScaleToWidthBindable.BindTo(config.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth));
             NoteTrackLineHeightBindable.BindTo(config.GetBindable<double>(Ez2Setting.NoteTrackLineHeight));

@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -17,7 +16,6 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Rulesets;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -366,13 +364,6 @@ namespace osu.Game.LAsEzExtensions.Screens
         public void PresentGameplay()
         {
             // 作为 overlay，这里不应 Push/Present gameplay。
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-
-            // Overlay 不需要更新屏幕大小
         }
 
         private partial class ApplySettingsButton : OsuButton

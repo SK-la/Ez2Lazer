@@ -66,6 +66,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             get
             {
                 yield return ("Divide", $"{Divide.Value}");
+
                 if (BPM.Value is null) yield return ("BPM", "Auto");
                 else yield return ("BPM", $"{BPM.Value}");
                 if (For14Jack.Value) yield return ("For 1/4 Jack", "On");

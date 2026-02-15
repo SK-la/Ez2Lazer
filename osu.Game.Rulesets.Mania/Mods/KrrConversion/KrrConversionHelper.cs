@@ -77,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
         // ---------------- 通用 LN/DP/N2N 方法 ----------------
 
         // Beta 分布随机数生成
-        public static int GenerateRandom(double dBar, double uBar, double mBar, int pBar, Random r, LAsMods.EzOscillator? osc = null)
+        public static int GenerateRandom(double dBar, double uBar, double mBar, int pBar, Random r, EzOscillator? osc = null)
         {
             if (pBar <= 0) return (int)mBar;
 
@@ -110,7 +110,7 @@ namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
         }
 
         // 百分比筛选
-        public static List<(int index, double start, int length)> MarkByPercentagePerGroup(List<(int index, double start, int length)> list, double percentage, Random r, LAsMods.EzOscillator osc)
+        public static List<(int index, double start, int length)> MarkByPercentagePerGroup(List<(int index, double start, int length)> list, double percentage, Random r, EzOscillator osc)
         {
             if (percentage >= 100) return list;
             if (percentage <= 0) return new List<(int, double, int)>();

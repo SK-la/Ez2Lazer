@@ -70,7 +70,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.ColumnWidth, 60, 5, 400.0, 1.0);
             SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
             SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
-            SetDefault(Ez2Setting.VisualHitPosition, 0.0, -100, 100, 1.0);
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
 
@@ -455,7 +454,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         HitPosition,
         HitTargetFloatFixed,
         HitTargetAlpha,
-        VisualHitPosition,
         NoteHeightScaleToWidth,
         NoteTrackLineHeight,
         NoteSetName,

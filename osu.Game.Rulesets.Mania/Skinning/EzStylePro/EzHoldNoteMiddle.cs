@@ -56,7 +56,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             tailMaskHeight = Column.EzSkinInfo.HoldTailMaskHeight;
             tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
 
-            isHitting ??= holdNote.IsHolding;
             isHitting.BindValueChanged(onIsHittingChanged, true);
 
             // Column will notify notes about EzSkinInfo-driven size changes via NoteSizeChanged; avoid per-note BindValueChanged

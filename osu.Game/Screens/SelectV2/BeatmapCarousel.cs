@@ -795,14 +795,14 @@ namespace osu.Game.Screens.SelectV2
         private ScheduledDelegate? loadingDebounce;
 
         // Lightweight instrumentation for investigating filter performance regressions.
-        private double lastFilterMs;
-        private int lastFilterItems;
-        private int lastFilterPanels;
         private int filterRuns;
 
-        public double LastFilterMs => lastFilterMs;
-        public int LastFilterItems => lastFilterItems;
-        public int LastFilterPanels => lastFilterPanels;
+        public double LastFilterMs { get; private set; }
+
+        public int LastFilterItems { get; private set; }
+
+        public int LastFilterPanels { get; private set; }
+
         public int FilterRuns => filterRuns;
 
         public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
@@ -829,11 +829,11 @@ namespace osu.Game.Screens.SelectV2
                 try
                 {
                     sw.Stop();
-                    lastFilterMs = sw.Elapsed.TotalMilliseconds;
+                    LastFilterMs = sw.Elapsed.TotalMilliseconds;
 
                     var items = GetCarouselItems();
-                    lastFilterItems = items?.Count ?? 0;
-                    lastFilterPanels = Scroll.Panels.Count;
+                    LastFilterItems = items?.Count ?? 0;
+                    LastFilterPanels = Scroll.Panels.Count;
                 }
                 finally
                 {

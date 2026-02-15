@@ -110,6 +110,7 @@ namespace osu.Game.LAsEzExtensions
             void scheduleTextureRefresh()
             {
                 if (textureRefreshScheduled) return;
+
                 textureRefreshScheduled = true;
                 Schedule(() =>
                 {
@@ -515,11 +516,19 @@ namespace osu.Game.LAsEzExtensions
                 catch
                 {
                 }
-                // 只清理实例级别的缓存，全局缓存留给 ClearGlobalCache 处理
-                foreach (var loader in loaderStoreCache.Values)
-                    loader.Dispose();
 
-                loaderStoreCache.Clear();
+                // 只清理实例级别的缓存，全局缓存留给 ClearGlobalCache 处理
+                lock (loaderStoreCache)
+                {
+                    foreach (var loader in loaderStoreCache.Values)
+                        loader.Dispose();
+                }
+
+                lock (loaderStoreCache)
+                {
+                    loaderStoreCache.Clear();
+                }
+
                 note_ratio_cache.Clear();
             }
 

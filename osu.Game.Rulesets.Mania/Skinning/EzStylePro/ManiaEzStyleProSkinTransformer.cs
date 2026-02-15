@@ -28,7 +28,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> hitPosition;
-        private readonly IBindable<double> virtualHitPosition;
 
         //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
         public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap)
@@ -46,7 +45,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
             hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            virtualHitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.VisualHitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -160,7 +158,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     judgementPiece.Y = 100;
                                 }
 
-                                var O2PillBar = container.OfType<O2PillBar>().FirstOrDefault();
+                                var o2PillBar = container.OfType<O2PillBar>().FirstOrDefault();
                             })
                             {
                                 new EzComComboSprite(),

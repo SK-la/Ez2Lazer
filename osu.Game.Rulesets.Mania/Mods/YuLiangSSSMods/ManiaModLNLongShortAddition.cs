@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 {
                     double fullDuration = locations[i + 1].startTime - locations[i].startTime;
                     double beatLength = beatmap.ControlPointInfo.TimingPointAt(locations[i + 1].startTime).BeatLength;
-                    double beatBPM = beatmap.ControlPointInfo.TimingPointAt(locations[i + 1].startTime).BPM;
+                    // double beatBPM = beatmap.ControlPointInfo.TimingPointAt(locations[i + 1].startTime).BPM;
                     double timeDivide = beatLength / Divide.Value; //beatBPM / 60 * 100 / Divide.Value;
                     double duration = rng.Next(100) < LongShort.Value ? fullDuration - timeDivide : timeDivide;
                     bool flag = true; // Can be transformed to LN
@@ -120,13 +120,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     }
                 }
 
-                if (Math.Abs(locations[locations.Count - 1].startTime - locations[locations.Count - 1].endTime) <= 2 || rng.Next(100) >= Percentage.Value)
+                if (Math.Abs(locations[^1].startTime - locations[^1].endTime) <= 2 || rng.Next(100) >= Percentage.Value)
                 {
                     newColumnObjects.Add(new Note
                     {
                         Column = column.Key,
-                        StartTime = locations[locations.Count - 1].startTime,
-                        Samples = locations[locations.Count - 1].samples
+                        StartTime = locations[^1].startTime,
+                        Samples = locations[^1].samples
                     });
                 }
                 else
@@ -134,9 +134,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     newColumnObjects.Add(new HoldNote
                     {
                         Column = column.Key,
-                        StartTime = locations[locations.Count - 1].startTime,
-                        Duration = locations[locations.Count - 1].endTime - locations[locations.Count - 1].startTime,
-                        NodeSamples = [locations[locations.Count - 1].samples, Array.Empty<HitSampleInfo>()]
+                        StartTime = locations[^1].startTime,
+                        Duration = locations[^1].endTime - locations[^1].startTime,
+                        NodeSamples = [locations[^1].samples, Array.Empty<HitSampleInfo>()]
                     });
                 }
 

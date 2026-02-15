@@ -14,7 +14,6 @@ using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
@@ -318,9 +317,9 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             var lastLine = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
             var nextLine = new List<(int column, double startTime, double endTime, IList<HitSampleInfo> samples)>();
 
-            double? middleTime = null;
-            IList<HitSampleInfo>? samples = null;
-            int lastQuantity = 0, middleQuantity = 0, nextQuantity = 0;
+            double? middleTime;
+            IList<HitSampleInfo>? samples;
+            int lastQuantity = 0, middleQuantity = 0, nextQuantity;
             int i = 0, skip = 0;
 
             foreach (var timingPoint in beatmap.HitObjects.GroupBy(h => h.StartTime))
@@ -385,7 +384,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
                         if (compare == 1)
                         {
-                            if (probability > 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
+                            if (probability > 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
                             {
                                 foreach (int column in columnWithNoNote)
                                 {
@@ -417,7 +416,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                         }
                         else if (compare == 2)
                         {
-                            if (probability > 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
+                            if (probability > 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
                             {
                                 foreach (int column in columnWithNoNote)
                                 {
@@ -433,7 +432,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                                     }
                                 }
                             }
-                            else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
+                            else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
                             {
                                 foreach (int column in columnWithNote)
                                 {
@@ -517,7 +516,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
                 if (compare == 1)
                 {
-                    if (probability > 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
+                    if (probability > 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
                     {
                         foreach (int column in columnWithNoNote)
                         {
@@ -533,7 +532,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
-                    else if (probability < 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
+                    else if (probability < 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
@@ -565,7 +564,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
-                    else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
+                    else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
@@ -580,7 +579,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                     }
                 }
 
-            skip:
+                skip:
 
                 if (skip > 0)
                 {
@@ -658,7 +657,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
-                    else if (probability < 0 && (middleQuantity >= nextQuantity && middleQuantity >= lastQuantity || ignoreComparison))
+                    else if (probability < 0 && ((middleQuantity >= nextQuantity && middleQuantity >= lastQuantity) || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {
@@ -673,7 +672,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
                 else if (compare == 2)
                 {
-                    if (probability > 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
+                    if (probability > 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
                     {
                         foreach (int column in columnWithNoNote)
                         {
@@ -688,7 +687,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                             }
                         }
                     }
-                    else if (probability < 0 && (middleQuantity <= nextQuantity && middleQuantity <= lastQuantity || ignoreComparison))
+                    else if (probability < 0 && ((middleQuantity <= nextQuantity && middleQuantity <= lastQuantity) || ignoreComparison))
                     {
                         foreach (int column in columnWithNote)
                         {

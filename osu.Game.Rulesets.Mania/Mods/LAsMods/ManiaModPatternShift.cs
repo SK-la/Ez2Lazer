@@ -329,7 +329,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return false;
         }
 
-        private List<PatternShiftNote> ModifyNotesByDifficulty(List<PatternShiftNote> originalNotes, ManiaBeatmap beatmap, int targetColumns, int stars, Random rng)
+        private List<PatternShiftNote> modifyNotesByDifficulty(List<PatternShiftNote> originalNotes, ManiaBeatmap beatmap, int targetColumns, int stars, Random rng)
         {
             // Default behavior: stars==5 => minimal change. stars<5 remove notes; stars>5 add notes.
             var notes = new List<PatternShiftNote>(originalNotes);
@@ -489,14 +489,6 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             return notes;
         }
 
-        // audio-based regeneration removed; use ModifyNotesByDifficulty to adjust original notes
-
-        private static int MaxChordDefault(int targetColumns)
-        {
-            // heuristic: more keys allow slightly larger chords
-            return Math.Min(5, Math.Max(1, targetColumns / 2));
-        }
-
         // In-place Cooley-Tukey FFT (radix-2)
         private static void FFT(Complex[] buffer, bool inverse)
         {
@@ -590,7 +582,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }).OrderBy(n => n.StartTime).ThenBy(n => n.SourceColumn).ToList();
 
             if (Regenerate.Value)
-                notes = ModifyNotesByDifficulty(notes, maniaBeatmap, targetColumns, RegenerateDifficulty.Value, rng);
+                notes = modifyNotesByDifficulty(notes, maniaBeatmap, targetColumns, RegenerateDifficulty.Value, rng);
 
             var chords = buildChords(notes);
             applyDelay(chords, maniaBeatmap.ControlPointInfo, DelayLevel.Value, rng);

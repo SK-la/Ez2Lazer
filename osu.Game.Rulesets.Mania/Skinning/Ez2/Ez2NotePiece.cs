@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private IBindable<Color4> accentColour = null!;
 
         private readonly Circle colouredBox;
-        private Drawable iconContainer = null!;
+        private readonly Drawable iconContainer;
 
         public Ez2NotePiece()
         {
@@ -102,8 +102,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             // NoteHeight = (float)config.Get<double>(ManiaRulesetSetting.ColumnWidth);
             // specialFactor = (float)config.Get<double>(ManiaRulesetSetting.SpecialFactor);
 
-            if (iconContainer != null)
-                iconContainer.Size = new Vector2(DrawWidth / NoteHeight * 0.7f);
+            iconContainer.Size = new Vector2(DrawWidth / NoteHeight * 0.7f);
         }
 
         protected virtual Drawable CreateIcon() => new Container

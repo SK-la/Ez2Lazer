@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        public readonly double ERROR = 1.5;
+        public readonly double Error = 1.5;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -118,23 +118,23 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
                     double duration = locations[i].endTime - locations[i].startTime;
 
-                    if (duration < timeDivide + ERROR && Len.Value)
+                    if (duration < timeDivide + Error && Len.Value)
                     {
                         duration = easierDivide;
                         gap = locations[i + 1].startTime - (locations[i].startTime + duration);
 
-                        if (gap < timeDivide + ERROR)
+                        if (gap < timeDivide + Error)
                         {
                             duration = locations[i + 1].startTime - locations[i].startTime - easierDivide;
                         }
                     }
 
-                    if (gap < timeDivide + ERROR && Gap.Value)
+                    if (gap < timeDivide + Error && Gap.Value)
                     {
                         duration = locations[i + 1].startTime - locations[i].startTime - easierDivide;
                     }
 
-                    if (duration < easierDivide - ERROR)
+                    if (duration < easierDivide - Error)
                     {
                         duration = 0;
                     }

@@ -29,7 +29,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> hitPosition;
-        private readonly IBindable<double> virtualHitPosition;
 
         public ManiaSbISkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
@@ -45,7 +44,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
             hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            virtualHitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.VisualHitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)

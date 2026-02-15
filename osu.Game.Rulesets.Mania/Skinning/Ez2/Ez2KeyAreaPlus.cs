@@ -180,6 +180,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 background.Colour = c.Darken(0.2f);
                 bottomIcon.Colour = c;
             }
+
             // apply current value immediately and subscribe to future changes via local bindable
             applyAccent(accentColourLocal.Value);
             accentColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);

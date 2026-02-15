@@ -84,10 +84,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         // 4、apply方法内部实现具体逻辑，重复处理次数
         // 5、最终统一清洗
         public static void ProcessRollingWindowWithOscillator(ManiaBeatmap beatmap,
-                                      KeyPatternType patternType,
-                                      KeyPatternSettings psSettings,
-                                      IEzOscillator oscillator,
-                                      Action<List<ManiaHitObject>, ManiaBeatmap, double, double, KeyPatternSettings, Random, int> applyPattern)
+                                                              KeyPatternType patternType,
+                                                              KeyPatternSettings psSettings,
+                                                              IEzOscillator oscillator,
+                                                              Action<List<ManiaHitObject>, ManiaBeatmap, double, double, KeyPatternSettings, Random, int> applyPattern)
         {
             if (psSettings.Level <= 0)
                 return;
@@ -122,12 +122,12 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             for (long wi = 0; wi <= totalWindows; wi++)
             {
-                double wstart = currentTime + wi * stepDuration;
-                double wend = wstart + windowDuration;
-                var ctx = new WindowContext(beatLength, wstart, windowDuration, stepDuration, 0, 0, beatmap.TotalColumns, 5.0);
+                double wStart = currentTime + wi * stepDuration;
+                double wEnd = wStart + windowDuration;
+                var ctx = new WindowContext(beatLength, wStart, windowDuration, stepDuration, 0, 0, beatmap.TotalColumns, 5.0);
                 bool skip = shouldSkipDenseWindow(patternType, objects, ctx, psSettings);
 
-                windowInfos.Add((wi, wstart, wend, skip));
+                windowInfos.Add((wi, wStart, wEnd, skip));
             }
 
             // 处理窗口：在需要时再计算 startIndex/endIndex 与构建 windowObjects，以便 applyPattern 修改后可重建 objects
@@ -234,9 +234,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         }
 
         internal static bool HasDenseBurstBetweenQuarterNotes(List<ManiaHitObject> windowObjects,
-                                      double beatLength,
-                                      int totalColumns,
-                                      KeyPatternSettings? psSettings = null)
+                                                              double beatLength,
+                                                              int totalColumns,
+                                                              KeyPatternSettings psSettings)
         {
             double anchorInterval = beatLength;
             if (anchorInterval <= 0)
@@ -291,10 +291,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
                     int countQuarter = 0;
                     int countOther = 0;
-                    int fineThresholdDefault = 2;
-                    int quarterDivDefault = 3;
-                    int fineThreshold = psSettings?.FineCountThreshold ?? fineThresholdDefault;
-                    int quarterDiv = psSettings?.QuarterLineDivisor ?? quarterDivDefault;
+                    int fineThreshold = psSettings.FineCountThreshold;
+                    int quarterDiv = psSettings.QuarterLineDivisor;
                     int mixedThreshold = Math.Max(fineThreshold, totalColumns / Math.Max(1, quarterDiv));
 
                     for (int i = start + 1; i < end; i++)
@@ -702,9 +700,9 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         }
 
         private static bool shouldSkipDenseWindow(KeyPatternType patternType,
-                              List<ManiaHitObject> objects,
-                              WindowContext ctx,
-                              KeyPatternSettings? psSettings)
+                                                  List<ManiaHitObject> objects,
+                                                  WindowContext ctx,
+                                                  KeyPatternSettings? psSettings)
         {
             if (patternType == KeyPatternType.Delay || patternType == KeyPatternType.Dump)
                 return false;
@@ -961,7 +959,8 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             List<ManiaHitObject> windowObjects;
 
             var pool = window_objects_pool.Value;
-            if (pool.Count > 0)
+
+            if (pool?.Count > 0)
             {
                 windowObjects = pool.Pop();
                 windowObjects.Clear();
@@ -982,7 +981,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             var pool = window_objects_pool.Value;
 
             // keep pool bounded to avoid unbounded memory usage
-            if (pool.Count < 128)
+            if (pool?.Count < 128)
             {
                 list.Clear();
                 pool.Push(list);

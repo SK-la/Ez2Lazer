@@ -682,7 +682,7 @@ namespace osu.Game.Screens.SelectV2
             }
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>

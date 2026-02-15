@@ -49,15 +49,15 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         // Public API similar to SRCalculator
         public static double CalculateSR(IBeatmap beatmap)
         {
-            return ComputeInternalXxySR(beatmap, 1.0).sr;
+            return computeInternalXxySR(beatmap, 1.0).sr;
         }
 
         public static double CalculateSR(IBeatmap beatmap, double clockRate)
         {
-            return ComputeInternalXxySR(beatmap, clockRate).sr;
+            return computeInternalXxySR(beatmap, clockRate).sr;
         }
 
-        private static (double sr, Dictionary<string, long> times) ComputeInternalXxySR(IBeatmap beatmap, double clockRate = 1.0)
+        private static (double sr, Dictionary<string, long> times) computeInternalXxySR(IBeatmap beatmap, double clockRate = 1.0)
         {
             var stopwatch = Stopwatch.StartNew();
             ManiaBeatmap maniaBeatmap = (ManiaBeatmap)beatmap;
@@ -217,7 +217,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             double[][] usage = new double[keyCount][];
             for (int k = 0; k < keyCount; k++) usage[k] = new double[baseCorners.Length];
 
-            double base_contribution = Tunables.KeyUsageBaseContribution;
+            double baseContribution = Tunables.KeyUsageBaseContribution;
             double falloff = Tunables.KeyUsageBaseContribution / (400.0 * 400.0);
 
             foreach (var note in notes)
@@ -233,7 +233,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
                 int duration = endTime - startTime;
                 double clampedDuration = Math.Min(duration, Tunables.KeyUsageDurationCap);
                 double extension = clampedDuration / Tunables.KeyUsageExtensionDivisor;
-                double contribution = base_contribution + extension;
+                double contribution = baseContribution + extension;
 
                 for (int idx = left; idx < right; idx++) usage[note.Column][idx] += contribution;
 
@@ -241,7 +241,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
                 {
                     double offset = baseCorners[idx] - startTime;
                     double falloffContribution = falloff * Math.Pow(offset, 2);
-                    double value = base_contribution - falloffContribution;
+                    double value = baseContribution - falloffContribution;
                     double clamped = Math.Max(value, 0);
                     usage[note.Column][idx] += clamped;
                 }
@@ -250,7 +250,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
                 {
                     double offset = baseCorners[idx] - endTime;
                     double falloffContribution = falloff * Math.Pow(offset, 2);
-                    double value = base_contribution - falloffContribution;
+                    double value = baseContribution - falloffContribution;
                     double clamped = Math.Max(value, 0);
                     usage[note.Column][idx] += clamped;
                 }

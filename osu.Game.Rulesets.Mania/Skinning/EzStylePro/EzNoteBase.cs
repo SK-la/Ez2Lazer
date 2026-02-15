@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        protected readonly IBindable<Colour4> columnColorBindable = new Bindable<Colour4>();
+        protected readonly IBindable<Colour4> ColumnColorBindable = new Bindable<Colour4>();
         protected readonly IBindable<string> NoteSetName = new Bindable<string>();
         protected readonly IBindable<bool> EnabledColor = new Bindable<bool>();
         protected readonly IBindable<Vector2> NoteSize = new Bindable<Vector2>();
@@ -126,6 +126,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             lastNoteColorCached = false;
             UpdateColor();
+
             if (LineContainer?.Children != null)
             {
                 foreach (var child in LineContainer.Children)

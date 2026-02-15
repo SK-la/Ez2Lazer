@@ -34,7 +34,7 @@ namespace osu.Game.Tests.Visual.Editing
             // Test that the screen loads without errors
             AddStep("load screen", () => { });
             AddAssert("screen is not null", () => ezSkinEditorScreen != null);
-            AddAssert("screen is EzSkinEditorScreen", () => ezSkinEditorScreen is EzSkinEditorScreen);
+            AddAssert("screen is EzSkinEditorScreen", () => ezSkinEditorScreen != null);
         }
 
         // Removed TestPushScreen as Stack is not accessible in this context

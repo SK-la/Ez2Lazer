@@ -27,7 +27,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     public class ManiaEz2SkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
-        private readonly Ez2ConfigManager ezSkinConfig;
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> hitPosition;
@@ -43,12 +42,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 Logger.Log("!GlobalConfigStore.EzConfig Ez2Skin", LoggingTarget.Runtime, LogLevel.Important);
             }
 
-            ezSkinConfig = GlobalConfigStore.EzConfig!;
-            // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
+            var ezSkinConfig1 = GlobalConfigStore.EzConfig!;
 
-            columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
-            specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
-            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
+            columnWidthBindable = ezSkinConfig1.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig1.GetBindable<double>(Ez2Setting.SpecialFactor);
+            hitPosition = ezSkinConfig1.GetBindable<double>(Ez2Setting.HitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)

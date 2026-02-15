@@ -19,7 +19,7 @@ namespace osu.Game.LAsEzExtensions.Audio
     {
         private const string log_prefix = "[LAsEz/DuplicateVirtualTrack]";
 
-        private void Log(string message)
+        private void log(string message)
         {
             try
             {
@@ -100,7 +100,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                     }
                     catch (Exception ex)
                     {
-                        Log($"error removing previous mute adjustment: {ex}");
+                        log($"error removing previous mute adjustment: {ex}");
                     }
 
                     beatmapTrackMuteAdjustment = new BindableDouble(0);
@@ -109,7 +109,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                     try
                     {
-                        Log(
+                        log(
                             $"StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}");
                     }
                     catch { }
@@ -131,7 +131,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             try
             {
-                Log(
+                log(
                     $"StartPreview overrides: StartTime={overrides.StartTime} Duration={overrides.Duration} LoopCount={overrides.LoopCount} LoopInterval={overrides.LoopInterval} ForceLooping={overrides.ForceLooping}");
             }
             catch { }
@@ -197,7 +197,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                             try
                             {
                                 activeCandidateTrack.Stop();
-                                Log("paused candidate due to gameplayClock.IsRunning=false");
+                                log("paused candidate due to gameplayClock.IsRunning=false");
                             }
                             catch { }
 
@@ -211,7 +211,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                             {
                                 // Resume playback from current time.
                                 activeCandidateTrack.Start();
-                                Log("resumed candidate due to gameplayClock.IsRunning=true");
+                                log("resumed candidate due to gameplayClock.IsRunning=true");
                             }
                             catch { }
 
@@ -231,7 +231,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                                             if (now + epsilon >= sliceEnd)
                                             {
-                                                Log($"loopChecker triggered now={now} sliceEnd={sliceEnd} loopsRemaining={loopsRemaining}");
+                                                log($"loopChecker triggered now={now} sliceEnd={sliceEnd} loopsRemaining={loopsRemaining}");
 
                                                 if (loopsRemaining <= 1)
                                                 {
@@ -280,7 +280,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                                                         }
                                                         catch (Exception ex)
                                                         {
-                                                            Log($"delayed restart failed: {ex}");
+                                                            log($"delayed restart failed: {ex}");
                                                         }
                                                     }, delayMs);
                                                 }
@@ -290,6 +290,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                                                     {
                                                         // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
                                                         bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+
                                                         if (!isUsingBeatmapTrack)
                                                         {
                                                             activeCandidateTrack.Seek(sliceStart);
@@ -347,7 +348,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch (Exception ex)
             {
-                Log($"failed to start candidate playback: {ex}");
+                log($"failed to start candidate playback: {ex}");
             }
         }
 
@@ -400,10 +401,11 @@ namespace osu.Game.LAsEzExtensions.Audio
                                                 {
                                                     // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
                                                     bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+
                                                     if (!isUsingBeatmapTrack)
                                                     {
                                                         activeCandidateTrack.Seek(sliceStart);
-                                                        Log($"seeked candidate to sliceStart on resume ({sliceStart})");
+                                                        log($"seeked candidate to sliceStart on resume ({sliceStart})");
                                                     }
                                                 }
                                             }
@@ -411,7 +413,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                                         }
 
                                         activeCandidateTrack.Start();
-                                        Log("resumed candidate via IsPaused=false");
+                                        log("resumed candidate via IsPaused=false");
                                     }
                                     catch { }
 
@@ -423,7 +425,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                         }
                         catch (Exception ex)
                         {
-                            Log($"error handling IsPaused change: {ex}");
+                            log($"error handling IsPaused change: {ex}");
                         }
                     };
 
@@ -507,25 +509,26 @@ namespace osu.Game.LAsEzExtensions.Audio
                                 {
                                     // 避免对beatmap.Track进行Seek，因为那会影响主游戏音频
                                     bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+
                                     if (!isUsingBeatmapTrack)
                                     {
                                         activeCandidateTrack.Seek(sliceStart);
-                                        Log($"seamless seek to {sliceStart}");
+                                        log($"seamless seek to {sliceStart}");
                                     }
                                 }
-                                catch (Exception ex) { Log($"seamless seek failed: {ex}"); }
+                                catch (Exception ex) { log($"seamless seek failed: {ex}"); }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Log($"loopChecker error: {ex}");
+                        log($"loopChecker error: {ex}");
                     }
                 }, 30, true);
             }
             catch (Exception ex)
             {
-                Log($"ensureLoopCheckerRunning failed: {ex}");
+                log($"ensureLoopCheckerRunning failed: {ex}");
             }
         }
 
@@ -586,12 +589,12 @@ namespace osu.Game.LAsEzExtensions.Audio
                 }
                 catch (Exception ex)
                 {
-                    Log($"ensure length failed for {candidateNames[i]}: {ex.Message}");
+                    log($"ensure length failed for {candidateNames[i]}: {ex.Message}");
                 }
 
                 if (t.Length > 0)
                 {
-                    Log($"selected {candidateNames[i]} (length={t.Length})");
+                    log($"selected {candidateNames[i]} (length={t.Length})");
                     if (gameplayClockContainer != null)
                         t.BindAdjustments(gameplayClockContainer.AdjustmentsFromMods);
                     if (gameplayClockContainer is MasterGameplayClockContainer master)
@@ -609,11 +612,11 @@ namespace osu.Game.LAsEzExtensions.Audio
                             // Seek to desired candidate start time if provided, otherwise to 0.
                             double seekTarget = desiredCandidateStartTime ?? 0;
                             t.Seek(seekTarget);
-                            Log($"prepared independent candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.");
+                            log($"prepared independent candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.");
                         }
                         catch (Exception ex)
                         {
-                            Log($"failed to prepare candidate track: {ex}");
+                            log($"failed to prepare candidate track: {ex}");
                         }
                     }
 
@@ -628,7 +631,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 var t = candidates[i];
                 if (t == null) continue;
 
-                Log($"fallback to {candidateNames[i]} (length={t.Length})");
+                log($"fallback to {candidateNames[i]} (length={t.Length})");
                 if (gameplayClockContainer != null)
                     t.BindAdjustments(gameplayClockContainer.AdjustmentsFromMods);
                 if (gameplayClockContainer is MasterGameplayClockContainer master)
@@ -643,11 +646,11 @@ namespace osu.Game.LAsEzExtensions.Audio
                         t.Stop();
                         double seekTarget = desiredCandidateStartTime ?? 0;
                         t.Seek(seekTarget);
-                        Log($"prepared fallback candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.");
+                        log($"prepared fallback candidate track (hash={t.GetHashCode()}) stopped and seeked to {seekTarget}.");
                     }
                     catch (Exception ex)
                     {
-                        Log($"failed to prepare fallback candidate track: {ex}");
+                        log($"failed to prepare fallback candidate track: {ex}");
                     }
                 }
 
@@ -655,7 +658,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 return t;
             }
 
-            Log("no candidate found, using beatmap.Track");
+            log("no candidate found, using beatmap.Track");
             return null;
         }
 
@@ -672,7 +675,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                     }
                     catch (Exception ex)
                     {
-                        Log($"failed to stop active candidate track on StopPreview: {ex}");
+                        log($"failed to stop active candidate track on StopPreview: {ex}");
                     }
 
                     // If we applied a candidate mute adjustment during a loop delay, remove it now.
@@ -696,7 +699,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                             try { activeCandidateTrack.Looping = prevCandidateLooping.Value; }
                             catch { }
 
-                            Log($"restored candidate track.Looping to {prevCandidateLooping.Value}");
+                            log($"restored candidate track.Looping to {prevCandidateLooping.Value}");
                         }
                     }
                     catch { }
@@ -722,7 +725,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 {
                     try
                     {
-                        Log(
+                        log(
                             $"removing mute adjustment from original track (hash={mutedOriginalTrack.GetHashCode()}) on StopPreview. pre: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
                     }
                     catch { }
@@ -733,19 +736,19 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                         try
                         {
-                            Log($"removed mute adjustment on StopPreview. post: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
+                            log($"removed mute adjustment on StopPreview. post: vol={mutedOriginalTrack.Volume.Value:F3} aggr={mutedOriginalTrack.AggregateVolume.Value:F3}");
                         }
                         catch { }
                     }
                     catch (Exception ex)
                     {
-                        Log($"failed to remove mute adjustment on StopPreview: {ex}");
+                        log($"failed to remove mute adjustment on StopPreview: {ex}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log($"failed to remove mute adjustment on StopPreview: {ex}");
+                log($"failed to remove mute adjustment on StopPreview: {ex}");
             }
 
             beatmapTrackMuteAdjustment = null;

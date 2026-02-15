@@ -24,6 +24,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<double> hitPositonBindable = new BindableDouble();
         private readonly IBindable<double> columnWidth = new BindableDouble();
         private readonly IBindable<string> noteSetName = new Bindable<string>();
+
         // private readonly LayoutValue layout = new LayoutValue(Invalidation.DrawSize);
 
         private Container sprite = null!;

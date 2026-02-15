@@ -122,10 +122,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             // (see: https://github.com/ppy/osu-framework/blob/fe2769171c6e26d1b6fdd6eb7ea8353162fe9065/osu.Framework/Graphics/Transforms/TransformBindable.cs#L21)
             FinishTransforms(targetMember: $"{Current.GetHashCode()}.{nameof(Current.Value)}");
         }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-        }
     }
 }

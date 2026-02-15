@@ -39,11 +39,5 @@ namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
                 Content.Add(texture);
             }
         }
-
-        protected override void Update()
-        {
-            base.Update();
-            // Implement health update logic here
-        }
     }
 }

@@ -49,9 +49,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     },
                 };
             }
-
-            // colour is driven by ez column colours via EzNoteBase
-
         }
 
         protected override void LoadComplete()
