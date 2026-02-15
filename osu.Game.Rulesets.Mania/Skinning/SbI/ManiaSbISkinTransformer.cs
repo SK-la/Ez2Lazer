@@ -35,10 +35,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            if (GlobalConfigStore.EzConfig == null)
-            {
-                Logger.Log("!GlobalConfigStore.EzConfig SbISkin", LoggingTarget.Runtime, LogLevel.Important);
-            }
+            // if (GlobalConfigStore.EzConfig == null)
+            // {
+            //     Logger.Log("!GlobalConfigStore.EzConfig SbISkin", LoggingTarget.Runtime, LogLevel.Important);
+            // }
 
             ezSkinConfig = GlobalConfigStore.EzConfig!;
             columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);

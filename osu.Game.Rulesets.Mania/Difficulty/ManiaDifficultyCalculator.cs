@@ -70,9 +70,9 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
             if (mods.Any(m => m is ModStarRatingRebirth))
             {
-                var xxySRFilter = GlobalConfigStore.EzConfig?.GetBindable<bool>(Ez2Setting.XxySRFilter);
+                var xxySRFilter = GlobalConfigStore.EzConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
 
-                sr = xxySRFilter != null && xxySRFilter.Value
+                sr = xxySRFilter.Value
                     ? SRCalculator.CalculateSR(beatmap, clockRate)
                     : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
             }

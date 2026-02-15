@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Objects
 
         public override Judgement CreateJudgement()
         {
-            var hitMode = GlobalConfigStore.EzConfig?.Get<EzEnumHitMode>(Ez2Setting.HitMode) ?? EzEnumHitMode.Lazer;
+            var hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode);
 
             switch (hitMode)
             {

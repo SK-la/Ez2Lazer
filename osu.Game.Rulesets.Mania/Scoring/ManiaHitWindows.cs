@@ -138,7 +138,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        public bool AllowPoorEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
+        public bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.CustomPoorHitResultBool);
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -205,7 +205,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void setHitMode()
         {
-            EzEnumHitMode hitMode = GlobalConfigStore.EzConfig?.Get<EzEnumHitMode>(Ez2Setting.HitMode) ?? EzEnumHitMode.Lazer;
+            EzEnumHitMode hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode);
 
             if (hitMode == EzEnumHitMode.Lazer)
             {

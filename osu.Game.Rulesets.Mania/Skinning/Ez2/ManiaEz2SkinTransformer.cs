@@ -4,10 +4,8 @@
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -15,10 +13,8 @@ using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
-using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 
@@ -37,10 +33,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            if (GlobalConfigStore.EzConfig == null)
-            {
-                Logger.Log("!GlobalConfigStore.EzConfig Ez2Skin", LoggingTarget.Runtime, LogLevel.Important);
-            }
+            // if (GlobalConfigStore.EzConfig == null)
+            // {
+            //     Logger.Log("!GlobalConfigStore.EzConfig Ez2Skin", LoggingTarget.Runtime, LogLevel.Important);
+            // }
 
             var ezSkinConfig1 = GlobalConfigStore.EzConfig!;
 

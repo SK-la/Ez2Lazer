@@ -35,10 +35,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            if (GlobalConfigStore.EzConfig == null)
-            {
-                Logger.Log("!GlobalConfigStore.EzConfig EzStyleProSkin", LoggingTarget.Runtime, LogLevel.Important);
-            }
+            // if (GlobalConfigStore.EzConfig == null)
+            // {
+            //     Logger.Log("!GlobalConfigStore.EzConfig EzStyleProSkin", LoggingTarget.Runtime, LogLevel.Important);
+            // }
 
             ezSkinConfig = GlobalConfigStore.EzConfig!;
 

@@ -11,7 +11,6 @@ using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
@@ -110,35 +109,32 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 columnsToDelete = new HashSet<int>();
 
                 // 获取列类型（仅用于 S/P/E 列删除）
-                if (GlobalConfigStore.EzConfig != null)
+                EzColumnType[] columnTypes = GlobalConfigStore.EzConfig.GetColumnTypes(keys2);
+
+                if (DeleteSColumn.Value)
                 {
-                    EzColumnType[] columnTypes = GlobalConfigStore.EzConfig.GetColumnTypes(keys2);
-
-                    if (DeleteSColumn.Value)
+                    for (int i = 0; i < keys2; i++)
                     {
-                        for (int i = 0; i < keys2; i++)
-                        {
-                            if (columnTypes[i] == EzColumnType.S)
-                                columnsToDelete.Add(i);
-                        }
+                        if (columnTypes[i] == EzColumnType.S)
+                            columnsToDelete.Add(i);
                     }
+                }
 
-                    if (DeletePColumn.Value)
+                if (DeletePColumn.Value)
+                {
+                    for (int i = 0; i < keys2; i++)
                     {
-                        for (int i = 0; i < keys2; i++)
-                        {
-                            if (columnTypes[i] == EzColumnType.P)
-                                columnsToDelete.Add(i);
-                        }
+                        if (columnTypes[i] == EzColumnType.P)
+                            columnsToDelete.Add(i);
                     }
+                }
 
-                    if (DeleteEColumn.Value)
+                if (DeleteEColumn.Value)
+                {
+                    for (int i = 0; i < keys2; i++)
                     {
-                        for (int i = 0; i < keys2; i++)
-                        {
-                            if (columnTypes[i] == EzColumnType.E)
-                                columnsToDelete.Add(i);
-                        }
+                        if (columnTypes[i] == EzColumnType.E)
+                            columnsToDelete.Add(i);
                     }
                 }
 

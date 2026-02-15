@@ -88,7 +88,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         private const double poor_offset = 150.0;
 
         public CustomHitWindowsHelper()
-            : this(GlobalConfigStore.EzConfig?.Get<EzEnumHitMode>(Ez2Setting.HitMode) ?? EzEnumHitMode.Classic)
+            : this(GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode))
         {
         }
 
@@ -232,7 +232,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             return HitResult.None;
         }
 
-        public virtual bool AllowPoorEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
+        public virtual bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.CustomPoorHitResultBool);
 
         public virtual bool IsHitResultAllowed(HitResult result)
         {
