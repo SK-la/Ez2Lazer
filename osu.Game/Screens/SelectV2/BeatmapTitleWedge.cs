@@ -27,6 +27,8 @@ using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Utils;
 using osuTK;
+using osu.Game.LAsEzExtensions.UserInterface;
+using osu.Game.LAsEzExtensions.Analysis;
 
 namespace osu.Game.Screens.SelectV2
 {
@@ -63,6 +65,7 @@ namespace osu.Game.Screens.SelectV2
         private FavouriteButton favouriteButton = null!;
         private Statistic lengthStatistic = null!;
         private Statistic bpmStatistic = null!;
+        private EzDisplayKpsGraph kpsGraph = null!;
 
         [Resolved]
         private ISongSelect? songSelect { get; set; }
@@ -160,6 +163,14 @@ namespace osu.Game.Screens.SelectV2
                                 bpmStatistic = new Statistic(OsuIcon.Metronome)
                                 {
                                     TooltipText = BeatmapsetsStrings.ShowStatsBpm,
+                                    Margin = new MarginPadding { Left = 5f },
+                                },
+                                // KPS 折线图，所有模式通用。尺寸保持与统计栏高度一致。
+                                kpsGraph = new EzDisplayKpsGraph
+                                {
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Size = new Vector2(300, 30),
                                     Margin = new MarginPadding { Left = 5f },
                                 },
                             },
@@ -280,6 +291,16 @@ namespace osu.Game.Screens.SelectV2
                     bpmStatistic.Text = bpmMin == bpmMax
                         ? $"{bpmMin}"
                         : LocalisableString.Interpolate($"{bpmMin}-{bpmMax} ({SongSelectStrings.MostlyBPM(mostCommonBPM)})");
+
+                    // 计算并展示 KPS 折线（非阻塞，粗略采样）
+                    try
+                    {
+                        var (_, _, kpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
+                        kpsGraph.SetPoints(kpsList);
+                    }
+                    catch
+                    {
+                    }
                 });
             }, token);
         }
