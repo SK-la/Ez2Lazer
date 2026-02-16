@@ -103,6 +103,13 @@ namespace osu.Game.Screens.Play
                 return false;
             }
 
+            // 本地模式不提交成绩，直接跳过 token 获取流程
+            if (api.IsLocalOnly)
+            {
+                // token = null;
+                return true;
+            }
+
             if (!api.IsLoggedIn)
             {
                 handleTokenFailure(new InvalidOperationException("API is not online."));

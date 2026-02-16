@@ -7,10 +7,6 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public static class EzSettingsStrings
     {
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_JUDGMENT_DIAG_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 判定诊断", "Enable Ez Judgment Diagnostics");
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_SUB_FRAME_CORRECTION_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 子帧修正", "Enable Ez Sub-frame Correction");
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_TIMING_TRACE_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 时序追踪", "Enable Ez Timing Trace");
-
 #region 分散设置
 
         public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE = new EzLocalizationManager.EzLocalisableString("缩放游戏模式", "Scaling Game Mode");
@@ -154,19 +150,6 @@ namespace osu.Game.EzOsuGame.Localization
 
 #endregion
 
-#region 音频&延迟&测试
-
-        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString("输入音频延迟追踪器", "Input Audio Latency Tracker");
-
-        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(测试功能)启用后可追踪按键输入与音频的延迟, 用于调试和优化打击音效的同步性。在游戏结束后会弹出一个统计窗口。更详细的内容可以查看runtime.log文件。"
-            + "\n延迟检测管线：按键 → 检查打击并应用 → 应用判定结果 → 播放note音频",
-            "(Testing feature) When enabled, it can track the latency between key input and audio, used for debugging and optimizing the synchronization of hit sound effects. "
-            + "A statistics window will pop up after the game ends. More detailed information can be found in the runtime.log file."
-            + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
-
-#endregion
-
 #region 音频设备设置
 
         public static readonly EzLocalizationManager.EzLocalisableString AUDIO_DEVICE_OUTPUT_HINT = new EzLocalizationManager.EzLocalisableString(
@@ -194,6 +177,36 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_HINT = new EzLocalizationManager.EzLocalisableString(
             "数值越低延迟越低，但过低可能会导致爆音或无法启动。默认为 128。",
             "Lower is lower latency, but too low may crackle or fail to start. Default is 128.");
+
+#endregion
+
+#region 实验性功能
+
+        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString("输入音频延迟追踪器", "Input Audio Latency Tracker");
+
+        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "(测试功能)启用后可追踪按键输入与音频的延迟, 用于调试和优化打击音效的同步性。在游戏结束后会弹出一个统计窗口。更详细的内容可以查看runtime.log文件。"
+            + "\n延迟检测管线：按键 → 检查打击并应用 → 应用判定结果 → 播放note音频",
+            "(Testing feature) When enabled, it can track the latency between key input and audio, used for debugging and optimizing the synchronization of hit sound effects. "
+            + "A statistics window will pop up after the game ends. More detailed information can be found in the runtime.log file."
+            + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXPERIMENTAL_P2P = new EzLocalizationManager.EzLocalisableString(
+            "启用实验性P2P功能", "Enable Experimental P2P Feature");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EXPERIMENTAL_P2P_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "使用本地账户登录，在多人大厅创建房间时，启用P2P。双方客户端均需要这样做", "Enable Experimental P2P Feature");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT = new EzLocalizationManager.EzLocalisableString(
+            "本地账户（实验性）", "Local Account (Testing)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "允许无密码登录本地账户。跳过一切成绩上传、网络账户检查。",
+            "Allows local account login without password. Skip all score submissions and online account checks.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_JUDGMENT_DIAG_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 判定诊断", "Enable Ez Judgment Diagnostics");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_SUB_FRAME_CORRECTION_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 子帧修正", "Enable Ez Sub-frame Correction");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_TIMING_TRACE_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 时序追踪", "Enable Ez Timing Trace");
 
 #endregion
     }

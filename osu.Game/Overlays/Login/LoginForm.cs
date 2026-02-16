@@ -3,6 +3,7 @@
 
 using System;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -10,6 +11,8 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -27,6 +30,7 @@ namespace osu.Game.Overlays.Login
         private TextBox username = null!;
         private TextBox password = null!;
         private ShakeContainer shakeSignIn = null!;
+        private Bindable<bool> localAccountBindable;
 
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
@@ -36,7 +40,7 @@ namespace osu.Game.Overlays.Login
         public override bool AcceptsFocus => true;
 
         [BackgroundDependencyLoader(permitNulls: true)]
-        private void load(OsuConfigManager config, AccountCreationOverlay accountCreation)
+        private void load(OsuConfigManager config, AccountCreationOverlay accountCreation, Ez2ConfigManager ezConfig)
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -94,6 +98,13 @@ namespace osu.Game.Overlays.Login
                     LabelText = LoginPanelStrings.StaySignedIn,
                     Current = config.GetBindable<bool>(OsuSetting.SavePassword),
                 },
+                // Experimental local account toggle (shows in login form next to stay signed in)
+                new SettingsCheckbox
+                {
+                    LabelText = EzSettingsStrings.LOCAL_ACCOUNT,
+                    TooltipText = EzSettingsStrings.LOCAL_ACCOUNT_TOOLTIP,
+                    Current = (localAccountBindable = ezConfig.GetBindable<bool>(Ez2Setting.ExperimentalLocalAccount)),
+                },
                 forgottenPasswordLink = new LinkFlowContainer
                 {
                     Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
@@ -142,10 +153,20 @@ namespace osu.Game.Overlays.Login
 
         private void performLogin()
         {
-            if (!string.IsNullOrEmpty(username.Text) && !string.IsNullOrEmpty(password.Text))
-                api.Login(username.Text, password.Text);
+            if (localAccountBindable.Value)
+            {
+                if (!string.IsNullOrEmpty(username.Text))
+                    api.LoginLocal(username.Text.Trim());
+                else
+                    shakeSignIn.Shake();
+            }
             else
-                shakeSignIn.Shake();
+            {
+                if (!string.IsNullOrEmpty(username.Text) && !string.IsNullOrEmpty(password.Text))
+                    api.Login(username.Text, password.Text);
+                else
+                    shakeSignIn.Shake();
+            }
         }
 
         protected override bool OnClick(ClickEvent e) => true;

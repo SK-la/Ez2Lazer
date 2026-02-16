@@ -8,13 +8,12 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
-using osu.Game.Screens.Play.PlayerSettings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class EzAnalysisSettings : SettingsSubsection
+    public partial class EzExperimentalSettings : SettingsSubsection
     {
-        protected override LocalisableString Header => "Analysis";
+        protected override LocalisableString Header => "Experimental";
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
@@ -29,6 +28,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "latency", "audio", "input" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.ExperimentalP2P),
+                    Caption = EzSettingsStrings.EXPERIMENTAL_P2P,
+                    HintText = EzSettingsStrings.EXPERIMENTAL_P2P_TOOLTIP,
+                })
+                {
+                    Keywords = new[] { "net", "p2p" }
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
