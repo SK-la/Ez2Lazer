@@ -386,6 +386,21 @@ namespace osu.Game.Online.API
             this.password = password;
         }
 
+        public void LoginLocal(string username)
+        {
+            // Use a non-empty password placeholder so HasLogin becomes true and the API thread doesn't force offline state.
+            ProvidedUsername = username;
+            this.password = "__local__";
+
+            // Set a placeholder local user and mark API as online for local-only usage.
+            Scheduler.Add(() =>
+            {
+                localUserState.SetPlaceholderLocalUser(ProvidedUsername);
+                LastLoginError = null;
+                state.Value = APIState.Online;
+            });
+        }
+
         public void AuthenticateSecondFactor(string code)
         {
             Debug.Assert(State.Value == APIState.RequiresSecondFactorAuth);

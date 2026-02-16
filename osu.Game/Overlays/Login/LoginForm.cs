@@ -27,6 +27,7 @@ namespace osu.Game.Overlays.Login
         private TextBox username = null!;
         private TextBox password = null!;
         private ShakeContainer shakeSignIn = null!;
+        private osu.Framework.Bindables.Bindable<bool>? experimentalLocalAccountBindable;
 
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
@@ -36,7 +37,7 @@ namespace osu.Game.Overlays.Login
         public override bool AcceptsFocus => true;
 
         [BackgroundDependencyLoader(permitNulls: true)]
-        private void load(OsuConfigManager config, AccountCreationOverlay accountCreation)
+        private void load(OsuConfigManager config, AccountCreationOverlay accountCreation, LAsEzExtensions.Configuration.Ez2ConfigManager? ezConfig = null)
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -94,6 +95,12 @@ namespace osu.Game.Overlays.Login
                     LabelText = LoginPanelStrings.StaySignedIn,
                     Current = config.GetBindable<bool>(OsuSetting.SavePassword),
                 },
+                // Experimental local account toggle (shows in login form next to stay signed in)
+                new SettingsCheckbox
+                {
+                    LabelText = "本地账户（实验性）",
+                    Current = (experimentalLocalAccountBindable = ezConfig?.GetBindable<bool>(LAsEzExtensions.Configuration.Ez2Setting.ExperimentalLocalAccount)) ?? new osu.Framework.Bindables.Bindable<bool>(),
+                },
                 forgottenPasswordLink = new LinkFlowContainer
                 {
                     Padding = new MarginPadding { Horizontal = SettingsPanel.CONTENT_MARGINS },
@@ -142,10 +149,20 @@ namespace osu.Game.Overlays.Login
 
         private void performLogin()
         {
-            if (!string.IsNullOrEmpty(username.Text) && !string.IsNullOrEmpty(password.Text))
-                api.Login(username.Text, password.Text);
+            if (experimentalLocalAccountBindable?.Value == true)
+            {
+                if (!string.IsNullOrEmpty(username.Text))
+                    api.LoginLocal(username.Text.Trim());
+                else
+                    shakeSignIn.Shake();
+            }
             else
-                shakeSignIn.Shake();
+            {
+                if (!string.IsNullOrEmpty(username.Text) && !string.IsNullOrEmpty(password.Text))
+                    api.Login(username.Text, password.Text);
+                else
+                    shakeSignIn.Shake();
+            }
         }
 
         protected override bool OnClick(ClickEvent e) => true;

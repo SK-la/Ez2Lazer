@@ -140,6 +140,19 @@ namespace osu.Game.Online.API
             }
         }
 
+        public void LoginLocal(string username)
+        {
+            // Simulate an immediate local login for tests.
+            LocalUser.Value = new APIUser
+            {
+                Username = username,
+                Id = DUMMY_USER_ID,
+            };
+
+            LastLoginError = null;
+            state.Value = APIState.Online;
+        }
+
         public void AuthenticateSecondFactor(string code)
         {
             var request = new VerifySessionRequest(code);

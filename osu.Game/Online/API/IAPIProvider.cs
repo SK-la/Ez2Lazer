@@ -105,6 +105,13 @@ namespace osu.Game.Online.API
         void Login(string username, string password);
 
         /// <summary>
+        /// Attempt to login as a local (offline) user without contacting the network.
+        /// This creates a placeholder local user and sets the API state to online for local-only usage.
+        /// </summary>
+        /// <param name="username">The local username to use.</param>
+        void LoginLocal(string username);
+
+        /// <summary>
         /// The <see cref="SessionVerificationMethod"/> requested by the server to complete verification.
         /// </summary>
         SessionVerificationMethod? SessionVerificationMethod { get; }
