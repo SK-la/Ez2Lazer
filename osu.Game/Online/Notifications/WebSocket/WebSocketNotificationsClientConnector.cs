@@ -53,5 +53,10 @@ namespace osu.Game.Online.Notifications.WebSocket
 
             return webSocketClient.SendAsync(message, cancellationToken);
         }
+
+        Task INotificationsClient.Disconnect()
+        {
+            return Disconnect();
+        }
     }
 }

@@ -192,5 +192,16 @@ namespace osu.Game.EzOsuGame.Localization
             "Lower is lower latency, but too low may crackle or fail to start. Default is 128.");
 
 #endregion
+
+#region 实验性功能
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT = new EzLocalizationManager.EzLocalisableString(
+            "本地账户（实验性）", "Local Account (Testing)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "允许无密码登录本地账户。跳过一切成绩上传、网络账户检查。",
+            "Allows local account login without password. Skip all score submissions and online account checks.");
+
+#endregion
     }
 }

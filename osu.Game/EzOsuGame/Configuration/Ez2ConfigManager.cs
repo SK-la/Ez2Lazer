@@ -179,6 +179,7 @@ namespace osu.Game.EzOsuGame.Configuration
             #region 实验性功能
 
             SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
+            SetDefault(Ez2Setting.ExperimentalLocalAccount, false);
 
             SetDefault(Ez2Setting.EzJudgmentDiagEnabled, false);
             SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, true);
@@ -832,6 +833,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 实验性功能
         InputAudioLatencyTracker,
+        ExperimentalLocalAccount,
 
         // 判定时序诊断与校正
         EzJudgmentDiagEnabled,

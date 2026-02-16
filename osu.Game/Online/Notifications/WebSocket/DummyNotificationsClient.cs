@@ -25,5 +25,7 @@ namespace osu.Game.Online.Notifications.WebSocket
         }
 
         public void Receive(SocketMessage message) => MessageReceived?.Invoke(message);
+
+        public Task Disconnect() => Task.CompletedTask;
     }
 }
