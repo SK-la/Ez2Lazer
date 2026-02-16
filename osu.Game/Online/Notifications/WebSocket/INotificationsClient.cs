@@ -27,5 +27,11 @@ namespace osu.Game.Online.Notifications.WebSocket
         /// Sends a <see cref="SocketMessage"/> to the notification server.
         /// </summary>
         Task SendAsync(SocketMessage message, CancellationToken? cancellationToken = default);
+
+        /// <summary>
+        /// Disconnects the notifications client, if connected.
+        /// Implementations should attempt a best-effort disconnect and complete when finished.
+        /// </summary>
+        Task Disconnect();
     }
 }

@@ -68,6 +68,9 @@ namespace osu.Game.Online.API
         /// </summary>
         public IBindable<APIState> State => state;
 
+        // Match IAPIProvider.IsLocalOnly
+        public bool IsLocalOnly { get; private set; }
+
         public virtual void Queue(APIRequest request)
         {
             request.AttachAPI(this);
@@ -129,6 +132,8 @@ namespace osu.Game.Online.API
                 Id = DUMMY_USER_ID,
             };
 
+            IsLocalOnly = false;
+
             if (SessionVerificationMethod != null)
             {
                 state.Value = APIState.RequiresSecondFactorAuth;
@@ -151,6 +156,8 @@ namespace osu.Game.Online.API
 
             LastLoginError = null;
             state.Value = APIState.Online;
+
+            IsLocalOnly = true;
         }
 
         public void AuthenticateSecondFactor(string code)
@@ -196,6 +203,8 @@ namespace osu.Game.Online.API
             // must happen after `state.Value` is changed such that subscribers to that bindable's value changes see the correct user.
             // compare: `APIAccess.Logout()`.
             LocalUser.Value = new GuestUser();
+
+            IsLocalOnly = false;
         }
 
         public void UpdateLocalFriends()

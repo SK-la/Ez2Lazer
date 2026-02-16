@@ -45,9 +45,11 @@ namespace osu.Game.Online.API
         /// This is useful for storing local scores and showing a placeholder username after starting the game,
         /// until a valid connection has been established.
         /// </summary>
-        public void SetPlaceholderLocalUser(string username)
+        /// <param name="username">The placeholder username.</param>
+        /// <param name="force">If true, overwrite any existing non-default local user.</param>
+        public void SetPlaceholderLocalUser(string username, bool force = false)
         {
-            if (!localUser.IsDefault)
+            if (!force && !localUser.IsDefault)
                 return;
 
             localUser.Value = new APIUser
@@ -56,6 +58,11 @@ namespace osu.Game.Online.API
                 IsSupporter = configSupporter.Value,
             };
         }
+
+        /// <summary>
+        /// 本地占位用户。仅在本地使用，无法与服务器交互。
+        /// </summary>
+        public void SetPlaceholderLocalUser(string username) => SetPlaceholderLocalUser(username, false);
 
         public void SetLocalUser(APIMe me)
         {

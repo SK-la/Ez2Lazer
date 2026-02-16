@@ -47,6 +47,11 @@ namespace osu.Game.Online.API
         bool IsLoggedIn { get; }
 
         /// <summary>
+        /// 本地模式，启用后不提交成绩
+        /// </summary>
+        bool IsLocalOnly { get; }
+
+        /// <summary>
         /// The last username provided by the end-user.
         /// May not be authenticated.
         /// </summary>
