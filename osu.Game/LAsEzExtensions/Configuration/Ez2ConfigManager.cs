@@ -113,6 +113,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.AsioSampleRate, 48000);
             SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
             SetDefault(Ez2Setting.ExperimentalLocalAccount, false);
+            SetDefault(Ez2Setting.ExperimentalP2P, false);
 
             SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
             SetDefault(Ez2Setting.XxySRFilter, false);
@@ -494,6 +495,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         AsioSampleRate,
         InputAudioLatencyTracker,
         ExperimentalLocalAccount,
+        ExperimentalP2P,
 
         // 来自拉取
         GameplayDisableCmdSpace,

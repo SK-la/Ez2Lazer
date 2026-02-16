@@ -11,9 +11,9 @@ using osu.Game.Screens;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
-    public partial class AnalysisSettings : SettingsSubsection
+    public partial class EzExperimentalSettings : SettingsSubsection
     {
-        protected override LocalisableString Header => "Analysis";
+        protected override LocalisableString Header => "EzExperimental";
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
@@ -28,6 +28,15 @@ namespace osu.Game.LAsEzExtensions.Configuration
                 })
                 {
                     Keywords = new[] { "latency", "audio", "input" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzLocalizationManager.IExperimentalP2P,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.ExperimentalP2P),
+                    HintText = EzLocalizationManager.IExperimentalP2PTooltip,
+                })
+                {
+                    Keywords = new[] { "latency", "audio", "input", "overlay" }
                 }
             });
         }

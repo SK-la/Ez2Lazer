@@ -252,6 +252,12 @@ namespace osu.Game.LAsEzExtensions.Configuration
             + "A statistics window will pop up after the game ends. More detailed information can be found in the runtime.log file."
             + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
 
+        public static readonly EzLocalisableString IExperimentalP2P = new EzLocalisableString(
+            "启用实验性P2P功能", "Enable Experimental P2P Feature");
+
+        public static readonly EzLocalisableString IExperimentalP2PTooltip = new EzLocalisableString(
+            "使用本地账户登录，在多人大厅创建房间时，启用P2P。双方客户端均需要这样做", "Enable Experimental P2P Feature");
+
         public static readonly EzLocalisableString KeySoundPreview_Tooltip = new EzLocalisableString(
             "按键音预览：\n0 关闭; \n1 蓝灯开启 (全量音效预览); \n2 黄灯开启 (全量音效预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",
             "Key sound preview: \n0 Off; \n1 BlueLight (keypress triggers samples); \n2 GoldLight (preserve preview in song select; in gameplay auto-play note samples, keypresses no longer trigger sample playback)");
