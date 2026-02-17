@@ -26,6 +26,8 @@ namespace osu.Game.Online.Rooms
             this.versionHash = versionHash;
         }
 
+        public override bool AllowLocal => true;
+
         protected override WebRequest CreateWebRequest()
         {
             var req = base.CreateWebRequest();

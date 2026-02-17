@@ -246,6 +246,39 @@ namespace osu.Game.Online.Rooms
         }
 
         /// <summary>
+        /// Whether this room is an experimental P2P room (host-based peer connections).
+        /// </summary>
+        public bool IsP2P
+        {
+            get => isP2P;
+            set => SetField(ref isP2P, value);
+        }
+
+        /// <summary>
+        /// Optional host signalling payload (e.g. SDP) stored on the room for short-term exchange.
+        /// </summary>
+        [JsonProperty("host_signalling")]
+        private string? hostSignalling;
+
+        public string? HostSignalling
+        {
+            get => hostSignalling;
+            set => SetField(ref hostSignalling, value);
+        }
+
+        /// <summary>
+        /// Optional per-peer signalling payloads uploaded by joiners keyed by user id.
+        /// </summary>
+        [JsonProperty("peer_signalling")]
+        private Dictionary<int, string> peerSignalling = new Dictionary<int, string>();
+
+        public IReadOnlyDictionary<int, string> PeerSignalling
+        {
+            get => peerSignalling;
+            set => SetField(ref peerSignalling, value == null ? new Dictionary<int, string>() : new Dictionary<int, string>(value));
+        }
+
+        /// <summary>
         /// The current status of the room.
         /// </summary>
         public RoomStatus Status
@@ -341,6 +374,9 @@ namespace osu.Game.Online.Rooms
         [JsonProperty("channel_id")]
         private int channelId;
 
+        [JsonProperty("is_p2p")]
+        private bool isP2P;
+
         [JsonProperty("status")]
         [JsonConverter(typeof(SnakeCaseStringEnumConverter))]
         private RoomStatus status;
@@ -367,6 +403,11 @@ namespace osu.Game.Online.Rooms
             AutoSkip = room.Settings.AutoSkip;
             Host = room.Host != null ? new APIUser { Id = room.Host.UserID } : null;
             Playlist = room.Playlist.Select(p => new PlaylistItem(p)).ToArray();
+
+            // map experimental P2P metadata
+            IsP2P = room.IsP2P;
+            HostSignalling = room.HostSignalling;
+            PeerSignalling = room.PeerSignalling != null ? new Dictionary<int, string>(room.PeerSignalling) : new Dictionary<int, string>();
         }
 
         /// <summary>
@@ -400,6 +441,9 @@ namespace osu.Game.Online.Rooms
             AutoSkip = other.AutoSkip;
             Playlist = other.Playlist;
             RecentParticipants = other.RecentParticipants;
+            IsP2P = other.IsP2P;
+            HostSignalling = other.HostSignalling;
+            PeerSignalling = other.PeerSignalling != null ? new Dictionary<int, string>(other.PeerSignalling) : new Dictionary<int, string>();
         }
 
         /// <summary>

@@ -21,6 +21,8 @@ namespace osu.Game.Online.Rooms
             Success += r => Room.CopyFrom(r);
         }
 
+        public override bool AllowLocal => true;
+
         protected override WebRequest CreateWebRequest()
         {
             var req = base.CreateWebRequest();

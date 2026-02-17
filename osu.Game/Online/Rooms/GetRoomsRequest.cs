@@ -22,6 +22,8 @@ namespace osu.Game.Online.Rooms
             status = filterCriteria.Status;
         }
 
+        public override bool AllowLocal => true;
+
         protected override WebRequest CreateWebRequest()
         {
             var req = base.CreateWebRequest();

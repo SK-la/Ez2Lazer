@@ -11,6 +11,8 @@ using osu.Framework.Extensions;
 using osu.Framework.Extensions.ExceptionExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.Online.Multiplayer.WebRtc;
+using osu.Game.Online.API;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -64,8 +66,17 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
             public OsuEnumDropdown<QueueMode> QueueModeDropdown = null!;
             public OsuTextBox PasswordTextBox = null!;
             public OsuCheckbox AutoSkipCheckbox = null!;
+            public OsuCheckbox P2PCheckbox = null!;
             public RoundedButton ApplyButton = null!;
             public OsuSpriteText ErrorText = null!;
+            public OsuSpriteText P2PStatusText = null!;
+            private OsuTextBox signallingBox = null!;
+            private OsuButton generateOfferButton = null!;
+            private OsuButton uploadHostButton = null!;
+            private OsuButton fetchHostButton = null!;
+            private OsuButton generateAnswerButton = null!;
+            private OsuButton uploadAnswerButton = null!;
+            private OsuButton fetchPeerAnswersButton = null!;
 
             private OsuEnumDropdown<StartMode> startModeDropdown = null!;
             private OsuSpriteText typeLabel = null!;
@@ -80,10 +91,20 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
             private MultiplayerClient client { get; set; } = null!;
 
             [Resolved]
+            private IAPIProvider api { get; set; } = null!;
+
+            [Resolved]
             private OngoingOperationTracker ongoingOperationTracker { get; set; } = null!;
+
+            [Resolved(CanBeNull = true)]
+            private WebRtcManager? webRtc { get; set; }
+
+            private bool webRtcOwned;
 
             private readonly IBindable<bool> operationInProgress = new BindableBool();
             private readonly Room room;
+
+            private Action<string>? p2pStatusHandler;
 
             private IDisposable? applyingSettingsOperation;
             private Drawable playlistContainer = null!;
@@ -246,6 +267,13 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
                                                                     {
                                                                         LabelText = "Automatically skip the beatmap intro"
                                                                     }
+                                                                },
+                                                                new Section("Experimental")
+                                                                {
+                                                                    Child = P2PCheckbox = new OsuCheckbox
+                                                                    {
+                                                                        LabelText = "Experimental P2P (host)"
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -307,13 +335,47 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
                                             Padding = new MarginPadding { Horizontal = OsuScreen.HORIZONTAL_OVERFLOW_PADDING },
                                             Children = new Drawable[]
                                             {
-                                                ApplyButton = new CreateOrUpdateButton(room)
+                                                            // signalling tools for experimental P2P (manual exchange)
+                                                            signallingBox = new OsuTextBox
+                                                            {
+                                                                RelativeSizeAxes = Axes.X,
+                                                                Height = 80,
+                                                                PlaceholderText = "Signalling (offer/answer) payload",
+                                                            },
+                                                            new FillFlowContainer
+                                                            {
+                                                                AutoSizeAxes = Axes.Y,
+                                                                RelativeSizeAxes = Axes.X,
+                                                                Direction = FillDirection.Horizontal,
+                                                                Spacing = new Vector2(5,5),
+                                                                Children = new Drawable[]
+                                                                {
+                                                                    generateOfferButton = new PurpleRoundedButton { Text = "Generate Offer" , Action = () => generateOffer()},
+                                                                    uploadHostButton = new PurpleRoundedButton { Text = "Upload Host Offer" , Action = () => uploadHostSignalling()},
+                                                                    fetchHostButton = new PurpleRoundedButton { Text = "Fetch Host Offer" , Action = () => fetchHostSignalling()},
+                                                                    generateAnswerButton = new PurpleRoundedButton { Text = "Generate Answer" , Action = () => generateAnswer()},
+                                                                    uploadAnswerButton = new PurpleRoundedButton { Text = "Upload Answer" , Action = () => uploadPeerSignalling()},
+                                                                    fetchPeerAnswersButton = new PurpleRoundedButton { Text = "Fetch Peer Answers" , Action = () => fetchPeerAnswers()},
+#if DEBUG
+                                                                    new PurpleRoundedButton { Text = "Debug: P2P Test", Action = () => runDebugP2PTest() },
+#endif
+                                                                }
+                                                            },
+                                                            ApplyButton = new CreateOrUpdateButton(room)
                                                 {
                                                     Anchor = Anchor.BottomCentre,
                                                     Origin = Anchor.BottomCentre,
                                                     Size = new Vector2(230, 55),
                                                     Enabled = { Value = false },
                                                     Action = apply,
+                                                },
+                                                P2PStatusText = new OsuSpriteText
+                                                {
+                                                    Anchor = Anchor.BottomCentre,
+                                                    Origin = Anchor.BottomCentre,
+                                                    Alpha = 0,
+                                                    Depth = 1,
+                                                    Colour = colours.Yellow
                                                 },
                                                 ErrorText = new OsuSpriteText
                                                 {
@@ -351,6 +413,14 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
 
                 room.PropertyChanged += onRoomPropertyChanged;
 
+                // subscribe to client P2P handshake status updates
+                p2pStatusHandler = s => Schedule(() =>
+                {
+                    P2PStatusText.Text = s;
+                    P2PStatusText.FadeIn(100).Delay(2000).FadeOut(200);
+                });
+                client.P2PHandshakeStatusChanged += p2pStatusHandler;
+
                 updateRoomName();
                 updateRoomType();
                 updateRoomQueueMode();
@@ -385,6 +455,10 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
                         updateRoomAutoSkip();
                         break;
 
+                    case nameof(Room.IsP2P):
+                        updateRoomP2P();
+                        break;
+
                     case nameof(Room.MaxParticipants):
                         updateRoomMaxParticipants();
                         break;
@@ -413,6 +487,9 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
 
             private void updateRoomAutoSkip()
                 => AutoSkipCheckbox.Current.Value = room.AutoSkip;
+
+            private void updateRoomP2P()
+                => P2PCheckbox.Current.Value = room.IsP2P;
 
             private void updateRoomMaxParticipants()
                 => MaxParticipantsField.Text = room.MaxParticipants?.ToString();
@@ -468,6 +545,7 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
                     room.QueueMode = QueueModeDropdown.Current.Value;
                     room.AutoStartDuration = TimeSpan.FromSeconds((int)startModeDropdown.Current.Value);
                     room.AutoSkip = AutoSkipCheckbox.Current.Value;
+                    room.IsP2P = P2PCheckbox.Current.Value;
                     room.Playlist = drawablePlaylist.Items.ToArray();
 
                     client.CreateRoom(room).ContinueWith(t => Schedule(() =>
@@ -479,6 +557,212 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
                     }));
                 }
             }
+
+            private async void generateOffer()
+            {
+                try
+                {
+                    if (webRtc == null)
+                    {
+                        webRtc = new WebRtcManager();
+                        webRtcOwned = true;
+                    }
+
+                    await webRtc.InitializeAsync();
+                    var offer = await webRtc.CreateOfferAsync();
+                    signallingBox.Text = offer;
+                }
+                catch (Exception e)
+                {
+                    onError(e, "Error generating offer");
+                }
+            }
+
+            private async void generateAnswer()
+            {
+                try
+                {
+                    if (webRtc == null)
+                    {
+                        webRtc = new WebRtcManager();
+                        webRtcOwned = true;
+                    }
+
+                    await webRtc.InitializeAsync();
+                    // if there's a host offer in the box, use it
+                    var offer = signallingBox.Text ?? string.Empty;
+                    var answer = await webRtc.CreateAnswerAsync(offer);
+                    signallingBox.Text = answer;
+                }
+                catch (Exception e)
+                {
+                    onError(e, "Error generating answer");
+                }
+            }
+
+            private async void uploadHostSignalling()
+            {
+                ErrorText.FadeOut(50);
+                try
+                {
+                    await client.UploadHostSignalling(signallingBox.Text);
+                    Schedule(() =>
+                    {
+                        ErrorText.Text = "Host signalling uploaded";
+                        ErrorText.FadeIn(100).Delay(1500).FadeOut(200);
+                    });
+                }
+                catch (Exception e)
+                {
+                    onError(e, "Error uploading host signalling");
+                }
+            }
+
+            private async void fetchHostSignalling()
+            {
+                ErrorText.FadeOut(50);
+                try
+                {
+                    var sig = await client.GetHostSignalling();
+                    Schedule(() =>
+                    {
+                        if (string.IsNullOrEmpty(sig))
+                        {
+                            ErrorText.Text = "No host signalling available";
+                            ErrorText.FadeIn(100).Delay(1500).FadeOut(200);
+                        }
+                        else
+                            signallingBox.Text = sig;
+                    });
+                }
+                catch (Exception e)
+                {
+                    onError(e, "Error fetching host signalling");
+                }
+            }
+
+            private async void uploadPeerSignalling()
+            {
+                ErrorText.FadeOut(50);
+                try
+                {
+                    var local = api.LocalUser.Value;
+                    if (local == null)
+                    {
+                        Schedule(() =>
+                        {
+                            ErrorText.Text = "No local user";
+                            ErrorText.FadeIn(100).Delay(1500).FadeOut(200);
+                        });
+                        return;
+                    }
+
+                    await client.UploadPeerSignalling(local.Id, signallingBox.Text);
+                    Schedule(() =>
+                    {
+                        ErrorText.Text = "Peer signalling uploaded";
+                        ErrorText.FadeIn(100).Delay(1500).FadeOut(200);
+                    });
+                }
+                catch (Exception e)
+                {
+                    onError(e, "Error uploading peer signalling");
+                }
+            }
+
+            private async void fetchPeerAnswers()
+            {
+                ErrorText.FadeOut(50);
+                try
+                {
+                    var dict = await client.GetPeerSignalling();
+                    Schedule(() =>
+                    {
+                        if (dict == null || dict.Count == 0)
+                        {
+                            ErrorText.Text = "No peer answers available";
+                            ErrorText.FadeIn(100).Delay(1500).FadeOut(200);
+                        }
+                        else
+                        {
+                            signallingBox.Text = string.Join("\n---\n", dict.Select(kv => $"peer {kv.Key}: {kv.Value}"));
+                        }
+                    });
+                }
+                catch (Exception e)
+                {
+                    onError(e, "Error fetching peer signalling");
+                }
+            }
+
+#if DEBUG
+            private async void runDebugP2PTest()
+            {
+                ErrorText.FadeOut(50);
+                try
+                {
+                    // Host flow: generate offer and upload
+                    if (client.IsHost)
+                    {
+                        if (webRtc == null)
+                        {
+                            webRtc = new WebRtcManager();
+                            webRtcOwned = true;
+                        }
+
+                        await webRtc.InitializeAsync();
+                        var offer = await webRtc.CreateOfferAsync();
+                        await client.UploadHostSignalling(offer);
+                        Schedule(() =>
+                        {
+                            ErrorText.Text = "Debug: host offer uploaded";
+                            ErrorText.FadeIn(100).Delay(1500).FadeOut(200);
+                        });
+                        P2PStatusText.Text = "Debug: host offer uploaded";
+                        P2PStatusText.FadeIn(100).Delay(2000).FadeOut(200);
+                    }
+                    else
+                    {
+                        // Joiner flow: fetch host offer, create answer and upload
+                        var hostSig = await client.GetHostSignalling();
+                        if (string.IsNullOrEmpty(hostSig))
+                        {
+                            Schedule(() =>
+                            {
+                                ErrorText.Text = "Debug: no host signalling available";
+                                ErrorText.FadeIn(100).Delay(1500).FadeOut(200);
+                            });
+                            return;
+                        }
+
+                        if (webRtc == null)
+                        {
+                            webRtc = new WebRtcManager();
+                            webRtcOwned = true;
+                        }
+
+                        await webRtc.InitializeAsync();
+                        var answer = await webRtc.CreateAnswerAsync(hostSig);
+                        var local = api.LocalUser.Value;
+                        if (local != null)
+                        {
+                            await client.UploadPeerSignalling(local.Id, answer);
+                            Schedule(() =>
+                            {
+                                ErrorText.Text = "Debug: answer uploaded";
+                                ErrorText.FadeIn(100).Delay(1500).FadeOut(200);
+                            });
+                            P2PStatusText.Text = "Debug: answer uploaded";
+                            P2PStatusText.FadeIn(100).Delay(2000).FadeOut(200);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    onError(e, "Debug P2P test failed");
+                }
+            }
+#endif
 
             private void onSuccess() => Schedule(() =>
             {
@@ -520,6 +804,14 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer.Match
             {
                 base.Dispose(isDisposing);
                 room.PropertyChanged -= onRoomPropertyChanged;
+                if (webRtcOwned && webRtc != null)
+                {
+                    webRtc.Dispose();
+                    webRtc = null;
+                    webRtcOwned = false;
+                }
+                if (p2pStatusHandler != null)
+                    client.P2PHandshakeStatusChanged -= p2pStatusHandler;
             }
         }
 

@@ -64,6 +64,7 @@ namespace osu.Game.Screens.OnlinePlay.Playlists
             public OsuDropdown<TimeSpan> DurationField = null!;
             public RoomAvailabilityPicker AvailabilityPicker = null!;
             public RoundedButton ApplyButton = null!;
+            public OsuCheckbox P2PCheckbox = null!;
 
             public bool IsLoading => loadingLayer.State.Value == Visibility.Visible;
 
@@ -201,6 +202,13 @@ namespace osu.Game.Screens.OnlinePlay.Playlists
                                                                 TabbableContentContainer = this,
                                                                 ReadOnly = true,
                                                             },
+                                                        },
+                                                        new Section("Experimental")
+                                                        {
+                                                            Child = P2PCheckbox = new OsuCheckbox
+                                                            {
+                                                                LabelText = "Experimental P2P (host)"
+                                                            }
                                                         },
                                                     },
                                                 },
@@ -371,6 +379,10 @@ namespace osu.Game.Screens.OnlinePlay.Playlists
                     case nameof(Room.Playlist):
                         updateRoomPlaylist();
                         break;
+
+                    case nameof(Room.IsP2P):
+                        updateRoomP2P();
+                        break;
                 }
             }
 
@@ -391,6 +403,9 @@ namespace osu.Game.Screens.OnlinePlay.Playlists
 
             private void updateRoomPlaylist()
                 => playlist.Items.ReplaceRange(0, playlist.Items.Count, room.Playlist);
+
+            private void updateRoomP2P()
+                => P2PCheckbox.Current.Value = room.IsP2P;
 
             private void populateDurations(ValueChangedEvent<APIUser> user)
             {
@@ -444,6 +459,7 @@ namespace osu.Game.Screens.OnlinePlay.Playlists
                 room.MaxParticipants = int.TryParse(MaxParticipantsField.Text, out int maxParticipants) ? maxParticipants : null;
                 room.MaxAttempts = int.TryParse(MaxAttemptsField.Text, out int maxAttempts) ? maxAttempts : null;
                 room.Duration = DurationField.Current.Value;
+                room.IsP2P = P2PCheckbox.Current.Value;
 
                 loadingLayer.Show();
 

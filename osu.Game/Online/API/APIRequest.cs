@@ -94,6 +94,12 @@ namespace osu.Game.Online.API
         /// </summary>
         public event APIFailureHandler? Failure;
 
+        /// <summary>
+        /// Whether this request is permitted to run when the <see cref="APIAccess"/> is in local-only mode.
+        /// By default requests are not allowed and will be failed early when running under a local-only login.
+        /// </summary>
+        public virtual bool AllowLocal => false;
+
         private readonly object completionStateLock = new object();
 
         /// <summary>

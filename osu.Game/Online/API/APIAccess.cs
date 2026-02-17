@@ -6,11 +6,16 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using osu.Game.Online.Rooms;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection;
 using Newtonsoft.Json.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Development;
@@ -23,13 +28,20 @@ using osu.Game.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Online.Chat;
+using osu.Game.Online.Discovery;
+using osu.Game.Online.LocalMultiplayer;
 using osu.Game.Online.Notifications.WebSocket;
 
 namespace osu.Game.Online.API
 {
     public partial class APIAccess : CompositeComponent, IAPIProvider
     {
+        // Local multiplayer server used in local-only mode.
+        private LocalMultiplayerServer localServer;
+        private LocalMultiplayerDiscovery localDiscovery;
+
         private readonly OsuGameBase game;
         private readonly OsuConfigManager config;
 
@@ -63,6 +75,9 @@ namespace osu.Game.Online.API
         private readonly LocalUserState localUserState;
 
         public INotificationsClient NotificationsClient { get; }
+
+        // Expose the in-memory local server for consumers which need to drive local multiplayer behaviour.
+        public LocalMultiplayerServer LocalMultiplayerServer => localServer ??= new LocalMultiplayerServer();
 
         public Language Language => game.CurrentLanguage.Value;
 
@@ -109,6 +124,15 @@ namespace osu.Game.Online.API
                 // This is required so that Queue() requests during startup sequence don't fail due to "not logged in".
                 state.Value = APIState.Connecting;
             }
+
+            // If the experimental P2P flag is enabled in Ez2 config, treat this client as local-only
+            // (i.e. act as its own server) to avoid server-side checks interfering with P2P usage.
+            try
+            {
+                if (GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ExperimentalP2P))
+                    LoginLocal(string.IsNullOrEmpty(ProvidedUsername) ? "Local" : ProvidedUsername);
+            }
+            catch { }
 
             var thread = new Thread(run)
             {
@@ -207,8 +231,20 @@ namespace osu.Game.Online.API
                 }
 
                 processQueuedRequests();
+                // perform local housekeeping for local-only mode
+                if (IsLocalOnly)
+                    cleanupLocalRooms();
+
                 Thread.Sleep(50);
             }
+        }
+
+        private void cleanupLocalRooms()
+        {
+            if (!IsLocalOnly)
+                return;
+
+            localServer?.CleanupExpired();
         }
 
         /// <summary>
@@ -371,7 +407,15 @@ namespace osu.Game.Online.API
             try
             {
                 if (IsLocalOnly)
+                {
+                    request.AttachAPI(this);
+                    // Handle known request types locally to provide a full offline multiplayer experience.
+                    if (handleLocalRequest(request))
+                        return;
+                    // If not handled locally, fail deterministically.
+                    request.Fail(new WebException("User not logged in"));
                     return;
+                }
 
                 request.AttachAPI(this);
                 request.Perform();
@@ -381,6 +425,134 @@ namespace osu.Game.Online.API
                 // todo: fix exception handling
                 request.Fail(e);
             }
+        }
+
+        /// <summary>
+        /// Handle requests locally when in local-only mode. Returns true if handled.
+        /// </summary>
+        private bool handleLocalRequest(APIRequest request)
+        {
+            if (localServer == null)
+                return false;
+
+            switch (request)
+            {
+                case GetRoomsRequest getRooms:
+                    getRooms.TriggerSuccess(localServer.GetRooms().ToList());
+                    return true;
+
+                case CreateRoomRequest createReq:
+                {
+                    var created = localServer.CreateRoom(createReq.Room, LocalUser.Value);
+                    createReq.TriggerSuccess(created);
+
+                    try
+                    {
+                        localDiscovery?.BroadcastRoom(new LocalMultiplayerDiscovery.DiscoveredRoom
+                        {
+                            Name = createReq.Room.Name,
+                            RoomID = created.RoomID.HasValue ? (int)created.RoomID.Value : 0,
+                            HostName = LocalUser.Value?.Username ?? ProvidedUsername,
+                            IsP2P = createReq.Room.IsP2P,
+                            Timestamp = DateTimeOffset.Now,
+                        });
+                    }
+                    catch { }
+
+                    return true;
+                }
+
+                case GetRoomRequest getRoomReq:
+                {
+                    var r = localServer.GetRoom(getRoomReq.RoomId);
+
+                    if (r == null)
+                    {
+                        getRoomReq.TriggerFailure(new InvalidOperationException("Room not found."));
+                        return true;
+                    }
+
+                    getRoomReq.TriggerSuccess(r);
+                    return true;
+                }
+
+                case JoinRoomRequest joinReq:
+                {
+                    var (success, room, error) = localServer.JoinRoom(joinReq.Room, LocalUser.Value, joinReq.Password);
+
+                    if (!success)
+                    {
+                        joinReq.TriggerFailure(new InvalidOperationException(error));
+                        return true;
+                    }
+
+                    joinReq.TriggerSuccess(room!);
+                    return true;
+                }
+
+                case PartRoomRequest partReq:
+                    localServer.PartRoom(partReqRoom(partReq), LocalUser.Value);
+                    partReq.TriggerSuccess();
+                    return true;
+
+                case CreateRoomScoreRequest createScoreReq:
+                {
+                    long roomId = getPrivateField<long>(createScoreReq, "roomId");
+                    long playlistItemId = getPrivateField<long>(createScoreReq, "playlistItemId");
+                    createScoreReq.TriggerSuccess(localServer.CreateRoomScore(roomId, playlistItemId));
+                    return true;
+                }
+
+                case GetRoomLeaderboardRequest leaderboardReq:
+                {
+                    long roomId = getPrivateField<long>(leaderboardReq, "roomId");
+                    leaderboardReq.TriggerSuccess(localServer.GetLeaderboard(roomId));
+                    return true;
+                }
+
+                case IndexPlaylistScoresRequest indexReq:
+                    indexReq.TriggerSuccess(localServer.IndexPlaylistScores(indexReq.RoomId, indexReq.PlaylistItemId));
+                    return true;
+
+                case SubmitRoomScoreRequest submitReq:
+                {
+                    long scoreId = getPrivateField<long>(submitReq, "ScoreId");
+                    long roomId = getPrivateField<long>(submitReq, "roomId");
+                    long playlistItemId = getPrivateField<long>(submitReq, "playlistItemId");
+                    var score = localServer.SubmitRoomScore(submitReq.Score, scoreId, roomId, playlistItemId, LocalUser.Value);
+                    submitReq.TriggerSuccess(score);
+                    return true;
+                }
+
+                default:
+                    return false;
+            }
+        }
+
+        // helper to extract room reference for PartRoomRequest; PartRoomRequest stores room private field, so use reflection as fallback.
+        private Room partReqRoom(PartRoomRequest partReq)
+        {
+            try
+            {
+                var field = typeof(PartRoomRequest).GetField("room", BindingFlags.NonPublic | BindingFlags.Instance);
+
+                if (field?.GetValue(partReq) is Room room)
+                    return room;
+            }
+            catch
+            {
+            }
+
+            return new Room();
+        }
+
+        private T getPrivateField<T>(object obj, string name)
+        {
+            var field = obj.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance);
+            if (field == null)
+                throw new InvalidOperationException($"Field '{name}' not found on type {obj.GetType()}");
+
+            return (T)field.GetValue(obj)!;
         }
 
         public Task PerformAsync(APIRequest request) =>
@@ -406,6 +578,65 @@ namespace osu.Game.Online.API
             Schedule(() => localUserState.SetPlaceholderLocalUser(ProvidedUsername, true));
             LastLoginError = null;
             state.Value = APIState.Online;
+
+            // start local server and LAN discovery in local-only mode immediately so
+            // requests can be handled synchronously after calling LoginLocal.
+            try
+            {
+                localServer ??= new LocalMultiplayerServer();
+
+                if (localDiscovery == null)
+                {
+                    localDiscovery = new LocalMultiplayerDiscovery();
+                    localDiscovery.RoomReceived += onRemoteRoomDiscovered;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Failed to start local server/discovery: {ex.Message}", LoggingTarget.Network, LogLevel.Debug);
+            }
+        }
+
+        private void onRemoteRoomDiscovered(LocalMultiplayerDiscovery.DiscoveredRoom discovered)
+        {
+            // schedule onto API thread to mutate localRooms safely
+            Schedule(() =>
+            {
+                try
+                {
+                    // create a synthetic room representation for discovered remote host
+                    var room = new Room
+                    {
+                        RoomID = -generateRoomKeyFromEndpoint(discovered.AdvertiserEndpoint),
+                        Name = discovered.Name,
+                        Host = new APIUser { Username = discovered.HostName },
+                        IsP2P = discovered.IsP2P,
+                        StartDate = discovered.Timestamp,
+                        EndDate = discovered.Timestamp.AddHours(2),
+                        ParticipantCount = 1,
+                    };
+
+                    // upsert into local server by negative synthetic key
+                    localServer?.UpsertRoom(room);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Error injecting discovered LAN room: {ex}", LoggingTarget.Network, LogLevel.Debug);
+                }
+            });
+        }
+
+        private int generateRoomKeyFromEndpoint(IPEndPoint ep)
+        {
+            if (ep == null) return (int)DateTimeOffset.Now.ToUnixTimeSeconds();
+
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 23 + ep.Address.GetHashCode();
+                hash = hash * 23 + ep.Port;
+                return Math.Abs(hash);
+            }
         }
 
         public void AuthenticateSecondFactor(string code)
@@ -579,19 +810,93 @@ namespace osu.Game.Online.API
         {
             lock (queue)
             {
+                // If a user attempts to create an experimental P2P room while we don't have
+                // a valid authenticated online session, switch to local-only mode so the
+                // request can be handled locally instead of being sent unauthenticated.
+                if (request is CreateRoomRequest cr && cr.Room.IsP2P)
+                {
+                    // Force local-only mode for experimental P2P room creation so that
+                    // no server-side authentication or checks are performed.
+                    LoginLocal(string.IsNullOrEmpty(ProvidedUsername) ? "Local" : ProvidedUsername);
+                }
+
                 request.AttachAPI(this);
 
-                if (IsLocalOnly)
+                // If we're in local-only mode and the request is allowed to be handled locally,
+                // perform it immediately rather than enqueueing so the caller (UI) receives
+                // a prompt response and doesn't remain stuck waiting for network activity.
+                if (IsLocalOnly && request.AllowLocal)
+                {
+                    // Perform synchronously on the API thread loop semantics.
+                    Perform(request);
                     return;
+                }
+
+                if (IsLocalOnly && !request.AllowLocal)
+                {
+                    // Avoid silently dropping requests in local-only mode which can lead to callers
+                    // waiting indefinitely for completion (e.g. lounge polling). Fail the
+                    // request immediately so callers receive a deterministic failure callback.
+                    request.Fail(new WebException(@"User not logged in"));
+                    return;
+                }
 
                 if (state.Value == APIState.Offline)
                 {
+                    if (request.AllowLocal)
+                    {
+                        // If the request may be handled locally, ensure local-only mode is started
+                        // and execute the request immediately on the API thread.
+                        ensureLocalModeStarted();
+                        PerformAsync(request);
+                        return;
+                    }
+
                     request.Fail(new WebException(@"User not logged in"));
                     return;
                 }
 
                 queue.Enqueue(request);
             }
+        }
+
+        private void ensureLocalModeStarted()
+        {
+            if (IsLocalOnly)
+                return;
+
+            // emulate the effect of LoginLocal without requiring explicit user action
+            NotificationsClient.Disconnect();
+
+            if (string.IsNullOrEmpty(ProvidedUsername))
+                ProvidedUsername = config.Get<string>(OsuSetting.Username) ?? "Local";
+
+            password = "__local__";
+            IsLocalOnly = true;
+
+            // set placeholder local user immediately on main thread
+            Schedule(() => localUserState.SetPlaceholderLocalUser(ProvidedUsername, true));
+            LastLoginError = null;
+            state.Value = APIState.Online;
+
+            // start local server and discovery
+            Schedule(() =>
+            {
+                try
+                {
+                    localServer ??= new LocalMultiplayerServer();
+
+                    if (localDiscovery == null)
+                    {
+                        localDiscovery = new LocalMultiplayerDiscovery();
+                        localDiscovery.RoomReceived += onRemoteRoomDiscovered;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Failed to start local server/discovery: {ex.Message}", LoggingTarget.Network, LogLevel.Debug);
+                }
+            });
         }
 
         private void flushQueue(bool failOldRequests = true)

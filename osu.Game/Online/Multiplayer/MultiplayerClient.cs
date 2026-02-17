@@ -24,6 +24,7 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Utils;
+using osu.Game.Online.Multiplayer.WebRtc;
 
 namespace osu.Game.Online.Multiplayer
 {
@@ -123,6 +124,10 @@ namespace osu.Game.Online.Multiplayer
 
         public event Action? MatchmakingQueueJoined;
         public event Action? MatchmakingQueueLeft;
+        /// <summary>
+        /// Invoked to report progress/status of the experimental P2P handshake flow.
+        /// </summary>
+        public event Action<string>? P2PHandshakeStatusChanged;
         public event Action? MatchmakingRoomInvited;
         public event Action<long, string>? MatchmakingRoomReady;
         public event Action<MatchmakingLobbyStatus>? MatchmakingLobbyStatusChanged;
@@ -162,6 +167,26 @@ namespace osu.Game.Online.Multiplayer
         private MultiplayerRoom? room;
 
         /// <summary>
+        /// Uploads host signalling payload for experimental P2P rooms.
+        /// </summary>
+        /// <param name="signalling">Arbitrary signalling payload (e.g. SDP).</param>
+        public virtual Task UploadHostSignalling(string signalling) => Task.CompletedTask;
+
+        /// <summary>
+        /// Uploads a peer's signalling payload (joiner's response) keyed by user id.
+        /// </summary>
+        public virtual Task UploadPeerSignalling(int userId, string signalling) => Task.CompletedTask;
+
+        /// <summary>
+        /// Retrieves the host signalling payload for the current room, if available.
+        /// </summary>
+        public virtual Task<string?> GetHostSignalling() => Task.FromResult<string?>(null);
+
+        /// <summary>
+        /// Retrieves the peer signalling payloads stored for the current room.
+        /// </summary>
+        public virtual Task<IDictionary<int, string>?> GetPeerSignalling() => Task.FromResult<IDictionary<int, string>?>(null);
+        /// <summary>
         /// The users in the joined <see cref="Room"/> which are participating in the current gameplay loop.
         /// </summary>
         public virtual IBindableList<int> CurrentMatchPlayingUserIds => PlayingUserIds;
@@ -187,6 +212,11 @@ namespace osu.Game.Online.Multiplayer
 
         [Resolved]
         protected IAPIProvider API { get; private set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        protected WebRtcManager? webRtc { get; private set; }
+
+        private bool webRtcOwned;
 
         [Resolved]
         protected IRulesetStore Rulesets { get; private set; } = null!;
@@ -233,6 +263,57 @@ namespace osu.Game.Online.Multiplayer
                 await runOnUpdateThreadAsync(() => pendingRequests.Clear(), cancellationSource.Token).ConfigureAwait(false);
                 var multiplayerRoom = await CreateRoomInternal(new MultiplayerRoom(room)).ConfigureAwait(false);
                 await setupJoinedRoom(room, multiplayerRoom, cancellationSource.Token).ConfigureAwait(false);
+                // If created as experimental P2P and we're the host, start offer generation and upload + poll for peer answers.
+                if (Room != null && Room.IsP2P && IsHost)
+                {
+                    // ensure webRtc instance
+                    if (webRtc == null)
+                    {
+                        webRtc = new WebRtcManager();
+                        webRtcOwned = true;
+                    }
+
+                    try
+                    {
+                        await webRtc.InitializeAsync().ConfigureAwait(false);
+                        var offer = await webRtc.CreateOfferAsync().ConfigureAwait(false);
+                        await UploadHostSignalling(offer).ConfigureAwait(false);
+                        P2PHandshakeStatusChanged?.Invoke("Host offer uploaded");
+
+                        // background polling for peer answers
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                for (int i = 0; i < 10; i++)
+                                {
+                                    var peerSigs = await GetPeerSignalling().ConfigureAwait(false);
+                                    if (peerSigs != null && peerSigs.Count > 0)
+                                    {
+                                        foreach (var kv in peerSigs)
+                                        {
+                                            try
+                                            {
+                                                await webRtc.SetRemoteAnswerAsync(kv.Value).ConfigureAwait(false);
+                                                P2PHandshakeStatusChanged?.Invoke($"Applied peer answer from {kv.Key}");
+                                            }
+                                            catch { }
+                                        }
+
+                                        break;
+                                    }
+
+                                    await Task.Delay(1000).ConfigureAwait(false);
+                                }
+                            }
+                            catch { }
+                        });
+                    }
+                    catch
+                    {
+                        // best-effort only
+                    }
+                }
             }, cancellationSource.Token).ConfigureAwait(false);
         }
 
@@ -308,6 +389,59 @@ namespace osu.Game.Online.Multiplayer
 
                 OnRoomJoined();
             }, cancellationToken).ConfigureAwait(false);
+
+            // If this room was created as experimental P2P, attempt to fetch any host signalling available.
+            // This is a best-effort retrieval; if the server does not support the hub methods, callers may ignore nulls.
+            if (joinedRoom != null && joinedRoom.IsP2P && !IsHost)
+            {
+                try
+                {
+                    var hostSig = await GetHostSignalling().ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(hostSig))
+                    {
+                        await runOnUpdateThreadAsync(() => Room!.HostSignalling = hostSig, cancellationToken).ConfigureAwait(false);
+                        P2PHandshakeStatusChanged?.Invoke("Fetched host offer");
+                    }
+
+                    var peerSigs = await GetPeerSignalling().ConfigureAwait(false);
+                    if (peerSigs != null)
+                    {
+                        await runOnUpdateThreadAsync(() =>
+                        {
+                            Room!.PeerSignalling = peerSigs.ToDictionary(k => k.Key, k => k.Value);
+                        }, cancellationToken).ConfigureAwait(false);
+                    }
+                    // If host signalling is available, automatically generate an answer and upload it.
+                    if (!string.IsNullOrEmpty(hostSig))
+                    {
+                        try
+                        {
+                            if (webRtc == null)
+                            {
+                                webRtc = new WebRtcManager();
+                                webRtcOwned = true;
+                            }
+
+                            await webRtc.InitializeAsync().ConfigureAwait(false);
+                            var answer = await webRtc.CreateAnswerAsync(hostSig).ConfigureAwait(false);
+                            var local = API.LocalUser.Value;
+                            if (local != null)
+                            {
+                                await UploadPeerSignalling(local.Id, answer).ConfigureAwait(false);
+                                P2PHandshakeStatusChanged?.Invoke("Answer uploaded");
+                            }
+                        }
+                        catch
+                        {
+                            // best-effort only
+                        }
+                    }
+                }
+                catch
+                {
+                    // Best-effort only; ignore failures.
+                }
+            }
         }
 
         /// <summary>
@@ -333,6 +467,16 @@ namespace osu.Game.Online.Multiplayer
                 PlayingUserIds.Clear();
 
                 RoomUpdated?.Invoke();
+                if (webRtcOwned && webRtc != null)
+                {
+                    try
+                    {
+                        webRtc.Dispose();
+                    }
+                    catch { }
+                    webRtc = null;
+                    webRtcOwned = false;
+                }
             });
 
             return Task.Run(async () =>

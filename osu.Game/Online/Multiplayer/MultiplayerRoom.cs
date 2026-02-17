@@ -65,6 +65,24 @@ namespace osu.Game.Online.Multiplayer
         [Key(8)]
         public int ChannelID { get; set; }
 
+        /// <summary>
+        /// Whether this room is using experimental P2P networking (host-to-peer).
+        /// </summary>
+        [Key(9)]
+        public bool IsP2P { get; set; }
+
+        /// <summary>
+        /// Optional host signalling payload (e.g. SDP or other rendezvous data) stored on the room for short-term exchange.
+        /// </summary>
+        [Key(10)]
+        public string? HostSignalling { get; set; }
+
+        /// <summary>
+        /// Optional per-peer signalling payloads uploaded by joiners keyed by user id.
+        /// </summary>
+        [Key(11)]
+        public IDictionary<int, string> PeerSignalling { get; set; } = new Dictionary<int, string>();
+
         [JsonConstructor]
         [SerializationConstructor]
         public MultiplayerRoom(long roomId)
@@ -79,6 +97,11 @@ namespace osu.Game.Online.Multiplayer
             Settings = new MultiplayerRoomSettings(room);
             Host = room.Host != null ? new MultiplayerRoomUser(room.Host.OnlineID) : null;
             Playlist = room.Playlist.Select(p => new MultiplayerPlaylistItem(p)).ToArray();
+
+            // Map optional P2P metadata from lounge room representation.
+            IsP2P = room.IsP2P;
+            HostSignalling = room.HostSignalling;
+            PeerSignalling = room.PeerSignalling != null ? new Dictionary<int, string>(room.PeerSignalling) : new Dictionary<int, string>();
         }
 
         /// <summary>

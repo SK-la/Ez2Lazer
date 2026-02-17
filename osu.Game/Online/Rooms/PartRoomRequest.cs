@@ -16,6 +16,8 @@ namespace osu.Game.Online.Rooms
             this.room = room;
         }
 
+        public override bool AllowLocal => true;
+
         protected override WebRequest CreateWebRequest()
         {
             var req = base.CreateWebRequest();

@@ -14,6 +14,8 @@ namespace osu.Game.Online.Rooms
             RoomId = roomId;
         }
 
+        public override bool AllowLocal => true;
+
         protected override string Target => $"rooms/{RoomId}";
     }
 }

@@ -361,7 +361,12 @@ namespace osu.Game
             // TODO: OsuGame or OsuGameBase?
             dependencies.CacheAs(beatmapUpdater = CreateBeatmapUpdater());
             dependencies.CacheAs(SpectatorClient = new OnlineSpectatorClient(endpoints));
-            dependencies.CacheAs(MultiplayerClient = new OnlineMultiplayerClient(endpoints));
+            // If API is local-only (experimental P2P / local account), use a local multiplayer client
+            // which provides `IsConnected` and multiplayer event semantics backed by an in-memory server.
+            if (API is APIAccess access && access.IsLocalOnly)
+                dependencies.CacheAs(MultiplayerClient = new LocalMultiplayerClient());
+            else
+                dependencies.CacheAs(MultiplayerClient = new OnlineMultiplayerClient(endpoints));
             dependencies.CacheAs(metadataClient = new OnlineMetadataClient(endpoints));
 
             base.Content.Add(new BeatmapOnlineChangeIngest(beatmapUpdater, realm, metadataClient));
