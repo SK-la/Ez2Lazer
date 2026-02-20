@@ -61,7 +61,7 @@ namespace osu.Game.Online
         {
             apiState = api.State.GetBoundCopy();
             notificationsClient = api.NotificationsClient;
-            multiplayerState = multiplayerClient.IsConnected.GetBoundCopy();
+            multiplayerState = multiplayerClient.IsMultiplayerUsable.GetBoundCopy();
             spectatorState = spectatorClient.IsConnected.GetBoundCopy();
 
             notificationsClient.MessageReceived += notifyAboutForcedDisconnection;

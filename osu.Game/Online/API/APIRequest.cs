@@ -9,7 +9,10 @@ using osu.Framework.Extensions.TypeExtensions;
 using osu.Framework.IO.Network;
 using osu.Framework.Logging;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Online.Rooms;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Online.API.Requests;
 
 namespace osu.Game.Online.API
 {
@@ -98,7 +101,25 @@ namespace osu.Game.Online.API
         /// Whether this request is permitted to run when the <see cref="APIAccess"/> is in local-only mode.
         /// By default requests are not allowed and will be failed early when running under a local-only login.
         /// </summary>
-        public virtual bool AllowLocal => false;
+        public virtual bool AllowLocal
+            => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ExperimentalP2P)
+               && (this is GetRoomsRequest
+                   || this is CreateRoomRequest
+                   || this is GetRoomRequest
+                   || this is JoinRoomRequest
+                   || this is PartRoomRequest
+                   || this is ListChannelsRequest
+                   || this is GetMessagesRequest
+                   || this is PostMessageRequest
+                   || this is CreateRoomScoreRequest
+                   || this is GetRoomLeaderboardRequest
+                   || this is IndexPlaylistScoresRequest
+                   || this is SubmitRoomScoreRequest
+                   || this is ChatAckRequest
+                   || this is GetUsersRequest
+                   || this is LookupUsersRequest
+                   || this is GetBeatmapsRequest
+                   || this is GetBeatmapSetRequest);
 
         private readonly object completionStateLock = new object();
 

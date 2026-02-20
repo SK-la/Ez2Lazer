@@ -9,6 +9,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Beatmaps;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Online.Rooms;
 using osu.Game.Screens.Select;
@@ -82,7 +83,7 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer
                 {
                     ID = itemToEdit?.ID ?? 0,
                     BeatmapID = item.Beatmap.OnlineID,
-                    BeatmapChecksum = item.Beatmap.MD5Hash,
+                    BeatmapChecksum = getBestChecksum(item.Beatmap),
                     RulesetID = item.RulesetID,
                     RequiredMods = item.RequiredMods.ToArray(),
                     AllowedMods = item.AllowedMods.ToArray(),
@@ -118,6 +119,23 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer
             }
 
             return true;
+        }
+
+        private static string getBestChecksum(IBeatmapInfo beatmap)
+        {
+            if (beatmap is BeatmapInfo localBeatmap)
+            {
+                if (!string.IsNullOrEmpty(localBeatmap.MD5Hash))
+                    return localBeatmap.MD5Hash;
+
+                if (!string.IsNullOrEmpty(localBeatmap.OnlineMD5Hash))
+                    return localBeatmap.OnlineMD5Hash;
+
+                if (!string.IsNullOrEmpty(localBeatmap.Hash))
+                    return localBeatmap.Hash;
+            }
+
+            return beatmap.MD5Hash ?? string.Empty;
         }
 
         protected override BeatmapDetailArea CreateBeatmapDetailArea() => new PlayBeatmapDetailArea();

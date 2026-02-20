@@ -361,9 +361,11 @@ namespace osu.Game
             // TODO: OsuGame or OsuGameBase?
             dependencies.CacheAs(beatmapUpdater = CreateBeatmapUpdater());
             dependencies.CacheAs(SpectatorClient = new OnlineSpectatorClient(endpoints));
-            // If API is local-only (experimental P2P / local account), use a local multiplayer client
+            // If API is local-only or experimental P2P is enabled, use a local multiplayer client
             // which provides `IsConnected` and multiplayer event semantics backed by an in-memory server.
-            if (API is APIAccess access && access.IsLocalOnly)
+            bool p2pEnabled = Ez2ConfigManager.GetBindable<bool>(Ez2Setting.ExperimentalP2P).Value;
+
+            if ((API is APIAccess access && access.IsLocalOnly) || p2pEnabled)
                 dependencies.CacheAs(MultiplayerClient = new LocalMultiplayerClient());
             else
                 dependencies.CacheAs(MultiplayerClient = new OnlineMultiplayerClient(endpoints));

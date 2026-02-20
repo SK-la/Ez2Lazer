@@ -156,7 +156,6 @@ namespace osu.Game.Online.Multiplayer
 
             Debug.Assert(connection != null);
 
-
             try
             {
                 await connection.InvokeAsync("InvitePlayer", userId).ConfigureAwait(false);
@@ -183,7 +182,7 @@ namespace osu.Game.Online.Multiplayer
 
             Debug.Assert(connection != null);
 
-                return connection.InvokeAsync("TransferHost", userId);
+            return connection.InvokeAsync("TransferHost", userId);
         }
 
         public override Task KickUser(int userId)
@@ -193,7 +192,7 @@ namespace osu.Game.Online.Multiplayer
 
             Debug.Assert(connection != null);
 
-                return connection.InvokeAsync("KickUser", userId);
+            return connection.InvokeAsync("KickUser", userId);
         }
 
         public override Task ChangeSettings(MultiplayerRoomSettings settings)
@@ -203,7 +202,7 @@ namespace osu.Game.Online.Multiplayer
 
             Debug.Assert(connection != null);
 
-                return connection.InvokeAsync("ChangeSettings", settings);
+            return connection.InvokeAsync("ChangeSettings", settings);
         }
 
         public override Task ChangeState(MultiplayerUserState newState)
@@ -213,7 +212,7 @@ namespace osu.Game.Online.Multiplayer
 
             Debug.Assert(connection != null);
 
-                return connection.InvokeAsync("ChangeState", newState);
+            return connection.InvokeAsync("ChangeState", newState);
         }
 
         public override Task ChangeBeatmapAvailability(BeatmapAvailability newBeatmapAvailability)
@@ -223,7 +222,7 @@ namespace osu.Game.Online.Multiplayer
 
             Debug.Assert(connection != null);
 
-                return connection.InvokeAsync("ChangeBeatmapAvailability", newBeatmapAvailability);
+            return connection.InvokeAsync("ChangeBeatmapAvailability", newBeatmapAvailability);
         }
 
         public override Task ChangeUserStyle(int? beatmapId, int? rulesetId)
@@ -233,7 +232,7 @@ namespace osu.Game.Online.Multiplayer
 
             Debug.Assert(connection != null);
 
-                return connection.InvokeAsync("ChangeUserStyle", beatmapId, rulesetId);
+            return connection.InvokeAsync("ChangeUserStyle", beatmapId, rulesetId);
         }
 
         public override Task ChangeUserMods(IEnumerable<APIMod> newMods)
@@ -243,7 +242,7 @@ namespace osu.Game.Online.Multiplayer
 
             Debug.Assert(connection != null);
 
-                return connection.InvokeAsync("ChangeUserMods", newMods);
+            return connection.InvokeAsync("ChangeUserMods", newMods);
         }
 
         public override Task UploadHostSignalling(string signalling)

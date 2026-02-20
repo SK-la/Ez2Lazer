@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using MessagePack;
 using osu.Game.Online.API;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Utils;
 
@@ -95,7 +96,7 @@ namespace osu.Game.Online.Rooms
             ID = item.ID;
             OwnerID = item.OwnerID;
             BeatmapID = item.Beatmap.OnlineID;
-            BeatmapChecksum = item.Beatmap.MD5Hash;
+            BeatmapChecksum = getBestChecksum(item.Beatmap);
             RulesetID = item.RulesetID;
             RequiredMods = item.RequiredMods.ToArray();
             AllowedMods = item.AllowedMods.ToArray();
@@ -155,6 +156,23 @@ namespace osu.Game.Online.Rooms
             hashCode.Add(StarRating);
             hashCode.Add(Freestyle);
             return hashCode.ToHashCode();
+        }
+
+        private static string getBestChecksum(IBeatmapInfo beatmap)
+        {
+            if (beatmap is BeatmapInfo localBeatmap)
+            {
+                if (!string.IsNullOrEmpty(localBeatmap.MD5Hash))
+                    return localBeatmap.MD5Hash;
+
+                if (!string.IsNullOrEmpty(localBeatmap.OnlineMD5Hash))
+                    return localBeatmap.OnlineMD5Hash;
+
+                if (!string.IsNullOrEmpty(localBeatmap.Hash))
+                    return localBeatmap.Hash;
+            }
+
+            return beatmap.MD5Hash ?? string.Empty;
         }
     }
 }

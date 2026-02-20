@@ -128,8 +128,16 @@ namespace osu.Game.Overlays
             req.Success += res =>
             {
                 beatmapSet.Value = res;
+
                 if (lastLookup.Value.type == BeatmapSetLookupType.BeatmapId)
-                    Header.HeaderContent.Picker.Beatmap.Value = Header.BeatmapSet.Value.Beatmaps.First(b => b.OnlineID == lastLookup.Value.id);
+                {
+                    var beatmaps = Header.BeatmapSet.Value?.Beatmaps;
+                    var selected = beatmaps?.FirstOrDefault(b => b.OnlineID == lastLookup.Value.id)
+                                   ?? beatmaps?.FirstOrDefault();
+
+                    if (selected != null)
+                        Header.HeaderContent.Picker.Beatmap.Value = selected;
+                }
             };
             API.Queue(req);
         }

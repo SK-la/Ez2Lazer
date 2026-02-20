@@ -203,6 +203,7 @@ namespace osu.Game.Screens.OnlinePlay.Lounge
             base.LoadComplete();
 
             searchTextBox.Current.BindValueChanged(_ => updateFilterDebounced());
+            searchTextBox.OnCommit += (_, _) => tryHandleDirectConnectCommand();
             ruleset.BindValueChanged(_ => UpdateFilter());
             isIdle.BindValueChanged(_ => updatePollingRate(this.IsCurrentScreen()), true);
 
@@ -222,6 +223,39 @@ namespace osu.Game.Screens.OnlinePlay.Lounge
 
             updateLoadingLayer();
             updateFilter();
+        }
+
+        private void tryHandleDirectConnectCommand()
+        {
+            string text = searchTextBox.Current.Value?.Trim() ?? string.Empty;
+
+            const string command_with_slash = "/connect ";
+            const string command_plain = "connect ";
+
+            string? endpoint = null;
+
+            if (text.StartsWith(command_with_slash, StringComparison.OrdinalIgnoreCase))
+                endpoint = text[command_with_slash.Length..].Trim();
+            else if (text.StartsWith(command_plain, StringComparison.OrdinalIgnoreCase))
+                endpoint = text[command_plain.Length..].Trim();
+
+            if (string.IsNullOrEmpty(endpoint))
+                return;
+
+            if (api is not APIAccess apiAccess)
+            {
+                Logger.Log("Direct connect is unavailable in this API provider.", LoggingTarget.Runtime, LogLevel.Important);
+                return;
+            }
+
+            if (!apiAccess.TryDiscoverRemoteHost(endpoint, out string error, out int discoveredCount))
+            {
+                Logger.Log($"Direct connect failed: {error}", LoggingTarget.Runtime, LogLevel.Important);
+                return;
+            }
+
+            Logger.Log($"Direct connect discovered {discoveredCount} room(s) from {endpoint}.", LoggingTarget.Runtime, LogLevel.Important);
+            RefreshRooms();
         }
 
         private void onListingReceived(Room[] result)

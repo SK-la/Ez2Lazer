@@ -98,7 +98,7 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer
 
         protected override void OpenNewRoom(Room room)
         {
-            if (!client.IsConnected.Value)
+            if (!client.IsMultiplayerUsable.Value)
             {
                 Logger.Log("Not currently connected to the multiplayer server.", LoggingTarget.Runtime, LogLevel.Important);
                 return;

@@ -653,6 +653,16 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer
             // Update global gameplay state to correspond to the new selection.
             // Retrieve the corresponding local beatmap, since we can't directly use the playlist's beatmap info
             var localBeatmap = beatmapManager.QueryOnlineBeatmapId(gameplayBeatmapId);
+
+            if (localBeatmap == null && !string.IsNullOrEmpty(item.BeatmapChecksum))
+            {
+                string checksum = item.BeatmapChecksum;
+
+                localBeatmap = beatmapManager.QueryBeatmap(b => b.MD5Hash == checksum
+                                                                || b.OnlineMD5Hash == checksum
+                                                                || b.Hash == checksum);
+            }
+
             Beatmap.Value = beatmapManager.GetWorkingBeatmap(localBeatmap);
             Ruleset.Value = ruleset;
             Mods.Value = client.LocalUser.Mods.Concat(item.RequiredMods).Select(m => m.ToMod(rulesetInstance)).ToArray();
@@ -672,7 +682,13 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer
             {
                 userStyleSection.Show();
 
-                PlaylistItem apiItem = new PlaylistItem(item).With(beatmap: new Optional<IBeatmapInfo>(new APIBeatmap { OnlineID = gameplayBeatmapId }), ruleset: gameplayRulesetId);
+                IBeatmapInfo displayBeatmap = (IBeatmapInfo?)localBeatmap ?? new APIBeatmap
+                {
+                    OnlineID = gameplayBeatmapId,
+                    Checksum = item.BeatmapChecksum,
+                };
+
+                PlaylistItem apiItem = new PlaylistItem(item).With(beatmap: new Optional<IBeatmapInfo>(displayBeatmap), ruleset: gameplayRulesetId);
                 DrawableRoomPlaylistItem? currentDisplay = userStyleDisplayContainer.SingleOrDefault();
 
                 if (!apiItem.Equals(currentDisplay?.Item))
@@ -845,7 +861,7 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer
             if (ExitConfirmed)
                 return true;
 
-            if (api.State.Value != APIState.Online || !client.IsConnected.Value)
+            if (api.State.Value != APIState.Online || !client.IsMultiplayerUsable.Value)
                 return true;
 
             if (dialogOverlay == null)

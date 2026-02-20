@@ -33,6 +33,7 @@ using osu.Game.Online.Chat;
 using osu.Game.Online.Discovery;
 using osu.Game.Online.LocalMultiplayer;
 using osu.Game.Online.Notifications.WebSocket;
+using osu.Game.Beatmaps;
 
 namespace osu.Game.Online.API
 {
@@ -41,6 +42,17 @@ namespace osu.Game.Online.API
         // Local multiplayer server used in local-only mode.
         private LocalMultiplayerServer localServer;
         private LocalMultiplayerDiscovery localDiscovery;
+        private LocalMultiplayerDirectServer localDirectServer;
+        private readonly Dictionary<long, RemoteRoomReference> remoteDiscoveredRooms = new Dictionary<long, RemoteRoomReference>();
+
+        private class RemoteRoomReference
+        {
+            public long RemoteRoomId;
+            public IPEndPoint Endpoint;
+            public DateTimeOffset LastSeen;
+        }
+
+        private static readonly TimeSpan remote_room_reference_ttl = TimeSpan.FromMinutes(2);
 
         private readonly OsuGameBase game;
         private readonly OsuConfigManager config;
@@ -125,14 +137,9 @@ namespace osu.Game.Online.API
                 state.Value = APIState.Connecting;
             }
 
-            // If the experimental P2P flag is enabled in Ez2 config, treat this client as local-only
-            // (i.e. act as its own server) to avoid server-side checks interfering with P2P usage.
-            try
-            {
-                if (GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ExperimentalP2P))
-                    LoginLocal(string.IsNullOrEmpty(ProvidedUsername) ? "Local" : ProvidedUsername);
-            }
-            catch { }
+            // If the experimental P2P flag is enabled, force this API into local-only mode.
+            if (isP2PForced())
+                LoginLocal(string.IsNullOrEmpty(ProvidedUsername) ? "Local" : ProvidedUsername);
 
             var thread = new Thread(run)
             {
@@ -438,7 +445,20 @@ namespace osu.Game.Online.API
             switch (request)
             {
                 case GetRoomsRequest getRooms:
+                    pruneExpiredRemoteReferences();
                     getRooms.TriggerSuccess(localServer.GetRooms().ToList());
+                    return true;
+
+                case ListChannelsRequest listChannelsReq:
+                    listChannelsReq.TriggerSuccess(localServer.GetChannels().ToList());
+                    return true;
+
+                case GetMessagesRequest getMessagesReq:
+                    getMessagesReq.TriggerSuccess(localServer.GetChannelMessages(getMessagesReq.Channel.Id).ToList());
+                    return true;
+
+                case PostMessageRequest postMessageReq:
+                    postMessageReq.TriggerSuccess(localServer.PostChannelMessage(postMessageReq.Message, LocalUser.Value));
                     return true;
 
                 case CreateRoomRequest createReq:
@@ -454,6 +474,7 @@ namespace osu.Game.Online.API
                             RoomID = created.RoomID.HasValue ? (int)created.RoomID.Value : 0,
                             HostName = LocalUser.Value?.Username ?? ProvidedUsername,
                             IsP2P = createReq.Room.IsP2P,
+                            ControlPort = LocalMultiplayerDirectServer.DEFAULT_PORT,
                             Timestamp = DateTimeOffset.Now,
                         });
                     }
@@ -466,6 +487,12 @@ namespace osu.Game.Online.API
                 {
                     var r = localServer.GetRoom(getRoomReq.RoomId);
 
+                    if (r == null && tryGetRemoteRoom(getRoomReq.RoomId, out Room remoteRoom, out _))
+                    {
+                        localServer.UpsertRoom(remoteRoom);
+                        r = remoteRoom;
+                    }
+
                     if (r == null)
                     {
                         getRoomReq.TriggerFailure(new InvalidOperationException("Room not found."));
@@ -476,13 +503,110 @@ namespace osu.Game.Online.API
                     return true;
                 }
 
+                case GetUsersRequest getUsersReq:
+                {
+                    APIUser local = LocalUser.Value;
+
+                    getUsersReq.TriggerSuccess(new GetUsersResponse
+                    {
+                        Users = getUsersReq.UserIds
+                                           .Distinct()
+                                           .Select(id => local != null && local.Id == id
+                                               ? local
+                                               : new APIUser
+                                               {
+                                                   Id = id,
+                                                   Username = $"User {id}",
+                                               })
+                                           .ToList()
+                    });
+
+                    return true;
+                }
+
+                case LookupUsersRequest lookupUsersReq:
+                {
+                    APIUser local = LocalUser.Value;
+
+                    lookupUsersReq.TriggerSuccess(new GetUsersResponse
+                    {
+                        Users = lookupUsersReq.UserIds
+                                              .Distinct()
+                                              .Select(id => local != null && local.Id == id
+                                                  ? local
+                                                  : new APIUser
+                                                  {
+                                                      Id = id,
+                                                      Username = $"User {id}",
+                                                  })
+                                              .ToList()
+                    });
+
+                    return true;
+                }
+
+                case GetBeatmapsRequest getBeatmapsReq:
+                {
+                    List<APIBeatmap> beatmaps = getBeatmapsReq.BeatmapIds
+                                                              .Distinct()
+                                                              .Select(id => tryGetKnownBeatmapInfo(id, out IBeatmapInfo info)
+                                                                  ? createApiBeatmap(info)
+                                                                  : createFallbackApiBeatmap(id))
+                                                              .ToList();
+
+                    getBeatmapsReq.TriggerSuccess(new GetBeatmapsResponse
+                    {
+                        Beatmaps = beatmaps
+                    });
+                    return true;
+                }
+
+                case GetBeatmapSetRequest getBeatmapSetReq:
+                {
+                    IBeatmapInfo sourceBeatmap;
+
+                    if (getBeatmapSetReq.Type == BeatmapSetLookupType.BeatmapId)
+                    {
+                        if (!tryGetKnownBeatmapInfo(getBeatmapSetReq.ID, out sourceBeatmap))
+                            sourceBeatmap = null;
+                    }
+                    else
+                    {
+                        sourceBeatmap = localServer.GetRooms()
+                                                   .SelectMany(r => r.Playlist)
+                                                   .Select(p => p.Beatmap)
+                                                   .FirstOrDefault(b => b.BeatmapSet?.OnlineID == getBeatmapSetReq.ID);
+                    }
+
+                    getBeatmapSetReq.TriggerSuccess(sourceBeatmap != null
+                        ? createApiBeatmapSet(sourceBeatmap)
+                        : createFallbackApiBeatmapSet(getBeatmapSetReq.ID));
+
+                    return true;
+                }
+
                 case JoinRoomRequest joinReq:
                 {
+                    string remoteJoinError = null;
+
+                    if (joinReq.Room.RoomID != null
+                        && tryGetRemoteRoomReference(joinReq.Room.RoomID.Value, out RemoteRoomReference remoteRef)
+                        && LocalMultiplayerDirectClient.TryJoinRoom(remoteRef.Endpoint, remoteRef.RemoteRoomId, joinReq.Password, LocalUser.Value, out Room remoteJoined, out remoteJoinError))
+                    {
+                        // keep synthetic room id locally while preserving remote id in ChannelId for follow-up calls.
+                        remoteJoined.ChannelId = (int)remoteRef.RemoteRoomId;
+                        remoteJoined.RoomID = joinReq.Room.RoomID;
+
+                        localServer.UpsertRoom(remoteJoined);
+                        joinReq.TriggerSuccess(remoteJoined);
+                        return true;
+                    }
+
                     var (success, room, error) = localServer.JoinRoom(joinReq.Room, LocalUser.Value, joinReq.Password);
 
                     if (!success)
                     {
-                        joinReq.TriggerFailure(new InvalidOperationException(error));
+                        joinReq.TriggerFailure(new InvalidOperationException(error ?? remoteJoinError ?? "Join failed."));
                         return true;
                     }
 
@@ -491,9 +615,19 @@ namespace osu.Game.Online.API
                 }
 
                 case PartRoomRequest partReq:
-                    localServer.PartRoom(partReqRoom(partReq), LocalUser.Value);
+                {
+                    Room partRoom = partReqRoom(partReq);
+
+                    if (partRoom.RoomID != null
+                        && tryGetRemoteRoomReference(partRoom.RoomID.Value, out RemoteRoomReference remoteRef))
+                    {
+                        LocalMultiplayerDirectClient.TryPartRoom(remoteRef.Endpoint, remoteRef.RemoteRoomId, LocalUser.Value, out _);
+                    }
+
+                    localServer.PartRoom(partRoom, LocalUser.Value);
                     partReq.TriggerSuccess();
                     return true;
+                }
 
                 case CreateRoomScoreRequest createScoreReq:
                 {
@@ -523,6 +657,10 @@ namespace osu.Game.Online.API
                     submitReq.TriggerSuccess(score);
                     return true;
                 }
+
+                case ChatAckRequest ackReq:
+                    ackReq.TriggerSuccess(new ChatAckResponse());
+                    return true;
 
                 default:
                     return false;
@@ -555,12 +693,111 @@ namespace osu.Game.Online.API
             return (T)field.GetValue(obj)!;
         }
 
+        private bool tryGetKnownBeatmapInfo(int beatmapId, out IBeatmapInfo beatmapInfo)
+        {
+            beatmapInfo = localServer.GetRooms()
+                                     .SelectMany(r => r.Playlist)
+                                     .Select(p => p.Beatmap)
+                                     .FirstOrDefault(b => b.OnlineID == beatmapId);
+
+            return beatmapInfo != null;
+        }
+
+        private APIBeatmap createApiBeatmap(IBeatmapInfo source)
+        {
+            int setId = source.BeatmapSet?.OnlineID ?? source.OnlineID;
+
+            APIBeatmapSet set = createApiBeatmapSet(source);
+
+            return new APIBeatmap
+            {
+                OnlineID = source.OnlineID,
+                OnlineBeatmapSetID = setId,
+                Status = source is BeatmapInfo beatmapInfo ? beatmapInfo.Status : BeatmapOnlineStatus.Ranked,
+                Checksum = source.MD5Hash,
+                AuthorID = source.Metadata.Author.OnlineID,
+                RulesetID = source.Ruleset.OnlineID,
+                StarRating = source.StarRating,
+                DifficultyName = source.DifficultyName,
+                BeatmapSet = set,
+            };
+        }
+
+        private APIBeatmapSet createApiBeatmapSet(IBeatmapInfo source)
+        {
+            int setId = source.BeatmapSet?.OnlineID ?? source.OnlineID;
+
+            BeatmapSetOnlineCovers covers = createCovers(setId);
+
+            return new APIBeatmapSet
+            {
+                OnlineID = setId,
+                Status = BeatmapOnlineStatus.Ranked,
+                Covers = covers,
+                Title = source.Metadata.Title,
+                TitleUnicode = source.Metadata.TitleUnicode,
+                Artist = source.Metadata.Artist,
+                ArtistUnicode = source.Metadata.ArtistUnicode,
+                Author = new APIUser
+                {
+                    Id = source.Metadata.Author.OnlineID,
+                    Username = source.Metadata.Author.Username
+                },
+                Beatmaps = Array.Empty<APIBeatmap>(),
+            };
+        }
+
+        private APIBeatmap createFallbackApiBeatmap(int beatmapId)
+        {
+            APIBeatmapSet set = createFallbackApiBeatmapSet(beatmapId);
+
+            return new APIBeatmap
+            {
+                OnlineID = beatmapId,
+                OnlineBeatmapSetID = set.OnlineID,
+                Status = BeatmapOnlineStatus.Ranked,
+                BeatmapSet = set,
+            };
+        }
+
+        private APIBeatmapSet createFallbackApiBeatmapSet(int setId) => new APIBeatmapSet
+        {
+            OnlineID = setId,
+            Status = BeatmapOnlineStatus.Ranked,
+            Covers = createCovers(setId),
+            Beatmaps = Array.Empty<APIBeatmap>(),
+        };
+
+        private BeatmapSetOnlineCovers createCovers(int setId)
+        {
+            if (setId <= 0)
+                return default;
+
+            string baseUrl = $"https://assets.ppy.sh/beatmaps/{setId}/covers";
+
+            return new BeatmapSetOnlineCovers
+            {
+                Cover = $"{baseUrl}/cover.jpg",
+                CoverLowRes = $"{baseUrl}/cover.jpg",
+                Card = $"{baseUrl}/card.jpg",
+                CardLowRes = $"{baseUrl}/card.jpg",
+                List = $"{baseUrl}/list.jpg",
+                ListLowRes = $"{baseUrl}/list.jpg",
+            };
+        }
+
         public Task PerformAsync(APIRequest request) =>
             Task.Factory.StartNew(() => Perform(request), TaskCreationOptions.LongRunning);
 
         public void Login(string username, string password)
         {
             Debug.Assert(State.Value == APIState.Offline);
+
+            if (isP2PForced())
+            {
+                LoginLocal(string.IsNullOrEmpty(username) ? "Local" : username);
+                return;
+            }
 
             ProvidedUsername = username;
             this.password = password;
@@ -584,6 +821,7 @@ namespace osu.Game.Online.API
             try
             {
                 localServer ??= new LocalMultiplayerServer();
+                localDirectServer ??= new LocalMultiplayerDirectServer(localServer);
 
                 if (localDiscovery == null)
                 {
@@ -604,15 +842,32 @@ namespace osu.Game.Online.API
             {
                 try
                 {
+                    long syntheticId = -generateRoomKey(discovered.AdvertiserEndpoint, discovered.RoomID);
+
+                    int controlPort = discovered.ControlPort > 0 ? discovered.ControlPort : LocalMultiplayerDirectServer.DEFAULT_PORT;
+                    IPEndPoint endpoint = discovered.AdvertiserEndpoint == null
+                        ? null
+                        : new IPEndPoint(discovered.AdvertiserEndpoint.Address, controlPort);
+
+                    if (endpoint != null)
+                    {
+                        remoteDiscoveredRooms[syntheticId] = new RemoteRoomReference
+                        {
+                            RemoteRoomId = discovered.RoomID,
+                            Endpoint = endpoint,
+                            LastSeen = DateTimeOffset.UtcNow,
+                        };
+                    }
+
                     // create a synthetic room representation for discovered remote host
                     var room = new Room
                     {
-                        RoomID = -generateRoomKeyFromEndpoint(discovered.AdvertiserEndpoint),
+                        RoomID = syntheticId,
                         Name = discovered.Name,
                         Host = new APIUser { Username = discovered.HostName },
                         IsP2P = discovered.IsP2P,
                         StartDate = discovered.Timestamp,
-                        EndDate = discovered.Timestamp.AddHours(2),
+                        EndDate = discovered.Timestamp.Add(remote_room_reference_ttl),
                         ParticipantCount = 1,
                     };
 
@@ -626,7 +881,7 @@ namespace osu.Game.Online.API
             });
         }
 
-        private int generateRoomKeyFromEndpoint(IPEndPoint ep)
+        private int generateRoomKey(IPEndPoint ep, int remoteRoomId)
         {
             if (ep == null) return (int)DateTimeOffset.Now.ToUnixTimeSeconds();
 
@@ -635,6 +890,7 @@ namespace osu.Game.Online.API
                 int hash = 17;
                 hash = hash * 23 + ep.Address.GetHashCode();
                 hash = hash * 23 + ep.Port;
+                hash = hash * 23 + remoteRoomId;
                 return Math.Abs(hash);
             }
         }
@@ -810,6 +1066,10 @@ namespace osu.Game.Online.API
         {
             lock (queue)
             {
+                // P2P experiments run only through local/direct path (no online API dependency).
+                if (isP2PForced())
+                    ensureLocalModeStarted();
+
                 // If a user attempts to create an experimental P2P room while we don't have
                 // a valid authenticated online session, switch to local-only mode so the
                 // request can be handled locally instead of being sent unauthenticated.
@@ -860,6 +1120,9 @@ namespace osu.Game.Online.API
             }
         }
 
+        private static bool isP2PForced()
+            => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.ExperimentalP2P);
+
         private void ensureLocalModeStarted()
         {
             if (IsLocalOnly)
@@ -885,6 +1148,7 @@ namespace osu.Game.Online.API
                 try
                 {
                     localServer ??= new LocalMultiplayerServer();
+                    localDirectServer ??= new LocalMultiplayerDirectServer(localServer);
 
                     if (localDiscovery == null)
                     {
@@ -915,11 +1179,125 @@ namespace osu.Game.Online.API
             }
         }
 
+        private bool tryGetRemoteRoomReference(long localSyntheticRoomId, out RemoteRoomReference remote)
+        {
+            pruneExpiredRemoteReferences();
+
+            if (!remoteDiscoveredRooms.TryGetValue(localSyntheticRoomId, out remote))
+                return false;
+
+            remote.LastSeen = DateTimeOffset.UtcNow;
+            return true;
+        }
+
+        private bool tryGetRemoteRoom(long localSyntheticRoomId, out Room room, out string error)
+        {
+            room = null;
+            error = null;
+
+            if (!tryGetRemoteRoomReference(localSyntheticRoomId, out RemoteRoomReference remote))
+                return false;
+
+            if (!LocalMultiplayerDirectClient.TryGetRoom(remote.Endpoint, remote.RemoteRoomId, out Room fetched, out error) || fetched == null)
+                return false;
+
+            fetched.ChannelId = (int)remote.RemoteRoomId;
+            fetched.RoomID = localSyntheticRoomId;
+            room = fetched;
+            return true;
+        }
+
+        public bool TryDiscoverRemoteHost(string addressOrEndpoint, out string error, out int discoveredCount)
+        {
+            error = null;
+            discoveredCount = 0;
+
+            if (string.IsNullOrWhiteSpace(addressOrEndpoint))
+            {
+                error = "Address is empty.";
+                return false;
+            }
+
+            ensureLocalModeStarted();
+
+            string address = addressOrEndpoint.Trim();
+            int port = LocalMultiplayerDirectServer.DEFAULT_PORT;
+
+            int idx = address.LastIndexOf(':');
+
+            if (idx > 0 && idx < address.Length - 1 && int.TryParse(address[(idx + 1)..], out int parsedPort))
+            {
+                port = parsedPort;
+                address = address[..idx];
+            }
+
+            if (!IPAddress.TryParse(address, out IPAddress ip))
+            {
+                error = "Invalid IP address format. Expected x.x.x.x[:port].";
+                return false;
+            }
+
+            var endpoint = new IPEndPoint(ip, port);
+
+            if (!LocalMultiplayerDirectClient.TryListRooms(endpoint, out Room[] rooms, out error))
+                return false;
+
+            foreach (Room remoteRoom in rooms ?? Array.Empty<Room>())
+            {
+                if (remoteRoom?.RoomID == null)
+                    continue;
+
+                long syntheticId = -generateRoomKey(endpoint, (int)remoteRoom.RoomID.Value);
+
+                remoteDiscoveredRooms[syntheticId] = new RemoteRoomReference
+                {
+                    RemoteRoomId = remoteRoom.RoomID.Value,
+                    Endpoint = endpoint,
+                    LastSeen = DateTimeOffset.UtcNow,
+                };
+
+                remoteRoom.ChannelId = (int)remoteRoom.RoomID.Value;
+                remoteRoom.RoomID = syntheticId;
+
+                localServer.UpsertRoom(remoteRoom);
+                discoveredCount++;
+            }
+
+            return true;
+        }
+
+        private void pruneExpiredRemoteReferences()
+        {
+            if (remoteDiscoveredRooms.Count == 0)
+                return;
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+
+            foreach (long roomId in remoteDiscoveredRooms.Where(kv => now - kv.Value.LastSeen > remote_room_reference_ttl).Select(kv => kv.Key).ToArray())
+                remoteDiscoveredRooms.Remove(roomId);
+
+            localServer?.CleanupExpired();
+        }
+
         public void Logout()
         {
             password = null;
             SecondFactorCode = null;
             authentication.Clear();
+
+            remoteDiscoveredRooms.Clear();
+
+            if (localDiscovery != null)
+            {
+                localDiscovery.Dispose();
+                localDiscovery = null;
+            }
+
+            if (localDirectServer != null)
+            {
+                localDirectServer.Dispose();
+                localDirectServer = null;
+            }
 
             localUserState.ClearLocalUser();
             IsLocalOnly = false;
@@ -931,6 +1309,18 @@ namespace osu.Game.Online.API
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
+
+            try
+            {
+                localDiscovery?.Dispose();
+            }
+            catch { }
+
+            try
+            {
+                localDirectServer?.Dispose();
+            }
+            catch { }
 
             flushQueue();
             cancellationToken.Cancel();

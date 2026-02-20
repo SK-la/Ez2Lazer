@@ -15,8 +15,10 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Online;
+using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Rooms;
+using Realms;
 
 namespace osu.Game.Screens.OnlinePlay
 {
@@ -43,6 +45,9 @@ namespace osu.Game.Screens.OnlinePlay
 
         [Resolved]
         private BeatmapLookupCache beatmapLookupCache { get; set; } = null!;
+
+        [Resolved]
+        private IAPIProvider api { get; set; } = null!;
 
         private readonly Bindable<BeatmapAvailability> availability = new Bindable<BeatmapAvailability>(BeatmapAvailability.NotDownloaded());
 
@@ -72,6 +77,12 @@ namespace osu.Game.Screens.OnlinePlay
 
                 cancelTracking();
 
+                if (api.IsLocalOnly)
+                {
+                    startTracking(createLookupBeatmap(item.NewValue.Beatmap));
+                    return;
+                }
+
                 beatmapLookupCache.GetBeatmapAsync(item.NewValue.Beatmap.OnlineID).ContinueWith(task => Schedule(() =>
                 {
                     var beatmap = task.GetResultSafely();
@@ -80,6 +91,23 @@ namespace osu.Game.Screens.OnlinePlay
                         startTracking(beatmap);
                 }), TaskContinuationOptions.OnlyOnRanToCompletion);
             }, true);
+        }
+
+        private static APIBeatmap createLookupBeatmap(IBeatmapInfo source)
+        {
+            int setId = source.BeatmapSet?.OnlineID ?? source.OnlineID;
+
+            return new APIBeatmap
+            {
+                OnlineID = source.OnlineID,
+                OnlineBeatmapSetID = setId,
+                Checksum = source.MD5Hash,
+                BeatmapSet = new APIBeatmapSet
+                {
+                    OnlineID = setId,
+                    Beatmaps = Array.Empty<APIBeatmap>(),
+                }
+            };
         }
 
         private void cancelTracking()
@@ -91,6 +119,20 @@ namespace osu.Game.Screens.OnlinePlay
         private void startTracking(APIBeatmap beatmap)
         {
             Debug.Assert(beatmap.BeatmapSet != null);
+
+            if (api.IsLocalOnly)
+            {
+                realmSubscription = realm.RegisterForNotifications(_ => queryBeatmap(), (_, changes) =>
+                {
+                    if (changes == null)
+                        return;
+
+                    Scheduler.AddOnce(updateLocalAvailability);
+                });
+
+                updateLocalAvailability();
+                return;
+            }
 
             downloadTracker = new BeatmapDownloadTracker(beatmap.BeatmapSet);
             downloadTracker.State.BindValueChanged(_ => Scheduler.AddOnce(updateAvailability), true);
@@ -153,8 +195,35 @@ namespace osu.Game.Screens.OnlinePlay
             }
 
             IQueryable<BeatmapInfo> queryBeatmap() =>
-                realm.Realm.All<BeatmapInfo>()
-                     .ForOnlineId(beatmap.OnlineID);
+                queryBeatmapByLookup(beatmap);
+
+            void updateLocalAvailability()
+                => availability.Value = queryBeatmap().Any()
+                    ? BeatmapAvailability.LocallyAvailable()
+                    : BeatmapAvailability.NotDownloaded();
+
+            IQueryable<BeatmapInfo> queryBeatmapByLookup(APIBeatmap lookupBeatmap)
+            {
+                IQueryable<BeatmapInfo> allBeatmaps = realm.Realm.All<BeatmapInfo>().NotDeleted();
+
+                string checksum = lookupBeatmap.Checksum;
+
+                if (api.IsLocalOnly)
+                {
+                    if (!string.IsNullOrEmpty(checksum))
+                        return allBeatmaps.Filter($@"{nameof(BeatmapInfo.MD5Hash)} == $0 OR {nameof(BeatmapInfo.OnlineMD5Hash)} == $0 OR {nameof(BeatmapInfo.Hash)} == $0", checksum);
+
+                    if (lookupBeatmap.OnlineID > 0)
+                        return allBeatmaps.Filter($@"{nameof(BeatmapInfo.OnlineID)} == $0", lookupBeatmap.OnlineID);
+
+                    if (lookupBeatmap.OnlineBeatmapSetID > 0)
+                        return allBeatmaps.Filter($@"{nameof(BeatmapInfo.BeatmapSet)}.{nameof(BeatmapSetInfo.OnlineID)} == $0", lookupBeatmap.OnlineBeatmapSetID);
+
+                    return allBeatmaps.Filter($@"{nameof(BeatmapInfo.OnlineID)} == $0", -1);
+                }
+
+                return allBeatmaps.ForOnlineId(lookupBeatmap.OnlineID);
+            }
         }
 
         protected override void Dispose(bool isDisposing)

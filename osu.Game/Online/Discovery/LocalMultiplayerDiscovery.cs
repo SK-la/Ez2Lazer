@@ -18,8 +18,8 @@ namespace osu.Game.Online.Discovery
     /// </summary>
     public class LocalMultiplayerDiscovery : IDisposable
     {
-        private const string multicastAddress = "239.0.0.222";
-        private const int multicastPort = 5325;
+        private const string multicast_address = "239.0.0.222";
+        private const int multicast_port = 5325;
 
         private readonly UdpClient listener;
         private readonly UdpClient broadcaster;
@@ -30,13 +30,13 @@ namespace osu.Game.Online.Discovery
 
         public LocalMultiplayerDiscovery()
         {
-            groupEndpoint = new IPEndPoint(IPAddress.Parse(multicastAddress), multicastPort);
+            groupEndpoint = new IPEndPoint(IPAddress.Parse(multicast_address), multicast_port);
 
             listener = new UdpClient(AddressFamily.InterNetwork);
             listener.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             listener.ExclusiveAddressUse = false;
-            listener.Client.Bind(new IPEndPoint(IPAddress.Any, multicastPort));
-            listener.JoinMulticastGroup(IPAddress.Parse(multicastAddress));
+            listener.Client.Bind(new IPEndPoint(IPAddress.Any, multicast_port));
+            listener.JoinMulticastGroup(IPAddress.Parse(multicast_address));
 
             broadcaster = new UdpClient();
             broadcaster.MulticastLoopback = false;
@@ -48,8 +48,8 @@ namespace osu.Game.Online.Discovery
         {
             try
             {
-                var json = JsonConvert.SerializeObject(room);
-                var bytes = Encoding.UTF8.GetBytes(json);
+                string json = JsonConvert.SerializeObject(room);
+                byte[] bytes = Encoding.UTF8.GetBytes(json);
                 broadcaster.Send(bytes, bytes.Length, groupEndpoint);
             }
             catch (Exception e)
@@ -64,9 +64,9 @@ namespace osu.Game.Online.Discovery
             {
                 try
                 {
-                    var result = await listener.ReceiveAsync().ConfigureAwait(false);
-                    var json = Encoding.UTF8.GetString(result.Buffer);
-                    var room = JsonConvert.DeserializeObject<DiscoveredRoom>(json);
+                    UdpReceiveResult result = await listener.ReceiveAsync(token).ConfigureAwait(false);
+                    string json = Encoding.UTF8.GetString(result.Buffer);
+                    DiscoveredRoom room = JsonConvert.DeserializeObject<DiscoveredRoom>(json);
 
                     if (room != null)
                     {
@@ -89,7 +89,7 @@ namespace osu.Game.Online.Discovery
             try
             {
                 cts.Cancel();
-                listener.DropMulticastGroup(IPAddress.Parse(multicastAddress));
+                listener.DropMulticastGroup(IPAddress.Parse(multicast_address));
             }
             catch { }
 
@@ -104,6 +104,7 @@ namespace osu.Game.Online.Discovery
             public int RoomID { get; set; }
             public string HostName { get; set; } = string.Empty;
             public bool IsP2P { get; set; }
+            public int ControlPort { get; set; } = osu.Game.Online.LocalMultiplayer.LocalMultiplayerDirectServer.DEFAULT_PORT;
             public IPEndPoint? AdvertiserEndpoint { get; set; }
             public DateTimeOffset Timestamp { get; set; }
         }

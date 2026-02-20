@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Online.Chat;
 using osu.Game.Online.Rooms;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.API;
@@ -21,7 +22,9 @@ namespace osu.Game.Online.LocalMultiplayer
     public class LocalMultiplayerServer
     {
         private readonly List<Room> rooms = new List<Room>();
+        private readonly Dictionary<long, List<Message>> channelMessages = new Dictionary<long, List<Message>>();
         private int nextRoomId = 1;
+        private long nextMessageId = 1;
 
         public IReadOnlyList<Room> GetRooms()
         {
@@ -36,11 +39,14 @@ namespace osu.Game.Online.LocalMultiplayer
         public APICreatedRoom CreateRoom(Room room, APIUser host)
         {
             room.RoomID = nextRoomId++;
+            room.ChannelId = (int)room.RoomID.Value;
             room.StartDate = DateTimeOffset.Now;
             room.EndDate = DateTimeOffset.Now.AddHours(2);
             room.Host = host;
             room.ParticipantCount = 1;
             room.RecentParticipants = new[] { host };
+
+            ensureChannel(room.ChannelId);
 
             var stored = new Room();
             stored.CopyFrom(room);
@@ -57,7 +63,14 @@ namespace osu.Game.Online.LocalMultiplayer
         /// </summary>
         public void UpsertRoom(Room room)
         {
+            if (room.RoomID != null && room.ChannelId == 0)
+                room.ChannelId = (int)room.RoomID.Value;
+
+            if (room.ChannelId != 0)
+                ensureChannel(room.ChannelId);
+
             var existing = rooms.SingleOrDefault(r => r.RoomID == room.RoomID);
+
             if (existing != null)
                 existing.CopyFrom(room);
             else
@@ -72,9 +85,64 @@ namespace osu.Game.Online.LocalMultiplayer
         {
             var found = rooms.SingleOrDefault(r => r.RoomID == id);
             if (found == null) return null;
+
+            if (found.ChannelId == 0 && found.RoomID != null)
+            {
+                found.ChannelId = (int)found.RoomID.Value;
+                ensureChannel(found.ChannelId);
+            }
+
             var copy = new Room();
             copy.CopyFrom(found);
             return copy;
+        }
+
+        public IReadOnlyList<Channel> GetChannels()
+        {
+            return rooms.Where(r => r.RoomID != null)
+                        .Select(r =>
+                        {
+                            long channelId = r.ChannelId != 0 ? r.ChannelId : r.RoomID!.Value;
+                            ensureChannel(channelId);
+
+                            return new Channel
+                            {
+                                Id = channelId,
+                                Name = $"#lazermp_{r.RoomID.Value}",
+                                Topic = r.Name,
+                                Type = ChannelType.Multiplayer,
+                                LastMessageId = channelMessages.TryGetValue(channelId, out List<Message>? msgs) && msgs.Count > 0
+                                    ? msgs[^1].Id
+                                    : 0,
+                            };
+                        })
+                        .ToArray();
+        }
+
+        public IReadOnlyList<Message> GetChannelMessages(long channelId)
+        {
+            if (!channelMessages.TryGetValue(channelId, out List<Message>? messages))
+                return Array.Empty<Message>();
+
+            return messages.Select(cloneMessage).ToArray();
+        }
+
+        public Message PostChannelMessage(Message incoming, APIUser sender)
+        {
+            ensureChannel(incoming.ChannelId);
+
+            var posted = new Message(nextMessageId++)
+            {
+                ChannelId = incoming.ChannelId,
+                Content = incoming.Content,
+                IsAction = incoming.IsAction,
+                Timestamp = DateTimeOffset.Now,
+                Sender = sender,
+                Uuid = incoming.Uuid,
+            };
+
+            channelMessages[incoming.ChannelId].Add(posted);
+            return cloneMessage(posted);
         }
 
         public (bool success, Room? room, string? error) JoinRoom(Room requested, APIUser user, string? password)
@@ -202,6 +270,25 @@ namespace osu.Game.Online.LocalMultiplayer
         {
             var now = DateTimeOffset.Now;
             rooms.RemoveAll(r => r.EndDate != null && r.EndDate <= now);
+        }
+
+        private void ensureChannel(long channelId)
+        {
+            if (!channelMessages.ContainsKey(channelId))
+                channelMessages[channelId] = new List<Message>();
+        }
+
+        private static Message cloneMessage(Message source)
+        {
+            return new Message(source.Id)
+            {
+                ChannelId = source.ChannelId,
+                IsAction = source.IsAction,
+                Timestamp = source.Timestamp,
+                Content = source.Content,
+                Sender = source.Sender,
+                Uuid = source.Uuid,
+            };
         }
     }
 }

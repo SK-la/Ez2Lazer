@@ -38,6 +38,7 @@ using osu.Game.Users.Drawables;
 using osuTK;
 using osuTK.Graphics;
 using osu.Game.Localisation;
+using osu.Game.Online.API;
 
 namespace osu.Game.Screens.OnlinePlay
 {
@@ -121,6 +122,9 @@ namespace osu.Game.Screens.OnlinePlay
         [Resolved(CanBeNull = true)]
         private ManageCollectionsDialog? manageCollectionsDialog { get; set; }
 
+        [Resolved]
+        private IAPIProvider api { get; set; } = null!;
+
         public DrawableRoomPlaylistItem(PlaylistItem item, bool loadImmediately = false)
             : base(item)
         {
@@ -186,6 +190,15 @@ namespace osu.Game.Screens.OnlinePlay
                         }
 
                         beatmap = await beatmapLookupCache.GetBeatmapAsync(Item.Beatmap.OnlineID).ConfigureAwait(false);
+
+                        if (api.IsLocalOnly)
+                        {
+                            if (!string.IsNullOrEmpty(Item.Beatmap.MD5Hash))
+                                beatmap = beatmaps.QueryBeatmap(b => b.MD5Hash == Item.Beatmap.MD5Hash) ?? beatmap;
+
+                            if (beatmap == null && Item.Beatmap.OnlineID > 0)
+                                beatmap = beatmaps.QueryOnlineBeatmapId(Item.Beatmap.OnlineID) ?? beatmap;
+                        }
 
                         Scheduler.AddOnce(refresh);
                     }
@@ -296,9 +309,11 @@ namespace osu.Game.Screens.OnlinePlay
             {
                 if (beatmap != null)
                 {
-                    difficultyIconContainer.Children = new Drawable[]
+                    Drawable thumbnailDrawable;
+
+                    if (beatmap.BeatmapSet is IBeatmapSetOnlineInfo onlineInfo)
                     {
-                        thumbnail = new BeatmapCardThumbnail(beatmap.BeatmapSet!, (IBeatmapSetOnlineInfo)beatmap.BeatmapSet!)
+                        thumbnailDrawable = thumbnail = new BeatmapCardThumbnail(beatmap.BeatmapSet, onlineInfo)
                         {
                             Anchor = Anchor.CentreLeft,
                             Origin = Anchor.CentreLeft,
@@ -307,7 +322,24 @@ namespace osu.Game.Screens.OnlinePlay
                             CornerRadius = 10,
                             RelativeSizeAxes = Axes.Y,
                             Dimmed = { Value = IsHovered }
-                        },
+                        };
+                    }
+                    else
+                    {
+                        thumbnail = null;
+                        thumbnailDrawable = new Box
+                        {
+                            Anchor = Anchor.CentreLeft,
+                            Origin = Anchor.CentreLeft,
+                            Width = 60,
+                            RelativeSizeAxes = Axes.Y,
+                            Colour = OsuColour.Gray(0.15f),
+                        };
+                    }
+
+                    difficultyIconContainer.Children = new[]
+                    {
+                        thumbnailDrawable,
                         new DifficultyIcon(beatmap, ruleset, requiredMods)
                         {
                             Size = new Vector2(24),
@@ -539,11 +571,17 @@ namespace osu.Game.Screens.OnlinePlay
                     d.Anchor = Anchor.Centre;
                     d.Origin = Anchor.Centre;
                 })
-                : new PlaylistDownloadButton(beatmap)
-                {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                },
+                : api.IsLocalOnly
+                    ? Empty().With(d =>
+                    {
+                        d.Anchor = Anchor.Centre;
+                        d.Origin = Anchor.Centre;
+                    })
+                    : new PlaylistDownloadButton(beatmap)
+                    {
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                    },
             showResultsButton = new GrayButton(FontAwesome.Solid.ChartPie)
             {
                 Anchor = Anchor.Centre,

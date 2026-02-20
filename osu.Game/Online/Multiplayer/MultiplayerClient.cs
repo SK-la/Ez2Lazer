@@ -13,6 +13,7 @@ using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Database;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
@@ -124,10 +125,12 @@ namespace osu.Game.Online.Multiplayer
 
         public event Action? MatchmakingQueueJoined;
         public event Action? MatchmakingQueueLeft;
+
         /// <summary>
         /// Invoked to report progress/status of the experimental P2P handshake flow.
         /// </summary>
         public event Action<string>? P2PHandshakeStatusChanged;
+
         public event Action? MatchmakingRoomInvited;
         public event Action<long, string>? MatchmakingRoomReady;
         public event Action<MatchmakingLobbyStatus>? MatchmakingLobbyStatusChanged;
@@ -146,6 +149,15 @@ namespace osu.Game.Online.Multiplayer
         /// This is NOT thread safe and usage should be scheduled.
         /// </summary>
         public abstract IBindable<bool> IsConnected { get; }
+
+        /// <summary>
+        /// Whether multiplayer is usable from UI perspective.
+        /// True when connected to multiplayer backend, running in local-only mode, or experimental P2P is enabled.
+        /// This is NOT thread safe and usage should be scheduled.
+        /// </summary>
+        public IBindable<bool> IsMultiplayerUsable => isMultiplayerUsable;
+
+        private readonly BindableBool isMultiplayerUsable = new BindableBool();
 
         /// <summary>
         /// The joined <see cref="MultiplayerRoom"/>.
@@ -186,6 +198,7 @@ namespace osu.Game.Online.Multiplayer
         /// Retrieves the peer signalling payloads stored for the current room.
         /// </summary>
         public virtual Task<IDictionary<int, string>?> GetPeerSignalling() => Task.FromResult<IDictionary<int, string>?>(null);
+
         /// <summary>
         /// The users in the joined <see cref="Room"/> which are participating in the current gameplay loop.
         /// </summary>
@@ -224,6 +237,11 @@ namespace osu.Game.Online.Multiplayer
         [Resolved]
         private UserLookupCache userLookupCache { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private IBindable<bool> p2PEnabled = null!;
+
         protected Room? APIRoom { get; private set; }
 
         private readonly Queue<Action> pendingRequests = new Queue<Action>();
@@ -231,6 +249,12 @@ namespace osu.Game.Online.Multiplayer
         [BackgroundDependencyLoader]
         private void load()
         {
+            p2PEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ExperimentalP2P).GetBoundCopy();
+
+            IsConnected.BindValueChanged(_ => Scheduler.Add(updateMultiplayerUsability));
+            API.State.BindValueChanged(_ => Scheduler.Add(updateMultiplayerUsability));
+            p2PEnabled.BindValueChanged(_ => Scheduler.Add(updateMultiplayerUsability), true);
+
             IsConnected.BindValueChanged(connected => Scheduler.Add(() =>
             {
                 if (!connected.NewValue)
@@ -242,6 +266,9 @@ namespace osu.Game.Online.Multiplayer
                 }
             }));
         }
+
+        private void updateMultiplayerUsability()
+            => isMultiplayerUsable.Value = IsConnected.Value || API.IsLocalOnly || p2PEnabled.Value;
 
         private readonly TaskChain joinOrLeaveTaskChain = new TaskChain();
         private CancellationTokenSource? joinCancellationSource;
@@ -263,6 +290,7 @@ namespace osu.Game.Online.Multiplayer
                 await runOnUpdateThreadAsync(() => pendingRequests.Clear(), cancellationSource.Token).ConfigureAwait(false);
                 var multiplayerRoom = await CreateRoomInternal(new MultiplayerRoom(room)).ConfigureAwait(false);
                 await setupJoinedRoom(room, multiplayerRoom, cancellationSource.Token).ConfigureAwait(false);
+
                 // If created as experimental P2P and we're the host, start offer generation and upload + poll for peer answers.
                 if (Room != null && Room.IsP2P && IsHost)
                 {
@@ -288,6 +316,7 @@ namespace osu.Game.Online.Multiplayer
                                 for (int i = 0; i < 10; i++)
                                 {
                                     var peerSigs = await GetPeerSignalling().ConfigureAwait(false);
+
                                     if (peerSigs != null && peerSigs.Count > 0)
                                     {
                                         foreach (var kv in peerSigs)
@@ -397,6 +426,7 @@ namespace osu.Game.Online.Multiplayer
                 try
                 {
                     var hostSig = await GetHostSignalling().ConfigureAwait(false);
+
                     if (!string.IsNullOrEmpty(hostSig))
                     {
                         await runOnUpdateThreadAsync(() => Room!.HostSignalling = hostSig, cancellationToken).ConfigureAwait(false);
@@ -404,6 +434,7 @@ namespace osu.Game.Online.Multiplayer
                     }
 
                     var peerSigs = await GetPeerSignalling().ConfigureAwait(false);
+
                     if (peerSigs != null)
                     {
                         await runOnUpdateThreadAsync(() =>
@@ -411,6 +442,7 @@ namespace osu.Game.Online.Multiplayer
                             Room!.PeerSignalling = peerSigs.ToDictionary(k => k.Key, k => k.Value);
                         }, cancellationToken).ConfigureAwait(false);
                     }
+
                     // If host signalling is available, automatically generate an answer and upload it.
                     if (!string.IsNullOrEmpty(hostSig))
                     {
@@ -425,6 +457,7 @@ namespace osu.Game.Online.Multiplayer
                             await webRtc.InitializeAsync().ConfigureAwait(false);
                             var answer = await webRtc.CreateAnswerAsync(hostSig).ConfigureAwait(false);
                             var local = API.LocalUser.Value;
+
                             if (local != null)
                             {
                                 await UploadPeerSignalling(local.Id, answer).ConfigureAwait(false);
@@ -467,6 +500,7 @@ namespace osu.Game.Online.Multiplayer
                 PlayingUserIds.Clear();
 
                 RoomUpdated?.Invoke();
+
                 if (webRtcOwned && webRtc != null)
                 {
                     try
@@ -474,6 +508,7 @@ namespace osu.Game.Online.Multiplayer
                         webRtc.Dispose();
                     }
                     catch { }
+
                     webRtc = null;
                     webRtcOwned = false;
                 }

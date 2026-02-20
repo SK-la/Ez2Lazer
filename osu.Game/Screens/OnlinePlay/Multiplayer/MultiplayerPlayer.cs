@@ -128,7 +128,7 @@ namespace osu.Game.Screens.OnlinePlay.Multiplayer
                 loadingDisplay.Show();
             });
 
-            isConnected = client.IsConnected.GetBoundCopy();
+            isConnected = client.IsMultiplayerUsable.GetBoundCopy();
             isConnected.BindValueChanged(connected => Schedule(() =>
             {
                 if (!connected.NewValue)
