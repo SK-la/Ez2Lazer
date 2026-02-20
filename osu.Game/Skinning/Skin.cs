@@ -166,6 +166,10 @@ namespace osu.Game.Skinning
             Samples = samples;
         }
 
+        internal virtual IEnumerable<string> GetScriptFiles() => Array.Empty<string>();
+
+        internal virtual Stream? GetFileStream(string filename) => store.GetStream(filename);
+
         protected virtual IResourceStore<TextureUpload> CreateTextureLoaderStore(IStorageResourceProvider resources, IResourceStore<byte[]> storage)
             => new MaxDimensionLimitedTextureLoaderStore(resources.CreateTextureLoaderStore(storage));
 
