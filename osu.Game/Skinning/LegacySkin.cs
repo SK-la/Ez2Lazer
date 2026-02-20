@@ -76,6 +76,11 @@ namespace osu.Game.Skinning
             }
         }
 
+        internal override IEnumerable<string> GetScriptFiles()
+            => SkinInfo.PerformRead(s => s.Files.Where(f => f.Filename.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                                          .Select(f => f.Filename)
+                                          .ToArray());
+
         [SuppressMessage("ReSharper", "RedundantAssignment")] // for `wasHit` assignments used in `finally` debug logic
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {

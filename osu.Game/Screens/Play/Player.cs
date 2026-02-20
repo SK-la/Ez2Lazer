@@ -36,6 +36,7 @@ using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
+using osu.Game.LAsEzExtensions.Skinning;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Users;
 using osu.Game.Utils;
@@ -140,6 +141,9 @@ namespace osu.Game.Screens.Play
 
         [Resolved]
         private OsuGameBase game { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private SkinScriptManager skinScriptManager { get; set; }
 
         public GameplayState GameplayState { get; private set; }
 
@@ -410,6 +414,7 @@ namespace osu.Game.Screens.Play
                 HealthProcessor.ApplyResult(r);
                 ScoreProcessor.ApplyResult(r);
                 GameplayState.ApplyResult(r);
+                skinScriptManager?.NotifyJudgement(r);
             };
 
             DrawableRuleset.RevertResult += r =>

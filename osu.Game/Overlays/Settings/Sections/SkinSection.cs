@@ -5,7 +5,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -17,10 +19,12 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.LAsEzExtensions.Skinning;
 using osu.Game.Localisation;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Screens.Select;
@@ -85,6 +89,7 @@ namespace osu.Game.Overlays.Settings.Sections
                     Text = SkinSettingsStrings.SkinLayoutEditor,
                     Action = () => skinEditor?.ToggleVisibility(),
                 },
+                new ImportOrUpdateScriptButton(),
             };
         }
 
@@ -292,6 +297,125 @@ namespace osu.Game.Overlays.Settings.Sections
             {
                 skins.Rename(skins.CurrentSkinInfo.Value, textBox.Text);
                 PopOut();
+            }
+        }
+
+        public partial class ImportOrUpdateScriptButton : SettingsButtonV2, IHasPopover
+        {
+            private const string script_storage_directory = "skin-scripts";
+
+            [Resolved]
+            private SkinManager skins { get; set; }
+
+            [Resolved]
+            private Storage storage { get; set; }
+
+            [Resolved(CanBeNull = true)]
+            private IDialogOverlay dialogOverlay { get; set; }
+
+            private Bindable<Skin> currentSkin = null!;
+            private Bindable<string> lastImportDirectory = null!;
+
+            [BackgroundDependencyLoader]
+            private void load()
+            {
+                var scriptingConfig = new SkinScriptingConfig(storage);
+                lastImportDirectory = scriptingConfig.GetBindable<string>(SkinScriptingSetting.LastImportDirectory);
+
+                Action = this.ShowPopover;
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                currentSkin = skins.CurrentSkin.GetBoundCopy();
+                currentSkin.BindValueChanged(_ => updateState());
+                currentSkin.BindDisabledChanged(_ => updateState(), true);
+            }
+
+            private void updateState()
+            {
+                if (currentSkin.Disabled)
+                {
+                    Enabled.Value = false;
+                    return;
+                }
+
+                bool hasScript = File.Exists(getScriptPath());
+                Text = hasScript ? "Update script" : "Import script";
+                Enabled.Value = true;
+            }
+
+            public Popover GetPopover()
+            {
+                string? chooserPath = string.IsNullOrEmpty(lastImportDirectory.Value) ? null : lastImportDirectory.Value;
+                return new LuaScriptFileChooserPopover(onLuaFileSelected, chooserPath);
+            }
+
+            private void onLuaFileSelected(FileInfo file)
+            {
+                Schedule(() => importOrUpdateScript(file));
+            }
+
+            private void importOrUpdateScript(FileInfo selectedFile)
+            {
+                try
+                {
+                    string sourcePath = selectedFile.FullName;
+
+                    string destinationPath = getScriptPath();
+                    Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+                    File.Copy(sourcePath, destinationPath, true);
+
+                    if (selectedFile.DirectoryName != null)
+                        lastImportDirectory.Value = selectedFile.DirectoryName;
+
+                    skins.CurrentSkinInfo.TriggerChange();
+                    updateState();
+
+                    Logger.Log($"[SkinScript] Script import/update succeeded: {Path.GetFileName(sourcePath)}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[SkinScript] Script import/update failed: {ex}", level: LogLevel.Error);
+                    dialogOverlay?.Push(new FileImportFaultDialog(ex.Message));
+                }
+            }
+
+            private string getScriptPath()
+            {
+                Guid skinId = skins.CurrentSkinInfo.Value.ID;
+                var scriptStorage = storage.GetStorageForDirectory(script_storage_directory);
+                return scriptStorage.GetFullPath($"{skinId}.lua");
+            }
+
+            private partial class LuaScriptFileChooserPopover : FormFileSelector.FileChooserPopover
+            {
+                private readonly Action<FileInfo> onFileSelected;
+
+                private bool fileHandled;
+
+                public LuaScriptFileChooserPopover(Action<FileInfo> onFileSelected, string? chooserPath)
+                    : base(new[] { ".lua" }, new Bindable<FileInfo>(), chooserPath)
+                {
+                    this.onFileSelected = onFileSelected;
+                }
+
+                protected override void LoadComplete()
+                {
+                    base.LoadComplete();
+
+                    FileSelector.CurrentFile.BindValueChanged(file =>
+                    {
+                        if (fileHandled || file.NewValue == null)
+                            return;
+
+                        fileHandled = true;
+                        onFileSelected(file.NewValue);
+                        Hide();
+                    });
+                }
             }
         }
     }

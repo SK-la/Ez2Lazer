@@ -2,9 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Allocation;
 using osu.Framework.Caching;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
+using osu.Game.LAsEzExtensions.Skinning;
 using osuTK;
 
 namespace osu.Game.Skinning
@@ -34,6 +36,9 @@ namespace osu.Game.Skinning
         protected readonly ISkinComponentLookup ComponentLookup;
 
         private readonly ConfineMode confineMode;
+
+        [Resolved(CanBeNull = true)]
+        private SkinScriptManager? skinScriptManager { get; set; }
 
         /// <summary>
         /// Create a new skinnable drawable.
@@ -97,6 +102,13 @@ namespace osu.Game.Skinning
             }
 
             InternalChild = Drawable;
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            skinScriptManager?.NotifyComponentLoaded(Drawable);
         }
 
         protected override void Update()

@@ -55,9 +55,11 @@ namespace osu.Game.Skinning
         /// <returns></returns>
         public override async Task<Live<SkinInfo>?> ImportAsUpdate(ProgressNotification notification, ImportTask task, SkinInfo original)
         {
+            Guid originalId = original.ID;
+
             return await Realm.WriteAsync<Live<SkinInfo>?>(r =>
             {
-                var skinInfo = r.Find<SkinInfo>(original.ID)!;
+                var skinInfo = r.Find<SkinInfo>(originalId)!;
                 skinInfo.Files.Clear();
 
                 string[] filesInMountedDirectory = Directory.EnumerateFiles(task.Path, "*.*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(task.Path, f)).ToArray();

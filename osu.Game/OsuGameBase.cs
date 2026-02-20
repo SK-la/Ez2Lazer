@@ -47,8 +47,8 @@ using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Analysis;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Skinning;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -163,6 +163,8 @@ namespace osu.Game
         protected ScoreModelDownloader ScoreDownloader { get; private set; }
 
         protected SkinManager SkinManager { get; private set; }
+
+        protected SkinScriptManager SkinScriptManager { get; private set; }
 
         protected RealmRulesetStore RulesetStore { get; private set; }
 
@@ -397,6 +399,9 @@ namespace osu.Game
 
             dependencies.CacheAs<IBindable<WorkingBeatmap>>(Beatmap);
             dependencies.CacheAs(Beatmap);
+
+            dependencies.Cache(SkinScriptManager = new SkinScriptManager());
+            base.Content.Add(SkinScriptManager);
 
             dependencies.Cache(LeaderboardManager = new LeaderboardManager());
             base.Content.Add(LeaderboardManager);
