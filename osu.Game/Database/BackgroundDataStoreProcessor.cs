@@ -609,7 +609,7 @@ namespace osu.Game.Database
                             return true;
                         }
 
-                        Logger.Log($"Could not find {beatmapSet.GetDisplayString()} in local cache while backpopulating missing submission/rank date");
+                        // Logger.Log($"Could not find {beatmapSet.GetDisplayString()} in local cache while backpopulating missing submission/rank date");
                         return false;
                     });
 
@@ -715,7 +715,7 @@ namespace osu.Game.Database
                             return false;
                         }
 
-                        Logger.Log(@$"Could not find {beatmap.GetDisplayString()} in local cache while backpopulating missing user tags");
+                        // Logger.Log(@$"Could not find {beatmap.GetDisplayString()} in local cache while backpopulating missing user tags");
                         return false;
                     });
 
@@ -744,7 +744,7 @@ namespace osu.Game.Database
             notification.Text = notification.Text.ToString().Split('(').First().TrimEnd() + $" ({processedCount} of {totalCount})";
             notification.Progress = (float)processedCount / totalCount;
 
-            if (processedCount % 100 == 0)
+            if (processedCount > 0 && processedCount % 100 == 0)
                 Logger.Log(notification.Text.ToString());
         }
 
