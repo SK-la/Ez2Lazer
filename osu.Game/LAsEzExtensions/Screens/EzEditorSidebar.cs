@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Screens;
 using osu.Game.Screens.Edit.Components;
 
@@ -15,13 +16,15 @@ namespace osu.Game.LAsEzExtensions.Screens
     {
         public enum SidebarTab
         {
-            Default = 0,
-            SkinSettings = 1,
-            ColumnSettings = 2
+            Select = 0,
+
+            EzSkin = 1,
+
+            Column = 2
         }
 
         private EzSkinTab? ezSkinSettings;
-        private SidebarTab currentTab = SidebarTab.Default;
+        private SidebarTab currentTab = SidebarTab.Select;
         private Action<Container<EditorSidebarSection>>? lastPopulator;
 
         public EzEditorSidebar()
@@ -42,7 +45,7 @@ namespace osu.Game.LAsEzExtensions.Screens
                 RelativeSizeAxes = Axes.X,
                 Height = 30,
                 Margin = new MarginPadding { Left = 5 },
-                Items = new[] { SidebarTab.Default, SidebarTab.SkinSettings, SidebarTab.ColumnSettings }
+                Items = new[] { SidebarTab.Select, SidebarTab.EzSkin, SidebarTab.Column }
             });
 
             // 设置内容区整体下移，避免与tab栏重叠
@@ -55,15 +58,15 @@ namespace osu.Game.LAsEzExtensions.Screens
 
                 switch (currentTab)
                 {
-                    case SidebarTab.SkinSettings:
+                    case SidebarTab.EzSkin:
                         showEzSettings();
                         break;
 
-                    case SidebarTab.ColumnSettings:
+                    case SidebarTab.Column:
                         showColumnSettings();
                         break;
 
-                    case SidebarTab.Default when lastPopulator != null:
+                    case SidebarTab.Select when lastPopulator != null:
                         PopulateSettings(lastPopulator);
                         break;
                 }
@@ -94,7 +97,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         public void PopulateSettings(Action<Container<EditorSidebarSection>> populator)
         {
             lastPopulator = populator;
-            if (currentTab != SidebarTab.Default)
+            if (currentTab != SidebarTab.Select)
                 return;
 
             Content.Clear();
