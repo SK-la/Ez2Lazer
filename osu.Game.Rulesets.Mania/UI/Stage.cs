@@ -92,6 +92,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Box dimBox;
         private readonly Container backgroundContainer;
         private readonly BackgroundScreenBeatmap.DimmableBackground maniaMaskedDimmable;
+        private readonly SkinnableDrawable stageForeground;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
@@ -168,7 +169,7 @@ namespace osu.Game.Rulesets.Mania.UI
                         {
                             RelativeSizeAxes = Axes.Y,
                         },
-                        new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageForeground))
+                        stageForeground = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageForeground))
                         {
                             RelativeSizeAxes = Axes.Both
                         },
@@ -241,6 +242,15 @@ namespace osu.Game.Rulesets.Mania.UI
             loadBackgroundAsync();
             columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
             columnBlur.BindValueChanged(v => maniaMaskedDimmable.BlurAmount.Value = (float)v.NewValue * 50, true);
+
+            var stagePanelEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.StagePanelEnabled);
+            stagePanelEnabled.BindValueChanged(e =>
+            {
+                if (e.NewValue)
+                    stageForeground.Show();
+                else
+                    stageForeground.Hide();
+            }, true);
         }
 
         private void bindWorkingBeatmapSource()

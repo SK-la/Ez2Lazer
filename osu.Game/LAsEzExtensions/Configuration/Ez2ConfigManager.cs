@@ -75,6 +75,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             SetDefault(Ez2Setting.NoteSetName, "lucenteclat");
             SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
+            SetDefault(Ez2Setting.StagePanelEnabled, true);
             SetDefault(Ez2Setting.GameThemeName, EzEnumGameThemeName.Celeste_Lumiere);
             SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 10, 0.1);
             SetDefault(Ez2Setting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
@@ -459,6 +460,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         NoteTrackLineHeight,
         NoteSetName,
         StageName,
+        StagePanelEnabled,
 
         GlobalTextureName,
         GameThemeName,

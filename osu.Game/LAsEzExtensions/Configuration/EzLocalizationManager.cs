@@ -217,6 +217,10 @@ namespace osu.Game.LAsEzExtensions.Configuration
             "设置Stage面板背景的虚化程度, 0为不模糊, 1为完全模糊\n"
             + "注意，如果铺面中有视频，面板", "Set the blur of each column, 0 is no blur, 1 is fully blurred");
 
+        public static readonly EzLocalisableString STAGE_PANEL = new EzLocalisableString("Stage前景面板", "Stage Panel");
+
+        public static readonly EzLocalisableString STAGE_PANEL_TOOLTIP = new EzLocalisableString("切换Stage前景面板可见性", "Toggle visibility of the stage foreground");
+
         public static readonly EzLocalisableString COLOUR_ENABLE_BUTTON = new EzLocalisableString("启用颜色配置", "Enable Colour Config");
 
         public static readonly EzLocalisableString COLOUR_ENABLE_BUTTON_TOOLTIP = new EzLocalisableString(

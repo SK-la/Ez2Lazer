@@ -35,9 +35,6 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private Bindable<int> columnTypeListSelectBindable = null!;
         private Bindable<bool> colorSettingsEnabled = null!;
-        private Bindable<double> columnBlur = null!;
-        private Bindable<double> columnDim = null!;
-        private Bindable<double> maniaPseudo3DRotation = null!;
 
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
@@ -54,10 +51,6 @@ namespace osu.Game.LAsEzExtensions.Screens
         [BackgroundDependencyLoader]
         private void load()
         {
-            maniaPseudo3DRotation = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation);
-            columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
-            columnDim = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim);
-
             colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             columnTypeListSelectBindable = ezSkinConfig.GetBindable<int>(Ez2Setting.ColumnTypeListSelect);
 
@@ -79,7 +72,7 @@ namespace osu.Game.LAsEzExtensions.Screens
                     {
                         LabelText = EzLocalizationManager.MANIA_PSEUDO_3D_ROTATION,
                         TooltipText = EzLocalizationManager.MANIA_PSEUDO_3D_ROTATION_TOOLTIP,
-                        Current = maniaPseudo3DRotation,
+                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation),
                         KeyboardStep = 1f,
                         DisplayAsPercentage = false
                     },
@@ -87,7 +80,7 @@ namespace osu.Game.LAsEzExtensions.Screens
                     {
                         LabelText = EzLocalizationManager.STAGE_BACKGROUND_DIM,
                         TooltipText = EzLocalizationManager.STAGE_BACKGROUND_DIM_TOOLTIP,
-                        Current = columnDim,
+                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim),
                         KeyboardStep = 0.01f,
                         DisplayAsPercentage = true
                     },
@@ -95,9 +88,15 @@ namespace osu.Game.LAsEzExtensions.Screens
                     {
                         LabelText = EzLocalizationManager.STAGE_BACKGROUND_BLUR,
                         TooltipText = EzLocalizationManager.STAGE_BACKGROUND_BLUR_TOOLTIP,
-                        Current = columnBlur,
+                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur),
                         KeyboardStep = 0.01f,
                         DisplayAsPercentage = true
+                    },
+                    new SettingsCheckbox
+                    {
+                        LabelText = EzLocalizationManager.STAGE_PANEL,
+                        TooltipText = EzLocalizationManager.STAGE_PANEL_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.StagePanelEnabled),
                     },
                     new SettingsCheckbox
                     {
