@@ -1,3 +1,6 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
 using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
@@ -13,7 +16,6 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Extensions;
 using osu.Game.Overlays.Settings;
-using osu.Game.Screens;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Skinning;
 using osuTK;
@@ -33,8 +35,9 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private Bindable<int> columnTypeListSelectBindable = null!;
         private Bindable<bool> colorSettingsEnabled = null!;
-        private Bindable<double> columnBlur = new Bindable<double>();
-        private Bindable<double> columnDim = new Bindable<double>();
+        private Bindable<double> columnBlur = null!;
+        private Bindable<double> columnDim = null!;
+        private Bindable<double> maniaPseudo3DRotation = null!;
 
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
@@ -51,156 +54,133 @@ namespace osu.Game.LAsEzExtensions.Screens
         [BackgroundDependencyLoader]
         private void load()
         {
-            columnTypeListSelectBindable = ezSkinConfig.GetBindable<int>(Ez2Setting.LastSelectForColumnsType);
-            colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            maniaPseudo3DRotation = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation);
             columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
             columnDim = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim);
+
+            colorSettingsEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            columnTypeListSelectBindable = ezSkinConfig.GetBindable<int>(Ez2Setting.ColumnTypeListSelect);
 
             colorBindables[Ez2Setting.ColumnTypeA] = createColorBindable(Ez2Setting.ColumnTypeA);
             colorBindables[Ez2Setting.ColumnTypeB] = createColorBindable(Ez2Setting.ColumnTypeB);
             colorBindables[Ez2Setting.ColumnTypeS] = createColorBindable(Ez2Setting.ColumnTypeS);
             colorBindables[Ez2Setting.ColumnTypeE] = createColorBindable(Ez2Setting.ColumnTypeE);
             colorBindables[Ez2Setting.ColumnTypeP] = createColorBindable(Ez2Setting.ColumnTypeP);
-            createUI();
+
+            InternalChild = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(5),
+                Children = new Drawable[]
+                {
+                    new SettingsSlider<double>
+                    {
+                        LabelText = EzLocalizationManager.MANIA_PSEUDO_3D_ROTATION,
+                        TooltipText = EzLocalizationManager.MANIA_PSEUDO_3D_ROTATION_TOOLTIP,
+                        Current = maniaPseudo3DRotation,
+                        KeyboardStep = 1f,
+                        DisplayAsPercentage = false
+                    },
+                    new SettingsSlider<double>
+                    {
+                        LabelText = EzLocalizationManager.STAGE_BACKGROUND_DIM,
+                        TooltipText = EzLocalizationManager.STAGE_BACKGROUND_DIM_TOOLTIP,
+                        Current = columnDim,
+                        KeyboardStep = 0.01f,
+                        DisplayAsPercentage = true
+                    },
+                    new SettingsSlider<double>
+                    {
+                        LabelText = EzLocalizationManager.STAGE_BACKGROUND_BLUR,
+                        TooltipText = EzLocalizationManager.STAGE_BACKGROUND_BLUR_TOOLTIP,
+                        Current = columnBlur,
+                        KeyboardStep = 0.01f,
+                        DisplayAsPercentage = true
+                    },
+                    new SettingsCheckbox
+                    {
+                        LabelText = EzLocalizationManager.COLOUR_ENABLE_BUTTON,
+                        TooltipText = EzLocalizationManager.COLOUR_ENABLE_BUTTON_TOOLTIP,
+                        Current = colorSettingsEnabled,
+                    },
+                    baseColorsContainer = new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Margin = new MarginPadding(5f),
+                        Children = new Drawable[]
+                        {
+                            new OsuSpriteText
+                            {
+                                Text = "Base Colors (基础颜色)",
+                                Margin = new MarginPadding { Bottom = 5 },
+                                Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14)
+                            }.WithUnderline(),
+                            SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_A, colorBindables[Ez2Setting.ColumnTypeA]),
+                            SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_B, colorBindables[Ez2Setting.ColumnTypeB]),
+                            SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_S, colorBindables[Ez2Setting.ColumnTypeS]),
+                            SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_E, colorBindables[Ez2Setting.ColumnTypeE]),
+                            SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_P, colorBindables[Ez2Setting.ColumnTypeP]),
+                        }
+                    },
+                    new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Margin = new MarginPadding(5f),
+                        Children = new Drawable[]
+                        {
+                            new OsuSpriteText
+                            {
+                                Text = "Key Mode (键位数)",
+                                Margin = new MarginPadding { Bottom = 5 },
+                                Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14),
+                            }.WithUnderline(),
+                            new SettingsDropdown<int>
+                            {
+                                Current = columnTypeListSelectBindable,
+                                Items = available_key_modes
+                            },
+                            new Box
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                Height = 2,
+                                Colour = Color4.DarkGray.Opacity(0.5f),
+                            },
+                            columnsContainer = new FillFlowContainer
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                AutoSizeAxes = Axes.Y,
+                                Direction = FillDirection.Vertical,
+                                Spacing = new Vector2(2)
+                            },
+                        }
+                    },
+                    new SettingsButton
+                    {
+                        Text = EzLocalizationManager.SAVE_COLOUR_BUTTON,
+                        TooltipText = EzLocalizationManager.SAVE_COLOUR_BUTTON_TOOLTIP,
+                        Action = () =>
+                        {
+                            skinManager.CurrentSkinInfo.TriggerChange();
+                            ezSkinConfig.Save();
+                        },
+                    }
+                }
+            };
+
             updateKeyModeFromCurrentBeatmap();
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            setupEventHandlers();
-            updateColumnsType(columnTypeListSelectBindable.Value);
-        }
 
-        private void createUI()
-        {
-            baseColorsContainer = createBaseColorsContainer();
-
-            Children = new Drawable[]
-            {
-                new FillFlowContainer
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(2),
-                    Children = new Drawable[]
-                    {
-                        new SettingsSlider<double>
-                        {
-                            LabelText = "Column Dim",
-                            TooltipText = "修改面板背景暗化",
-                            Current = columnDim,
-                            KeyboardStep = 0.01f,
-                            DisplayAsPercentage = true
-                        },
-                        new SettingsSlider<double>
-                        {
-                            LabelText = "Column Blur",
-                            TooltipText = "修改面板背景虚化",
-                            Current = columnBlur,
-                            KeyboardStep = 0.01f,
-                            DisplayAsPercentage = true
-                        },
-                        createColorSettingsCheckbox(),
-                        baseColorsContainer,
-                        createKeyModeSection(),
-                        createSaveButton()
-                    }
-                }
-            };
-        }
-
-        private SettingsCheckbox createColorSettingsCheckbox()
-        {
-            return new SettingsCheckbox
-            {
-                LabelText = "Color Enable\n(着色设置)",
-                TooltipText = "仅支持EZ Style Pro皮肤. Only supports EZ Style Pro skin\n" +
-                              "切换tab栏或保存后, 将重置默认颜色为当前设置\n" +
-                              "Switching tabs or saving will reset the colors to the default values",
-                Current = colorSettingsEnabled,
-            };
-        }
-
-        private FillFlowContainer createBaseColorsContainer()
-        {
-            return new FillFlowContainer
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Margin = new MarginPadding(5f),
-                Children = new Drawable[]
-                {
-                    new OsuSpriteText
-                    {
-                        Text = "Base Colors (基础颜色)",
-                        Margin = new MarginPadding { Bottom = 5 },
-                        Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14)
-                    }.WithUnderline(),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_A, colorBindables[Ez2Setting.ColumnTypeA]),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_B, colorBindables[Ez2Setting.ColumnTypeB]),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_S, colorBindables[Ez2Setting.ColumnTypeS]),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_E, colorBindables[Ez2Setting.ColumnTypeE]),
-                    SettingsColourExtensions.CreateStyledSettingsColour(EzConstants.COLUMN_TYPE_P, colorBindables[Ez2Setting.ColumnTypeP]),
-                }
-            };
-        }
-
-        private FillFlowContainer createKeyModeSection()
-        {
-            return new FillFlowContainer
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Margin = new MarginPadding(5f),
-                Children = new Drawable[]
-                {
-                    new OsuSpriteText
-                    {
-                        Text = "Key Mode (键位数)",
-                        Margin = new MarginPadding { Bottom = 5 },
-                        Font = OsuFont.GetFont(weight: FontWeight.Bold, size: 14),
-                    }.WithUnderline(),
-                    new SettingsDropdown<int>
-                    {
-                        Current = columnTypeListSelectBindable,
-                        Items = available_key_modes
-                    },
-                    new Box
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Height = 2,
-                        Colour = Color4.DarkGray.Opacity(0.5f),
-                    },
-                    columnsContainer = new FillFlowContainer
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Vertical,
-                        Spacing = new Vector2(2)
-                    },
-                }
-            };
-        }
-
-        private SettingsButton createSaveButton()
-        {
-            return new SettingsButton
-            {
-                Action = () =>
-                {
-                    skinManager.CurrentSkinInfo.TriggerChange();
-                    ezSkinConfig.Save();
-                },
-            }.WithTwoLineText("(保存颜色设置)", "Save Color Settings");
-        }
-
-        private void setupEventHandlers()
-        {
             colorSettingsEnabled.BindValueChanged(onColorSettingsEnabledChanged, true);
-            columnTypeListSelectBindable.BindValueChanged(e => updateColumnsType(e.NewValue));
+            columnTypeListSelectBindable.BindValueChanged(e => updateColumnsType(e.NewValue), true);
 
             // 设置颜色变化事件
             colorBindables[Ez2Setting.ColumnTypeA].BindValueChanged(e => updateBaseColour(e.NewValue, Ez2Setting.ColumnTypeA, EzConstants.COLUMN_TYPE_A));
@@ -215,15 +195,20 @@ namespace osu.Game.LAsEzExtensions.Screens
             var configBindable = ezSkinConfig.GetBindable<Colour4>(setting);
             var result = new BindableColour4(configBindable.Value);
 
-            configBindable.BindValueChanged(e => result.Value = e.NewValue);
-            result.BindValueChanged(e => configBindable.Value = e.NewValue);
+            result.BindTo(configBindable);
 
             return result;
         }
 
         private void onColorSettingsEnabledChanged(ValueChangedEvent<bool> e)
         {
-            baseColorsContainer.Alpha = e.NewValue ? 1f : 0f;
+            if (e.NewValue)
+            {
+                baseColorsContainer.Show();
+                updateColumnsType(columnTypeListSelectBindable.Value);
+            }
+            else
+                baseColorsContainer.Hide();
         }
 
         private void updateBaseColour(Colour4 newColor, Ez2Setting setting, string type)
@@ -231,8 +216,7 @@ namespace osu.Game.LAsEzExtensions.Screens
             if (!colorSettingsEnabled.Value)
                 return;
 
-            ezSkinConfig.SetValue(setting, newColor);
-
+            // BindTo 已经处理了双向绑定，不需要手动 SetValue
             foreach (var selector in columnsContainer.ChildrenOfType<EzSelectorColour>())
             {
                 selector.SetColorMapping(type, newColor);
@@ -259,12 +243,23 @@ namespace osu.Game.LAsEzExtensions.Screens
         {
             if (columnSelectorCache.TryGetValue(keyModeForList, out var cachedSelectors))
             {
-                columnsContainer.Clear();
+                // 使用 Clear(false) 避免释放子控件
+                columnsContainer.Clear(false);
                 columnsContainer.AddRange(cachedSelectors);
+
+                // 更新缓存选择器的颜色映射
+                var colorMapping = createColorMapping();
+
+                foreach (var selector in cachedSelectors)
+                {
+                    selector.UpdateColorMapping(colorMapping);
+                }
+
                 return;
             }
 
-            columnsContainer.Clear();
+            // 清理旧内容但不释放（可能是其他键位模式的缓存）
+            columnsContainer.Clear(false);
 
             if (keyModeForList == 0 || !available_key_modes.Contains(keyModeForList))
             {

@@ -162,6 +162,17 @@ namespace osu.Game.LAsEzExtensions.Screens
                 button.UpdateColor(color);
         }
 
+        public void UpdateColorMapping(Dictionary<string, Color4> newColorMapping)
+        {
+            foreach (var kvp in newColorMapping)
+            {
+                colorMap[kvp.Key] = kvp.Value;
+
+                if (buttonsByName.TryGetValue(kvp.Key, out var button))
+                    button.UpdateColor(kvp.Value);
+            }
+        }
+
         private Color4 getColorForName(string name)
         {
             if (colorMap.TryGetValue(name, out Color4 color))

@@ -15,12 +15,12 @@ namespace osu.Game.LAsEzExtensions.Screens
     {
         public enum SidebarTab
         {
-            Default,
-            EzSettings,
-            ColorSettings
+            Default = 0,
+            SkinSettings = 1,
+            ColumnSettings = 2
         }
 
-        private EzSkinSettings? ezSkinSettings;
+        private EzSkinTab? ezSkinSettings;
         private SidebarTab currentTab = SidebarTab.Default;
         private Action<Container<EditorSidebarSection>>? lastPopulator;
 
@@ -42,9 +42,9 @@ namespace osu.Game.LAsEzExtensions.Screens
                 RelativeSizeAxes = Axes.X,
                 Height = 30,
                 Margin = new MarginPadding { Left = 5 },
-                Items = new[] { SidebarTab.Default, SidebarTab.EzSettings, SidebarTab.ColorSettings }
+                Items = new[] { SidebarTab.Default, SidebarTab.SkinSettings, SidebarTab.ColumnSettings }
             });
-            //TODO 添加多列颜色选择
+
             // 设置内容区整体下移，避免与tab栏重叠
             Content.Margin = new MarginPadding { Top = 30 };
 
@@ -55,12 +55,12 @@ namespace osu.Game.LAsEzExtensions.Screens
 
                 switch (currentTab)
                 {
-                    case SidebarTab.EzSettings:
+                    case SidebarTab.SkinSettings:
                         showEzSettings();
                         break;
 
-                    case SidebarTab.ColorSettings:
-                        showColorSettings();
+                    case SidebarTab.ColumnSettings:
+                        showColumnSettings();
                         break;
 
                     case SidebarTab.Default when lastPopulator != null:
@@ -72,14 +72,14 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private void showEzSettings()
         {
-            ezSkinSettings = new EzSkinSettings
+            ezSkinSettings = new EzSkinTab
             {
                 RelativeSizeAxes = Axes.X
             };
             Content.Add(ezSkinSettings);
         }
 
-        private void showColorSettings()
+        private void showColumnSettings()
         {
             var ezColumnSettings = new EzColumnTab
             {

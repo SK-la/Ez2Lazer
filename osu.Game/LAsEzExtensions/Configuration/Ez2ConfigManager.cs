@@ -62,7 +62,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         {
             #region 皮肤类
 
-            SetDefault(Ez2Setting.LastSelectForColumnsType, 4);
+            SetDefault(Ez2Setting.ColumnTypeListSelect, 4);
             SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzStyleProOnly);
             SetDefault(Ez2Setting.GlobalHitPosition, false);
             SetDefault(Ez2Setting.GlobalTextureName, 4);
@@ -131,6 +131,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.CustomPoorHitResultBool, true);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 
+            SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
             SetDefault(Ez2Setting.ManiaHoldTailAlpha, 0.0, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
         }
@@ -436,7 +437,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         XxySRFilter,
         KpcDisplayMode,
 
-        LastSelectForColumnsType,
+        ColumnTypeListSelect,
         EzSelectCsMode,
 
         // 全局开关
@@ -463,6 +464,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         GameThemeName,
 
         // Mania 长按尾部相关（EzSkinEditor 用）
+        ManiaPseudo3DRotation,
         ManiaHoldTailAlpha,
         ManiaHoldTailMaskGradientHeight,
 
@@ -504,7 +506,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         HitMode,
         CustomHealthMode,
         CustomPoorHitResultBool,
-        ManiaBarLinesBool
+        ManiaBarLinesBool,
     }
 
     public enum EzColumnType

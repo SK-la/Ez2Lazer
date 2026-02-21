@@ -200,9 +200,40 @@ namespace osu.Game.LAsEzExtensions.Configuration
         public static readonly EzLocalisableString NoteTrackLine = new EzLocalisableString("Note辅助线", "Note Track Line");
         public static readonly EzLocalisableString NoteTrackLineTooltip = new EzLocalisableString("(Ez风格)note两侧辅助轨道线的高度", "(Ez Style)note side auxiliary track line height");
 
-        public static readonly EzLocalisableString RefreshSaveSkin = new EzLocalisableString("强制刷新、保存皮肤", "Refresh & Save Skin");
+        public static readonly EzLocalisableString RefreshSaveSkin = new EzLocalisableString("强制刷新&保存", "Force Refresh & Save Skin");
+        public static readonly EzLocalisableString RefreshSaveSkinTooltip = new EzLocalisableString("没遇到问题不要点，调整用按钮", "If you haven't encountered any issues, don't click this. Use it for adjustments.");
+
         public static readonly EzLocalisableString SwitchToAbsolute = new EzLocalisableString("强制刷新, 并切换至 绝对位置 (不稳定) ", "Refresh, Switch to Absolute(Unstable)");
         public static readonly EzLocalisableString SwitchToRelative = new EzLocalisableString("强制刷新, 并切换至 相对位置 (不稳定) ", "Refresh, Switch to Relative(Unstable)");
+
+        public static readonly EzLocalisableString STAGE_BACKGROUND_DIM = new EzLocalisableString("轨道暗度", "Column Dim");
+
+        public static readonly EzLocalisableString STAGE_BACKGROUND_DIM_TOOLTIP = new EzLocalisableString(
+            "设置Stage面板背景的暗化程度, 0为完全透明, 1为完全黑色", "Set the dim of each column, 0 is fully transparent, 1 is fully black");
+
+        public static readonly EzLocalisableString STAGE_BACKGROUND_BLUR = new EzLocalisableString("轨道虚化", "Column Blur");
+
+        public static readonly EzLocalisableString STAGE_BACKGROUND_BLUR_TOOLTIP = new EzLocalisableString(
+            "设置Stage面板背景的虚化程度, 0为不模糊, 1为完全模糊\n"
+            + "注意，如果铺面中有视频，面板", "Set the blur of each column, 0 is no blur, 1 is fully blurred");
+
+        public static readonly EzLocalisableString COLOUR_ENABLE_BUTTON = new EzLocalisableString("启用颜色配置", "Enable Colour Config");
+
+        public static readonly EzLocalisableString COLOUR_ENABLE_BUTTON_TOOLTIP = new EzLocalisableString(
+            "仅支持EzPro, Ez2, Strong Box, 3个皮肤.\n" +
+            "先修改Base基础颜色，然后定义每一列的类型（一个5种类型，S为Special特殊列，同时还关联特殊列宽度倍率设置）\n"
+            + "切换tab栏或保存后, 将重置默认颜色为当前设置值。",
+            "Only support EzPro, Ez2, Strong Box skins.\n"
+            + "First modify the Base color, then define the type of each column (5 types for one column, S is Special column, also related to Special Column Width Factor setting)\n"
+            + "Switching tabs or saving will reset the default color to the current setting value.");
+
+        public static readonly EzLocalisableString SAVE_COLOUR_BUTTON = new EzLocalisableString("保存颜色配置", "Save Colour Config");
+
+        public static readonly EzLocalisableString SAVE_COLOUR_BUTTON_TOOLTIP = new EzLocalisableString(
+            "保存当前颜色，并刷新默认值为当前设置值，下次修改设置时，重置控件的目标为本次保存值"
+            + "\n注意！切换Tab视同保存，如果你不喜欢修改结果，请重置颜色后再切换Tab",
+            "Save the current color and refresh the default value to the current setting value. "
+            + "\nThe next time you modify the setting, the target of the control will be reset to this saved value.");
 
         public static readonly EzLocalisableString DisableCmdSpace = new EzLocalisableString("游戏时禁用 Cmd+Space (聚焦搜索) ", "Disable Cmd+Space (Spotlight) during gameplay");
 
@@ -257,7 +288,15 @@ namespace osu.Game.LAsEzExtensions.Configuration
             "Key sound preview: \n0 Off; \n1 BlueLight (keypress triggers samples); \n2 GoldLight (preserve preview in song select; in gameplay auto-play note samples, keypresses no longer trigger sample playback)");
 
         public static readonly LocalisableString ManiaBarLinesBool = new EzLocalisableString("Mania 强制小节线显示开关", "(Mania) BarLines Boolean Toggle");
-        public static readonly LocalisableString ManiaBarLinesBoolTooltip = new EzLocalisableString("强制显示Mania小节线功能的开关, 关闭后仅由皮肤控制", "(Mania) Toggle to force display of bar lines, when off only controlled by skin");
+
+        public static readonly LocalisableString ManiaBarLinesBoolTooltip =
+            new EzLocalisableString("强制显示Mania小节线功能的开关, 关闭后仅由皮肤控制", "(Mania) Toggle to force display of bar lines, when off only controlled by skin");
+
+        public static readonly LocalisableString MANIA_PSEUDO_3D_ROTATION = new EzLocalisableString("Mania 轨道旋转角", "(Mania) Lane Perspective Angle");
+
+        public static readonly LocalisableString MANIA_PSEUDO_3D_ROTATION_TOOLTIP = new EzLocalisableString(
+            "通过透视映射模拟轨道旋转。0° 为原始效果，角度越大越明显（上窄下宽）。",
+            "Simulate lane rotation using perspective mapping. 0° is the original look, larger angles increase the effect (narrower top and wider bottom).");
 
         public static readonly LocalisableString OffsetPlusMania = new EzLocalisableString("高阶Offset修正(Mania)", "Advanced Offset Plus (Mania)");
 
@@ -274,14 +313,5 @@ namespace osu.Game.LAsEzExtensions.Configuration
             + "\n可以根绝所有输入延迟。（测试性功能！锁定成绩上传）",
             "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
             + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
-    }
-
-    public static class EzLocalizationExtensions
-    {
-        public static string Localize(this string key)
-        {
-            // 由于不再使用字典, 这个扩展方法可能不再需要, 但保留兼容性
-            return key;
-        }
     }
 }

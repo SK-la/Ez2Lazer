@@ -2,8 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.UI;
 using osuTK;
 
@@ -14,8 +17,13 @@ namespace osu.Game.Rulesets.Mania.UI
         protected override Container<Drawable> Content { get; }
 
         private readonly DrawSizePreservingFillContainer scalingContainer;
+        private readonly BufferedContainer perspectiveContainer;
 
         private readonly DrawableManiaRuleset drawableManiaRuleset;
+        private Bindable<double> maniaPseudo3DRotation = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         public ManiaPlayfieldAdjustmentContainer(DrawableManiaRuleset drawableManiaRuleset)
         {
@@ -25,11 +33,33 @@ namespace osu.Game.Rulesets.Mania.UI
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 RelativeSizeAxes = Axes.Both,
-                Child = Content = new Container
+                Child = perspectiveContainer = new BufferedContainer
                 {
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
                     RelativeSizeAxes = Axes.Both,
+                    DrawOriginal = false,
+                    Child = Content = new Container
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                    }
                 }
             };
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            maniaPseudo3DRotation = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation);
+            maniaPseudo3DRotation.BindValueChanged(_ => updatePerspective(), true);
+        }
+
+        private void updatePerspective()
+        {
+            float angle = (float)maniaPseudo3DRotation.Value;
+            float t = angle / 75f;
+
+            perspectiveContainer.VerticalPerspective = t;
         }
 
         protected override void Update()
