@@ -21,6 +21,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private readonly IBindable<double> hitPositonBindable = new BindableDouble();
         private readonly IBindable<double> columnWidth = new BindableDouble();
+        private readonly IBindable<double> specialFactor = new BindableDouble();
         private readonly IBindable<string> stageName = new Bindable<string>();
 
         private readonly LayoutValue layout = new LayoutValue(Invalidation.DrawSize);
@@ -63,6 +64,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
             columnWidth.BindTo(ezSkinInfo.ColumnWidth);
+            specialFactor.BindTo(ezSkinInfo.SpecialFactor);
             stageName.BindTo(ezSkinInfo.StageName);
             stageName.BindValueChanged(_ => OnSkinChanged(), true);
             hitPositonBindable.BindValueChanged(_ => invalidateLayout(), true);

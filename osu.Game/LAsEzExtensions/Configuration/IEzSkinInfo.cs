@@ -14,7 +14,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         IBindable<double> SpecialFactor { get; }
 
         IBindable<double> HitPosition { get; }
-        IBindable<double> VisualHitPosition { get; }
 
         IBindable<double> NoteHeightScaleToWidth { get; }
         IBindable<double> NoteTrackLineHeight { get; }
@@ -37,7 +36,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         public readonly Bindable<double> SpecialFactorBindable = new Bindable<double>();
 
         public readonly Bindable<double> HitPositionBindable = new Bindable<double>();
-        public readonly Bindable<double> VisualHitPositionBindable = new Bindable<double>();
 
         public readonly Bindable<double> NoteHeightScaleToWidthBindable = new Bindable<double>();
         public readonly Bindable<double> NoteTrackLineHeightBindable = new Bindable<double>();
@@ -88,7 +86,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         IBindable<double> IEzSkinInfo.SpecialFactor => SpecialFactorBindable;
 
         IBindable<double> IEzSkinInfo.HitPosition => HitPositionBindable;
-        IBindable<double> IEzSkinInfo.VisualHitPosition => VisualHitPositionBindable;
 
         IBindable<double> IEzSkinInfo.NoteHeightScaleToWidth => NoteHeightScaleToWidthBindable;
         IBindable<double> IEzSkinInfo.NoteTrackLineHeight => NoteTrackLineHeightBindable;

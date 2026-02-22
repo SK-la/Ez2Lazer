@@ -10,7 +10,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -18,6 +17,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzNoteSideLine : CompositeDrawable
     {
         private Drawable separator = null!;
+        private readonly IBindable<double> noteTrackLineHeight = new BindableDouble();
 
         [Resolved]
         private TextureStore textures { get; set; } = null!;
@@ -43,12 +43,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         RelativeSizeAxes = Axes.X,
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
-                        // Blending = BlendingParameters.Mixture,
+                        // Blending = BlendingParameters.Additive,
                         Child = new Sprite
                         {
                             RelativeSizeAxes = Axes.Y,
                             Width = 10,
-                            Scale = new Vector2(2f, 1),
+                            Scale = new Vector2(1f, 1),
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
                             Texture = texture,
@@ -56,21 +56,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     }
                 }
             };
-
-            // Initialize from the column's central EzSkinInfo. Note-level components must not create their
-            // own bindings; column is authoritative and will notify notes via ColumnWatcher.
-            separator.Height = (float)column.EzSkinInfo.NoteTrackLineHeight.Value;
         }
 
-        public void UpdateTrackLineHeight()
+        public void UpdateTrackLineHeight(ValueChangedEvent<double> v)
         {
-            separator.Height = (float)column.EzSkinInfo.NoteTrackLineHeight.Value;
+            separator.Height = (float)v.NewValue;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            UpdateTrackLineHeight();
+            noteTrackLineHeight.BindTo(column.EzSkinInfo.NoteTrackLineHeight);
+            noteTrackLineHeight.BindValueChanged(UpdateTrackLineHeight, true);
         }
 
         public void UpdateGlowEffect(Colour4 color)

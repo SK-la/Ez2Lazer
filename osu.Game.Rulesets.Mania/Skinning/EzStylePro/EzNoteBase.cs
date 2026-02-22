@@ -127,14 +127,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             lastNoteColorCached = false;
             UpdateColor();
 
-            if (LineContainer?.Children != null)
-            {
-                foreach (var child in LineContainer.Children)
-                {
-                    if (child is EzNoteSideLine sideLine)
-                        sideLine.UpdateTrackLineHeight();
-                }
-            }
+            // if (LineContainer?.Children != null)
+            // {
+            //     foreach (var child in LineContainer.Children)
+            //     {
+            //         if (child is EzNoteSideLine sideLine)
+            //             sideLine.UpdateTrackLineHeight();
+            //     }
+            // }
         }
 
         protected virtual void UpdateColor()
