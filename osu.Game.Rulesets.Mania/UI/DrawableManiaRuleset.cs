@@ -184,23 +184,18 @@ namespace osu.Game.Rulesets.Mania.UI
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>
             {
-                _ = Task.Run(async () =>
+                try
                 {
-                    try
-                    {
-                        var factory = Dependencies.Get<EzLocalTextureFactory>();
+                    var factory = Dependencies.Get<EzLocalTextureFactory>();
 
-                        if (factory != null)
-                        {
-                            await factory.PreloadGameTextures().ConfigureAwait(false);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}",
-                            LoggingTarget.Runtime, LogLevel.Error);
-                    }
-                });
+                    if (factory != null)
+                        _ = factory.PreloadGameTextures();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}",
+                        LoggingTarget.Runtime, LogLevel.Error);
+                }
             });
         }
 

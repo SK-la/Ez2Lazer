@@ -30,16 +30,10 @@ namespace osu.Game.LAsEzExtensions
                 Logger.Log($"[EzLocalTextureFactory] Starting preload for note set: {currentNoteSetName}",
                     LoggingTarget.Runtime, LogLevel.Debug);
 
-                var preloadTasks = new List<Task>();
-
                 foreach (string component in preload_components)
-                {
-                    preloadTasks.Add(Task.Run(() => preloadComponent(component, currentNoteSetName)));
-                }
+                    preloadComponent(component, currentNoteSetName);
 
-                // preloadTasks.Add(Task.Run(preloadStageTextures));
-
-                await Task.WhenAll(preloadTasks).ConfigureAwait(false);
+                await Task.CompletedTask.ConfigureAwait(false);
 
                 preloadCompleted = true;
                 Logger.Log($"[EzLocalTextureFactory] Preload completed for {preload_components.Length} components",
