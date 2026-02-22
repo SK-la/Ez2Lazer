@@ -133,6 +133,12 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods
         public static readonly LocalisableString JudgmentsAdjust_Description = new EzLocalisableString("修改你的判定", "Modify your judgement.");
 
         public static readonly LocalisableString PatternShift_Description = new EzLocalisableString("重构谱面列数、密度与多压", "Rebuild the beatmap with new column count, density and chord limit.");
+        public static readonly LocalisableString PatternShift_Description_Bracket = new EzLocalisableString("修改/补充键型：切叉", "Rebuild the beatmap with new column count, density and chord limit (with bracket).");
+        public static readonly LocalisableString PatternShift_Description_Chord = new EzLocalisableString("修改/补充键型：拍", "Rebuild the beatmap with new column count, density and chord limit (chord limit).");
+        public static readonly LocalisableString PatternShift_Description_Delay = new EzLocalisableString("修改/补充键型：偏移", "Rebuild the beatmap with new column count, density and chord limit (with delay).");
+        public static readonly LocalisableString PatternShift_Description_Dump = new EzLocalisableString("修改/补充键型：楼梯", "Rebuild the beatmap with new column count, density and chord limit (full).");
+        public static readonly LocalisableString PatternShift_Description_Jack = new EzLocalisableString("修改/补充键型：叠/子弹", "Rebuild the beatmap with new column count, density and chord limit (with Jack).");
+
         public static readonly LocalisableString PatternShift_KeyCount_Label = new EzLocalisableString("目标列数", "Target Columns");
         public static readonly LocalisableString PatternShift_KeyCount_Description = new EzLocalisableString("设置生成后的列数", "Set the output column count.");
         public static readonly LocalisableString PatternShift_Density_Label = new EzLocalisableString("密度", "Density");

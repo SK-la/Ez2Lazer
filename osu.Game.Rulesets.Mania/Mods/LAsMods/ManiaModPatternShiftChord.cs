@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Bindables;
+using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
@@ -17,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         protected override KeyPatternType PatternType => KeyPatternType.Chord;
         protected override string PatternName => "Chord";
         protected override string PatternAcronym => "PSC";
-
+        public override LocalisableString Description => EzManiaModStrings.PatternShift_Description_Chord;
         protected override int DefaultLevel => 4;
         protected override EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
         protected override int DefaultOscillationBeats => 1;

@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         protected override KeyPatternType PatternType => KeyPatternType.Jack;
         protected override string PatternName => "Jack";
         protected override string PatternAcronym => "PSJ";
-
+        public override LocalisableString Description => EzManiaModStrings.PatternShift_Description_Jack;
         protected override int DefaultLevel => 5;
         protected override EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
         protected override int DefaultOscillationBeats => 1;

@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         protected override KeyPatternType PatternType => KeyPatternType.Bracket;
         protected override string PatternName => "Bracket";
         protected override string PatternAcronym => "PSB";
-
+        public override LocalisableString Description => EzManiaModStrings.PatternShift_Description_Bracket;
         protected override int DefaultLevel => 4;
         protected override EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
         protected override int DefaultOscillationBeats => 1;
