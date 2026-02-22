@@ -13,6 +13,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteHittingLayer : EzNoteBase
     {
+        private static readonly BlendingParameters additive_preserve_alpha = new BlendingParameters
+        {
+            Source = BlendingType.SrcAlpha,
+            Destination = BlendingType.One,
+            SourceAlpha = BlendingType.Zero,
+            DestinationAlpha = BlendingType.One,
+            RGBEquation = BlendingEquation.Add,
+            AlphaEquation = BlendingEquation.Add,
+        };
+
         protected override bool BoolUpdateColor => false;
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
         private TextureAnimation? animation;
@@ -24,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.Centre;
             RelativeSizeAxes = Axes.None;
-            Blending = BlendingParameters.Additive;
+            Blending = additive_preserve_alpha;
         }
 
         [BackgroundDependencyLoader]

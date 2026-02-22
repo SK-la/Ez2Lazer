@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         RelativeSizeAxes = Axes.X,
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
-                        Blending = BlendingParameters.Additive,
+                        // Blending = BlendingParameters.Mixture,
                         Child = new Sprite
                         {
                             RelativeSizeAxes = Axes.Y,
@@ -70,11 +70,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            updateSizes();
-        }
-
-        private void updateSizes()
-        {
             UpdateTrackLineHeight();
         }
 

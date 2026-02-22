@@ -13,6 +13,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHitExplosion : EzNoteBase, IHitExplosion
     {
+        private static readonly BlendingParameters additive_preserve_alpha = new BlendingParameters
+        {
+            Source = BlendingType.SrcAlpha,
+            Destination = BlendingType.One,
+            SourceAlpha = BlendingType.Zero,
+            DestinationAlpha = BlendingType.One,
+            RGBEquation = BlendingEquation.Add,
+            AlphaEquation = BlendingEquation.Add,
+        };
+
         protected override bool BoolUpdateColor => false;
 
         // public override bool RemoveWhenNotAlive => true;
@@ -23,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         public EzHitExplosion()
         {
             RelativeSizeAxes = Axes.Both;
-            Blending = BlendingParameters.Additive;
+            Blending = additive_preserve_alpha;
         }
 
         [BackgroundDependencyLoader]

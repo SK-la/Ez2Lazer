@@ -154,14 +154,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             }
 
-            if (LineContainer?.Children != null)
-            {
-                foreach (var child in LineContainer.Children)
-                {
-                    if (child is EzNoteSideLine sideLine)
-                        sideLine.UpdateGlowEffect(NoteColor);
-                }
-            }
+            // if (LineContainer?.Children != null)
+            // {
+            //     foreach (var child in LineContainer.Children)
+            //     {
+            //         if (child is EzNoteSideLine sideLine)
+            //             sideLine.UpdateGlowEffect(NoteColor);
+            //     }
+            // }
         }
 
         private void OnColourChanged()

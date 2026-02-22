@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 RelativeSizeAxes = Axes.Both,
-                Child = perspectiveContainer = new BufferedContainer
+                Child = perspectiveContainer = new BufferedContainer(pixelSnapping: true)
                 {
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
