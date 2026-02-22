@@ -107,6 +107,9 @@ namespace osu.Game.Rulesets.Mania.UI
                     RelativeSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
+                    PassthroughByDrawOrder = false,
+                    StrictCaptureTargetsMode = false,
+                    // FrameBufferScale = new Vector2(0.2f),
                     CaptureFrameInterval = 1,
                     MaxCapturesPerSecond = 0,
                 },
@@ -330,14 +333,20 @@ namespace osu.Game.Rulesets.Mania.UI
             if (gameplayBackdropSource == null)
                 return;
 
-            stageBackdropBlur.CaptureTarget = null;
+            Drawable preferredSource = gameplayBackdropSource.StoryboardPreferred
+                ? gameplayBackdropSource.StoryboardSource
+                : gameplayBackdropSource.BeatmapBackgroundSource;
+
+            Drawable fallbackSource = gameplayBackdropSource.StoryboardPreferred
+                ? gameplayBackdropSource.BeatmapBackgroundSource
+                : gameplayBackdropSource.StoryboardSource;
+
+            stageBackdropBlur.CaptureTarget = preferredSource ?? fallbackSource;
+
             stageBackdropBlur.CaptureTargets.Clear();
 
-            if (gameplayBackdropSource.BeatmapBackgroundSource != null)
-                stageBackdropBlur.CaptureTargets.Add(gameplayBackdropSource.BeatmapBackgroundSource);
-
-            if (gameplayBackdropSource.StoryboardSource != null)
-                stageBackdropBlur.CaptureTargets.Add(gameplayBackdropSource.StoryboardSource);
+            if (preferredSource != null)
+                stageBackdropBlur.CaptureTargets.Add(preferredSource);
         }
     }
 }
