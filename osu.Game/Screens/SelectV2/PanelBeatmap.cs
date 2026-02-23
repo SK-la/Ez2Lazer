@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -35,7 +34,7 @@ namespace osu.Game.Screens.SelectV2
 {
     public partial class PanelBeatmap : Panel
     {
-        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT + 8f;
+        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT + 26f;
 
         private const int update_ms = 15;
 
@@ -60,6 +59,8 @@ namespace osu.Game.Screens.SelectV2
         private EzKpsDisplay ezKpsDisplay = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
         private EzDisplayXxySR displayXxySR = null!;
+        private EzTagDisplay ezTagDisplay = null!;
+
         private Bindable<bool> xxySrFilterSetting = null!;
         private Bindable<KpcDisplayMode> kpcMode = null!;
 
@@ -237,6 +238,11 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                         },
                                     }
+                                },
+                                ezTagDisplay = new EzTagDisplay
+                                {
+                                    Margin = new MarginPadding { Top = 2 },
+                                    Alpha = 0.9f,
                                 }
                             }
                         }
@@ -283,6 +289,7 @@ namespace osu.Game.Screens.SelectV2
             localRank.Beatmap = beatmap;
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
+            ezTagDisplay.UpdateBeatmap(beatmap);
 
             computeManiaAnalysis();
             computeStarRating();
@@ -319,6 +326,7 @@ namespace osu.Game.Screens.SelectV2
 
             localRank.Beatmap = null;
             starDifficultyBindable = null;
+            ezTagDisplay.UpdateBeatmap(null);
 
             starDifficultyCancellationSource?.Cancel();
             maniaAnalysisCancellationSource?.Cancel();

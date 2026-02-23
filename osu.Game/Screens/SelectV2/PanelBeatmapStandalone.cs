@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Buffers;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -32,7 +31,7 @@ namespace osu.Game.Screens.SelectV2
 {
     public partial class PanelBeatmapStandalone : Panel
     {
-        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT * 1.6f;
+        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT * 1.8f;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -61,6 +60,8 @@ namespace osu.Game.Screens.SelectV2
         private EzKpsDisplay ezKpsDisplay = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
         private EzDisplayXxySR displayXxySR = null!;
+        private EzTagDisplay ezTagDisplay = null!;
+
         private Bindable<KpcDisplayMode> kpcMode = null!;
 
         private IBindable<EzAnalysisResult>? maniaAnalysisBindable;
@@ -246,6 +247,11 @@ namespace osu.Game.Screens.SelectV2
                                             Origin = Anchor.CentreLeft,
                                         },
                                     },
+                                },
+                                ezTagDisplay = new EzTagDisplay
+                                {
+                                    Margin = new MarginPadding { Top = 2 },
+                                    Alpha = 0.9f,
                                 }
                             }
                         }
@@ -302,6 +308,7 @@ namespace osu.Game.Screens.SelectV2
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
+            ezTagDisplay.UpdateBeatmap(beatmap);
             computeManiaAnalysis();
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
@@ -337,6 +344,7 @@ namespace osu.Game.Screens.SelectV2
             starDifficultyCancellationSource?.Cancel();
 
             // Ez功能
+            ezTagDisplay.UpdateBeatmap(null);
             maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisBindable = null;
         }
