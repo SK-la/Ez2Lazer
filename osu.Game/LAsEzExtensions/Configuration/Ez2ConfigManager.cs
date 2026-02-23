@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
@@ -11,6 +10,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
+using osu.Game.LAsEzExtensions.Online;
 using osu.Game.Screens.SelectV2;
 
 namespace osu.Game.LAsEzExtensions.Configuration
@@ -123,6 +123,24 @@ namespace osu.Game.LAsEzExtensions.Configuration
             // 判定偏移修正（以毫秒计）
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
+
+            // 服务器配置
+            SetDefault(Ez2Setting.ServerPreset, ServerPreset.Official);
+            SetDefault(Ez2Setting.CustomApiUrl, string.Empty);
+            SetDefault(Ez2Setting.CustomWebsiteUrl, string.Empty);
+            SetDefault(Ez2Setting.CustomClientId, string.Empty);
+            SetDefault(Ez2Setting.CustomClientSecret, string.Empty);
+            SetDefault(Ez2Setting.CustomSpectatorUrl, string.Empty);
+            SetDefault(Ez2Setting.CustomMultiplayerUrl, string.Empty);
+            SetDefault(Ez2Setting.CustomMetadataUrl, string.Empty);
+
+            // 每个服务器对应的登录账号
+            SetDefault(Ez2Setting.ServerOfficialUsername, string.Empty);
+            SetDefault(Ez2Setting.ServerOfficialToken, string.Empty);
+            SetDefault(Ez2Setting.ServerGuUsername, string.Empty);
+            SetDefault(Ez2Setting.ServerGuToken, string.Empty);
+            SetDefault(Ez2Setting.ServerManualUsername, string.Empty);
+            SetDefault(Ez2Setting.ServerManualToken, string.Empty);
         }
 
         private void initializeManiaDefaults()
@@ -509,6 +527,25 @@ namespace osu.Game.LAsEzExtensions.Configuration
         CustomHealthMode,
         CustomPoorHitResultBool,
         ManiaBarLinesBool,
+
+        // 服务器配置
+        ServerPreset, // 服务器预设选项
+
+        CustomApiUrl,
+        CustomWebsiteUrl,
+        CustomClientId,
+        CustomClientSecret,
+        CustomSpectatorUrl,
+        CustomMultiplayerUrl,
+        CustomMetadataUrl,
+
+        // 各服务器对应的登录凭证
+        ServerOfficialUsername,
+        ServerOfficialToken,
+        ServerGuUsername,
+        ServerGuToken,
+        ServerManualUsername,
+        ServerManualToken,
     }
 
     public enum EzColumnType
