@@ -47,9 +47,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Localization
         public static readonly LocalisableString POOR_HIT_RESULT = new EzLocalizationManager.EzLocalisableString("增加 Poor 判定类型", "Additional Poor HitResult");
 
         public static readonly LocalisableString POOR_HIT_RESULT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "Pool判定类型只用于严格扣血, 不影响Combo、Score\n"
+            "Pool判定类型只在BMS系血量系统下生效, 用于严格扣血, 不影响Combo、Score\n"
             + "一个note可触发多个Pool判定, 只有早于Miss时才会触发, 不存在晚Pool",
-            "The Poor HitResult type is only used for strict health reduction, and does not affect Combo or Score\n"
+            "The Poor HitResult type only takes effect under the BMS Health Mode, used for strict health deduction, does not affect Combo or Score\n"
             + "One note can trigger multiple Poor hit results, and it will only trigger if it is earlier than Miss, there is no late Poor");
 
         public static readonly LocalisableString MANIA_BAR_LINES_BOOL = new EzLocalizationManager.EzLocalisableString("启用强制显示小节线", "Force Display Bar Lines");
