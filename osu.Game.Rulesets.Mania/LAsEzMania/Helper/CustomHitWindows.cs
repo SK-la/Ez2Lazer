@@ -8,7 +8,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
 {
-    // TODO:考虑重构为使用冻结字典 FrozenDictionary<EzEnumHitMode, double[]> 来存储各个模式的窗口，实现性能最大化。
+    // NOTE: 当前模式数量很少，优先保持 switch/数组索引与低分配路径，收益通常高于引入 FrozenDictionary。
     public class CustomHitWindowsHelper
     {
         private static readonly double[,] hit_range_bms =
@@ -191,29 +191,64 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                     double meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, meh_window_range) * TotalMultiplier) + 0.5;
                     double miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, miss_window_range) * TotalMultiplier) + 0.5;
                     double poor = miss;
-                    SetRanges(new[] { perfect, great, good, ok, meh, miss, poor });
+                    SetRanges(perfect, great, good, ok, meh, miss, poor);
                     break;
 
                 case EzEnumHitMode.O2Jam:
-                    SetRanges(GetHitWindowsO2Jam(bpm));
+                    Range305 = 7500.0 / bpm * TotalMultiplier;
+                    Range300 = Range305;
+                    Range200 = 22500.0 / bpm * TotalMultiplier;
+                    Range100 = Range200;
+                    Range050 = 31250.0 / bpm * TotalMultiplier;
+                    Range000 = Range050;
+                    PoorRange = Range000 + poor_offset;
                     break;
 
                 case EzEnumHitMode.EZ2AC:
-                    SetRanges(GetHitWindowsEZ2AC());
+                    Range305 = 18.0 * TotalMultiplier;
+                    Range300 = 38.0 * TotalMultiplier;
+                    Range200 = 68.0 * TotalMultiplier;
+                    Range100 = 88.0 * TotalMultiplier;
+                    Range050 = 88.0 * TotalMultiplier;
+                    Range000 = 100.0 * TotalMultiplier;
+                    PoorRange = poor_offset;
                     break;
 
                 case EzEnumHitMode.IIDX_HD:
                 case EzEnumHitMode.LR2_HD:
                 case EzEnumHitMode.Raja_NM:
-                    SetRanges(GetHitWindowsBMS(0));
+                    int row = HitMode == EzEnumHitMode.LR2_HD ? 1
+                        : HitMode == EzEnumHitMode.Raja_NM ? 2
+                        : 0;
+
+                    Range305 = hit_range_bms[row, 0] * TotalMultiplier;
+                    Range300 = hit_range_bms[row, 1] * TotalMultiplier;
+                    Range200 = hit_range_bms[row, 2] * TotalMultiplier;
+                    Range100 = hit_range_bms[row, 3] * TotalMultiplier;
+                    Range050 = hit_range_bms[row, 4] * TotalMultiplier;
+                    Range000 = hit_range_bms[row, 5] * TotalMultiplier;
+                    PoorRange = hit_range_bms[row, 6] * TotalMultiplier;
                     break;
 
                 case EzEnumHitMode.Malody:
-                    SetRanges(GetHitWindowsMelody());
+                    Range305 = 20.0 * TotalMultiplier;
+                    Range300 = 40.0 * TotalMultiplier;
+                    Range200 = 60.0 * TotalMultiplier;
+                    Range100 = 80.0 * TotalMultiplier;
+                    Range050 = 100.0 * TotalMultiplier;
+                    Range000 = 120.0 * TotalMultiplier;
+                    PoorRange = Range000 + poor_offset;
                     break;
 
                 default:
-                    SetRanges(GetHitWindowsClassic());
+                    double invertedOd = Math.Clamp(10 - OverallDifficulty, 0, 10);
+                    Range305 = Math.Floor(16 * TotalMultiplier) + 0.5;
+                    Range300 = Math.Floor((34 + 3 * invertedOd) * TotalMultiplier) + 0.5;
+                    Range200 = Math.Floor((67 + 3 * invertedOd) * TotalMultiplier) + 0.5;
+                    Range100 = Math.Floor((97 + 3 * invertedOd) * TotalMultiplier) + 0.5;
+                    Range050 = Math.Floor((121 + 3 * invertedOd) * TotalMultiplier) + 0.5;
+                    Range000 = Math.Floor((158 + 3 * invertedOd) * TotalMultiplier) + 0.5;
+                    PoorRange = Range000;
                     break;
             }
         }
@@ -282,7 +317,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
         {
             if (ranges == null) return;
 
-            if (ranges.Length >= 6)
+            if (ranges.Length >= 7)
             {
                 Range305 = ranges[0];
                 Range300 = ranges[1];
@@ -292,6 +327,17 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                 Range000 = ranges[5];
                 PoorRange = ranges[6];
             }
+        }
+
+        private void SetRanges(double range305, double range300, double range200, double range100, double range050, double range000, double poorRange)
+        {
+            Range305 = range305;
+            Range300 = range300;
+            Range200 = range200;
+            Range100 = range100;
+            Range050 = range050;
+            Range000 = range000;
+            PoorRange = poorRange;
         }
 
         /// <summary>
