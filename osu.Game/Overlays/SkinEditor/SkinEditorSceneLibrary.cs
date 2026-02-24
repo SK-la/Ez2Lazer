@@ -91,7 +91,7 @@ namespace osu.Game.Overlays.SkinEditor
                                 },
                                 new SceneButton
                                 {
-                                    Text = "Mania Note Editor(Testing)",
+                                    Text = "LN Editor",
                                     Anchor = Anchor.CentreLeft,
                                     Origin = Anchor.CentreLeft,
                                     Action = () => skinEditorOverlay?.ToggleEzSkinEditor(),

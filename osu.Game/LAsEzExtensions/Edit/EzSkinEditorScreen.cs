@@ -4,9 +4,9 @@
 using System;
 using System.Reflection;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
@@ -15,35 +15,24 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
-using osu.Game.Rulesets;
+using osu.Game.Screens;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Screens
+namespace osu.Game.LAsEzExtensions.Edit
 {
     /// <summary>
-    /// 一个屏幕，用于在用户请求时加载皮肤编辑器以指定目标。
-    /// 这也处理目标的缩放/定位调整。
+    /// Ez皮肤编辑界面，提供预览和参数调整功能。通过按钮打开，该场景应与GameplayScreen和SongSelect并列存在，以同样的形式进行切换。
+    /// <para>分为三个区域：</para>
+    /// 1.左侧, 虚拟播放场景（循环连续播放note下落，包含循环命中，和循环Miss）;
+    /// 2.中间, 当前皮肤note显示 vs 编辑中note显示对比（LN的Head, Body, Tail显示容器着色边框）;
+    /// 3.右侧, 设置面板, 放置相关设置，投皮面尾编辑一类。
     /// </summary>
-    public partial class EzSkinEditorScreen : OverlayContainer
+    public partial class EzSkinEditorScreen : OsuScreen
     {
-        // Only block interactions inside the central preview rect.
-        // Keep non-positional input (handled by SkinEditorOverlay) working for sidebars/menus.
-        protected override bool BlockPositionalInput => true;
-        protected override bool BlockNonPositionalInput => false;
-
-        [Resolved]
-        private ISkinSource skinSource { get; set; } = null!;
-
         [Resolved]
         private SkinManager skinManager { get; set; } = null!;
-
-        [Resolved]
-        private Bindable<RulesetInfo> ruleset { get; set; } = null!;
-
-        [Resolved]
-        private Bindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         // 必须这样，否则会构建失败
         [Resolved(canBeNull: true)]
@@ -51,13 +40,10 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private ISkinEditorVirtualProvider? provider;
 
-        private Container? mainContainer;
         private Container? backgroundContainer;
         private Container? leftPlaybackContainer;
         private Container? centerNoteDisplayContainer;
-        private Container? rightSettingsContainer;
         private OsuScrollContainer? settingsScrollContainer;
-        private OsuButton? applyButton;
 
         public EzSkinEditorScreen()
         {
@@ -68,14 +54,16 @@ namespace osu.Game.LAsEzExtensions.Screens
             // AddLayout(drawSizeLayout = new LayoutValue(Invalidation.DrawSize));
         }
 
-        protected override void PopIn()
+        public override void OnEntering(ScreenTransitionEvent e)
         {
-            this.FadeIn(200, Easing.OutQuint);
+            base.OnEntering(e);
+            this.FadeInFromZero(200, Easing.OutQuint);
         }
 
-        protected override void PopOut()
+        public override bool OnExiting(ScreenExitEvent e)
         {
             this.FadeOut(200, Easing.OutQuint);
+            return base.OnExiting(e);
         }
 
         [BackgroundDependencyLoader]
@@ -83,7 +71,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         {
             InternalChildren = new Drawable[]
             {
-                mainContainer = new Container
+                new Container
                 {
                     RelativeSizeAxes = Axes.Both,
                     Children = new Drawable[]
@@ -122,7 +110,7 @@ namespace osu.Game.LAsEzExtensions.Screens
                                         RelativeSizeAxes = Axes.Both,
                                     },
                                     // 右侧：设置面板
-                                    rightSettingsContainer = new Container
+                                    new Container
                                     {
                                         RelativeSizeAxes = Axes.Both,
                                         Children = new Drawable[]
@@ -132,14 +120,14 @@ namespace osu.Game.LAsEzExtensions.Screens
                                                 RelativeSizeAxes = Axes.Both,
                                                 Height = 0.9f, // 为应用按钮留出空间
                                             },
-                                            applyButton = new ApplySettingsButton
+                                            new ApplySettingsButton
                                             {
                                                 Text = "Apply Settings",
                                                 RelativeSizeAxes = Axes.X,
                                                 Height = 40,
                                                 Anchor = Anchor.BottomCentre,
                                                 Origin = Anchor.BottomCentre,
-                                                Action = ApplySettings,
+                                                Action = applySettings,
                                             }
                                         }
                                     },
@@ -158,53 +146,76 @@ namespace osu.Game.LAsEzExtensions.Screens
             base.LoadComplete();
 
             // Ensure dependencies are available before initialising.
-            PopulateSettings();
+            Schedule(populateSettings);
         }
 
-        public void PopulateSettings()
+        public void PopulateSettings() => populateSettings();
+
+        private void populateSettings()
         {
             // 注意：这里不要创建 HitObjectComposer（会引入编辑器依赖）。
-            // 本功能目前只服务 mania + EzPro，通过 registry 解析 provider。
-            var currentBeatmap = beatmap.Value.Beatmap;
-            var ezProSkin = skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager);
-
             // 尽量确保 mania 程序集已加载，以便其在模块初始化时完成 provider 注册。
-            try
-            {
-                Assembly.Load("osu.Game.Rulesets.Mania");
-            }
-            catch
-            {
-            }
 
             backgroundContainer!.Child = createManiaStageBackgroundOrNull() ?? new Container { RelativeSizeAxes = Axes.Both };
             backgroundContainer.Child.RelativeSizeAxes = Axes.Both;
 
-            provider = createManiaProviderOrNull();
+            provider = createProviderOrNull(Beatmap.Value?.Beatmap);
 
             // 当调用时初始化屏幕
-            InitializeLeftPlayback();
-            InitializeCenterDisplay();
-            InitializeRightSettings();
+            initializeLeftPlayback();
+            initializeCenterDisplay();
+            initializeRightSettings();
         }
 
-        private static ISkinEditorVirtualProvider? createManiaProviderOrNull()
+        private static ISkinEditorVirtualProvider? createProviderOrNull(IBeatmap? beatmap)
         {
-            // 仅针对 mania + EzPro 的简化实现：用反射创建 provider，避免引入 registry/额外文件。
-            const string type_name = "osu.Game.Rulesets.Mania.Skinning.Editor.ManiaEzProSkinEditorVirtualProvider, osu.Game.Rulesets.Mania";
-
+            // Prefer a ruleset-registered provider when a beatmap is available.
             try
             {
-                var providerType = Type.GetType(type_name, throwOnError: false);
-                if (providerType == null)
-                    return null;
+                int rulesetId = beatmap?.BeatmapInfo.Ruleset.OnlineID ?? 0;
 
-                return Activator.CreateInstance(providerType) as ISkinEditorVirtualProvider;
+                if (rulesetId != 0)
+                {
+                    var fromRegistry = SkinEditorProviderRegistry.Get(rulesetId);
+                    if (fromRegistry != null)
+                        return fromRegistry;
+                }
+
+                // Fallback: discover any loaded type that implements ISkinEditorVirtualProvider.
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type[] types;
+
+                    try
+                    {
+                        types = asm.GetTypes();
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    foreach (var t in types)
+                    {
+                        if (typeof(ISkinEditorVirtualProvider).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
+                        {
+                            try
+                            {
+                                return Activator.CreateInstance(t) as ISkinEditorVirtualProvider;
+                            }
+                            catch
+                            {
+                                // ignore and continue
+                            }
+                        }
+                    }
+                }
             }
             catch
             {
-                return null;
             }
+
+            return null;
         }
 
         private static Drawable? createManiaStageBackgroundOrNull()
@@ -241,18 +252,17 @@ namespace osu.Game.LAsEzExtensions.Screens
             }
         }
 
-        private void InitializeLeftPlayback()
+        private void initializeLeftPlayback()
         {
             var currentSkin = skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager);
-            var currentBeatmap = beatmap.Value.Beatmap;
 
             if (provider != null)
             {
-                var virtualPlayfield = provider.CreateVirtualPlayfield(currentSkin, currentBeatmap);
+                var dynamicPart = provider.CreateDynamicPart(currentSkin);
 
                 leftPlaybackContainer!.Children = new Drawable[]
                 {
-                    virtualPlayfield.With(p =>
+                    dynamicPart.With(p =>
                     {
                         p.RelativeSizeAxes = Axes.Both;
                         p.Anchor = Anchor.Centre;
@@ -276,23 +286,13 @@ namespace osu.Game.LAsEzExtensions.Screens
             }
         }
 
-        private void InitializeCenterDisplay()
+        private void initializeCenterDisplay()
         {
             if (provider != null)
             {
                 centerNoteDisplayContainer!.Children = new Drawable[]
                 {
-                    new FillFlowContainer
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Direction = FillDirection.Horizontal,
-                        Spacing = new Vector2(10),
-                        Children = new[]
-                        {
-                            provider.CreateCurrentSkinNoteDisplay(skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager)),
-                            provider.CreateEditedNoteDisplay(skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager)),
-                        }
-                    }
+                    provider.CreateStaticPart(skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager))
                 };
             }
             else
@@ -310,61 +310,78 @@ namespace osu.Game.LAsEzExtensions.Screens
             }
         }
 
-        private void InitializeRightSettings()
+        private void initializeRightSettings()
         {
-            // TODO: 添加皮肤参数控件和应用逻辑
-            settingsScrollContainer!.Child = new FillFlowContainer
+            if (provider != null)
             {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(10),
-                Padding = new MarginPadding(10),
-                Children = new Drawable[]
+                // Provider may provide a full parameters UI; prefer that when available.
+                settingsScrollContainer!.Child = provider.CreateParametersPart(skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager));
+            }
+            else
+            {
+                // Default placeholder when provider not present
+                settingsScrollContainer!.Child = new FillFlowContainer
                 {
-                    new OsuSpriteText
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(10),
+                    Padding = new MarginPadding(10),
+                    Children = new Drawable[]
                     {
-                        Text = "皮肤参数调整",
-                        Colour = Color4.White,
-                        Font = OsuFont.Default.With(size: 18),
-                    },
-                    new OsuSpriteText
-                    {
-                        Text = "TODO: 添加参数控件",
-                        Colour = Color4.Gray,
-                        Font = OsuFont.Default.With(size: 14),
+                        new OsuSpriteText
+                        {
+                            Text = "皮肤参数调整",
+                            Colour = Color4.White,
+                            Font = OsuFont.Default.With(size: 18),
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = "TODO: 添加参数控件",
+                            Colour = Color4.Gray,
+                            Font = OsuFont.Default.With(size: 14),
+                        }
                     }
-                }
-            };
+                };
+            }
         }
 
-        private void ApplySettings()
+        private void applySettings()
         {
             // TODO: 将设置应用到当前皮肤
             // 目前只是刷新中间显示
-            InitializeCenterDisplay();
+            initializeCenterDisplay();
         }
 
-        private void ShowExitDialog()
+        private void showExitDialog()
         {
             // 里程碑A阶段：dialog overlay 可能在当前依赖树里不可用，务必降级为直接退出。
             if (dialogOverlay == null)
             {
-                Hide();
+                this.Exit();
                 return;
             }
 
             dialogOverlay.Push(new ConfirmDialog("应用更改到皮肤？", () =>
             {
-                ApplySettings();
-                Hide();
-            }, Hide));
+                applySettings();
+                this.Exit();
+            }, this.Exit));
         }
 
         public void PresentGameplay()
         {
             // 作为 overlay，这里不应 Push/Present gameplay。
         }
+
+        private static OsuSpriteText createUnavailableText(string text) =>
+            new OsuSpriteText
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Text = text,
+                Colour = Color4.White,
+            };
 
         private partial class ApplySettingsButton : OsuButton
         {

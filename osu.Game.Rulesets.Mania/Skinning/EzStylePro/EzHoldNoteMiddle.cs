@@ -5,6 +5,7 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -36,6 +37,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private float lastBodyContainerHeight = float.NaN;
         private float lastBodyScaleY = float.NaN;
+        private float lastTopContainerY = float.NaN;
 
         public EzHoldNoteMiddle()
         {
@@ -220,12 +222,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // TODO: V3版应该增加一个顶部Dot标识，以免常规图无法分辨正确的面尾
         }
 
+        protected override void UpdateColor()
+        {
+            base.UpdateColor();
+
+            if (topContainer != null)
+            {
+                topContainer.Colour = ColourInfo.GradientVertical(
+                    NoteColor.Opacity((float)tailAlpha.Value),
+                    NoteColor);
+            }
+        }
+
         protected override void Update()
         {
             base.Update();
 
             if (MainContainer?.Children.Count > 0 && bodyContainer != null && tailHeight > 0)
             {
+                float targetTopY = tailMaskHeight.Value > 0
+                    ? (float)tailMaskHeight.Value
+                    : 0;
+
+                if (topContainer != null && layoutChanged(lastTopContainerY, targetTopY))
+                {
+                    topContainer.Y = targetTopY;
+                    lastTopContainerY = targetTopY;
+                }
+
                 float drawHeightMinusHalf = DrawHeight - tailHeight;
                 float middleHeight = Math.Max(drawHeightMinusHalf, tailHeight);
 
@@ -251,6 +275,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             lastBodyContainerHeight = float.NaN;
             lastBodyScaleY = float.NaN;
+            lastTopContainerY = float.NaN;
         }
 
         private static bool layoutChanged(float oldValue, float newValue)

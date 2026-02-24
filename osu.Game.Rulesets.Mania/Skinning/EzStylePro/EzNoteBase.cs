@@ -175,9 +175,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             UpdateSize();
         }
 
-        protected virtual Colour4 NoteColor => (EnabledColor.Value && UseColorization)
-            ? Column.EzColumnColourBindable.Value
-            : Colour4.White;
+        protected virtual Colour4 NoteColor
+        {
+            get
+            {
+                if (!EnabledColor.Value || !UseColorization)
+                    return Colour4.White;
+
+                return Column.EzColumnColourBindable?.Value ?? Colour4.White;
+            }
+        }
 
         protected virtual string ColorPrefix
         {

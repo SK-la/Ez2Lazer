@@ -5,7 +5,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 
-namespace osu.Game.LAsEzExtensions.Screens.Edit
+namespace osu.Game.LAsEzExtensions.Edit
 {
     public partial class LoopIntervalDisplay : CompositeDrawable
     {

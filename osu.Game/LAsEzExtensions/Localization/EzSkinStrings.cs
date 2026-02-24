@@ -70,8 +70,8 @@ namespace osu.Game.LAsEzExtensions.Localization
         public static readonly LocalisableString NOTE_HEIGHT_SCALE = new EzLocalizationManager.EzLocalisableString("note 高度比例", "Note Height Scale");
         public static readonly LocalisableString NOTE_HEIGHT_SCALE_TOOLTIP = new EzLocalizationManager.EzLocalisableString("统一修改note的高度的比例", "Fixed Height for square notes");
 
-        public static readonly LocalisableString LN_TAIL_ALPHA = new EzLocalizationManager.EzLocalisableString("Tail面尾透明度(未实装)", "Mania Hold Tail Alpha");
-        public static readonly LocalisableString LN_TAIL_ALPHA_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Mania Tail面尾的透明度", "Modify the transparency of the Mania hold tail");
+        public static readonly LocalisableString LN_TAIL_ALPHA = new EzLocalizationManager.EzLocalisableString("Tail面尾透明度", "Mania Hold Tail Alpha");
+        public static readonly LocalisableString LN_TAIL_ALPHA_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Mania Tail面尾的透明度，当前只用于Ez Pro皮肤", "Modify the transparency of the Mania hold tail");
 
         public static readonly LocalisableString LN_TAIL_MASK_GRADIENT_HEIGHT = new EzLocalizationManager.EzLocalisableString("调整缩短面尾的距离(投)", "Adjust LN Tail Length (Opportunistic)");
 

@@ -14,7 +14,7 @@ using osu.Game.Overlays;
 using osuTK;
 using osuTK.Input;
 
-namespace osu.Game.LAsEzExtensions.Screens.Edit
+namespace osu.Game.LAsEzExtensions.Edit
 {
     public partial class LoopMarker : CompositeDrawable
     {

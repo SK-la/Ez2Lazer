@@ -3,8 +3,11 @@
 
 using NUnit.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Graphics;
+using osu.Game.LAsEzExtensions.Edit;
 using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Overlays;
+using osu.Game.Screens;
 
 namespace osu.Game.Tests.Visual.Editing
 {
@@ -22,9 +25,13 @@ namespace osu.Game.Tests.Visual.Editing
         [BackgroundDependencyLoader]
         private void load()
         {
-            // Instantiate the screen for testing purposes
+            // Instantiate the screen for testing purposes and host it in a screen stack.
             ezSkinEditorScreen = new EzSkinEditorScreen();
-            Child = ezSkinEditorScreen;
+
+            var stack = new OsuScreenStack { RelativeSizeAxes = Axes.Both };
+            Add(stack);
+            stack.Push(ezSkinEditorScreen);
+
             Add(dialogOverlay);
         }
 
@@ -49,12 +56,6 @@ namespace osu.Game.Tests.Visual.Editing
         public void TestPopulateSettings()
         {
             AddStep("populate settings", () => ezSkinEditorScreen.PopulateSettings());
-        }
-
-        [Test]
-        public void TestPresentGameplay()
-        {
-            AddStep("present gameplay", () => ezSkinEditorScreen.PresentGameplay());
         }
     }
 }

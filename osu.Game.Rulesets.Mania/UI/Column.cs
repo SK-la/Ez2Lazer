@@ -105,8 +105,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
         public readonly IBindable<string> NoteSetBindable = new Bindable<string>();
         public readonly Bindable<Vector2> NoteSizeBindable = new Bindable<Vector2>();
-        public Bindable<Colour4> EzColumnColourBindable = null!;
-        private Bindable<EzEnumHitMode> hitModeBindable = null!;
+        public Bindable<Colour4> EzColumnColourBindable = new Bindable<Colour4>();
+        private Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
 
         public event Action? NoteSetChanged;
         public event Action? NoteSizeChanged;
