@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             if (!userTriggered)
             {
                 if (!HitObject.HitWindows.CanBeHit(timeOffset))
-                    ApplyResult(HitResult.Miss);
+                    ApplyMinResult();
 
                 return;
             }
@@ -28,7 +28,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
-                ApplyResult(HitResult.Miss);
+            {
+                ApplyMinResult();
+                return;
+            }
 
             // Logger.Log($"Tail result: {result}, IsHolding: {HoldNote.IsHolding.Value}, HasHoldBreak: {HoldNote.Body.HasHoldBreak}");
             // ApplyResult(static (r, state) =>
@@ -41,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if ((timeOffset >= 0 && HoldNote.IsHolding.Value) || (timeOffset <= 20 && HoldNote.Tail.IsHit))
             {
-                ApplyResult(HitResult.IgnoreHit);
+                return;
             }
             else if (timeOffset > 0)
             {
