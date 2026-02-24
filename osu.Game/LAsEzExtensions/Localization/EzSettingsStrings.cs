@@ -43,5 +43,7 @@ namespace osu.Game.LAsEzExtensions.Localization
             + "\n可以根绝所有输入延迟。（测试性功能！锁定成绩上传）",
             "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
             + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SAVE_TO_COLLECTION = new EzLocalizationManager.EzLocalisableString("将当前过滤结果保存到", "Save current filter result to");
     }
 }
