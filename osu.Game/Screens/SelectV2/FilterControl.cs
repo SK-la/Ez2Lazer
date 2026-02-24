@@ -246,8 +246,8 @@ namespace osu.Game.Screens.SelectV2
                                     {
                                         Anchor = Anchor.Centre,
                                         Origin = Anchor.Centre,
-                                        Text = "xxy_SR",
-                                        TooltipText = "(NoActive)Filter, sort beatmaps by Xxy Star Rating",
+                                        Text = "xxy SR",
+                                        TooltipText = EzSongSelectStrings.XXY_SR_FILTER_TOOLTIP,
                                         Height = 30f,
                                     },
                                 },

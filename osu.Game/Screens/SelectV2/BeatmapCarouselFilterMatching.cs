@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Extensions;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Screens.Select;
@@ -16,43 +17,70 @@ namespace osu.Game.Screens.SelectV2
     public class BeatmapCarouselFilterMatching : ICarouselFilter
     {
         private readonly Func<FilterCriteria> getCriteria;
+        private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
+        private readonly Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync;
 
         public int BeatmapItemsCount { get; private set; }
 
-        public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria)
+        public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations, Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync)
         {
             this.getCriteria = getCriteria;
+            this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
+            this.getDifficultyForOperationsAsync = getDifficultyForOperationsAsync;
         }
 
-        public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken) => await Task.Run(() =>
+        public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
         {
             var criteria = getCriteria();
-
-            return matchItems(items, criteria).ToList();
-        }, cancellationToken).ConfigureAwait(false);
-
-        private IEnumerable<CarouselItem> matchItems(IEnumerable<CarouselItem> items, FilterCriteria criteria)
-        {
+            var itemList = items.ToList();
             int countMatching = 0;
+            var matchedItems = new List<CarouselItem>();
 
-            foreach (var item in items)
+            bool useXxyDifficulty = shouldUseXxySrForDifficultyOperations();
+            bool requiresDifficultyForFiltering = useXxyDifficulty && (criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter);
+
+            Dictionary<BeatmapInfo, double>? operationDifficulties = null;
+
+            if (requiresDifficultyForFiltering)
             {
+                var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model)
+                                             .Where(b => !b.Hidden)
+                                             .Distinct()
+                                             .ToList();
+
+                var difficultyTasks = uniqueBeatmaps.ToDictionary(b => b, b => getDifficultyForOperationsAsync(b, cancellationToken));
+
+                await Task.WhenAll(difficultyTasks.Values).ConfigureAwait(false);
+
+                operationDifficulties = difficultyTasks.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.GetResultSafely());
+            }
+
+            foreach (var item in itemList)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var beatmap = (BeatmapInfo)item.Model;
 
                 if (beatmap.Hidden)
                     continue;
 
-                if (!checkCriteriaMatch(beatmap, criteria))
+                double starDifficultyForFilter = beatmap.StarRating;
+
+                if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
+                    starDifficultyForFilter = operationDifficulty;
+
+                if (!checkCriteriaMatch(beatmap, criteria, starDifficultyForFilter))
                     continue;
 
                 countMatching++;
-                yield return item;
+                matchedItems.Add(item);
             }
 
             BeatmapItemsCount = countMatching;
+            return matchedItems;
         }
 
-        private static bool checkCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria)
+        private static bool checkCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter)
         {
             bool match = criteria.Ruleset == null || beatmap.AllowGameplayWithRuleset(criteria.Ruleset!, criteria.AllowConvertedBeatmaps);
 
@@ -79,8 +107,8 @@ namespace osu.Game.Screens.SelectV2
 
             if (!match) return false;
 
-            // TODO: 这里要改成根据 xxySrFilter 的设置来决定是用 star rating 还是 xxy star rating 进行过滤
-            match &= !criteria.StarDifficulty.HasFilter || criteria.StarDifficulty.IsInRange(beatmap.StarRating.FloorToDecimalDigits(2));
+            // truncation is intentional - compare `FormatUtils.FormatStarRating()`
+            match &= !criteria.StarDifficulty.HasFilter || criteria.StarDifficulty.IsInRange(starDifficultyForFilter.FloorToDecimalDigits(2));
             match &= !criteria.ApproachRate.HasFilter || criteria.ApproachRate.IsInRange(beatmap.Difficulty.ApproachRate);
             match &= !criteria.DrainRate.HasFilter || criteria.DrainRate.IsInRange(beatmap.Difficulty.DrainRate);
             match &= !criteria.CircleSize.HasFilter || criteria.CircleSize.IsInRange(beatmap.Difficulty.CircleSize);
@@ -142,7 +170,7 @@ namespace osu.Game.Screens.SelectV2
                 }
             }
 
-            match &= !criteria.UserStarDifficulty.HasFilter || criteria.UserStarDifficulty.IsInRange(beatmap.StarRating);
+            match &= !criteria.UserStarDifficulty.HasFilter || criteria.UserStarDifficulty.IsInRange(starDifficultyForFilter);
 
             if (!match) return false;
 

@@ -7,6 +7,10 @@ namespace osu.Game.LAsEzExtensions.Localization
 {
     public static class EzSongSelectStrings
     {
+        public static readonly LocalisableString XXY_SR_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "使用 xxy SR 进行难度过滤、排序、分组, 可能会增加加载时间",
+            "Use xxy SR for difficulty filtering, sorting, and grouping, which may increase load times");
+
         public static readonly LocalisableString KEY_SOUND_PREVIEW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "按键音预览：\n0 关闭; \n1 蓝灯开启 (全量音效预览); \n2 黄灯开启 (全量音效预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",
             "Key sound preview: \n0 Off; \n1 BlueLight (keypress triggers samples); \n2 GoldLight (preserve preview in song select; in gameplay auto-play note samples, keypresses no longer trigger sample playback)");
