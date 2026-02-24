@@ -60,8 +60,10 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Localization
         public static readonly LocalisableString SCROLLING_STYLE = new EzLocalizationManager.EzLocalisableString("滚动速度风格", "Scrolling Style");
 
         public static readonly LocalisableString SCROLLING_STYLE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "滚动速度风格, 时间速度是note从屏幕开始的边缘到目标相对位置（具体看风格）的时间。",
-            "Scrolling style, the time speed is the time from the edge of the screen where the note starts to the target relative position (see style for details).");
+            "滚动速度风格, 时间速度是note从屏幕开始的边缘到目标相对位置（具体看风格）的时间。\n"
+            + "游戏中，可以在原本调速快捷键的基础上, 增加按住LAlt键，切换为5x调速，即：±1 → ±5。",
+            "Scrolling style, the time speed is the time from the edge of the screen where the note starts to the target relative position (see style for details).\n"
+            + "In the game, you can increase the speed adjustment to 5x by holding down the LAlt key on top of the original speed adjustment shortcut, that is: ±1 → ±5.");
 
         public static readonly LocalisableString SCROLL_BASE_SPEED = new EzLocalizationManager.EzLocalisableString("基础速度", "Scroll Base Speed");
 
