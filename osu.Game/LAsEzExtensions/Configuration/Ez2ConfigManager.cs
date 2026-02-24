@@ -84,8 +84,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             #region 列类型、着色系统
 
-            SetDefault(Ez2Setting.ColumnBlur, 0.7, 0.0, 1, 0.01);
-            SetDefault(Ez2Setting.ColumnDim, 0.25, 0.0, 1, 0.01);
+            SetDefault(Ez2Setting.ColumnDim, 0.5, 0.0, 1, 0.01);
+            SetDefault(Ez2Setting.ColumnBlur, 0.3, 0.0, 1, 0.01);
 
             SetDefault(Ez2Setting.ColorSettingsEnabled, true);
             SetDefault(Ez2Setting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
@@ -464,7 +464,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         AccuracyCutoffS,
         AccuracyCutoffA,
         ColumnWidthStyle,
-        GlobalHitPosition, //TODO:未来改成下拉栏，补充虚拟判定线
+        GlobalHitPosition,
 
         // 皮肤设置
         ColumnWidth,
