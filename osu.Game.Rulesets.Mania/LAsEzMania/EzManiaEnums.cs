@@ -31,8 +31,8 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
     public static class EzManiaScrollingStyleStrings
     {
         public static readonly LocalisableString SCROLL_SPEED_STYLE = new EzLocalizationManager.EzLocalisableString(
-            "40速 通配速度风格(不可用)",
-            "40-speed universal speed style (unavailable)");
+            "40速 通配速度风格(1-400速对应1.0~40.0倍速)",
+            "40-speed universal style(1-400 speed corresponds to 1.0~40.0x speed)");
 
         public static readonly LocalisableString SCROLL_TIME_FOR_DEFAULT_JUDGEMENT = new EzLocalizationManager.EzLocalisableString(
             "(ms) 相对于到默认判定线的时间",
