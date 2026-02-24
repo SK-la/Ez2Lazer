@@ -4,10 +4,10 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using osu.Framework.Logging;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Mods.LAsMods;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 
-namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion
 {
     public static class KrrN2NcConverter
     {

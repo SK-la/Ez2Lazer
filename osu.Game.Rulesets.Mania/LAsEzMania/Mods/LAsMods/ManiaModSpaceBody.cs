@@ -14,10 +14,11 @@ using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
+using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     /// <summary>
     /// 需要同时使用IApplicableAfterBeatmapConversion, IHasApplyOrder
@@ -30,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override string Acronym => "SB";
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => EzModStrings.SpaceBody_Description;
+        public override LocalisableString Description => SpaceBodyStrings.SPACE_BODY_DESCRIPTION;
 
         public override ModType Type => ModType.LA_Mod;
 
@@ -39,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override bool ValidForFreestyleAsRequiredMod => false;
         public override Type[] IncompatibleMods => new[] { typeof(ManiaModHoldOff) };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.SpaceBody_Label), nameof(EzModStrings.SpaceBodyGap_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(SpaceBodyStrings), nameof(SpaceBodyStrings.SPACE_BODY_LABEL), nameof(SpaceBodyStrings.SPACE_BODY_GAP_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> SpaceBeat { get; } = new BindableDouble(4)
         {
             MinValue = 1,
@@ -47,10 +48,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.AddShield_Label), nameof(EzModStrings.AddShield_Description))]
+        [SettingSource(typeof(SpaceBodyStrings), nameof(SpaceBodyStrings.ADD_SHIELD_LABEL), nameof(SpaceBodyStrings.ADD_SHIELD_DESCRIPTION))]
         public BindableBool Shield { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {
             MinValue = 0,
@@ -153,5 +154,14 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 yield return ("Shield", Shield.Value ? "On" : "Off");
             }
         }
+    }
+
+    public static class SpaceBodyStrings
+    {
+        public static readonly LocalisableString SPACE_BODY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("全LN面海，可调面缝", "Full LN, adjustable gaps");
+        public static readonly LocalisableString SPACE_BODY_LABEL = new EzLocalizationManager.EzLocalisableString("全反键缝隙", "Space Body");
+        public static readonly LocalisableString SPACE_BODY_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整前后两个面之间的间隔缝隙", "Full LN, adjustable gaps");
+        public static readonly LocalisableString ADD_SHIELD_LABEL = new EzLocalizationManager.EzLocalisableString("添加盾型", "Add Shield");
+        public static readonly LocalisableString ADD_SHIELD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("将每个面尾添加盾牌键型", "Add shield notes in the sea");
     }
 }

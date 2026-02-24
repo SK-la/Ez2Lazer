@@ -57,7 +57,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
             {
                 Add(new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzLocalizationManager.DisableCmdSpace,
+                    Caption = EzSettingsStrings.DISABLE_CMD_SPACE,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDisableCmdSpace)
                 }));
             }

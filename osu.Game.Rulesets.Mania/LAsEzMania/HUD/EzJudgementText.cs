@@ -8,7 +8,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.Mania.LAsEZMania
+namespace osu.Game.Rulesets.Mania.LAsEzMania.HUD
 {
     public abstract partial class EzJudgementText : CompositeDrawable //, ISerialisableDrawable
     {

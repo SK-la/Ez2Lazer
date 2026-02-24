@@ -2,9 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using static osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods.ModStarRatingRebirth;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class Utils
     {
@@ -107,12 +106,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             return 9 + (sr - 9) * (1 / 1.2);
         }
 
-        public static EasyObject FindNextNoteInColumn(EasyObject note, int[] times, EasyObject[][] noteSeqByColumn)
+        public static ModStarRatingRebirth.EasyObject FindNextNoteInColumn(ModStarRatingRebirth.EasyObject note, int[] times, ModStarRatingRebirth.EasyObject[][] noteSeqByColumn)
         {
             int idx = Array.BinarySearch(times, note.Head);
             if (idx < 0) idx = ~idx;
 
-            return idx + 1 < noteSeqByColumn[note.Key].Length ? noteSeqByColumn[note.Key][idx + 1] : new EasyObject(0, int.MaxValue, int.MaxValue);
+            return idx + 1 < noteSeqByColumn[note.Key].Length ? noteSeqByColumn[note.Key][idx + 1] : new ModStarRatingRebirth.EasyObject(0, int.MaxValue, int.MaxValue);
         }
     }
 }

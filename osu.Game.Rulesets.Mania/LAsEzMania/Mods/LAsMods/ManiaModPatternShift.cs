@@ -18,12 +18,12 @@ using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModPatternShift : Mod, IApplicableAfterBeatmapConversion, IApplicableToBeatmapConverter, IHasSeed, IHasApplyOrder
     {
@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => EzManiaModStrings.PatternShift_Description;
+        public override LocalisableString Description => PatternShiftStrings.PATTERN_SHIFT_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Magic;
 
@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_KeyCount_Label), nameof(EzManiaModStrings.PatternShift_KeyCount_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_KEY_COUNT_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_KEY_COUNT_DESCRIPTION))]
         public BindableNumber<int> KeyCount { get; } = new BindableInt(8)
         {
             MinValue = 2,
@@ -51,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Density_Label), nameof(EzManiaModStrings.PatternShift_Density_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_DENSITY_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_DENSITY_DESCRIPTION))]
         public BindableNumber<int> Density { get; } = new BindableInt(7)
         {
             MinValue = 1,
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_MaxChord_Label), nameof(EzManiaModStrings.PatternShift_MaxChord_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_MAX_CHORD_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_MAX_CHORD_DESCRIPTION))]
         public BindableNumber<int> MaxChord { get; } = new BindableInt(5)
         {
             MinValue = 1,
@@ -67,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_AlignDivisor_Label), nameof(EzManiaModStrings.PatternShift_AlignDivisor_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_ALIGN_DIVISOR_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_ALIGN_DIVISOR_DESCRIPTION))]
         public BindableNumber<int> AlignDivisor { get; } = new BindableInt
         {
             MinValue = 0,
@@ -75,7 +75,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_DelayLevel_Label), nameof(EzManiaModStrings.PatternShift_DelayLevel_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_DELAY_LEVEL_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_DELAY_LEVEL_DESCRIPTION))]
         public BindableNumber<int> DelayLevel { get; } = new BindableInt
         {
             MinValue = 0,
@@ -83,10 +83,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Regenerate_Label), nameof(EzManiaModStrings.PatternShift_Regenerate_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_REGENERATE_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_REGENERATE_DESCRIPTION))]
         public BindableBool Regenerate { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_RegenerateDifficulty_Label), nameof(EzManiaModStrings.PatternShift_RegenerateDifficulty_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_REGENERATE_DIFFICULTY_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_REGENERATE_DIFFICULTY_DESCRIPTION))]
         public BindableNumber<int> RegenerateDifficulty { get; } = new BindableInt(5)
         {
             MinValue = 2,
@@ -94,10 +94,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt
         {
             MinValue = 0,
@@ -129,7 +129,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            ApplyToBeatmapInternal((ManiaBeatmap)beatmap, null);
+            applyToBeatmapInternal((ManiaBeatmap)beatmap, null);
         }
 
         public void ApplyToWorkingBeatmap(WorkingBeatmap workingBeatmap)
@@ -148,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 trackLength = 0;
             }
 
-            ApplyToBeatmapInternal((ManiaBeatmap)workingBeatmap.Beatmap, workingBeatmap.Waveform, trackLength);
+            applyToBeatmapInternal((ManiaBeatmap)workingBeatmap.Beatmap, workingBeatmap.Waveform, trackLength);
         }
 
         private static List<PatternShiftChord> buildChords(List<PatternShiftNote> notes)
@@ -542,7 +542,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             }
         }
 
-        private void ApplyToBeatmapInternal(ManiaBeatmap maniaBeatmap, Waveform? waveform, double? trackLength = null)
+        private void applyToBeatmapInternal(ManiaBeatmap maniaBeatmap, Waveform? waveform, double? trackLength = null)
         {
             Seed.Value ??= RNG.Next();
             var rng = new Random(Seed.Value.Value);
@@ -652,5 +652,74 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 Time = time;
             }
         }
+    }
+
+    public static class PatternShiftStrings
+    {
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("重构谱面列数、密度与多压", "Rebuild the beatmap with new column count, density and chord limit.");
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_BRACKET = new EzLocalizationManager.EzLocalisableString("修改/补充键型：切叉", "Rebuild the beatmap with new column count, density and chord limit (with bracket).");
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_CHORD = new EzLocalizationManager.EzLocalisableString("修改/补充键型：拍", "Rebuild the beatmap with new column count, density and chord limit (chord limit).");
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_DELAY = new EzLocalizationManager.EzLocalisableString("修改/补充键型：偏移", "Rebuild the beatmap with new column count, density and chord limit (with delay).");
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_DUMP = new EzLocalizationManager.EzLocalisableString("修改/补充键型：楼梯", "Rebuild the beatmap with new column count, density and chord limit (full).");
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_JACK = new EzLocalizationManager.EzLocalisableString("修改/补充键型：叠/子弹", "Rebuild the beatmap with new column count, density and chord limit (with Jack).");
+
+        public static readonly LocalisableString PATTERN_SHIFT_KEY_COUNT_LABEL = new EzLocalizationManager.EzLocalisableString("目标列数", "Target Columns");
+        public static readonly LocalisableString PATTERN_SHIFT_KEY_COUNT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置生成后的列数", "Set the output column count.");
+        public static readonly LocalisableString PATTERN_SHIFT_DENSITY_LABEL = new EzLocalizationManager.EzLocalisableString("密度", "Density");
+        public static readonly LocalisableString PATTERN_SHIFT_DENSITY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("密度强度（1-10）", "Density strength (1-10).");
+        public static readonly LocalisableString PATTERN_SHIFT_MAX_CHORD_LABEL = new EzLocalizationManager.EzLocalisableString("和弦上限", "Max Chord");
+        public static readonly LocalisableString PATTERN_SHIFT_MAX_CHORD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每一排最多保留的note数量", "Maximum notes per row.");
+        public static readonly LocalisableString PATTERN_SHIFT_ALIGN_DIVISOR_LABEL = new EzLocalizationManager.EzLocalisableString("对齐", "Align");
+
+        public static readonly LocalisableString PATTERN_SHIFT_ALIGN_DIVISOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "对齐到节拍网格，0=关闭，1=1/1，2=1/2，4=1/4，8=1/8，16=1/16",
+            "Snap to beat grid. 0=off, 1=1/1, 2=1/2, 4=1/4, 8=1/8, 16=1/16.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_DELAY_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("Delay", "Delay");
+
+        public static readonly LocalisableString PATTERN_SHIFT_DELAY_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "随机将部分note前后偏移，0=关闭。\n1-3: 偏移1/16、3/32、1/8；偏移数量<=等级，且至少保留等级数量不偏移。\n4-6: 同样偏移；至少保留1个不偏移。\n7-10: 偏移1/16、1/12、5/48、1/8；偏移数量<=等级，不强制保留。",
+            "Randomly offset some notes. 0=off.\n1-3: offsets 1/16, 3/32, 1/8; shift up to level, keep at least level unshifted.\n4-6: same offsets; keep at least 1 unshifted.\n7-10: offsets 1/16, 1/12, 5/48, 1/8; shift up to level, no minimum unshifted.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_JACK_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "Jack 等级说明：\n1: 1/2 源，移动，单侧列。\n2: 1/2 源，移动，仅双侧列（失败时回退到较低等级）。\n3: 1/4 源，移动，单侧列。\n4: 1/4 源，移动，仅双侧列（失败时回退）。\n5: 1/2 源，添加，单侧列。\n6: 1/2 源，添加，仅双侧列（失败时回退）。\n7: 1/4 源，添加，单侧列。\n8: 1/4 源，添加，仅双侧列（失败时回退）。\n9: 等级5 + 等级7。\n10: 等级6 + 等级8.",
+            "Jack level description:\n1: 1/2 sources, move, one-side columns.\n2: 1/2 sources, move, both-sides only (fallback to lower levels on fail).\n3: 1/4 sources, move, one-side columns.\n4: 1/4 sources, move, both-sides only (fallback).\n5: 1/2 sources, add, one-side columns.\n6: 1/2 sources, add, both-sides only (fallback).\n7: 1/4 sources, add, one-side columns.\n8: 1/4 sources, add, both-sides only (fallback).\n9: level 5 + level 7.\n10: level 6 + level 8.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_WINDOW_MAX_ITERATIONS_LABEL = new EzLocalizationManager.EzLocalisableString("窗口最大迭代", "Window Max Iterations");
+        public static readonly LocalisableString PATTERN_SHIFT_WINDOW_MAX_ITERATIONS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每个窗口的最大迭代次数", "Max iterations per window.");
+        public static readonly LocalisableString PATTERN_SHIFT_WAVEFORM_LABEL = new EzLocalizationManager.EzLocalisableString("波形", "Waveform");
+        public static readonly LocalisableString PATTERN_SHIFT_WAVEFORM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("振荡器波形，影响键型局部处理时的循环周期", "Oscillator waveform used to vary pattern intensity.");
+        public static readonly LocalisableString PATTERN_SHIFT_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("等级", "Level");
+        public static readonly LocalisableString PATTERN_SHIFT_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("0=off, 1-10。控制每个窗口生成的音符数量", "0=off, 1-10. Controls how many notes are generated per window.");
+        public static readonly LocalisableString PATTERN_SHIFT_OSCILLATION_BEATS_LABEL = new EzLocalizationManager.EzLocalisableString("振荡节拍", "Oscillation Beats");
+        public static readonly LocalisableString PATTERN_SHIFT_OSCILLATION_BEATS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("振荡器变化的节拍间隔。1=每拍。", "Beat interval for oscillator changes. 1=every beat.");
+        public static readonly LocalisableString PATTERN_SHIFT_WINDOW_INTERVAL_LABEL = new EzLocalizationManager.EzLocalisableString("窗口间隔", "Window Interval");
+        public static readonly LocalisableString PATTERN_SHIFT_WINDOW_INTERVAL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每N半拍处理一次。1=每半拍。", "Process every N half-beats. 1=every half-beat.");
+        public static readonly LocalisableString PATTERN_SHIFT_WINDOW_START_OFFSET_LABEL = new EzLocalizationManager.EzLocalisableString("窗口起始偏移", "Window Start Offset");
+        public static readonly LocalisableString PATTERN_SHIFT_WINDOW_START_OFFSET_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("1-4：第一到第四个半拍。", "1-4: first to fourth half-beat.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_SKIP_FINE_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("Bypass高分节拍跳过阈值", "Bypass high-density beat skip threshold");
+
+        public static readonly LocalisableString PATTERN_SHIFT_SKIP_FINE_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在1/2节拍之间出现1/4以上（不含1/4）线的note数量阈值，超过则跳过处理。高星图需适当增加。",
+            "Threshold for notes finer than 1/4 within a half-window; exceeding this skips processing. Default = 2.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_LABEL = new EzLocalizationManager.EzLocalisableString("Bypass 1/4线跳过阈值 (1/n)", "Bypass Quarter-line threshold divisor (1/n)");
+
+        public static readonly LocalisableString PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "1/4线上的note数量阈值按谱面总列数的1/n计算，默认 n=2，即 k/2 阈值。",
+            "Quarter-line note threshold is totalColumns / n. Default n=2 (k/2).");
+
+        public static readonly LocalisableString PATTERN_SHIFT_REGENERATE_LABEL = new EzLocalizationManager.EzLocalisableString("重生成", "Regenerate");
+
+        public static readonly LocalisableString PATTERN_SHIFT_REGENERATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在转换时根据音频重新生成完整谱面，而不是使用原始音符",
+            "Regenerate the full beatmap from audio during conversion instead of using original hit objects.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_REGENERATE_DIFFICULTY_LABEL = new EzLocalizationManager.EzLocalisableString("重生成难度", "Regenerate Difficulty");
+
+        public static readonly LocalisableString PATTERN_SHIFT_REGENERATE_DIFFICULTY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "控制重生成的目标难度（星级），范围 2-10",
+            "Target difficulty (stars) for regeneration, range 2-10.");
     }
 }

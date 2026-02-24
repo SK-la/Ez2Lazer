@@ -18,8 +18,8 @@ using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
+using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -30,7 +30,7 @@ using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModAdjust : ModRateAdjust,
                                           IApplicableAfterConversion,
@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
     {
         public override string Name => @"Adjust";
 
-        public override LocalisableString Description => EzManiaModStrings.Adjust_Description;
+        public override LocalisableString Description => AdjustStrings.ADJUST_DESCRIPTION;
 
         public override string Acronym => "AJ";
 
@@ -63,7 +63,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public BindableDouble OriginalOD = new BindableDouble();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ScoreMultiplier_Label))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.SCORE_MULTIPLIER_LABEL))]
         public BindableNumber<double> ScoreMultiplierAdjust { get; } = new BindableDouble(1)
         {
             MinValue = 0,
@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.HPDrain_Label), nameof(EzManiaModStrings.HPDrain_Description), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.HP_DRAIN_LABEL), nameof(AdjustStrings.HP_DRAIN_DESCRIPTION), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable DrainRate { get; } = new DifficultyBindable(0)
         {
             Precision = 0.1f,
@@ -83,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.DrainRate
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustAccuracy_Label), nameof(EzManiaModStrings.AdjustAccuracy_Description), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ADJUST_ACCURACY_LABEL), nameof(AdjustStrings.ADJUST_ACCURACY_DESCRIPTION), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable(0)
         {
             Precision = 0.1f,
@@ -93,7 +93,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.OverallDifficulty
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ReleaseLenience_Label), nameof(EzManiaModStrings.ReleaseLenience_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RELEASE_LENIENCE_LABEL), nameof(AdjustStrings.RELEASE_LENIENCE_DESCRIPTION))]
         public BindableDouble ReleaseLenience { get; } = new BindableDouble(2)
         {
             MaxValue = 4,
@@ -101,19 +101,19 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomHP_Label))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_HP_LABEL))]
         public BindableBool CustomHP { get; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomOD_Label))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_OD_LABEL))]
         public BindableBool CustomOD { get; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomRelease_Label))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_RELEASE_LABEL))]
         public BindableBool CustomRelease { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ExtendedLimits_Label), nameof(EzManiaModStrings.ExtendedLimits_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.EXTENDED_LIMITS_LABEL), nameof(AdjustStrings.EXTENDED_LIMITS_DESCRIPTION))]
         public BindableBool ExtendedLimits { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.AdjustConstantSpeed_Label), nameof(EzManiaModStrings.AdjustConstantSpeed_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ADJUST_CONSTANT_SPEED_LABEL), nameof(AdjustStrings.ADJUST_CONSTANT_SPEED_DESCRIPTION))]
         public BindableBool ConstantSpeed { get; } = new BindableBool(true);
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
@@ -172,7 +172,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string ExtendedIconInformation => "";
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.SpeedChange_Label), nameof(EzModStrings.SpeedChange_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
         public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.1,
@@ -180,7 +180,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.025
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.AdjustPitch_Label), nameof(EzModStrings.AdjustPitch_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
         public virtual BindableBool AdjustPitch { get; } = new BindableBool();
 
         private readonly RateAdjustModHelper rateAdjustHelper;
@@ -273,25 +273,25 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Mirror_Label), nameof(EzModStrings.Mirror_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.MIRROR_LABEL), nameof(EzCommonModStrings.MIRROR_DESCRIPTION))]
         public BindableBool Mirror { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.RandomMirror_Label), nameof(EzManiaModStrings.RandomMirror_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RANDOM_MIRROR_LABEL), nameof(AdjustStrings.RANDOM_MIRROR_DESCRIPTION))]
         public BindableBool RandomMirror { get; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoFail_Label), nameof(EzManiaModStrings.NoFail_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.NO_FAIL_LABEL), nameof(AdjustStrings.NO_FAIL_DESCRIPTION))]
         public BindableBool NoFail { get; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Restart_Label), nameof(EzManiaModStrings.Restart_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RESTART_LABEL), nameof(AdjustStrings.RESTART_DESCRIPTION))]
         public BindableBool Restart { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.RandomSelect_Label), nameof(EzManiaModStrings.RandomSelect_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RANDOM_SELECT_LABEL), nameof(AdjustStrings.RANDOM_SELECT_DESCRIPTION))]
         public BindableBool RandomSelect { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.TrueRandom_Label), nameof(EzManiaModStrings.TrueRandom_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.TRUE_RANDOM_LABEL), nameof(AdjustStrings.TRUE_RANDOM_DESCRIPTION))]
         public BindableBool TrueRandom { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         public void ApplyToBeatmap(IBeatmap beatmap)
@@ -398,7 +398,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             triggerFailureDelegate?.Invoke();
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomHitRange_Label), nameof(EzManiaModStrings.CustomHitRange_Description))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_HIT_RANGE_LABEL), nameof(AdjustStrings.CUSTOM_HIT_RANGE_DESCRIPTION))]
         public BindableBool CustomHitRange { get; } = new BindableBool();
 
         [SettingSource("Perfect")]
@@ -609,6 +609,63 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
 
             public override double MaximumJudgementOffset => base.MaximumJudgementOffset / TailNote.RELEASE_WINDOW_LENIENCE * ReleaseLenience;
+        }
+
+        public static class AdjustStrings
+        {
+            public static readonly LocalisableString ADJUST_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("凉雨Mod一卡通", "Set your settings.");
+
+            public static readonly LocalisableString RANDOM_MIRROR_LABEL = new EzLocalizationManager.EzLocalisableString("随机镜像", "Random Mirror");
+            public static readonly LocalisableString RANDOM_MIRROR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("随机决定是否镜像音符", "Random Mirror. Mirror or not mirror notes by random.");
+            public static readonly LocalisableString NO_FAIL_LABEL = new EzLocalizationManager.EzLocalisableString("无失败", "No Fail");
+            public static readonly LocalisableString NO_FAIL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("无论如何都不会失败", "No Fail. You can't fail, no matter what.");
+            public static readonly LocalisableString RESTART_LABEL = new EzLocalizationManager.EzLocalisableString("失败重启", "Restart on fail");
+            public static readonly LocalisableString RESTART_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("失败时自动重启", "Restart on fail. Automatically restarts when failed.");
+            public static readonly LocalisableString RANDOM_SELECT_LABEL = new EzLocalizationManager.EzLocalisableString("随机选择", "Random");
+            public static readonly LocalisableString RANDOM_SELECT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("随机排列按键", "Random. Shuffle around the keys.");
+            public static readonly LocalisableString TRUE_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("真随机", "True Random");
+
+            public static readonly LocalisableString TRUE_RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+                "随机排列所有音符（使用NoLN（LN转换器等级-3），否则可能会重叠）",
+                "True Random. Shuffle all notes(Use NoLN(LN Transformer Level -3), or you will get overlapping notes otherwise).");
+
+            public static readonly LocalisableString BEAT_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("转换的节拍速度", "Transform Beat Speed");
+
+            public static readonly LocalisableString BEAT_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+                "| Index | Beat Length |\n" +
+                "|-------|-------------|\n" +
+                "| 0        | 1/8 Beat    |\n" +
+                "| 1        | 1/4 Beat    |\n" +
+                "| 2        | 1/2 Beat    |\n" +
+                "| 3        | 3/4 Beat    |\n" +
+                "| 4        | 1 Beat      |\n" +
+                "| 5        | 2 Beats     |\n" +
+                "| 6        | 3 Beats     |\n" +
+                "| 7        | 4 Beats     |\n" +
+                "| 8        | Free        |"
+            );
+
+            public static readonly LocalisableString SCORE_MULTIPLIER_LABEL = new EzLocalizationManager.EzLocalisableString("分数倍数", "Score Multiplier");
+            public static readonly LocalisableString HP_DRAIN_LABEL = new EzLocalizationManager.EzLocalisableString("HP消耗", "HP Drain");
+            public static readonly LocalisableString HP_DRAIN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("覆盖谱面的HP设置", "Override a beatmap's set HP.");
+            public static readonly LocalisableString ADJUST_ACCURACY_LABEL = new EzLocalizationManager.EzLocalisableString("准确度", "Accuracy");
+            public static readonly LocalisableString ADJUST_ACCURACY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("覆盖谱面的OD设置", "Override a beatmap's set OD.");
+            public static readonly LocalisableString RELEASE_LENIENCE_LABEL = new EzLocalizationManager.EzLocalisableString("释放宽容度", "Release Lenience");
+
+            public static readonly LocalisableString RELEASE_LENIENCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+                "调整LN尾部释放窗口宽容度。（Score v2中的尾部默认有1.5倍打击窗口）",
+                "Adjust LN tail release window lenience.(Tail in Score v2 has default 1.5x hit window)");
+
+            public static readonly LocalisableString CUSTOM_HP_LABEL = new EzLocalizationManager.EzLocalisableString("自定义HP", "Custom HP");
+            public static readonly LocalisableString CUSTOM_OD_LABEL = new EzLocalizationManager.EzLocalisableString("自定义OD", "Custom OD");
+            public static readonly LocalisableString CUSTOM_RELEASE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义释放", "Custom Release");
+            public static readonly LocalisableString EXTENDED_LIMITS_LABEL = new EzLocalizationManager.EzLocalisableString("扩展限制", "Extended Limits");
+            public static readonly LocalisableString EXTENDED_LIMITS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整难度超出合理限制", "Adjust difficulty beyond sane limits.");
+            public static readonly LocalisableString ADJUST_CONSTANT_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("恒定速度", "Constant Speed");
+            public static readonly LocalisableString ADJUST_CONSTANT_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("不再有棘手的速度变化", "No more tricky speed changes.");
+
+            public static readonly LocalisableString CUSTOM_HIT_RANGE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义打击窗口", "Custom Hit Range");
+            public static readonly LocalisableString CUSTOM_HIT_RANGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("自定义每个判定的打击窗口", "Customize hit windows for each judgement.");
         }
     }
 }

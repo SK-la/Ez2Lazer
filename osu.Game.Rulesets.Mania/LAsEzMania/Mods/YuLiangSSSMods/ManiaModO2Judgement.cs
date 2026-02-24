@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
@@ -22,7 +23,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModO2Judgement : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>, IApplicableToHUD
     {
@@ -32,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "OJ";
 
-        public override LocalisableString Description => EzManiaModStrings.O2Judgement_Description;
+        public override LocalisableString Description => O2JudgementStrings.O2_JUDGEMENT_DESCRIPTION;
 
         public override double ScoreMultiplier => 1.0;
 
@@ -50,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PillSwitch_Label), nameof(EzManiaModStrings.PillSwitch_Description))]
+        [SettingSource(typeof(O2JudgementStrings), nameof(O2JudgementStrings.PILL_SWITCH_LABEL), nameof(O2JudgementStrings.PILL_SWITCH_DESCRIPTION))]
         public BindableBool PillMode { get; set; } = new BindableBool(true);
 
         public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
@@ -110,5 +111,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             pillUI.BoxElementAlpha.Value = 0.7f;
             overlay.Add(pillUI);
         }
+    }
+
+    public static class O2JudgementStrings
+    {
+        public static readonly LocalisableString O2_JUDGEMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("为O2JAM玩家设计的判定系统", "Judgement System for O2JAM players.");
+        public static readonly LocalisableString PILL_SWITCH_LABEL = new EzLocalizationManager.EzLocalisableString("药丸开关", "Pill Switch");
+        public static readonly LocalisableString PILL_SWITCH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("使用O2JAM药丸功能", "Use O2JAM pill function.");
     }
 }

@@ -34,7 +34,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzLocalizationManager.AccuracyCutoffS,
+                    Caption = EzSettingsStrings.ACCURACY_CUTOFF_S,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true,
@@ -44,7 +44,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzLocalizationManager.AccuracyCutoffA,
+                    Caption = EzSettingsStrings.ACCURACY_CUTOFF_A,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true,

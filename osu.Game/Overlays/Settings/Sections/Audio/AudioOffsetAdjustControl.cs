@@ -61,8 +61,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 {
                     new SettingsItemV2(new FormSliderBar<double>
                     {
-                        Caption = EzLocalizationManager.OffsetPlusMania,
-                        HintText = EzLocalizationManager.OffsetPlusManiaTooltip,
+                        Caption = EzSettingsStrings.OFFSET_PLUS_MANIA,
+                        HintText = EzSettingsStrings.OFFSET_PLUS_MANIA_TOOLTIP,
                         RelativeSizeAxes = Axes.X,
                         Current = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania),
                         KeyboardStep = 1,
@@ -71,8 +71,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     }),
                     new SettingsItemV2(new FormSliderBar<double>
                     {
-                        Caption = EzLocalizationManager.OffsetPlusNonMania,
-                        HintText = EzLocalizationManager.OffsetPlusNonManiaTooltip,
+                        Caption = EzSettingsStrings.OFFSET_PLUS_NON_MANIA,
+                        HintText = EzSettingsStrings.OFFSET_PLUS_NON_MANIA_TOOLTIP,
                         RelativeSizeAxes = Axes.X,
                         Current = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania),
                         KeyboardStep = 1,

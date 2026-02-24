@@ -10,7 +10,7 @@ using osu.Game.Overlays.Settings;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.LAsEzExtensions.Screens
+namespace osu.Game.LAsEzExtensions.Extensions
 {
     /// <summary>
     /// 让按钮支持同时显示两行文本的扩展方法

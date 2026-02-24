@@ -10,15 +10,15 @@ using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
 // using osu.Framework.Logging;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModLNTransformer : ManiaModLN, IApplicableAfterBeatmapConversion
     {
@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LT";
 
-        public override LocalisableString Description => EzManiaModStrings.LNTransformer_Description;
+        public override LocalisableString Description => LNTransformerStrings.LN_TRANSFORMER_DESCRIPTION;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
@@ -395,5 +395,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 newObjects.AddNote(sampleList[column].lastSample, column, noteList[column].lastTime);
             }
         }
+    }
+
+    public static class LNTransformerStrings
+    {
+        public static readonly LocalisableString LN_TRANSFORMER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("LN转换", "LN Transformer");
     }
 }

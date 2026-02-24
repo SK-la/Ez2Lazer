@@ -6,10 +6,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class KeyPatternSettings
     {

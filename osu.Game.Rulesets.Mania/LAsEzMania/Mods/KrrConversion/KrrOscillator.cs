@@ -3,7 +3,7 @@
 
 using System;
 
-namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion
 {
     public class KrrOscillator
     {

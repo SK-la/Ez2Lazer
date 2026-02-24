@@ -9,23 +9,20 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
-using osu.Game.Rulesets.Mania.Mods.KrrConversion;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModKrrN2Nc : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
     {
-        public override string Name => "Krr N2Nc";
+        public override string Name => "Krr N2N Converter";
 
         public override string Acronym => "N2N";
 
-        public override LocalisableString Description => "[KrrTool] KeyCounts conversion";
+        public override LocalisableString Description => KrrN2NcStrings.KRR_N2N_DESCRIPTION;
 
         public override double ScoreMultiplier => 1;
 
@@ -35,38 +32,38 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override bool ValidForMultiplayer => true;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrN2Nc_TargetKeys_Label), nameof(EzManiaModStrings.KrrN2Nc_TargetKeys_Description))]
+        [SettingSource(typeof(KrrN2NcStrings), nameof(KrrN2NcStrings.KRR_N2N_TARGET_KEYS_LABEL), nameof(KrrN2NcStrings.KRR_N2N_TARGET_KEYS_DESCRIPTION))]
         public BindableNumber<int> TargetKeys { get; } = new BindableInt(8)
         {
             MinValue = 1,
             MaxValue = 18,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrN2Nc_MaxKeys_Label), nameof(EzManiaModStrings.KrrN2Nc_MaxKeys_Description))]
+        [SettingSource(typeof(KrrN2NcStrings), nameof(KrrN2NcStrings.KRR_N2N_MAX_KEYS_LABEL), nameof(KrrN2NcStrings.KRR_N2N_MAX_KEYS_DESCRIPTION))]
         public BindableNumber<int> MaxKeys { get; } = new BindableInt(6)
         {
             MinValue = 0,
             MaxValue = 10
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrN2Nc_MinKeys_Label), nameof(EzManiaModStrings.KrrN2Nc_MinKeys_Description))]
+        [SettingSource(typeof(KrrN2NcStrings), nameof(KrrN2NcStrings.KRR_N2N_MIN_KEYS_LABEL), nameof(KrrN2NcStrings.KRR_N2N_MIN_KEYS_DESCRIPTION))]
         public BindableNumber<int> MinKeys { get; } = new BindableInt(2)
         {
             MinValue = 0,
             MaxValue = 10
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.BeatSpeed_Label), nameof(EzManiaModStrings.BeatSpeed_Description))]
+        [SettingSource(typeof(KrrN2NcStrings), nameof(KrrN2NcStrings.KRR_N2N_BEAT_SPEED_LABEL), nameof(KrrN2NcStrings.BEAT_SPEED_DESCRIPTION))]
         public BindableNumber<int> BeatSpeed { get; } = new BindableInt(4)
         {
             MinValue = 0,
             MaxValue = 8
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {
             MinValue = 0,
@@ -117,6 +114,32 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 Logger.Log($"[ManiaModKrrN2Nc] Failed to update stages: {ex.Message}");
             }
         }
+    }
+
+    public static class KrrN2NcStrings
+    {
+        public static readonly LocalisableString KRR_N2N_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("[KrrTool] N2N 转换器", "[KrrTool] N2N Converter");
+        public static readonly LocalisableString KRR_N2N_TARGET_KEYS_LABEL = new EzLocalizationManager.EzLocalisableString("目标键数", "Target Keys");
+        public static readonly LocalisableString KRR_N2N_TARGET_KEYS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("目标键数（用于修改列数）", "Target key count (change columns).");
+        public static readonly LocalisableString KRR_N2N_MAX_KEYS_LABEL = new EzLocalizationManager.EzLocalisableString("密度上限", "Density Max");
+        public static readonly LocalisableString KRR_N2N_MAX_KEYS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每行最大键数", "Max keys per row.");
+        public static readonly LocalisableString KRR_N2N_MIN_KEYS_LABEL = new EzLocalizationManager.EzLocalisableString("密度下限", "Density Min");
+        public static readonly LocalisableString KRR_N2N_MIN_KEYS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每行最小键数", "Min keys per row.");
+        public static readonly LocalisableString KRR_N2N_BEAT_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("转换的节拍速度", "Transform Beat Speed");
+
+        public static readonly LocalisableString BEAT_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "| Index | Beat Length |\n" +
+            "|-------|-------------|\n" +
+            "| 0        | 1/8 Beat    |\n" +
+            "| 1        | 1/4 Beat    |\n" +
+            "| 2        | 1/2 Beat    |\n" +
+            "| 3        | 3/4 Beat    |\n" +
+            "| 4        | 1 Beat      |\n" +
+            "| 5        | 2 Beats     |\n" +
+            "| 6        | 3 Beats     |\n" +
+            "| 7        | 4 Beats     |\n" +
+            "| 8        | Free        |"
+        );
     }
 
     public class KrrOptions

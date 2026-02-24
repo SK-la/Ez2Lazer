@@ -9,11 +9,9 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Mods;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
+using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.UI;
@@ -21,7 +19,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModReleaseAdjust : Mod, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
@@ -29,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "RA";
 
-        public override LocalisableString Description => EzManiaModStrings.ReleaseAdjust_Description;
+        public override LocalisableString Description => ReleaseAdjustStrings.RELEASE_ADJUST_DESCRIPTION;
 
         public override double ScoreMultiplier => 1;
 
@@ -136,5 +134,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 });
             }
         }
+    }
+
+    public static class ReleaseAdjustStrings
+    {
+        public static readonly LocalisableString RELEASE_ADJUST_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("不再需要计时长按音符的结尾", "No more timing the end of hold notes.");
     }
 }

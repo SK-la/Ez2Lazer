@@ -20,7 +20,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.LAsEzExtensions.Background;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -177,12 +176,12 @@ namespace osu.Game.Screens.Backgrounds
                     if (dataFolderPath != null && !Directory.Exists(dataFolderPath))
                     {
                         Directory.CreateDirectory(dataFolderPath);
-                        Logger.Log(EzLocalizationManager.StorageFolder_Created.Format(dataFolderPath), LoggingTarget.Information, LogLevel.Important);
+                        Logger.Log(EzSettingsStrings.STORAGE_FOLDER_CREATED.Format(dataFolderPath), LoggingTarget.Information, LogLevel.Important);
                     }
 
                     // directory exists but no files
                     if (dataFolderPath != null)
-                        Logger.Log(EzLocalizationManager.StorageFolder_Empty.Format(dataFolderPath), LoggingTarget.Information, LogLevel.Important);
+                        Logger.Log(EzSettingsStrings.STORAGE_FOLDER_EMPTY.Format(dataFolderPath), LoggingTarget.Information, LogLevel.Important);
 
                     return false;
                 }

@@ -3,91 +3,85 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.LAsEzExtensions.Mods;
-using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
-using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Mania.Mods.KrrConversion;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModKrrDP : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
     {
-        public override string Name => "Krr DP";
-        public override string Acronym => "DP";
-        public override LocalisableString Description => "[KrrTool] Convert to Dual Play mode";
+        public override string Name => "Krr DP Converter";
+        public override string Acronym => "KDP";
+        public override LocalisableString Description => KrrDPStrings.KRR_DP_DESCRIPTION;
         public override double ScoreMultiplier => 1;
         public override ModType Type => ModType.LA_Mod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_EnableModifyKeys_Label), nameof(EzManiaModStrings.KrrDP_EnableModifyKeys_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_ENABLE_MODIFY_KEYS_LABEL), nameof(KrrDPStrings.KRR_DP_ENABLE_MODIFY_KEYS_DESCRIPTION))]
         public BindableBool EnableModifyKeys { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_TargetKeys_Label), nameof(EzManiaModStrings.KrrDP_TargetKeys_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_TARGET_KEYS_LABEL), nameof(KrrDPStrings.KRR_DP_TARGET_KEYS_DESCRIPTION))]
         public BindableNumber<int> TargetKeys { get; } = new BindableInt(4)
         {
             MinValue = 1,
             MaxValue = 9,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_LeftMirror_Label), nameof(EzManiaModStrings.KrrDP_LeftMirror_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_LEFT_MIRROR_LABEL), nameof(KrrDPStrings.KRR_DP_LEFT_MIRROR_DESCRIPTION))]
         public BindableBool LMirror { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_LeftDensity_Label), nameof(EzManiaModStrings.KrrDP_LeftDensity_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_LEFT_DENSITY_LABEL), nameof(KrrDPStrings.KRR_DP_LEFT_DENSITY_DESCRIPTION))]
         public BindableBool LDensity { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_LeftRemove_Label), nameof(EzManiaModStrings.KrrDP_LeftRemove_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_LEFT_REMOVE_LABEL), nameof(KrrDPStrings.KRR_DP_LEFT_REMOVE_DESCRIPTION))]
         public BindableBool LRemove { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_LeftMax_Label), nameof(EzManiaModStrings.KrrDP_LeftMax_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_LEFT_MAX_LABEL), nameof(KrrDPStrings.KRR_DP_LEFT_MAX_DESCRIPTION))]
         public BindableNumber<int> LMaxKeys { get; set; } = new BindableInt(5)
         {
             MinValue = 1,
             MaxValue = 5,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_LeftMin_Label), nameof(EzManiaModStrings.KrrDP_LeftMin_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_LEFT_MIN_LABEL), nameof(KrrDPStrings.KRR_DP_LEFT_MIN_DESCRIPTION))]
         public BindableNumber<int> LMinKeys { get; set; } = new BindableInt(1)
         {
             MinValue = 1,
             MaxValue = 5,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_RightMirror_Label), nameof(EzManiaModStrings.KrrDP_RightMirror_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_RIGHT_MIRROR_LABEL), nameof(KrrDPStrings.KRR_DP_RIGHT_MIRROR_DESCRIPTION))]
         public BindableBool RMirror { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_RightDensity_Label), nameof(EzManiaModStrings.KrrDP_RightDensity_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_RIGHT_DENSITY_LABEL), nameof(KrrDPStrings.KRR_DP_RIGHT_DENSITY_DESCRIPTION))]
         public BindableBool RDensity { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_RightRemove_Label), nameof(EzManiaModStrings.KrrDP_RightRemove_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_RIGHT_REMOVE_LABEL), nameof(KrrDPStrings.KRR_DP_RIGHT_REMOVE_DESCRIPTION))]
         public BindableBool RRemove { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_RightMax_Label), nameof(EzManiaModStrings.KrrDP_RightMax_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_RIGHT_MAX_LABEL), nameof(KrrDPStrings.KRR_DP_RIGHT_MAX_DESCRIPTION))]
         public BindableNumber<int> RMaxKeys { get; set; } = new BindableInt(5)
         {
             MinValue = 1,
             MaxValue = 5,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrDP_RightMin_Label), nameof(EzManiaModStrings.KrrDP_RightMin_Description))]
+        [SettingSource(typeof(KrrDPStrings), nameof(KrrDPStrings.KRR_DP_RIGHT_MIN_LABEL), nameof(KrrDPStrings.KRR_DP_RIGHT_MIN_DESCRIPTION))]
         public BindableNumber<int> RMinKeys { get; set; } = new BindableInt(1)
         {
             MinValue = 1,
             MaxValue = 5,
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {
             MinValue = 0,
@@ -143,5 +137,34 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             maniaBeatmap.Stages.Add(new StageDefinition(finalKeys));
             maniaBeatmap.Difficulty.CircleSize = finalKeys;
         }
+    }
+
+    public static class KrrDPStrings
+    {
+        public static readonly LocalisableString KRR_DP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("[KrrTool] DP转换器", "[KrrTool] DP Converter");
+        public static readonly LocalisableString KRR_DP_ENABLE_MODIFY_KEYS_LABEL = new EzLocalizationManager.EzLocalisableString("启用键数修改", "Enable Modify Keys");
+        public static readonly LocalisableString KRR_DP_ENABLE_MODIFY_KEYS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("启用后可指定左右各自的键数", "Enable to set keys per side.");
+        public static readonly LocalisableString KRR_DP_TARGET_KEYS_LABEL = new EzLocalizationManager.EzLocalisableString("目标键数", "Target Keys");
+        public static readonly LocalisableString KRR_DP_TARGET_KEYS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("左右每侧的目标键数", "Target keys per side.");
+        public static readonly LocalisableString KRR_DP_LEFT_MIRROR_LABEL = new EzLocalizationManager.EzLocalisableString("左侧镜像", "Left Mirror");
+        public static readonly LocalisableString KRR_DP_LEFT_MIRROR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("左侧镜像翻转", "Mirror left side.");
+        public static readonly LocalisableString KRR_DP_RIGHT_MIRROR_LABEL = new EzLocalizationManager.EzLocalisableString("右侧镜像", "Right Mirror");
+        public static readonly LocalisableString KRR_DP_RIGHT_MIRROR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("右侧镜像翻转", "Mirror right side.");
+        public static readonly LocalisableString KRR_DP_LEFT_DENSITY_LABEL = new EzLocalizationManager.EzLocalisableString("左侧密度", "Left Density");
+        public static readonly LocalisableString KRR_DP_LEFT_DENSITY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整左侧密度", "Adjust left density.");
+        public static readonly LocalisableString KRR_DP_RIGHT_DENSITY_LABEL = new EzLocalizationManager.EzLocalisableString("右侧密度", "Right Density");
+        public static readonly LocalisableString KRR_DP_RIGHT_DENSITY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整右侧密度", "Adjust right density.");
+        public static readonly LocalisableString KRR_DP_LEFT_REMOVE_LABEL = new EzLocalizationManager.EzLocalisableString("移除左侧", "Remove Left");
+        public static readonly LocalisableString KRR_DP_LEFT_REMOVE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("移除左侧所有音符", "Remove left side.");
+        public static readonly LocalisableString KRR_DP_RIGHT_REMOVE_LABEL = new EzLocalizationManager.EzLocalisableString("移除右侧", "Remove Right");
+        public static readonly LocalisableString KRR_DP_RIGHT_REMOVE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("移除右侧所有音符", "Remove right side.");
+        public static readonly LocalisableString KRR_DP_LEFT_MAX_LABEL = new EzLocalizationManager.EzLocalisableString("左侧最大键数", "Left Max Keys");
+        public static readonly LocalisableString KRR_DP_LEFT_MAX_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("左侧密度最大键数", "Left density max keys.");
+        public static readonly LocalisableString KRR_DP_LEFT_MIN_LABEL = new EzLocalizationManager.EzLocalisableString("左侧最小键数", "Left Min Keys");
+        public static readonly LocalisableString KRR_DP_LEFT_MIN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("左侧密度最小键数", "Left density min keys.");
+        public static readonly LocalisableString KRR_DP_RIGHT_MAX_LABEL = new EzLocalizationManager.EzLocalisableString("右侧最大键数", "Right Max Keys");
+        public static readonly LocalisableString KRR_DP_RIGHT_MAX_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("右侧密度最大键数", "Right density max keys.");
+        public static readonly LocalisableString KRR_DP_RIGHT_MIN_LABEL = new EzLocalizationManager.EzLocalisableString("右侧最小键数", "Right Min Keys");
+        public static readonly LocalisableString KRR_DP_RIGHT_MIN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("右侧密度最小键数", "Right density min keys.");
     }
 }

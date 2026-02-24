@@ -171,7 +171,7 @@ namespace osu.Game.Screens.SelectV2
                                         Anchor = Anchor.TopCentre,
                                         Origin = Anchor.TopCentre,
                                         Text = "kSound",
-                                        TooltipText = EzLocalizationManager.KeySoundPreview_Tooltip,
+                                        TooltipText = EzSongSelectStrings.KEY_SOUND_PREVIEW_TOOLTIP,
                                         Height = 30f,
                                     },
                                 },

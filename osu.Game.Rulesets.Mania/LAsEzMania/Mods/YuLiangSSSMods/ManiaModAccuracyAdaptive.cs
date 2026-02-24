@@ -20,7 +20,7 @@ using osu.Game.Scoring;
 using System.Linq;
 using osu.Game.Beatmaps.Timing;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     /// <summary>
     /// 根据 accuracy 改变速度

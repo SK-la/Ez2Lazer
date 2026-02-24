@@ -3,13 +3,12 @@
 
 using System;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
 {
+    // TODO:考虑重构为使用冻结字典 FrozenDictionary<EzEnumHitMode, double[]> 来存储各个模式的窗口，实现性能最大化。
     public class CustomHitWindowsHelper
     {
         private static readonly double[,] hit_range_bms =

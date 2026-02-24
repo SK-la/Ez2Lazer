@@ -12,14 +12,13 @@ using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModChangeSpeedByAccuracy : Mod, IUpdatableByPlayfield, IApplicableToScoreProcessor, IApplicableToRate
     {
@@ -27,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "SA";
 
-        public override LocalisableString Description => EzManiaModStrings.ChangeSpeedByAccuracy_Description;
+        public override LocalisableString Description => ChangeSpeedByAccuracyStrings.CHANGE_SPEED_BY_ACCURACY_DESCRIPTION;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -50,7 +49,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         private double targetSpeed = 1;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ChangeSpeedAccuracy_Label), nameof(EzManiaModStrings.ChangeSpeedAccuracy_Description))]
+        [SettingSource(typeof(ChangeSpeedByAccuracyStrings), nameof(ChangeSpeedByAccuracyStrings.CHANGE_SPEED_ACCURACY_LABEL), nameof(ChangeSpeedByAccuracyStrings.CHANGE_SPEED_ACCURACY_DESCRIPTION))]
         public BindableDouble Accuracy { get; } = new BindableDouble(95)
         {
             MinValue = 0,
@@ -58,7 +57,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.5,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MaxSpeed_Label), nameof(EzManiaModStrings.MaxSpeed_Description))]
+        [SettingSource(typeof(ChangeSpeedByAccuracyStrings), nameof(ChangeSpeedByAccuracyStrings.MAX_SPEED_LABEL), nameof(ChangeSpeedByAccuracyStrings.MAX_SPEED_DESCRIPTION))]
         public BindableDouble MaxSpeed { get; } = new BindableDouble(1.5)
         {
             MinValue = 1,
@@ -66,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.1,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MinSpeed_Label), nameof(EzManiaModStrings.MinSpeed_Description))]
+        [SettingSource(typeof(ChangeSpeedByAccuracyStrings), nameof(ChangeSpeedByAccuracyStrings.MIN_SPEED_LABEL), nameof(ChangeSpeedByAccuracyStrings.MIN_SPEED_DESCRIPTION))]
         public BindableDouble MinSpeed { get; } = new BindableDouble(0.5)
         {
             MinValue = 0.5,
@@ -74,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.1,
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.AdjustPitch_Label), nameof(EzModStrings.AdjustPitch_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
         public virtual BindableBool AdjustPitch { get; } = new BindableBool();
 
         public ManiaModChangeSpeedByAccuracy()
@@ -140,5 +139,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         {
             sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
         }
+    }
+
+    public static class ChangeSpeedByAccuracyStrings
+    {
+        public static readonly LocalisableString CHANGE_SPEED_BY_ACCURACY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("根据准确度调整游戏速度", "Adapt the speed of the game based on the accuracy.");
+        public static readonly LocalisableString CHANGE_SPEED_ACCURACY_LABEL = new EzLocalizationManager.EzLocalisableString("准确度", "Accuracy");
+        public static readonly LocalisableString CHANGE_SPEED_ACCURACY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("应用速度变化的准确度", "Accuracy. Accuracy for speed change to be applied.");
+        public static readonly LocalisableString MAX_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("最大速度", "Max Speed");
+        public static readonly LocalisableString MAX_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("最大速度", "Max Speed");
+        public static readonly LocalisableString MIN_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("最小速度", "Min Speed");
+        public static readonly LocalisableString MIN_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("最小速度", "Min Speed");
     }
 }

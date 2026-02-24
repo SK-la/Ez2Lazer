@@ -16,12 +16,11 @@ using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModGracer : Mod, IApplicableAfterBeatmapConversion, IHasSeed
     {
@@ -41,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        public override LocalisableString Description => EzManiaModStrings.Gracer_Description;
+        public override LocalisableString Description => GracerStrings.GRACER_DESCRIPTION;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -56,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Bias_Label), nameof(EzManiaModStrings.Bias_Description))]
+        [SettingSource(typeof(GracerStrings), nameof(GracerStrings.BIAS_LABEL), nameof(GracerStrings.BIAS_DESCRIPTION))]
         public BindableNumber<int> Bias { get; set; } = new BindableInt(16)
         {
             MinValue = 1,
@@ -65,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         };
 
         // If interval is too high which will have bug taken place.
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Interval_Label), nameof(EzManiaModStrings.Interval_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.INTERVAL_LABEL), nameof(EzCommonModStrings.INTERVAL_DESCRIPTION))]
         public BindableNumber<double> Interval { get; set; } = new BindableNumber<double>(20)
         {
             MinValue = 1,
@@ -73,7 +72,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Probability_Label), nameof(EzManiaModStrings.Probability_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.PROBABILITY_LABEL), nameof(EzCommonModStrings.PROBABILITY_DESCRIPTION))]
         public BindableNumber<int> Probability { get; set; } = new BindableInt(100)
         {
             MinValue = 0,
@@ -81,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 5
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         public void ApplyToBeatmap(IBeatmap beatmap)
@@ -196,5 +195,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             newObjects.AddRange(newColumnObjects);
             maniaBeatmap.HitObjects = [.. newObjects.OrderBy(h => h.StartTime)];
         }
+    }
+
+    public static class GracerStrings
+    {
+        public static readonly LocalisableString GRACER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("转换为grace", "Convert to grace.");
+        public static readonly LocalisableString BIAS_LABEL = new EzLocalizationManager.EzLocalisableString("偏差", "Bias");
+        public static readonly LocalisableString BIAS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("原始时机的偏差", "Bias. The bias of original timing.");
     }
 }

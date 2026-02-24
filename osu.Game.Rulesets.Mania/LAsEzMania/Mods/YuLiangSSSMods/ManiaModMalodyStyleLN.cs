@@ -6,12 +6,12 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -21,7 +21,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     internal partial class ManiaModMalodyStyleLN : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "NL";
 
-        public override LocalisableString Description => EzManiaModStrings.MalodyStyleLN_Description;
+        public override LocalisableString Description => MalodyStyleLNStrings.MALODY_STYLE_LN_DESCRIPTION;
 
         public override double ScoreMultiplier => 1;
 
@@ -213,5 +213,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
             }
         }
+    }
+
+    public static class MalodyStyleLNStrings
+    {
+        public static readonly LocalisableString MALODY_STYLE_LN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("像Malody一样播放LN！", "Play LN like Malody!");
     }
 }

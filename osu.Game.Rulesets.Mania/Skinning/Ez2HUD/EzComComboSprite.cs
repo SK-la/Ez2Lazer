@@ -9,6 +9,7 @@ using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.LAsEzMania.Helper;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning.Components;

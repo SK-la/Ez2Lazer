@@ -8,11 +8,10 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.LAsEZMania
+namespace osu.Game.Rulesets.Mania.LAsEzMania.HUD
 {
     public abstract partial class ManiaKeyCounterDisplay : Container
     {

@@ -12,15 +12,12 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModNoteAdjust : Mod, IApplicableAfterBeatmapConversion, IHasSeed
     {
@@ -28,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "NA";
 
-        public override LocalisableString Description => EzManiaModStrings.NoteAdjust_Description;
+        public override LocalisableString Description => NoteAdjustStrings.NOTE_ADJUST_DESCRIPTION;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -65,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoteAdjustStyle_Label), nameof(EzManiaModStrings.NoteAdjustStyle_Description))]
+        [SettingSource(typeof(NoteAdjustStrings), nameof(NoteAdjustStrings.NOTE_ADJUST_STYLE_LABEL), nameof(NoteAdjustStrings.NOTE_ADJUST_STYLE_DESCRIPTION))]
         public BindableInt Style { get; set; } = new BindableInt(1)
         {
             Precision = 1,
@@ -73,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 6
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoteAdjustProbability_Label), nameof(EzManiaModStrings.NoteAdjustProbability_Description))]
+        [SettingSource(typeof(NoteAdjustStrings), nameof(NoteAdjustStrings.NOTE_ADJUST_PROBABILITY_LABEL), nameof(NoteAdjustStrings.NOTE_ADJUST_PROBABILITY_DESCRIPTION))]
         public BindableDouble Probability { get; set; } = new BindableDouble(100)
         {
             Precision = 2.5,
@@ -81,7 +78,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 100,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Extremum_Label), nameof(EzManiaModStrings.Extremum_Description))]
+        [SettingSource(typeof(NoteAdjustStrings), nameof(NoteAdjustStrings.EXTREMUM_LABEL), nameof(NoteAdjustStrings.EXTREMUM_DESCRIPTION))]
         public BindableInt Extremum { get; set; } = new BindableInt(10)
         {
             Precision = 1,
@@ -89,7 +86,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 10
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ComparisonStyle_Label), nameof(EzManiaModStrings.ComparisonStyle_Description))]
+        [SettingSource(typeof(NoteAdjustStrings), nameof(NoteAdjustStrings.COMPARISON_STYLE_LABEL), nameof(NoteAdjustStrings.COMPARISON_STYLE_DESCRIPTION))]
         public BindableInt ComparisonStyle { get; set; } = new BindableInt(1)
         {
             Precision = 1,
@@ -97,7 +94,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 2
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoteAdjustLine_Label), nameof(EzManiaModStrings.NoteAdjustLine_Description))]
+        [SettingSource(typeof(NoteAdjustStrings), nameof(NoteAdjustStrings.NOTE_ADJUST_LINE_LABEL), nameof(NoteAdjustStrings.NOTE_ADJUST_LINE_DESCRIPTION))]
         public BindableInt Line { get; set; } = new BindableInt(1)
         {
             Precision = 1,
@@ -105,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 10
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Step_Label), nameof(EzManiaModStrings.Step_Description))]
+        [SettingSource(typeof(NoteAdjustStrings), nameof(NoteAdjustStrings.STEP_LABEL), nameof(NoteAdjustStrings.STEP_DESCRIPTION))]
         public BindableInt Step { get; set; } = new BindableInt(-1)
         {
             Precision = 1,
@@ -113,13 +110,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 10
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.IgnoreComparison_Label), nameof(EzManiaModStrings.IgnoreComparison_Description))]
+        [SettingSource(typeof(NoteAdjustStrings), nameof(NoteAdjustStrings.IGNORE_COMPARISON_LABEL), nameof(NoteAdjustStrings.IGNORE_COMPARISON_DESCRIPTION))]
         public BindableBool IgnoreComparison { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.IgnoreInterval_Label), nameof(EzManiaModStrings.IgnoreInterval_Description))]
+        [SettingSource(typeof(NoteAdjustStrings), nameof(NoteAdjustStrings.IGNORE_INTERVAL_LABEL), nameof(NoteAdjustStrings.IGNORE_INTERVAL_DESCRIPTION))]
         public BindableBool IgnoreInterval { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         // Column Number: 0 to n - 1
@@ -733,5 +730,42 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             return false;
         }
+    }
+
+    public static class NoteAdjustStrings
+    {
+        public static readonly LocalisableString NOTE_ADJUST_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("制作更多或更少的音符", "To make more or less note.");
+        public static readonly LocalisableString NOTE_ADJUST_STYLE_LABEL = new EzLocalizationManager.EzLocalisableString("样式", "Style");
+
+        public static readonly LocalisableString NOTE_ADJUST_STYLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "1: 适用于Jack模式。2&3: 适用于Stream模式。4&5: 适用于Speed模式（无Jack）。6: DIY（将使用↓↓↓所有选项）（1~5将仅使用↓种子选项）",
+            "1: Applicable to Jack Pattern.  2&3: Applicable to Stream Pattern.  4&5: Applicable to Speed Pattern(No Jack).  6: DIY(Will use ↓↓↓ all options) (1~5 will only use ↓ seed option).");
+
+        public static readonly LocalisableString NOTE_ADJUST_PROBABILITY_LABEL = new EzLocalizationManager.EzLocalisableString("概率", "Probability");
+        public static readonly LocalisableString NOTE_ADJUST_PROBABILITY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("增加音符的概率", "The Probability of increasing note.");
+        public static readonly LocalisableString EXTREMUM_LABEL = new EzLocalizationManager.EzLocalisableString("极值", "Extremum");
+
+        public static readonly LocalisableString EXTREMUM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "取决于你在一行上保留多少音符（可用最大音符或最小音符）",
+            "Depending on how many notes on one line you keep(Available maximum note or minimum note).");
+
+        public static readonly LocalisableString COMPARISON_STYLE_LABEL = new EzLocalizationManager.EzLocalisableString("比较样式", "Comparison Style");
+
+        public static readonly LocalisableString COMPARISON_STYLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "1: 当此行的音符数量>=上一行和下一行时处理一行。2: 当此行的音符数量<=上一行和下一行时处理一行",
+            "1: Dispose a line when this line's note quantity >= Last&Next line. 2: Dispose a line when this line's note quantity <= Last&Next line.");
+
+        public static readonly LocalisableString NOTE_ADJUST_LINE_LABEL = new EzLocalizationManager.EzLocalisableString("线", "Line");
+
+        public static readonly LocalisableString NOTE_ADJUST_LINE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "取决于这张图的难度（0推荐用于Jack，1推荐用于（Jump/Hand/Etc.）Stream，2推荐用于Speed）",
+            "Depending on how heavy about this map(0 is recommended for Jack,  1 is recommended for (Jump/Hand/Etc.)Stream, 2 is recommended for Speed).");
+
+        public static readonly LocalisableString STEP_LABEL = new EzLocalizationManager.EzLocalisableString("步长", "Step");
+        public static readonly LocalisableString STEP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("在一行上成功转换时跳过\"Step\"行", "Skip \"Step\" line when converting successfully on a line.");
+        public static readonly LocalisableString IGNORE_COMPARISON_LABEL = new EzLocalizationManager.EzLocalisableString("忽略比较", "Ignore Comparison");
+        public static readonly LocalisableString IGNORE_COMPARISON_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("忽略比较条件", "Ignore condition of Comparison.");
+        public static readonly LocalisableString IGNORE_INTERVAL_LABEL = new EzLocalizationManager.EzLocalisableString("忽略间隔", "Ignore Interval");
+        public static readonly LocalisableString IGNORE_INTERVAL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("忽略音符间隔", "Ignore interval of note.");
     }
 }

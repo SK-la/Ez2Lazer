@@ -17,6 +17,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.LAsEzMania.HUD;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
@@ -25,6 +26,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
+    // 警告：此文件没写完，调查创建可能导致程序崩溃。
     public partial class Ez2KeyAreaPlus : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
         private readonly IBindable<ScrollingDirection> directionLocal = new Bindable<ScrollingDirection>();

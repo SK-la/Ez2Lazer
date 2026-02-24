@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
@@ -20,7 +21,7 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModPlayfieldTransformation : Mod, IApplicableToPlayer, IUpdatableByPlayfield, IApplicableToScoreProcessor, IApplicableToDrawableRuleset<ManiaHitObject>
     {
@@ -28,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "PS";
 
-        public override LocalisableString Description => EzManiaModStrings.PlayfieldTransformation_Description;
+        public override LocalisableString Description => PlayfieldTransformationStrings.PLAYFIELD_TRANSFORMATION_DESCRIPTION;
 
         public override double ScoreMultiplier => 1.0;
 
@@ -37,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MinimumScale_Label), nameof(EzManiaModStrings.MinimumScale_Description))]
+        [SettingSource(typeof(PlayfieldTransformationStrings), nameof(PlayfieldTransformationStrings.MINIMUM_SCALE_LABEL), nameof(PlayfieldTransformationStrings.MINIMUM_SCALE_DESCRIPTION))]
         public BindableFloat MinScale { get; } = new BindableFloat(0.3f)
         {
             MinValue = 0.3f,
@@ -117,5 +118,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
         {
         }
+    }
+
+    public static class PlayfieldTransformationStrings
+    {
+        public static readonly LocalisableString PLAYFIELD_TRANSFORMATION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("根据连击数调整游戏区域缩放", "Adjusts playfield scale based on combo.");
+        public static readonly LocalisableString MINIMUM_SCALE_LABEL = new EzLocalizationManager.EzLocalisableString("最小缩放", "Minimum scale");
+        public static readonly LocalisableString MINIMUM_SCALE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("游戏区域的最小缩放", "The minimum scale of the playfield.");
     }
 }

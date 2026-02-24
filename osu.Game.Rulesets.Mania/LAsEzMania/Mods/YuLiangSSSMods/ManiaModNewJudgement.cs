@@ -6,15 +6,15 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModNewJudgement : Mod, IApplicableToBeatmap
     {
@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "NJ";
 
-        public override LocalisableString Description => EzManiaModStrings.NewJudgement_Description;
+        public override LocalisableString Description => NewJudgementStrings.NEW_JUDGEMENT_DESCRIPTION;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
         public override bool Ranked => false;
@@ -116,5 +116,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             base.ResetSettingsToDefaults();
             HitWindows.ResetRange();
         }
+    }
+
+    public static class NewJudgementStrings
+    {
+        public static readonly LocalisableString NEW_JUDGEMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("根据歌曲BPM设置新的判定", "New judgement set by BPM of the song.");
     }
 }

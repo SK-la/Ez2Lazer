@@ -7,110 +7,107 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
-using osu.Game.Rulesets.Mania.Mods.KrrConversion;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModKrrLN : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
     {
-        public override string Name => "Krr LN";
-        public override string Acronym => "LN";
-        public override LocalisableString Description => "[KrrTool] LN Conversion";
+        public override string Name => "Krr LN Converter";
+        public override string Acronym => "KLN";
+        public override LocalisableString Description => KrrLNStrings.KRR_LN_DESCRIPTION;
         public override double ScoreMultiplier => 1;
         public override ModType Type => ModType.LA_Mod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_LongLevel_Label), nameof(EzManiaModStrings.KrrLN_LongLevel_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_LONG_LEVEL_LABEL), nameof(KrrLNStrings.KRR_LN_LONG_LEVEL_DESCRIPTION))]
         public BindableNumber<int> LongLevel { get; } = new BindableInt(50)
         {
             MinValue = 0,
             MaxValue = 100,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_ShortLevel_Label), nameof(EzManiaModStrings.KrrLN_ShortLevel_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_SHORT_LEVEL_LABEL), nameof(KrrLNStrings.KRR_LN_SHORT_LEVEL_DESCRIPTION))]
         public BindableNumber<int> ShortLevel { get; } = new BindableInt(8)
         {
             MinValue = 0,
             MaxValue = 256,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_ProcessOriginal_Label), nameof(EzManiaModStrings.KrrLN_ProcessOriginal_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_PROCESS_ORIGINAL_LABEL), nameof(KrrLNStrings.KRR_LN_PROCESS_ORIGINAL_DESCRIPTION))]
         public BindableBool ProcessOriginalBool { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_LengthThreshold_Label), nameof(EzManiaModStrings.KrrLN_LengthThreshold_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_LENGTH_THRESHOLD_LABEL), nameof(KrrLNStrings.KRR_LN_LENGTH_THRESHOLD_DESCRIPTION))]
         public BindableNumber<int> LengthThreshold { get; } = new BindableInt(16)
         {
             MinValue = 0,
             MaxValue = 65,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_LongPercentage_Label), nameof(EzManiaModStrings.KrrLN_LongPercentage_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_LONG_PERCENTAGE_LABEL), nameof(KrrLNStrings.KRR_LN_LONG_PERCENTAGE_DESCRIPTION))]
         public BindableNumber<int> LongPercentage { get; } = new BindableInt(50)
         {
             MinValue = 0,
             MaxValue = 100,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_ShortPercentage_Label), nameof(EzManiaModStrings.KrrLN_ShortPercentage_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_SHORT_PERCENTAGE_LABEL), nameof(KrrLNStrings.KRR_LN_SHORT_PERCENTAGE_DESCRIPTION))]
         public BindableNumber<int> ShortPercentage { get; } = new BindableInt(100)
         {
             MinValue = 0,
             MaxValue = 100,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_LongLimit_Label), nameof(EzManiaModStrings.KrrLN_LongLimit_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_LONG_LIMIT_LABEL), nameof(KrrLNStrings.KRR_LN_LONG_LIMIT_DESCRIPTION))]
         public BindableNumber<int> LongLimit { get; } = new BindableInt(10)
         {
             MinValue = 0,
             MaxValue = 10,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_ShortLimit_Label), nameof(EzManiaModStrings.KrrLN_ShortLimit_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_SHORT_LIMIT_LABEL), nameof(KrrLNStrings.KRR_LN_SHORT_LIMIT_DESCRIPTION))]
         public BindableNumber<int> ShortLimit { get; } = new BindableInt(10)
         {
             MinValue = 0,
             MaxValue = 10,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_LongRandom_Label), nameof(EzManiaModStrings.KrrLN_LongRandom_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_LONG_RANDOM_LABEL), nameof(KrrLNStrings.KRR_LN_LONG_RANDOM_DESCRIPTION))]
         public BindableNumber<int> LongRandom { get; } = new BindableInt(50)
         {
             MinValue = 0,
             MaxValue = 100,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_ShortRandom_Label), nameof(EzManiaModStrings.KrrLN_ShortRandom_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_SHORT_RANDOM_LABEL), nameof(KrrLNStrings.KRR_LN_SHORT_RANDOM_DESCRIPTION))]
         public BindableNumber<int> ShortRandom { get; } = new BindableInt(0)
         {
             MinValue = 0,
             MaxValue = 100,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_Alignment_Label), nameof(EzManiaModStrings.KrrLN_Alignment_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_ALIGNMENT_LABEL), nameof(KrrLNStrings.KRR_LN_ALIGNMENT_DESCRIPTION))]
         public BindableNumber<int> Alignment { get; } = new BindableInt(5)
         {
             MinValue = 0,
             MaxValue = 8,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.KrrLN_LNAlignment_Label), nameof(EzManiaModStrings.KrrLN_LNAlignment_Description))]
+        [SettingSource(typeof(KrrLNStrings), nameof(KrrLNStrings.KRR_LN_LN_ALIGNMENT_LABEL), nameof(KrrLNStrings.KRR_LN_LN_ALIGNMENT_DESCRIPTION))]
         public BindableNumber<int> LNAlignment { get; } = new BindableInt(6)
         {
             MinValue = 0,
             MaxValue = 8,
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {
             MinValue = 0,
@@ -163,6 +160,35 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
             KrrLNConverter.Transform(maniaBeatmap, options);
         }
+    }
+
+    public static class KrrLNStrings
+    {
+        public static readonly LocalisableString KRR_LN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("[KrrTool] LN转换器", "[KrrTool] LN Converter");
+        public static readonly LocalisableString KRR_LN_LONG_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("长按等级", "Long Level");
+        public static readonly LocalisableString KRR_LN_LONG_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按长度强度（0-100）", "Long length level (0-100).");
+        public static readonly LocalisableString KRR_LN_SHORT_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("短按等级", "Short Level");
+        public static readonly LocalisableString KRR_LN_SHORT_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按长度强度（0-256）", "Short length level (0-256).");
+        public static readonly LocalisableString KRR_LN_PROCESS_ORIGINAL_LABEL = new EzLocalizationManager.EzLocalisableString("处理原始LN", "Process Original LN");
+        public static readonly LocalisableString KRR_LN_PROCESS_ORIGINAL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("关闭时跳过原始LN", "Skip original LN when disabled.");
+        public static readonly LocalisableString KRR_LN_LENGTH_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("长度阈值", "Length Threshold");
+        public static readonly LocalisableString KRR_LN_LENGTH_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长短按判定阈值", "Threshold between long/short.");
+        public static readonly LocalisableString KRR_LN_LONG_PERCENTAGE_LABEL = new EzLocalizationManager.EzLocalisableString("长按比例", "Long Percentage");
+        public static readonly LocalisableString KRR_LN_LONG_PERCENTAGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按转换比例", "Percentage of long conversion.");
+        public static readonly LocalisableString KRR_LN_SHORT_PERCENTAGE_LABEL = new EzLocalizationManager.EzLocalisableString("短按比例", "Short Percentage");
+        public static readonly LocalisableString KRR_LN_SHORT_PERCENTAGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按转换比例", "Percentage of short conversion.");
+        public static readonly LocalisableString KRR_LN_LONG_LIMIT_LABEL = new EzLocalizationManager.EzLocalisableString("长按上限", "Long Limit");
+        public static readonly LocalisableString KRR_LN_LONG_LIMIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每行长按上限", "Max long notes per row.");
+        public static readonly LocalisableString KRR_LN_SHORT_LIMIT_LABEL = new EzLocalizationManager.EzLocalisableString("短按上限", "Short Limit");
+        public static readonly LocalisableString KRR_LN_SHORT_LIMIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每行短按上限", "Max short notes per row.");
+        public static readonly LocalisableString KRR_LN_LONG_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("长按随机", "Long Random");
+        public static readonly LocalisableString KRR_LN_LONG_RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按随机强度", "Randomness for long notes.");
+        public static readonly LocalisableString KRR_LN_SHORT_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("短按随机", "Short Random");
+        public static readonly LocalisableString KRR_LN_SHORT_RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("短按随机强度", "Randomness for short notes.");
+        public static readonly LocalisableString KRR_LN_ALIGNMENT_LABEL = new EzLocalizationManager.EzLocalisableString("对齐", "Alignment");
+        public static readonly LocalisableString KRR_LN_ALIGNMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("普通音符对齐节拍", "Snap normal notes to beat grid.");
+        public static readonly LocalisableString KRR_LN_LN_ALIGNMENT_LABEL = new EzLocalizationManager.EzLocalisableString("LN对齐", "LN Alignment");
+        public static readonly LocalisableString KRR_LN_LN_ALIGNMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("长按尾部对齐节拍", "Snap hold tails to beat grid.");
     }
 
     public class KrrLNOptions

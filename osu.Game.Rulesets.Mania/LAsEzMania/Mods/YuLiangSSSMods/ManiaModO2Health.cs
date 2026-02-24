@@ -6,15 +6,12 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Mods;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModO2Health : ModFailCondition, IApplicableAfterBeatmapConversion
     {
@@ -35,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "OH";
 
-        public override LocalisableString Description => EzManiaModStrings.O2Health_Description;
+        public override LocalisableString Description => O2HealthStrings.O2_HEALTH_DESCRIPTION;
 
         public override double ScoreMultiplier => 1.0;
 
@@ -59,7 +56,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Difficulty_Label), nameof(EzManiaModStrings.Difficulty_Description))]
+        [SettingSource(typeof(O2HealthStrings), nameof(O2HealthStrings.DIFFICULTY_LABEL), nameof(O2HealthStrings.DIFFICULTY_DESCRIPTION))]
         public BindableInt Difficulty { get; set; } = new BindableInt(1)
         {
             MinValue = 1,
@@ -105,5 +102,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             return HP.Value <= 0;
         }
+    }
+
+    public static class O2HealthStrings
+    {
+        public static readonly LocalisableString O2_HEALTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("为O2JAM玩家设计的生命值系统", "Health system for O2JAM players.");
+        public static readonly LocalisableString DIFFICULTY_LABEL = new EzLocalizationManager.EzLocalisableString("难度", "Difficulty");
+        public static readonly LocalisableString DIFFICULTY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("1: 简单  2: 普通  3: 困难", "1: Easy  2: Normal  3: Hard");
     }
 }

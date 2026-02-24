@@ -8,7 +8,7 @@ using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
-using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;

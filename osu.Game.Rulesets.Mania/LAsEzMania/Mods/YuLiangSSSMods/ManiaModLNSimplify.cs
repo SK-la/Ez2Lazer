@@ -10,15 +10,15 @@ using osu.Framework.Localisation;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModLNSimplify : Mod, IApplicableAfterBeatmapConversion
     {
@@ -28,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => EzManiaModStrings.LNSimplify_Description;
+        public override LocalisableString Description => LNSimplifyStrings.LN_SIMPLIFY_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.YinYang;
 
@@ -51,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LimitDivide_Label), nameof(EzManiaModStrings.LimitDivide_Description))]
+        [SettingSource(typeof(LNSimplifyStrings), nameof(LNSimplifyStrings.LIMIT_DIVIDE_LABEL), nameof(LNSimplifyStrings.LIMIT_DIVIDE_DESCRIPTION))]
         public BindableInt LimitDivide { get; set; } = new BindableInt(4)
         {
             MinValue = 1,
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.EasierDivide_Label), nameof(EzManiaModStrings.EasierDivide_Description))]
+        [SettingSource(typeof(LNSimplifyStrings), nameof(LNSimplifyStrings.EASIER_DIVIDE_LABEL), nameof(LNSimplifyStrings.EASIER_DIVIDE_DESCRIPTION))]
         public BindableInt EasierDivide { get; set; } = new BindableInt(4)
         {
             MinValue = 1,
@@ -67,10 +67,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LongestLN_Label), nameof(EzManiaModStrings.LongestLN_Description))]
+        [SettingSource(typeof(LNSimplifyStrings), nameof(LNSimplifyStrings.LONGEST_LN_LABEL), nameof(LNSimplifyStrings.LONGEST_LN_DESCRIPTION))]
         public BindableBool Gap { get; set; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ShortestLN_Label), nameof(EzManiaModStrings.ShortestLN_Description))]
+        [SettingSource(typeof(LNSimplifyStrings), nameof(LNSimplifyStrings.SHORTEST_LN_LABEL), nameof(LNSimplifyStrings.SHORTEST_LN_DESCRIPTION))]
         public BindableBool Len { get; set; } = new BindableBool(true);
 
         //[SettingSource("Allowable ms", "Minimum ms.")]
@@ -190,5 +190,18 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             //maniaBeatmap.Breaks.Clear();
         }
+    }
+
+    public static class LNSimplifyStrings
+    {
+        public static readonly LocalisableString LN_SIMPLIFY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("通过转换简化节奏", "Simplifies rhythms by converting.");
+        public static readonly LocalisableString LIMIT_DIVIDE_LABEL = new EzLocalizationManager.EzLocalisableString("限制分割", "Limit Divide");
+        public static readonly LocalisableString LIMIT_DIVIDE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择限制", "Select limit.");
+        public static readonly LocalisableString EASIER_DIVIDE_LABEL = new EzLocalizationManager.EzLocalisableString("简化分割", "Easier Divide");
+        public static readonly LocalisableString EASIER_DIVIDE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择复杂度", "Select complexity.");
+        public static readonly LocalisableString LONGEST_LN_LABEL = new EzLocalizationManager.EzLocalisableString("最长LN", "Longest LN");
+        public static readonly LocalisableString LONGEST_LN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("最长LN", "Longest LN.");
+        public static readonly LocalisableString SHORTEST_LN_LABEL = new EzLocalizationManager.EzLocalisableString("最短LN", "Shortest LN");
+        public static readonly LocalisableString SHORTEST_LN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("最短LN", "Shortest LN.");
     }
 }

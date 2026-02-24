@@ -10,15 +10,15 @@ using osu.Framework.Utils;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModLNLongShortAddition : ManiaModLN, IApplicableAfterBeatmapConversion
     {
@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LS";
 
-        public override LocalisableString Description => EzManiaModStrings.LNLongShortAddition_Description;
+        public override LocalisableString Description => LNLongShortAdditionStrings.LN_LONG_SHORT_ADDITION_DESCRIPTION;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LongShortPercent_Label), nameof(EzManiaModStrings.LongShortPercent_Description), 0)]
+        [SettingSource(typeof(LNLongShortAdditionStrings), nameof(LNLongShortAdditionStrings.LONG_SHORT_PERCENT_LABEL), nameof(LNLongShortAdditionStrings.LONG_SHORT_PERCENT_DESCRIPTION), 0)]
         public BindableNumber<int> LongShort { get; set; } = new BindableInt(40)
         {
             MinValue = 0,
@@ -149,5 +149,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             maniaBeatmap.Breaks.Clear();
         }
+    }
+
+    public static class LNLongShortAdditionStrings
+    {
+        public static readonly LocalisableString LN_LONG_SHORT_ADDITION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("LN转换器附加版本", "LN Transformer additional version.");
+        public static readonly LocalisableString LONG_SHORT_PERCENT_LABEL = new EzLocalizationManager.EzLocalisableString("长/短百分比", "Long / Short %");
+        public static readonly LocalisableString LONG_SHORT_PERCENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("形状", "The Shape");
     }
 }

@@ -10,34 +10,22 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Ranking.Statistics;
 
-namespace osu.Game.Rulesets.Mania.LAsEZMania
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 {
     /// <summary>
-    /// A graph which displays the distribution of hit timing for each column in a series of <see cref="HitEvent"/>s.
+    /// 一个偏移表，显示Mania每列判定偏移的分布情况.
+    /// <para></para>主要使用 <see cref="HitEvent"/> 中的 <see cref="HitEvent.TimeOffset"/> 来计算每列的平均偏移、稳定率等统计数据，并以图表和表格的形式展示出来。
     /// </summary>
     public partial class EzHitTimingGraphByColumn : CompositeDrawable
     {
-        /// <summary>
-        /// The currently displayed hit events.
-        /// </summary>
         private readonly IReadOnlyList<HitEvent> hitEvents;
-
-        /// <summary>
-        /// The number of columns in the beatmap.
-        /// </summary>
         private readonly int columnCount;
 
-        /// <summary>
-        /// Creates a new <see cref="EzHitTimingGraphByColumn"/>.
-        /// </summary>
-        /// <param name="hitEvents">The <see cref="HitEvent"/>s to display the timing distribution of.</param>
-        /// <param name="columnCount">The number of columns in the beatmap.</param>
         public EzHitTimingGraphByColumn(IReadOnlyList<HitEvent> hitEvents, int columnCount)
         {
             this.hitEvents = hitEvents;

@@ -10,14 +10,14 @@ using osu.Framework.Localisation;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModDoublePlay : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion
     {
@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.DoublePlayStyle_Label), nameof(EzManiaModStrings.DoublePlayStyle_Description))]
+        [SettingSource(typeof(DoublePlayStrings), nameof(DoublePlayStrings.DOUBLE_PLAY_STYLE_LABEL), nameof(DoublePlayStrings.DOUBLE_PLAY_STYLE_DESCRIPTION))]
         public BindableNumber<int> Style { get; } = new BindableInt(1)
         {
             MinValue = 1,
@@ -507,5 +507,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             newObjects.AddRange(newColumnObjects);
             maniaBeatmap.HitObjects = newObjects;
         }
+    }
+
+    public static class DoublePlayStrings
+    {
+        public static readonly LocalisableString DOUBLE_PLAY_STYLE_LABEL = new EzLocalizationManager.EzLocalisableString("样式", "Style");
+
+        public static readonly LocalisableString DOUBLE_PLAY_STYLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "1: NM+NM   2: MR+MR   3: NM+MR   4: MR+NM   5: Bracket NM+NM   6: Bracket MR   7: Wide Bracket   8: Wide Bracket MR",
+            "1: NM+NM   2: MR+MR   3: NM+MR   4: MR+NM   5: Bracket NM+NM   6: Bracket MR   7: Wide Bracket   8: Wide Bracket MR");
     }
 }

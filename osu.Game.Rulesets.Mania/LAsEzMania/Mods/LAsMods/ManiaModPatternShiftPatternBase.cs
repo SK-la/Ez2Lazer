@@ -13,13 +13,12 @@ using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public abstract class ManiaModPatternShiftPatternBase : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
     {
@@ -51,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => EzManiaModStrings.PatternShift_Description;
+        public override LocalisableString Description => PatternShiftStrings.PATTERN_SHIFT_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Magic;
 
@@ -61,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         public override bool ValidForMultiplayer => false;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Waveform_Label), nameof(EzManiaModStrings.PatternShift_Waveform_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_WAVEFORM_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_WAVEFORM_DESCRIPTION))]
         public Bindable<EzOscillator.EzWaveform> Waveform { get; } = new Bindable<EzOscillator.EzWaveform>(EzOscillator.EzWaveform.Sine);
 
         public BindableNumber<int> Level { get; } = new BindableInt(0)
@@ -71,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_OscillationBeats_Label), nameof(EzManiaModStrings.PatternShift_OscillationBeats_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_OSCILLATION_BEATS_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_OSCILLATION_BEATS_DESCRIPTION))]
         public BindableNumber<int> OscillationBeats { get; } = new BindableInt(2)
         {
             MinValue = 1,
@@ -79,7 +78,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_WindowInterval_Label), nameof(EzManiaModStrings.PatternShift_WindowInterval_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_WINDOW_INTERVAL_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_WINDOW_INTERVAL_DESCRIPTION))]
         public BindableNumber<int> WindowInterval { get; } = new BindableInt(2)
         {
             MinValue = 1,
@@ -87,7 +86,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_WindowStartOffset_Label), nameof(EzManiaModStrings.PatternShift_WindowStartOffset_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_WINDOW_START_OFFSET_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_WINDOW_START_OFFSET_DESCRIPTION))]
         public BindableNumber<int> WindowStartOffset { get; } = new BindableInt(1)
         {
             MinValue = 1,
@@ -95,7 +94,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Skip_FineThreshold_Label), nameof(EzManiaModStrings.PatternShift_Skip_FineThreshold_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_SKIP_FINE_THRESHOLD_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_SKIP_FINE_THRESHOLD_DESCRIPTION))]
         public BindableNumber<int> SkipFineThreshold { get; } = new BindableInt(2)
         {
             MinValue = 1,
@@ -103,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Skip_QuarterDivisor_Label), nameof(EzManiaModStrings.PatternShift_Skip_QuarterDivisor_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_DESCRIPTION))]
         public BindableNumber<int> SkipQuarterDivisor { get; } = new BindableInt(2)
         {
             MinValue = 1,
@@ -111,10 +110,10 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(50)
         {
             MinValue = 0,

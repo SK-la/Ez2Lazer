@@ -12,17 +12,13 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModNtoM : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder, IApplicableToBeatmapConverter
     {
@@ -32,7 +28,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => EzManiaModStrings.NtoM_Description;
+        public override LocalisableString Description => NtoMStrings.NTOM_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Moon;
 
@@ -52,7 +48,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Probability_Label), nameof(EzManiaModStrings.Probability_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.PROBABILITY_LABEL), nameof(EzCommonModStrings.PROBABILITY_DESCRIPTION))]
         public BindableNumber<int> Probability { get; set; } = new BindableInt(70)
         {
             MinValue = 0,
@@ -60,7 +56,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 5
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Key_Label), nameof(EzManiaModStrings.Key_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.KEY_LABEL), nameof(EzCommonModStrings.KEY_DESCRIPTION))]
         public BindableNumber<int> Key { get; set; } = new BindableInt(8)
         {
             MinValue = 2,
@@ -68,10 +64,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(0)
         {
             MinValue = 0,
@@ -342,5 +338,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             maniaBeatmap.HitObjects = newObjects;
         }
+    }
+
+    public static class NtoMStrings
+    {
+        public static readonly LocalisableString NTOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("转换为更高的按键数模式", "Convert to upper Keys mode.");
     }
 }

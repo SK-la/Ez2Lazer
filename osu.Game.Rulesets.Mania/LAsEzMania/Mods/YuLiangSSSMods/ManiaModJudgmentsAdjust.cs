@@ -7,16 +7,16 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModJudgmentsAdjust : Mod, IApplicableToScoreProcessor
     {
@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "JU";
 
-        public override LocalisableString Description => EzManiaModStrings.JudgmentsAdjust_Description;
+        public override LocalisableString Description => JudgmentsAdjustStrings.JUDGMENTS_ADJUST_DESCRIPTION;
 
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomHitRange_Label), nameof(EzManiaModStrings.CustomHitRange_Description))]
+        [SettingSource(typeof(JudgmentsAdjustStrings), nameof(JudgmentsAdjustStrings.CUSTOM_HIT_RANGE_LABEL), nameof(JudgmentsAdjustStrings.CUSTOM_HIT_RANGE_DESCRIPTION))]
         public BindableBool CustomHitRange { get; set; } = new BindableBool(true);
 
         [SettingSource("Perfect")]
@@ -115,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             MaxValue = 250
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomProportionScore_Label), nameof(EzManiaModStrings.CustomProportionScore_Description))]
+        [SettingSource(typeof(JudgmentsAdjustStrings), nameof(JudgmentsAdjustStrings.CUSTOM_PROPORTION_SCORE_LABEL), nameof(JudgmentsAdjustStrings.CUSTOM_PROPORTION_SCORE_DESCRIPTION))]
         public BindableBool CustomProportionScore { get; set; } = new BindableBool(true);
 
         [SettingSource("Perfect")]
@@ -213,5 +213,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             // mania.HitProportionScore.Meh = Meh.Value;
             // mania.HitProportionScore.Miss = Miss.Value;
         }
+    }
+
+    public static class JudgmentsAdjustStrings
+    {
+        public static readonly LocalisableString JUDGMENTS_ADJUST_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("修改你的判定", "Modify your judgement.");
+        public static readonly LocalisableString CUSTOM_HIT_RANGE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义打击范围", "Custom Hit Range");
+        public static readonly LocalisableString CUSTOM_HIT_RANGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整音符的打击范围", "Custom Hit Range. Adjust the hit range of notes.");
+        public static readonly LocalisableString CUSTOM_PROPORTION_SCORE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义比例分数", "Custom Proportion Score");
+        public static readonly LocalisableString CUSTOM_PROPORTION_SCORE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("自定义比例分数", "Custom Proportion Score");
     }
 }

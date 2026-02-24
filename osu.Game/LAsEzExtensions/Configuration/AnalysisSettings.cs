@@ -23,9 +23,9 @@ namespace osu.Game.LAsEzExtensions.Configuration
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzLocalizationManager.InputAudioLatencyTracker,
+                    Caption = EzSettingsStrings.INPUT_AUDIO_LATENCY_TRACKER,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker),
-                    HintText = EzLocalizationManager.InputAudioLatencyTrackerTooltip,
+                    HintText = EzSettingsStrings.INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP,
                 })
                 {
                     Keywords = new[] { "latency", "audio", "input" }

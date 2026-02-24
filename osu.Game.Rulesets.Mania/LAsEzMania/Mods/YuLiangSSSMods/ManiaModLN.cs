@@ -10,11 +10,10 @@ using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModLN : Mod, IHasSeed
     {
@@ -22,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LN";
 
-        public override LocalisableString Description => EzManiaModStrings.LN_Description;
+        public override LocalisableString Description => LNStrings.LN_DESCRIPTION;
 
         public override double ScoreMultiplier => 1;
 
@@ -33,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Divide_Label), nameof(EzManiaModStrings.Divide_Description))]
+        [SettingSource(typeof(LNStrings), nameof(LNStrings.DIVIDE_LABEL), nameof(LNStrings.DIVIDE_DESCRIPTION))]
         public BindableNumber<int> Divide { get; set; } = new BindableInt(4)
         {
             MinValue = 1,
@@ -41,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Percentage_Label), nameof(EzManiaModStrings.Percentage_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.PERCENTAGE_LABEL), nameof(EzCommonModStrings.PERCENTAGE_DESCRIPTION))]
         public BindableNumber<int> Percentage { get; set; } = new BindableInt(100)
         {
             MinValue = 5,
@@ -49,10 +48,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 5
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.OriginalLN_Label), nameof(EzManiaModStrings.OriginalLN_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ORIGINAL_LN_LABEL), nameof(EzCommonModStrings.ORIGINAL_LN_DESCRIPTION))]
         public BindableBool OriginalLN { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.ColumnNum_Label), nameof(EzManiaModStrings.ColumnNum_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.COLUMN_NUM_LABEL), nameof(EzCommonModStrings.COLUMN_NUM_DESCRIPTION))]
         public BindableInt SelectColumn { get; set; } = new BindableInt(10)
         {
             MinValue = 1,
@@ -60,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Gap_Label), nameof(EzManiaModStrings.Gap_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.GAP_LABEL), nameof(EzCommonModStrings.GAP_DESCRIPTION))]
         public BindableInt Gap { get; set; } = new BindableInt(12)
         {
             MinValue = 0,
@@ -68,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LineSpacing_Label), nameof(EzManiaModStrings.LineSpacing_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.LINE_SPACING_LABEL), nameof(EzCommonModStrings.LINE_SPACING_DESCRIPTION))]
         public BindableInt LineSpacing { get; set; } = new BindableInt(0)
         {
             MinValue = 0,
@@ -76,10 +75,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.InvertLineSpacing_Label), nameof(EzManiaModStrings.InvertLineSpacing_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.INVERT_LINE_SPACING_LABEL), nameof(EzCommonModStrings.INVERT_LINE_SPACING_DESCRIPTION))]
         public BindableBool InvertLineSpacing { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.DurationLimit_Label), nameof(EzManiaModStrings.DurationLimit_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.DURATION_LIMIT_LABEL), nameof(EzCommonModStrings.DURATION_LIMIT_DESCRIPTION))]
         public BindableDouble DurationLimit { get; set; } = new BindableDouble(5)
         {
             MinValue = 0,
@@ -87,7 +86,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 0.5
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
@@ -107,5 +106,12 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
             }
         }
+    }
+
+    public static class LNStrings
+    {
+        public static readonly LocalisableString LN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("LN转换器", "LN Transformer");
+        public static readonly LocalisableString DIVIDE_LABEL = new EzLocalizationManager.EzLocalisableString("分割", "Divide");
+        public static readonly LocalisableString DIVIDE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("使用1/?", "Use 1/?");
     }
 }

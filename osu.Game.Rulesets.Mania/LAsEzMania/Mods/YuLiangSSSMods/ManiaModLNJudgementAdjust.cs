@@ -9,12 +9,12 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Judgements;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -24,7 +24,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModLNJudgementAdjust : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
@@ -32,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "LA";
 
-        public override LocalisableString Description => EzManiaModStrings.LNJudgementAdjust_Description;
+        public override LocalisableString Description => LNJudgementAdjustStrings.LN_JUDGEMENT_ADJUST_DESCRIPTION;
 
         public override double ScoreMultiplier => 1;
 
@@ -44,10 +44,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.BodyJudgementSwitch_Label), nameof(EzManiaModStrings.BodyJudgementSwitch_Description))]
+        [SettingSource(typeof(LNJudgementAdjustStrings), nameof(LNJudgementAdjustStrings.BODY_JUDGEMENT_SWITCH_LABEL), nameof(LNJudgementAdjustStrings.BODY_JUDGEMENT_SWITCH_DESCRIPTION))]
         public BindableBool BodyJudgementSwitch { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.TailJudgementSwitch_Label), nameof(EzManiaModStrings.TailJudgementSwitch_Description))]
+        [SettingSource(typeof(LNJudgementAdjustStrings), nameof(LNJudgementAdjustStrings.TAIL_JUDGEMENT_SWITCH_LABEL), nameof(LNJudgementAdjustStrings.TAIL_JUDGEMENT_SWITCH_DESCRIPTION))]
         public BindableBool TailJudgementSwitch { get; } = new BindableBool();
 
         public void ApplyToBeatmap(IBeatmap beatmap)
@@ -348,5 +348,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 }
             }
         }
+    }
+
+    public static class LNJudgementAdjustStrings
+    {
+        public static readonly LocalisableString LN_JUDGEMENT_ADJUST_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整LN的判定", "Adjust the judgement of LN.");
+        public static readonly LocalisableString BODY_JUDGEMENT_SWITCH_LABEL = new EzLocalizationManager.EzLocalisableString("主体判定开关", "Body Judgement Switch");
+        public static readonly LocalisableString BODY_JUDGEMENT_SWITCH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启/关闭主体判定", "Turn on/off body judgement.");
+        public static readonly LocalisableString TAIL_JUDGEMENT_SWITCH_LABEL = new EzLocalizationManager.EzLocalisableString("尾部判定开关", "Tail Judgement Switch");
+        public static readonly LocalisableString TAIL_JUDGEMENT_SWITCH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启/关闭尾部判定", "Turn on/off tail judgement.");
     }
 }

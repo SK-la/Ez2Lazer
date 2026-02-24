@@ -11,18 +11,15 @@ using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
+using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.LAsEzExtensions.Mods;
-using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModCleanColumn : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
     {
@@ -32,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => EzManiaModStrings.CleanColumn_Description;
+        public override LocalisableString Description => CleanColumnStrings.CLEAN_COLUMN_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Backspace;
 
@@ -42,31 +39,31 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.DeleteSColumn_Label), nameof(EzManiaModStrings.DeleteSColumn_Description))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.DELETE_S_COLUMN_LABEL), nameof(CleanColumnStrings.DELETE_S_COLUMN_DESCRIPTION))]
         public BindableBool DeleteSColumn { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.DeletePColumn_Label), nameof(EzManiaModStrings.DeletePColumn_Description))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.DELETE_P_COLUMN_LABEL), nameof(CleanColumnStrings.DELETE_P_COLUMN_DESCRIPTION))]
         public BindableBool DeletePColumn { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.DeleteEColumn_Label), nameof(EzManiaModStrings.DeleteEColumn_Description))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.DELETE_E_COLUMN_LABEL), nameof(CleanColumnStrings.DELETE_E_COLUMN_DESCRIPTION))]
         public BindableBool DeleteEColumn { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.EnableCustomDelete_Label), nameof(EzManiaModStrings.EnableCustomDelete_Description))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.ENABLE_CUSTOM_DELETE_LABEL), nameof(CleanColumnStrings.ENABLE_CUSTOM_DELETE_DESCRIPTION))]
         public BindableBool EnableCustomDelete { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomDeleteColumn_Label), nameof(EzManiaModStrings.CustomDeleteColumn_Description), SettingControlType = typeof(SettingsTextBox))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.CUSTOM_DELETE_COLUMN_LABEL), nameof(CleanColumnStrings.CUSTOM_DELETE_COLUMN_DESCRIPTION), SettingControlType = typeof(SettingsTextBox))]
         public Bindable<string> CustomDeleteColumn { get; } = new Bindable<string>(string.Empty);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.EnableCustomReorder_Label), nameof(EzManiaModStrings.EnableCustomReorder_Description))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL), nameof(CleanColumnStrings.ENABLE_CUSTOM_REORDER_DESCRIPTION))]
         public BindableBool EnableCustomReorder { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseHealthCapReduction_Label), nameof(EzManiaModStrings.UseHealthCapReduction_Description))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_LABEL), nameof(CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_DESCRIPTION))]
         public BindableBool UseHealthCapReduction { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CustomReorderColumn_Label), nameof(EzManiaModStrings.CustomReorderColumn_Description), SettingControlType = typeof(SettingsTextBox))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.CUSTOM_REORDER_COLUMN_LABEL), nameof(CleanColumnStrings.CUSTOM_REORDER_COLUMN_DESCRIPTION), SettingControlType = typeof(SettingsTextBox))]
         public Bindable<string> CustomReorderColumn { get; } = new Bindable<string>(string.Empty);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
         {
             MinValue = 0,
@@ -391,5 +388,65 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
                 // 如果处理失败，保持原谱面不变
             }
         }
+    }
+
+    public static class CleanColumnStrings
+    {
+        public static readonly LocalisableString CLEAN_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("整理Column, 排序、删除轨道中的note", "Clean Column, Sort, Delete notes in the column.");
+        public static readonly LocalisableString DELETE_S_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除S列", "Delete S Column Type");
+        public static readonly LocalisableString DELETE_S_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了S Column Type的列", "Delete columns marked with S column type when enabled");
+        public static readonly LocalisableString DELETE_P_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除P列", "Delete P Column Type");
+        public static readonly LocalisableString DELETE_P_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了P Column Type的列", "Delete columns marked with P column type when enabled");
+        public static readonly LocalisableString DELETE_E_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除E列", "Delete E Column Type");
+        public static readonly LocalisableString DELETE_E_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
+        public static readonly LocalisableString ENABLE_CUSTOM_DELETE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义删除列", "Enable Custom Delete");
+
+        public static readonly LocalisableString ENABLE_CUSTOM_DELETE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后启用自定义删除列功能，支持与其他功能同时使用。输入多个数字如'2468'删除第2、4、6、8列",
+            "Enable custom column deletion when enabled, can be used with other features. Input multiple digits like '2468' to delete columns 2, 4, 6, 8");
+
+        public static readonly LocalisableString CUSTOM_DELETE_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除列序号", "Delete Column Indexes");
+
+        public static readonly LocalisableString CUSTOM_DELETE_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "输入要删除的列序号，支持多个数字。如'2468'删除2、4、6、8列。超过谱面列数的数字将被忽略。支持最多10k（0表示第10列）",
+            "Input the column indexes to delete, support multiple digits. E.g. '2468' deletes columns 2, 4, 6, 8. Indexes exceeding the beatmap's column count will be ignored. Support up to 10k (0 means column 10)");
+
+        public static readonly LocalisableString ENABLE_CUSTOM_REORDER_LABEL = new EzLocalizationManager.EzLocalisableString("自定义列重排", "Enable Custom Reorder");
+
+        public static readonly LocalisableString ENABLE_CUSTOM_REORDER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后启用自定义列清洗Column功能，如果更改了列数，需要重开此功能才能正常生效",
+            "Enable custom column reorder when enabled, if the column count is changed, you need to toggle this feature again to take effect");
+
+        public static readonly LocalisableString CUSTOM_REORDER_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("列重排规则", "Column Reorder Rule");
+
+        public static readonly LocalisableString CUSTOM_REORDER_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "处理Column，自定义排序、复制、删除或置空列中的note。"
+            + "\n执行顺序：先重排，后删除。支持最多10k（0表示第10列）；"
+            + "\n'-'表示该新列位置清空，"
+            + "\n'|'表示该新列位置放置贯穿全谱面的长按note，"
+            + "\n'?'表示该新列保持原列位置不变。"
+            + "\n字符串长度决定新的列数（修改长度必须重新启用开关）。每位数字代表新列使用原谱面的哪一列内容，可重复以复制列。"
+            + "\n如果输入包含超出原列数的数字，该位会被忽略并保持为空列。"
+            + "\n示例：原谱面5k，输入 2|30-? 转换为6k："
+            + "\n- 新列1=原列2；新列2=锁手长按；新列3=原列3；"
+            + "\n- 新列4=原列10（超出，忽略，空列）；新列5='-'清空；"
+            + "\n- 新列6=随机的原列",
+            "Process Column: custom reorder, copy, delete, or clear notes in columns."
+            + "\nExecution order: first reorder, then delete. Support up to 10k (0 means column 10); '-' clears the new column; '|' places a hold note spanning the entire beatmap in that new column; '?' keeps the original column in place."
+            + "\nString length determines the new column count (must re-enable when changing length). Each digit maps the new column to an original column; duplicates copy columns."
+            + "\nDigits exceeding the original column count are ignored and remain empty."
+            + "\nExample: original 5k, input " + '"' + "2|30-1" + '"' + " converts to 6k:"
+            + "\n- New col1 = orig col2;"
+            + "\n- New col2 = full-length hold;"
+            + "\n- New col3 = orig col3;"
+            + "\n- New col4 = orig col10 (ignored, empty);"
+            + "\n- New col5 = '-' cleared;"
+            + "\n- New col6 = orig col1.");
+
+        public static readonly LocalisableString USE_HEALTH_CAP_REDUCTION_LABEL = new EzLocalizationManager.EzLocalisableString("血量上限降低模式", "Health Cap Reduction Mode");
+
+        public static readonly LocalisableString USE_HEALTH_CAP_REDUCTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "开启后锁手面的combo break降低血量上限15%而不是直接扣血，最低40%上限",
+            "When enabled, Lock LN's combo breaks reduce the maximum health cap by 15% instead of direct health deduction, down to a minimum of 40%.");
     }
 }

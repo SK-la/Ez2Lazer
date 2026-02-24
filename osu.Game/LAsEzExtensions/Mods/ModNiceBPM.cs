@@ -27,7 +27,7 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         public override string Acronym => "NB";
 
-        public override LocalisableString Description => EzModStrings.NiceBPM_Description;
+        public override LocalisableString Description => NiceBPMStrings.NICE_BPM_DESCRIPTION;
 
         public override ModType Type => ModType.LA_Mod;
 
@@ -39,10 +39,10 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         public override Type[] IncompatibleMods => new[] { typeof(ModRateAdjust), typeof(ModTimeRamp), typeof(ModAutoplay) };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.FreeBPM_Label), nameof(EzModStrings.FreeBPM_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.FREE_BPM_LABEL), nameof(NiceBPMStrings.FREE_BPM_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> FreeBPM { get; } = new Bindable<int?>();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.InitialRate_Label), nameof(EzModStrings.InitialRate_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.INITIAL_RATE_LABEL), nameof(NiceBPMStrings.INITIAL_RATE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> InitialRate { get; } = new BindableDouble(1)
         {
             MinValue = 0.2,
@@ -50,13 +50,13 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 0.01
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.EnableDynamicBPM_Label), nameof(EzModStrings.EnableDynamicBPM_Description), SettingControlType = typeof(SettingsCheckbox))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.ENABLE_DYNAMIC_BPM_LABEL), nameof(NiceBPMStrings.ENABLE_DYNAMIC_BPM_DESCRIPTION), SettingControlType = typeof(SettingsCheckbox))]
         public BindableBool EnableDynamicBPM { get; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.AdjustPitch_Label), nameof(EzModStrings.AdjustPitch_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
         public BindableBool AdjustPitch { get; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.MinAllowableRate_Label), nameof(EzModStrings.MinAllowableRate_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MIN_ALLOWABLE_RATE_LABEL), nameof(NiceBPMStrings.MIN_ALLOWABLE_RATE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> MinAllowableRate { get; } = new BindableDouble(0.7)
         {
             MinValue = 0.1,
@@ -64,7 +64,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 0.1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.MaxAllowableRate_Label), nameof(EzModStrings.MaxAllowableRate_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MAX_ALLOWABLE_RATE_LABEL), nameof(NiceBPMStrings.MAX_ALLOWABLE_RATE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> MaxAllowableRate { get; } = new BindableDouble(1.5)
         {
             MinValue = 1.0,
@@ -76,7 +76,7 @@ namespace osu.Game.LAsEzExtensions.Mods
         private const double min_rate_change_factor = 0.9d;
         private const double max_rate_change_factor = 1.11d;
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.MissCountThreshold_Label), nameof(EzModStrings.MissCountThreshold_Description), SettingControlType = typeof(SettingsSlider<int>))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MISS_COUNT_THRESHOLD_LABEL), nameof(NiceBPMStrings.MISS_COUNT_THRESHOLD_DESCRIPTION), SettingControlType = typeof(SettingsSlider<int>))]
         public BindableInt MissThreshold { get; } = new BindableInt(3)
         {
             MinValue = 1,
@@ -84,7 +84,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.RateChangeOnMiss_Label), nameof(EzModStrings.RateChangeOnMiss_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.RATE_CHANGE_ON_MISS_LABEL), nameof(NiceBPMStrings.RATE_CHANGE_ON_MISS_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> RateChangeOnMiss { get; } = new BindableDouble(0.95)
         {
             MinValue = 0.5,
@@ -462,5 +462,24 @@ namespace osu.Game.LAsEzExtensions.Mods
             // 根据一致性缩放速率调整
             targetRate = Interpolation.Lerp(targetRate, recentRates.Average(), Math.Abs(consistency) / (recent_rate_count - 1d));
         }
+    }
+
+    public static class NiceBPMStrings
+    {
+        public static readonly LocalisableString NICE_BPM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("自由调整BPM或速度", "Free BPM or Speed");
+        public static readonly LocalisableString INITIAL_RATE_LABEL = new EzLocalizationManager.EzLocalisableString("初始速度倍率", "Initial rate");
+        public static readonly LocalisableString INITIAL_RATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整初始播放速度倍率", "Initial rate. The starting speed of the track");
+        public static readonly LocalisableString FREE_BPM_LABEL = new EzLocalizationManager.EzLocalisableString("初始BPM", "Initial BPM");
+        public static readonly LocalisableString FREE_BPM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置BPM值以调整初始播放速度", "BPM to speed");
+        public static readonly LocalisableString ENABLE_DYNAMIC_BPM_LABEL = new EzLocalizationManager.EzLocalisableString("启用动态BPM", "Enable Dynamic BPM");
+        public static readonly LocalisableString ENABLE_DYNAMIC_BPM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("基于表现启用动态BPM调整", "Enable dynamic BPM adjustment based on performance");
+        public static readonly LocalisableString MIN_ALLOWABLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString("最小允许速率", "Min Allowable Rate");
+        public static readonly LocalisableString MIN_ALLOWABLE_RATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动态BPM调整的最小速率", "Minimum rate for dynamic BPM adjustment");
+        public static readonly LocalisableString MAX_ALLOWABLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString("最大允许速率", "Max Allowable Rate");
+        public static readonly LocalisableString MAX_ALLOWABLE_RATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动态BPM调整的最大速率", "Maximum rate for dynamic BPM adjustment");
+        public static readonly LocalisableString MISS_COUNT_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("Miss计数阈值", "Miss Count Threshold");
+        public static readonly LocalisableString MISS_COUNT_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("触发降速所需的Miss数量", "Number of misses required to trigger rate decrease");
+        public static readonly LocalisableString RATE_CHANGE_ON_MISS_LABEL = new EzLocalizationManager.EzLocalisableString("Miss时的速率变化", "Rate Change On Miss");
+        public static readonly LocalisableString RATE_CHANGE_ON_MISS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("达到Miss阈值时应用的速率倍数", "Rate multiplier applied when miss threshold is reached");
     }
 }

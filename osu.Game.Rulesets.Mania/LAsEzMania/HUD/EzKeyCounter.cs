@@ -9,7 +9,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Screens.Play.HUD;
 
-namespace osu.Game.Rulesets.Mania.LAsEZMania
+namespace osu.Game.Rulesets.Mania.LAsEzMania.HUD
 {
     public partial class EzKeyCounter : KeyCounter
     {

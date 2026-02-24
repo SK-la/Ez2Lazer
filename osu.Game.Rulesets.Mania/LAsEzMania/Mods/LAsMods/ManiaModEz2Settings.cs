@@ -14,38 +14,37 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModEz2Settings : Mod, IApplicableToDifficulty, IApplicableToBeatmap //, IApplicableToSample //, IStoryboardElement
     {
         public override string Name => "Ez2 Settings";
         public override string Acronym => "ES";
-        public override LocalisableString Description => EzManiaModStrings.Ez2Settings_Description;
+        public override LocalisableString Description => Ez2SettingsStrings.EZ2_SETTINGS_DESCRIPTION;
         public override ModType Type => ModType.LA_Mod;
         public override IconUsage? Icon => FontAwesome.Solid.Tools;
 
         public override bool Ranked => false;
         public override double ScoreMultiplier => 1;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoScratch_Label), nameof(EzManiaModStrings.NoScratch_Description))]
+        [SettingSource(typeof(Ez2SettingsStrings), nameof(Ez2SettingsStrings.NO_SCRATCH_LABEL), nameof(Ez2SettingsStrings.NO_SCRATCH_DESCRIPTION))]
         public BindableBool NoScratch { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NoPanel_Label), nameof(EzManiaModStrings.NoPanel_Description))]
+        [SettingSource(typeof(Ez2SettingsStrings), nameof(Ez2SettingsStrings.NO_PANEL_LABEL), nameof(Ez2SettingsStrings.NO_PANEL_DESCRIPTION))]
         public BindableBool NoPanel { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.HealthyScratch_Label), nameof(EzManiaModStrings.HealthyScratch_Description))]
+        [SettingSource(typeof(Ez2SettingsStrings), nameof(Ez2SettingsStrings.HEALTHY_SCRATCH_LABEL), nameof(Ez2SettingsStrings.HEALTHY_SCRATCH_DESCRIPTION))]
         public BindableBool HealthScratch { get; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.MaxBeat_Label), nameof(EzManiaModStrings.MaxBeat_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(Ez2SettingsStrings), nameof(Ez2SettingsStrings.MAX_BEAT_LABEL), nameof(Ez2SettingsStrings.MAX_BEAT_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> MaxBeat { get; } = new BindableDouble(3)
         {
             MinValue = 1,
@@ -294,6 +293,23 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         //     { 7, new List<int> { 6 } },
         //     { 6, new List<int> { 5, 4 } },
         // };
+
+        public static class Ez2SettingsStrings
+        {
+            public static readonly LocalisableString EZ2_SETTINGS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按固定模版，移除盘子和踏板", "Remove Scratch, Panel.");
+            public static readonly LocalisableString NO_SCRATCH_LABEL = new EzLocalizationManager.EzLocalisableString("无盘", "No Scratch");
+
+            public static readonly LocalisableString NO_SCRATCH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+                "按固定模版，去除Ez街机谱面中的盘子. 用于: 6-9k L-S; 12\\14\\16k LR-S",
+                "No (EZ)Scratch. For: 6-9k L-S; 12\\14\\16k LR-S");
+
+            public static readonly LocalisableString NO_PANEL_LABEL = new EzLocalizationManager.EzLocalisableString("无踏板", "No Panel");
+            public static readonly LocalisableString NO_PANEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按固定模版，去除Ez街机谱面中的脚踏. 用于: 7\\14\\18k", "No (EZ)Panel. For: 7\\14\\18k");
+            public static readonly LocalisableString HEALTHY_SCRATCH_LABEL = new EzLocalizationManager.EzLocalisableString("健康盘子", "Healthy Scratch");
+            public static readonly LocalisableString HEALTHY_SCRATCH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("优化盘子密度，通过特定模版将过快的盘子移动到其他列", "Healthy (EZ)Scratch. Move the fast Scratch to the other columns");
+            public static readonly LocalisableString MAX_BEAT_LABEL = new EzLocalizationManager.EzLocalisableString("最大节拍", "Max Beat");
+            public static readonly LocalisableString MAX_BEAT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("盘子密度的最大节拍间隔, 1/? 拍", "Scratch MAX Beat Space, MAX 1/? Beat");
+        }
     }
 }
 // #pragma warning restore

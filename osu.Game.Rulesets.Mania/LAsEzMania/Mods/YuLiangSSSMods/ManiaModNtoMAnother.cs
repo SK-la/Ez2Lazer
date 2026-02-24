@@ -12,16 +12,12 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModNtoMAnother : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
     {
@@ -37,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1;
 
-        public override LocalisableString Description => EzManiaModStrings.NtoMAnother_Description;
+        public override LocalisableString Description => NtoMAnotherStrings.NTOM_ANOTHER_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.CloudRain;
 
@@ -75,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Key_Label), nameof(EzManiaModStrings.Key_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.KEY_LABEL), nameof(EzCommonModStrings.KEY_DESCRIPTION))]
         public BindableNumber<int> Key { get; set; } = new BindableInt(8)
         {
             MinValue = 2,
@@ -83,7 +79,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.BlankColumn_Label), nameof(EzManiaModStrings.BlankColumn_Description))]
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.BLANK_COLUMN_LABEL), nameof(NtoMAnotherStrings.BLANK_COLUMN_DESCRIPTION))]
         public BindableNumber<int> BlankColumn { get; set; } = new BindableInt(0)
         {
             MinValue = 0,
@@ -91,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.NtoMGap_Label), nameof(EzManiaModStrings.NtoMGap_Description))]
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.NTOM_GAP_LABEL), nameof(NtoMAnotherStrings.NTOM_GAP_DESCRIPTION))]
         public BindableInt Gap { get; set; } = new BindableInt(10)
         {
             MinValue = 0,
@@ -99,10 +95,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Clean_Label), nameof(EzManiaModStrings.Clean_Description))]
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.CLEAN_LABEL), nameof(NtoMAnotherStrings.CLEAN_DESCRIPTION))]
         public BindableBool Clean { get; set; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.CleanDivide_Label), nameof(EzManiaModStrings.CleanDivide_Description))]
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.CLEAN_DIVIDE_LABEL), nameof(NtoMAnotherStrings.CLEAN_DIVIDE_DESCRIPTION))]
         public BindableInt CleanDivide { get; set; } = new BindableInt(4)
         {
             MinValue = 0,
@@ -110,16 +106,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Adjust4Jack_Label), nameof(EzManiaModStrings.Adjust4Jack_Description))]
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.ADJUST_4_JACK_LABEL), nameof(NtoMAnotherStrings.ADJUST_4_JACK_DESCRIPTION))]
         public BindableBool Adjust4Jack { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Adjust4Speed_Label), nameof(EzManiaModStrings.Adjust4Speed_Description))]
+        [SettingSource(typeof(NtoMAnotherStrings), nameof(NtoMAnotherStrings.ADJUST_4_SPEED_LABEL), nameof(NtoMAnotherStrings.ADJUST_4_SPEED_DESCRIPTION))]
         public BindableBool Adjust4Speed { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ApplyOrder_Label), nameof(EzModStrings.ApplyOrder_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
         public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(0)
         {
             MinValue = 0,
@@ -487,5 +483,41 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             return (newObjects, checkColumn);
         }
+    }
+
+    public static class NtoMAnotherStrings
+    {
+        public static readonly LocalisableString NTOM_ANOTHER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("转Key，来自krrcream的工具（有一些bug，请使用Clean设置来清理）", "From krrcream's Tool (It has some bugs, please use Clean settings to clean it.)");
+        public static readonly LocalisableString BLANK_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("空白列", "Blank Column");
+
+        public static readonly LocalisableString BLANK_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "要添加的空白列数。（注意：如果按键数-圆形大小小于空白列数，则不会添加。）",
+            "Number of blank columns to add. (Notice: If the number of Key - CircleSize is less than the number of blank columns, it won't be added.)");
+
+        public static readonly LocalisableString NTOM_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("间隙", "Gap");
+
+        public static readonly LocalisableString NTOM_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "在每个区域重新排列音符。（间隙越大，音符分布越广。）",
+            "Rearrange the notes in every area. (If Gap is bigger, the notes will be more spread out.)");
+
+        public static readonly LocalisableString CLEAN_LABEL = new EzLocalizationManager.EzLocalisableString("清理", "Clean");
+        public static readonly LocalisableString CLEAN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("尝试清理谱面中的一些音符。", "Try to clean some notes in the map.");
+        public static readonly LocalisableString CLEAN_DIVIDE_LABEL = new EzLocalizationManager.EzLocalisableString("清理分割", "Clean Divide");
+
+        public static readonly LocalisableString CLEAN_DIVIDE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "选择清理的分割（0表示不分割清理，4推荐用于流，8推荐用于Jack）。（如果清理为false，此设置不会被使用。）",
+            "Choose the divide(0 For no Divide Clean, 4 is Recommended for Stream, 8 is Recommended for Jack) of cleaning. (If Clean is false, this setting won't be used.)");
+
+        public static readonly LocalisableString ADJUST_4_JACK_LABEL = new EzLocalizationManager.EzLocalisableString("1/4 Jack", "1/4 Jack");
+
+        public static readonly LocalisableString ADJUST_4_JACK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "（如100+ BPM 1/4 Jack）清理分割 * 1/2，用于1/4 Jack，避免清理1/4 Jack。",
+            "(Like 100+ BPM 1/4 Jack)Clean Divide * 1/2, for 1/4 Jack, avoiding cleaning 1/4 Jack.");
+
+        public static readonly LocalisableString ADJUST_4_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("1/4 Speed", "1/4 Speed");
+
+        public static readonly LocalisableString ADJUST_4_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "（如300+ BPM 1/4 Speed）清理分割 * 2，用于1/4 Speed，避免额外的1/2 Jack。",
+            "(Like 300+ BPM 1/4 Speed)Clean Divide * 2, for 1/4 Speed, avoiding additional 1/2 Jack.");
     }
 }

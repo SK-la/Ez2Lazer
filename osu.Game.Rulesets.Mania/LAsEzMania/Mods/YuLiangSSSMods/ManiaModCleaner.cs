@@ -9,15 +9,15 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ManiaModCleaner : Mod, IApplicableAfterBeatmapConversion
     {
@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "CL";
 
-        public override LocalisableString Description => EzManiaModStrings.Cleaner_Description;
+        public override LocalisableString Description => CleanerStrings.CLEANER_DESCRIPTION;
 
         public override IconUsage? Icon => FontAwesome.Solid.Broom;
 
@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Style_Label), nameof(EzManiaModStrings.Style_Description))]
+        [SettingSource(typeof(CleanerStrings), nameof(CleanerStrings.STYLE_LABEL), nameof(CleanerStrings.STYLE_DESCRIPTION))]
         public BindableNumber<int> Style { get; set; } = new BindableInt(2)
         {
             MinValue = 1,
@@ -74,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
         // 250BPM - 60.00ms    260BPM - 57.69ms    270BPM - 55.55ms
         // 280BPM - 53.57ms    290BPM - 51.72ms    300BPM - 50.00ms
         //
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.Interval_Label), nameof(EzManiaModStrings.Interval_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.INTERVAL_LABEL), nameof(EzCommonModStrings.INTERVAL_DESCRIPTION))]
         public BindableNumber<int> Interval { get; set; } = new BindableInt(80)
         {
             MinValue = 1,
@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             Precision = 1,
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.LNInterval_Label), nameof(EzManiaModStrings.LNInterval_Description))]
+        [SettingSource(typeof(CleanerStrings), nameof(CleanerStrings.LN_INTERVAL_LABEL), nameof(CleanerStrings.LN_INTERVAL_DESCRIPTION))]
         public BindableNumber<int> LNInterval { get; set; } = new BindableInt(30)
         {
             MinValue = 1,
@@ -212,5 +212,14 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             maniaBeatmap.HitObjects = [.. newObjects.OrderBy(h => h.StartTime)];
         }
+    }
+
+    public static class CleanerStrings
+    {
+        public static readonly LocalisableString CLEANER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("清理谱面中的子弹或其他音符（例如重叠音符）", "Clean bullet or other notes on map(e.g. Overlap note).");
+        public static readonly LocalisableString STYLE_LABEL = new EzLocalizationManager.EzLocalisableString("样式", "Style");
+        public static readonly LocalisableString STYLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择你的样式", "Choose your style.");
+        public static readonly LocalisableString LN_INTERVAL_LABEL = new EzLocalizationManager.EzLocalisableString("LN间隔", "LN Interval");
+        public static readonly LocalisableString LN_INTERVAL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("你决定的释放和按压速度", "The release & press speed you decide.");
     }
 }

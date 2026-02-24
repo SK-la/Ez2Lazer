@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace osu.Game.Rulesets.Mania.Mods.KrrConversion
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion
 {
     internal class NoteMatrix
     {

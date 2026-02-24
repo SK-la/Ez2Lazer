@@ -7,13 +7,13 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModSRAdjust : Mod, IApplicableToDifficulty
     {
@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override string Acronym => "SRA";
 
-        public override LocalisableString Description => "修正xxySR计算中的一些系数。影响的是难度卡上的SR(月亮星)数值。";
+        public override LocalisableString Description => SRAdjustStrings.SR_DESCRIPTION;
 
         public override ModType Type => ModType.LA_Mod;
 
@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
 
         public override bool Ranked => false;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SRAdjust_RescaleThreshold_Label), nameof(EzManiaModStrings.SRAdjust_RescaleThreshold_Description),
+        [SettingSource(typeof(SRAdjustStrings), nameof(SRAdjustStrings.SR_ADJUST_RESCALE_THRESHOLD_LABEL), nameof(SRAdjustStrings.SR_ADJUST_RESCALE_THRESHOLD_DESCRIPTION),
             SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> RescaleThreshold { get; } = new BindableDouble(SRCalculator.RescaleHighThreshold)
         {
@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.SRAdjust_LnMultiplier_Label), nameof(EzManiaModStrings.SRAdjust_LnMultiplier_Description),
+        [SettingSource(typeof(SRAdjustStrings), nameof(SRAdjustStrings.SR_ADJUST_LN_MULTIPLIER_LABEL), nameof(SRAdjustStrings.SR_ADJUST_LN_MULTIPLIER_DESCRIPTION),
             SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> LnMultiplier { get; } = new BindableDouble(SRCalculator.LnIntegralMultiplier)
         {
@@ -57,13 +57,25 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         {
             get
             {
-                yield return (EzManiaModStrings.SRAdjust_RescaleThreshold_Label, new LocalisableString(RescaleThreshold.Value.ToString(CultureInfo.InvariantCulture)));
-                yield return (EzManiaModStrings.SRAdjust_LnMultiplier_Label, new LocalisableString(LnMultiplier.Value.ToString(CultureInfo.InvariantCulture)));
+                yield return (SRAdjustStrings.SR_ADJUST_RESCALE_THRESHOLD_LABEL, new LocalisableString(RescaleThreshold.Value.ToString(CultureInfo.InvariantCulture)));
+                yield return (SRAdjustStrings.SR_ADJUST_LN_MULTIPLIER_LABEL, new LocalisableString(LnMultiplier.Value.ToString(CultureInfo.InvariantCulture)));
             }
         }
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
         }
+    }
+
+    public static class SRAdjustStrings
+    {
+        public static readonly LocalisableString SR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "调整 SR 计算中的重缩放阈值和 LN 因子, 影响难度卡上的SR(月亮星)数值。",
+            "Adjust rescale threshold and LN multiplier in SR calculation. Affects the SR (star rating) value shown on difficulty cards.");
+
+        public static readonly LocalisableString SR_ADJUST_RESCALE_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("重缩放阈值", "Rescale Threshold");
+        public static readonly LocalisableString SR_ADJUST_RESCALE_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("超过此阈值后将降低难度膨胀速度", "Reduce difficulty inflation speed when above this threshold.");
+        public static readonly LocalisableString SR_ADJUST_LN_MULTIPLIER_LABEL = new EzLocalizationManager.EzLocalisableString("LN 因子", "LN Integral Multiplier");
+        public static readonly LocalisableString SR_ADJUST_LN_MULTIPLIER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("LN 因子", "LN integral multiplier.");
     }
 }

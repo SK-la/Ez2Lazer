@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Objects;
@@ -21,8 +20,9 @@ using osu.Game.Utils;
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 {
     /// <summary>
-    /// Generates <see cref="HitEvent"/>s for mania scores by re-evaluating a score's replay input against a provided playable beatmap.
-    /// This is intended for results/statistics usage where <see cref="ScoreInfo.HitEvents"/> are not persisted.
+    /// Mania成绩的<see cref="HitEvent"/>生成器，通过将成绩的回放输入重新评估与提供的可玩谱面进行比较来生成<see cref="HitEvent"/>。
+    /// <para>这个生成器主要用于结果/统计用途，其中<see cref="ScoreInfo.HitEvents"/>没有被持久化。</para>
+    /// <para>上游通过反射注册到<see cref="ScoreHitEventGeneratorBridge"/>，因此无法直接查看调用源。</para>
     /// </summary>
     public sealed class ManiaScoreHitEventGenerator : IHitEventGenerator
     {

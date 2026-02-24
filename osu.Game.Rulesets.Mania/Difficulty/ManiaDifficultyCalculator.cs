@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Extensions;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
@@ -15,14 +14,13 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Mania.Difficulty.Skills;
 using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.MathUtils;
 using osu.Game.Rulesets.Mania.Mods;
-using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Difficulty
 {

@@ -71,38 +71,38 @@ namespace osu.Game.LAsEzExtensions.Screens
                 {
                     new SettingsSlider<double>
                     {
-                        LabelText = EzLocalizationManager.MANIA_PSEUDO_3D_ROTATION,
-                        TooltipText = EzLocalizationManager.MANIA_PSEUDO_3D_ROTATION_TOOLTIP,
+                        LabelText = EzColumnStrings.MANIA_PSEUDO_3D_ROTATION,
+                        TooltipText = EzColumnStrings.MANIA_PSEUDO_3D_ROTATION_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation),
                         KeyboardStep = 1f,
                         DisplayAsPercentage = false
                     },
                     new SettingsSlider<double>
                     {
-                        LabelText = EzLocalizationManager.STAGE_BACKGROUND_DIM,
-                        TooltipText = EzLocalizationManager.STAGE_BACKGROUND_DIM_TOOLTIP,
+                        LabelText = EzColumnStrings.STAGE_BACKGROUND_DIM,
+                        TooltipText = EzColumnStrings.STAGE_BACKGROUND_DIM_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim),
                         KeyboardStep = 0.01f,
                         DisplayAsPercentage = true
                     },
                     new SettingsSlider<double>
                     {
-                        LabelText = EzLocalizationManager.STAGE_BACKGROUND_BLUR,
-                        TooltipText = EzLocalizationManager.STAGE_BACKGROUND_BLUR_TOOLTIP,
+                        LabelText = EzColumnStrings.STAGE_BACKGROUND_BLUR,
+                        TooltipText = EzColumnStrings.STAGE_BACKGROUND_BLUR_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur),
                         KeyboardStep = 0.01f,
                         DisplayAsPercentage = true
                     },
                     new SettingsCheckbox
                     {
-                        LabelText = EzLocalizationManager.STAGE_PANEL,
-                        TooltipText = EzLocalizationManager.STAGE_PANEL_TOOLTIP,
+                        LabelText = EzColumnStrings.STAGE_PANEL,
+                        TooltipText = EzColumnStrings.STAGE_PANEL_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.StagePanelEnabled),
                     },
                     new SettingsCheckbox
                     {
-                        LabelText = EzLocalizationManager.COLOUR_ENABLE_BUTTON,
-                        TooltipText = EzLocalizationManager.COLOUR_ENABLE_BUTTON_TOOLTIP,
+                        LabelText = EzColumnStrings.COLOUR_ENABLE_BUTTON,
+                        TooltipText = EzColumnStrings.COLOUR_ENABLE_BUTTON_TOOLTIP,
                         Current = colorSettingsEnabled,
                     },
                     baseColorsContainer = new FillFlowContainer
@@ -161,8 +161,8 @@ namespace osu.Game.LAsEzExtensions.Screens
                     },
                     new SettingsButton
                     {
-                        Text = EzLocalizationManager.SAVE_COLOUR_BUTTON,
-                        TooltipText = EzLocalizationManager.SAVE_COLOUR_BUTTON_TOOLTIP,
+                        Text = EzColumnStrings.SAVE_COLOUR_BUTTON,
+                        TooltipText = EzColumnStrings.SAVE_COLOUR_BUTTON_TOOLTIP,
                         Action = () =>
                         {
                             skinManager.CurrentSkinInfo.TriggerChange();

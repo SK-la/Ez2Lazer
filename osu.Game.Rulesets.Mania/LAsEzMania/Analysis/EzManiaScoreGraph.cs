@@ -10,7 +10,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -23,8 +22,9 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 {
     /// <summary>
-    /// Mania-specific implementation of score graph that extends BaseEzScoreGraph.
-    /// Provides LN (Long Note) aware scoring calculation for Classic mode.
+    /// Mania判定偏移分布图的特定实现，扩展了BaseEzScoreGraph。
+    /// 按Mania的判定方式重新过滤、计算了每个HitEvent的结果，并将其与原始结果进行比较，以分析偏移分布和准确性。
+    /// 覆写判定区间计算以适应Mania的判定方式，并添加了对Classic模式下LN（长按键）判定的支持。
     /// </summary>
     public partial class EzManiaScoreGraph : BaseEzScoreGraph
     {

@@ -9,6 +9,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -23,7 +24,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModRemedy : Mod, IApplicableToDifficulty, IApplicableAfterBeatmapConversion, IApplicableToDrawableRuleset<ManiaHitObject>
     {
@@ -31,7 +32,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "RY";
 
-        public override LocalisableString Description => EzManiaModStrings.Remedy_Description;
+        public override LocalisableString Description => RemedyStrings.REMEDY_DESCRIPTION;
 
         public override double ScoreMultiplier => 1;
 
@@ -400,5 +401,10 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
                 });
             }
         }
+    }
+
+    public static class RemedyStrings
+    {
+        public static readonly LocalisableString REMEDY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("修复较低的判定", "Remedy lower judgement.");
     }
 }

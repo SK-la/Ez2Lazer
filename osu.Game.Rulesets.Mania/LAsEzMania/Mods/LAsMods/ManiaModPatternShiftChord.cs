@@ -8,19 +8,18 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 
-namespace osu.Game.Rulesets.Mania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModPatternShiftChord : ManiaModPatternShiftPatternBase
     {
         protected override KeyPatternType PatternType => KeyPatternType.Chord;
         protected override string PatternName => "Chord";
         protected override string PatternAcronym => "PSC";
-        public override LocalisableString Description => EzManiaModStrings.PatternShift_Description_Chord;
+        public override LocalisableString Description => PatternShiftStrings.PATTERN_SHIFT_DESCRIPTION_CHORD;
         protected override int DefaultLevel => 4;
         protected override EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
         protected override int DefaultOscillationBeats => 1;
@@ -28,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Mods.LAsMods
         protected override int DefaultWindowProcessOffset => 0;
         protected override int DefaultApplyOrder => 50;
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.PatternShift_Level_Label), nameof(EzManiaModStrings.PatternShift_Level_Description))]
+        [SettingSource(typeof(PatternShiftStrings), nameof(PatternShiftStrings.PATTERN_SHIFT_LEVEL_LABEL), nameof(PatternShiftStrings.PATTERN_SHIFT_LEVEL_DESCRIPTION))]
         public new BindableNumber<int> Level => base.Level;
 
         protected override void ApplyPatternForWindow(List<ManiaHitObject> windowObjects,

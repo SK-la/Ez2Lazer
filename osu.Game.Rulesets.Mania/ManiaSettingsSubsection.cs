@@ -10,11 +10,11 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania
@@ -44,8 +44,8 @@ namespace osu.Game.Rulesets.Mania
             {
                 new SettingsItemV2(new FormEnumDropdown<EzEnumHitMode>
                 {
-                    Caption = EzLocalizationManager.HitMode,
-                    HintText = EzLocalizationManager.HitModeTooltip,
+                    Caption = EzManiaSettingsStrings.HIT_MODE,
+                    HintText = EzManiaSettingsStrings.HIT_MODE_TOOLTIP,
                     Current = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode),
                 })
                 {
@@ -53,8 +53,8 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsItemV2(new FormEnumDropdown<EzEnumHealthMode>
                 {
-                    Caption = EzLocalizationManager.HealthMode,
-                    HintText = EzLocalizationManager.HealthModeTooltip,
+                    Caption = EzManiaSettingsStrings.HEALTH_MODE,
+                    HintText = EzManiaSettingsStrings.HEALTH_MODE_TOOLTIP,
                     Current = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.CustomHealthMode),
                 })
                 {
@@ -62,8 +62,8 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzLocalizationManager.PoorHitResult,
-                    HintText = EzLocalizationManager.PoorHitResultTooltip,
+                    Caption = EzManiaSettingsStrings.POOR_HIT_RESULT,
+                    HintText = EzManiaSettingsStrings.POOR_HIT_RESULT_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResultBool),
                 })
                 {
@@ -71,8 +71,8 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzLocalizationManager.ManiaBarLinesBool,
-                    HintText = EzLocalizationManager.ManiaBarLinesBoolTooltip,
+                    Caption = EzManiaSettingsStrings.MANIA_BAR_LINES_BOOL,
+                    HintText = EzManiaSettingsStrings.MANIA_BAR_LINES_BOOL_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool),
                 })
                 {
@@ -87,7 +87,8 @@ namespace osu.Game.Rulesets.Mania
 
                 new SettingsItemV2(new FormEnumDropdown<EzManiaScrollingStyle>
                 {
-                    Caption = "Scrolling style",
+                    Caption = EzManiaSettingsStrings.SCROLLING_STYLE,
+                    HintText = EzManiaSettingsStrings.SCROLLING_STYLE_TOOLTIP,
                     Current = config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle)
                 })
                 {
@@ -109,7 +110,8 @@ namespace osu.Game.Rulesets.Mania
 
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "Scroll Base MS (when 200 Speed)",
+                    Caption = EzManiaSettingsStrings.SCROLL_BASE_SPEED,
+                    HintText = EzManiaSettingsStrings.SCROLL_BASE_SPEED_TOOLTIP,
                     Current = BaseSpeedBindable,
                     KeyboardStep = 1,
                     LabelFormat = v =>
@@ -124,7 +126,8 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "MS / Speed",
+                    Caption = EzManiaSettingsStrings.SCROLL_TIME_PER_SPEED,
+                    HintText = EzManiaSettingsStrings.SCROLL_TIME_PER_SPEED_TOOLTIP,
                     Current = TimePerSpeedBindable,
                     KeyboardStep = 1,
                     LabelFormat = v =>

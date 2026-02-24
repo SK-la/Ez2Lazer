@@ -9,16 +9,13 @@ using osu.Framework.Localisation;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Mods;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
-using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 
-namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
     public class ModStarRatingRebirth : Mod, IApplicableAfterBeatmapConversion
     {
@@ -26,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
         public override string Acronym => "SR";
 
-        public override LocalisableString Description => EzManiaModStrings.StarRatingRebirth_Description;
+        public override LocalisableString Description => StarRatingRebirthStrings.STAR_RATING_REBIRTH_DESCRIPTION;
 
         public override double ScoreMultiplier => 1;
 
@@ -50,13 +47,13 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
             }
         }
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseOriginalOD_Label), nameof(EzManiaModStrings.UseOriginalOD_Description))]
+        [SettingSource(typeof(StarRatingRebirthStrings), nameof(StarRatingRebirthStrings.USE_ORIGINAL_OD_LABEL), nameof(StarRatingRebirthStrings.USE_ORIGINAL_OD_DESCRIPTION))]
         public BindableBool Original { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.UseCustomOD_Label), nameof(EzManiaModStrings.UseCustomOD_Description))]
+        [SettingSource(typeof(StarRatingRebirthStrings), nameof(StarRatingRebirthStrings.USE_CUSTOM_OD_LABEL), nameof(StarRatingRebirthStrings.USE_CUSTOM_OD_DESCRIPTION))]
         public BindableBool Custom { get; set; } = new BindableBool();
 
-        [SettingSource(typeof(EzManiaModStrings), nameof(EzManiaModStrings.OD_Label), nameof(EzManiaModStrings.OD_Description))]
+        [SettingSource(typeof(StarRatingRebirthStrings), nameof(StarRatingRebirthStrings.OD_LABEL), nameof(StarRatingRebirthStrings.OD_DESCRIPTION))]
         public BindableDouble OD { get; set; } = new BindableDouble(0)
         {
             Precision = 0.1,
@@ -1667,5 +1664,16 @@ namespace osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods
 
             return (newObjects, checkColumn);
         }
+    }
+
+    public static class StarRatingRebirthStrings
+    {
+        public static readonly LocalisableString STAR_RATING_REBIRTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("sunnyxxy的星级算法，替换官方星级标记", "New algorithm by sunnyxxy.");
+        public static readonly LocalisableString USE_ORIGINAL_OD_LABEL = new EzLocalizationManager.EzLocalisableString("使用原始OD", "Use original OD");
+        public static readonly LocalisableString USE_ORIGINAL_OD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("高优先级", "High Priority");
+        public static readonly LocalisableString USE_CUSTOM_OD_LABEL = new EzLocalizationManager.EzLocalisableString("使用自定义OD", "Use custom OD");
+        public static readonly LocalisableString USE_CUSTOM_OD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("低优先级", "Low Priority");
+        public static readonly LocalisableString OD_LABEL = new EzLocalizationManager.EzLocalisableString("OD", "OD");
+        public static readonly LocalisableString OD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择要重新计算的OD", "Choose the OD you want to recalculate.");
     }
 }

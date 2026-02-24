@@ -6,7 +6,7 @@ using osu.Framework.Graphics;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.LAsEZMania
+namespace osu.Game.Rulesets.Mania.LAsEzMania.Helper
 {
     public static class EzEffectHelper
     {
