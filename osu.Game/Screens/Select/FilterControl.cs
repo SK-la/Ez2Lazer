@@ -30,6 +30,7 @@ using osu.Game.Screens.Select.Filter;
 using osuTK;
 using osuTK.Input;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.UserInterface;
 
 namespace osu.Game.Screens.Select

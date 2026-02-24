@@ -227,7 +227,7 @@ namespace osu.Game.LAsEzExtensions.HUD
             [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMin))]
             MinimumAchievable,
 
-            [Description("Classic")]
+            [Description("Mania V1")]
             Classic,
 
             [Description("None")]

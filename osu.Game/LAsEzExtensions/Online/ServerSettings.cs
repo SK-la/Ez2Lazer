@@ -8,6 +8,7 @@ using osu.Framework.Localisation;
 using osu.Game;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;

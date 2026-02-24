@@ -4,6 +4,7 @@
 using osu.Framework.Extensions;
 using osu.Framework.Localisation;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 
 namespace osu.Game.LAsEzExtensions.Online
 {

@@ -7,8 +7,11 @@ using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.LAsEzExtensions.HUD
@@ -69,9 +72,19 @@ namespace osu.Game.LAsEzExtensions.HUD
 
     public enum EzComEffectType
     {
+        [LocalisableDescription(typeof(EzComEffectTypeStrings), nameof(EzComEffectTypeStrings.SCALE))]
         Scale,
+
+        [LocalisableDescription(typeof(EzComEffectTypeStrings), nameof(EzComEffectTypeStrings.BOUNCE))]
         Bounce,
+
         None
+    }
+
+    public static class EzComEffectTypeStrings
+    {
+        public static readonly LocalisableString SCALE = new EzLocalizationManager.EzLocalisableString("缩放动效", "Scale");
+        public static readonly LocalisableString BOUNCE = new EzLocalizationManager.EzLocalisableString("跳跃动效", "Bounce");
     }
 
     //TODO: 枚举维护不方便，修改后要清理重构，考虑改为读取配置文件，或自动搜索子文件夹生成列表

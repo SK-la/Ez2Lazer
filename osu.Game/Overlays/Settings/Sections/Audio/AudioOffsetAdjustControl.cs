@@ -15,6 +15,7 @@ using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.Localisation;
 using osu.Game.Screens.Play.PlayerSettings;

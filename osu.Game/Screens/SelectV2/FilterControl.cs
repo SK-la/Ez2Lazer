@@ -21,6 +21,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
