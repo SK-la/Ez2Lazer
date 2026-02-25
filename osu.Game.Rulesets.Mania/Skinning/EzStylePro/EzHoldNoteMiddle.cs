@@ -224,14 +224,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateColor()
         {
-            base.UpdateColor();
-
             if (topContainer != null)
             {
                 topContainer.Colour = ColourInfo.GradientVertical(
                     NoteColor.Opacity((float)tailAlpha.Value),
                     NoteColor);
             }
+
+            if (bodyContainer != null)
+                bodyContainer.Colour = NoteColor;
         }
 
         protected override void Update()
