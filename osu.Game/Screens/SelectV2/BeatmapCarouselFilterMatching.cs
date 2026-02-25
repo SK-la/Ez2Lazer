@@ -70,7 +70,7 @@ namespace osu.Game.Screens.SelectV2
                 if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
                     starDifficultyForFilter = operationDifficulty;
 
-                if (!checkCriteriaMatch(beatmap, criteria, starDifficultyForFilter))
+                if (!CheckCriteriaMatch(beatmap, criteria, starDifficultyForFilter))
                     continue;
 
                 countMatching++;
@@ -81,7 +81,7 @@ namespace osu.Game.Screens.SelectV2
             return matchedItems;
         }
 
-        private static bool checkCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter)
+        public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter)
         {
             bool match = criteria.Ruleset == null || beatmap.AllowGameplayWithRuleset(criteria.Ruleset!, criteria.AllowConvertedBeatmaps);
 
