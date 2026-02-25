@@ -12,7 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 
-namespace osu.Game.Screens.Select.Details
+namespace osu.Game.Overlays.BeatmapSet
 {
     public partial class FailRetryGraph : Container
     {

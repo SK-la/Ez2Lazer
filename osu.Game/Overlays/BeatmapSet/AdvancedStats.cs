@@ -33,7 +33,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Utils;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.Select.Details
+namespace osu.Game.Overlays.BeatmapSet
 {
     public partial class AdvancedStats : Container
     {
