@@ -385,19 +385,24 @@ namespace osu.Game.LAsEzExtensions.Configuration
             var specialFactorBindable = GetBindable<double>(Ez2Setting.SpecialFactor);
             var columnWidthStyleBindable = GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
             var noteHeightScaleBindable = GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
+            var holdTailMaskHeightBindable = GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
 
             columnWidthBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
             specialFactorBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
             columnWidthStyleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
             noteHeightScaleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+            holdTailMaskHeightBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
 
+            var holdTailAlphaBindable = GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
             var colorSettingsEnabledBindable = GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+
             var colorABindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
             var colorBBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
             var colorSBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
             var colorEBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
             var colorPBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
 
+            holdTailAlphaBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
             colorSettingsEnabledBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
             colorABindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
             colorBBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
