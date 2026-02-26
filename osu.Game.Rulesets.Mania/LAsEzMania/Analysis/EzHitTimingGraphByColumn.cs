@@ -14,6 +14,7 @@ using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Ranking.Statistics;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 {
@@ -95,7 +96,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                     Height = 100,
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    Scale = new osuTK.Vector2(0.96f),
+                    Scale = new Vector2(0.96f),
                     Margin = new MarginPadding { Top = 5, Bottom = 10 }
                 });
 
@@ -111,14 +112,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 {
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    Scale = new osuTK.Vector2(0.96f)
+                    Scale = new Vector2(0.96f)
                 });
 
                 columnContainer.Add(new UnstableRate(columnEvents)
                 {
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    Scale = new osuTK.Vector2(0.96f)
+                    Scale = new Vector2(0.96f)
                 });
 
                 columnContainer.Add(new SimpleStatisticTable(3, new[]
@@ -148,7 +149,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 {
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    Scale = new osuTK.Vector2(0.96f)
+                    Scale = new Vector2(0.96f)
                 });
 
                 columnGraphs.Add(columnContainer);

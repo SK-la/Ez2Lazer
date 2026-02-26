@@ -1,5 +1,5 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
-// See the LICENCE file in the repository root for full licence comboSprite.
+// See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -8,11 +8,9 @@ using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.LAsEzMania.Helper;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
-using osu.Game.Skinning.Components;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
