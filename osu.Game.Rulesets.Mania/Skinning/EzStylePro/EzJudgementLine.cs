@@ -27,10 +27,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        public EzJudgementLine()
-        {
-            // AddLayout(layout);
-        }
+        // public EzJudgementLine()
+        // {
+        //     // AddLayout(layout);
+        // }
 
         [BackgroundDependencyLoader]
         private void load(IEzSkinInfo ezSkinInfo)

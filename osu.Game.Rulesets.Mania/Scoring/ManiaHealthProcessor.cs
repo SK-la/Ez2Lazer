@@ -32,9 +32,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public ManiaHealthProcessor(double drainStartTime)
             : base(drainStartTime)
         {
-            if (GlobalConfigStore.EzConfig != null)
-                mode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.CustomHealthMode);
-
+            mode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.CustomHealthMode);
             row = switchHealthMode(mode);
         }
 

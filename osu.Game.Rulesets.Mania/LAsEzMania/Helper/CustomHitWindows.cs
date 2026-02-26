@@ -191,7 +191,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
                     double meh = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, meh_window_range) * TotalMultiplier) + 0.5;
                     double miss = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, miss_window_range) * TotalMultiplier) + 0.5;
                     double poor = miss;
-                    SetRanges(perfect, great, good, ok, meh, miss, poor);
+                    setRanges(perfect, great, good, ok, meh, miss, poor);
                     break;
 
                 case EzEnumHitMode.O2Jam:
@@ -329,7 +329,7 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania.Helper
             }
         }
 
-        private void SetRanges(double range305, double range300, double range200, double range100, double range050, double range000, double poorRange)
+        private void setRanges(double range305, double range300, double range200, double range100, double range050, double range000, double poorRange)
         {
             Range305 = range305;
             Range300 = range300;

@@ -79,7 +79,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         public Bindable<string> SlowText { get; } = new Bindable<string>("Slow");
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FAST_COLOUR_STYLE), nameof(FastSlowDisplayStrings.FAST_COLOUR_STYLE_DESCRIPTION))]
-        public Bindable<ColourStyle> FastColourStyle { get; } = new Bindable<ColourStyle>();
+        public Bindable<YuColourStyle> FastColourStyle { get; } = new Bindable<YuColourStyle>();
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FAST_COLOUR), nameof(FastSlowDisplayStrings.TEXT_COLOUR_DESCRIPTION))]
         public BindableColour4 FastColour { get; } = new BindableColour4(Colour4.FromHex("#97A5FF"));
@@ -88,7 +88,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         public BindableColour4 FastColourGradient { get; } = new BindableColour4(Colour4.LightPink);
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SLOW_COLOUR_STYLE), nameof(FastSlowDisplayStrings.SLOW_COLOUR_STYLE_DESCRIPTION))]
-        public Bindable<ColourStyle> SlowColourStyle { get; } = new Bindable<ColourStyle>();
+        public Bindable<YuColourStyle> SlowColourStyle { get; } = new Bindable<YuColourStyle>();
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SLOW_COLOUR), nameof(FastSlowDisplayStrings.TEXT_COLOUR_DESCRIPTION))]
         public BindableColour4 SlowColour { get; } = new BindableColour4(Colour4.FromHex("#D1FF74"));
@@ -119,7 +119,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         public BindableBool OnlyDisplayOne { get; } = new BindableBool(false);
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SELECT_COLUMN), nameof(FastSlowDisplayStrings.SELECT_COLUMN_DESCRIPTION))]
-        public Bindable<Column> SelectColumn { get; } = new Bindable<Column>();
+        public Bindable<YuColumnPosition> SelectColumn { get; } = new Bindable<YuColumnPosition>();
 
         private Container textContainer = null!;
         private Container fast = null!;
@@ -256,15 +256,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             FastColourStyle.BindValueChanged(e =>
             {
-                if (e.NewValue == ColourStyle.SingleColour)
+                if (e.NewValue == YuColourStyle.SingleColour)
                 {
                     SetFastTextColour(FastColour.Value);
                 }
-                else if (e.NewValue == ColourStyle.HorizontalGradient)
+                else if (e.NewValue == YuColourStyle.HorizontalGradient)
                 {
                     SetFastTextColour(FastColour.Value, FastColourGradient.Value);
                 }
-                else if (e.NewValue == ColourStyle.VerticalGradient)
+                else if (e.NewValue == YuColourStyle.VerticalGradient)
                 {
                     SetFastTextColour(FastColour.Value, FastColourGradient.Value);
                 }
@@ -272,15 +272,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             SlowColourStyle.BindValueChanged(e =>
             {
-                if (e.NewValue == ColourStyle.SingleColour)
+                if (e.NewValue == YuColourStyle.SingleColour)
                 {
                     SetSlowTextColour(SlowColour.Value);
                 }
-                else if (e.NewValue == ColourStyle.HorizontalGradient)
+                else if (e.NewValue == YuColourStyle.HorizontalGradient)
                 {
                     SetSlowTextColour(SlowColour.Value, SlowColourGradient.Value);
                 }
-                else if (e.NewValue == ColourStyle.VerticalGradient)
+                else if (e.NewValue == YuColourStyle.VerticalGradient)
                 {
                     SetSlowTextColour(SlowColour.Value, SlowColourGradient.Value);
                 }
@@ -427,15 +427,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             displayFastText.Colour = colour;
 
-            if (gradient != null && FastColourStyle.Value != ColourStyle.SingleColour)
+            if (gradient != null && FastColourStyle.Value != YuColourStyle.SingleColour)
             {
                 FastColourGradient.Value = gradient.Value;
 
-                if (FastColourStyle.Value == ColourStyle.HorizontalGradient)
+                if (FastColourStyle.Value == YuColourStyle.HorizontalGradient)
                 {
                     displayFastText.Colour = ColourInfo.GradientHorizontal(colour, gradient.Value);
                 }
-                else if (FastColourStyle.Value == ColourStyle.VerticalGradient)
+                else if (FastColourStyle.Value == YuColourStyle.VerticalGradient)
                 {
                     displayFastText.Colour = ColourInfo.GradientVertical(colour, gradient.Value);
                 }
@@ -447,15 +447,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             SlowColour.Value = colour;
             displaySlowText.Colour = colour;
 
-            if (gradient != null && FastColourStyle.Value != ColourStyle.SingleColour)
+            if (gradient != null && FastColourStyle.Value != YuColourStyle.SingleColour)
             {
                 SlowColourGradient.Value = gradient.Value;
 
-                if (SlowColourStyle.Value == ColourStyle.HorizontalGradient)
+                if (SlowColourStyle.Value == YuColourStyle.HorizontalGradient)
                 {
                     displaySlowText.Colour = ColourInfo.GradientHorizontal(colour, gradient.Value);
                 }
-                else if (SlowColourStyle.Value == ColourStyle.VerticalGradient)
+                else if (SlowColourStyle.Value == YuColourStyle.VerticalGradient)
                 {
                     displaySlowText.Colour = ColourInfo.GradientVertical(colour, gradient.Value);
                 }
@@ -507,11 +507,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                 var legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keys = legacyRuleset.GetKeyCount(beatmap.Value.BeatmapInfo, mods.Value);
 
-                if (SelectColumn.Value == Column.Middle && keys / 2.0 != Math.Truncate(keys / 2.0) && column == (keys / 2) + 1)
+                if (SelectColumn.Value == YuColumnPosition.Middle && keys / 2.0 != Math.Truncate(keys / 2.0) && column == (keys / 2) + 1)
                 {
                     displayResult(judgement);
                 }
-                else if (SelectColumn.Value == Column.RightHalf && column > keys / 2.0)
+                else if (SelectColumn.Value == YuColumnPosition.RightHalf && column > keys / 2.0)
                 {
                     if (keys % 2 != 0 && column > (keys / 2) + 1)
                     {
@@ -522,11 +522,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                         displayResult(judgement);
                     }
                 }
-                else if (SelectColumn.Value == Column.LeftHalf && column <= keys / 2.0)
+                else if (SelectColumn.Value == YuColumnPosition.LeftHalf && column <= keys / 2.0)
                 {
                     displayResult(judgement);
                 }
-                else if (column >= LowerColumnBound.Value && column <= UpperColumnBound.Value && SelectColumn.Value == Column.None)
+                else if (column >= LowerColumnBound.Value && column <= UpperColumnBound.Value && SelectColumn.Value == YuColumnPosition.None)
                 {
                     displayResult(judgement);
                 }

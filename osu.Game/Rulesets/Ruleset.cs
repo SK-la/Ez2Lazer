@@ -43,7 +43,7 @@ namespace osu.Game.Rulesets
 
         private static readonly ConcurrentDictionary<string, IMod[]> mod_reference_cache = new ConcurrentDictionary<string, IMod[]>();
 
-        private Mod[]? cached_all_mods;
+        private Mod[]? cachedAllMods;
 
         /// <summary>
         /// Version history:
@@ -66,7 +66,7 @@ namespace osu.Game.Rulesets
         /// <summary>
         /// A queryable source containing all available mods.
         /// Call <see cref="IMod.CreateInstance"/> for consumption purposes.
-        /// /// </summary>
+        /// </summary>
         public IEnumerable<IMod> AllMods
         {
             get
@@ -91,10 +91,10 @@ namespace osu.Game.Rulesets
         /// </remarks>
         public IEnumerable<Mod> CreateAllMods()
         {
-            if (cached_all_mods != null)
-                return cached_all_mods;
+            if (cachedAllMods != null)
+                return cachedAllMods;
 
-            return cached_all_mods = Enum.GetValues<ModType>()
+            return cachedAllMods = Enum.GetValues<ModType>()
                                           // Confine all mods of each mod type into a single IEnumerable<Mod>
                                           .SelectMany(GetModsFor)
                                           // Filter out all null mods

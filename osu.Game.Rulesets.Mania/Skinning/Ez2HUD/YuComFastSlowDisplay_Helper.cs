@@ -8,7 +8,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
     public partial class YuComFastSlowDisplay
     {
-        public enum Column
+        public enum YuColumnPosition
         {
             [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.NONE))]
             None,
@@ -23,7 +23,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Middle
         }
 
-        public enum ColourStyle
+        public enum YuColourStyle
         {
             [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SINGLE_COLOUR))]
             SingleColour,
@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             VerticalGradient
         }
 
-        public static class FastSlowDisplayStrings
+        protected static class FastSlowDisplayStrings
         {
             public static readonly LocalisableString SHOW_JUDGEMENT = new EzLocalizationManager.EzLocalisableString("判定", "Judgement");
             public static readonly LocalisableString SHOW_STYLE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("何时显示快/慢", "When to show fast/slow.");

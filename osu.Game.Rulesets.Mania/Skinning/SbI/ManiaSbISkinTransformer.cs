@@ -36,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             //     Logger.Log("!GlobalConfigStore.EzConfig SbISkin", LoggingTarget.Runtime, LogLevel.Important);
             // }
 
-            ezSkinConfig = GlobalConfigStore.EzConfig!;
+            ezSkinConfig = GlobalConfigStore.EzConfig;
             columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
             hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);

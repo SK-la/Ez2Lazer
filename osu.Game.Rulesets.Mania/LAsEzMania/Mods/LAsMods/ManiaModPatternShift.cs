@@ -489,7 +489,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
         }
 
         // In-place Cooley-Tukey FFT (radix-2)
-        private static void FFT(Complex[] buffer, bool inverse)
+        private static void fft(Complex[] buffer, bool inverse)
         {
             int n = buffer.Length;
             int bits = (int)Math.Log(n, 2);

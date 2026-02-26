@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             //     Logger.Log("!GlobalConfigStore.EzConfig Ez2Skin", LoggingTarget.Runtime, LogLevel.Important);
             // }
 
-            var ezSkinConfig1 = GlobalConfigStore.EzConfig!;
+            var ezSkinConfig1 = GlobalConfigStore.EzConfig;
 
             // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
             columnWidthBindable = ezSkinConfig1.GetBindable<double>(Ez2Setting.ColumnWidth);

@@ -184,7 +184,7 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 new SettingsItemV2(new FormEnumDropdown<ScalingGameMode>
                 {
                     Caption = EzSettingsStrings.SCALING_GAME_MODE,
-                    HintText = EzSettingsStrings.ScalingGameModeTooltip,
+                    HintText = EzSettingsStrings.SCALING_GAME_MODE_TOOLTIP,
                     Current = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode),
                 })
                 {

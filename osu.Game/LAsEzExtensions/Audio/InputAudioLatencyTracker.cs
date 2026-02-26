@@ -3,7 +3,6 @@
 
 using System;
 using osu.Framework.Allocation;
-using osu.Framework.Audio;
 using osu.Framework.Audio.EzLatency;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -25,9 +24,6 @@ namespace osu.Game.LAsEzExtensions.Audio
     {
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notificationOverlay { get; set; }
-
-        [Resolved]
-        private AudioManager? audioManager { get; set; }
 
         private Ez2ConfigManager ezConfig { get; set; }
 
