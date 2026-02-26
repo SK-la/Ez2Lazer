@@ -19,10 +19,13 @@ namespace osu.Game.Online
             {
                 case ServerPreset.Manual:
                 case ServerPreset.Gu:
+                    #if DEBUG
+                    // 任何从服务器获取资源的事件都会引发这个日志输出
                     if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri1) || !uri1.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
                     {
                         Logger.Log($@"[Ez2Lazer] Using Custom ApiUrl {url}", LoggingTarget.Network, LogLevel.Important);
                     }
+                    #endif
 
                     return url;
 
