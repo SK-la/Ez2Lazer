@@ -457,7 +457,8 @@ namespace osu.Game.Screens.SelectV2
 
             // priority-ordered matching
             if (containsAny(combined, "touhou", "東方", "东方", "touhou project", "東方Project", "東方プロジェクト", "동방프로젝트", "동방Project", "tohou",
-                    "瑶山百灵", "藤咲かりん", "小峠舞", "ZUN", "上海アリス幻樂団", "上海アリス", "Team Shanghai Alice", "IOSYS", "EastNewSound", "幽閉サテライト", "C-CLAYS", "Silver Forest", "Sound Holic", "Alstroemeria Records", "豚乙女", "Demetori", "SOUND HOLIC",
+                    "瑶山百灵", "藤咲かりん", "小峠舞", "ZUN", "上海アリス幻樂団", "上海アリス", "Team Shanghai Alice", "IOSYS", "EastNewSound", "幽閉サテライト", "C-CLAYS", "Silver Forest", "Sound Holic", "Alstroemeria Records",
+                    "豚乙女", "Demetori", "SOUND HOLIC",
                     "幽闭星光",
                     "博麗", "霊夢", "霊夢", "魔理沙", "アリス", "咲夜", "レミリア", "フランドール", "チルノ", "パチュリー", "妖夢", "鈴仙", "早苗", "映姫", "幽々子", "蓮子", "メディスン", "妖怪",
                     "地霊殿", "紅魔郷", "妖々夢", "永夜抄", "花映塚", "風神録", "神霊廟", "輝針城", "紺珠伝", "天空璋", "鬼形獣", "虹龍洞"))

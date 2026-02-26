@@ -10,17 +10,14 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
-using osu.Game.LAsEzExtensions;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Overlays.SkinEditor;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {

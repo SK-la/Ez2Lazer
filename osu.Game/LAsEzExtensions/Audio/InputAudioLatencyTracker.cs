@@ -3,9 +3,9 @@
 
 using System;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Audio;
 using osu.Framework.Audio.EzLatency;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
 using osu.Game.LAsEzExtensions.Configuration;
@@ -148,8 +148,10 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
 
             // 输出统计日志
-            string message1 = $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, Input→Audio: {stats.AvgInputToPlayback:F2}ms, Audio→Judgement: {stats.AvgPlaybackToJudge:F2}ms (based on {stats.RecordCount} complete records)";
-            string message2 = $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
+            string message1 =
+                $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, Input→Audio: {stats.AvgInputToPlayback:F2}ms, Audio→Judgement: {stats.AvgPlaybackToJudge:F2}ms (based on {stats.RecordCount} complete records)";
+            string message2 =
+                $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
 
             Logger.Log($"[EzOsuLatency] Latency Analysis: {message1}");
             Logger.Log($"[EzOsuLatency] Latency Analysis: \n{message2}", LoggingTarget.Runtime, LogLevel.Important);
@@ -157,7 +159,8 @@ namespace osu.Game.LAsEzExtensions.Audio
             // 显示通知
             notificationOverlay?.Post(new SimpleNotification
             {
-                Text = $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms\nRecords: {stats.RecordCount}",
+                Text =
+                    $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms\nRecords: {stats.RecordCount}",
                 Icon = FontAwesome.Solid.ChartLine,
             });
         }
@@ -209,7 +212,8 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                 string keyVal = inputData.KeyValue?.ToString() ?? "-";
 
-                string line = $"[EzOsuLatency] {r.Timestamp:O} | {r.MeasuredMs:F2} ms | note={r.Note} | in={r.InputTime:F2} | key={keyVal} | play={r.PlaybackTime:F2} | judge={r.JudgeTime:F2} | driver={r.DriverTime:F2} | out_hw={r.OutputHardwareTime:F2} | in_hw={r.InputHardwareTime:F2} | diff={r.LatencyDifference:F2}";
+                string line =
+                    $"[EzOsuLatency] {r.Timestamp:O} | {r.MeasuredMs:F2} ms | note={r.Note} | in={r.InputTime:F2} | key={keyVal} | play={r.PlaybackTime:F2} | judge={r.JudgeTime:F2} | driver={r.DriverTime:F2} | out_hw={r.OutputHardwareTime:F2} | in_hw={r.InputHardwareTime:F2} | diff={r.LatencyDifference:F2}";
 
                 // extra low-level structs
                 string extra = $" | input_struct=(in={inputData.InputTime:F2}, key={inputData.KeyValue ?? "-"}, judge={inputData.JudgeTime:F2}, play={inputData.PlaybackTime:F2})" +

@@ -19,11 +19,11 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
-using osuTK;
-using osuTK.Graphics;
 using osu.Game.Localisation;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Utils;
+using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Screens.Play
 {

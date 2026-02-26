@@ -9,7 +9,6 @@ using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
-using osu.Game.Skinning.Components;
 
 namespace osu.Game.LAsEzExtensions.HUD
 {

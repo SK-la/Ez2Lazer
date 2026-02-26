@@ -49,12 +49,17 @@ namespace osu.Game.LAsEzExtensions.Localization
         public static readonly LocalisableString COLUMN_NUM_LABEL = new EzLocalizationManager.EzLocalisableString("列数", "Column Num");
         public static readonly LocalisableString COLUMN_NUM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择要转换的列数", "Select the number of column to transform.");
         public static readonly LocalisableString GAP_LABEL = new EzLocalizationManager.EzLocalisableString("间隙", "Gap");
-        public static readonly LocalisableString GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("转换后改变随机列的音符数量间隙", "For changing random columns after transforming the gap's number of notes.");
+
+        public static readonly LocalisableString GAP_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("转换后改变随机列的音符数量间隙", "For changing random columns after transforming the gap's number of notes.");
+
         public static readonly LocalisableString LINE_SPACING_LABEL = new EzLocalizationManager.EzLocalisableString("行间距", "Line Spacing");
         public static readonly LocalisableString LINE_SPACING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置为0时转换每一行", "Transform every line when set to 0.");
         public static readonly LocalisableString INVERT_LINE_SPACING_LABEL = new EzLocalizationManager.EzLocalisableString("反转行间距", "Invert Line Spacing");
         public static readonly LocalisableString INVERT_LINE_SPACING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("反转行间距", "Invert the Line Spacing.");
         public static readonly LocalisableString DURATION_LIMIT_LABEL = new EzLocalizationManager.EzLocalisableString("持续时间限制", "Duration Limit");
-        public static readonly LocalisableString DURATION_LIMIT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("LN的最大持续时间（秒）。（设置为0时无限制）", "The max duration(second) of a LN.(No limit when set to 0)");
+
+        public static readonly LocalisableString DURATION_LIMIT_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("LN的最大持续时间（秒）。（设置为0时无限制）", "The max duration(second) of a LN.(No limit when set to 0)");
     }
 }

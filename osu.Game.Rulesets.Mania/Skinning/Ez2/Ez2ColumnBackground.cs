@@ -14,7 +14,6 @@ using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2

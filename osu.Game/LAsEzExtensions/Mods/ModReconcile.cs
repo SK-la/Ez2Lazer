@@ -35,7 +35,8 @@ namespace osu.Game.LAsEzExtensions.Mods
         [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_ENABLE_MISS_LABEL), nameof(ReconcileStrings.RECONCILE_ENABLE_MISS_DESCRIPTION))]
         public BindableBool EnableMissCondition { get; } = new BindableBool(false);
 
-        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_MISS_JUDGEMENT_LABEL), nameof(ReconcileStrings.RECONCILE_MISS_JUDGEMENT_DESCRIPTION), SettingControlType = typeof(SettingsEnumDropdown<HitResult>))]
+        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_MISS_JUDGEMENT_LABEL), nameof(ReconcileStrings.RECONCILE_MISS_JUDGEMENT_DESCRIPTION),
+            SettingControlType = typeof(SettingsEnumDropdown<HitResult>))]
         public Bindable<HitResult> MissJudgement { get; } = new Bindable<HitResult>(HitResult.Miss);
 
         [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_MISS_COUNT_LABEL), nameof(ReconcileStrings.RECONCILE_MISS_COUNT_DESCRIPTION))]
@@ -303,7 +304,10 @@ namespace osu.Game.LAsEzExtensions.Mods
             "Pause when conditions are met, optionally rewinding to the previous target position.");
 
         public static readonly LocalisableString RECONCILE_ENABLE_MISS_LABEL = new EzLocalizationManager.EzLocalisableString("启用判定计数", "Enable judgement count");
-        public static readonly LocalisableString RECONCILE_ENABLE_MISS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("当指定判定累计到阈值时触发", "Trigger when the selected judgement reaches the threshold.");
+
+        public static readonly LocalisableString RECONCILE_ENABLE_MISS_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("当指定判定累计到阈值时触发", "Trigger when the selected judgement reaches the threshold.");
+
         public static readonly LocalisableString RECONCILE_MISS_JUDGEMENT_LABEL = new EzLocalizationManager.EzLocalisableString("判定类型", "Judgement Type");
         public static readonly LocalisableString RECONCILE_MISS_JUDGEMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择要计数的判定类型", "Select the judgement to count.");
         public static readonly LocalisableString RECONCILE_MISS_COUNT_LABEL = new EzLocalizationManager.EzLocalisableString("判定计数阈值", "Judgement Count Threshold");

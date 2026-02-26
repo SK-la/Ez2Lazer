@@ -3,13 +3,11 @@
 
 using System;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Sprites;
-using osuTK.Graphics;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Logging;
+using osu.Framework.Graphics.Sprites;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Localisation.SkinComponents;
@@ -17,6 +15,7 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Skinning;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {

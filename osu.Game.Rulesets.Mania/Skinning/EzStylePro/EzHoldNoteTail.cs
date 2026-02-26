@@ -6,13 +6,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Screens;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {

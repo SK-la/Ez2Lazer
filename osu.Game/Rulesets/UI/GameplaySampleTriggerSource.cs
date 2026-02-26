@@ -4,11 +4,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Logging;
 using osu.Game.Audio;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;

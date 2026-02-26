@@ -23,7 +23,8 @@ namespace osu.Game.Screens.SelectV2
         private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
         private readonly Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync;
 
-        public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations, Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync)
+        public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
+                                            Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync)
         {
             this.getCriteria = getCriteria;
             this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;

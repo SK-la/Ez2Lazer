@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics;
-using osu.Game.Beatmaps;
 using osu.Game.Skinning;
 
 namespace osu.Game.LAsEzExtensions.Edit

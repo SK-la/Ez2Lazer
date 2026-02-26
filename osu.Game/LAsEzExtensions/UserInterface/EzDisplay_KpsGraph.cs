@@ -9,12 +9,11 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Layout;
 using osu.Game.Graphics;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Analysis;
 using osuTK;
 
 namespace osu.Game.LAsEzExtensions.UserInterface

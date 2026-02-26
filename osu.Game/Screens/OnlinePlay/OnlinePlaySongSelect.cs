@@ -12,6 +12,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
+using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.Rooms;
 using osu.Game.Overlays;
@@ -21,7 +22,6 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select;
 using osu.Game.Users;
 using osu.Game.Utils;
-using osu.Game.Localisation;
 
 namespace osu.Game.Screens.OnlinePlay
 {

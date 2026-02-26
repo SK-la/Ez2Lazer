@@ -8,8 +8,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods

@@ -76,7 +76,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 try
                 {
-                    Logger.Log($"[OptimizedBeatmapCalculator] large estimatedIntervals={estimatedIntervals} bpm={beatmap.BeatmapInfo.BPM} interval={interval} songEndTime={songEndTime} hitObjects={hitObjects.Count}");
+                    Logger.Log(
+                        $"[OptimizedBeatmapCalculator] large estimatedIntervals={estimatedIntervals} bpm={beatmap.BeatmapInfo.BPM} interval={interval} songEndTime={songEndTime} hitObjects={hitObjects.Count}");
                 }
                 catch
                 {

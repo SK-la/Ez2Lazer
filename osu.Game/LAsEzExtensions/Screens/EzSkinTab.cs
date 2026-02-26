@@ -14,9 +14,8 @@ using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
@@ -48,11 +47,12 @@ namespace osu.Game.LAsEzExtensions.Screens
             ["GameTheme"] = Path.Combine("EzResources", "GameTheme")
         };
 
-        private static readonly Dictionary<bool, (Color4 Color, LocalisableString TopText, LocalisableString BottomText)> position_mode_config = new Dictionary<bool, (Color4 Color, LocalisableString TopText, LocalisableString BottomText)>
-        {
-            [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), EzSkinStrings.SWITCH_TO_ABSOLUTE, EzSkinStrings.SWITCH_TO_ABSOLUTE),
-            [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), EzSkinStrings.SWITCH_TO_RELATIVE, EzSkinStrings.SWITCH_TO_RELATIVE)
-        };
+        private static readonly Dictionary<bool, (Color4 Color, LocalisableString TopText, LocalisableString BottomText)> position_mode_config =
+            new Dictionary<bool, (Color4 Color, LocalisableString TopText, LocalisableString BottomText)>
+            {
+                [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), EzSkinStrings.SWITCH_TO_ABSOLUTE, EzSkinStrings.SWITCH_TO_ABSOLUTE),
+                [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), EzSkinStrings.SWITCH_TO_RELATIVE, EzSkinStrings.SWITCH_TO_RELATIVE)
+            };
 
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();

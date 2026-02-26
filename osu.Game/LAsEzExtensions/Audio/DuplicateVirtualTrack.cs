@@ -221,86 +221,87 @@ namespace osu.Game.LAsEzExtensions.Audio
                 }
             }
 
-                // Gameplay-clock driven loop check: perform loop transitions precisely when the gameplay clock crosses the expected boundary.
-                try
+            // Gameplay-clock driven loop check: perform loop transitions precisely when the gameplay clock crosses the expected boundary.
+            try
+            {
+                if (activeCandidateTrack != null && gameplayClock != null && overrideDuration != null && !inLoopDelay)
                 {
-                    if (activeCandidateTrack != null && gameplayClock != null && overrideDuration != null && !inLoopDelay)
+                    double sliceLength = sliceEnd - sliceStart;
+
+                    if (sliceLength > 0)
                     {
-                        double sliceLength = sliceEnd - sliceStart;
+                        lastLoopStartGameplayTime ??= gameplayClock.CurrentTime;
 
-                        if (sliceLength > 0)
+                        double expectedNext = lastLoopStartGameplayTime.Value + sliceLength;
+
+                        // If we've reached or passed the expected loop end, trigger the loop.
+                        if (gameplayClock.CurrentTime >= expectedNext)
                         {
-                            lastLoopStartGameplayTime ??= gameplayClock.CurrentTime;
+                            // prevent double triggers from scheduled delegates
+                            loopCheckerDelegate?.Cancel();
+                            loopCheckerDelegate = null;
 
-                            double expectedNext = lastLoopStartGameplayTime.Value + sliceLength;
+                            debug(
+                                $"gameplay-driven trigger: gameplayNow={gameplayClock.CurrentTime} trackNow={activeCandidateTrack.CurrentTime} expectedNext={expectedNext} loopsRemaining={loopsRemaining}");
 
-                            // If we've reached or passed the expected loop end, trigger the loop.
-                            if (gameplayClock.CurrentTime >= expectedNext)
+                            if (loopsRemaining <= 1)
                             {
-                                // prevent double triggers from scheduled delegates
-                                loopCheckerDelegate?.Cancel();
-                                loopCheckerDelegate = null;
+                                stopPreviewInternal("loops_finished");
+                            }
+                            else
+                            {
+                                loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
 
-                                debug($"gameplay-driven trigger: gameplayNow={gameplayClock.CurrentTime} trackNow={activeCandidateTrack.CurrentTime} expectedNext={expectedNext} loopsRemaining={loopsRemaining}");
+                                double interval = overrideLoopInterval ?? 0.0;
 
-                                if (loopsRemaining <= 1)
+                                if (interval > 0)
                                 {
-                                    stopPreviewInternal("loops_finished");
+                                    candidateMuteAdjustment ??= new BindableDouble(0);
+                                    activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+                                    inLoopDelay = true;
+
+                                    loopDelayDelegate?.Cancel();
+                                    loopDelayDelegate = Scheduler.AddDelayed(() =>
+                                    {
+                                        try
+                                        {
+                                            activeCandidateTrack?.Seek(sliceStart);
+                                            if (candidateMuteAdjustment != null)
+                                                activeCandidateTrack?.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
+                                            activeCandidateTrack?.Start();
+                                            inLoopDelay = false;
+
+                                            // advance baseline to next loop start
+                                            lastLoopStartGameplayTime = expectedNext + interval;
+                                            debug($"delayed restart: newBaseline={lastLoopStartGameplayTime}");
+                                            ensureLoopCheckerRunning();
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            log($"delayed restart failed: {ex}");
+                                        }
+                                    }, (int)interval);
                                 }
                                 else
                                 {
-                                    loopsRemaining = loopsRemaining == int.MaxValue ? int.MaxValue : loopsRemaining - 1;
+                                    bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
+                                    if (!isUsingBeatmapTrack)
+                                        activeCandidateTrack.Seek(sliceStart);
 
-                                    double interval = overrideLoopInterval ?? 0.0;
-
-                                    if (interval > 0)
-                                    {
-                                        candidateMuteAdjustment ??= new BindableDouble(0);
-                                        activeCandidateTrack.AddAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
-                                        inLoopDelay = true;
-
-                                        loopDelayDelegate?.Cancel();
-                                        loopDelayDelegate = Scheduler.AddDelayed(() =>
-                                        {
-                                            try
-                                            {
-                                                activeCandidateTrack?.Seek(sliceStart);
-                                                if (candidateMuteAdjustment != null)
-                                                    activeCandidateTrack?.RemoveAdjustment(AdjustableProperty.Volume, candidateMuteAdjustment);
-                                                activeCandidateTrack?.Start();
-                                                inLoopDelay = false;
-
-                                                // advance baseline to next loop start
-                                                lastLoopStartGameplayTime = expectedNext + interval;
-                                                debug($"delayed restart: newBaseline={lastLoopStartGameplayTime}");
-                                                ensureLoopCheckerRunning();
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                log($"delayed restart failed: {ex}");
-                                            }
-                                        }, (int)interval);
-                                    }
-                                    else
-                                    {
-                                        bool isUsingBeatmapTrack = pendingBeatmap?.Track != null && ReferenceEquals(activeCandidateTrack, pendingBeatmap.Track);
-                                        if (!isUsingBeatmapTrack)
-                                            activeCandidateTrack.Seek(sliceStart);
-
-                                        // advance baseline to next loop start
-                                        lastLoopStartGameplayTime = expectedNext;
-                                        debug($"seamless restart: newBaseline={lastLoopStartGameplayTime}");
-                                        ensureLoopCheckerRunning();
-                                    }
+                                    // advance baseline to next loop start
+                                    lastLoopStartGameplayTime = expectedNext;
+                                    debug($"seamless restart: newBaseline={lastLoopStartGameplayTime}");
+                                    ensureLoopCheckerRunning();
                                 }
                             }
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    log($"gameplay-driven loop check failed: {ex}");
-                }
+            }
+            catch (Exception ex)
+            {
+                log($"gameplay-driven loop check failed: {ex}");
+            }
 
             if (started || !startRequested || pendingBeatmap == null)
                 return;
@@ -389,7 +390,8 @@ namespace osu.Game.LAsEzExtensions.Audio
                 if (!isUsingBeatmapTrack)
                 {
                     double seekTarget = getInitialSeekTarget();
-                    log($"OnSeek handler: seekTarget={seekTarget} activeHash={activeCandidateTrack?.GetHashCode()} isUsingBeatmapTrack={isUsingBeatmapTrack} currentBefore={activeCandidateTrack?.CurrentTime}");
+                    log(
+                        $"OnSeek handler: seekTarget={seekTarget} activeHash={activeCandidateTrack?.GetHashCode()} isUsingBeatmapTrack={isUsingBeatmapTrack} currentBefore={activeCandidateTrack?.CurrentTime}");
 
                     // Cancel any pending loop logic to avoid it fighting our manual seek.
                     loopDelayDelegate?.Cancel();
@@ -478,7 +480,8 @@ namespace osu.Game.LAsEzExtensions.Audio
                         {
                             if (activeCandidateTrack == null) return;
 
-                            debug($"gameplay-loop-callback: gameplayNow={gameplayClock.CurrentTime} trackNow={activeCandidateTrack.CurrentTime} expectedNext={(lastLoopStartGameplayTime ?? gameplayClock.CurrentTime) + sliceLength}");
+                            debug(
+                                $"gameplay-loop-callback: gameplayNow={gameplayClock.CurrentTime} trackNow={activeCandidateTrack.CurrentTime} expectedNext={(lastLoopStartGameplayTime ?? gameplayClock.CurrentTime) + sliceLength}");
 
                             if (loopsRemaining <= 1)
                             {

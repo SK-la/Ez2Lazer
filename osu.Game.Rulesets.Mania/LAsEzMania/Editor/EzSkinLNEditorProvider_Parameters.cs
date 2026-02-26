@@ -4,10 +4,10 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Skinning;
 using osuTK;

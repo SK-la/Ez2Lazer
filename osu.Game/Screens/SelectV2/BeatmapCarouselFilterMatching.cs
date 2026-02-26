@@ -22,7 +22,8 @@ namespace osu.Game.Screens.SelectV2
 
         public int BeatmapItemsCount { get; private set; }
 
-        public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations, Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync)
+        public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
+                                             Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync)
         {
             this.getCriteria = getCriteria;
             this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;

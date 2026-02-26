@@ -14,7 +14,6 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Framework.Text;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Skinning.Components;
 
 namespace osu.Game.LAsEzExtensions.HUD
 {

@@ -9,9 +9,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods;
+using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {

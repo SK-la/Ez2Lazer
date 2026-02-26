@@ -19,16 +19,13 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Screens;
-using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
@@ -263,7 +260,7 @@ namespace osu.Game.Screens.Ranking
                 Icon = FontAwesome.Solid.Cog,
                 Action = () =>
                 {
-                     /* TODO: show settings menu */
+                    /* TODO: show settings menu */
                 }
             });
 

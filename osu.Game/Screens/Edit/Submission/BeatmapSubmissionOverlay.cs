@@ -4,8 +4,8 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
-using osu.Game.Overlays;
 using osu.Game.Localisation;
+using osu.Game.Overlays;
 
 namespace osu.Game.Screens.Edit.Submission
 {

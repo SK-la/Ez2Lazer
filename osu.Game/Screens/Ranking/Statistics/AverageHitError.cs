@@ -4,8 +4,8 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Localisation;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Localisation;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Screens.Ranking.Statistics
 {

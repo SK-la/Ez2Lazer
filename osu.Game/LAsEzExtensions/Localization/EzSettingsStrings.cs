@@ -1,8 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Localisation;
-
 namespace osu.Game.LAsEzExtensions.Localization
 {
     public static class EzSettingsStrings
@@ -19,9 +17,12 @@ namespace osu.Game.LAsEzExtensions.Localization
         public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_S = new EzLocalizationManager.EzLocalisableString("Acc S评级线(Mania)", "Accuracy Cutoff S (Mania)");
         public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_A = new EzLocalizationManager.EzLocalisableString("Acc A评级线(Mania)", "Accuracy Cutoff A (Mania)");
 
-        public static readonly EzLocalizationManager.EzLocalisableString DISABLE_CMD_SPACE = new EzLocalizationManager.EzLocalisableString("游戏时禁用 Cmd+Space (聚焦搜索) ", "Disable Cmd+Space (Spotlight) during gameplay");
+        public static readonly EzLocalizationManager.EzLocalisableString DISABLE_CMD_SPACE =
+            new EzLocalizationManager.EzLocalisableString("游戏时禁用 Cmd+Space (聚焦搜索) ", "Disable Cmd+Space (Spotlight) during gameplay");
 
-        public static readonly EzLocalizationManager.EzLocalisableString STORAGE_FOLDER_CREATED = new EzLocalizationManager.EzLocalisableString("已创建目录：{0}\n请将文件放入该目录", "Created folder: {0}\nAdd files to the folder");
+        public static readonly EzLocalizationManager.EzLocalisableString STORAGE_FOLDER_CREATED =
+            new EzLocalizationManager.EzLocalisableString("已创建目录：{0}\n请将文件放入该目录", "Created folder: {0}\nAdd files to the folder");
+
         public static readonly EzLocalizationManager.EzLocalisableString STORAGE_FOLDER_EMPTY = new EzLocalizationManager.EzLocalisableString("目录为空：{0}", "Folder is empty: {0}");
 
         public static readonly EzLocalizationManager.EzLocalisableString SETTINGS_TITLE = new EzLocalizationManager.EzLocalisableString("设置", "Settings");
@@ -36,7 +37,8 @@ namespace osu.Game.LAsEzExtensions.Localization
             "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
             + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
 
-        public static readonly EzLocalizationManager.EzLocalisableString OFFSET_PLUS_NON_MANIA = new EzLocalizationManager.EzLocalisableString("高阶Offset修正(非Mania)", "Advanced Offset Plus (Non-Mania)");
+        public static readonly EzLocalizationManager.EzLocalisableString
+            OFFSET_PLUS_NON_MANIA = new EzLocalizationManager.EzLocalisableString("高阶Offset修正(非Mania)", "Advanced Offset Plus (Non-Mania)");
 
         public static readonly EzLocalizationManager.EzLocalisableString OFFSET_PLUS_NON_MANIA_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "直接修正输入结果的偏移值, 不改变音频、谱面的时间轴。"

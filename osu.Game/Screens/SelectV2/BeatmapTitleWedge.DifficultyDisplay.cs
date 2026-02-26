@@ -18,6 +18,7 @@ using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
@@ -25,7 +26,6 @@ using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osuTK.Graphics;
-using osu.Game.LAsEzExtensions.Analysis;
 
 namespace osu.Game.Screens.SelectV2
 {

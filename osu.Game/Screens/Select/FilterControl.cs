@@ -22,6 +22,9 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
+using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
@@ -29,9 +32,6 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select.Filter;
 using osuTK;
 using osuTK.Input;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.LAsEzExtensions.UserInterface;
 
 namespace osu.Game.Screens.Select
 {

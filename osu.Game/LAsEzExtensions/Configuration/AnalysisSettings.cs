@@ -4,11 +4,9 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Framework.Platform;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
-using osu.Game.Screens;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {

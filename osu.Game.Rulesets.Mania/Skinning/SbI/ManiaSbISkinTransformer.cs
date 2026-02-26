@@ -3,12 +3,9 @@
 
 using System.Linq;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
-using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -16,7 +13,6 @@ using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
-using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 

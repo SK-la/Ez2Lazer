@@ -88,7 +88,8 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.5,
@@ -118,10 +119,12 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 1
         };*/
 
-        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CUT_START_TIME_LABEL), nameof(LoopPlayClipStrings.CUT_START_TIME_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CUT_START_TIME_LABEL), nameof(LoopPlayClipStrings.CUT_START_TIME_DESCRIPTION),
+            SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> CutTimeStart { get; set; } = new Bindable<int?>();
 
-        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CUT_END_TIME_LABEL), nameof(LoopPlayClipStrings.CUT_END_TIME_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CUT_END_TIME_LABEL), nameof(LoopPlayClipStrings.CUT_END_TIME_DESCRIPTION),
+            SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> CutTimeEnd { get; set; } = new Bindable<int?>();
 
         [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.USE_MILLISECOND_LABEL), nameof(LoopPlayClipStrings.USE_MILLISECOND_DESCRIPTION))]
@@ -470,7 +473,9 @@ namespace osu.Game.LAsEzExtensions.Mods
         public static readonly LocalisableString LOOP_COUNT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("切片循环次数", "Loop Clip Count.");
 
         public static readonly LocalisableString CONSTANT_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("无SV变速", "Constant Speed");
-        public static readonly LocalisableString CONSTANT_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("去除SV变速。（恒定速度/忽略谱面中的变速）", "Constant Speed. No more tricky speed changes.(恒定速度/忽略谱面中的变速)");
+
+        public static readonly LocalisableString CONSTANT_SPEED_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("去除SV变速。（恒定速度/忽略谱面中的变速）", "Constant Speed. No more tricky speed changes.(恒定速度/忽略谱面中的变速)");
 
         public static readonly LocalisableString CUT_START_TIME_LABEL = new EzLocalizationManager.EzLocalisableString("切片开始时间", "Cut Start Time");
         public static readonly LocalisableString CUT_START_TIME_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("切片开始时间, 默认是秒。推荐通过谱面编辑器A-B控件设置，可自动输入", "Cut StartTime. Default is second.");

@@ -3,8 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Logging;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;

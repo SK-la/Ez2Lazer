@@ -4,18 +4,10 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Framework.Layout;
-using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens;
-using osuTK;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {

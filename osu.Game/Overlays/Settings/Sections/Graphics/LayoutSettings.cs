@@ -22,6 +22,7 @@ using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osuTK;
 using osuTK.Graphics;
+using WindowState = osu.Framework.Platform.WindowState;
 
 namespace osu.Game.Overlays.Settings.Sections.Graphics
 {
@@ -295,9 +296,9 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 if (size.NewValue == sizeWindowed.Value || windowModeDropdown.Current.Value != WindowMode.Windowed)
                     return;
 
-                if (window?.WindowState == Framework.Platform.WindowState.Maximised)
+                if (window?.WindowState == WindowState.Maximised)
                 {
-                    window.WindowState = Framework.Platform.WindowState.Normal;
+                    window.WindowState = WindowState.Normal;
                 }
 
                 // Adjust only for top decorations (assuming system titlebar).

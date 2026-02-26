@@ -56,7 +56,8 @@ namespace osu.Game.LAsEzExtensions.Mods
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
         public BindableBool AdjustPitch { get; } = new BindableBool(false);
 
-        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MIN_ALLOWABLE_RATE_LABEL), nameof(NiceBPMStrings.MIN_ALLOWABLE_RATE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MIN_ALLOWABLE_RATE_LABEL), nameof(NiceBPMStrings.MIN_ALLOWABLE_RATE_DESCRIPTION),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> MinAllowableRate { get; } = new BindableDouble(0.7)
         {
             MinValue = 0.1,
@@ -64,7 +65,8 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 0.1
         };
 
-        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MAX_ALLOWABLE_RATE_LABEL), nameof(NiceBPMStrings.MAX_ALLOWABLE_RATE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MAX_ALLOWABLE_RATE_LABEL), nameof(NiceBPMStrings.MAX_ALLOWABLE_RATE_DESCRIPTION),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> MaxAllowableRate { get; } = new BindableDouble(1.5)
         {
             MinValue = 1.0,
@@ -76,7 +78,8 @@ namespace osu.Game.LAsEzExtensions.Mods
         private const double min_rate_change_factor = 0.9d;
         private const double max_rate_change_factor = 1.11d;
 
-        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MISS_COUNT_THRESHOLD_LABEL), nameof(NiceBPMStrings.MISS_COUNT_THRESHOLD_DESCRIPTION), SettingControlType = typeof(SettingsSlider<int>))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.MISS_COUNT_THRESHOLD_LABEL), nameof(NiceBPMStrings.MISS_COUNT_THRESHOLD_DESCRIPTION),
+            SettingControlType = typeof(SettingsSlider<int>))]
         public BindableInt MissThreshold { get; } = new BindableInt(3)
         {
             MinValue = 1,
@@ -84,7 +87,8 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 1
         };
 
-        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.RATE_CHANGE_ON_MISS_LABEL), nameof(NiceBPMStrings.RATE_CHANGE_ON_MISS_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(NiceBPMStrings), nameof(NiceBPMStrings.RATE_CHANGE_ON_MISS_LABEL), nameof(NiceBPMStrings.RATE_CHANGE_ON_MISS_DESCRIPTION),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> RateChangeOnMiss { get; } = new BindableDouble(0.95)
         {
             MinValue = 0.5,
@@ -478,8 +482,13 @@ namespace osu.Game.LAsEzExtensions.Mods
         public static readonly LocalisableString MAX_ALLOWABLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString("最大允许速率", "Max Allowable Rate");
         public static readonly LocalisableString MAX_ALLOWABLE_RATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动态BPM调整的最大速率", "Maximum rate for dynamic BPM adjustment");
         public static readonly LocalisableString MISS_COUNT_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("Miss计数阈值", "Miss Count Threshold");
-        public static readonly LocalisableString MISS_COUNT_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("触发降速所需的Miss数量", "Number of misses required to trigger rate decrease");
+
+        public static readonly LocalisableString MISS_COUNT_THRESHOLD_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("触发降速所需的Miss数量", "Number of misses required to trigger rate decrease");
+
         public static readonly LocalisableString RATE_CHANGE_ON_MISS_LABEL = new EzLocalizationManager.EzLocalisableString("Miss时的速率变化", "Rate Change On Miss");
-        public static readonly LocalisableString RATE_CHANGE_ON_MISS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("达到Miss阈值时应用的速率倍数", "Rate multiplier applied when miss threshold is reached");
+
+        public static readonly LocalisableString RATE_CHANGE_ON_MISS_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("达到Miss阈值时应用的速率倍数", "Rate multiplier applied when miss threshold is reached");
     }
 }

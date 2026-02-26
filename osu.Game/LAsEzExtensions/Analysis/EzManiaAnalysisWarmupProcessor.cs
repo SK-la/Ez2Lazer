@@ -124,7 +124,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     beatmaps.Add((b.ID, b.Hash));
                 }
 
-                Logger.Log($"Warmup beatmap query summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+                Logger.Log($"Warmup beatmap query summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}",
+                    EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
 
                 if (maniaTotal == 0)
                 {

@@ -7,14 +7,12 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
-using osuTK;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.UI;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {

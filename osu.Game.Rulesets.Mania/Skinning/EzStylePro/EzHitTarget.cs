@@ -6,8 +6,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Screens;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro

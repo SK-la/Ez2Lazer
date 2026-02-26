@@ -23,4 +23,3 @@ namespace osu.Game.Screens.Edit
         }
     }
 }
-

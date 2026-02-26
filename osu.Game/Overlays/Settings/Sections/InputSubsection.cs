@@ -12,8 +12,8 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
-using osuTK.Graphics;
 using osu.Game.Localisation;
+using osuTK.Graphics;
 
 namespace osu.Game.Overlays.Settings.Sections
 {

@@ -10,7 +10,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 
