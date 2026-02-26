@@ -19,6 +19,7 @@ using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Localisation;
 using osuTK;
 using osuTK.Graphics;
@@ -182,7 +183,8 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 },
                 new SettingsItemV2(new FormEnumDropdown<ScalingGameMode>
                 {
-                    Caption = "Scaling To Game Mode",
+                    Caption = EzSettingsStrings.SCALING_GAME_MODE,
+                    HintText = EzSettingsStrings.ScalingGameModeTooltip,
                     Current = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode),
                 })
                 {

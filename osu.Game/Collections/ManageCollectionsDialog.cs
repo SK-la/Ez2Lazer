@@ -192,7 +192,7 @@ namespace osu.Game.Collections
                                                             {
                                                                 Anchor = Anchor.CentreLeft,
                                                                 Origin = Anchor.CentreLeft,
-                                                                Text = EzSettingsStrings.SAVE_TO_COLLECTION,
+                                                                Text = EzSongSelectStrings.SAVE_TO_COLLECTION,
                                                                 Font = OsuFont.GetFont(size: 16),
                                                             },
                                                             Empty(),

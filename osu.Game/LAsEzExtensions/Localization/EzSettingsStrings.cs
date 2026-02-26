@@ -1,18 +1,21 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Localisation;
+
 namespace osu.Game.LAsEzExtensions.Localization
 {
     public static class EzSettingsStrings
     {
-        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString("输入音频延迟追踪器", "Input Audio Latency Tracker");
+        public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE = new EzLocalizationManager.EzLocalisableString("缩放游戏模式", "Scaling Game Mode");
 
-        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(测试功能)启用后可追踪按键输入与音频的延迟, 用于调试和优化打击音效的同步性。在游戏结束后会弹出一个统计窗口。更详细的内容可以查看runtime.log文件。"
-            + "\n延迟检测管线：按键 → 检查打击并应用 → 应用判定结果 → 播放note音频",
-            "(Testing feature) When enabled, it can track the latency between key input and audio, used for debugging and optimizing the synchronization of hit sound effects. "
-            + "A statistics window will pop up after the game ends. More detailed information can be found in the runtime.log file."
-            + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
+        public static readonly EzLocalizationManager.EzLocalisableString ScalingGameModeTooltip = new EzLocalizationManager.EzLocalisableString(
+            "缩放游戏模式会根据当前游戏模式自动调整界面元素的大小。"
+            + "\n开启后，界面元素会根据当前游戏模式进行缩放，以提供更适合的视觉体验。"
+            + "\n例如，在Mania模式下，界面元素会缩小以适应更多的列数，而在其他模式下则保持默认大小。",
+            "The Scaling Game Mode will automatically adjust the size of UI elements based on the current game mode."
+            + "\nWhen enabled, UI elements will be scaled according to the current game mode to provide a more suitable visual experience."
+            + "\nFor example, in Mania mode, UI elements will be scaled down to accommodate more columns, while in other modes they will remain at their default size.");
 
         public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_S = new EzLocalizationManager.EzLocalisableString("Acc S评级线(Mania)", "Accuracy Cutoff S (Mania)");
         public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_A = new EzLocalizationManager.EzLocalisableString("Acc A评级线(Mania)", "Accuracy Cutoff A (Mania)");
@@ -46,6 +49,13 @@ namespace osu.Game.LAsEzExtensions.Localization
             "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
             + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
 
-        public static readonly EzLocalizationManager.EzLocalisableString SAVE_TO_COLLECTION = new EzLocalizationManager.EzLocalisableString("将当前过滤结果保存到", "Save current filter result to");
+        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString("输入音频延迟追踪器", "Input Audio Latency Tracker");
+
+        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "(测试功能)启用后可追踪按键输入与音频的延迟, 用于调试和优化打击音效的同步性。在游戏结束后会弹出一个统计窗口。更详细的内容可以查看runtime.log文件。"
+            + "\n延迟检测管线：按键 → 检查打击并应用 → 应用判定结果 → 播放note音频",
+            "(Testing feature) When enabled, it can track the latency between key input and audio, used for debugging and optimizing the synchronization of hit sound effects. "
+            + "A statistics window will pop up after the game ends. More detailed information can be found in the runtime.log file."
+            + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
     }
 }

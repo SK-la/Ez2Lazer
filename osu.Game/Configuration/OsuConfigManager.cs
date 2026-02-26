@@ -139,7 +139,7 @@ namespace osu.Game.Configuration
             SetDefault(OsuSetting.Prefer24HourTime, !CultureInfoHelper.SystemCulture.DateTimeFormat.ShortTimePattern.Contains(@"tt"));
 
             // Gameplay
-            SetDefault(OsuSetting.PositionalHitsoundsLevel, 0.8f, 0, 1, 0.01f);
+            SetDefault(OsuSetting.PositionalHitsoundsLevel, 0.7f, 0, 1, 0.01f);
             SetDefault(OsuSetting.DimLevel, 0.7, 0, 1, 0.01);
             SetDefault(OsuSetting.BlurLevel, 0, 0, 1, 0.01);
             SetDefault(OsuSetting.LightenDuringBreaks, true);

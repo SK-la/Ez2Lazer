@@ -7,6 +7,8 @@ namespace osu.Game.LAsEzExtensions.Localization
 {
     public static class EzSongSelectStrings
     {
+        public static readonly EzLocalizationManager.EzLocalisableString SAVE_TO_COLLECTION = new EzLocalizationManager.EzLocalisableString("将当前过滤结果保存到", "Save current filter result to");
+
         public static readonly LocalisableString XXY_SR_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "使用 xxy SR 进行难度过滤、排序、分组, 可能会增加加载时间",
             "Use xxy SR for difficulty filtering, sorting, and grouping, which may increase load times");
