@@ -231,9 +231,6 @@ namespace osu.Game.Rulesets.Mania.UI
             skin.SourceChanged += onSkinChanged;
             onSkinChanged();
 
-            ezSkinConfig.KeyMode = Definition.Columns; //确保 KeyMode 已设置正确
-            ezSkinConfig.ColumnTotalWidth = DrawWidth; //确保 ColumnTotalWidth 已设置正确
-
             osuConfigDim = osuConfig.GetBindable<double>(OsuSetting.DimLevel);
 
             columnDim = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim);

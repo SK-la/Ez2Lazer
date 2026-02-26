@@ -22,9 +22,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;
 
-        public static readonly Dictionary<int, EzColumnType[]> COLUMN_TYPE_CACHE = new Dictionary<int, EzColumnType[]>();
-        public static readonly Dictionary<int, bool[]> IS_SPECIAL_CACHE = new Dictionary<int, bool[]>();
-
         private static readonly ConcurrentDictionary<int, KeyModeColumnData> runtime_column_data = new ConcurrentDictionary<int, KeyModeColumnData>();
 
         private static readonly Dictionary<int, Ez2Setting> key_mode_to_column_color_setting = new Dictionary<int, Ez2Setting>
@@ -360,9 +357,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         public bool[] GetSpecialColumnsBools(int keyMode)
         {
-            if (IS_SPECIAL_CACHE.TryGetValue(keyMode, out bool[]? specials))
-                return specials;
-
             KeyModeColumnData data = getOrBuildKeyModeColumnData(keyMode);
 
             bool[] result = new bool[data.Length];
@@ -374,7 +368,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
             for (int i = uptoMask; i < data.Length; i++)
                 result[i] = data.Types[i] == (byte)EzColumnType.S;
 
-            IS_SPECIAL_CACHE[keyMode] = result;
             return result;
         }
 
@@ -390,16 +383,12 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         public EzColumnType[] GetColumnTypes(int keyMode)
         {
-            if (COLUMN_TYPE_CACHE.TryGetValue(keyMode, out EzColumnType[]? types))
-                return types;
-
             KeyModeColumnData data = getOrBuildKeyModeColumnData(keyMode);
             var arr = new EzColumnType[data.Length];
 
             for (int i = 0; i < data.Length; i++)
                 arr[i] = (EzColumnType)data.Types[i];
 
-            COLUMN_TYPE_CACHE[keyMode] = arr;
             return arr;
         }
 
@@ -440,7 +429,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             var data = createRuntimeData(typesBytes);
             runtime_column_data[keyMode] = data;
-            populateCompatibilityCaches(keyMode, data);
 
             return data;
         }
@@ -467,20 +455,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             return new KeyModeColumnData(types, mask);
         }
 
-        private static void populateCompatibilityCaches(int keyMode, in KeyModeColumnData data)
-        {
-            var enumArr = new EzColumnType[data.Length];
-            bool[] boolArr = new bool[data.Length];
-
-            for (int i = 0; i < data.Length; i++)
-            {
-                enumArr[i] = (EzColumnType)data.Types[i];
-                boolArr[i] = i < 64 ? ((data.SpecialMask >> i) & 1UL) != 0UL : data.Types[i] == (byte)EzColumnType.S;
-            }
-
-            COLUMN_TYPE_CACHE[keyMode] = enumArr;
-            IS_SPECIAL_CACHE[keyMode] = boolArr;
-        }
+        // Compatibility caches removed: runtime compact data is authoritative.
 
         private static Ez2Setting getColorSetting(EzColumnType colorType) => column_type_to_setting.TryGetValue(colorType, out var setting) ? setting : Ez2Setting.ColumnTypeA;
 
@@ -501,7 +476,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         {
             var updatedData = createRuntimeData(updatedTypes);
             runtime_column_data[keyMode] = updatedData;
-            populateCompatibilityCaches(keyMode, updatedData);
 
             string serialized = serializeColumnTypes(updatedTypes);
             if (!string.Equals(Get<string>(setting), serialized, StringComparison.Ordinal))
@@ -663,20 +637,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         IBindable<float> IGameplaySettings.ComboColourNormalisationAmount => null!;
         IBindable<float> IGameplaySettings.PositionalHitsoundsLevel => null!;
-
-        public int KeyMode;
-
-        public int GetKeyMode()
-        {
-            return KeyMode;
-        }
-
-        public double ColumnTotalWidth;
-
-        public double GetColumnTotalWidth()
-        {
-            return ColumnTotalWidth;
-        }
 
         // New compact struct placed inside the class for clarity and correct accessibility.
         // This stores compact runtime representation: a byte[] of EzColumnType values and a 64-bit mask for 'S' columns.
