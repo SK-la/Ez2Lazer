@@ -15,6 +15,7 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
 using osuTK.Graphics;
 
@@ -79,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             };
 
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
-            shouldDrawSeparator = drawSeparatorImpl(Column.Index, stageDefinition);
+            shouldDrawSeparator = stageDefinition.HasSeparator(Column.Index);
 
             applyAccent(Column.AccentColour.Value);
 
@@ -152,15 +153,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 hitOverlay.FadeTo(0, 250, Easing.OutQuint);
         }
 
-        // 基于不变的列数和列索引预计算分隔符显示
-        private bool drawSeparatorImpl(int columnIndex, StageDefinition stage) => stage.Columns switch
-        {
-            12 => columnIndex is 0 or 10,
-            14 => columnIndex is 0 or 5 or 6 or 11,
-            16 => columnIndex is 0 or 5 or 9 or 14,
-            _ => false
-        };
-
         private void applyAccent(Colour4 baseCol)
         {
             var baseColor4 = new Color4(baseCol.R, baseCol.G, baseCol.B, baseCol.A);
@@ -170,18 +162,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             hitOverlay.Colour = newColour;
             brightColour = baseColor4.Opacity(0.6f);
             dimColour = baseColor4.Opacity(0);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                // Unbind local bindables to avoid leaking subscriptions.
-                columnColourLocal.UnbindBindings();
-                hitPosition.UnbindBindings();
-            }
-
-            base.Dispose(isDisposing);
         }
     }
 }

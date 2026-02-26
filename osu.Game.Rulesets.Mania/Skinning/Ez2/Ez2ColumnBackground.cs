@@ -101,15 +101,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         private void OnConfigChanged()
         {
             separator.Height = DrawHeight - (float)hitPosition.Value;
-
-            if (drawSeparator(column.Index, stageDefinition))
-            {
-                separator.Alpha = 0.2f;
-            }
-            else
-            {
-                separator.Alpha = 0;
-            }
+            separator.Alpha = stageDefinition.HasSeparator(column.Index)
+                ? 0.2f
+                : 0;
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
@@ -138,18 +132,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         public static Color4 DrawColoursForColumns(int columnIndex, StageDefinition stage)
         {
             return stage.EzGetColumnColor(columnIndex);
-        }
-
-        //TODO: 这里的逻辑可以优化，避免重复计算
-        private bool drawSeparator(int columnIndex, StageDefinition stage)
-        {
-            return stage.Columns switch
-            {
-                12 => columnIndex is 0 or 10,
-                14 => columnIndex is 0 or 5 or 6 or 11,
-                16 => columnIndex is 0 or 5 or 9 or 14,
-                _ => false
-            };
         }
     }
 }
