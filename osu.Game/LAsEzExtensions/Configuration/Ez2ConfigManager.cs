@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Collections.Concurrent;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics;
@@ -23,6 +24,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         public static readonly Dictionary<int, EzColumnType[]> COLUMN_TYPE_CACHE = new Dictionary<int, EzColumnType[]>();
         public static readonly Dictionary<int, bool[]> IS_SPECIAL_CACHE = new Dictionary<int, bool[]>();
+
+        private static readonly ConcurrentDictionary<int, KeyModeColumnData> runtime_column_data = new ConcurrentDictionary<int, KeyModeColumnData>();
 
         private static readonly Dictionary<int, Ez2Setting> key_mode_to_column_color_setting = new Dictionary<int, Ez2Setting>
         {
@@ -199,8 +202,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
                 types[columnIndex] = colorType.Trim();
                 SetValue(setting, string.Join(",", types));
 
-                COLUMN_TYPE_CACHE.Remove(keyMode);
-                IS_SPECIAL_CACHE.Remove(keyMode);
+                buildKeyModeColumnDataFromSetting(keyMode);
             }
             catch (NotSupportedException)
             {
@@ -221,8 +223,8 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         public float GetTotalWidth(int keyMode)
         {
-            double baseWidth = GetBindable<double>(Ez2Setting.ColumnWidth).Value;
-            double specialFactor = GetBindable<double>(Ez2Setting.SpecialFactor).Value;
+            double baseWidth = Get<double>(Ez2Setting.ColumnWidth);
+            double specialFactor = Get<double>(Ez2Setting.SpecialFactor);
             float totalWidth = 0;
             int forMode = keyMode == 14 ? keyMode - 1 : keyMode;
             bool[] isSpecials = GetSpecialColumnsBools(keyMode);
@@ -266,24 +268,67 @@ namespace osu.Game.LAsEzExtensions.Configuration
             if (IS_SPECIAL_CACHE.TryGetValue(keyMode, out bool[]? specials))
                 return specials;
 
-            EzColumnType[] types = GetColumnTypes(keyMode);
-            bool[] result = new bool[keyMode];
-
-            for (int i = 0; i < keyMode; i++)
+            // If runtime data exists, use it to build the bool[] quickly.
+            if (runtime_column_data.TryGetValue(keyMode, out var data))
             {
-                result[i] = types[i] == EzColumnType.S;
+                bool[] result = new bool[data.Length];
+                int len = data.Length;
+                int uptoMask = Math.Min(len, 64);
+                // use mask for indices < 64
+                for (int i = 0; i < uptoMask; i++)
+                    result[i] = ((data.SpecialMask >> i) & 1UL) != 0UL;
+                // for indices >= 64 fall back to types array
+                for (int i = uptoMask; i < len; i++)
+                    result[i] = data.Types[i] == (byte)EzColumnType.S;
+
+                IS_SPECIAL_CACHE[keyMode] = result;
+                return result;
             }
 
-            IS_SPECIAL_CACHE[keyMode] = result;
-            return result;
+            buildKeyModeColumnDataFromSetting(keyMode);
+
+            if (IS_SPECIAL_CACHE.TryGetValue(keyMode, out bool[]? after))
+                return after;
+
+            // final fallback: use default generation
+            EzColumnType[] types = GetColumnTypes(keyMode);
+            bool[] fallback = new bool[keyMode];
+            for (int i = 0; i < keyMode; i++)
+                fallback[i] = types[i] == EzColumnType.S;
+
+            IS_SPECIAL_CACHE[keyMode] = fallback;
+            return fallback;
         }
 
         public EzColumnType GetColumnType(int keyMode, int columnIndex)
         {
-            EzColumnType[] types = GetColumnTypes(keyMode);
-            if (columnIndex < types.Length)
-                return types[columnIndex];
+            // Try runtime cache first for fastest path
+            if (runtime_column_data.TryGetValue(keyMode, out var data))
+            {
+                if (columnIndex < data.Length)
+                    return (EzColumnType)data.Types[columnIndex];
 
+                return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
+            }
+
+            // Fallback to existing array cache or build data lazily
+            if (COLUMN_TYPE_CACHE.TryGetValue(keyMode, out EzColumnType[]? types))
+            {
+                if (columnIndex < types.Length)
+                    return types[columnIndex];
+
+                return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
+            }
+
+            buildKeyModeColumnDataFromSetting(keyMode);
+
+            if (runtime_column_data.TryGetValue(keyMode, out data))
+            {
+                if (columnIndex < data.Length)
+                    return (EzColumnType)data.Types[columnIndex];
+            }
+
+            // final fallback
             return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
         }
 
@@ -292,86 +337,102 @@ namespace osu.Game.LAsEzExtensions.Configuration
             if (COLUMN_TYPE_CACHE.TryGetValue(keyMode, out EzColumnType[]? types))
                 return types;
 
-            types = new EzColumnType[keyMode];
-
-            try
+            // If runtime exists, materialize to EzColumnType[] for backward compatibility
+            if (runtime_column_data.TryGetValue(keyMode, out var data))
             {
-                var setting = getColumnTypeListSetting(keyMode);
-                string? columnColors = Get<string>(setting);
+                var arr = new EzColumnType[data.Length];
+                for (int i = 0; i < data.Length; i++)
+                    arr[i] = (EzColumnType)data.Types[i];
 
-                if (!string.IsNullOrEmpty(columnColors))
+                COLUMN_TYPE_CACHE[keyMode] = arr;
+                return arr;
+            }
+
+            buildKeyModeColumnDataFromSetting(keyMode);
+
+            if (COLUMN_TYPE_CACHE.TryGetValue(keyMode, out var after))
+                return after;
+
+            // final fallback to defaults
+            var def = new EzColumnType[keyMode];
+            for (int i = 0; i < keyMode; i++)
+                def[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
+
+            COLUMN_TYPE_CACHE[keyMode] = def;
+            return def;
+        }
+
+        // New helper: build runtime compact data from the stored setting string and populate public caches.
+        private KeyModeColumnData buildKeyModeColumnDataFromSetting(int keyMode)
+        {
+            var setting = getColumnTypeListSetting(keyMode);
+            string? columnColors = Get<string>(setting);
+
+            byte[] typesBytes = new byte[keyMode];
+
+            if (!string.IsNullOrEmpty(columnColors))
+            {
+                int start = 0;
+                int index = 0;
+
+                for (int i = 0; i <= columnColors.Length && index < keyMode; i++)
                 {
-                    int start = 0;
-                    int index = 0;
-
-                    for (int i = 0; i <= columnColors.Length && index < keyMode; i++)
+                    if (i == columnColors.Length || columnColors[i] == ',')
                     {
-                        if (i == columnColors.Length || columnColors[i] == ',')
-                        {
-                            string part = columnColors.Substring(start, i - start).Trim();
-                            if (!string.IsNullOrEmpty(part) && Enum.TryParse<EzColumnType>(part, out var t))
-                                types[index] = t;
-                            else
-                                types[index] = EzColumnTypeManager.GetColumnType(keyMode, index);
-                            index++;
-                            start = i + 1;
-                        }
-                    }
+                        string part = columnColors.Substring(start, i - start).Trim();
+                        if (!string.IsNullOrEmpty(part) && Enum.TryParse<EzColumnType>(part, out var t))
+                            typesBytes[index] = (byte)t;
+                        else
+                            typesBytes[index] = (byte)EzColumnTypeManager.GetColumnType(keyMode, index);
 
-                    // Fill remaining with defaults
-                    for (int i = index; i < keyMode; i++)
-                        types[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
+                        index++;
+                        start = i + 1;
+                    }
                 }
-                else
+
+                // Fill remaining with defaults
+                for (int i = 0; i < keyMode; i++)
                 {
-                    for (int i = 0; i < keyMode; i++)
-                        types[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
+                    if (typesBytes[i] == 0 && i >= columnColors.Split(',').Length)
+                        typesBytes[i] = (byte)EzColumnTypeManager.GetColumnType(keyMode, i);
                 }
             }
-            catch (NotSupportedException)
+            else
             {
                 for (int i = 0; i < keyMode; i++)
-                    types[i] = EzColumnTypeManager.GetColumnType(keyMode, i);
+                    typesBytes[i] = (byte)EzColumnTypeManager.GetColumnType(keyMode, i);
             }
 
-            COLUMN_TYPE_CACHE[keyMode] = types;
-            return types;
+            // compute mask (only for indices < 64)
+            ulong mask = 0;
+            int upto = Math.Min(keyMode, 64);
+
+            for (int i = 0; i < upto; i++)
+            {
+                if (typesBytes[i] == (byte)EzColumnType.S)
+                    mask |= (1UL << i);
+            }
+
+            var data = new KeyModeColumnData(typesBytes, mask);
+            runtime_column_data[keyMode] = data;
+
+            // Also populate public caches for backward compatibility
+            var enumArr = new EzColumnType[keyMode];
+            bool[] boolArr = new bool[keyMode];
+
+            for (int i = 0; i < keyMode; i++)
+            {
+                enumArr[i] = (EzColumnType)typesBytes[i];
+                boolArr[i] = (i < 64) ? (((mask >> i) & 1UL) != 0UL) : (typesBytes[i] == (byte)EzColumnType.S);
+            }
+
+            COLUMN_TYPE_CACHE[keyMode] = enumArr;
+            IS_SPECIAL_CACHE[keyMode] = boolArr;
+
+            return data;
         }
 
         #endregion
-
-        // public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex)
-        // {
-        //     var result = new Bindable<Vector2>();
-        //
-        //     var columnWidthBindable = GetBindable<double>(EzSkinSetting.ColumnWidth);
-        //     var specialFactorBindable = GetBindable<double>(EzSkinSetting.SpecialFactor);
-        //     var heightScaleBindable = GetBindable<double>(EzSkinSetting.NoteHeightScaleToWidth);
-        //
-        //     void updateNoteSize()
-        //     {
-        //         bool isSpecialColumn = GetColumnType(keyMode, columnIndex) == "S";
-        //         double baseWidth = columnWidthBindable.Value;
-        //         double specialFactor = specialFactorBindable.Value;
-        //         double heightScale = heightScaleBindable.Value;
-        //
-        //         float x = (float)(baseWidth * (isSpecialColumn ? specialFactor : 1.0));
-        //         float y = (float)(heightScale);
-        //         result.Value = new Vector2(x, y);
-        //     }
-        //
-        //     columnWidthBindable.BindValueChanged(e =>
-        //     {
-        //         Logger.Log($"ColumnWidth changed: {e.NewValue}");
-        //         updateNoteSize();
-        //     });
-        //     specialFactorBindable.BindValueChanged(_ => updateNoteSize());
-        //     heightScaleBindable.BindValueChanged(_ => updateNoteSize());
-        //
-        //     updateNoteSize();
-        //
-        //     return result;
-        // }
 
         #region 事件发布
 
@@ -451,6 +512,22 @@ namespace osu.Game.LAsEzExtensions.Configuration
         public double GetColumnTotalWidth()
         {
             return ColumnTotalWidth;
+        }
+
+        // New compact struct placed inside the class for clarity and correct accessibility.
+        // This stores compact runtime representation: a byte[] of EzColumnType values and a 64-bit mask for 'S' columns.
+        private readonly struct KeyModeColumnData
+        {
+            public readonly byte[] Types;
+            public readonly ulong SpecialMask;
+
+            public KeyModeColumnData(byte[] types, ulong specialMask)
+            {
+                Types = types;
+                SpecialMask = specialMask;
+            }
+
+            public int Length => Types.Length;
         }
     }
 
@@ -553,7 +630,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         ServerManualToken,
     }
 
-    public enum EzColumnType
+    public enum EzColumnType : byte
     {
         A,
         B,
