@@ -117,9 +117,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                var typeList = ezSkinConfig.GetColumnTypes(keyMode);
+                var type = ezSkinConfig.GetColumnTypeFast(keyMode, columnIndex);
 
-                switch (typeList[columnIndex])
+                switch (type)
                 {
                     case EzColumnType.A:
                         return "0";

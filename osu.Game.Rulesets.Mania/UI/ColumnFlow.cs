@@ -162,8 +162,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     continue;
                 }
 
-                bool isSpecialColumn =
-                    ezSkinConfig.IsSpecialColumn(stageDefinition.Columns, i);
+                bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(stageDefinition.Columns, i);
                 float ezWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
 
                 switch (ezColumnWidthStyle.Value)

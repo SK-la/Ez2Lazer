@@ -171,7 +171,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             {
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
-                bool isSpecialColumn = ezSkinConfig.IsSpecialColumn(stage.Columns, columnIndex);
+                bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(stage.Columns, columnIndex);
                 columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
 
                 switch (maniaLookup.Lookup)
@@ -180,20 +180,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
 
                     case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.LeftColumnSpacing:
                     case LegacyManiaSkinConfigurationLookups.RightColumnSpacing:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.StagePaddingBottom:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.StagePaddingTop:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
 

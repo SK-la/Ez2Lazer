@@ -67,10 +67,9 @@ namespace osu.Game.LAsEzExtensions
 
             public CacheEntry UpdateAccess() => new CacheEntry(Textures, HasComponent);
 
-            public bool Equals(CacheEntry other) =>
-                ReferenceEquals(Textures, other.Textures) &&
-                HasComponent == other.HasComponent &&
-                LastAccess.Equals(other.LastAccess);
+            public bool Equals(CacheEntry other) => ReferenceEquals(Textures, other.Textures) &&
+                                                    HasComponent == other.HasComponent &&
+                                                    LastAccess.Equals(other.LastAccess);
 
             public override bool Equals(object? obj) => obj is CacheEntry other && Equals(other);
 
@@ -154,7 +153,7 @@ namespace osu.Game.LAsEzExtensions
         public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex, bool? noSpecial = null)
         {
             var result = new Bindable<Vector2>();
-            bool isSpecialColumn = noSpecial != true && ezSkinConfig.IsSpecialColumn(keyMode, columnIndex);
+            bool isSpecialColumn = noSpecial != true && ezSkinConfig.IsSpecialColumnFast(keyMode, columnIndex);
 
             void updateNoteSize()
             {

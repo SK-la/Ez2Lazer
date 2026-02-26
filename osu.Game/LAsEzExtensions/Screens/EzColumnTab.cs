@@ -312,7 +312,7 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private EzSelectorColour createColumnSelector(int keyMode, int columnIndex, string[] columnTypes, Dictionary<string, Color4> colorMapping)
         {
-            EzColumnType savedType = ezSkinConfig.GetColumnType(keyMode, columnIndex);
+            EzColumnType savedType = ezSkinConfig.GetColumnTypeFast(keyMode, columnIndex);
 
             var selector = new EzSelectorColour($"Column {columnIndex + 1}", columnTypes, colorMapping);
             selector.Current.Value = savedType.ToString();
