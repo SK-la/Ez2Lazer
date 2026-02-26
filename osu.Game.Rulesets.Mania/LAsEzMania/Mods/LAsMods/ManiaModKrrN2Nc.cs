@@ -93,10 +93,10 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             var options = new KrrOptions
             {
                 TargetKeys = TargetKeys.Value,
-                MaxKeys    = MaxKeys.Value,
-                MinKeys    = MinKeys.Value,
+                MaxKeys = MaxKeys.Value,
+                MinKeys = MinKeys.Value,
                 BeatSpeed = BeatSpeed.Value,
-                Seed       = Seed.Value
+                Seed = Seed.Value
             };
 
             // 转换器内部负责：先重建对象，再更新列数

@@ -487,7 +487,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 
     public static class NtoMAnotherStrings
     {
-        public static readonly LocalisableString NTOM_ANOTHER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("转Key，来自krrcream的工具（有一些bug，请使用Clean设置来清理）", "From krrcream's Tool (It has some bugs, please use Clean settings to clean it.)");
+        public static readonly LocalisableString NTOM_ANOTHER_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("转Key，来自krrcream的工具（有一些bug，请使用Clean设置来清理）", "From krrcream's Tool (It has some bugs, please use Clean settings to clean it.)");
+
         public static readonly LocalisableString BLANK_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("空白列", "Blank Column");
 
         public static readonly LocalisableString BLANK_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(

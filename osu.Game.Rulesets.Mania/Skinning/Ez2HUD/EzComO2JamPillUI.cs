@@ -208,11 +208,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                         Icon = pill_sprites[(int)SpriteDropdown.Value],
                         Colour = Color4.White
                     });
-                    // new OsuSpriteText
-                    // {
-                    //     Text = "💊",
-                    //     Font = new FontUsage(null, 40),
-                    // });
+                // new OsuSpriteText
+                // {
+                //     Text = "💊",
+                //     Font = new FontUsage(null, 40),
+                // });
             }
         }
 

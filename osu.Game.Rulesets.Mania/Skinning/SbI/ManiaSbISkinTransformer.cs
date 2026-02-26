@@ -157,8 +157,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         case ManiaSkinComponents.KeyArea:
                             return new SbIKeyArea();
 
-                            // case ManiaSkinComponents.HitExplosion:
-                            // return new SbIHitExplosion();
+                        // case ManiaSkinComponents.HitExplosion:
+                        // return new SbIHitExplosion();
                     }
 
                     break;

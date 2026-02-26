@@ -74,7 +74,10 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             "Adjust rescale threshold and LN multiplier in SR calculation. Affects the SR (star rating) value shown on difficulty cards.");
 
         public static readonly LocalisableString SR_ADJUST_RESCALE_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("重缩放阈值", "Rescale Threshold");
-        public static readonly LocalisableString SR_ADJUST_RESCALE_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("超过此阈值后将降低难度膨胀速度", "Reduce difficulty inflation speed when above this threshold.");
+
+        public static readonly LocalisableString SR_ADJUST_RESCALE_THRESHOLD_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("超过此阈值后将降低难度膨胀速度", "Reduce difficulty inflation speed when above this threshold.");
+
         public static readonly LocalisableString SR_ADJUST_LN_MULTIPLIER_LABEL = new EzLocalizationManager.EzLocalisableString("LN 因子", "LN Integral Multiplier");
         public static readonly LocalisableString SR_ADJUST_LN_MULTIPLIER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("LN 因子", "LN integral multiplier.");
     }

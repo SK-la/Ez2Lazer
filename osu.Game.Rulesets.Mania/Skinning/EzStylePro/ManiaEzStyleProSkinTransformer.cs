@@ -219,7 +219,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
                         case ManiaSkinComponents.HitExplosion:
                             return new EzHitExplosion();
-                            // return HitExplosionPool.Rent();
+                        // return HitExplosionPool.Rent();
 
                         case ManiaSkinComponents.StageBackground:
                             return new EzStageBottom();

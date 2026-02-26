@@ -143,7 +143,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 
     public static class ChangeSpeedByAccuracyStrings
     {
-        public static readonly LocalisableString CHANGE_SPEED_BY_ACCURACY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("根据准确度调整游戏速度", "Adapt the speed of the game based on the accuracy.");
+        public static readonly LocalisableString CHANGE_SPEED_BY_ACCURACY_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("根据准确度调整游戏速度", "Adapt the speed of the game based on the accuracy.");
+
         public static readonly LocalisableString CHANGE_SPEED_ACCURACY_LABEL = new EzLocalizationManager.EzLocalisableString("准确度", "Accuracy");
         public static readonly LocalisableString CHANGE_SPEED_ACCURACY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("应用速度变化的准确度", "Accuracy. Accuracy for speed change to be applied.");
         public static readonly LocalisableString MAX_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("最大速度", "Max Speed");

@@ -656,12 +656,23 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
     public static class PatternShiftStrings
     {
-        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("重构谱面列数、密度与多压", "Rebuild the beatmap with new column count, density and chord limit.");
-        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_BRACKET = new EzLocalizationManager.EzLocalisableString("修改/补充键型：切叉", "Rebuild the beatmap with new column count, density and chord limit (with bracket).");
-        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_CHORD = new EzLocalizationManager.EzLocalisableString("修改/补充键型：拍", "Rebuild the beatmap with new column count, density and chord limit (chord limit).");
-        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_DELAY = new EzLocalizationManager.EzLocalisableString("修改/补充键型：偏移", "Rebuild the beatmap with new column count, density and chord limit (with delay).");
-        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_DUMP = new EzLocalizationManager.EzLocalisableString("修改/补充键型：楼梯", "Rebuild the beatmap with new column count, density and chord limit (full).");
-        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_JACK = new EzLocalizationManager.EzLocalisableString("修改/补充键型：叠/子弹", "Rebuild the beatmap with new column count, density and chord limit (with Jack).");
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("重构谱面列数、密度与多压", "Rebuild the beatmap with new column count, density and chord limit.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_BRACKET =
+            new EzLocalizationManager.EzLocalisableString("修改/补充键型：切叉", "Rebuild the beatmap with new column count, density and chord limit (with bracket).");
+
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_CHORD =
+            new EzLocalizationManager.EzLocalisableString("修改/补充键型：拍", "Rebuild the beatmap with new column count, density and chord limit (chord limit).");
+
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_DELAY =
+            new EzLocalizationManager.EzLocalisableString("修改/补充键型：偏移", "Rebuild the beatmap with new column count, density and chord limit (with delay).");
+
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_DUMP =
+            new EzLocalizationManager.EzLocalisableString("修改/补充键型：楼梯", "Rebuild the beatmap with new column count, density and chord limit (full).");
+
+        public static readonly LocalisableString PATTERN_SHIFT_DESCRIPTION_JACK =
+            new EzLocalizationManager.EzLocalisableString("修改/补充键型：叠/子弹", "Rebuild the beatmap with new column count, density and chord limit (with Jack).");
 
         public static readonly LocalisableString PATTERN_SHIFT_KEY_COUNT_LABEL = new EzLocalizationManager.EzLocalisableString("目标列数", "Target Columns");
         public static readonly LocalisableString PATTERN_SHIFT_KEY_COUNT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置生成后的列数", "Set the output column count.");
@@ -688,13 +699,25 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
         public static readonly LocalisableString PATTERN_SHIFT_WINDOW_MAX_ITERATIONS_LABEL = new EzLocalizationManager.EzLocalisableString("窗口最大迭代", "Window Max Iterations");
         public static readonly LocalisableString PATTERN_SHIFT_WINDOW_MAX_ITERATIONS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每个窗口的最大迭代次数", "Max iterations per window.");
         public static readonly LocalisableString PATTERN_SHIFT_WAVEFORM_LABEL = new EzLocalizationManager.EzLocalisableString("波形", "Waveform");
-        public static readonly LocalisableString PATTERN_SHIFT_WAVEFORM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("振荡器波形，影响键型局部处理时的循环周期", "Oscillator waveform used to vary pattern intensity.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_WAVEFORM_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("振荡器波形，影响键型局部处理时的循环周期", "Oscillator waveform used to vary pattern intensity.");
+
         public static readonly LocalisableString PATTERN_SHIFT_LEVEL_LABEL = new EzLocalizationManager.EzLocalisableString("等级", "Level");
-        public static readonly LocalisableString PATTERN_SHIFT_LEVEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("0=off, 1-10。控制每个窗口生成的音符数量", "0=off, 1-10. Controls how many notes are generated per window.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_LEVEL_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("0=off, 1-10。控制每个窗口生成的音符数量", "0=off, 1-10. Controls how many notes are generated per window.");
+
         public static readonly LocalisableString PATTERN_SHIFT_OSCILLATION_BEATS_LABEL = new EzLocalizationManager.EzLocalisableString("振荡节拍", "Oscillation Beats");
-        public static readonly LocalisableString PATTERN_SHIFT_OSCILLATION_BEATS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("振荡器变化的节拍间隔。1=每拍。", "Beat interval for oscillator changes. 1=every beat.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_OSCILLATION_BEATS_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("振荡器变化的节拍间隔。1=每拍。", "Beat interval for oscillator changes. 1=every beat.");
+
         public static readonly LocalisableString PATTERN_SHIFT_WINDOW_INTERVAL_LABEL = new EzLocalizationManager.EzLocalisableString("窗口间隔", "Window Interval");
-        public static readonly LocalisableString PATTERN_SHIFT_WINDOW_INTERVAL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每N半拍处理一次。1=每半拍。", "Process every N half-beats. 1=every half-beat.");
+
+        public static readonly LocalisableString PATTERN_SHIFT_WINDOW_INTERVAL_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("每N半拍处理一次。1=每半拍。", "Process every N half-beats. 1=every half-beat.");
+
         public static readonly LocalisableString PATTERN_SHIFT_WINDOW_START_OFFSET_LABEL = new EzLocalizationManager.EzLocalisableString("窗口起始偏移", "Window Start Offset");
         public static readonly LocalisableString PATTERN_SHIFT_WINDOW_START_OFFSET_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("1-4：第一到第四个半拍。", "1-4: first to fourth half-beat.");
 
@@ -704,7 +727,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             "在1/2节拍之间出现1/4以上（不含1/4）线的note数量阈值，超过则跳过处理。高星图需适当增加。",
             "Threshold for notes finer than 1/4 within a half-window; exceeding this skips processing. Default = 2.");
 
-        public static readonly LocalisableString PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_LABEL = new EzLocalizationManager.EzLocalisableString("Bypass 1/4线跳过阈值 (1/n)", "Bypass Quarter-line threshold divisor (1/n)");
+        public static readonly LocalisableString PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_LABEL =
+            new EzLocalizationManager.EzLocalisableString("Bypass 1/4线跳过阈值 (1/n)", "Bypass Quarter-line threshold divisor (1/n)");
 
         public static readonly LocalisableString PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "1/4线上的note数量阈值按谱面总列数的1/n计算，默认 n=2，即 k/2 阈值。",

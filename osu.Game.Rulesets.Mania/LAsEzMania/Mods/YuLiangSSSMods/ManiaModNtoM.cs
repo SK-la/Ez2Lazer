@@ -239,7 +239,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
                         {
                             if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum - k, locations[i].startTime, locations[i].endTime) && columnNum - k >= 0)
                                 columnNum -= k;
-                            else if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum + k, locations[i].startTime, locations[i].endTime) && columnNum + k <= keyValue - 1) columnNum += k;
+                            else if (!ManiaModYuModHelper.FindOverlapInList(newColumnObjects, columnNum + k, locations[i].startTime, locations[i].endTime)
+                                     && columnNum + k <= keyValue - 1) columnNum += k;
                         }
                     }
 

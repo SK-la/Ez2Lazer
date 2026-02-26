@@ -83,7 +83,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.DrainRate
         };
 
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ADJUST_ACCURACY_LABEL), nameof(AdjustStrings.ADJUST_ACCURACY_DESCRIPTION), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ADJUST_ACCURACY_LABEL), nameof(AdjustStrings.ADJUST_ACCURACY_DESCRIPTION),
+            SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable(0)
         {
             Precision = 0.1f,
@@ -172,7 +173,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 
         public override string ExtendedIconInformation => "";
 
-        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.1,

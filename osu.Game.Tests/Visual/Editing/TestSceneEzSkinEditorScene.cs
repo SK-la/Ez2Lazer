@@ -5,7 +5,6 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Game.LAsEzExtensions.Edit;
-using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Overlays;
 using osu.Game.Screens;
 

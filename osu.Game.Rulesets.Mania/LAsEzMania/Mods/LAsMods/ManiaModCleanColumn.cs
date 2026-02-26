@@ -51,7 +51,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
         [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.ENABLE_CUSTOM_DELETE_LABEL), nameof(CleanColumnStrings.ENABLE_CUSTOM_DELETE_DESCRIPTION))]
         public BindableBool EnableCustomDelete { get; } = new BindableBool();
 
-        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.CUSTOM_DELETE_COLUMN_LABEL), nameof(CleanColumnStrings.CUSTOM_DELETE_COLUMN_DESCRIPTION), SettingControlType = typeof(SettingsTextBox))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.CUSTOM_DELETE_COLUMN_LABEL), nameof(CleanColumnStrings.CUSTOM_DELETE_COLUMN_DESCRIPTION),
+            SettingControlType = typeof(SettingsTextBox))]
         public Bindable<string> CustomDeleteColumn { get; } = new Bindable<string>(string.Empty);
 
         [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL), nameof(CleanColumnStrings.ENABLE_CUSTOM_REORDER_DESCRIPTION))]
@@ -60,7 +61,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
         [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_LABEL), nameof(CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_DESCRIPTION))]
         public BindableBool UseHealthCapReduction { get; } = new BindableBool();
 
-        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.CUSTOM_REORDER_COLUMN_LABEL), nameof(CleanColumnStrings.CUSTOM_REORDER_COLUMN_DESCRIPTION), SettingControlType = typeof(SettingsTextBox))]
+        [SettingSource(typeof(CleanColumnStrings), nameof(CleanColumnStrings.CUSTOM_REORDER_COLUMN_LABEL), nameof(CleanColumnStrings.CUSTOM_REORDER_COLUMN_DESCRIPTION),
+            SettingControlType = typeof(SettingsTextBox))]
         public Bindable<string> CustomReorderColumn { get; } = new Bindable<string>(string.Empty);
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
@@ -394,11 +396,20 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
     {
         public static readonly LocalisableString CLEAN_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("整理Column, 排序、删除轨道中的note", "Clean Column, Sort, Delete notes in the column.");
         public static readonly LocalisableString DELETE_S_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除S列", "Delete S Column Type");
-        public static readonly LocalisableString DELETE_S_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了S Column Type的列", "Delete columns marked with S column type when enabled");
+
+        public static readonly LocalisableString DELETE_S_COLUMN_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("开启时删除标记了S Column Type的列", "Delete columns marked with S column type when enabled");
+
         public static readonly LocalisableString DELETE_P_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除P列", "Delete P Column Type");
-        public static readonly LocalisableString DELETE_P_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了P Column Type的列", "Delete columns marked with P column type when enabled");
+
+        public static readonly LocalisableString DELETE_P_COLUMN_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("开启时删除标记了P Column Type的列", "Delete columns marked with P column type when enabled");
+
         public static readonly LocalisableString DELETE_E_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除E列", "Delete E Column Type");
-        public static readonly LocalisableString DELETE_E_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
+
+        public static readonly LocalisableString DELETE_E_COLUMN_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
+
         public static readonly LocalisableString ENABLE_CUSTOM_DELETE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义删除列", "Enable Custom Delete");
 
         public static readonly LocalisableString ENABLE_CUSTOM_DELETE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(

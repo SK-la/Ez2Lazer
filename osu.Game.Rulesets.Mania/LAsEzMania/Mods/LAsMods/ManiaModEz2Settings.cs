@@ -306,7 +306,10 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             public static readonly LocalisableString NO_PANEL_LABEL = new EzLocalizationManager.EzLocalisableString("无踏板", "No Panel");
             public static readonly LocalisableString NO_PANEL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按固定模版，去除Ez街机谱面中的脚踏. 用于: 7\\14\\18k", "No (EZ)Panel. For: 7\\14\\18k");
             public static readonly LocalisableString HEALTHY_SCRATCH_LABEL = new EzLocalizationManager.EzLocalisableString("健康盘子", "Healthy Scratch");
-            public static readonly LocalisableString HEALTHY_SCRATCH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("优化盘子密度，通过特定模版将过快的盘子移动到其他列", "Healthy (EZ)Scratch. Move the fast Scratch to the other columns");
+
+            public static readonly LocalisableString HEALTHY_SCRATCH_DESCRIPTION =
+                new EzLocalizationManager.EzLocalisableString("优化盘子密度，通过特定模版将过快的盘子移动到其他列", "Healthy (EZ)Scratch. Move the fast Scratch to the other columns");
+
             public static readonly LocalisableString MAX_BEAT_LABEL = new EzLocalizationManager.EzLocalisableString("最大节拍", "Max Beat");
             public static readonly LocalisableString MAX_BEAT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("盘子密度的最大节拍间隔, 1/? 拍", "Scratch MAX Beat Space, MAX 1/? Beat");
         }

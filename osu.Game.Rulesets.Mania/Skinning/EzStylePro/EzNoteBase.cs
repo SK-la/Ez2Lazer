@@ -330,4 +330,3 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
     }
 }
-
