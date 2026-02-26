@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
@@ -416,7 +417,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             duplicateTrack.StopPreview();
 
             // 从父容器中移除 duplicateTrack（如果已加入），确保 mod 关闭时不会残留在 HUD 中或影响后续音频。
-            if (duplicateTrack.Parent is osu.Framework.Graphics.Containers.Container c)
+            if (duplicateTrack.Parent is Container c)
                 c.Remove(duplicateTrack, false);
         }
 

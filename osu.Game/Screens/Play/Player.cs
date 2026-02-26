@@ -112,40 +112,38 @@ namespace osu.Game.Screens.Play
 
         public class GameplayBackdropSource
         {
-            private Drawable beatmapBackgroundSource;
-            private Drawable storyboardSource;
-            private bool storyboardPreferred;
+            public Drawable BeatmapBackgroundSource { get; private set; }
 
-            public Drawable BeatmapBackgroundSource => beatmapBackgroundSource;
-            public Drawable StoryboardSource => storyboardSource;
-            public bool StoryboardPreferred => storyboardPreferred;
+            public Drawable StoryboardSource { get; private set; }
+
+            public bool StoryboardPreferred { get; private set; }
 
             public event Action SourcesChanged;
 
             public void SetStoryboardSource(DimmableStoryboard source)
             {
-                if (storyboardSource == source)
+                if (StoryboardSource == source)
                     return;
 
-                storyboardSource = source;
+                StoryboardSource = source;
                 SourcesChanged?.Invoke();
             }
 
             public void SetBeatmapBackgroundSource(Drawable source)
             {
-                if (beatmapBackgroundSource == source)
+                if (BeatmapBackgroundSource == source)
                     return;
 
-                beatmapBackgroundSource = source;
+                BeatmapBackgroundSource = source;
                 SourcesChanged?.Invoke();
             }
 
             public void SetStoryboardPreferred(bool preferred)
             {
-                if (storyboardPreferred == preferred)
+                if (StoryboardPreferred == preferred)
                     return;
 
-                storyboardPreferred = preferred;
+                StoryboardPreferred = preferred;
                 SourcesChanged?.Invoke();
             }
         }

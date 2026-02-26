@@ -8,10 +8,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Effects;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Screens;
 using osuTK;
 using osuTK.Graphics;
@@ -81,13 +81,13 @@ namespace osu.Game.LAsEzExtensions.Extensions
 
             public LocalisableString TooltipText { get; set; } = "全局列颜色方案设置";
 
-            protected override bool OnHover(osu.Framework.Input.Events.HoverEvent e)
+            protected override bool OnHover(HoverEvent e)
             {
                 BackgroundBox.FadeColour(Color4.White.Opacity(0.1f), 200, Easing.OutQuint);
                 return false; // 允许事件继续传递
             }
 
-            protected override void OnHoverLost(osu.Framework.Input.Events.HoverLostEvent e)
+            protected override void OnHoverLost(HoverLostEvent e)
             {
                 BackgroundBox.FadeColour(Color4.Black.Opacity(0.05f), 200, Easing.OutQuint);
             }

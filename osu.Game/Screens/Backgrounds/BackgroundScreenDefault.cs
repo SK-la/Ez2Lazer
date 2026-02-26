@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -11,6 +12,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
@@ -166,7 +168,7 @@ namespace osu.Game.Screens.Backgrounds
                 string[] files = storage.GetFiles(relativePath, "*").ToArray();
 
                 if (extensions != null && extensions.Length > 0)
-                    files = files.Where(f => extensions.Any(ext => f.EndsWith(ext, System.StringComparison.OrdinalIgnoreCase))).ToArray();
+                    files = files.Where(f => extensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase))).ToArray();
 
                 // ensure directory exists on disk so users can drop files
                 string dataFolderPath = storage.GetFullPath(relativePath);
@@ -191,7 +193,7 @@ namespace osu.Game.Screens.Backgrounds
                 {
                     try
                     {
-                        var loader = gameHost.CreateTextureLoaderStore(new osu.Framework.IO.Stores.StorageBackedResourceStore(storage));
+                        var loader = gameHost.CreateTextureLoaderStore(new StorageBackedResourceStore(storage));
                         textures.AddTextureSource(loader);
 
                         largeTextures?.AddTextureSource(loader);
@@ -210,8 +212,8 @@ namespace osu.Game.Screens.Backgrounds
                 string normalizedFile = file.Replace('\\', '/');
                 string normalizedRelative = relativePath.Replace('\\', '/').TrimEnd('/');
 
-                if (normalizedFile.StartsWith(normalizedRelative + "/", System.StringComparison.OrdinalIgnoreCase)
-                    || normalizedFile.Equals(normalizedRelative, System.StringComparison.OrdinalIgnoreCase))
+                if (normalizedFile.StartsWith(normalizedRelative + "/", StringComparison.OrdinalIgnoreCase)
+                    || normalizedFile.Equals(normalizedRelative, StringComparison.OrdinalIgnoreCase))
                 {
                     resourcePath = normalizedFile;
                 }

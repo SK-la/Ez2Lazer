@@ -1,9 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
@@ -13,8 +13,6 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Rulesets.UI;
-using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.LAsEzExtensions.Mods
@@ -259,7 +257,7 @@ namespace osu.Game.LAsEzExtensions.Mods
         private int getRelaxedMissCount()
         {
             int threshold = missCountThreshold.Value;
-            return (int)System.Math.Ceiling(threshold / 3d);
+            return (int)Math.Ceiling(threshold / 3d);
         }
 
         private double getRelaxedAccThreshold()
@@ -289,7 +287,7 @@ namespace osu.Game.LAsEzExtensions.Mods
 
             return targetTime;
 
-            static double selectEarlier(double? current, double candidate) => current.HasValue ? System.Math.Min(current.Value, candidate) : candidate;
+            static double selectEarlier(double? current, double candidate) => current.HasValue ? Math.Min(current.Value, candidate) : candidate;
         }
 
         private readonly record struct TriggerState(bool MissTriggered, bool AccTriggered, bool HealthTriggered)
