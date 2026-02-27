@@ -22,6 +22,7 @@ using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Dialog;
 using osu.Game.Resources.Localisation.Web;
 using osuTK;
 using Realms;
@@ -64,6 +65,9 @@ namespace osu.Game.Collections
 
         [Resolved]
         private MusicController? musicController { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private IDialogOverlay? dialogOverlay { get; set; }
 
         public ManageCollectionsDialog()
         {
@@ -335,6 +339,79 @@ namespace osu.Game.Collections
             if (hashes.Count == 0)
                 return;
 
+            // Read existing entries from the collection to determine overlap.
+            var existing = collection.PerformRead(c => c.BeatmapMD5Hashes.ToList());
+            var intersection = existing.Intersect(hashes).ToList();
+
+            // Case 1: collection already contains all filtered results -> offer bulk remove.
+            if (intersection.Count == hashes.Count)
+            {
+                Schedule(() => dialogOverlay?.Push(new SimplePopupDialog(
+                    FontAwesome.Solid.Trash,
+                    "从收藏夹移除筛选结果",
+                    "收藏夹已包含所有筛选结果，是否从收藏夹中移除这些谱面？",
+                    new PopupDialogButton[]
+                    {
+                        new PopupDialogCancelButton { Text = "取消" },
+                        new PopupDialogDangerousButton
+                        {
+                            Text = "移除",
+                            Action = () => Task.Run(() => collection.PerformWrite(c =>
+                            {
+                                foreach (string h in intersection)
+                                    c.BeatmapMD5Hashes.Remove(h);
+                            }))
+                        }
+                    })));
+
+                return;
+            }
+
+            // Case 2: partial overlap -> let user choose to add remaining or remove overlapping parts.
+            if (intersection.Count > 0)
+            {
+                var toAdd = hashes.Except(existing).ToList();
+                var toRemove = intersection;
+
+                Schedule(() => dialogOverlay?.Push(new SimplePopupDialog(
+                    FontAwesome.Solid.Question,
+                    "筛选结果与收藏夹部分重合",
+                    $"有 {intersection.Count} 个谱面已存在。请选择要执行的操作：",
+                    new PopupDialogButton[]
+                    {
+                        new PopupDialogCancelButton { Text = "取消" },
+                        new PopupDialogOkButton
+                        {
+                            Text = "添加剩余",
+                            Action = () =>
+                            {
+                                if (toAdd.Count == 0) return;
+
+                                Task.Run(() => collection.PerformWrite(c =>
+                                {
+                                    foreach (string h in toAdd)
+                                    {
+                                        if (!c.BeatmapMD5Hashes.Contains(h))
+                                            c.BeatmapMD5Hashes.Add(h);
+                                    }
+                                }));
+                            }
+                        },
+                        new PopupDialogDangerousButton
+                        {
+                            Text = "移除重合",
+                            Action = () => Task.Run(() => collection.PerformWrite(c =>
+                            {
+                                foreach (string h in toRemove)
+                                    c.BeatmapMD5Hashes.Remove(h);
+                            }))
+                        }
+                    })));
+
+                return;
+            }
+
+            // Case 3: no overlap -> add all results to the collection.
             Task.Run(() => collection.PerformWrite(c =>
             {
                 foreach (string hash in hashes)
@@ -348,6 +425,20 @@ namespace osu.Game.Collections
         private partial class SaveToCollectionDropdown : OsuDropdown<CollectionFilterMenuItem>
         {
             protected override LocalisableString GenerateItemText(CollectionFilterMenuItem item) => item.CollectionName;
+        }
+
+        /// <summary>
+        /// A minimal concrete <see cref="PopupDialog"/> used for inline confirmation prompts in this dialog.
+        /// </summary>
+        private partial class SimplePopupDialog : PopupDialog
+        {
+            public SimplePopupDialog(IconUsage icon, LocalisableString header, LocalisableString body, PopupDialogButton[] buttons)
+            {
+                Icon = icon;
+                HeaderText = header;
+                BodyText = body;
+                Buttons = buttons;
+            }
         }
     }
 }
