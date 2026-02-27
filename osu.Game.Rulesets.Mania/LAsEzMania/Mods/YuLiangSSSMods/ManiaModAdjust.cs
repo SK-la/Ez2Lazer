@@ -59,8 +59,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => false;
         public override Type[] IncompatibleMods => new[] { typeof(ModEasy), typeof(ModHardRock), typeof(ModTimeRamp), typeof(ModAdaptiveSpeed), typeof(ModRateAdjust) };
 
-        public BindableDouble OriginalOD = new BindableDouble();
-
         [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.SCORE_MULTIPLIER_LABEL))]
         public BindableNumber<double> ScoreMultiplierAdjust { get; } = new BindableDouble(1)
         {
@@ -68,8 +66,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
             MaxValue = 10,
             Precision = 0.01
         };
-
-        public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
         [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.HP_DRAIN_LABEL), nameof(AdjustStrings.HP_DRAIN_DESCRIPTION), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
         public DifficultyBindable DrainRate { get; } = new DifficultyBindable(0)
@@ -183,96 +179,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
         public virtual BindableBool AdjustPitch { get; } = new BindableBool();
 
-        private readonly RateAdjustModHelper rateAdjustHelper;
-
-        public ManiaModAdjust()
-        {
-            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
-
-            foreach (var (_, property) in this.GetOrderedSettingsSourceProperties())
-            {
-                if (property.GetValue(this) is DifficultyBindable diffAdjustBindable)
-                    diffAdjustBindable.ExtendedLimits.BindTo(ExtendedLimits);
-            }
-
-            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
-
-            CustomHitRange.BindValueChanged(_ => updateCustomHitRange());
-            PerfectHit.BindValueChanged(_ => updateCustomHitRange());
-            GreatHit.BindValueChanged(_ => updateCustomHitRange());
-            GoodHit.BindValueChanged(_ => updateCustomHitRange());
-            OkHit.BindValueChanged(_ => updateCustomHitRange());
-            MehHit.BindValueChanged(_ => updateCustomHitRange());
-            MissHit.BindValueChanged(_ => updateCustomHitRange());
-        }
-
-        private void updateCustomHitRange()
-        {
-            if (CustomHitRange.Value)
-            {
-                HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
-                    PerfectHit.Value,
-                    GreatHit.Value,
-                    GoodHit.Value,
-                    OkHit.Value,
-                    MehHit.Value,
-                    MissHit.Value
-                ));
-            }
-            else
-            {
-                HitWindows.ResetRange();
-            }
-        }
-
-        /// <summary>
-        /// Apply all custom settings to the provided beatmap.
-        /// </summary>
-        /// <param name="difficulty">The beatmap to have settings applied.</param>
-        protected void ApplySettings(BeatmapDifficulty difficulty)
-        {
-            if (DrainRate.Value != null && CustomHP.Value)
-                difficulty.DrainRate = DrainRate.Value.Value;
-
-            if (OverallDifficulty.Value != null && CustomOD.Value && !CustomHitRange.Value)
-            {
-                OriginalOD.Value = difficulty.OverallDifficulty;
-                difficulty.OverallDifficulty = OverallDifficulty.Value.Value;
-            }
-        }
-
-        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
-        {
-            HitWindows.SpeedMultiplier = SpeedChange.Value;
-
-            HitWindows.SetDifficulty(difficulty.OverallDifficulty);
-
-            ApplySettings(difficulty);
-            AdjustHoldNote.ReleaseLenience = ReleaseLenience.Value;
-            AdjustTailNote.ReleaseLenience = ReleaseLenience.Value;
-            AdjustDrawableHoldNoteTail.ReleaseLenience = ReleaseLenience.Value;
-        }
-
-        public override void ApplyToTrack(IAdjustableAudioComponent track)
-        {
-            rateAdjustHelper.ApplyToTrack(track);
-        }
-
-        public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
-        {
-            var maniaRuleset = (DrawableManiaRuleset)drawableRuleset;
-
-            if (ConstantSpeed.Value) maniaRuleset.VisualisationMethod = ScrollVisualisationMethod.Constant;
-
-            if (CustomRelease.Value)
-            {
-                foreach (var stage in maniaRuleset.Playfield.Stages)
-                {
-                    foreach (var column in stage.Columns) column.RegisterPool<AdjustTailNote, AdjustDrawableHoldNoteTail>(10, 50);
-                }
-            }
-        }
-
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.MIRROR_LABEL), nameof(EzCommonModStrings.MIRROR_DESCRIPTION))]
         public BindableBool Mirror { get; } = new BindableBool();
 
@@ -293,110 +199,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
-
-        public void ApplyToBeatmap(IBeatmap beatmap)
-        {
-            var maniaBeatmap = (ManiaBeatmap)beatmap;
-
-            if (Test.Value)
-            {
-                var obj = maniaBeatmap;
-                var groups = obj.HitObjects.GroupBy(c => c.Column).OrderBy(c => c.Key);
-                // int note = obj.HitObjects.Select(h => h.GetEndTime() != h.StartTime).Count();
-                // int note = obj.HitObjects.Count - note;
-                foreach (var column in groups) Logger.Log($"Column {column.Key + 1}: {column.Count()} notes", level: LogLevel.Important);
-                //Logger.Log($"Test:\nThis beatmap has {obj.HitObjects.Count} HitObjects.\n", level: LogLevel.Important);
-            }
-
-            if (RandomSelect.Value)
-            {
-                Seed.Value ??= RNG.Next();
-                var rng = new Random((int)Seed.Value);
-
-                int availableColumns = maniaBeatmap.TotalColumns;
-                var shuffledColumns = Enumerable.Range(0, availableColumns).OrderBy(_ => rng.Next()).ToList();
-                beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = shuffledColumns[h.Column]);
-            }
-
-            if (Mirror.Value)
-            {
-                int availableColumns = maniaBeatmap.TotalColumns;
-                beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = availableColumns - 1 - h.Column);
-            }
-
-            if (RandomMirror.Value)
-            {
-                Seed.Value ??= RNG.Next();
-                var rng = new Random((int)Seed.Value);
-
-                if (rng.Next() % 2 == 0)
-                {
-                    int availableColumns = maniaBeatmap.TotalColumns;
-                    beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = availableColumns - 1 - h.Column);
-                }
-            }
-
-            if (TrueRandom.Value)
-            {
-                Seed.Value ??= RNG.Next();
-                var rng = new Random((int)Seed.Value);
-                int availableColumns = maniaBeatmap.TotalColumns;
-
-                foreach (var obj in beatmap.HitObjects.OfType<ManiaHitObject>().GroupBy(c => c.StartTime))
-                {
-                    var columnList = new List<int>();
-                    foreach (var hit in obj) columnList.Add(hit.Column);
-                    var newColumn = Enumerable.Range(0, availableColumns).SelectRandom(rng, columnList.Count).ToList();
-                    int index = 0;
-
-                    foreach (var hit in obj)
-                    {
-                        hit.Column = newColumn[index];
-                        index++;
-                    }
-                }
-            }
-        }
-
-        //------Fail Condition------
-        private Action? triggerFailureDelegate;
-
-        private readonly Bindable<bool> showHealthBar = new Bindable<bool>();
-
-        public bool PerformFail()
-        {
-            return !NoFail.Value;
-        }
-
-        public bool RestartOnFail
-        {
-            get
-            {
-                if (NoFail.Value) return !NoFail.Value;
-
-                return Restart.Value;
-            }
-        }
-
-        public void ReadFromConfig(OsuConfigManager config)
-        {
-            config.BindWith(OsuSetting.ShowHealthDisplayWhenCantFail, showHealthBar);
-        }
-
-        public void ApplyToHUD(HUDOverlay overlay)
-        {
-            overlay.ShowHealthBar.BindTo(showHealthBar);
-        }
-
-        public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
-        {
-            triggerFailureDelegate = healthProcessor.TriggerFailure;
-        }
-
-        protected void TriggerFailure()
-        {
-            triggerFailureDelegate?.Invoke();
-        }
 
         [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_HIT_RANGE_LABEL), nameof(AdjustStrings.CUSTOM_HIT_RANGE_DESCRIPTION))]
         public BindableBool CustomHitRange { get; } = new BindableBool();
@@ -503,9 +305,185 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
         [SettingSource("Test")]
         public BindableBool Test { get; } = new BindableBool();
 
+        public BindableDouble OriginalOD = new BindableDouble();
+
+        public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
+
+        private readonly RateAdjustModHelper rateAdjustHelper;
+
+        private readonly Bindable<bool> showHealthBar = new Bindable<bool>();
+
         private readonly BindableInt combo = new BindableInt();
 
         private readonly BindableDouble accuracy = new BindableDouble();
+
+        private Action? triggerFailureDelegate;
+
+        public bool RestartOnFail
+        {
+            get
+            {
+                if (NoFail.Value) return !NoFail.Value;
+
+                return Restart.Value;
+            }
+        }
+
+        public ManiaModAdjust()
+        {
+            rateAdjustHelper = new RateAdjustModHelper(SpeedChange);
+
+            foreach (var (_, property) in this.GetOrderedSettingsSourceProperties())
+            {
+                if (property.GetValue(this) is DifficultyBindable diffAdjustBindable)
+                    diffAdjustBindable.ExtendedLimits.BindTo(ExtendedLimits);
+            }
+
+            rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
+        }
+
+        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
+        {
+            HitWindows.SpeedMultiplier = SpeedChange.Value;
+
+            HitWindows.SetDifficulty(difficulty.OverallDifficulty);
+
+            ApplySettings(difficulty);
+            AdjustHoldNote.ReleaseLenience = ReleaseLenience.Value;
+            AdjustTailNote.ReleaseLenience = ReleaseLenience.Value;
+            AdjustDrawableHoldNoteTail.ReleaseLenience = ReleaseLenience.Value;
+
+            CustomHitRange.BindValueChanged(_ => updateCustomHitRange());
+            PerfectHit.BindValueChanged(_ => updateCustomHitRange());
+            GreatHit.BindValueChanged(_ => updateCustomHitRange());
+            GoodHit.BindValueChanged(_ => updateCustomHitRange());
+            OkHit.BindValueChanged(_ => updateCustomHitRange());
+            MehHit.BindValueChanged(_ => updateCustomHitRange());
+            MissHit.BindValueChanged(_ => updateCustomHitRange());
+        }
+
+        private void updateCustomHitRange()
+        {
+            if (CustomHitRange.Value)
+            {
+                HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
+                    PerfectHit.Value,
+                    GreatHit.Value,
+                    GoodHit.Value,
+                    OkHit.Value,
+                    MehHit.Value,
+                    MissHit.Value
+                ));
+            }
+            else
+            {
+                HitWindows.ResetRange();
+            }
+        }
+
+        public override void ApplyToTrack(IAdjustableAudioComponent track)
+        {
+            rateAdjustHelper.ApplyToTrack(track);
+        }
+
+        public void ApplyToDrawableRuleset(DrawableRuleset<ManiaHitObject> drawableRuleset)
+        {
+            var maniaRuleset = (DrawableManiaRuleset)drawableRuleset;
+
+            if (ConstantSpeed.Value) maniaRuleset.VisualisationMethod = ScrollVisualisationMethod.Constant;
+
+            if (CustomRelease.Value)
+            {
+                foreach (var stage in maniaRuleset.Playfield.Stages)
+                {
+                    foreach (var column in stage.Columns) column.RegisterPool<AdjustTailNote, AdjustDrawableHoldNoteTail>(10, 50);
+                }
+            }
+        }
+
+        public void ApplyToBeatmap(IBeatmap beatmap)
+        {
+            var maniaBeatmap = (ManiaBeatmap)beatmap;
+
+            if (Test.Value)
+            {
+                var obj = maniaBeatmap;
+                var groups = obj.HitObjects.GroupBy(c => c.Column).OrderBy(c => c.Key);
+                // int note = obj.HitObjects.Select(h => h.GetEndTime() != h.StartTime).Count();
+                // int note = obj.HitObjects.Count - note;
+                foreach (var column in groups) Logger.Log($"Column {column.Key + 1}: {column.Count()} notes", level: LogLevel.Important);
+                //Logger.Log($"Test:\nThis beatmap has {obj.HitObjects.Count} HitObjects.\n", level: LogLevel.Important);
+            }
+
+            if (RandomSelect.Value)
+            {
+                Seed.Value ??= RNG.Next();
+                var rng = new Random((int)Seed.Value);
+
+                int availableColumns = maniaBeatmap.TotalColumns;
+                var shuffledColumns = Enumerable.Range(0, availableColumns).OrderBy(_ => rng.Next()).ToList();
+                beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = shuffledColumns[h.Column]);
+            }
+
+            if (Mirror.Value)
+            {
+                int availableColumns = maniaBeatmap.TotalColumns;
+                beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = availableColumns - 1 - h.Column);
+            }
+
+            if (RandomMirror.Value)
+            {
+                Seed.Value ??= RNG.Next();
+                var rng = new Random((int)Seed.Value);
+
+                if (rng.Next() % 2 == 0)
+                {
+                    int availableColumns = maniaBeatmap.TotalColumns;
+                    beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = availableColumns - 1 - h.Column);
+                }
+            }
+
+            if (TrueRandom.Value)
+            {
+                Seed.Value ??= RNG.Next();
+                var rng = new Random((int)Seed.Value);
+                int availableColumns = maniaBeatmap.TotalColumns;
+
+                foreach (var obj in beatmap.HitObjects.OfType<ManiaHitObject>().GroupBy(c => c.StartTime))
+                {
+                    var columnList = new List<int>();
+                    foreach (var hit in obj) columnList.Add(hit.Column);
+                    var newColumn = Enumerable.Range(0, availableColumns).SelectRandom(rng, columnList.Count).ToList();
+                    int index = 0;
+
+                    foreach (var hit in obj)
+                    {
+                        hit.Column = newColumn[index];
+                        index++;
+                    }
+                }
+            }
+        }
+
+        public bool PerformFail()
+        {
+            return !NoFail.Value;
+        }
+
+        public void ReadFromConfig(OsuConfigManager config)
+        {
+            config.BindWith(OsuSetting.ShowHealthDisplayWhenCantFail, showHealthBar);
+        }
+
+        public void ApplyToHUD(HUDOverlay overlay)
+        {
+            overlay.ShowHealthBar.BindTo(showHealthBar);
+        }
+
+        public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
+        {
+            triggerFailureDelegate = healthProcessor.TriggerFailure;
+        }
 
         public ScoreRank AdjustRank(ScoreRank rank, double accuracy)
         {
@@ -514,28 +492,10 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 
         public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
         {
-            // var mania = (ManiaScoreProcessor)scoreProcessor;
-
-            // if (CustomProportionScore.Value)
-            // {
-            //     mania.HitProportionScore.Perfect = Perfect.Value;
-            //     mania.HitProportionScore.Great = Great.Value;
-            //     mania.HitProportionScore.Good = Good.Value;
-            //     mania.HitProportionScore.Ok = Ok.Value;
-            //     mania.HitProportionScore.Meh = Meh.Value;
-            //     mania.HitProportionScore.Miss = Miss.Value;
-            // }
-
             combo.UnbindAll();
             accuracy.UnbindAll();
             combo.BindTo(scoreProcessor.Combo);
             accuracy.BindTo(scoreProcessor.Accuracy);
-        }
-
-        public override void ResetSettingsToDefaults()
-        {
-            base.ResetSettingsToDefaults();
-            HitWindows.ResetRange();
         }
 
         public void ApplyToBeatmapAfterConversion(IBeatmap beatmap)
@@ -556,6 +516,22 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
             }
         }
 
+        /// <summary>
+        /// Apply all custom settings to the provided beatmap.
+        /// </summary>
+        /// <param name="difficulty">The beatmap to have settings applied.</param>
+        protected void ApplySettings(BeatmapDifficulty difficulty)
+        {
+            if (DrainRate.Value != null && CustomHP.Value)
+                difficulty.DrainRate = DrainRate.Value.Value;
+
+            if (OverallDifficulty.Value != null && CustomOD.Value && !CustomHitRange.Value)
+            {
+                OriginalOD.Value = difficulty.OverallDifficulty;
+                difficulty.OverallDifficulty = OverallDifficulty.Value.Value;
+            }
+        }
+
         public partial class AdjustDrawableHoldNoteTail : DrawableHoldNoteTail
         {
             public static double ReleaseLenience;
@@ -568,13 +544,13 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 
         private class AdjustTailNote : TailNote
         {
-            public static double ReleaseLenience;
-
             public override double MaximumJudgementOffset => base.MaximumJudgementOffset / RELEASE_WINDOW_LENIENCE * ReleaseLenience;
+            public static double ReleaseLenience;
         }
 
         private class AdjustHoldNote : HoldNote
         {
+            public override double MaximumJudgementOffset => base.MaximumJudgementOffset / TailNote.RELEASE_WINDOW_LENIENCE * ReleaseLenience;
             public static double ReleaseLenience;
 
             public AdjustHoldNote(HoldNote hold)
@@ -607,8 +583,21 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
                     Column = Column
                 });
             }
+        }
 
-            public override double MaximumJudgementOffset => base.MaximumJudgementOffset / TailNote.RELEASE_WINDOW_LENIENCE * ReleaseLenience;
+        public override void ResetSettingsToDefaults()
+        {
+            base.ResetSettingsToDefaults();
+
+            CustomHitRange.UnbindAll();
+            PerfectHit.UnbindAll();
+            GreatHit.UnbindAll();
+            GoodHit.UnbindAll();
+            OkHit.UnbindAll();
+            MehHit.UnbindAll();
+            MissHit.UnbindAll();
+
+            HitWindows.ResetRange();
         }
 
         public static class AdjustStrings

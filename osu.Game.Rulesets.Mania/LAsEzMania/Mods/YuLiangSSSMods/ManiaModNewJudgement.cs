@@ -51,14 +51,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 
         public double BeatmapBPM;
 
-        public ManiaModNewJudgement()
-        {
-            Divide.BindValueChanged(_ =>
-            {
-                updateHitRanges();
-            });
-        }
-
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
             get
@@ -106,11 +98,19 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
             BeatmapBPM = beatmap.BeatmapInfo.BPM > 0
                 ? beatmap.BeatmapInfo.BPM
                 : 200;
+
+            // Bind value-changed after beatmap is applied to avoid modifying global
+            // HitWindows before the mod is actually in effect.
+            Divide.UnbindAll();
+            Divide.BindValueChanged(_ => updateHitRanges(), false);
+
+            updateHitRanges();
         }
 
         public override void ResetSettingsToDefaults()
         {
             base.ResetSettingsToDefaults();
+            Divide.UnbindAll();
             HitWindows.ResetRange();
         }
     }

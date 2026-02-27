@@ -5,16 +5,16 @@ using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
+using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 {
-    public class ManiaModJudgmentsAdjust : Mod, IApplicableToScoreProcessor
+    public class ManiaModJudgmentsAdjust : Mod, IApplicableToDifficulty
     {
         public override string Name => "Judgments Adjust";
 
@@ -46,17 +46,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
                     yield return ("Meh Range", $"{MehHit.Value:0.#}");
                     yield return ("Miss Range", $"{MissHit.Value:0.#}");
                 }
-
-                // if (CustomProportionScore.Value)
-                // {
-                //     yield return ("Custom Proportion Score", "On");
-                //     yield return ("Perfect Score", $"{Perfect.Value:0.#}");
-                //     yield return ("Great Score", $"{Great.Value:0.#}");
-                //     yield return ("Good Score", $"{Good.Value:0.#}");
-                //     yield return ("Ok Score", $"{Ok.Value:0.#}");
-                //     yield return ("Meh Score", $"{Meh.Value:0.#}");
-                //     yield return ("Miss Score", $"{Miss.Value:0.#}");
-                // }
             }
         }
 
@@ -164,7 +153,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
 
         public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
-        public ManiaModJudgmentsAdjust()
+        public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
             CustomHitRange.BindValueChanged(_ => updateCustomHitRange());
             PerfectHit.BindValueChanged(_ => updateCustomHitRange());
@@ -199,15 +188,19 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
             return rank;
         }
 
-        public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
+        public override void ResetSettingsToDefaults()
         {
-            // var mania = (ManiaScoreProcessor)scoreProcessor;
-            // mania.HitProportionScore.Perfect = Perfect.Value;
-            // mania.HitProportionScore.Great = Great.Value;
-            // mania.HitProportionScore.Good = Good.Value;
-            // mania.HitProportionScore.Ok = Ok.Value;
-            // mania.HitProportionScore.Meh = Meh.Value;
-            // mania.HitProportionScore.Miss = Miss.Value;
+            base.ResetSettingsToDefaults();
+
+            CustomHitRange.UnbindAll();
+            PerfectHit.UnbindAll();
+            GreatHit.UnbindAll();
+            GoodHit.UnbindAll();
+            OkHit.UnbindAll();
+            MehHit.UnbindAll();
+            MissHit.UnbindAll();
+
+            HitWindows.ResetRange();
         }
     }
 
