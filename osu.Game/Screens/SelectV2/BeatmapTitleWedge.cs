@@ -253,8 +253,8 @@ namespace osu.Game.Screens.SelectV2
             artistLink.Action = () => songSelect?.Search(artistText.GetPreferred(localisation.CurrentParameters.Value.PreferOriginalScript));
             DisplayedArtist = artistText.ToString();
 
-            updateLengthAndBpmStatistics();
             updateOnlineDisplay();
+            updateLengthAndBpmStatistics();
         }
 
         private CancellationTokenSource? lengthBpmCancellationSource;
@@ -294,16 +294,18 @@ namespace osu.Game.Screens.SelectV2
                         : LocalisableString.Interpolate($"{bpmMin}-{bpmMax} ({SongSelectStrings.MostlyBPM(mostCommonBPM)})");
 
                     // 计算并展示 KPS 折线（非阻塞，粗略采样）
-                    try
-                    {
-                        var (_, _, kpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
-                        kpsGraph.SetPoints(kpsList);
-                    }
-                    catch
-                    {
-                    }
+                    var (_, _, kpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
+                    kpsGraph.SetPoints(kpsList);
+                    updateKPSGraphSize();
                 });
             }, token);
+        }
+
+        private void updateKPSGraphSize()
+        {
+            float availableWidth = DrawWidth - playCount.DrawWidth - favouriteButton.DrawWidth - lengthStatistic.DrawWidth - bpmStatistic.DrawWidth - statisticsFlow.Spacing.X * 3 - SongSelect.WEDGE_CONTENT_MARGIN * 2;
+            kpsGraph.Width = availableWidth;
+            // Logger.Log($"[EzTest] T: {DrawWidth}, {playCount.DrawWidth}, {favouriteButton.DrawWidth}, {lengthStatistic.DrawWidth}, {bpmStatistic.DrawWidth}");
         }
 
         private CancellationTokenSource? onlineDisplayCancellationSource;
