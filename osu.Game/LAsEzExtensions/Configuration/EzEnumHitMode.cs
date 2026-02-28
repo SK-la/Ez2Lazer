@@ -16,19 +16,19 @@ namespace osu.Game.LAsEzExtensions.Configuration
         [Description("O2JAM Style")]
         O2Jam = 2,
 
-        [Description("IIDX Hard Style(Testing)")]
+        [Description("IIDX Hard Style")]
         IIDX_HD = 3,
 
-        [Description("LR2 Hard Style(Testing)")]
+        [Description("LR2 Hard Style")]
         LR2_HD = 4,
 
-        [Description("Raja Hard Style(Testing)")]
+        [Description("Raja Hard Style")]
         Raja_NM = 5,
 
-        [Description("/(NotAction)")]
+        [Description("")]
         Malody = 6,
 
-        [Description("/(NotAction)")]
+        [Description("")]
         Classic = 7,
     }
 }
