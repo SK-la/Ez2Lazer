@@ -26,6 +26,7 @@ using osu.Game.Overlays.Dialog;
 using osu.Game.Resources.Localisation.Web;
 using osuTK;
 using Realms;
+using CommonStrings = osu.Game.Resources.Localisation.Web.CommonStrings;
 
 namespace osu.Game.Collections
 {
@@ -348,14 +349,14 @@ namespace osu.Game.Collections
             {
                 Schedule(() => dialogOverlay?.Push(new SimplePopupDialog(
                     FontAwesome.Solid.Trash,
-                    "从收藏夹移除筛选结果",
-                    "收藏夹已包含所有筛选结果，是否从收藏夹中移除这些谱面？",
+                    EzSongSelectStrings.REMOVE_FROM_COLLECTION,
+                    EzSongSelectStrings.REMOVE_FROM_COLLECTION_TOOLTIP,
                     new PopupDialogButton[]
                     {
-                        new PopupDialogCancelButton { Text = "取消" },
+                        new PopupDialogCancelButton { Text = CommonStrings.ButtonsCancel },
                         new PopupDialogDangerousButton
                         {
-                            Text = "移除",
+                            Text = AccountsStrings.UserTotpButtonRemove,
                             Action = () => Task.Run(() => collection.PerformWrite(c =>
                             {
                                 foreach (string h in intersection)
@@ -375,14 +376,14 @@ namespace osu.Game.Collections
 
                 Schedule(() => dialogOverlay?.Push(new SimplePopupDialog(
                     FontAwesome.Solid.Question,
-                    "筛选结果与收藏夹部分重合",
-                    $"有 {intersection.Count} 个谱面已存在。请选择要执行的操作：",
+                    EzSongSelectStrings.PARTIALLY_OVERLAPPED,
+                    $"{intersection.Count}{EzSongSelectStrings.SELECT_ACTION_FOR_OVERLAP}",
                     new PopupDialogButton[]
                     {
-                        new PopupDialogCancelButton { Text = "取消" },
+                        new PopupDialogCancelButton { Text = CommonStrings.ButtonsCancel },
                         new PopupDialogOkButton
                         {
-                            Text = "添加剩余",
+                            Text = EzSongSelectStrings.ADD_DIFFERENCE,
                             Action = () =>
                             {
                                 if (toAdd.Count == 0) return;
@@ -399,7 +400,7 @@ namespace osu.Game.Collections
                         },
                         new PopupDialogDangerousButton
                         {
-                            Text = "移除重合",
+                            Text = EzSongSelectStrings.REMOVE_INTERSECTION,
                             Action = () => Task.Run(() => collection.PerformWrite(c =>
                             {
                                 foreach (string h in toRemove)
@@ -411,7 +412,6 @@ namespace osu.Game.Collections
                 return;
             }
 
-            // Case 3: no overlap -> add all results to the collection.
             Task.Run(() => collection.PerformWrite(c =>
             {
                 foreach (string hash in hashes)
