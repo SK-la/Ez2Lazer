@@ -2,12 +2,10 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Background;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
@@ -138,7 +136,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        public bool AllowPoorEnabled => GlobalConfigStore.EzConfig?.Get<bool>(Ez2Setting.CustomPoorHitResultBool) ?? false;
+        public bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.CustomPoorHitResultBool);
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -205,30 +203,30 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void setHitMode()
         {
-            EzMUGHitMode HitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+            EzEnumHitMode hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode);
 
-            if (HitMode == EzMUGHitMode.Lazer)
+            if (hitMode == EzEnumHitMode.Lazer)
             {
                 return;
             }
 
-            switch (HitMode)
+            switch (hitMode)
             {
-                case EzMUGHitMode.O2Jam:
+                case EzEnumHitMode.O2Jam:
                     modifyManiaHitRange(custom_helper.GetHitWindowsO2Jam(BPM));
                     break;
 
-                case EzMUGHitMode.EZ2AC:
+                case EzEnumHitMode.EZ2AC:
                     modifyManiaHitRange(custom_helper.GetHitWindowsEZ2AC());
                     break;
 
-                case EzMUGHitMode.IIDX_HD:
-                case EzMUGHitMode.LR2_HD:
-                case EzMUGHitMode.Raja_NM:
-                    modifyManiaHitRange(custom_helper.GetHitWindowsBMS(HitMode));
+                case EzEnumHitMode.IIDX_HD:
+                case EzEnumHitMode.LR2_HD:
+                case EzEnumHitMode.Raja_NM:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsBMS(hitMode));
                     break;
 
-                case EzMUGHitMode.Malody:
+                case EzEnumHitMode.Malody:
                     modifyManiaHitRange(custom_helper.GetHitWindowsMelody());
                     break;
             }

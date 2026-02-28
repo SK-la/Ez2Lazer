@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -9,21 +10,23 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
-using osu.Game.LAsEzExtensions;
-using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
+        private readonly IBindable<string> stageName = new Bindable<string>();
+        private readonly IBindable<double> hitPositonBindable = new BindableDouble();
+        private readonly Bindable<Vector2> noteSize = new Bindable<Vector2>();
+
         private Container sprite = null!;
         private TextureAnimation? upSprite;
         private TextureAnimation? downSprite;
@@ -48,8 +51,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        private Bindable<string> stageName = null!;
-        private Bindable<double> hitPositonBindable = null!;
+        private Action? noteSizeChangedHandler;
 
         private double bpm;
         private double beatInterval;
@@ -62,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             sprite = new Container
             {
@@ -75,8 +77,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             keyMode = stageDefinition.Columns;
             columnIndex = column.Index;
 
-            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            stageName.BindTo(ezSkinInfo.StageName);
+            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
+            column.NoteSizeBindable.BindTo(noteSize);
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm * 64;
@@ -104,16 +107,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             stageName.BindValueChanged(_ => loadAnimation(), true);
             hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
-            ezSkinConfig.OnNoteSizeChanged += OnConfigChanged;
+
+            // Subscribe to global Ez config changes.
+            noteSizeChangedHandler = OnConfigChanged;
+            ezSkinConfig.OnNoteSizeChanged += noteSizeChangedHandler;
         }
 
         protected virtual string KeySuffix
         {
             get
             {
-                var typeList = ezSkinConfig.GetColumnTypes(keyMode);
+                var type = ezSkinConfig.GetColumnTypeFast(keyMode, columnIndex);
 
-                switch (typeList[columnIndex])
+                switch (type)
                 {
                     case EzColumnType.A:
                         return "0";
@@ -156,13 +162,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
-            float actualPanelWidth = factory.GetNoteSize(keyMode, columnIndex, true).Value.X;
+            float actualPanelWidth = noteSize.Value.X;
             float baseWidth = 410f / keyMode;
-            float scale = actualPanelWidth / baseWidth;
+            float newScale = 2f * (actualPanelWidth / baseWidth);
+            float newY = 768f - (float)hitPositonBindable.Value + 2f;
 
-            sprite.Scale = new Vector2(2f, 2 * scale);
+            // 只在值实际改变时更新
+            if (MathF.Abs(sprite.Scale.X - newScale) > 0.001f)
+            {
+                sprite.Scale = new Vector2(newScale, newScale);
+            }
 
-            sprite.Y = 768f - (float)hitPositonBindable.Value + 2f;
+            if (MathF.Abs(sprite.Y - newY) > 0.001f)
+            {
+                sprite.Y = newY;
+            }
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
@@ -183,6 +197,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 upSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(1);
                 downSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
             }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                if (noteSizeChangedHandler != null)
+                    ezSkinConfig.OnNoteSizeChanged -= noteSizeChangedHandler;
+            }
+
+            base.Dispose(isDisposing);
         }
 
         private static readonly HashSet<string> free_size_stages = new HashSet<string>

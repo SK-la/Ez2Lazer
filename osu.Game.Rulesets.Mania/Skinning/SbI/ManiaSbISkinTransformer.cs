@@ -3,12 +3,9 @@
 
 using System.Linq;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
-using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -16,7 +13,6 @@ using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
-using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 
@@ -29,23 +25,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> hitPosition;
-        private readonly IBindable<double> virtualHitPosition;
 
         public ManiaSbISkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            if (GlobalConfigStore.EzConfig == null)
-            {
-                Logger.Log("!GlobalConfigStore.EzConfig SbISkin", LoggingTarget.Runtime, LogLevel.Important);
-            }
+            // if (GlobalConfigStore.EzConfig == null)
+            // {
+            //     Logger.Log("!GlobalConfigStore.EzConfig SbISkin", LoggingTarget.Runtime, LogLevel.Important);
+            // }
 
-            ezSkinConfig = GlobalConfigStore.EzConfig!;
+            ezSkinConfig = GlobalConfigStore.EzConfig;
             columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
             specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
             hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            virtualHitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.VisualHitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -159,8 +153,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         case ManiaSkinComponents.KeyArea:
                             return new SbIKeyArea();
 
-                            // case ManiaSkinComponents.HitExplosion:
-                            // return new SbIHitExplosion();
+                        // case ManiaSkinComponents.HitExplosion:
+                        // return new SbIHitExplosion();
                     }
 
                     break;
@@ -177,7 +171,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             {
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
-                bool isSpecialColumn = ezSkinConfig.IsSpecialColumn(stage.Columns, columnIndex);
+                bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(stage.Columns, columnIndex);
                 columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
 
                 switch (maniaLookup.Lookup)
@@ -186,20 +180,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
 
                     case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.LeftColumnSpacing:
                     case LegacyManiaSkinConfigurationLookups.RightColumnSpacing:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.StagePaddingBottom:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.StagePaddingTop:
-                        return SkinUtils.As<TValue>(new Bindable<float>(0));
+                        return SkinUtils.As<TValue>(new Bindable<float>());
 
                     case LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour:
 

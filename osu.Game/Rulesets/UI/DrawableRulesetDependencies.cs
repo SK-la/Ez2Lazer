@@ -16,12 +16,23 @@ using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Configuration;
 
 namespace osu.Game.Rulesets.UI
 {
     public class DrawableRulesetDependencies : DependencyContainer, IDisposable
     {
+        /// <summary>
+        /// Snapshot of global autoplay-related settings taken when the ruleset dependencies are created.
+        /// </summary>
+        public class AutoPlaySnapshot
+        {
+            public bool IsAutoPlayPlus { get; }
+
+            public AutoPlaySnapshot(bool isAutoPlayPlus) => IsAutoPlayPlus = isAutoPlayPlus;
+        }
+
         /// <summary>
         /// The texture store to be used for the ruleset.
         /// </summary>
@@ -73,6 +84,18 @@ namespace osu.Game.Rulesets.UI
             RulesetConfigManager = parent.Get<IRulesetConfigCache>().GetConfigFor(ruleset);
             if (RulesetConfigManager != null)
                 Cache(RulesetConfigManager);
+
+            // Cache a one-time autoplay snapshot based on Ez2ConfigManager if available.
+            try
+            {
+                var ez = parent.Get<Ez2ConfigManager>();
+                var mode = ez.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
+                Cache(new AutoPlaySnapshot(mode == KeySoundPreviewMode.AutoPlayPlus));
+            }
+            catch
+            {
+                // ez config not available; skip snapshot.
+            }
         }
 
         #region Disposal

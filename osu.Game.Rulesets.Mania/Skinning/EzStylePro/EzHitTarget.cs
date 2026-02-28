@@ -6,8 +6,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Screens;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -20,8 +18,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override string ColorPrefix => "white";
 
-        private Bindable<double> hitTargetFloatFixed = new Bindable<double>();
-        private Bindable<double> hitTargetAlpha = new Bindable<double>(0.3);
+        private IBindable<double> hitTargetFloatFixed = null!;
+        private IBindable<double> hitTargetAlpha = null!;
 
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
@@ -41,13 +39,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
-
-            Alpha = (float)hitTargetAlpha.Value;
-            hitTargetAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha);
-            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
-
-            hitTargetFloatFixed = EzSkinConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed);
-            hitTargetFloatFixed.BindValueChanged(_ => updatePosition());
         }
 
         private double beatInterval;
@@ -56,6 +47,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            hitTargetAlpha = Column.EzSkinInfo.HitTargetAlpha;
+            // use column-led notifications; set initial alpha
+            Alpha = (float)hitTargetAlpha.Value;
+
+            hitTargetFloatFixed = Column.EzSkinInfo.HitTargetFloatFixed;
+
             calculateBeatInterval();
             requiresUpdate = true;
         }

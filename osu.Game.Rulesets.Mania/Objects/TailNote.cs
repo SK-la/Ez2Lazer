@@ -1,11 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Judgements;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects
 {
@@ -23,12 +21,12 @@ namespace osu.Game.Rulesets.Mania.Objects
 
         public override Judgement CreateJudgement()
         {
-            var hitMode = GlobalConfigStore.EzConfig?.Get<EzMUGHitMode>(Ez2Setting.HitMode) ?? EzMUGHitMode.Lazer;
+            var hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode);
 
             switch (hitMode)
             {
-                case EzMUGHitMode.EZ2AC:
-                case EzMUGHitMode.Malody:
+                case EzEnumHitMode.EZ2AC:
+                case EzEnumHitMode.Malody:
                     return new HoldNoteBodyJudgement();
 
                 default:

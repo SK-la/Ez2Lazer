@@ -25,6 +25,8 @@ using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.Graphics.Containers;
 using osu.Game.IO.Archives;
+using osu.Game.LAsEzExtensions.Audio;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
@@ -36,7 +38,6 @@ using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Users;
 using osu.Game.Utils;
 using osuTK.Graphics;
@@ -105,6 +106,47 @@ namespace osu.Game.Screens.Play
 
         // 公开以供外部检查当前状态。
         public readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
+
+        [Cached]
+        public readonly GameplayBackdropSource BackdropSource = new GameplayBackdropSource();
+
+        public class GameplayBackdropSource
+        {
+            public Drawable BeatmapBackgroundSource { get; private set; }
+
+            public Drawable StoryboardSource { get; private set; }
+
+            public bool StoryboardPreferred { get; private set; }
+
+            public event Action SourcesChanged;
+
+            public void SetStoryboardSource(DimmableStoryboard source)
+            {
+                if (StoryboardSource == source)
+                    return;
+
+                StoryboardSource = source;
+                SourcesChanged?.Invoke();
+            }
+
+            public void SetBeatmapBackgroundSource(Drawable source)
+            {
+                if (BeatmapBackgroundSource == source)
+                    return;
+
+                BeatmapBackgroundSource = source;
+                SourcesChanged?.Invoke();
+            }
+
+            public void SetStoryboardPreferred(bool preferred)
+            {
+                if (StoryboardPreferred == preferred)
+                    return;
+
+                StoryboardPreferred = preferred;
+                SourcesChanged?.Invoke();
+            }
+        }
 
         public IBindable<bool> LocalUserPlaying => localUserPlaying;
 
@@ -217,6 +259,16 @@ namespace osu.Game.Screens.Play
             gameActive.BindValueChanged(_ => updatePauseOnFocusLostState(), true);
         }
 
+        protected override void Update()
+        {
+            base.Update();
+
+            if (DimmableStoryboard == null)
+                return;
+
+            BackdropSource.SetStoryboardPreferred(DimmableStoryboard.ContentDisplayed && !DimmableStoryboard.HasStoryboardEnded.Value);
+        }
+
         /// <summary>
         /// Run any recording / playback setup for replays.
         /// </summary>
@@ -266,17 +318,13 @@ namespace osu.Game.Screens.Play
             dependencies.CacheAs(ScoreProcessor);
 
             // Initialize InputAudioLatencyTracker if available in DI
-            try
+            if (GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.InputAudioLatencyTracker))
             {
                 var ezConfig = dependencies.Get<Ez2ConfigManager>();
-                var tracker = new osu.Game.LAsEzExtensions.Audio.InputAudioLatencyTracker(ezConfig);
+                var tracker = new InputAudioLatencyTracker(ezConfig);
                 dependencies.CacheAs(tracker);
                 tracker.Initialize(ScoreProcessor);
                 tracker.Start();
-            }
-            catch (Exception)
-            {
-                // Ez2ConfigManager not available or tracker initialization failed — skip silently.
             }
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
@@ -463,6 +511,10 @@ namespace osu.Game.Screens.Play
                     new KiaiGameplayFountains(),
                 },
             };
+
+            // Provide a stable background capture source for rulesets that require backdrop effects.
+            dependencies.CacheAs(DimmableStoryboard);
+            BackdropSource.SetStoryboardSource(DimmableStoryboard);
 
             return container;
         }
@@ -1135,6 +1187,8 @@ namespace osu.Game.Screens.Play
 
             ApplyToBackground(b =>
             {
+                BackdropSource.SetBeatmapBackgroundSource(b.CaptureSource);
+
                 b.IgnoreUserSettings.Value = false;
                 b.BlurAmount.Value = 0;
                 b.FadeColour(Color4.White, 250);

@@ -13,6 +13,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.IO.Stores;
 using osu.Framework.Localisation;
+using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
@@ -41,6 +42,8 @@ namespace osu.Game.Rulesets
         public RulesetInfo RulesetInfo { get; }
 
         private static readonly ConcurrentDictionary<string, IMod[]> mod_reference_cache = new ConcurrentDictionary<string, IMod[]>();
+
+        private Mod[]? cachedAllMods;
 
         /// <summary>
         /// Version history:
@@ -86,15 +89,22 @@ namespace osu.Game.Rulesets
         /// This comes with considerable allocation overhead. If only accessing for reference purposes (ie. not changing bindables / settings)
         /// use <see cref="AllMods"/> instead.
         /// </remarks>
-        public IEnumerable<Mod> CreateAllMods() => Enum.GetValues<ModType>()
-                                                       // Confine all mods of each mod type into a single IEnumerable<Mod>
-                                                       .SelectMany(GetModsFor)
-                                                       // Filter out all null mods
-                                                       // This is to handle old rulesets which were doing mods bad. Can be removed at some point we are sure nulls will not appear here.
-                                                       // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-                                                       .Where(mod => mod != null)
-                                                       // Resolve MultiMods as their .Mods property
-                                                       .SelectMany(mod => (mod as MultiMod)?.Mods ?? new[] { mod });
+        public IEnumerable<Mod> CreateAllMods()
+        {
+            if (cachedAllMods != null)
+                return cachedAllMods;
+
+            return cachedAllMods = Enum.GetValues<ModType>()
+                                          // Confine all mods of each mod type into a single IEnumerable<Mod>
+                                          .SelectMany(GetModsFor)
+                                          // Filter out all null mods
+                                          // This is to handle old rulesets which were doing mods bad. Can be removed at some point we are sure nulls will not appear here.
+                                          // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                          .Where(mod => mod != null)
+                                          // Resolve MultiMods as their .Mods property
+                                          .SelectMany(mod => (mod as MultiMod)?.Mods ?? new[] { mod })
+                                          .ToArray();
+        }
 
         /// <summary>
         /// Returns a fresh instance of the mod matching the specified acronym.
@@ -334,13 +344,17 @@ namespace osu.Game.Rulesets
         public virtual StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => Array.Empty<StatisticItem>();
 
         /// <summary>
-        /// Get all valid <see cref="HitResult"/>s for this ruleset.
-        /// Generally used for results display purposes, where it can't be determined if zero-count means the user has not achieved any or the type is not used by this ruleset.
+        /// Get all <see cref="HitResult"/>s for this ruleset which are important enough to displayed to the end user.
+        /// Used for results display purposes, where it can't be determined if zero-count means the user has not achieved any or the type is not used by this ruleset.
         /// </summary>
+        /// <remarks>
+        /// <see cref="HitResult.Miss"/> is implicitly included. Special types like <see cref="HitResult.IgnoreHit"/> are not returned by this method.
+        /// Values are returned as ordered by <see cref="OrderAttribute"/>.
+        /// </remarks>
         /// <returns>
-        /// All valid <see cref="HitResult"/>s along with a display-friendly name.
+        /// All relevant <see cref="HitResult"/>s along with a display-friendly name.
         /// </returns>
-        public IEnumerable<(HitResult result, LocalisableString displayName)> GetHitResults()
+        public IEnumerable<(HitResult result, LocalisableString displayName)> GetHitResultsForDisplay()
         {
             var validResults = GetValidHitResults();
 
@@ -353,6 +367,7 @@ namespace osu.Game.Rulesets
                     case HitResult.None:
                     case HitResult.IgnoreHit:
                     case HitResult.IgnoreMiss:
+                    case HitResult.ComboBreak:
                     // display is handled as a completion count with corresponding "hit" type.
                     case HitResult.LargeTickMiss:
                     case HitResult.SmallTickMiss:
@@ -366,12 +381,10 @@ namespace osu.Game.Rulesets
 
         /// <summary>
         /// Get all valid <see cref="HitResult"/>s for this ruleset.
-        /// Generally used for results display purposes, where it can't be determined if zero-count means the user has not achieved any or the type is not used by this ruleset.
+        /// Used for strict validation purposes. The ruleset should return ALL applicable <see cref="HitResult"/> types here
+        /// (except <see cref="HitResult.None"/> and obsolete types).
         /// </summary>
-        /// <remarks>
-        /// <see cref="HitResult.Miss"/> is implicitly included. Special types like <see cref="HitResult.IgnoreHit"/> are ignored even when specified.
-        /// </remarks>
-        protected virtual IEnumerable<HitResult> GetValidHitResults() => EnumExtensions.GetValuesInOrder<HitResult>();
+        public virtual IEnumerable<HitResult> GetValidHitResults() => EnumExtensions.GetValuesInOrder<HitResult>();
 
         /// <summary>
         /// Get a display friendly name for the specified result type.

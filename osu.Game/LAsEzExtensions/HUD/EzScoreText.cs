@@ -8,7 +8,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Skinning.Components;
 using osuTK;
 
 namespace osu.Game.LAsEzExtensions.HUD

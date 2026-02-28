@@ -1,15 +1,14 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.Collections.Generic;
-using System.Linq;
+using System.Reflection;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Lines;
-using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Shaders;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.UserInterface;
 using osuTK.Graphics;
@@ -86,7 +85,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         private void load(ShaderManager shaders)
         {
             // Modify the path's shader to use TriangleBorder for the triangle effect
-            var pathField = typeof(LineGraph).GetField("path", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var pathField = typeof(LineGraph).GetField("path", BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (pathField != null)
             {
@@ -106,7 +105,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
                         triangleBorderPath.AddVertex(vertex);
 
                     // Replace in the masking container
-                    var maskingContainerField = typeof(LineGraph).GetField("maskingContainer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    var maskingContainerField = typeof(LineGraph).GetField("maskingContainer", BindingFlags.NonPublic | BindingFlags.Instance);
 
                     if (maskingContainerField != null)
                     {
@@ -136,7 +135,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         private void load(ShaderManager shaders)
         {
             // Use reflection to set the TriangleBorder shader
-            var shaderField = typeof(Path).GetField("TextureShader", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var shaderField = typeof(Path).GetField("TextureShader", BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (shaderField != null)
             {

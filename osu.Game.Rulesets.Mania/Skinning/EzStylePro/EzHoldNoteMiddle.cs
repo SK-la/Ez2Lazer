@@ -5,35 +5,36 @@ using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
-using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Screens;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
     {
-        private readonly IBindable<bool> isHitting = new Bindable<bool>();
-        private DrawableHoldNote holdNote = null!;
+        private IBindable<bool> isHitting = null!;
+        private IBindable<double> tailAlpha = null!;
+        private IBindable<double> tailMaskHeight = null!;
 
         private Container? topContainer;
         private Container? bodyContainer;
         private Container? bodyScaleContainer;
         private Container? bodyInnerContainer;
 
-        private Bindable<double> tailAlpha = null!;
-        private Bindable<double> tailMaskHeight = new Bindable<double>();
-        private IBindable<double> hitPosition = new Bindable<double>();
-        private EzHoldNoteHittingLayer? hittingLayer;
+        private DrawableHoldNote holdNote = null!;
         private Drawable? lightContainer;
+        private EzHoldNoteHittingLayer? hittingLayer;
 
         private float tailHeight;
+
+        private float lastBodyContainerHeight = float.NaN;
+        private float lastBodyScaleY = float.NaN;
+        private float lastTopContainerY = float.NaN;
 
         public EzHoldNoteMiddle()
         {
@@ -44,20 +45,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load(DrawableHitObject drawableObject)
         {
             holdNote = (DrawableHoldNote)drawableObject;
-            isHitting.BindTo(holdNote.IsHolding);
-
-            hitPosition = EzSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            tailMaskHeight = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
-            tailAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
+            isHitting = holdNote.IsHolding;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            tailMaskHeight = Column.EzSkinInfo.HoldTailMaskHeight;
+            tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
+
             isHitting.BindValueChanged(onIsHittingChanged, true);
 
-            tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
-            tailAlpha.BindValueChanged(_ => UpdateSize(), true);
+            // Column will notify notes about EzSkinInfo-driven size changes via NoteSizeChanged; avoid per-note BindValueChanged
+            // ensure initial size/state matches current config
+            UpdateSize();
             // 确保光效层被正确初始化
             if (lightContainer == null)
                 OnLightChanged();
@@ -74,8 +76,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             hittingLayer = new EzHoldNoteHittingLayer
             {
-                Alpha = 0,
-                IsHitting = { BindTarget = isHitting }
+                Alpha = 0
             };
 
             lightContainer = new HitTargetInsetContainer
@@ -85,7 +86,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Child = hittingLayer
             };
 
-            hittingLayer.HitPosition.BindTo(hitPosition);
+            if (isHitting != null)
+                ((IBindable<bool>)hittingLayer.IsHitting).BindTo(isHitting);
         }
 
         private void onIsHittingChanged(ValueChangedEvent<bool> isHitting)
@@ -190,6 +192,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // 重新初始化光效层
             OnLightChanged();
 
+            resetLayoutCache();
             Schedule(UpdateSize);
         }
 
@@ -216,23 +219,65 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // TODO: V3版应该增加一个顶部Dot标识，以免常规图无法分辨正确的面尾
         }
 
+        protected override void UpdateColor()
+        {
+            if (topContainer != null)
+            {
+                topContainer.Colour = ColourInfo.GradientVertical(
+                    NoteColor.Opacity((float)tailAlpha.Value),
+                    NoteColor);
+            }
+
+            if (bodyContainer != null)
+                bodyContainer.Colour = NoteColor;
+        }
+
         protected override void Update()
         {
             base.Update();
 
             if (MainContainer?.Children.Count > 0 && bodyContainer != null && tailHeight > 0)
             {
+                float targetTopY = tailMaskHeight.Value > 0
+                    ? (float)tailMaskHeight.Value
+                    : 0;
+
+                if (topContainer != null && layoutChanged(lastTopContainerY, targetTopY))
+                {
+                    topContainer.Y = targetTopY;
+                    lastTopContainerY = targetTopY;
+                }
+
                 float drawHeightMinusHalf = DrawHeight - tailHeight;
                 float middleHeight = Math.Max(drawHeightMinusHalf, tailHeight);
 
-                bodyContainer.Height = tailMaskHeight.Value > 0
+                float targetBodyHeight = tailMaskHeight.Value > 0
                     ? middleHeight - (float)tailMaskHeight.Value + 1
                     : middleHeight + 2;
 
-                if (bodyScaleContainer != null)
+                if (layoutChanged(lastBodyContainerHeight, targetBodyHeight))
+                {
+                    bodyContainer.Height = targetBodyHeight;
+                    lastBodyContainerHeight = targetBodyHeight;
+                }
+
+                if (bodyScaleContainer != null && layoutChanged(lastBodyScaleY, drawHeightMinusHalf))
+                {
                     bodyScaleContainer.Scale = new Vector2(1, drawHeightMinusHalf);
+                    lastBodyScaleY = drawHeightMinusHalf;
+                }
             }
         }
+
+        private void resetLayoutCache()
+        {
+            lastBodyContainerHeight = float.NaN;
+            lastBodyScaleY = float.NaN;
+            lastTopContainerY = float.NaN;
+        }
+
+        private static bool layoutChanged(float oldValue, float newValue)
+            => float.IsNaN(oldValue) || MathF.Abs(oldValue - newValue) > 0.001f;
 
         protected override void Dispose(bool isDisposing)
         {

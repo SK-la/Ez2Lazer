@@ -1,11 +1,11 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
-using osu.Game.Rulesets.Scoring;
-using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
@@ -176,7 +176,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             }
         }
 
-        private System.Func<DrawableHitObject, double, bool>? originalCheckHittable;
+        private Func<DrawableHitObject, double, bool>? originalCheckHittable;
 
         protected override void Update()
         {

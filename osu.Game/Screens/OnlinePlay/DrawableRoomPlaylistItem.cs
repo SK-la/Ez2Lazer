@@ -26,6 +26,7 @@ using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
 using osu.Game.Online.Rooms;
@@ -37,7 +38,7 @@ using osu.Game.Screens.Play.HUD;
 using osu.Game.Users.Drawables;
 using osuTK;
 using osuTK.Graphics;
-using osu.Game.Localisation;
+using CommonStrings = osu.Game.Resources.Localisation.Web.CommonStrings;
 
 namespace osu.Game.Screens.OnlinePlay
 {
@@ -560,7 +561,7 @@ namespace osu.Game.Screens.OnlinePlay
                 Size = new Vector2(30, 30),
                 Alpha = AllowEditing ? 1 : 0,
                 Action = () => RequestEdit?.Invoke(Item),
-                TooltipText = Resources.Localisation.Web.CommonStrings.ButtonsEdit
+                TooltipText = CommonStrings.ButtonsEdit
             },
             removeButton = new PlaylistRemoveButton
             {

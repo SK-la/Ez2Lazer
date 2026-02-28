@@ -23,10 +23,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         public const float NOTE_ACCENT_RATIO = 1f;
         public const float CORNER_RADIUS = 0;
 
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly IBindable<Color4> accentColour = new Bindable<Color4>();
+        private IBindable<ScrollingDirection> direction = null!;
+        private IBindable<Color4> accentColour = null!;
 
         private readonly Circle colouredBox;
+        private readonly Drawable iconContainer;
 
         public Ez2NotePiece()
         {
@@ -34,6 +35,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
             CornerRadius = CORNER_RADIUS;
             // Masking = true;
+
+            iconContainer = CreateIcon();
 
             InternalChildren = new[]
             {
@@ -83,7 +86,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                     RelativeSizeAxes = Axes.X,
                     Height = 0,
                 },
-                CreateIcon(),
+                iconContainer,
             };
         }
 
@@ -99,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             // NoteHeight = (float)config.Get<double>(ManiaRulesetSetting.ColumnWidth);
             // specialFactor = (float)config.Get<double>(ManiaRulesetSetting.SpecialFactor);
 
-            CreateIcon().Size = new Vector2(DrawWidth / NoteHeight * 0.7f);
+            iconContainer.Size = new Vector2(DrawWidth / NoteHeight * 0.7f);
         }
 
         protected virtual Drawable CreateIcon() => new Container
@@ -139,12 +142,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader(true)]
         private void load(IScrollingInfo scrollingInfo, DrawableHitObject? drawableObject)
         {
-            direction.BindTo(scrollingInfo.Direction);
+            direction = scrollingInfo.Direction;
             direction.BindValueChanged(onDirectionChanged, true);
 
             if (drawableObject != null)
             {
-                accentColour.BindTo(drawableObject.AccentColour);
+                accentColour = drawableObject.AccentColour;
                 accentColour.BindValueChanged(onAccentChanged, true);
             }
         }

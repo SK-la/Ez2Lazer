@@ -9,12 +9,12 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.LAsEzMania.Localization;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania
@@ -25,6 +25,9 @@ namespace osu.Game.Rulesets.Mania
         protected Bindable<double> BaseSpeedBindable = null!;
         protected Bindable<double> TimePerSpeedBindable = null!;
         protected Bindable<double> SpeedBindable = null!;
+        protected Bindable<EzEnumHealthMode> CustomHealthModeBindable = null!;
+
+        private SettingsItemV2 poorHitResultCheckBox = null!;
 
         public ManiaSettingsSubsection(ManiaRuleset ruleset)
             : base(ruleset)
@@ -39,31 +42,32 @@ namespace osu.Game.Rulesets.Mania
             BaseSpeedBindable = config.GetBindable<double>(ManiaRulesetSetting.ScrollBaseSpeed);
             TimePerSpeedBindable = config.GetBindable<double>(ManiaRulesetSetting.ScrollTimePerSpeed);
             SpeedBindable = config.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed);
+            CustomHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.CustomHealthMode);
 
             Children = new Drawable[]
             {
-                new SettingsItemV2(new FormEnumDropdown<EzMUGHitMode>
+                new SettingsItemV2(new FormEnumDropdown<EzEnumHitMode>
                 {
-                    Caption = EzLocalizationManager.HitMode,
-                    HintText = EzLocalizationManager.HitModeTooltip,
-                    Current = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode),
+                    Caption = EzManiaSettingsStrings.HIT_MODE,
+                    HintText = EzManiaSettingsStrings.HIT_MODE_TOOLTIP,
+                    Current = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode),
                 })
                 {
                     Keywords = new[] { "mania" }
                 },
-                new SettingsItemV2(new FormEnumDropdown<EnumHealthMode>
+                new SettingsItemV2(new FormEnumDropdown<EzEnumHealthMode>
                 {
-                    Caption = EzLocalizationManager.HealthMode,
-                    HintText = EzLocalizationManager.HealthModeTooltip,
-                    Current = ezConfig.GetBindable<EnumHealthMode>(Ez2Setting.CustomHealthMode),
+                    Caption = EzManiaSettingsStrings.HEALTH_MODE,
+                    HintText = EzManiaSettingsStrings.HEALTH_MODE_TOOLTIP,
+                    Current = CustomHealthModeBindable,
                 })
                 {
                     Keywords = new[] { "mania" }
                 },
-                new SettingsItemV2(new FormCheckBox
+                poorHitResultCheckBox = new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzLocalizationManager.PoorHitResult,
-                    HintText = EzLocalizationManager.PoorHitResultTooltip,
+                    Caption = EzManiaSettingsStrings.POOR_HIT_RESULT,
+                    HintText = EzManiaSettingsStrings.POOR_HIT_RESULT_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResultBool),
                 })
                 {
@@ -71,8 +75,8 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzLocalizationManager.ManiaBarLinesBool,
-                    HintText = EzLocalizationManager.ManiaBarLinesBoolTooltip,
+                    Caption = EzManiaSettingsStrings.MANIA_BAR_LINES_BOOL,
+                    HintText = EzManiaSettingsStrings.MANIA_BAR_LINES_BOOL_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool),
                 })
                 {
@@ -87,7 +91,8 @@ namespace osu.Game.Rulesets.Mania
 
                 new SettingsItemV2(new FormEnumDropdown<EzManiaScrollingStyle>
                 {
-                    Caption = "Scrolling style",
+                    Caption = EzManiaSettingsStrings.SCROLLING_STYLE,
+                    HintText = EzManiaSettingsStrings.SCROLLING_STYLE_TOOLTIP,
                     Current = config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle)
                 })
                 {
@@ -109,7 +114,8 @@ namespace osu.Game.Rulesets.Mania
 
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "Scroll Base MS (when 200 Speed)",
+                    Caption = EzManiaSettingsStrings.SCROLL_BASE_SPEED,
+                    HintText = EzManiaSettingsStrings.SCROLL_BASE_SPEED_TOOLTIP,
                     Current = BaseSpeedBindable,
                     KeyboardStep = 1,
                     LabelFormat = v =>
@@ -124,7 +130,8 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "MS / Speed",
+                    Caption = EzManiaSettingsStrings.SCROLL_TIME_PER_SPEED,
+                    HintText = EzManiaSettingsStrings.SCROLL_TIME_PER_SPEED_TOOLTIP,
                     Current = TimePerSpeedBindable,
                     KeyboardStep = 1,
                     LabelFormat = v =>
@@ -165,6 +172,22 @@ namespace osu.Game.Rulesets.Mania
 #pragma warning restore CS0618 // Type or member is obsolete
                 }));
             }
+
+            CustomHealthModeBindable.BindValueChanged(e =>
+            {
+                switch (e.NewValue)
+                {
+                    case EzEnumHealthMode.IIDX_HD:
+                    case EzEnumHealthMode.LR2_HD:
+                    case EzEnumHealthMode.Raja_NM:
+                        poorHitResultCheckBox.Show();
+                        break;
+
+                    default:
+                        poorHitResultCheckBox.Hide();
+                        break;
+                }
+            }, true);
         }
     }
 }

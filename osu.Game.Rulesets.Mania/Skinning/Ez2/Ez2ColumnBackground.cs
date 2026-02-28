@@ -14,31 +14,26 @@ using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     public partial class Ez2ColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private readonly Bindable<float> overlayHeight = new Bindable<float>();
-        private Bindable<double> hitPosition = new Bindable<double>();
+        private readonly IBindable<double> hitPosition = new Bindable<double>();
         private Color4 brightColour;
         private Color4 dimColour;
 
         private Box background = null!;
         private Box backgroundOverlay = null!;
         private Box separator = new Box();
-        private Bindable<Color4> accentColour = null!;
+        private IBindable<Color4> accentColour = null!;
 
         [Resolved]
         private Column column { get; set; } = null!;
 
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
-        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         public Ez2ColumnBackground()
         {
@@ -49,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             InternalChild = new Container
             {
@@ -83,9 +78,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             };
             column.TopLevelContainer.Add(separator);
 
-            overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
-
-            accentColour = new Bindable<Color4>(DrawColoursForColumns(column.Index, stageDefinition));
+            accentColour = column.AccentColour;
             accentColour.BindValueChanged(colour =>
             {
                 var newColour = colour.NewValue.Darken(3);
@@ -100,28 +93,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 brightColour = colour.NewValue.Opacity(0.6f);
                 dimColour = colour.NewValue.Opacity(0);
             }, true);
-        }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            hitPosition.BindTo(ezSkinInfo.HitPosition);
             hitPosition.BindValueChanged(_ => OnConfigChanged(), true);
         }
 
         private void OnConfigChanged()
         {
             separator.Height = DrawHeight - (float)hitPosition.Value;
-
-            if (drawSeparator(column.Index, stageDefinition))
-            {
-                separator.Alpha = 0.2f;
-            }
-            else
-            {
-                separator.Alpha = 0;
-            }
+            separator.Alpha = stageDefinition.HasSeparator(column.Index)
+                ? 0.2f
+                : 0;
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
@@ -133,8 +115,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 dimColour = noteColour.Opacity(0);
 
                 backgroundOverlay.Colour = ColourInfo.GradientVertical(dimColour, brightColour);
-
-                overlayHeight.Value = 0.5f;
+                backgroundOverlay.Height = 0.5f;
 
                 backgroundOverlay.FadeTo(1, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
             }
@@ -151,18 +132,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         public static Color4 DrawColoursForColumns(int columnIndex, StageDefinition stage)
         {
             return stage.EzGetColumnColor(columnIndex);
-        }
-
-        //TODO: 这里的逻辑可以优化，避免重复计算
-        private bool drawSeparator(int columnIndex, StageDefinition stage)
-        {
-            return stage.Columns switch
-            {
-                12 => columnIndex is 0 or 10,
-                14 => columnIndex is 0 or 5 or 6 or 11,
-                16 => columnIndex is 0 or 5 or 9 or 14,
-                _ => false
-            };
         }
     }
 }

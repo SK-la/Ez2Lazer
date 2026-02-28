@@ -11,7 +11,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Threading;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Screens.Edit;
+using osu.Game.LAsEzExtensions.Edit;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Edit.Components.Timelines.Summary.Parts;

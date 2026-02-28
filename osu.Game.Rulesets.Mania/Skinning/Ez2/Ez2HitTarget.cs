@@ -14,7 +14,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     internal partial class Ez2HitTarget : Ez2NotePiece
     {
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
+        private IBindable<ScrollingDirection> direction = null!;
 
         private double bpm;
 
@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             Blending = BlendingParameters.Mixture;
             Colour = Color4.Gray;
 
-            direction.BindTo(scrollingInfo.Direction);
+            direction = scrollingInfo.Direction;
             direction.BindValueChanged(onDirectionChanged, true);
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();

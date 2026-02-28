@@ -35,7 +35,7 @@ namespace osu.Game.Storyboards.Drawables
 
         protected override Container<DrawableStoryboardLayer> Content { get; }
 
-        protected override Vector2 DrawScale => new Vector2((Parent?.DrawHeight ?? 0) / 480);
+        protected override Vector2 DrawScale => onlyHasVideoElements ? Vector2.One : new Vector2((Parent?.DrawHeight ?? 0) / 480);
 
         public override bool RemoveCompletedTransforms => false;
 
@@ -55,6 +55,8 @@ namespace osu.Game.Storyboards.Drawables
         private BindableNumber<double> health = null!;
         private readonly BindableBool passing = new BindableBool(true);
 
+        private readonly bool onlyHasVideoElements;
+
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent) =>
             dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
 
@@ -63,12 +65,21 @@ namespace osu.Game.Storyboards.Drawables
             Storyboard = storyboard;
             Mods = mods ?? Array.Empty<Mod>();
 
-            bool onlyHasVideoElements = Storyboard.Layers.SelectMany(l => l.Elements).All(e => e is StoryboardVideo);
+            var drawableElements = Storyboard.Layers
+                                             .SelectMany(l => l.Elements)
+                                             .Where(e => e.IsDrawable)
+                                             .ToList();
 
-            if (!onlyHasVideoElements)
+            onlyHasVideoElements = drawableElements.Count > 0 && drawableElements.All(e => e is StoryboardVideo);
+
+            if (onlyHasVideoElements)
+            {
+                RelativeSizeAxes = Axes.Both;
+                Size = Vector2.One;
+            }
+            else
             {
                 Size = new Vector2(640, 480);
-                // TODO:考虑更多比例的适配
                 Width = Height * (storyboard.Beatmap.WidescreenStoryboard ? 16 / 9f : 4 / 3f);
             }
 
@@ -109,31 +120,6 @@ namespace osu.Game.Storyboards.Drawables
         protected override void LoadComplete()
         {
             base.LoadComplete();
-
-            if (Storyboard.Layers.SelectMany(l => l.Elements).FirstOrDefault() is StoryboardVideo videoElement)
-            {
-                if (videoElement.CreateDrawable() is DrawableStoryboardVideo drawableVideo)
-                {
-                    Schedule(() =>
-                    {
-                        if (Parent != null)
-                        {
-                            float videoAspectRatio = drawableVideo.DrawSize.X / drawableVideo.DrawSize.Y;
-
-                            if (videoAspectRatio < 1.5f)
-                            {
-                                RelativeSizeAxes = Axes.X;
-                                Width = 1f / DrawScale.X;
-                            }
-                            else
-                            {
-                                RelativeSizeAxes = Axes.Y;
-                                Height = 1f / DrawScale.Y;
-                            }
-                        }
-                    });
-                }
-            }
 
             health.BindValueChanged(val => passing.Value = val.NewValue >= 0.5, true);
             passing.BindValueChanged(_ => updateLayerVisibility(), true);

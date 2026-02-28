@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Threading;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ListExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -26,6 +27,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
+using osu.Game.LAsEzExtensions.Configuration;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Objects.Drawables
@@ -156,6 +158,18 @@ namespace osu.Game.Rulesets.Objects.Drawables
         [Resolved(CanBeNull = true)]
         private IPooledHitObjectProvider pooledObjectProvider { get; set; }
 
+        [Resolved(CanBeNull = true)]
+        private DrawableRuleset drawableRuleset { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private DrawableRulesetDependencies.AutoPlaySnapshot autoPlaySnapshot { get; set; }
+
+        private IBindable<double> offsetBindable;
+
+        // cached config for autoplay behaviour
+        private Ez2ConfigManager ezConfig;
+        private ScheduledDelegate autoplayDelegate;
+
         /// <summary>
         /// Whether the initialization logic in <see cref="Playfield" /> has applied.
         /// </summary>
@@ -197,7 +211,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
         }
 
         [BackgroundDependencyLoader]
-        private void load(IGameplaySettings gameplaySettings, ISkinSource skinSource)
+        private void load(IGameplaySettings gameplaySettings, ISkinSource skinSource, Ez2ConfigManager ezConfig)
         {
             positionalHitsoundsLevel.BindTo(gameplaySettings.PositionalHitsoundsLevel);
             comboColourBrightness.BindTo(gameplaySettings.ComboColourNormalisationAmount);
@@ -210,6 +224,19 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             CurrentSkin = skinSource;
             CurrentSkin.SourceChanged += skinSourceChanged;
+
+            // cache config reference for autoplay scheduling
+            this.ezConfig = ezConfig;
+
+            // Choose the appropriate offset bindable once during load to avoid runtime reflection/namespace checks.
+            if (ezConfig != null && drawableRuleset != null)
+            {
+                int onlineId = drawableRuleset.Ruleset.RulesetInfo.OnlineID;
+                if (onlineId == 3) // Mania legacy ruleset id
+                    offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+                else
+                    offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+            }
         }
 
         protected override void LoadAsyncComplete()
@@ -313,6 +340,38 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 // Update here to ensure we're in a good state.
                 UpdateComboColour();
             }
+
+            // Schedule one-shot autoplay of this object's samples when configured to do so.
+            try
+            {
+                bool isAutoPlayPlus = autoPlaySnapshot?.IsAutoPlayPlus ?? (ezConfig != null && ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) == KeySoundPreviewMode.AutoPlayPlus);
+
+                if (isAutoPlayPlus)
+                {
+                    autoplayDelegate?.Cancel();
+
+                    double delay = HitObject.StartTime - Time.Current;
+                    if (delay < 0) delay = 0;
+
+                    autoplayDelegate = Scheduler.AddDelayed(() =>
+                    {
+                        if (Judged) return;
+
+                        // Ensure samples are loaded before attempting to play them.
+                        if (!samplesLoaded)
+                        {
+                            samplesLoaded = true;
+                            LoadSamples();
+                        }
+
+                        PlaySamples();
+                    }, delay);
+                }
+            }
+            catch
+            {
+                // be defensive; don't let scheduling failures affect hitobject application
+            }
         }
 
         private void updateStateFromResult()
@@ -338,6 +397,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
             }
 
             samplesBindable.UnbindFrom(HitObject.SamplesBindable);
+
+            // cancel any pending autoplay scheduling
+            autoplayDelegate?.Cancel();
 
             // Release the samples for other hitobjects to use.
             samplesLoaded = false;
@@ -739,6 +801,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
             Result.RawTime = Time.Current;
             Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
+            // cancel any pending autoplay since this object is being judged
+            autoplayDelegate?.Cancel();
+
             if (Result.HasResult)
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
 
@@ -800,7 +865,12 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (Judged)
                 return false;
 
-            CheckForResult(userTriggered, Time.Current - HitObject.GetEndTime());
+            double timeOffset = Time.Current - HitObject.GetEndTime();
+
+            if (offsetBindable != null)
+                timeOffset += offsetBindable.Value;
+
+            CheckForResult(userTriggered, timeOffset);
 
             return Judged;
         }

@@ -7,20 +7,16 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     public partial class SbIHoldBodyPiece : EzNoteBase, IHoldNoteBody
     {
-        private readonly Bindable<Color4> accentColour = new Bindable<Color4>();
-        private Bindable<double> tailMaskHeight = new Bindable<double>();
+        private IBindable<double> tailMaskHeight = null!;
 
         private Container? topContainer;
         private Container? bodyContainer;
@@ -50,17 +46,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     },
                 };
             }
+        }
 
-            if (drawableObject != null)
-            {
-                var holdNote = (DrawableHoldNote)drawableObject;
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
 
-                accentColour.BindTo(holdNote.AccentColour);
-                // hittingLayer.AccentColour.BindTo(holdNote.AccentColour);
-                // ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHitting);
-            }
-
-            tailMaskHeight = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
+            tailMaskHeight = Column.EzSkinInfo.HoldTailMaskHeight;
             tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
         }
 

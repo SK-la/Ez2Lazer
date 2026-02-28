@@ -42,6 +42,17 @@ namespace osu.Game.Rulesets.Mania.LAsEZMania
             };
         }
 
+        public static bool HasSeparator(this StageDefinition stage, int columnIndex)
+        {
+            return stage.Columns switch
+            {
+                12 => columnIndex is 0 or 10,
+                14 => columnIndex is 0 or 5 or 6 or 11,
+                16 => columnIndex is 0 or 5 or 9 or 14,
+                _ => false
+            };
+        }
+
         private static readonly Color4 colour_column = new Color4(4, 4, 4, 255);
         private static readonly Color4 colour_scratch = new Color4(20, 0, 0, 255);
         private static readonly Color4 colour_panel = new Color4(0, 20, 0, 255);

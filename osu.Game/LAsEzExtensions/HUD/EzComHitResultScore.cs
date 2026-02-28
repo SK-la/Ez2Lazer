@@ -17,7 +17,6 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning;
-using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 

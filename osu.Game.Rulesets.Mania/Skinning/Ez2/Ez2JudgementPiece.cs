@@ -13,7 +13,7 @@ using osu.Framework.Utils;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.LAsEzMania.HUD;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 using osuTK.Graphics;

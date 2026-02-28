@@ -4,6 +4,8 @@
 using System;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Online;
 
 namespace osu.Game.Online
 {
@@ -11,13 +13,31 @@ namespace osu.Game.Online
     {
         protected override string GetLookupUrl(string url)
         {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) || !uri.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
-            {
-                Logger.Log($@"Blocking resource lookup from external website: {url}", LoggingTarget.Network, LogLevel.Important);
-                return string.Empty;
-            }
+            ServerPreset customApiUrl = GlobalConfigStore.EzConfig.Get<ServerPreset>(Ez2Setting.ServerPreset);
 
-            return url;
+            switch (customApiUrl)
+            {
+                case ServerPreset.Manual:
+                case ServerPreset.Gu:
+                    #if DEBUG
+                    // 任何从服务器获取资源的事件都会引发这个日志输出
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri1) || !uri1.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.Log($@"[Ez2Lazer] Using Custom ApiUrl {url}", LoggingTarget.Network, LogLevel.Important);
+                    }
+                    #endif
+
+                    return url;
+
+                default:
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) || !uri.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.Log($@"Blocking resource lookup from external website: {url}", LoggingTarget.Network, LogLevel.Important);
+                        return string.Empty;
+                    }
+
+                    return url;
+            }
         }
     }
 }

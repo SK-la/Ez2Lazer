@@ -4,19 +4,22 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Input;
+using osu.Framework.Input.Bindings;
+using osu.Framework.Input.Events;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.Database;
+using osu.Game.Input.Bindings;
 using osu.Game.Input.Handlers;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
@@ -37,6 +40,7 @@ using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
+using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.UI
 {
@@ -64,6 +68,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected new ManiaRulesetConfigManager Config => (ManiaRulesetConfigManager)base.Config;
 
+        private static EzManiaScrollingStyle scrollingStyleStatic = EzManiaScrollingStyle.ScrollTimeStyleFixed;
         private readonly Bindable<ManiaScrollingDirection> configDirection = new Bindable<ManiaScrollingDirection>();
         private readonly BindableDouble configScrollSpeed = new BindableDouble();
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
@@ -84,10 +89,13 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
+
         private Bindable<double> hitPositonBindable = new Bindable<double>();
         private Bindable<bool> globalHitPosition = new Bindable<bool>();
         private Bindable<bool> barLinesBindable = new Bindable<bool>();
-        private Bindable<EzMUGHitMode> hitMode = new Bindable<EzMUGHitMode>();
+        private Bindable<EzEnumHitMode> hitMode = new Bindable<EzEnumHitMode>();
 
         //自定义判定系统
         private Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
@@ -141,7 +149,12 @@ namespace osu.Game.Rulesets.Mania.UI
             });
 
             scrollingStyle = Config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle);
-            scrollingStyle.BindValueChanged(_ => updateTimeRange());
+            scrollingStyleStatic = scrollingStyle.Value;
+            scrollingStyle.BindValueChanged(style =>
+            {
+                scrollingStyleStatic = style.NewValue;
+                updateTimeRange();
+            });
 
             TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
@@ -156,7 +169,7 @@ namespace osu.Game.Rulesets.Mania.UI
             globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
             barLinesBindable = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool);
-            hitMode = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
         }
 
         protected override void LoadComplete()
@@ -167,7 +180,7 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 O2HitModeExtension.PILL_COUNT.Value = 0;
 
-                if (h.NewValue == EzMUGHitMode.O2Jam)
+                if (h.NewValue == EzEnumHitMode.O2Jam)
                 {
                     O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
                     O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
@@ -184,23 +197,18 @@ namespace osu.Game.Rulesets.Mania.UI
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>
             {
-                _ = Task.Run(async () =>
+                try
                 {
-                    try
-                    {
-                        var factory = Dependencies.Get<EzLocalTextureFactory>();
+                    var factory = Dependencies.Get<EzLocalTextureFactory>();
 
-                        if (factory != null)
-                        {
-                            await factory.PreloadGameTextures().ConfigureAwait(false);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}",
-                            LoggingTarget.Runtime, LogLevel.Error);
-                    }
-                });
+                    if (factory != null)
+                        _ = factory.PreloadGameTextures();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}",
+                        LoggingTarget.Runtime, LogLevel.Error);
+                }
             });
         }
 
@@ -218,6 +226,60 @@ namespace osu.Game.Rulesets.Mania.UI
                 touchInputArea = null;
             }
         }
+
+        private const Key accelerated_scroll_speed_modifier_key = Key.LAlt;
+        private const int accelerated_scroll_speed_adjustment_amount = 5;
+
+        protected override bool OnKeyDown(KeyDownEvent e)
+        {
+            if (!e.Repeat
+                && AllowScrollSpeedAdjustment)
+            {
+                if (matchesAcceleratedScrollSpeedBinding(e, GlobalAction.IncreaseScrollSpeed))
+                {
+                    AdjustScrollSpeed(accelerated_scroll_speed_adjustment_amount);
+                    return true;
+                }
+
+                if (matchesAcceleratedScrollSpeedBinding(e, GlobalAction.DecreaseScrollSpeed))
+                {
+                    AdjustScrollSpeed(-accelerated_scroll_speed_adjustment_amount);
+                    return true;
+                }
+            }
+
+            return base.OnKeyDown(e);
+        }
+
+        private bool matchesAcceleratedScrollSpeedBinding(KeyDownEvent e, GlobalAction action)
+        {
+            if (!e.CurrentState.Keyboard.Keys.IsPressed(accelerated_scroll_speed_modifier_key))
+                return false;
+
+            KeyCombination pressedCombination = KeyCombination.FromInputState(e.CurrentState);
+            bool matched = false;
+
+            realm.Run(context =>
+            {
+                var bindings = context.All<RealmKeyBinding>()
+                                      .Where(b => b.RulesetName == null && b.ActionInt == (int)action)
+                                      .ToList();
+
+                foreach (var binding in bindings)
+                {
+                    if (binding.KeyCombination.IsPressed(pressedCombination, e.CurrentState, KeyCombinationMatchingMode.Any))
+                    {
+                        matched = true;
+                        break;
+                    }
+                }
+            });
+
+            return matched;
+        }
+
+        protected override int GetScrollSpeedAdjustmentAmount(KeyBindingPressEvent<GlobalAction> e)
+            => e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt) ? 5 : 1;
 
         protected override void AdjustScrollSpeed(int amount) => configScrollSpeed.Value += amount;
 
@@ -295,7 +357,16 @@ namespace osu.Game.Rulesets.Mania.UI
         /// <returns>The scroll time.</returns>
         public static double ComputeScrollTime(double scrollSpeed, double baseSpeed, double timePerSpeed)
         {
-            return baseSpeed - (scrollSpeed - 200) * timePerSpeed;
+            switch (scrollingStyleStatic)
+            {
+                case EzManiaScrollingStyle.ScrollSpeedStyle:
+                    // 线性缩放，scroll speed 1-40 映射到 MAX_TIME_RANGE-MIN_TIME_RANGE
+                    double sp = Math.Clamp(scrollSpeed / 10, 1, 40);
+                    return MAX_TIME_RANGE / sp;
+
+                default:
+                    return baseSpeed - (scrollSpeed - 200) * timePerSpeed;
+            }
         }
 
         public override PlayfieldAdjustmentContainer CreatePlayfieldAdjustmentContainer() => new ManiaPlayfieldAdjustmentContainer(this);

@@ -3,17 +3,8 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Colour;
-using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.UI.Scrolling;
-using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
@@ -22,8 +13,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }
 
-        private Bindable<bool> enabledColor = null!;
-        private Bindable<double> tailAlpha = null!;
+        private IBindable<double> tailAlpha = null!;
 
         // private SbIHoldNoteHittingLayer hittingLayer { get; set; }
 
@@ -46,9 +36,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             {
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
+        }
 
-            enabledColor = EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
-            tailAlpha = EzSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
             tailAlpha.BindValueChanged(alpha =>
             {
                 Alpha = (float)alpha.NewValue;

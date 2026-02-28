@@ -21,7 +21,6 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Screens.SelectV2;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
@@ -445,7 +444,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 bool shouldCalculateXxy = lookup.Ruleset.OnlineID == 3;
 
-                if (shouldCalculateXxy && playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, rate, out double sr) && !double.IsNaN(sr) && !double.IsInfinity(sr))
+                if (shouldCalculateXxy && playableBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(playableBeatmap, rate, out double sr) && !double.IsNaN(sr)
+                    && !double.IsInfinity(sr))
                     xxySr = sr;
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -472,7 +472,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 if (Interlocked.Increment(ref computeFailCount) <= 10)
                 {
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
-                    Logger.Error(ex, $"[EzBeatmapManiaAnalysisCache] computeAnalysis failed. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}");
+                    Logger.Error(ex,
+                        $"[EzBeatmapManiaAnalysisCache] computeAnalysis failed. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}");
                 }
 
                 return null;

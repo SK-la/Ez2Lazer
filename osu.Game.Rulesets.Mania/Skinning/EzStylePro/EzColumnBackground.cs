@@ -8,7 +8,6 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
@@ -16,9 +15,8 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
-using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -29,14 +27,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     /// </summary>
     public partial class EzColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private Bindable<double> hitPosition = new Bindable<double>();
+        private readonly IBindable<Colour4> columnColourLocal = new Bindable<Colour4>();
+        private readonly IBindable<double> hitPosition = new BindableDouble();
         private Color4 brightColour;
         private Color4 dimColour;
 
         private Sprite hitOverlay = null!;
         private Box separator = null!;
 
-        private Bindable<Color4> accentColour = null!;
+        private bool shouldDrawSeparator;
 
         [Resolved]
         protected Column Column { get; private set; } = null!;
@@ -47,9 +46,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private TextureStore textures { get; set; } = null!;
 
-        [Resolved]
-        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
-
         public EzColumnBackground()
         {
             Anchor = Anchor.BottomLeft;
@@ -58,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             var texture = textures.Get("EzResources/note/ColumnLight.png");
 
@@ -83,31 +79,40 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Alpha = 0,
             };
 
-            accentColour = new Bindable<Color4>(ezSkinConfig.GetColumnColor(stageDefinition.Columns, Column.Index));
-            accentColour.BindValueChanged(colour =>
-            {
-                var baseCol = colour.NewValue;
-                var newColour = baseCol.Darken(3);
-                if (newColour.A != 0)
-                    newColour = newColour.Opacity(0.8f);
-                hitOverlay.Colour = newColour;
-                brightColour = baseCol.Opacity(0.6f);
-                dimColour = baseCol.Opacity(0);
-            }, true);
+            // 计算 drawSeparator 结果（基于不变的列数和列索引）
+            shouldDrawSeparator = stageDefinition.HasSeparator(Column.Index);
+
+            applyAccent(Column.AccentColour.Value);
+
+            hitPosition.BindTo(ezSkinInfo.HitPosition);
+            hitPosition.BindValueChanged(_ => updateSeparator(), true);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            if (Column.BackgroundContainer.Children.OfType<Box>().All(b => b.Name != "Separator"))
+            bool hasSeparator = false;
+
+            foreach (var child in Column.BackgroundContainer.Children)
+            {
+                if (child is Box b && b.Name == "Separator")
+                {
+                    hasSeparator = true;
+                    break;
+                }
+            }
+
+            if (!hasSeparator)
                 Column.BackgroundContainer.Add(separator);
 
             if (!Column.BackgroundContainer.Children.Contains(hitOverlay))
                 Column.BackgroundContainer.Add(hitOverlay);
 
-            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            hitPosition.BindValueChanged(_ => updateSeparator(), true);
+            // Now bind to column colour (Column may not have been ready during load).
+            columnColourLocal.BindTo(Column.EzColumnColourBindable);
+            // apply current accent immediately and subscribe to future changes
+            columnColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);
         }
 
         private void updateSeparator()
@@ -116,10 +121,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             hitOverlay.Y = -(float)hitPosition.Value;
             hitOverlay.Height = h;
             separator.Height = h;
-            separator.Alpha = drawSeparator(Column.Index, stageDefinition) ? 0.25f : 0;
+            separator.Alpha = shouldDrawSeparator ? 0.25f : 0;
         }
 
-        protected virtual Color4 NoteColor => ezSkinConfig.GetColumnColor(stageDefinition.Columns, Column.Index);
+        protected virtual Color4 NoteColor
+        {
+            get
+            {
+                var c = Column.EzColumnColourBindable.Value;
+                return new Color4(c.R, c.G, c.B, c.A);
+            }
+        }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
@@ -141,13 +153,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 hitOverlay.FadeTo(0, 250, Easing.OutQuint);
         }
 
-        //TODO: 这里的逻辑可以优化，避免重复计算
-        private bool drawSeparator(int columnIndex, StageDefinition stage) => stage.Columns switch
+        private void applyAccent(Colour4 baseCol)
         {
-            12 => columnIndex is 0 or 10,
-            14 => columnIndex is 0 or 5 or 6 or 11,
-            16 => columnIndex is 0 or 5 or 9 or 14,
-            _ => false
-        };
+            var baseColor4 = new Color4(baseCol.R, baseCol.G, baseCol.B, baseCol.A);
+            var newColour = baseColor4.Darken(3);
+            if (newColour.A != 0)
+                newColour = newColour.Opacity(0.8f);
+            hitOverlay.Colour = newColour;
+            brightColour = baseColor4.Opacity(0.6f);
+            dimColour = baseColor4.Opacity(0);
+        }
     }
 }

@@ -4,9 +4,9 @@
 #nullable disable
 
 using System;
-using osu.Framework.Screens;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
+using osu.Framework.Screens;
 using osuTK;
 
 namespace osu.Game.Screens
@@ -82,7 +82,7 @@ namespace osu.Game.Screens
             if (IsLoaded)
             {
                 this.FadeOut(TRANSITION_LENGTH, Easing.OutExpo);
-                    this.MoveToX(x_movement_amount, TRANSITION_LENGTH, Easing.OutExpo);
+                this.MoveToX(x_movement_amount, TRANSITION_LENGTH, Easing.OutExpo);
             }
 
             return base.OnExiting(e);

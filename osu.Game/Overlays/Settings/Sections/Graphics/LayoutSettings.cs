@@ -19,9 +19,11 @@ using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Localisation;
 using osuTK;
 using osuTK.Graphics;
+using WindowState = osu.Framework.Platform.WindowState;
 
 namespace osu.Game.Overlays.Settings.Sections.Graphics
 {
@@ -181,7 +183,8 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 },
                 new SettingsItemV2(new FormEnumDropdown<ScalingGameMode>
                 {
-                    Caption = "Scaling To Game Mode",
+                    Caption = EzSettingsStrings.SCALING_GAME_MODE,
+                    HintText = EzSettingsStrings.SCALING_GAME_MODE_TOOLTIP,
                     Current = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode),
                 })
                 {
@@ -295,9 +298,9 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 if (size.NewValue == sizeWindowed.Value || windowModeDropdown.Current.Value != WindowMode.Windowed)
                     return;
 
-                if (window?.WindowState == Framework.Platform.WindowState.Maximised)
+                if (window?.WindowState == WindowState.Maximised)
                 {
-                    window.WindowState = Framework.Platform.WindowState.Normal;
+                    window.WindowState = WindowState.Normal;
                 }
 
                 // Adjust only for top decorations (assuming system titlebar).

@@ -96,6 +96,12 @@ namespace osu.Game.Screens.SelectV2
         protected bool ControlGlobalMusic { get; init; } = true;
 
         /// <summary>
+        /// Whether this song select instance should allow scoping down to a specific beatmap set,
+        /// exposing other difficulties that are otherwise hidden by filter criteria.
+        /// </summary>
+        protected bool SupportScoping { init => scopedBeatmapSet.Disabled = !value; }
+
+        /// <summary>
         /// Whether the osu! logo should be shown at the bottom-right of the screen.
         /// </summary>
         protected bool ShowOsuLogo { get; init; } = true;
@@ -113,7 +119,8 @@ namespace osu.Game.Screens.SelectV2
 
         private BeatmapCarousel carousel = null!;
 
-        private FilterControl filterControl = null!;
+        protected FilterControl FilterControl { get; private set; } = null!;
+
         private BeatmapTitleWedge titleWedge = null!;
         private BeatmapDetailsArea detailsArea = null!;
         private FillFlowContainer wedgesContainer = null!;
@@ -164,7 +171,7 @@ namespace osu.Game.Screens.SelectV2
 
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
-        private Bindable<bool> keySoundPreview = null!;
+        private Bindable<KeySoundPreviewMode> keySoundPreview = null!;
         private EzPreviewTrackManager ezPreviewManager = null!;
 
         private IDisposable? modSelectOverlayRegistration;
@@ -279,15 +286,16 @@ namespace osu.Game.Screens.SelectV2
                                                             },
                                                             noResultsPlaceholder = new NoResultsPlaceholder
                                                             {
-                                                                RequestClearFilterText = () => filterControl.Search(string.Empty)
+                                                                RequestClearFilterText = () => FilterControl.Search(string.Empty)
                                                             }
                                                         }
                                                     },
-                                                    filterControl = new FilterControl
+                                                    FilterControl = new FilterControl
                                                     {
                                                         Anchor = Anchor.TopRight,
                                                         Origin = Anchor.TopRight,
                                                         RelativeSizeAxes = Axes.X,
+                                                        ScopedBeatmapSet = { BindTarget = ScopedBeatmapSet },
                                                     },
                                                 }
                                             },
@@ -320,7 +328,7 @@ namespace osu.Game.Screens.SelectV2
 
             ezPreviewManager = new EzPreviewTrackManager();
             AddInternal(ezPreviewManager);
-            keySoundPreview = ezConfig.GetBindable<bool>(Ez2Setting.KeySoundPreview);
+            keySoundPreview = ezConfig.GetBindable<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
         }
 
@@ -385,7 +393,7 @@ namespace osu.Game.Screens.SelectV2
 
             inputManager = GetContainingInputManager()!;
 
-            filterControl.CriteriaChanged += criteriaChanged;
+            FilterControl.CriteriaChanged += criteriaChanged;
 
             modSelectOverlay.State.BindValueChanged(v =>
             {
@@ -411,7 +419,8 @@ namespace osu.Game.Screens.SelectV2
 
             keySoundPreview.BindValueChanged(e =>
             {
-                ezPreviewManager.EnabledBindable.Value = e.NewValue;
+                Logger.Log("[Key sound preview mode] changed to " + e.NewValue);
+                ezPreviewManager.EnabledBindable.Value = e.NewValue != 0;
                 ensureTrackLooping(Beatmap.Value, TrackChangeDirection.None);
                 ensurePlayingSelected();
             });
@@ -552,7 +561,7 @@ namespace osu.Game.Screens.SelectV2
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
         {
-            if (!ezPreviewManager.StartPreview(beatmap) && !keySoundPreview.Value)
+            if (!ezPreviewManager.StartPreview(beatmap) && keySoundPreview.Value == 0)
             {
                 ezPreviewManager.StopPreview();
             }
@@ -734,6 +743,9 @@ namespace osu.Game.Screens.SelectV2
 
         private void onArrivingAtScreen()
         {
+            if (manageCollectionsDialog != null)
+                manageCollectionsDialog.FilteredBeatmapsProvider = getFilteredBeatmaps;
+
             modSelectOverlay.Beatmap.BindTo(Beatmap);
             // required due to https://github.com/ppy/osu-framework/issues/3218
             modSelectOverlay.SelectedMods.Disabled = false;
@@ -771,6 +783,9 @@ namespace osu.Game.Screens.SelectV2
         private void onLeavingScreen()
         {
             restoreBackground();
+
+            if (manageCollectionsDialog?.FilteredBeatmapsProvider == getFilteredBeatmaps)
+                manageCollectionsDialog.FilteredBeatmapsProvider = null;
 
             modSelectOverlay.SelectedMods.UnbindFrom(Mods);
             modSelectOverlay.Beatmap.UnbindFrom(Beatmap);
@@ -843,13 +858,13 @@ namespace osu.Game.Screens.SelectV2
             {
                 titleWedge.Hide();
                 detailsArea.Hide();
-                filterControl.Hide();
+                FilterControl.Hide();
             }
             else
             {
                 titleWedge.Show();
                 detailsArea.Show();
-                filterControl.Show();
+                FilterControl.Show();
             }
         }
 
@@ -912,7 +927,7 @@ namespace osu.Game.Screens.SelectV2
 
             // Intentionally not localised until we have proper support for this (see https://github.com/ppy/osu-framework/pull/4918
             // but also in this case we want support for formatting a number within a string).
-            filterControl.StatusText = count != 1 ? $"{count:#,0} matches" : $"{count:#,0} match";
+            FilterControl.StatusText = count != 1 ? $"{count:#,0} matches" : $"{count:#,0} match";
 
             // If there's already a selection update in progress, let's not interrupt it.
             // Interrupting could cause the debounce interval to be reduced.
@@ -956,6 +971,19 @@ namespace osu.Game.Screens.SelectV2
 
                 rightGradientBackground.ResizeWidthTo(1, 400, Easing.OutPow10);
             }
+        }
+
+        private IEnumerable<BeatmapInfo> getFilteredBeatmaps()
+        {
+            var items = carousel.GetCarouselItems();
+
+            if (items == null)
+                return Enumerable.Empty<BeatmapInfo>();
+
+            return items.Select(i => i.Model)
+                        .OfType<GroupedBeatmap>()
+                        .Select(gb => gb.Beatmap)
+                        .DistinctBy(b => b.MD5Hash);
         }
 
         #endregion
@@ -1170,7 +1198,7 @@ namespace osu.Game.Screens.SelectV2
 
         #region Implementation of ISongSelect
 
-        void ISongSelect.Search(string query) => filterControl.Search(query);
+        void ISongSelect.Search(string query) => FilterControl.Search(query);
 
         void ISongSelect.PresentScore(ScoreInfo score)
         {
@@ -1265,7 +1293,29 @@ namespace osu.Game.Screens.SelectV2
                 beatmaps.Restore(b);
         }
 
-        public Bindable<BeatmapSetInfo?> ScopedBeatmapSet => filterControl.ScopedBeatmapSet;
+        private GroupedBeatmap? beforeScopedSelection;
+
+        private readonly Bindable<BeatmapSetInfo?> scopedBeatmapSet = new Bindable<BeatmapSetInfo?>();
+        public IBindable<BeatmapSetInfo?> ScopedBeatmapSet => scopedBeatmapSet;
+
+        public void ScopeToBeatmapSet(BeatmapSetInfo beatmapSet)
+        {
+            beforeScopedSelection = carousel.CurrentGroupedBeatmap;
+
+            scopedBeatmapSet.Value = beatmapSet;
+        }
+
+        public void UnscopeBeatmapSet()
+        {
+            if (scopedBeatmapSet.Value == null)
+                return;
+
+            if (beforeScopedSelection != null)
+                queueBeatmapSelection(beforeScopedSelection);
+
+            scopedBeatmapSet.Value = null;
+            beforeScopedSelection = null;
+        }
 
         #endregion
 

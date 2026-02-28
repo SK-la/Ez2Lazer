@@ -86,9 +86,9 @@ namespace osu.Game.Rulesets.Mania.UI
             ezSkinConfig.BindWith(Ez2Setting.ColumnWidthStyle, ezColumnWidthStyle);
             ezSkinConfig.BindWith(Ez2Setting.ColumnWidth, columnWidthBindable);
             ezSkinConfig.BindWith(Ez2Setting.SpecialFactor, specialFactorBindable);
-            ezColumnWidthStyle.BindValueChanged(v => updateColumnSize());
-            columnWidthBindable.BindValueChanged(v => updateColumnSize());
-            specialFactorBindable.BindValueChanged(v => updateColumnSize());
+            ezColumnWidthStyle.BindValueChanged(v => invalidateLayout());
+            columnWidthBindable.BindValueChanged(v => invalidateLayout());
+            specialFactorBindable.BindValueChanged(v => invalidateLayout());
 
             mobileLayout.BindValueChanged(_ => invalidateLayout());
             skin.SourceChanged += invalidateLayout;
@@ -162,8 +162,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     continue;
                 }
 
-                bool isSpecialColumn =
-                    ezSkinConfig.IsSpecialColumn(stageDefinition.Columns, i);
+                bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(stageDefinition.Columns, i);
                 float ezWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1);
 
                 switch (ezColumnWidthStyle.Value)

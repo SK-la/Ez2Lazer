@@ -18,6 +18,7 @@ using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
@@ -58,6 +59,7 @@ namespace osu.Game.Screens.SelectV2
             private GridContainer ratingAndNameContainer = null!;
             private DifficultyStatisticsDisplay countStatisticsDisplay = null!;
             private DifficultyStatisticsDisplay difficultyStatisticsDisplay = null!;
+            private EzKpcDisplay ezKpcDisplay = null!;
 
             private CancellationTokenSource? cancellationSource;
 
@@ -178,6 +180,8 @@ namespace osu.Game.Screens.SelectV2
                                             ColumnDimensions = new[]
                                             {
                                                 new Dimension(),
+                                                new Dimension(GridSizeMode.Absolute),
+                                                new Dimension(GridSizeMode.AutoSize),
                                                 new Dimension(GridSizeMode.Absolute, 30),
                                                 new Dimension(GridSizeMode.AutoSize),
                                             },
@@ -188,6 +192,21 @@ namespace osu.Game.Screens.SelectV2
                                                     countStatisticsDisplay = new DifficultyStatisticsDisplay
                                                     {
                                                         RelativeSizeAxes = Axes.X,
+                                                    },
+                                                    Empty(),
+                                                    // 中间列：容器自动适配并居中放置 KPC 药丸组件，避免与右侧统计重叠
+                                                    new Container
+                                                    {
+                                                        AutoSizeAxes = Axes.X,
+                                                        RelativeSizeAxes = Axes.Y,
+                                                        Anchor = Anchor.CentreLeft,
+                                                        Origin = Anchor.CentreLeft,
+                                                        Child = ezKpcDisplay = new EzKpcDisplay
+                                                        {
+                                                            Anchor = Anchor.CentreLeft,
+                                                            Origin = Anchor.CentreLeft,
+                                                            RelativeSizeAxes = Axes.Y,
+                                                        },
                                                     },
                                                     Empty(),
                                                     difficultyStatisticsDisplay = new DifficultyStatisticsDisplay(autoSize: true),
@@ -251,7 +270,8 @@ namespace osu.Game.Screens.SelectV2
                     mapperText.Text = beatmap.Value.Metadata.Author.Username;
                 }
 
-                starRatingDisplay.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                starRatingDisplay.Current =
+                    (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
 
                 updateCountStatistics(cancellationSource.Token);
                 updateDifficultyStatistics();
@@ -273,6 +293,33 @@ namespace osu.Game.Screens.SelectV2
                     var statistics = playableBeatmap.GetStatistics()
                                                     .Select(s => new StatisticDifficulty.Data(s.Name, s.BarDisplayLength ?? 0, s.BarDisplayLength ?? 0, 1, s.Content))
                                                     .ToList();
+
+                    // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
+                    try
+                    {
+                        if (ruleset.Value != null && ruleset.Value.OnlineID == 3)
+                        {
+                            var (columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetCountsOnly(playableBeatmap);
+                            Schedule(() =>
+                            {
+                                if (cancellationToken.IsCancellationRequested)
+                                    return;
+
+                                ezKpcDisplay.Show();
+                                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts);
+                            });
+                        }
+                        else
+                        {
+                            // 非 Mania 情况隐藏组件
+                            Schedule(() => ezKpcDisplay.Hide());
+                        }
+                    }
+                    catch
+                    {
+                        // 忽略分析错误，保持组件隐藏或原样
+                        Schedule(() => ezKpcDisplay.Hide());
+                    }
 
                     Schedule(() =>
                     {
@@ -306,10 +353,12 @@ namespace osu.Game.Screens.SelectV2
                 difficultyText.MaxWidth = Math.Max(nameLine.DrawWidth - mappedByText.DrawWidth - mapperText.DrawWidth - 20, 0);
 
                 // Use difficulty colour until it gets too dark to be visible against dark backgrounds.
-                Color4 col = starRatingDisplay.DisplayedStars.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF ? starRatingDisplay.DisplayedDifficultyTextColour : starRatingDisplay.DisplayedDifficultyColour;
+                Color4 col = starRatingDisplay.DisplayedStars.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF
+                    ? starRatingDisplay.DisplayedDifficultyTextColour
+                    : starRatingDisplay.DisplayedDifficultyColour;
 
                 difficultyText.Colour = col;
-                mappedByText.Colour = col;
+                mappedByText.Colour = Colour4.WhiteSmoke;
                 countStatisticsDisplay.AccentColour = col;
                 difficultyStatisticsDisplay.AccentColour = col;
             }

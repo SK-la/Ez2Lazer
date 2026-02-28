@@ -47,8 +47,8 @@ using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Analysis;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Online;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -67,6 +67,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Utils;
+using Logger = osu.Framework.Logging.Logger;
 using RuntimeInfo = osu.Framework.RuntimeInfo;
 
 namespace osu.Game
@@ -108,8 +109,27 @@ namespace osu.Game
 
         public virtual bool UseDevelopmentServer => DebugUtils.IsDebugBuild;
 
-        public virtual EndpointConfiguration CreateEndpoints() =>
-            UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();
+        public virtual EndpointConfiguration CreateEndpoints()
+        {
+            // 如果Ez2ConfigManager已初始化，根据服务器预设选择对应的配置
+            if (Ez2ConfigManager != null)
+            {
+                var serverPreset = Ez2ConfigManager.Get<ServerPreset>(Ez2Setting.ServerPreset);
+                Logger.Log($"[Ez] Using server preset: {serverPreset}");
+
+                return serverPreset switch
+                {
+                    ServerPreset.Gu => new GuServerEndpointConfiguration(),
+                    ServerPreset.Manual => new ManualServerEndpointConfiguration(Ez2ConfigManager),
+                    _ => new ProductionEndpointConfiguration()
+                };
+            }
+
+            Logger.Log("[Ez] Switch server failed: Ez2ConfigManager not initialized. Falling back to default configuration.");
+
+            // 否则使用默认配置
+            return UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();
+        }
 
         protected override OnlineStore CreateOnlineStore() => new TrustedDomainOnlineStore();
 
@@ -177,6 +197,8 @@ namespace osu.Game
         protected Storage Storage { get; set; }
 
         protected Ez2ConfigManager Ez2ConfigManager { get; private set; }
+
+        protected EzSkinInfo EzSkinInfo { get; private set; }
 
         protected EzLocalTextureFactory NoteFactory { get; private set; }
 
@@ -290,6 +312,8 @@ namespace osu.Game
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);
+            EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);
+            dependencies.CacheAs<IEzSkinInfo>(EzSkinInfo);
             dependencies.Cache(NoteFactory = new EzLocalTextureFactory(
                 Ez2ConfigManager,
                 Host.Renderer,

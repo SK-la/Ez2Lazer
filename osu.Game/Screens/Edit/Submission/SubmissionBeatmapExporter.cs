@@ -39,7 +39,8 @@ namespace osu.Game.Screens.Edit.Submission
                 }
 
                 if (playableBeatmap.BeatmapInfo.OnlineID > 0)
-                    throw new InvalidOperationException($@"Difficulty ""{playableBeatmap.BeatmapInfo.DifficultyName}"" has BeatmapID {playableBeatmap.BeatmapInfo.OnlineID} that has not been assigned to it by the server!");
+                    throw new InvalidOperationException(
+                        $@"Difficulty ""{playableBeatmap.BeatmapInfo.DifficultyName}"" has BeatmapID {playableBeatmap.BeatmapInfo.OnlineID} that has not been assigned to it by the server!");
 
                 if (allocatedBeatmapIds.Count == 0)
                     throw new InvalidOperationException(@"Ran out of new beatmap IDs to assign to unsubmitted beatmaps!");

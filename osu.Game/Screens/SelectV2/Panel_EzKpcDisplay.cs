@@ -2,9 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Buffers;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -682,7 +682,7 @@ namespace osu.Game.Screens.SelectV2
             }
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>

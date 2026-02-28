@@ -3,18 +3,14 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Formats;
-using osu.Game.IO;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania.Analysis;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Tests.Visual;
@@ -24,9 +20,9 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
 {
     public partial class TestSceneSRTune : OsuTestScene
     {
-        private FillFlowContainer listContainer = null!;
-        private Dictionary<string, double> last = new Dictionary<string, double>();
-        private Dictionary<string, double> current = new Dictionary<string, double>();
+        private readonly FillFlowContainer listContainer;
+        private readonly Dictionary<string, double> last = new Dictionary<string, double>();
+        private readonly Dictionary<string, double> current = new Dictionary<string, double>();
 
         // exposed tuning parameters (initialized from Tunables defaults)
         private double ln_weight = SRCalculatorTunable.Tunables.FinalLNToNotesFactor; // 0.0 - 1.0
@@ -75,7 +71,8 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             // save current settings to "last" snapshot
             AddStep("Save as last settings", () =>
             {
-                lastSettings = (SRCalculatorTunable.Tunables.FinalLNToNotesFactor, SRCalculatorTunable.Tunables.FinalLNLenCap, SRCalculatorTunable.Tunables.TotalNotesOffset, SRCalculatorTunable.Tunables.PBarLnMultiplier, SRCalculatorTunable.Tunables.JackPenaltyMultiplier, SRCalculatorTunable.Tunables.FinalScale);
+                lastSettings = (SRCalculatorTunable.Tunables.FinalLNToNotesFactor, SRCalculatorTunable.Tunables.FinalLNLenCap, SRCalculatorTunable.Tunables.TotalNotesOffset,
+                    SRCalculatorTunable.Tunables.PBarLnMultiplier, SRCalculatorTunable.Tunables.JackPenaltyMultiplier, SRCalculatorTunable.Tunables.FinalScale);
                 // also snapshot last SR values from current
                 foreach (string k in current.Keys)
                     last[k] = current[k];
@@ -91,8 +88,10 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
 
             for (int i = 0; i < 8; i++)
             {
-                var bm = new ManiaBeatmap(new StageDefinition(4));
-                bm.BeatmapInfo = new BeatmapInfo { Metadata = new BeatmapMetadata { Title = $"Sample {i + 1}" } };
+                var bm = new ManiaBeatmap(new StageDefinition(4))
+                {
+                    BeatmapInfo = new BeatmapInfo { Metadata = new BeatmapMetadata { Title = $"Sample {i + 1}" } }
+                };
 
                 for (int t = 0; t < 2000; t += 250)
                 {
@@ -104,8 +103,11 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
                     }
                     else
                     {
-                        var hold = new HoldNote { StartTime = t + i * 10, Column = i % 4 };
-                        hold.Duration = 400 + i * 50;
+                        var hold = new HoldNote
+                        {
+                            StartTime = t + i * 10, Column = i % 4,
+                            Duration = 400 + i * 50
+                        };
                         bm.HitObjects.Add(hold);
                     }
                 }
@@ -139,7 +141,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
 
             foreach (var bm in sampleBeatmaps)
             {
-                string id = ((BeatmapInfo)bm.BeatmapInfo).Metadata.Title!;
+                string id = bm.BeatmapInfo.Metadata.Title;
                 last[id] = 0;
                 current[id] = 0;
 
@@ -151,12 +153,12 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
                     Spacing = new Vector2(10f),
                     Children = new Drawable[]
                     {
-                        new OsuSpriteText { Text = id, Width = 180, Font = new FontUsage(size:20) },
-                        new OsuSpriteText { Text = "Last: 0", Name = "last_" + id, Font = new FontUsage(size:20) },
-                        new OsuSpriteText { Text = "Cur: 0", Name = "cur_" + id, Font = new FontUsage(size:20) },
+                        new OsuSpriteText { Text = id, Width = 180, Font = new FontUsage(size: 20) },
+                        new OsuSpriteText { Text = "Last: 0", Name = "last_" + id, Font = new FontUsage(size: 20) },
+                        new OsuSpriteText { Text = "Cur: 0", Name = "cur_" + id, Font = new FontUsage(size: 20) },
                         // place holders for settings display under the SRs
-                        new OsuSpriteText { Text = "Last settings: -", Name = "last_set_" + id, Font = new FontUsage(size:20) },
-                        new OsuSpriteText { Text = "Cur settings: -", Name = "cur_set_" + id, Font = new FontUsage(size:20) }
+                        new OsuSpriteText { Text = "Last settings: -", Name = "last_set_" + id, Font = new FontUsage(size: 20) },
+                        new OsuSpriteText { Text = "Cur settings: -", Name = "cur_set_" + id, Font = new FontUsage(size: 20) }
                     }
                 };
 
@@ -181,7 +183,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             }
 
             // propagate slider values into SRCalculatorTunable.Tunables
-            TunableSyncFromSliders();
+            tunableSyncFromSliders();
 
             for (int i = 0; i < sampleBeatmaps.Length; i++)
             {
@@ -197,16 +199,23 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
                 if (curText != null) curText.Text = $"Cur: {sr:F2}";
 
                 // update settings display
-                var lastSetText = row?.Children[3] as SpriteText;
                 var curSetText = row?.Children[4] as SpriteText;
-                if (lastSetText != null)
-                    lastSetText.Text = $"Last settings: ln_w={lastSettings.lnWeight:F3}, ln_cap={lastSettings.lnLenCap:F0}, off={lastSettings.offset:F0}, pbar={lastSettings.pbarCoeff:F4}, jack={lastSettings.jackMult:F1}, scale={lastSettings.scale:F3}";
+
+                if (row?.Children[3] is SpriteText lastSetText)
+                {
+                    lastSetText.Text =
+                        $"Last settings: ln_w={lastSettings.lnWeight:F3}, ln_cap={lastSettings.lnLenCap:F0}, off={lastSettings.offset:F0}, pbar={lastSettings.pbarCoeff:F4}, jack={lastSettings.jackMult:F1}, scale={lastSettings.scale:F3}";
+                }
+
                 if (curSetText != null)
-                    curSetText.Text = $"Cur settings: ln_w={SRCalculatorTunable.Tunables.FinalLNToNotesFactor:F3}, ln_cap={SRCalculatorTunable.Tunables.FinalLNLenCap:F0}, off={SRCalculatorTunable.Tunables.TotalNotesOffset:F0}, pbar={SRCalculatorTunable.Tunables.PBarLnMultiplier:F4}, jack={SRCalculatorTunable.Tunables.JackPenaltyMultiplier:F1}, scale={SRCalculatorTunable.Tunables.FinalScale:F3}";
+                {
+                    curSetText.Text =
+                        $"Cur settings: ln_w={SRCalculatorTunable.Tunables.FinalLNToNotesFactor:F3}, ln_cap={SRCalculatorTunable.Tunables.FinalLNLenCap:F0}, off={SRCalculatorTunable.Tunables.TotalNotesOffset:F0}, pbar={SRCalculatorTunable.Tunables.PBarLnMultiplier:F4}, jack={SRCalculatorTunable.Tunables.JackPenaltyMultiplier:F1}, scale={SRCalculatorTunable.Tunables.FinalScale:F3}";
+                }
             }
         }
 
-        private void TunableSyncFromSliders()
+        private void tunableSyncFromSliders()
         {
             var sliders = this.ChildrenOfType<BasicSliderBar<double>>();
 
@@ -222,7 +231,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         }
 
         // isolated compute method that uses exposed parameters
-        private double HotComputeSR(IBeatmap beatmap, double lnWeight, int lnLenCap, int offset, double pbarCoeff, double jackMult, double scale)
+        private double hotComputeSR(IBeatmap beatmap, double lnWeight, int lnLenCap, int offset, double pbarCoeff, double jackMult, double scale)
         {
             var mania = (ManiaBeatmap)beatmap;
             int headCount = 0;

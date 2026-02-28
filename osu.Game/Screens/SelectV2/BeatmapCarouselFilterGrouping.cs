@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Extensions;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
@@ -46,6 +47,8 @@ namespace osu.Game.Screens.SelectV2
         public required Func<List<BeatmapCollection>> GetCollections { get; init; }
         public required Func<FilterCriteria, IReadOnlyDictionary<Guid, ScoreRank>> GetLocalUserTopRanks { get; init; }
         public required Func<HashSet<int>> GetFavouriteBeatmapSets { get; init; }
+        public required Func<bool> ShouldUseXxySrForDifficultyOperations { get; init; }
+        public required Func<BeatmapInfo, CancellationToken, Task<double>> GetDifficultyForOperationsAsync { get; init; }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
         {
@@ -58,10 +61,37 @@ namespace osu.Game.Screens.SelectV2
 
                 var criteria = GetCriteria();
                 var newItems = new List<CarouselItem>();
+                var itemList = (List<CarouselItem>)items;
+
+                Dictionary<BeatmapInfo, double>? operationDifficulties = null;
+
+                // xxy_SR is only required when difficulty is the active grouping key.
+                // For 0/1 item, grouping key does not affect output.
+                bool useXxyDifficulty = criteria.Group == GroupMode.Difficulty
+                                        && ShouldUseXxySrForDifficultyOperations()
+                                        && itemList.Count > 1;
+
+                if (useXxyDifficulty)
+                {
+                    var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
+                    var difficultyTasks = uniqueBeatmaps.ToDictionary(b => b, b => GetDifficultyForOperationsAsync(b, cancellationToken));
+
+                    Task.WhenAll(difficultyTasks.Values).Wait(cancellationToken);
+
+                    operationDifficulties = difficultyTasks.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.GetResultSafely());
+                }
 
                 BeatmapSetsGroupedTogether = ShouldGroupBeatmapsTogether(criteria);
 
-                var groups = getGroups((List<CarouselItem>)items, criteria);
+                double getDifficulty(BeatmapInfo beatmap)
+                {
+                    if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double difficulty))
+                        return difficulty;
+
+                    return beatmap.StarRating;
+                }
+
+                var groups = getGroups(itemList, criteria, getDifficulty);
                 int displayedBeatmapsCount = 0;
 
                 foreach (var (group, itemsInGroup) in groups)
@@ -164,7 +194,7 @@ namespace osu.Game.Screens.SelectV2
             return true;
         }
 
-        private List<GroupMapping> getGroups(List<CarouselItem> items, FilterCriteria criteria)
+        private List<GroupMapping> getGroups(List<CarouselItem> items, FilterCriteria criteria, Func<BeatmapInfo, double> getDifficulty)
         {
             switch (criteria.Group)
             {
@@ -204,7 +234,7 @@ namespace osu.Game.Screens.SelectV2
                     return getGroupsBy(b => defineGroupByBPM(FormatUtils.RoundBPM(b.BPM)), items);
 
                 case GroupMode.Difficulty:
-                    return getGroupsBy(b => defineGroupByStars(b.StarRating), items);
+                    return getGroupsBy(b => defineGroupByStars(getDifficulty(b)), items);
 
                 case GroupMode.Length:
                     return getGroupsBy(b => defineGroupByLength(b.Length), items);
@@ -427,7 +457,8 @@ namespace osu.Game.Screens.SelectV2
 
             // priority-ordered matching
             if (containsAny(combined, "touhou", "東方", "东方", "touhou project", "東方Project", "東方プロジェクト", "동방프로젝트", "동방Project", "tohou",
-                    "瑶山百灵", "藤咲かりん", "小峠舞", "ZUN", "上海アリス幻樂団", "上海アリス", "Team Shanghai Alice", "IOSYS", "EastNewSound", "幽閉サテライト", "C-CLAYS", "Silver Forest", "Sound Holic", "Alstroemeria Records", "豚乙女", "Demetori", "SOUND HOLIC",
+                    "瑶山百灵", "藤咲かりん", "小峠舞", "ZUN", "上海アリス幻樂団", "上海アリス", "Team Shanghai Alice", "IOSYS", "EastNewSound", "幽閉サテライト", "C-CLAYS", "Silver Forest", "Sound Holic", "Alstroemeria Records",
+                    "豚乙女", "Demetori", "SOUND HOLIC",
                     "幽闭星光",
                     "博麗", "霊夢", "霊夢", "魔理沙", "アリス", "咲夜", "レミリア", "フランドール", "チルノ", "パチュリー", "妖夢", "鈴仙", "早苗", "映姫", "幽々子", "蓮子", "メディスン", "妖怪",
                     "地霊殿", "紅魔郷", "妖々夢", "永夜抄", "花映塚", "風神録", "神霊廟", "輝針城", "紺珠伝", "天空璋", "鬼形獣", "虹龍洞"))

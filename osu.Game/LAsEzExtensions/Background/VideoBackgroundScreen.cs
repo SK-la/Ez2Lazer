@@ -1,10 +1,10 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
 using System.IO;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Video;
-using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Screens;
 
 namespace osu.Game.LAsEzExtensions.Background
 {
@@ -18,7 +18,7 @@ namespace osu.Game.LAsEzExtensions.Background
         }
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config, Ez2ConfigManager ezSkinConfig)
+        private void load()
         {
             var video = new Video(videoPath)
             {
@@ -30,17 +30,7 @@ namespace osu.Game.LAsEzExtensions.Background
             video.FillAspectRatio = 1.0f * video.DrawSize.X / video.DrawSize.Y;
 
             AddInternal(video);
-
-            // //下面只用于注册全局设置
-            // GlobalConfigStore.Config = config;
-            // GlobalConfigStore.EzConfig = ezSkinConfig;
         }
-    }
-
-    public static class GlobalConfigStore
-    {
-        public static OsuConfigManager? Config { get; set; }
-        public static Ez2ConfigManager? EzConfig { get; set; }
     }
 
     public partial class StreamVideoBackgroundScreen : Graphics.Backgrounds.Background

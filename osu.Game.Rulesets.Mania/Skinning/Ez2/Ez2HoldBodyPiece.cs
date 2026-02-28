@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
     public partial class Ez2HoldBodyPiece : CompositeDrawable, IHoldNoteBody
     {
-        protected readonly Bindable<Color4> AccentColour = new Bindable<Color4>();
+        private IBindable<Color4> accentColour = null!;
 
         private Drawable background = null!;
         private Container tailContainer = null!;
@@ -77,12 +77,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             {
                 var holdNote = (DrawableHoldNote)drawableObject;
 
-                AccentColour.BindTo(holdNote.AccentColour);
-                hittingLayer.AccentColour.BindTo(holdNote.AccentColour);
+                accentColour = holdNote.AccentColour;
+                hittingLayer.BindAccentColour(holdNote.AccentColour);
                 ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNote.IsHolding);
             }
 
-            AccentColour.BindValueChanged(colour =>
+            accentColour.BindValueChanged(colour =>
             {
                 background.Colour = colour.NewValue.Darken(0.0f).Opacity(1f);
                 tailContainer.Colour = ColourInfo.GradientVertical(colour.NewValue.Opacity(1f), colour.NewValue.Opacity(1f));

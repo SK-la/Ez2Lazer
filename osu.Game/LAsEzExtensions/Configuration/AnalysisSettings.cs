@@ -4,10 +4,9 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Framework.Platform;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
-using osu.Game.Screens;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {
@@ -22,9 +21,9 @@ namespace osu.Game.LAsEzExtensions.Configuration
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzLocalizationManager.InputAudioLatencyTracker,
+                    Caption = EzSettingsStrings.INPUT_AUDIO_LATENCY_TRACKER,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker),
-                    HintText = EzLocalizationManager.InputAudioLatencyTrackerTooltip,
+                    HintText = EzSettingsStrings.INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP,
                 })
                 {
                     Keywords = new[] { "latency", "audio", "input" }

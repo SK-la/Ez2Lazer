@@ -21,7 +21,8 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Select;
+using osu.Game.LAsEzExtensions.Localization;
+using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -34,14 +35,14 @@ using osuTK.Input;
 
 namespace osu.Game.Screens.SelectV2
 {
-    public partial class FilterControl : OverlayContainer
+    public sealed partial class FilterControl : OverlayContainer
     {
         // taken from draw visualiser. used for carousel alignment purposes.
         public const float HEIGHT_FROM_SCREEN_TOP = 171 - corner_radius;
 
         private const float corner_radius = 10;
 
-        public Bindable<BeatmapSetInfo?> ScopedBeatmapSet { get; } = new Bindable<BeatmapSetInfo?>();
+        public IBindable<BeatmapSetInfo?> ScopedBeatmapSet { get; } = new Bindable<BeatmapSetInfo?>();
 
         private SongSelectSearchTextBox searchTextBox = null!;
         private ShearedToggleButton showConvertedBeatmapsButton = null!;
@@ -50,12 +51,20 @@ namespace osu.Game.Screens.SelectV2
         private ShearedDropdown<GroupMode> groupDropdown = null!;
         private CollectionDropdown collectionDropdown = null!;
         private EzKeyModeSelector csSelector = null!;
-        private ShearedToggleButton keySoundPreviewButton = null!;
+        private ShearedTriStateButton keySoundPreviewButton = null!;
         private ShearedToggleButton xxySrFilterButton = null!;
         private ShearedDropdown<KpcDisplayMode> kpcDropdown = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        /// <summary>
+        /// An optional method which can force certain criteria adjustments.
+        /// </summary>
+        public Action<FilterCriteria>? ApplyRequiredCriteria { get; set; }
+
+        [Resolved]
+        private ISongSelect? songSelect { get; set; }
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -124,7 +133,7 @@ namespace osu.Game.Screens.SelectV2
                             {
                                 RelativeSizeAxes = Axes.X,
                                 HoldFocus = true,
-                                ScopedBeatmapSet = ScopedBeatmapSet,
+                                ScopedBeatmapSet = { BindTarget = ScopedBeatmapSet },
                             },
                         },
                         new GridContainer
@@ -157,11 +166,12 @@ namespace osu.Game.Screens.SelectV2
                                         Text = UserInterfaceStrings.ShowConverts,
                                         Height = 30f,
                                     },
-                                    keySoundPreviewButton = new ShearedToggleButton
+                                    keySoundPreviewButton = new ShearedTriStateButton
                                     {
                                         Anchor = Anchor.TopCentre,
                                         Origin = Anchor.TopCentre,
                                         Text = "kSound",
+                                        TooltipText = EzSongSelectStrings.KEY_SOUND_PREVIEW_TOOLTIP,
                                         Height = 30f,
                                     },
                                 },
@@ -236,8 +246,8 @@ namespace osu.Game.Screens.SelectV2
                                     {
                                         Anchor = Anchor.Centre,
                                         Origin = Anchor.Centre,
-                                        Text = "xxy_SR",
-                                        TooltipText = "(NoActive)Filter, sort beatmaps by Xxy Star Rating",
+                                        Text = "xxy SR",
+                                        TooltipText = EzSongSelectStrings.XXY_SR_FILTER_TOOLTIP,
                                         Height = 30f,
                                     },
                                 },
@@ -245,7 +255,7 @@ namespace osu.Game.Screens.SelectV2
                         },
                         new ScopedBeatmapSetDisplay
                         {
-                            ScopedBeatmapSet = ScopedBeatmapSet,
+                            ScopedBeatmapSet = { BindTarget = ScopedBeatmapSet },
                         }
                     },
                 }
@@ -263,7 +273,7 @@ namespace osu.Game.Screens.SelectV2
             difficultyRangeSlider.UpperBound = config.GetBindable<double>(OsuSetting.DisplayStarsMaximum);
             ezConfig.BindWith(Ez2Setting.KpcDisplayMode, kpcDropdown.Current);
             ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
-            ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
+            ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, keySoundPreviewButton.State);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
             config.BindWith(OsuSetting.SongSelectGroupMode, groupDropdown.Current);
@@ -375,6 +385,9 @@ namespace osu.Game.Screens.SelectV2
             criteria.RulesetCriteria = ruleset.Value.CreateInstance().CreateRulesetFilterCriteria();
 
             FilterQueryParser.ApplyQueries(criteria, query);
+
+            ApplyRequiredCriteria?.Invoke(criteria);
+
             return criteria;
         }
 
@@ -412,7 +425,7 @@ namespace osu.Game.Screens.SelectV2
         {
             if (clearScopedSet && ScopedBeatmapSet.Value != null)
             {
-                ScopedBeatmapSet.Value = null;
+                songSelect?.UnscopeBeatmapSet();
                 // because `ScopedBeatmapSet` has a value change callback bound to it that calls `updateCriteria()` again,
                 // we can just do nothing other than clear it to avoid extra work and duplicated `CriteriaChanged` invocations
                 return;
@@ -445,34 +458,22 @@ namespace osu.Game.Screens.SelectV2
 
         internal partial class SongSelectSearchTextBox : ShearedFilterTextBox
         {
-            public Bindable<BeatmapSetInfo?> ScopedBeatmapSet
-            {
-                get => scopedBeatmapSet.Current;
-                set => scopedBeatmapSet.Current = value;
-            }
-
-            private readonly BindableWithCurrent<BeatmapSetInfo?> scopedBeatmapSet = new BindableWithCurrent<BeatmapSetInfo?>();
+            public IBindable<BeatmapSetInfo?> ScopedBeatmapSet { get; } = new Bindable<BeatmapSetInfo?>();
 
             protected override InnerSearchTextBox CreateInnerTextBox() => new InnerTextBox
             {
-                ScopedBeatmapSet = ScopedBeatmapSet,
+                ScopedBeatmapSet = { BindTarget = ScopedBeatmapSet },
             };
 
             private partial class InnerTextBox : InnerFilterTextBox
             {
-                public Bindable<BeatmapSetInfo?> ScopedBeatmapSet
-                {
-                    get => scopedBeatmapSet.Current;
-                    set => scopedBeatmapSet.Current = value;
-                }
-
-                private readonly BindableWithCurrent<BeatmapSetInfo?> scopedBeatmapSet = new BindableWithCurrent<BeatmapSetInfo?>();
+                public IBindable<BeatmapSetInfo?> ScopedBeatmapSet { get; } = new Bindable<BeatmapSetInfo?>();
 
                 public override bool HandleLeftRightArrows => false;
 
                 public override bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
                 {
-                    if (e.Action == GlobalAction.Back && scopedBeatmapSet.Value != null)
+                    if (e.Action == GlobalAction.Back && ScopedBeatmapSet.Value != null)
                         return false;
 
                     return base.OnPressed(e);

@@ -1,20 +1,20 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using osu.Framework.Allocation;
-using osu.Framework.Audio;
-using osu.Framework.Graphics;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
+using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
-using osu.Game.LAsEzExtensions.Audio;
+using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.Localisation;
 using osu.Framework.Logging;
+using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.Audio
 {
@@ -44,7 +44,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 new SettingsItemV2(dropdown = new AudioDeviceDropdown
                 {
                     Caption = AudioSettingsStrings.OutputDevice,
-                    HintText = "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive.",
+                    HintText =
+                        "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive.",
                 })
                 {
                     Keywords = new[] { "speaker", "headphone", "output" },

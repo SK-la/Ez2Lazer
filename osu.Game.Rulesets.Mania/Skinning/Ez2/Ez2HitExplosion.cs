@@ -23,11 +23,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private Column column { get; set; } = null!;
 
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-
         private Container largeFaint = null!;
 
-        private Bindable<Color4> accentColour = null!;
+        private readonly IBindable<Color4> accentColourLocal = new Bindable<Color4>();
 
         public Ez2HitExplosion()
         {
@@ -70,22 +68,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 },
             };
 
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
+            accentColourLocal.BindTo(column.AccentColour);
 
-            accentColour = column.AccentColour.GetBoundCopy();
-            accentColour.BindValueChanged(colour =>
+            void applyAccent(Color4 c)
             {
-                largeFaint.Colour = Interpolation.ValueAt(0.8f, colour.NewValue, Color4.White, 0, 1);
+                largeFaint.Colour = Interpolation.ValueAt(0.8f, accentColourLocal.Value, Color4.White, 0, 1);
 
                 largeFaint.EdgeEffect = new EdgeEffectParameters
                 {
                     Type = EdgeEffectType.Glow,
-                    Colour = colour.NewValue,
+                    Colour = accentColourLocal.Value,
                     Roundness = NoteHeight,
                     Radius = 50,
                 };
-            }, true);
+            }
+
+            applyAccent(accentColourLocal.Value);
+            accentColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
@@ -96,6 +95,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         public void Animate(JudgementResult result)
         {
             this.FadeOutFromOne(PoolableHitExplosion.DURATION, Easing.Out);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                accentColourLocal.UnbindBindings();
+            }
+
+            base.Dispose(isDisposing);
         }
     }
 }

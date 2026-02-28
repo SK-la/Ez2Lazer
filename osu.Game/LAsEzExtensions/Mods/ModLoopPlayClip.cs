@@ -3,9 +3,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
@@ -13,11 +13,10 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
-using osu.Framework.Platform;
 using osu.Game.Screens.Play;
-using osu.Game.Screens.Play.HUD;
 
 namespace osu.Game.LAsEzExtensions.Mods
 {
@@ -30,12 +29,13 @@ namespace osu.Game.LAsEzExtensions.Mods
                                    IApplicableToPlayer,
                                    IApplicableToHUD,
                                    IApplicableFailOverride,
-                                   IApplicableToRate
+                                   IApplicableToRate,
+                                   IHasApplyOrder
     {
         public override string Name => "Loop Play Clip (No Fail)";
 
         public override string Acronym => "LP";
-        public override LocalisableString Description => EzModStrings.LoopPlayClip_Description;
+        public override LocalisableString Description => LoopPlayClipStrings.LOOP_PLAY_CLIP_DESCRIPTION;
 
         public override double ScoreMultiplier => 1;
 
@@ -50,7 +50,6 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         public bool RestartOnFail => false;
 
-        // LP 内置变速（复刻 HT 的实现）后，为避免叠加导致体验混乱，直接与其它变速 Mod 互斥。
         public override Type[] IncompatibleMods => new[]
         {
             typeof(ModRateAdjust),
@@ -65,7 +64,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             {
                 yield return ($"Speed x{SpeedChange.Value:N2}", AdjustPitch.Value ? "Pitch Adjusted" : "Pitch Unchanged");
                 yield return ($"{LoopCount.Value}", "Loop Count");
-                yield return ("Break", $"{BreakQuarter.Value} × 1/4 beat");
+                yield return ("Break", $"{BreakQuarter.Value} × 1/2 beat");
                 yield return ("Start", $"{(CutTimeStart.Value is null ? "Original Start Time" : Millisecond.Value ? $"{CutTimeStart.Value} ms" : GetStringTime((int)CutTimeStart.Value))}");
                 yield return ("End", $"{(CutTimeEnd.Value is null ? "Original End Time" : Millisecond.Value ? $"{CutTimeEnd.Value} ms" : GetStringTime((int)CutTimeEnd.Value))}");
                 yield return ("Infinite Loop", InfiniteLoop.Value ? "Enabled" : "Disabled");
@@ -81,7 +80,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             return $"{minus}{minute}:{secondLessThan10}{second:N1}";
         }
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.LoopCount_Label), nameof(EzModStrings.LoopCount_Description))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.LOOP_COUNT_LABEL), nameof(LoopPlayClipStrings.LOOP_COUNT_DESCRIPTION))]
         public BindableInt LoopCount { get; set; } = new BindableInt(20)
         {
             MinValue = 1,
@@ -89,7 +88,8 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.SpeedChange_Label), nameof(EzModStrings.SpeedChange_Description), SettingControlType = typeof(MultiplierSettingsSlider))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION),
+            SettingControlType = typeof(MultiplierSettingsSlider))]
         public BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
         {
             MinValue = 0.5,
@@ -97,10 +97,10 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 0.01,
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.AdjustPitch_Label), nameof(EzModStrings.AdjustPitch_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
         public BindableBool AdjustPitch { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.ConstantSpeed_Label), nameof(EzModStrings.ConstantSpeed_Description))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CONSTANT_SPEED_LABEL), nameof(LoopPlayClipStrings.CONSTANT_SPEED_DESCRIPTION))]
         public BindableBool ConstantSpeed { get; } = new BindableBool(true);
 
         /*[SettingSource("Cut Time Start", "Select your part(second).", SettingControlType = typeof(SettingsSlider<int, CutStart>))]
@@ -111,7 +111,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.CutTimeEnd_Label), nameof(EzModStrings.CutTimeEnd_Description), SettingControlType = typeof(SettingsSlider<int, CutEnd>))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CUT_END_TIME_LABEL), nameof(LoopPlayClipStrings.CUT_END_TIME_DESCRIPTION), SettingControlType = typeof(SettingsSlider<int, CutEnd>))]
         public BindableInt CutTimeEnd { get; set; } = new BindableInt(1800)
         {
             MinValue = -10,
@@ -119,36 +119,38 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 1
         };*/
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.CutStartTime_Label), nameof(EzModStrings.CutStartTime_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CUT_START_TIME_LABEL), nameof(LoopPlayClipStrings.CUT_START_TIME_DESCRIPTION),
+            SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> CutTimeStart { get; set; } = new Bindable<int?>();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.CutEndTime_Label), nameof(EzModStrings.CutEndTime_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.CUT_END_TIME_LABEL), nameof(LoopPlayClipStrings.CUT_END_TIME_DESCRIPTION),
+            SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> CutTimeEnd { get; set; } = new Bindable<int?>();
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.UseMillisecond_Label), nameof(EzModStrings.UseMillisecond_Description))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.USE_MILLISECOND_LABEL), nameof(LoopPlayClipStrings.USE_MILLISECOND_DESCRIPTION))]
         public BindableBool Millisecond { get; set; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.UseGlobalABRange_Label), nameof(EzModStrings.UseGlobalABRange_Description))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.USE_GLOBAL_AB_RANGE_LABEL), nameof(LoopPlayClipStrings.USE_GLOBAL_AB_RANGE_DESCRIPTION))]
         public BindableBool UseGlobalAbRange { get; set; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.BreakTime_Label), nameof(EzModStrings.BreakTime_Description))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.BREAK_TIME_LABEL), nameof(LoopPlayClipStrings.BREAK_TIME_DESCRIPTION))]
         public BindableInt BreakQuarter { get; set; } = new BindableInt(4)
         {
-            MinValue = 1,
+            MinValue = 0,
             MaxValue = 12,
             Precision = 1
         };
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Random_Label), nameof(EzModStrings.Random_Description))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.RANDOM_LABEL), nameof(LoopPlayClipStrings.RANDOM_DESCRIPTION))]
         public BindableBool Rand { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Mirror_Label), nameof(EzModStrings.Mirror_Description))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.MIRROR_LABEL), nameof(EzCommonModStrings.MIRROR_DESCRIPTION))]
         public BindableBool Mirror { get; set; } = new BindableBool(true);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.InfiniteLoop_Label), nameof(EzModStrings.InfiniteLoop_Description))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.INFINITE_LOOP_LABEL), nameof(LoopPlayClipStrings.INFINITE_LOOP_DESCRIPTION))]
         public BindableBool InfiniteLoop { get; set; } = new BindableBool(false);
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.MirrorTime_Label), nameof(EzModStrings.MirrorTime_Description))]
+        [SettingSource(typeof(LoopPlayClipStrings), nameof(LoopPlayClipStrings.MIRROR_TIME_LABEL), nameof(LoopPlayClipStrings.MIRROR_TIME_DESCRIPTION))]
         public BindableInt MirrorTime { get; set; } = new BindableInt(1)
         {
             MinValue = 1,
@@ -167,8 +169,17 @@ namespace osu.Game.LAsEzExtensions.Mods
         //    Precision = 1
         //};
 
-        [SettingSource(typeof(EzModStrings), nameof(EzModStrings.Seed_Label), nameof(EzModStrings.Seed_Description), SettingControlType = typeof(SettingsNumberBox))]
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>(114514);
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(100)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         private readonly DuplicateVirtualTrack duplicateTrack;
         private IWorkingBeatmap? pendingWorkingBeatmap;
@@ -352,29 +363,14 @@ namespace osu.Game.LAsEzExtensions.Mods
             double start = ResolvedCutTimeStart;
             double end = ResolvedCutTimeEnd;
 
-            // 计算总偏移量（全局用户偏移 + 谱面特定偏移 + 平台偏移）
+            // 计算总偏移量（全局用户偏移 + 谱面特定偏移 + 平台偏移），实际多数情况为0
             double totalOffset = getAppliedOffsetMs(beatmap);
+            double audioStart = start - totalOffset;
+            double audioEnd = end - totalOffset;
 
-            // DuplicateVirtualTrack使用独立的Track，不应用偏移，所以需要手动应用偏移
-            // 以匹配beatmap的FramedBeatmapClock行为
-            double audioStart = start + totalOffset;
-            double audioEnd = end + totalOffset;
-
-            // Compute loop interval in milliseconds as a multiple of a quarter-beat at the slice start.
-            double loopIntervalMs;
-
-            try
-            {
-                var timing = beatmap.Beatmap.ControlPointInfo.TimingPointAt(start);
-                // BeatLength is ms per beat; quarter-beat is BeatLength / 4.
-                double quarterMs = timing.BeatLength / 4.0;
-                loopIntervalMs = quarterMs * Math.Max(1, BreakQuarter.Value);
-            }
-            catch
-            {
-                // Fallback: treat quarter as 250ms (i.e. 60 BPM) if timing unavailable.
-                loopIntervalMs = 250 * Math.Max(1, BreakQuarter.Value);
-            }
+            var timing = beatmap.Beatmap.ControlPointInfo.TimingPointAt(start);
+            double halfBeatMs = timing.BeatLength / 2.0;
+            double loopIntervalMs = halfBeatMs * Math.Max(1, BreakQuarter.Value);
 
             return new OverrideSettings
             {
@@ -396,19 +392,11 @@ namespace osu.Game.LAsEzExtensions.Mods
         /// </summary>
         private double getAppliedOffsetMs(IWorkingBeatmap beatmap)
         {
-            // 暂时简化，假设偏移为0，因为用户说"和offset无关"
-            return 0;
-
-            // 获取全局音频偏移设置
-            // double globalOffset = OsuSetting.AudioOffset.Value;
-
             // 获取谱面特定偏移
-            // double beatmapOffset = beatmap.BeatmapInfo.OnlineOffset;
-
-            // 获取平台偏移（Windows通常是+15ms）
-            // double platformOffset = RuntimeInfo.OS == RuntimeInfo.Platform.Windows ? 15 : 0;
-
-            // return globalOffset + beatmapOffset + platformOffset;
+            double audioLeadIn = beatmap.Beatmap.AudioLeadIn;
+            double beatmapOffset = beatmap.Beatmap.CountdownOffset;
+            Logger.Log($"[ModLoopPlayClip] AudioLeadIn = {audioLeadIn}, Beatmap CountdownOffset = {beatmapOffset}");
+            return audioLeadIn + beatmapOffset;
         }
 
         // 获取原始音谱边界
@@ -432,7 +420,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             duplicateTrack.StopPreview();
 
             // 从父容器中移除 duplicateTrack（如果已加入），确保 mod 关闭时不会残留在 HUD 中或影响后续音频。
-            if (duplicateTrack.Parent is osu.Framework.Graphics.Containers.Container c)
+            if (duplicateTrack.Parent is Container c)
                 c.Remove(duplicateTrack, false);
         }
 
@@ -473,5 +461,52 @@ namespace osu.Game.LAsEzExtensions.Mods
             double length = Math.Max(0, cutTimeEnd - cutTimeStart);
             return (cutTimeStart, cutTimeEnd, length);
         }
+    }
+
+    public static class LoopPlayClipStrings
+    {
+        public static readonly LocalisableString LOOP_PLAY_CLIP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "将谱面切割成片段用于循环练习。",
+            "Cut the beatmap into a clip for loop practice. (The original is YuLiangSSS's Duplicate Mod)");
+
+        public static readonly LocalisableString LOOP_COUNT_LABEL = new EzLocalizationManager.EzLocalisableString("循环次数", "Loop Count");
+        public static readonly LocalisableString LOOP_COUNT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("切片循环次数", "Loop Clip Count.");
+
+        public static readonly LocalisableString CONSTANT_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("无SV变速", "Constant Speed");
+
+        public static readonly LocalisableString CONSTANT_SPEED_DESCRIPTION =
+            new EzLocalizationManager.EzLocalisableString("去除SV变速。（恒定速度/忽略谱面中的变速）", "Constant Speed. No more tricky speed changes.(恒定速度/忽略谱面中的变速)");
+
+        public static readonly LocalisableString CUT_START_TIME_LABEL = new EzLocalizationManager.EzLocalisableString("切片开始时间", "Cut Start Time");
+        public static readonly LocalisableString CUT_START_TIME_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("切片开始时间, 默认是秒。推荐通过谱面编辑器A-B控件设置，可自动输入", "Cut StartTime. Default is second.");
+        public static readonly LocalisableString CUT_END_TIME_LABEL = new EzLocalizationManager.EzLocalisableString("切片结束时间", "Cut End Time");
+        public static readonly LocalisableString CUT_END_TIME_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("切片结束时间, 默认是秒。推荐通过谱面编辑器A-B控件设置，可自动输入", "Cut EndTime. Default is second.");
+
+        public static readonly LocalisableString USE_MILLISECOND_LABEL = new EzLocalizationManager.EzLocalisableString("使用毫秒", "Use Millisecond");
+        public static readonly LocalisableString USE_MILLISECOND_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("改为使用ms单位", "Use millisecond(ms).");
+
+        public static readonly LocalisableString USE_GLOBAL_AB_RANGE_LABEL = new EzLocalizationManager.EzLocalisableString("使用全局A-B范围", "Use Global A-B Range");
+
+        public static readonly LocalisableString USE_GLOBAL_AB_RANGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "始终使用谱面编辑器中A/B空间设置的范围（毫秒）。推荐保持开启",
+            "Use global A-B range. Always use the editor A/B range stored for this session (ms).");
+
+        public static readonly LocalisableString BREAK_TIME_LABEL = new EzLocalizationManager.EzLocalisableString("休息时间", "Break Time");
+
+        public static readonly LocalisableString BREAK_TIME_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "设置两个切片循环之间的休息时间（以四分之一拍为单位，范围 1-12，默认 4）",
+            "Set the break between clip loops as multiples of 1/4 beat (1-12, default 4).");
+
+        public static readonly LocalisableString RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("随机", "Random");
+        public static readonly LocalisableString RANDOM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("在切片每次重复时进行随机", "Random. Do a Random on every duplicate.");
+
+        public static readonly LocalisableString MIRROR_TIME_LABEL = new EzLocalizationManager.EzLocalisableString("镜像时间", "Mirror Time");
+        public static readonly LocalisableString MIRROR_TIME_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("每隔多少次循环做一次镜像", "Mirror Time. Every next time part will be mirrored.");
+
+        public static readonly LocalisableString INFINITE_LOOP_LABEL = new EzLocalizationManager.EzLocalisableString("无限循环", "Infinite Loop");
+
+        public static readonly LocalisableString INFINITE_LOOP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "启用无限循环播放。游戏中必须使用Esc退出才能结束，无法获得成绩结算。",
+            "Infinite Loop. Enable infinite loop playback. You must use Esc to exit in the game to end, and you cannot get score settlement.");
     }
 }

@@ -7,13 +7,13 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Audio;
 using osu.Game.Configuration;
+using osu.Game.Localisation;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osuTK;
-using osu.Game.Localisation;
 
 namespace osu.Game.Screens.Play.HUD
 {

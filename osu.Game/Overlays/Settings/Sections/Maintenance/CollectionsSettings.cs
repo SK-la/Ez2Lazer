@@ -49,7 +49,8 @@ namespace osu.Game.Overlays.Settings.Sections.Maintenance
                 }
             });
 
-            notificationOverlay?.Post(new ProgressCompletionNotification { Text = anyDeleted ? MaintenanceSettingsStrings.DeletedAllCollections : MaintenanceSettingsStrings.NoCollectionsFoundToDelete });
+            notificationOverlay?.Post(new ProgressCompletionNotification
+                { Text = anyDeleted ? MaintenanceSettingsStrings.DeletedAllCollections : MaintenanceSettingsStrings.NoCollectionsFoundToDelete });
         }
     }
 }

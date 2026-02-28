@@ -1,17 +1,18 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
-using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens;
-using osuTK;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.UI;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -36,21 +37,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        // private IBindable<Colour4> columnColorBindable = null!;
-        protected Bindable<bool> EnabledColor = null!;
-        protected Bindable<Vector2> NoteSize = null!;
-        protected Bindable<string> NoteSetName = null!;
+        protected readonly IBindable<Colour4> ColumnColorBindable = new Bindable<Colour4>();
+        protected readonly IBindable<string> NoteSetName = new Bindable<string>();
+        protected readonly IBindable<bool> EnabledColor = new Bindable<bool>();
+        protected readonly IBindable<Vector2> NoteSize = new Bindable<Vector2>();
         protected int KeyMode;
         protected int ColumnIndex;
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             KeyMode = StageDefinition.Columns;
             ColumnIndex = Column.Index;
-            EnabledColor = EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
-            // columnColorBindable = EzSkinConfig.GetColumnColorBindable(KeyMode, ColumnIndex);
-            NoteSetName = EzSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
 
             createSeparators();
             MainContainer = new Container
@@ -60,8 +58,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Origin = Anchor.Centre,
             };
             AddInternal(MainContainer); //允许多个子元素
-
-            UpdateSize();
             Scheduler.AddOnce(OnDrawableChanged);
         }
 
@@ -100,70 +96,93 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
 
-            NoteSetName.BindValueChanged(OnNoteChanged);
-            NoteSize.BindValueChanged(_ => UpdateSize(), true);
-            EnabledColor.BindValueChanged(_ => UpdateColor(), true);
-            EzSkinConfig.OnNoteColourChanged += UpdateColor;
-            EzSkinConfig.OnNoteSizeChanged += (() =>
-            {
-                UpdatedColor = false;
-                UpdateSize();
-            });
-            // columnColorBindable.BindValueChanged(_ => UpdateColor(), true);
+            EnabledColor.BindTo(EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled));
+            NoteSetName.BindTo(Column.NoteSetBindable);
+            NoteSize.BindTo(Column.NoteSizeBindable);
+
+            // Use a per-column watcher to avoid creating an event handler delegate per-note.
+            ColumnWatcher.GetOrCreate(Column).Add(this);
+
+            UpdateSize();
         }
 
-        protected bool UpdatedColor;
+        private Colour4 lastNoteColor = Colour4.White;
+        private bool lastNoteColorCached;
 
-        private void OnNoteChanged(ValueChangedEvent<string> obj)
+        private void OnNoteSetChanged()
         {
-            if (string.IsNullOrEmpty(obj.NewValue))
+            if (string.IsNullOrEmpty(NoteSetName.Value))
                 return;
 
             MainContainer?.Clear();
+            lastNoteColorCached = false;
 
             Scheduler.AddOnce(OnDrawableChanged);
         }
 
-        protected override void Update()
-        {
-            base.Update();
-
-            if (!UpdatedColor)
-                UpdateColor();
-        }
-
         protected virtual void UpdateSize()
         {
-            NoteSize = Factory.GetNoteSize(KeyMode, ColumnIndex);
+            lastNoteColorCached = false;
             UpdateColor();
+
+            // if (LineContainer?.Children != null)
+            // {
+            //     foreach (var child in LineContainer.Children)
+            //     {
+            //         if (child is EzNoteSideLine sideLine)
+            //             sideLine.UpdateTrackLineHeight();
+            //     }
+            // }
         }
 
         protected virtual void UpdateColor()
         {
-            if (BoolUpdateColor)
+            // TODO： 命中HMT面条时，考虑是否跳过面头着色，只更新面身。
+            // 或者单独做一个着色拓展设置，比如“仅着色面身”“着色面头和面身”“不着色”等等。
+            // 或者，不着色时，使用新的开关拓展，在Middle中进一步单独管理着色
+            if (MainContainer != null)
             {
-                // TODO： 命中HMT面条时，考虑是否跳过面头着色，只更新面身。
-                // 或者单独做一个着色拓展设置，比如“仅着色面身”“着色面头和面身”“不着色”等等。
-                // 或者，不着色时，使用新的开关拓展，在Middle中进一步单独管理着色
-                if (MainContainer != null)
-                    MainContainer.Colour = NoteColor;
+                Colour4 targetColor = NoteColor;
 
-                if (LineContainer?.Children != null)
+                if (!lastNoteColorCached || lastNoteColor != targetColor)
                 {
-                    foreach (var child in LineContainer.Children)
-                    {
-                        if (child is EzNoteSideLine sideLine)
-                            sideLine.UpdateGlowEffect(NoteColor);
-                    }
+                    MainContainer.Colour = targetColor;
+                    lastNoteColor = targetColor;
+                    lastNoteColorCached = true;
                 }
-
-                UpdatedColor = true;
             }
+
+            // if (LineContainer?.Children != null)
+            // {
+            //     foreach (var child in LineContainer.Children)
+            //     {
+            //         if (child is EzNoteSideLine sideLine)
+            //             sideLine.UpdateGlowEffect(NoteColor);
+            //     }
+            // }
         }
 
-        protected virtual Colour4 NoteColor => (EnabledColor.Value && UseColorization)
-            ? EzSkinConfig.GetColumnColor(KeyMode, ColumnIndex)
-            : Colour4.White;
+        private void OnColourChanged()
+        {
+            lastNoteColorCached = false;
+            UpdateColor();
+        }
+
+        private void OnNoteSizeChanged()
+        {
+            UpdateSize();
+        }
+
+        protected virtual Colour4 NoteColor
+        {
+            get
+            {
+                if (!EnabledColor.Value || !UseColorization)
+                    return Colour4.White;
+
+                return Column.EzColumnColourBindable?.Value ?? Colour4.White;
+            }
+        }
 
         protected virtual string ColorPrefix
         {
@@ -171,7 +190,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 if (EnabledColor.Value) return "white";
 
-                EzColumnType keyType = EzSkinConfig.GetColumnType(KeyMode, ColumnIndex);
+                EzColumnType keyType = EzSkinConfig.GetColumnTypeFast(KeyMode, ColumnIndex);
 
                 return keyType switch
                 {
@@ -189,11 +208,123 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void Dispose(bool isDisposing)
         {
-            base.Dispose(isDisposing);
+            if (isDisposing)
+            {
+                ColumnWatcher.Remove(Column, this);
+            }
 
-            EzLocalTextureFactory.ClearGlobalCache();
-            EzSkinConfig.OnNoteColourChanged -= UpdateColor;
-            EzSkinConfig.OnNoteSizeChanged -= UpdateSize;
+            base.Dispose(isDisposing);
+        }
+
+        // Forwarders used by ColumnWatcher when broadcasting per-column changes to instances.
+        internal void ForwardOnNoteSetChanged() => OnNoteSetChanged();
+        internal void ForwardOnColourChanged() => OnColourChanged();
+        internal void ForwardOnNoteSizeChanged() => OnNoteSizeChanged();
+
+        private class ColumnWatcher
+        {
+            private readonly Column column;
+            private readonly List<WeakReference<EzNoteBase>> notes = new List<WeakReference<EzNoteBase>>();
+
+            public ColumnWatcher(Column column)
+            {
+                this.column = column;
+                column.NoteSetChanged += onNoteSetChanged;
+                column.NoteColourChanged += onNoteColourChanged;
+                column.NoteSizeChanged += onNoteSizeChanged;
+            }
+
+            public void Add(EzNoteBase note)
+            {
+                // store weak reference to avoid preventing note GC if removed elsewhere
+                notes.Add(new WeakReference<EzNoteBase>(note));
+            }
+
+            public void Remove(EzNoteBase note)
+            {
+                notes.RemoveAll(wr => !wr.TryGetTarget(out var target) || ReferenceEquals(target, note));
+            }
+
+            private void onNoteSetChanged()
+            {
+                // iterate backwards and remove dead weak references in-place to avoid
+                // allocating a large temporary array when the column has many notes.
+                for (int i = notes.Count - 1; i >= 0; i--)
+                {
+                    var wr = notes[i];
+                    if (wr.TryGetTarget(out var target))
+                        target.ForwardOnNoteSetChanged();
+                    else
+                        notes.RemoveAt(i);
+                }
+            }
+
+            private void onNoteColourChanged()
+            {
+                for (int i = notes.Count - 1; i >= 0; i--)
+                {
+                    var wr = notes[i];
+                    if (wr.TryGetTarget(out var target))
+                        target.ForwardOnColourChanged();
+                    else
+                        notes.RemoveAt(i);
+                }
+            }
+
+            private void onNoteSizeChanged()
+            {
+                for (int i = notes.Count - 1; i >= 0; i--)
+                {
+                    var wr = notes[i];
+                    if (wr.TryGetTarget(out var target))
+                        target.ForwardOnNoteSizeChanged();
+                    else
+                        notes.RemoveAt(i);
+                }
+            }
+
+            public void Unsubscribe()
+            {
+                column.NoteSetChanged -= onNoteSetChanged;
+                column.NoteColourChanged -= onNoteColourChanged;
+                column.NoteSizeChanged -= onNoteSizeChanged;
+            }
+
+            public bool IsEmpty => notes.All(wr => !wr.TryGetTarget(out _));
+
+            private static readonly Dictionary<Column, ColumnWatcher> watchers = new Dictionary<Column, ColumnWatcher>();
+            private static readonly object watcher_lock = new object();
+
+            public static ColumnWatcher GetOrCreate(Column c)
+            {
+                lock (watcher_lock)
+                {
+                    if (!watchers.TryGetValue(c, out var w))
+                    {
+                        w = new ColumnWatcher(c);
+                        watchers[c] = w;
+                    }
+
+                    return w;
+                }
+            }
+
+            public static void Remove(Column c, EzNoteBase note)
+            {
+                lock (watcher_lock)
+                {
+                    if (!watchers.TryGetValue(c, out var w))
+                        return;
+
+                    w.Remove(note);
+
+                    if (w.IsEmpty)
+                    {
+                        w.Unsubscribe();
+                        watchers.Remove(c);
+                    }
+                }
+            }
         }
     }
 }

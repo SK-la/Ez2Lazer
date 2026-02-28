@@ -8,6 +8,7 @@ using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.Gameplay
@@ -56,7 +57,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
             {
                 Add(new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzLocalizationManager.DisableCmdSpace,
+                    Caption = EzSettingsStrings.DISABLE_CMD_SPACE,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDisableCmdSpace)
                 }));
             }

@@ -63,7 +63,6 @@ namespace osu.Game.Rulesets.Mania.Configuration
         };
     }
 
-    // TODO: 未来应考虑完全迁移到Ez2Setting中
     public enum ManiaRulesetSetting
     {
         ScrollStyle,

@@ -22,13 +22,15 @@ using osu.Framework.Screens;
 using osu.Game.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Screens;
+using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Online.Placeholders;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.Volume;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
@@ -65,7 +67,10 @@ namespace osu.Game.Screens.Ranking
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private Bindable<EzMUGHitMode> hitModeBindable = new Bindable<EzMUGHitMode>();
+        private Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
+        private Bindable<double> offsetPlusMania = new Bindable<double>();
+
+        // private ScheduledDelegate? offsetPlusManiaScheduled;
 
         private bool skipExitTransition;
 
@@ -239,11 +244,14 @@ namespace osu.Game.Screens.Ranking
             if (Score?.BeatmapInfo != null)
                 buttons.Add(new CollectionButton(Score.BeatmapInfo));
 
+            if (Score?.BeatmapInfo != null)
+                buttons.Add(new ExportButton(Score.BeatmapInfo));
+
             if (Score?.BeatmapInfo?.BeatmapSet != null && Score.BeatmapInfo.BeatmapSet.OnlineID > 0)
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
 
             // 底部增加按钮
-            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
             buttons.Add(new HitModeButton(hitModeBindable));
 
             // Add settings button (placeholder)
@@ -252,7 +260,32 @@ namespace osu.Game.Screens.Ranking
                 Icon = FontAwesome.Solid.Cog,
                 Action = () =>
                 {
-                     /* TODO: show settings menu */
+                    /* TODO: show settings menu */
+                }
+            });
+
+            // 添加一个与 OffsetPlusMania 双向绑定的滑条，显示在齿轮右侧
+            offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+            buttons.Add(new FillFlowContainer
+            {
+                AutoSizeAxes = Axes.Both,
+                Children = new Drawable[]
+                {
+                    new OsuSpriteText
+                    {
+                        Text = "HitResult Offset",
+                        Font = OsuFont.Default.With(size: 14),
+                        Margin = new MarginPadding { Left = 5 },
+                    },
+                    new SettingsSlider<double>
+                    {
+                        // 只自动适应高度，避免与父容器的相对宽度冲突
+                        AutoSizeAxes = Axes.Y,
+                        // 不使用相对大小，使用固定宽度以避免与父容器 AutoSize 冲突
+                        RelativeSizeAxes = Axes.None,
+                        Width = 220,
+                        Current = offsetPlusMania,
+                    }
                 }
             });
         }
@@ -266,6 +299,18 @@ namespace osu.Game.Screens.Ranking
                 Score?.HitEvents.Clear();
                 StatisticsPanel.Score.TriggerChange();
             });
+
+            // offsetPlusMania.BindValueChanged(v =>
+            // {
+            //     // debounce/defer handling by 100ms to avoid thrash when slider is dragged rapidly.
+            //     offsetPlusManiaScheduled?.Cancel();
+            //     offsetPlusManiaScheduled = Scheduler.AddDelayed(() =>
+            //     {
+            //         // 会引起重绘，除非以后实现更全面的影响，否则会先注释掉，让分析组件内部自己绑定回调
+            //         Score?.HitEvents.Clear();
+            //         StatisticsPanel.Score.TriggerChange();
+            //     }, 100);
+            // });
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
 

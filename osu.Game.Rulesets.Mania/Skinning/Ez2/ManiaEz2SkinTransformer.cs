@@ -4,10 +4,8 @@
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -15,10 +13,8 @@ using osu.Game.Rulesets.Mania.LAsEZMania;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Scoring;
-using osu.Game.Screens;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
-using osu.Game.Skinning.Components;
 using osuTK;
 using osuTK.Graphics;
 
@@ -27,7 +23,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
     public class ManiaEz2SkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
-        private readonly Ez2ConfigManager ezSkinConfig;
         private readonly IBindable<double> columnWidthBindable;
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> hitPosition;
@@ -38,17 +33,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            if (GlobalConfigStore.EzConfig == null)
-            {
-                Logger.Log("!GlobalConfigStore.EzConfig Ez2Skin", LoggingTarget.Runtime, LogLevel.Important);
-            }
+            // if (GlobalConfigStore.EzConfig == null)
+            // {
+            //     Logger.Log("!GlobalConfigStore.EzConfig Ez2Skin", LoggingTarget.Runtime, LogLevel.Important);
+            // }
 
-            ezSkinConfig = GlobalConfigStore.EzConfig!;
+            var ezSkinConfig1 = GlobalConfigStore.EzConfig;
+
             // this.ezSkinSettings = ezSkinSettings ?? throw new ArgumentNullException(nameof(ezSkinSettings));
-
-            columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
-            specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
-            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            columnWidthBindable = ezSkinConfig1.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactorBindable = ezSkinConfig1.GetBindable<double>(Ez2Setting.SpecialFactor);
+            hitPosition = ezSkinConfig1.GetBindable<double>(Ez2Setting.HitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)

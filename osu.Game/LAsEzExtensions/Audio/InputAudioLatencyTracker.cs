@@ -3,8 +3,8 @@
 
 using System;
 using osu.Framework.Allocation;
-using osu.Framework.Audio;
 using osu.Framework.Audio.EzLatency;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
 using osu.Game.LAsEzExtensions.Configuration;
@@ -25,14 +25,13 @@ namespace osu.Game.LAsEzExtensions.Audio
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notificationOverlay { get; set; }
 
-        [Resolved]
-        private AudioManager? audioManager { get; set; }
-
         private Ez2ConfigManager ezConfig { get; set; }
 
         private ScoreProcessor? scoreProcessor;
 
-        private EzLatencyManager latencyManager;
+        private readonly EzLatencyManager latencyManager;
+        private Bindable<bool>? inputAudioLatencyConfigBindable;
+        private Action<ValueChangedEvent<bool>>? inputAudioLatencyConfigHandler;
 
         /// <summary>
         /// Global instance for unified access
@@ -50,12 +49,15 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         public void Initialize(ScoreProcessor processor)
         {
-            Logger.Log($"InputAudioLatencyTracker.Initialize called", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log("InputAudioLatencyTracker.Initialize called", LoggingTarget.Runtime, LogLevel.Debug);
             scoreProcessor = processor;
 
             // 将 Ez2Setting 的启用状态绑定到 EzLatencyManager
-            var configBindable = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker);
-            latencyManager.Enabled.BindTo(configBindable);
+            inputAudioLatencyConfigBindable = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker);
+            // Avoid BindTo here to prevent repeated double-binding errors when Initialize is called multiple times.
+            // Use a one-way update from config -> latencyManager instead.
+            inputAudioLatencyConfigHandler = v => latencyManager.Enabled.Value = v.NewValue;
+            inputAudioLatencyConfigBindable.BindValueChanged(inputAudioLatencyConfigHandler, true);
 
             // 订阅延迟记录事件，用于日志输出
             latencyManager.OnNewRecord += OnLatencyRecordGenerated;
@@ -78,7 +80,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             started = true;
 
-            Logger.Log($"InputAudioLatencyTracker.Start called", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log("InputAudioLatencyTracker.Start called", LoggingTarget.Runtime, LogLevel.Debug);
 
             if (scoreProcessor != null)
                 scoreProcessor.NewJudgement += OnNewJudgement;
@@ -137,26 +139,26 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             if (!stats.HasData)
             {
-                Logger.Log($"[EzOsuLatency] No latency data available for analysis", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log("[EzOsuLatency] No latency data available for analysis", LoggingTarget.Runtime, LogLevel.Debug);
                 return;
             }
 
             // 输出统计日志
-            string message1 = $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, Input→Audio: {stats.AvgInputToPlayback:F2}ms, Audio→Judgement: {stats.AvgPlaybackToJudge:F2}ms (based on {stats.RecordCount} complete records)";
-            string message2 = $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
+            string message1 =
+                $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, Input→Audio: {stats.AvgInputToPlayback:F2}ms, Audio→Judgement: {stats.AvgPlaybackToJudge:F2}ms (based on {stats.RecordCount} complete records)";
+            string message2 =
+                $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
 
             Logger.Log($"[EzOsuLatency] Latency Analysis: {message1}");
             Logger.Log($"[EzOsuLatency] Latency Analysis: \n{message2}", LoggingTarget.Runtime, LogLevel.Important);
 
             // 显示通知
-            if (notificationOverlay != null)
+            notificationOverlay?.Post(new SimpleNotification
             {
-                notificationOverlay.Post(new SimpleNotification
-                {
-                    Text = $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms\nRecords: {stats.RecordCount}",
-                    Icon = FontAwesome.Solid.ChartLine,
-                });
-            }
+                Text =
+                    $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms\nRecords: {stats.RecordCount}",
+                Icon = FontAwesome.Solid.ChartLine,
+            });
         }
 
         private void OnNewJudgement(JudgementResult result)
@@ -185,11 +187,11 @@ namespace osu.Game.LAsEzExtensions.Audio
             Stop();
 
             // 解绑事件
-            if (latencyManager != null)
-            {
-                latencyManager.OnNewRecord -= OnLatencyRecordGenerated;
-                latencyManager.Dispose();
-            }
+            latencyManager.OnNewRecord -= OnLatencyRecordGenerated;
+            latencyManager.Dispose();
+
+            if (inputAudioLatencyConfigBindable != null && inputAudioLatencyConfigHandler != null)
+                inputAudioLatencyConfigBindable.ValueChanged -= inputAudioLatencyConfigHandler;
 
             Instance = null;
         }
@@ -206,7 +208,8 @@ namespace osu.Game.LAsEzExtensions.Audio
 
                 string keyVal = inputData.KeyValue?.ToString() ?? "-";
 
-                string line = $"[EzOsuLatency] {r.Timestamp:O} | {r.MeasuredMs:F2} ms | note={r.Note} | in={r.InputTime:F2} | key={keyVal} | play={r.PlaybackTime:F2} | judge={r.JudgeTime:F2} | driver={r.DriverTime:F2} | out_hw={r.OutputHardwareTime:F2} | in_hw={r.InputHardwareTime:F2} | diff={r.LatencyDifference:F2}";
+                string line =
+                    $"[EzOsuLatency] {r.Timestamp:O} | {r.MeasuredMs:F2} ms | note={r.Note} | in={r.InputTime:F2} | key={keyVal} | play={r.PlaybackTime:F2} | judge={r.JudgeTime:F2} | driver={r.DriverTime:F2} | out_hw={r.OutputHardwareTime:F2} | in_hw={r.InputHardwareTime:F2} | diff={r.LatencyDifference:F2}";
 
                 // extra low-level structs
                 string extra = $" | input_struct=(in={inputData.InputTime:F2}, key={inputData.KeyValue ?? "-"}, judge={inputData.JudgeTime:F2}, play={inputData.PlaybackTime:F2})" +

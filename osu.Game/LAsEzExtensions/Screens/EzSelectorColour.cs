@@ -1,3 +1,6 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -160,6 +163,17 @@ namespace osu.Game.LAsEzExtensions.Screens
 
             if (buttonsByName.TryGetValue(name, out var button))
                 button.UpdateColor(color);
+        }
+
+        public void UpdateColorMapping(Dictionary<string, Color4> newColorMapping)
+        {
+            foreach (var kvp in newColorMapping)
+            {
+                colorMap[kvp.Key] = kvp.Value;
+
+                if (buttonsByName.TryGetValue(kvp.Key, out var button))
+                    button.UpdateColor(kvp.Value);
+            }
         }
 
         private Color4 getColorForName(string name)

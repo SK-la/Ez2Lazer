@@ -20,6 +20,9 @@ using osu.Game.Extensions;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.UserInterface;
+using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
@@ -62,6 +65,7 @@ namespace osu.Game.Screens.SelectV2
         private FavouriteButton favouriteButton = null!;
         private Statistic lengthStatistic = null!;
         private Statistic bpmStatistic = null!;
+        private EzDisplayKpsGraph kpsGraph = null!;
 
         [Resolved]
         private ISongSelect? songSelect { get; set; }
@@ -161,6 +165,15 @@ namespace osu.Game.Screens.SelectV2
                                     TooltipText = BeatmapsetsStrings.ShowStatsBpm,
                                     Margin = new MarginPadding { Left = 5f },
                                 },
+                                // KPS 折线图，所有模式通用。尺寸保持与统计栏高度一致。
+                                kpsGraph = new EzDisplayKpsGraph
+                                {
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Size = new Vector2(300, 30),
+                                    HoverValueEnabled = true,
+                                    Margin = new MarginPadding { Left = 5f },
+                                },
                             },
                         }),
                         new ShearAligningWrapper(new Container
@@ -240,8 +253,8 @@ namespace osu.Game.Screens.SelectV2
             artistLink.Action = () => songSelect?.Search(artistText.GetPreferred(localisation.CurrentParameters.Value.PreferOriginalScript));
             DisplayedArtist = artistText.ToString();
 
-            updateLengthAndBpmStatistics();
             updateOnlineDisplay();
+            updateLengthAndBpmStatistics();
         }
 
         private CancellationTokenSource? lengthBpmCancellationSource;
@@ -278,9 +291,21 @@ namespace osu.Game.Screens.SelectV2
 
                     bpmStatistic.Text = bpmMin == bpmMax
                         ? $"{bpmMin}"
-                        : $"{bpmMin}-{bpmMax} (mostly {mostCommonBPM})";
+                        : LocalisableString.Interpolate($"{bpmMin}-{bpmMax} ({SongSelectStrings.MostlyBPM(mostCommonBPM)})");
+
+                    // 计算并展示 KPS 折线（非阻塞，粗略采样）
+                    var (_, _, kpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
+                    kpsGraph.SetPoints(kpsList);
+                    updateKPSGraphSize();
                 });
             }, token);
+        }
+
+        private void updateKPSGraphSize()
+        {
+            float availableWidth = DrawWidth - playCount.DrawWidth - favouriteButton.DrawWidth - lengthStatistic.DrawWidth - bpmStatistic.DrawWidth - statisticsFlow.Spacing.X * 3 - SongSelect.WEDGE_CONTENT_MARGIN * 2;
+            kpsGraph.Width = availableWidth;
+            // Logger.Log($"[EzTest] T: {DrawWidth}, {playCount.DrawWidth}, {favouriteButton.DrawWidth}, {lengthStatistic.DrawWidth}, {bpmStatistic.DrawWidth}");
         }
 
         private CancellationTokenSource? onlineDisplayCancellationSource;

@@ -8,7 +8,7 @@ using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
-using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -115,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             // if (!IsLegacyScore) return;
 
-            var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
+            var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
             {
                 OverallDifficulty = od
             };
@@ -154,7 +154,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override void RemoveScoreChange(JudgementResult judgement)
         {
-            var hitWindows = new CustomHitWindowsHelper(EzMUGHitMode.Classic)
+            var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
             {
                 OverallDifficulty = od
             };

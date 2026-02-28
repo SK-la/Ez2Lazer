@@ -13,7 +13,6 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -331,4 +330,3 @@ namespace osu.Game.LAsEzExtensions.Statistics
         }
     }
 }
-

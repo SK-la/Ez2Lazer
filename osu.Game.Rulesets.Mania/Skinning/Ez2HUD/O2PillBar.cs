@@ -125,7 +125,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             ColourAccent.BindValueChanged(_ => updateAccentColour(), true);
             ColourGlow.BindValueChanged(_ => updateGlowColour(), true);
-
         }
 
         private void updateAccentColour()

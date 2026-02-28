@@ -22,6 +22,9 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
+using osu.Game.LAsEzExtensions.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
@@ -29,8 +32,6 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select.Filter;
 using osuTK;
 using osuTK.Input;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Select;
 
 namespace osu.Game.Screens.Select
 {
@@ -55,7 +56,7 @@ namespace osu.Game.Screens.Select
         private Bindable<GroupMode> groupMode;
         private FilterControlTextBox searchTextBox;
         private EzKeyModeSelector csSelector = null!;
-        private ShearedToggleButton keySoundPreviewButton = null!;
+        private ShearedTriStateButton keySoundPreviewButton = null!;
         private ShearedToggleButton xxySrFilterButton = null!;
         private CollectionDropdown collectionDropdown;
 
@@ -206,11 +207,12 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.BottomRight,
                                             Origin = Anchor.BottomRight,
                                         },
-                                        keySoundPreviewButton = new ShearedToggleButton
+                                        keySoundPreviewButton = new ShearedTriStateButton
                                         {
                                             Anchor = Anchor.TopRight,
                                             Origin = Anchor.TopRight,
                                             Text = "kSound Preview",
+                                            TooltipText = EzSongSelectStrings.KEY_SOUND_PREVIEW_TOOLTIP,
                                             Height = 30f,
                                         }
                                     }
@@ -298,7 +300,7 @@ namespace osu.Game.Screens.Select
             });
 
             ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
-            ezConfig.BindWith(Ez2Setting.KeySoundPreview, keySoundPreviewButton.Active);
+            ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, keySoundPreviewButton.State);
 
             groupMode.BindValueChanged(_ => updateCriteria());
             sortMode.BindValueChanged(_ => updateCriteria());
@@ -344,7 +346,7 @@ namespace osu.Game.Screens.Select
             csSelector?.Current.BindValueChanged(_ => updateCriteria());
             // csSelector?.EzKeyModeFilter.SelectionChanged += updateCriteria;
             xxySrFilterButton?.Active.BindValueChanged(_ => updateCriteria());
-            keySoundPreviewButton?.Active.BindValueChanged(_ => updateCriteria());
+            keySoundPreviewButton?.State.BindValueChanged(_ => updateCriteria());
         }
 
         public void Deactivate()

@@ -331,12 +331,24 @@ namespace osu.Game.Screens.Play
                 return Task.CompletedTask;
             }
 
+            double accCutoffA = ezConfig.Get<double>(Ez2Setting.AccuracyCutoffA);
+            double accCutoffS = ezConfig.Get<double>(Ez2Setting.AccuracyCutoffS);
             // 如果当前所选的 HitMode 不是 Lazer，则强制跳过上传成绩
-            var hitMode = ezConfig.Get<EzMUGHitMode>(Ez2Setting.HitMode);
+            var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode);
 
-            if (hitMode != EzMUGHitMode.Lazer)
+            if (hitMode != EzEnumHitMode.Lazer || accCutoffA != 90.0 || accCutoffS != 95.0)
             {
                 // Logger.Log("非 Lazer 模式，跳过上传成绩");
+                return Task.CompletedTask;
+            }
+
+            // 如果任一 offsetPlus 设置非0，则禁止上传成绩以防止不公平的分数提交
+            double offsetMania = ezConfig.Get<double>(Ez2Setting.OffsetPlusMania);
+            double offsetNonStd = ezConfig.Get<double>(Ez2Setting.OffsetPlusNonMania);
+
+            if (offsetMania != 0.0 || offsetNonStd != 0.0)
+            {
+                Logger.Log("OffsetPlus 设置非0，已禁止上传成绩以保证公平性.");
                 return Task.CompletedTask;
             }
 

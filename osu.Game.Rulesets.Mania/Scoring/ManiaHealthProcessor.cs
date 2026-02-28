@@ -3,8 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using osu.Framework.Logging;
-using osu.Game.LAsEzExtensions.Background;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
@@ -28,15 +26,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
             { 0.012, 0.012, 0.006, 0.000, -0.030, -0.060, -0.020 }, // raja normal
         };
 
-        private static EnumHealthMode mode = EnumHealthMode.Lazer;
+        private static EzEnumHealthMode mode = EzEnumHealthMode.Lazer;
         private static int row;
 
         public ManiaHealthProcessor(double drainStartTime)
             : base(drainStartTime)
         {
-            if (GlobalConfigStore.EzConfig != null)
-                mode = GlobalConfigStore.EzConfig.Get<EnumHealthMode>(Ez2Setting.CustomHealthMode);
-
+            mode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.CustomHealthMode);
             row = switchHealthMode(mode);
         }
 
@@ -45,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             // Base call is run only to compute HP recovery (namely, `HpMultiplierNormal`).
             // This closely mirrors (broken) behaviour of stable and as such is preserved unchanged.
             // 只有Lazer模式下，会调用此方法。从基类中计算HP作用。非Lazer模式禁止使用，否则会出现无限计算。
-            if (mode == EnumHealthMode.Lazer)
+            if (mode == EzEnumHealthMode.Lazer)
                 base.ComputeDrainRate();
 
             return 0;
@@ -60,7 +56,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             double increase = 0;
 
-            if (mode == EnumHealthMode.Lazer)
+            if (mode == EzEnumHealthMode.Lazer)
             {
                 switch (result)
                 {
@@ -97,7 +93,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 return HpMultiplierNormal * increase;
             }
 
-            if (mode == EnumHealthMode.O2JamHard || mode == EnumHealthMode.O2JamEasy || mode == EnumHealthMode.O2JamNormal)
+            if (mode == EzEnumHealthMode.O2JamHard || mode == EzEnumHealthMode.O2JamEasy || mode == EzEnumHealthMode.O2JamNormal)
             {
                 switch (hitObject)
                 {
@@ -137,9 +133,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
             // Suppress extremely small floating-point changes which are noise
             // and can cause issues (e.g. infinite loading) when treated as non-zero.
-            const double EPSILON = 1e-6;
+            const double epsilon = 1e-6;
 
-            if (Math.Abs(scaled) < EPSILON)
+            if (Math.Abs(scaled) < epsilon)
             {
                 scaled = 0;
             }
@@ -153,7 +149,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return scaled;
         }
 
-        private int switchHealthMode(EnumHealthMode mode)
+        private int switchHealthMode(EzEnumHealthMode mode)
         {
             int idx = (int)mode;
 

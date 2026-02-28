@@ -14,7 +14,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
-using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.LAsEzMania.HUD;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
@@ -23,9 +23,10 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 {
+    // 警告：此文件没写完，调查创建可能导致程序崩溃。
     public partial class Ez2KeyAreaPlus : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
+        private readonly IBindable<ScrollingDirection> directionLocal = new Bindable<ScrollingDirection>();
 
         private Container directionContainer = null!;
         private Drawable background = null!;
@@ -34,7 +35,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
 
         private Container<Circle> bottomIcon = null!;
         private CircularContainer topIcon = null!;
-        private Bindable<Color4> accentColour = null!;
+        private Box? topIconBox;
+        private readonly IBindable<Color4> accentColourLocal = new Bindable<Color4>();
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -160,31 +162,40 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 }
             };
 
+            directionLocal.BindTo(scrollingInfo.Direction);
+            directionLocal.BindValueChanged(onDirectionChanged, true);
+
             // double bpm = beatmap.BeatmapInfo.BPM;
             double bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
-            applyBlinkingEffect(topIcon, bpm);
+            // cache inner box once to avoid repeated LINQ allocation inside scheduled callback
+            topIconBox = topIcon.Children.OfType<Box>().FirstOrDefault();
+            applyBlinkingEffect(topIconBox, bpm);
 
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
+            // Use a local bindable bound to the column's shared bindable so we can safely unbind later.
+            accentColourLocal.BindTo(column.AccentColour);
 
-            accentColour = column.AccentColour.GetBoundCopy();
-            accentColour.BindValueChanged(colour =>
-                {
-                    background.Colour = colour.NewValue.Darken(0.2f);
-                    bottomIcon.Colour = colour.NewValue;
-                },
-                true);
+            void applyAccent(Color4 c)
+            {
+                background.Colour = c.Darken(0.2f);
+                bottomIcon.Colour = c;
+            }
+
+            // apply current value immediately and subscribe to future changes via local bindable
+            applyAccent(accentColourLocal.Value);
+            accentColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);
 
             column.TopLevelContainer.Add(CreateProxy());
         }
 
-        private void applyBlinkingEffect(CircularContainer container, double bpm)
+        private void applyBlinkingEffect(Box? box, double bpm)
         {
+            if (box == null) return;
+
             double interval = 60000 / bpm;
 
             Scheduler.AddDelayed(() =>
             {
-                container.Children.OfType<Box>().First().FadeTo(1, interval / 2).Then().FadeTo(0, interval / 2);
+                box.FadeTo(1, interval / 2).Then().FadeTo(0, interval / 2);
             }, interval, true);
         }
 
@@ -214,7 +225,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             Color4 lightingColour = getLightingColour();
 
             background
-                .FlashColour(accentColour.Value.Lighten(0.8f), 200, Easing.OutQuint)
+                .FlashColour(accentColourLocal.Value.Lighten(0.8f), 200, Easing.OutQuint)
                 .FadeTo(1, lighting_fade_in_duration, Easing.OutQuint)
                 .Then()
                 .FadeTo(0.8f, 500);
@@ -279,7 +290,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 Radius = 25,
             }, lighting_fade_out_duration, Easing.OutQuint);
 
-            bottomIcon.FadeColour(accentColour.Value, lighting_fade_out_duration, Easing.OutQuint);
+            bottomIcon.FadeColour(accentColourLocal.Value, lighting_fade_out_duration, Easing.OutQuint);
 
             foreach (var circle in bottomIcon)
             {
@@ -292,6 +303,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             }
         }
 
-        private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColour.Value, Color4.White, 0, 1);
+        private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColourLocal.Value, Color4.White, 0, 1);
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                accentColourLocal.UnbindBindings();
+                directionLocal.UnbindBindings();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }

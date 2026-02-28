@@ -9,12 +9,11 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
-using osu.Game.LAsEzExtensions.Background;
+using osu.Game.LAsEzExtensions.Mods;
 using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
@@ -28,9 +27,9 @@ using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
 using osu.Game.Rulesets.Mania.LAsEzMania.Analysis;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods;
+using osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Mods;
-using osu.Game.Rulesets.Mania.Mods.LAsMods;
-using osu.Game.Rulesets.Mania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
@@ -263,11 +262,18 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModCleanColumn(),
                         new ManiaModNiceBPM(),
                         new ManiaModSpaceBody(),
-                        new ManiaModLoopPlayClip(),
-                        new ManiaModSRAdjust(),
+                        new ManiaModPatternShift(),
+                        new ManiaModPatternShiftBracket(),
+                        new ManiaModPatternShiftDelay(),
+                        new ManiaModPatternShiftDump(),
+                        new ManiaModPatternShiftJack(),
+                        new ManiaModPatternShiftChord(),
                         new ManiaModKrrN2Nc(),
                         new ManiaModKrrLN(),
                         new ManiaModKrrDP(),
+                        new ManiaModReconcile(),
+                        new UniversalLoopPlayClip(),
+                        new ManiaModSRAdjust(),
                     };
 
                 case ModType.YuLiangSSS_Mod:
@@ -279,6 +285,8 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModCleaner(),
                         new ManiaModNewJudgement(),
                         new ManiaModNoteAdjust(),
+                        new ManiaModHealthAdaptive(),
+                        new ManiaModAccuracyAdaptive(),
                         new ManiaModDoublePlay(),
                         new ManiaModGracer(),
                         new ManiaModJudgmentsAdjust(),
@@ -426,7 +434,7 @@ namespace osu.Game.Rulesets.Mania
             return (PlayfieldType)Enum.GetValues(typeof(PlayfieldType)).Cast<int>().OrderDescending().First(v => variant >= v);
         }
 
-        protected override IEnumerable<HitResult> GetValidHitResults()
+        public override IEnumerable<HitResult> GetValidHitResults()
         {
             return new[]
             {
@@ -435,13 +443,11 @@ namespace osu.Game.Rulesets.Mania
                 HitResult.Good,
                 HitResult.Ok,
                 HitResult.Meh,
-                HitResult.IgnoreHit,
-                HitResult.IgnoreMiss,
-                HitResult.ComboBreak,
+                HitResult.Miss,
                 HitResult.Poor,
-
-                // HitResult.SmallBonus is used for awarding perfect bonus score but is not included here as
-                // it would be a bit redundant to show this to the user.
+                HitResult.IgnoreHit,
+                HitResult.ComboBreak,
+                HitResult.IgnoreMiss,
             };
         }
 

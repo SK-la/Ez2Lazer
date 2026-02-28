@@ -20,6 +20,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
+using osu.Game.LAsEzExtensions.Edit;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -31,7 +32,6 @@ using osu.Game.Screens.Play;
 using osu.Game.Screens.SelectV2;
 using osu.Game.Users;
 using osu.Game.Utils;
-using osu.Game.LAsEzExtensions.Screens;
 
 namespace osu.Game.Overlays.SkinEditor
 {
@@ -46,8 +46,6 @@ namespace osu.Game.Overlays.SkinEditor
         protected override bool BlockNonPositionalInput => true;
 
         private SkinEditor? skinEditor;
-
-        private EzSkinEditorScreen? ezSkinEditorScreen;
 
         [Resolved]
         private IPerformFromScreenRunner? performer { get; set; }
@@ -102,13 +100,6 @@ namespace osu.Game.Overlays.SkinEditor
             base.LoadComplete();
 
             externalEditOverlayRegistration = overlayManager?.RegisterBlockingOverlay(externalEditOverlay);
-
-            // EzSkinEditorScreen 是皮肤编辑器内的 overlay，不应 Push 到 ScreenStack。
-            // 它作为 SkinEditorOverlay 的子级存在，切换场景或退出皮肤编辑器时会自动隐藏/销毁，不与其他场景叠画。
-            AddInternal(ezSkinEditorScreen = new EzSkinEditorScreen
-            {
-                Depth = -10
-            });
         }
 
         public bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
@@ -116,12 +107,6 @@ namespace osu.Game.Overlays.SkinEditor
             switch (e.Action)
             {
                 case GlobalAction.Back:
-                    if (ezSkinEditorScreen?.State.Value == Visibility.Visible)
-                    {
-                        ToggleEzSkinEditor();
-                        return true;
-                    }
-
                     if (skinEditor?.State.Value != Visibility.Visible)
                         break;
 
@@ -176,31 +161,24 @@ namespace osu.Game.Overlays.SkinEditor
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
 
-            // 离开皮肤编辑器时确保关闭 Ez overlay。
-            ezSkinEditorScreen?.Hide();
-
             restoreSkinEditorRelevantSettings();
         }
 
         /// <summary>
-        /// 在皮肤编辑器内切换 EzSkinEditorScreen 的可见性。
+        /// 在皮肤编辑器内切换 EzSkinEditorScreen。
         /// </summary>
         public void ToggleEzSkinEditor()
         {
-            if (ezSkinEditorScreen == null)
-                return;
-
-            if (ezSkinEditorScreen.State.Value == Visibility.Visible)
+            performer?.PerformFromScreen(screen =>
             {
-                ezSkinEditorScreen.Hide();
-            }
-            else
-            {
-                ezSkinEditorScreen.Show();
+                if (State.Value != Visibility.Visible)
+                    return;
 
-                // Ensure sizing is applied immediately when showing.
-                Scheduler.AddOnce(updateScreenSizing);
-            }
+                if (screen is EzSkinEditorScreen)
+                    return;
+
+                screen.Push(new EzSkinEditorScreen());
+            }, new[] { typeof(EzSkinEditorScreen) });
         }
 
         public void PresentGameplay() => presentGameplay(false);
@@ -279,15 +257,6 @@ namespace osu.Game.Overlays.SkinEditor
                 1f - relativeToolbarHeight - padding / DrawHeight);
 
             scalingContainer.SetCustomRect(rect, true);
-
-            // Keep Ez overlay constrained to the same central preview area.
-            if (ezSkinEditorScreen != null)
-            {
-                ezSkinEditorScreen.RelativePositionAxes = Axes.Both;
-                ezSkinEditorScreen.RelativeSizeAxes = Axes.Both;
-                ezSkinEditorScreen.Position = rect.Location;
-                ezSkinEditorScreen.Size = rect.Size;
-            }
         }
 
         private void updateComponentVisibility()
@@ -320,11 +289,11 @@ namespace osu.Game.Overlays.SkinEditor
         /// </summary>
         public void SetTarget(OsuScreen screen)
         {
+            if (screen is EzSkinEditorScreen)
+                return;
+
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
-
-            // 切换场景时，Ez overlay 应当自动退出，避免与其他场景叠画。
-            ezSkinEditorScreen?.Hide();
 
             lastTargetScreen = screen;
 

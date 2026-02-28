@@ -411,7 +411,10 @@ namespace osu.Game.Screens.Edit.Compose.Components
 
                 items.Add(new OsuMenuItem(CommonStrings.ButtonsDelete, MenuItemType.Destructive, DeleteSelected)
                 {
-                    Hotkey = new Hotkey { PlatformAction = PlatformAction.Delete, KeyCombinations = [new KeyCombination(InputKey.Shift, InputKey.MouseRight), new KeyCombination(InputKey.MouseMiddle)] }
+                    Hotkey = new Hotkey
+                    {
+                        PlatformAction = PlatformAction.Delete, KeyCombinations = [new KeyCombination(InputKey.Shift, InputKey.MouseRight), new KeyCombination(InputKey.MouseMiddle)]
+                    }
                 });
 
                 return items.ToArray();

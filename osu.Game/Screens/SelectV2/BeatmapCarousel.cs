@@ -13,8 +13,8 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Extensions;
+using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
@@ -29,8 +29,11 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
 using Realms;
@@ -55,6 +58,7 @@ namespace osu.Game.Screens.SelectV2
         public const float SPACING = 3f;
 
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
+        private Bindable<bool> xxySrFilterSetting = null!;
 
         private readonly LoadingLayer loading;
 
@@ -104,14 +108,16 @@ namespace osu.Game.Screens.SelectV2
 
             Filters = new ICarouselFilter[]
             {
-                new BeatmapCarouselFilterMatching(() => Criteria!),
-                new BeatmapCarouselFilterSorting(() => Criteria!),
+                new BeatmapCarouselFilterMatching(() => Criteria!, () => shouldUseXxySrForDifficultyOperations, getDifficultyForOperationsAsync),
+                new BeatmapCarouselFilterSorting(() => Criteria!, () => shouldUseXxySrForDifficultyOperations, getDifficultyForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
                     GetCriteria = () => Criteria!,
                     GetCollections = GetAllCollections,
                     GetLocalUserTopRanks = GetBeatmapInfoGuidToTopRankMapping,
                     GetFavouriteBeatmapSets = GetFavouriteBeatmapSets,
+                    ShouldUseXxySrForDifficultyOperations = () => shouldUseXxySrForDifficultyOperations,
+                    GetDifficultyForOperationsAsync = getDifficultyForOperationsAsync,
                 }
             };
 
@@ -134,13 +140,25 @@ namespace osu.Game.Screens.SelectV2
         }
 
         [BackgroundDependencyLoader]
-        private void load(BeatmapStore beatmapStore, AudioManager audio, OsuConfigManager config, CancellationToken? cancellationToken)
+        private void load(BeatmapStore beatmapStore, AudioManager audio, OsuConfigManager config, Ez2ConfigManager ezConfig, CancellationToken? cancellationToken)
         {
             setupPools();
             detachedBeatmaps = beatmapStore.GetBeatmapSets(cancellationToken);
             loadSamples(audio);
+            xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
 
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
+        }
+
+        private bool shouldUseXxySrForDifficultyOperations => xxySrFilterSetting.Value && ruleset.Value.OnlineID == 3;
+
+        private async Task<double> getDifficultyForOperationsAsync(BeatmapInfo beatmap, CancellationToken cancellationToken)
+        {
+            if (!shouldUseXxySrForDifficultyOperations || beatmap.Ruleset.OnlineID != 3)
+                return beatmap.StarRating;
+
+            var analysis = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods.Value, cancellationToken).ConfigureAwait(false);
+            return analysis?.Details.XxySr ?? beatmap.StarRating;
         }
 
         protected override void LoadComplete()
@@ -795,14 +813,14 @@ namespace osu.Game.Screens.SelectV2
         private ScheduledDelegate? loadingDebounce;
 
         // Lightweight instrumentation for investigating filter performance regressions.
-        private double lastFilterMs;
-        private int lastFilterItems;
-        private int lastFilterPanels;
         private int filterRuns;
 
-        public double LastFilterMs => lastFilterMs;
-        public int LastFilterItems => lastFilterItems;
-        public int LastFilterPanels => lastFilterPanels;
+        public double LastFilterMs { get; private set; }
+
+        public int LastFilterItems { get; private set; }
+
+        public int LastFilterPanels { get; private set; }
+
         public int FilterRuns => filterRuns;
 
         public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
@@ -829,11 +847,11 @@ namespace osu.Game.Screens.SelectV2
                 try
                 {
                     sw.Stop();
-                    lastFilterMs = sw.Elapsed.TotalMilliseconds;
+                    LastFilterMs = sw.Elapsed.TotalMilliseconds;
 
                     var items = GetCarouselItems();
-                    lastFilterItems = items?.Count ?? 0;
-                    lastFilterPanels = Scroll.Panels.Count;
+                    LastFilterItems = items?.Count ?? 0;
+                    LastFilterPanels = Scroll.Panels.Count;
                 }
                 finally
                 {
@@ -863,6 +881,15 @@ namespace osu.Game.Screens.SelectV2
 
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
+
+        [Resolved]
+        private IBindable<RulesetInfo> ruleset { get; set; } = null!;
+
+        [Resolved]
+        private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
+
+        [Resolved]
+        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         /// <remarks>
         /// FOOTGUN WARNING: this being sorted on the realm side before detaching is IMPORTANT.

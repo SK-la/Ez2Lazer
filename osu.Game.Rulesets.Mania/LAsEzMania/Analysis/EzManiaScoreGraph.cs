@@ -10,11 +10,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Statistics;
-using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
@@ -23,8 +22,9 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 {
     /// <summary>
-    /// Mania-specific implementation of score graph that extends BaseEzScoreGraph.
-    /// Provides LN (Long Note) aware scoring calculation for Classic mode.
+    /// Mania判定偏移分布图的特定实现，扩展了BaseEzScoreGraph。
+    /// 按Mania的判定方式重新过滤、计算了每个HitEvent的结果，并将其与原始结果进行比较，以分析偏移分布和准确性。
+    /// 覆写判定区间计算以适应Mania的判定方式，并添加了对Classic模式下LN（长按键）判定的支持。
     /// </summary>
     public partial class EzManiaScoreGraph : BaseEzScoreGraph
     {
@@ -32,7 +32,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
         private readonly CustomHitWindowsHelper hitWindows1;
         private readonly CustomHitWindowsHelper hitWindows2;
-        private Bindable<EzMUGHitMode> hitModeBindable = null!;
+        private Bindable<EzEnumHitMode> hitModeBindable = null!;
+        private readonly Bindable<double> offsetPlusMania = new Bindable<double>();
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -49,7 +50,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
-            return Score.HitEvents.Where(e => maniaHitWindows.IsHitResultAllowed(e.Result)).ToList();
+            var events = Score.HitEvents.Where(e => maniaHitWindows.IsHitResultAllowed(e.Result));
+
+            // If no offset is set, return original events to avoid allocations.
+            if (offsetPlusMania.Value == 0)
+                return events.ToList();
+
+            // Otherwise, return a new list with adjusted TimeOffset so visualisations (point cloud) reflect the correction.
+            return events.Select(e => new HitEvent(e.TimeOffset + offsetPlusMania.Value, e.GameplayRate, e.Result, e.HitObject, e.LastHitObject, e.Position)).ToList();
         }
 
         protected override double UpdateBoundary(HitResult result)
@@ -61,7 +69,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
         private void load()
         {
             // Bind to the global hit mode setting so that switching hit modes updates our helpers and redraws.
-            hitModeBindable = ezConfig.GetBindable<EzMUGHitMode>(Ez2Setting.HitMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
             hitModeBindable.BindValueChanged(v =>
             {
                 hitWindows1.HitMode = v.NewValue;
@@ -74,6 +82,10 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
                 // Recalculate and redraw.
                 Refresh();
             }, true);
+
+            // Bind to OffsetPlusMania so analysis reflects runtime correction and redraws when changed.
+            offsetPlusMania.BindTo(ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania));
+            offsetPlusMania.BindValueChanged(_ => Refresh());
         }
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
@@ -84,6 +96,23 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Analysis
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)
         {
             return maniaHitWindows.ResultFor(hitEvent.TimeOffset);
+        }
+
+        protected override void UpdateDisplay()
+        {
+            base.UpdateDisplay();
+
+            if (offsetPlusMania.Value != 0)
+            {
+                AddInternal(new OsuSpriteText
+                {
+                    Text = $"Fake Offset Fixing: {offsetPlusMania.Value:+0;-0;0} ms",
+                    Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
+                    Colour = Color4.OrangeRed,
+                    Anchor = Anchor.TopCentre,
+                    Origin = Anchor.TopCentre,
+                });
+            }
         }
 
         protected override void UpdateText()

@@ -10,8 +10,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Localisation;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
@@ -44,10 +42,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [Resolved]
         private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.ShowJudgement), nameof(FastSlowDisplayStrings.ShowStyleDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SHOW_JUDGEMENT), nameof(FastSlowDisplayStrings.SHOW_STYLE_DESCRIPTION))]
         public Bindable<ManiaHitResult> Judgement { get; } = new Bindable<ManiaHitResult>(ManiaHitResult.Perfect);
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Gap), nameof(FastSlowDisplayStrings.GapDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.GAP), nameof(FastSlowDisplayStrings.GAP_DESCRIPTION))]
         public BindableNumber<float> Gap { get; } = new BindableNumber<float>(50)
         {
             MinValue = -200,
@@ -55,7 +53,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.1f,
         };
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FadeDuration), nameof(FastSlowDisplayStrings.FadeDurationDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FADE_DURATION), nameof(FastSlowDisplayStrings.FADE_DURATION_DESCRIPTION))]
         public BindableNumber<double> FadeDuration { get; } = new BindableNumber<double>(430)
         {
             MinValue = 0,
@@ -66,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Font))]
         public Bindable<Typeface> Font { get; } = new Bindable<Typeface>(Typeface.Torus);
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FontSize), nameof(FastSlowDisplayStrings.FontSizeDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FONT_SIZE), nameof(FastSlowDisplayStrings.FONT_SIZE_DESCRIPTION))]
         public BindableNumber<float> FontSize { get; } = new BindableNumber<float>(DEFAULT_FONT_SIZE)
         {
             MinValue = 1,
@@ -74,34 +72,34 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.1f,
         };
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FastText), nameof(FastSlowDisplayStrings.TextDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FAST_TEXT), nameof(FastSlowDisplayStrings.TEXT_DESCRIPTION))]
         public Bindable<string> FastText { get; } = new Bindable<string>("Fast");
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SlowText), nameof(FastSlowDisplayStrings.TextDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SLOW_TEXT), nameof(FastSlowDisplayStrings.TEXT_DESCRIPTION))]
         public Bindable<string> SlowText { get; } = new Bindable<string>("Slow");
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FastColourStyle), nameof(FastSlowDisplayStrings.FastColourStyleDescription))]
-        public Bindable<ColourStyle> FastColourStyle { get; } = new Bindable<ColourStyle>();
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FAST_COLOUR_STYLE), nameof(FastSlowDisplayStrings.FAST_COLOUR_STYLE_DESCRIPTION))]
+        public Bindable<YuColourStyle> FastColourStyle { get; } = new Bindable<YuColourStyle>();
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FastColour), nameof(FastSlowDisplayStrings.TextColourDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FAST_COLOUR), nameof(FastSlowDisplayStrings.TEXT_COLOUR_DESCRIPTION))]
         public BindableColour4 FastColour { get; } = new BindableColour4(Colour4.FromHex("#97A5FF"));
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FastColour), nameof(FastSlowDisplayStrings.TextColourDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FAST_COLOUR), nameof(FastSlowDisplayStrings.TEXT_COLOUR_DESCRIPTION))]
         public BindableColour4 FastColourGradient { get; } = new BindableColour4(Colour4.LightPink);
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SlowColourStyle), nameof(FastSlowDisplayStrings.SlowColourStyleDescription))]
-        public Bindable<ColourStyle> SlowColourStyle { get; } = new Bindable<ColourStyle>();
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SLOW_COLOUR_STYLE), nameof(FastSlowDisplayStrings.SLOW_COLOUR_STYLE_DESCRIPTION))]
+        public Bindable<YuColourStyle> SlowColourStyle { get; } = new Bindable<YuColourStyle>();
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SlowColour), nameof(FastSlowDisplayStrings.TextColourDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SLOW_COLOUR), nameof(FastSlowDisplayStrings.TEXT_COLOUR_DESCRIPTION))]
         public BindableColour4 SlowColour { get; } = new BindableColour4(Colour4.FromHex("#D1FF74"));
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SlowColour), nameof(FastSlowDisplayStrings.TextColourDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SLOW_COLOUR), nameof(FastSlowDisplayStrings.TEXT_COLOUR_DESCRIPTION))]
         public BindableColour4 SlowColourGradient { get; } = new BindableColour4(Colour4.LightCyan);
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.DisplayStyle), nameof(FastSlowDisplayStrings.DisplayStyleDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.DISPLAY_STYLE), nameof(FastSlowDisplayStrings.DISPLAY_STYLE_DESCRIPTION))]
         public BindableBool DisplayStyle { get; } = new BindableBool(false);
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.LowerColumn), nameof(FastSlowDisplayStrings.LowerColumnDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.LOWER_COLUMN), nameof(FastSlowDisplayStrings.LOWER_COLUMN_DESCRIPTION))]
         public BindableNumber<int> LowerColumnBound { get; } = new BindableNumber<int>(1)
         {
             MinValue = 1,
@@ -109,7 +107,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1,
         };
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.UpperColumn), nameof(FastSlowDisplayStrings.UpperColumnDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.UPPER_COLUMN), nameof(FastSlowDisplayStrings.UPPER_COLUMN_DESCRIPTION))]
         public BindableNumber<int> UpperColumnBound { get; } = new BindableNumber<int>(18)
         {
             MinValue = 1,
@@ -117,11 +115,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1,
         };
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.OnlyDisplayOne), nameof(FastSlowDisplayStrings.OnlyDisplayOneDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.ONLY_DISPLAY_ONE), nameof(FastSlowDisplayStrings.ONLY_DISPLAY_ONE_DESCRIPTION))]
         public BindableBool OnlyDisplayOne { get; } = new BindableBool(false);
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SelectColumn), nameof(FastSlowDisplayStrings.SelectColumnDescription))]
-        public Bindable<Column> SelectColumn { get; } = new Bindable<Column>();
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SELECT_COLUMN), nameof(FastSlowDisplayStrings.SELECT_COLUMN_DESCRIPTION))]
+        public Bindable<YuColumnPosition> SelectColumn { get; } = new Bindable<YuColumnPosition>();
 
         private Container textContainer = null!;
         private Container fast = null!;
@@ -137,7 +135,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         private string fastTextLNString = string.Empty;
         private string slowTextLNString = string.Empty;
 
-        private BindableNumber<float> gap = new BindableNumber<float>();
+        private readonly BindableNumber<float> gap = new BindableNumber<float>();
 
         private (HitResult result, double length)[] hitWindows = null!;
 
@@ -258,15 +256,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             FastColourStyle.BindValueChanged(e =>
             {
-                if (e.NewValue == ColourStyle.SingleColour)
+                if (e.NewValue == YuColourStyle.SingleColour)
                 {
                     SetFastTextColour(FastColour.Value);
                 }
-                else if (e.NewValue == ColourStyle.HorizontalGradient)
+                else if (e.NewValue == YuColourStyle.HorizontalGradient)
                 {
                     SetFastTextColour(FastColour.Value, FastColourGradient.Value);
                 }
-                else if (e.NewValue == ColourStyle.VerticalGradient)
+                else if (e.NewValue == YuColourStyle.VerticalGradient)
                 {
                     SetFastTextColour(FastColour.Value, FastColourGradient.Value);
                 }
@@ -274,15 +272,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             SlowColourStyle.BindValueChanged(e =>
             {
-                if (e.NewValue == ColourStyle.SingleColour)
+                if (e.NewValue == YuColourStyle.SingleColour)
                 {
                     SetSlowTextColour(SlowColour.Value);
                 }
-                else if (e.NewValue == ColourStyle.HorizontalGradient)
+                else if (e.NewValue == YuColourStyle.HorizontalGradient)
                 {
                     SetSlowTextColour(SlowColour.Value, SlowColourGradient.Value);
                 }
-                else if (e.NewValue == ColourStyle.VerticalGradient)
+                else if (e.NewValue == YuColourStyle.VerticalGradient)
                 {
                     SetSlowTextColour(SlowColour.Value, SlowColourGradient.Value);
                 }
@@ -429,15 +427,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
             displayFastText.Colour = colour;
 
-            if (gradient != null && FastColourStyle.Value != ColourStyle.SingleColour)
+            if (gradient != null && FastColourStyle.Value != YuColourStyle.SingleColour)
             {
                 FastColourGradient.Value = gradient.Value;
 
-                if (FastColourStyle.Value == ColourStyle.HorizontalGradient)
+                if (FastColourStyle.Value == YuColourStyle.HorizontalGradient)
                 {
                     displayFastText.Colour = ColourInfo.GradientHorizontal(colour, gradient.Value);
                 }
-                else if (FastColourStyle.Value == ColourStyle.VerticalGradient)
+                else if (FastColourStyle.Value == YuColourStyle.VerticalGradient)
                 {
                     displayFastText.Colour = ColourInfo.GradientVertical(colour, gradient.Value);
                 }
@@ -449,15 +447,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             SlowColour.Value = colour;
             displaySlowText.Colour = colour;
 
-            if (gradient != null && FastColourStyle.Value != ColourStyle.SingleColour)
+            if (gradient != null && FastColourStyle.Value != YuColourStyle.SingleColour)
             {
                 SlowColourGradient.Value = gradient.Value;
 
-                if (SlowColourStyle.Value == ColourStyle.HorizontalGradient)
+                if (SlowColourStyle.Value == YuColourStyle.HorizontalGradient)
                 {
                     displaySlowText.Colour = ColourInfo.GradientHorizontal(colour, gradient.Value);
                 }
-                else if (SlowColourStyle.Value == ColourStyle.VerticalGradient)
+                else if (SlowColourStyle.Value == YuColourStyle.VerticalGradient)
                 {
                     displaySlowText.Colour = ColourInfo.GradientVertical(colour, gradient.Value);
                 }
@@ -509,11 +507,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                 var legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
                 int keys = legacyRuleset.GetKeyCount(beatmap.Value.BeatmapInfo, mods.Value);
 
-                if (SelectColumn.Value == Column.Middle && keys / 2.0 != Math.Truncate(keys / 2.0) && column == (keys / 2) + 1)
+                if (SelectColumn.Value == YuColumnPosition.Middle && keys / 2.0 != Math.Truncate(keys / 2.0) && column == (keys / 2) + 1)
                 {
                     displayResult(judgement);
                 }
-                else if (SelectColumn.Value == Column.RightHalf && column > keys / 2.0)
+                else if (SelectColumn.Value == YuColumnPosition.RightHalf && column > keys / 2.0)
                 {
                     if (keys % 2 != 0 && column > (keys / 2) + 1)
                     {
@@ -524,11 +522,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                         displayResult(judgement);
                     }
                 }
-                else if (SelectColumn.Value == Column.LeftHalf && column <= keys / 2.0)
+                else if (SelectColumn.Value == YuColumnPosition.LeftHalf && column <= keys / 2.0)
                 {
                     displayResult(judgement);
                 }
-                else if (column >= LowerColumnBound.Value && column <= UpperColumnBound.Value && SelectColumn.Value == Column.None)
+                else if (column >= LowerColumnBound.Value && column <= UpperColumnBound.Value && SelectColumn.Value == YuColumnPosition.None)
                 {
                     displayResult(judgement);
                 }
@@ -629,43 +627,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             return false;
         }
 
-        public enum Column
-        {
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.None))]
-            None,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.LeftHalf))]
-            LeftHalf,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.RightHalf))]
-            RightHalf,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Middle))]
-            Middle
-        }
-
-        public enum ColourStyle
-        {
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SingleColour))]
-            SingleColour,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.HorizontalGradient))]
-            HorizontalGradient,
-
-            [LocalisableDescription(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.VerticalGradient))]
-            VerticalGradient
-        }
-
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.LNSwitch), nameof(FastSlowDisplayStrings.LNSwitchDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.LN_SWITCH), nameof(FastSlowDisplayStrings.LN_SWITCH_DESCRIPTION))]
         public BindableBool LNSwitch { get; } = new BindableBool(false);
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FastTextLN), nameof(FastSlowDisplayStrings.TextDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.FAST_TEXT_LN), nameof(FastSlowDisplayStrings.TEXT_DESCRIPTION))]
         public Bindable<string> FastTextLN { get; } = new Bindable<string>("Fast");
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SlowTextLN), nameof(FastSlowDisplayStrings.TextDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SLOW_TEXT_LN), nameof(FastSlowDisplayStrings.TEXT_DESCRIPTION))]
         public Bindable<string> SlowTextLN { get; } = new Bindable<string>("Slow");
 
-        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.Test), nameof(FastSlowDisplayStrings.TestDescription))]
+        [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.TEST), nameof(FastSlowDisplayStrings.TEST_DESCRIPTION))]
         public BindableBool Test { get; } = new BindableBool();
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.TextElementText))]

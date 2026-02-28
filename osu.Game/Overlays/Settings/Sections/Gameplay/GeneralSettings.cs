@@ -8,6 +8,7 @@ using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Scoring;
 
@@ -33,7 +34,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzLocalizationManager.AccuracyCutoffS,
+                    Caption = EzSettingsStrings.ACCURACY_CUTOFF_S,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true,
@@ -43,7 +44,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = EzLocalizationManager.AccuracyCutoffA,
+                    Caption = EzSettingsStrings.ACCURACY_CUTOFF_A,
                     Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true,

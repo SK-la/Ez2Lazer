@@ -208,18 +208,25 @@ namespace osu.Game.Rulesets.UI.Scrolling
             this.TransformBindableTo(TimeRange, TimeRange.Value - amount * time_span_step, 200, Easing.OutQuint);
         }
 
+        /// <summary>
+        /// Retrieves the amount to use for a single scroll speed adjustment input.
+        /// </summary>
+        protected virtual int GetScrollSpeedAdjustmentAmount(KeyBindingPressEvent<GlobalAction> e) => 1;
+
         public bool OnPressed(KeyBindingPressEvent<GlobalAction> e)
         {
+            int adjustmentAmount = GetScrollSpeedAdjustmentAmount(e);
+
             switch (e.Action)
             {
                 case GlobalAction.IncreaseScrollSpeed:
                     if (AllowScrollSpeedAdjustment)
-                        AdjustScrollSpeed(1);
+                        AdjustScrollSpeed(adjustmentAmount);
                     return true;
 
                 case GlobalAction.DecreaseScrollSpeed:
                     if (AllowScrollSpeedAdjustment)
-                        AdjustScrollSpeed(-1);
+                        AdjustScrollSpeed(-adjustmentAmount);
                     return true;
             }
 

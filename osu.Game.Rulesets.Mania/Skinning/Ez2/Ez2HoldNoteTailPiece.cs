@@ -20,8 +20,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }
 
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly IBindable<Color4> accentColour = new Bindable<Color4>();
+        private IBindable<ScrollingDirection> direction = null!;
+        private IBindable<Color4> accentColour = null!;
 
         private readonly Box foreground;
 
@@ -81,12 +81,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         [BackgroundDependencyLoader(true)]
         private void load(IScrollingInfo scrollingInfo)
         {
-            direction.BindTo(scrollingInfo.Direction);
+            direction = scrollingInfo.Direction;
             direction.BindValueChanged(onDirectionChanged, true);
 
             if (drawableObject != null)
             {
-                accentColour.BindTo(drawableObject.AccentColour);
+                accentColour = drawableObject.AccentColour;
                 accentColour.BindValueChanged(onAccentChanged, true);
 
                 drawableObject.HitObjectApplied += hitObjectApplied;

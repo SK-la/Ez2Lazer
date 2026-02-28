@@ -6,7 +6,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Screens;
 using osu.Game.Screens.Edit.Components;
 
 namespace osu.Game.LAsEzExtensions.Screens
@@ -15,13 +14,15 @@ namespace osu.Game.LAsEzExtensions.Screens
     {
         public enum SidebarTab
         {
-            Default,
-            EzSettings,
-            ColorSettings
+            Select = 0,
+
+            EzSkin = 1,
+
+            Column = 2
         }
 
-        private EzSkinSettings? ezSkinSettings;
-        private SidebarTab currentTab = SidebarTab.Default;
+        private EzSkinTab? ezSkinSettings;
+        private SidebarTab currentTab = SidebarTab.Select;
         private Action<Container<EditorSidebarSection>>? lastPopulator;
 
         public EzEditorSidebar()
@@ -42,9 +43,9 @@ namespace osu.Game.LAsEzExtensions.Screens
                 RelativeSizeAxes = Axes.X,
                 Height = 30,
                 Margin = new MarginPadding { Left = 5 },
-                Items = new[] { SidebarTab.Default, SidebarTab.EzSettings, SidebarTab.ColorSettings }
+                Items = new[] { SidebarTab.Select, SidebarTab.EzSkin, SidebarTab.Column }
             });
-            //TODO 添加多列颜色选择
+
             // 设置内容区整体下移，避免与tab栏重叠
             Content.Margin = new MarginPadding { Top = 30 };
 
@@ -55,15 +56,15 @@ namespace osu.Game.LAsEzExtensions.Screens
 
                 switch (currentTab)
                 {
-                    case SidebarTab.EzSettings:
+                    case SidebarTab.EzSkin:
                         showEzSettings();
                         break;
 
-                    case SidebarTab.ColorSettings:
-                        showColorSettings();
+                    case SidebarTab.Column:
+                        showColumnSettings();
                         break;
 
-                    case SidebarTab.Default when lastPopulator != null:
+                    case SidebarTab.Select when lastPopulator != null:
                         PopulateSettings(lastPopulator);
                         break;
                 }
@@ -72,14 +73,14 @@ namespace osu.Game.LAsEzExtensions.Screens
 
         private void showEzSettings()
         {
-            ezSkinSettings = new EzSkinSettings
+            ezSkinSettings = new EzSkinTab
             {
                 RelativeSizeAxes = Axes.X
             };
             Content.Add(ezSkinSettings);
         }
 
-        private void showColorSettings()
+        private void showColumnSettings()
         {
             var ezColumnSettings = new EzColumnTab
             {
@@ -94,7 +95,7 @@ namespace osu.Game.LAsEzExtensions.Screens
         public void PopulateSettings(Action<Container<EditorSidebarSection>> populator)
         {
             lastPopulator = populator;
-            if (currentTab != SidebarTab.Default)
+            if (currentTab != SidebarTab.Select)
                 return;
 
             Content.Clear();

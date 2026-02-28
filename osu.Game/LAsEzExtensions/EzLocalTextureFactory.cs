@@ -1,3 +1,6 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -13,7 +16,6 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Screens;
 using osu.Game.Skinning;
 using osuTK;
 
@@ -45,6 +47,9 @@ namespace osu.Game.LAsEzExtensions
         private readonly Bindable<double> hitPositonBindable;
         private readonly Bindable<double> noteHeightScaleToWidth;
 
+        // scheduling guard to batch multiple bindable changes into one refresh
+        private bool textureRefreshScheduled;
+
         private Vector2 tempNoteSize;
 
         private readonly struct CacheEntry : IEquatable<CacheEntry>
@@ -62,10 +67,9 @@ namespace osu.Game.LAsEzExtensions
 
             public CacheEntry UpdateAccess() => new CacheEntry(Textures, HasComponent);
 
-            public bool Equals(CacheEntry other) =>
-                ReferenceEquals(Textures, other.Textures) &&
-                HasComponent == other.HasComponent &&
-                LastAccess.Equals(other.LastAccess);
+            public bool Equals(CacheEntry other) => ReferenceEquals(Textures, other.Textures) &&
+                                                    HasComponent == other.HasComponent &&
+                                                    LastAccess.Equals(other.LastAccess);
 
             public override bool Equals(object? obj) => obj is CacheEntry other && Equals(other);
 
@@ -103,14 +107,29 @@ namespace osu.Game.LAsEzExtensions
             hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
             noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
 
-            // noteSetName.BindValueChanged(e =>
-            // {
-            //     clearRelatedCache(e.OldValue);
-            // });
+            // Batch refresh: subscribe once and schedule a single refresh per frame when any relevant config changes.
+            void scheduleTextureRefresh()
+            {
+                if (textureRefreshScheduled) return;
 
-            // stageName.BindValueChanged(e =>
-            // {
-            // });
+                textureRefreshScheduled = true;
+                Schedule(() =>
+                {
+                    textureRefreshScheduled = false;
+                    // Clear caches and let consumers lazily reload textures on next access.
+                    ClearGlobalCache();
+                    lock (loaderStoreCache)
+                        loaderStoreCache.Clear();
+                });
+            }
+
+            // Subscribe and reuse the same schedule lambda for different generic Bindable<T>
+            noteSetName.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            stageName.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            columnWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            specialFactor.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            hitPositonBindable.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
         }
 
         #region 工具方法
@@ -134,11 +153,11 @@ namespace osu.Game.LAsEzExtensions
         public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex, bool? noSpecial = null)
         {
             var result = new Bindable<Vector2>();
-            float ratio = GetRatio();
-            bool isSpecialColumn = noSpecial != true && ezSkinConfig.IsSpecialColumn(keyMode, columnIndex);
+            bool isSpecialColumn = noSpecial != true && ezSkinConfig.IsSpecialColumnFast(keyMode, columnIndex);
 
             void updateNoteSize()
             {
+                float ratio = GetRatio();
                 float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
                 float y = (float)noteHeightScaleToWidth.Value * ratio * x;
                 tempNoteSize.X = x;
@@ -149,6 +168,7 @@ namespace osu.Game.LAsEzExtensions
             columnWidth.BindValueChanged(_ => updateNoteSize());
             specialFactor.BindValueChanged(_ => updateNoteSize());
             noteHeightScaleToWidth.BindValueChanged(_ => updateNoteSize());
+            noteSetName.BindValueChanged(_ => updateNoteSize());
 
             updateNoteSize();
             return result;
@@ -253,7 +273,7 @@ namespace osu.Game.LAsEzExtensions
 
                     if (texture == null) break;
 
-                    if (texture.Width < 500) texture.ScaleAdjust = 0.5f; // 大纹理缩小加载，防止内存暴涨
+                    texture.ScaleAdjust = 2f;
 
                     frames.Add(texture);
                 }
@@ -484,11 +504,32 @@ namespace osu.Game.LAsEzExtensions
         {
             if (isDisposing)
             {
-                // 只清理实例级别的缓存，全局缓存留给 ClearGlobalCache 处理
-                foreach (var loader in loaderStoreCache.Values)
-                    loader.Dispose();
+                // Unbind to avoid leaking handlers
+                try
+                {
+                    noteSetName.UnbindAll();
+                    stageName.UnbindAll();
+                    columnWidth.UnbindAll();
+                    specialFactor.UnbindAll();
+                    hitPositonBindable.UnbindAll();
+                    noteHeightScaleToWidth.UnbindAll();
+                }
+                catch
+                {
+                }
 
-                loaderStoreCache.Clear();
+                // 只清理实例级别的缓存，全局缓存留给 ClearGlobalCache 处理
+                lock (loaderStoreCache)
+                {
+                    foreach (var loader in loaderStoreCache.Values)
+                        loader.Dispose();
+                }
+
+                lock (loaderStoreCache)
+                {
+                    loaderStoreCache.Clear();
+                }
+
                 note_ratio_cache.Clear();
             }
 

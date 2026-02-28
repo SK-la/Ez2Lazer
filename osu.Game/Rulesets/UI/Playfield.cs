@@ -11,19 +11,19 @@ using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
+using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
+using osu.Framework.Graphics.Primitives;
 using osu.Game.Audio;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
+using osu.Game.Rulesets.Objects.Pooling;
 using osu.Game.Skinning;
 using osuTK;
-using osu.Game.Rulesets.Objects.Pooling;
-using osu.Framework.Extensions.ObjectExtensions;
-using osu.Framework.Graphics.Primitives;
 
 namespace osu.Game.Rulesets.UI
 {
