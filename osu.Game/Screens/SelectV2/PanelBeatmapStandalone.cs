@@ -56,6 +56,9 @@ namespace osu.Game.Screens.SelectV2
         [Resolved]
         private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
         private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
         private EzKpsDisplay ezKpsDisplay = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
@@ -106,7 +109,7 @@ namespace osu.Game.Screens.SelectV2
         }
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig)
+        private void load()
         {
             Height = HEIGHT;
 
@@ -258,9 +261,6 @@ namespace osu.Game.Screens.SelectV2
                     }
                 }
             };
-
-            kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
-            ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
         }
 
         protected override void LoadComplete()
@@ -285,7 +285,8 @@ namespace osu.Game.Screens.SelectV2
                 spreadDisplay.Enabled.Value = s.NewValue;
             }, true);
 
-            // kpcMode.BindValueChanged(_ => maniaWasVisible = false);
+            kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
         }
 
         protected override void PrepareForUse()
@@ -345,8 +346,8 @@ namespace osu.Game.Screens.SelectV2
 
             // Ez功能
             ezTagDisplay.UpdateBeatmap(null);
-            maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisBindable = null;
+            maniaAnalysisCancellationSource?.Cancel();
         }
 
         private void updateKPS((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
@@ -466,8 +467,6 @@ namespace osu.Game.Screens.SelectV2
             }
             else
                 keyCountText.Alpha = 0;
-
-            computeStarRating();
         }
 
         public override MenuItem[] ContextMenuItems

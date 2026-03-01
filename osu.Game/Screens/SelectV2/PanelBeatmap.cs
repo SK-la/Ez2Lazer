@@ -36,8 +36,6 @@ namespace osu.Game.Screens.SelectV2
     {
         public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT + 26f;
 
-        private const int update_ms = 15;
-
         private StarCounter starCounter = null!;
         private ConstrainedIconContainer difficultyIcon = null!;
         private OsuSpriteText keyCountText = null!;
@@ -249,9 +247,6 @@ namespace osu.Game.Screens.SelectV2
                     }
                 }
             };
-
-            kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
-            ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
         }
 
         protected override void LoadComplete()
@@ -270,7 +265,8 @@ namespace osu.Game.Screens.SelectV2
                 updateKeyCount();
             }, true);
 
-            // kpcMode.BindValueChanged(_ => maniaWasVisible = false);
+            kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
             xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
             xxySrFilterSetting.BindValueChanged(value =>
             {
@@ -289,9 +285,10 @@ namespace osu.Game.Screens.SelectV2
             localRank.Beatmap = beatmap;
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
-            ezTagDisplay.UpdateBeatmap(beatmap);
 
+            ezTagDisplay.UpdateBeatmap(beatmap);
             computeManiaAnalysis();
+
             computeStarRating();
             updateKeyCount();
         }
@@ -326,6 +323,9 @@ namespace osu.Game.Screens.SelectV2
 
             localRank.Beatmap = null;
             starDifficultyBindable = null;
+
+            starDifficultyCancellationSource?.Cancel();
+
             ezTagDisplay.UpdateBeatmap(null);
 
             starDifficultyCancellationSource?.Cancel();
