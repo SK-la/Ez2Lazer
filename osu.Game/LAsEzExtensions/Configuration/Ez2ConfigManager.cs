@@ -66,7 +66,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         // Save debounce machinery: schedule delayed Save() to coalesce rapid writes.
         private readonly object saveLock = new object();
         private System.Threading.Timer? saveTimer;
-        private const int save_debounce_ms = 300;
+        private const int save_debounce_ms = 50;
 
         // Cache of bindables returned by GetBindable to avoid creating multiple instances
         private readonly object bindableCacheLock = new object();
