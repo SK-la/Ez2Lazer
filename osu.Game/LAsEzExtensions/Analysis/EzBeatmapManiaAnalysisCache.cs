@@ -226,6 +226,15 @@ namespace osu.Game.LAsEzExtensions.Analysis
             lock (bindableUpdateLock)
                 trackedBindables.Add(bindable);
 
+            if (cancellationToken.CanBeCanceled)
+            {
+                cancellationToken.Register(() =>
+                {
+                    lock (bindableUpdateLock)
+                        trackedBindables.Remove(bindable);
+                });
+            }
+
             return bindable;
         }
 
