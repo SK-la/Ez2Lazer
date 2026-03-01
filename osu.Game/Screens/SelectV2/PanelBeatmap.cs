@@ -59,8 +59,8 @@ namespace osu.Game.Screens.SelectV2
         private EzDisplayXxySR displayXxySR = null!;
         private EzTagDisplay ezTagDisplay = null!;
 
-        private Bindable<bool> xxySrFilterSetting = null!;
-        private Bindable<KpcDisplayMode> kpcMode = null!;
+        // private IBindable<bool>? xxySrFilterSetting;
+        // private Bindable<KpcDisplayMode> kpcMode = null!;
 
         private IBindable<EzAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
@@ -265,9 +265,9 @@ namespace osu.Game.Screens.SelectV2
                 updateKeyCount();
             }, true);
 
-            kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            var kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
             ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
-            xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
+            var xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
             xxySrFilterSetting.BindValueChanged(value =>
             {
                 starCounter.Icon = value.NewValue
@@ -287,7 +287,6 @@ namespace osu.Game.Screens.SelectV2
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             ezTagDisplay.UpdateBeatmap(beatmap);
-            computeManiaAnalysis();
 
             computeStarRating();
             updateKeyCount();
@@ -327,10 +326,7 @@ namespace osu.Game.Screens.SelectV2
             starDifficultyCancellationSource?.Cancel();
 
             ezTagDisplay.UpdateBeatmap(null);
-
-            starDifficultyCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisBindable = null;
+            clearManiaAnalysisBinding();
             scratchText = null;
         }
 
@@ -355,13 +351,6 @@ namespace osu.Game.Screens.SelectV2
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 Schedule(updateKeyCount);
             }
-        }
-
-        private void computeManiaAnalysis()
-        {
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = null;
-            maniaAnalysisBindable = null;
         }
 
         private void requestManiaAnalysisBindable()
@@ -406,9 +395,7 @@ namespace osu.Game.Screens.SelectV2
                 starDifficultyCancellationSource?.Cancel();
                 starDifficultyCancellationSource = null;
 
-                maniaAnalysisCancellationSource?.Cancel();
-                maniaAnalysisCancellationSource = null;
-                maniaAnalysisBindable = null;
+                clearManiaAnalysisBinding();
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.
@@ -443,6 +430,15 @@ namespace osu.Game.Screens.SelectV2
 
             if (maniaWasVisible && Item?.IsVisible != true)
                 maniaWasVisible = false;
+        }
+
+        private void clearManiaAnalysisBinding()
+        {
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = null;
+
+            maniaAnalysisBindable?.UnbindAll();
+            maniaAnalysisBindable = null;
         }
 
         private void updateKeyCount()

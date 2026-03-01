@@ -65,7 +65,7 @@ namespace osu.Game.Screens.SelectV2
         private EzDisplayXxySR displayXxySR = null!;
         private EzTagDisplay ezTagDisplay = null!;
 
-        private Bindable<KpcDisplayMode> kpcMode = null!;
+        // private Bindable<KpcDisplayMode> kpcMode = null!;
 
         private IBindable<EzAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
@@ -285,7 +285,7 @@ namespace osu.Game.Screens.SelectV2
                 spreadDisplay.Enabled.Value = s.NewValue;
             }, true);
 
-            kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            var kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
             ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
         }
 
@@ -310,7 +310,7 @@ namespace osu.Game.Screens.SelectV2
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
             ezTagDisplay.UpdateBeatmap(beatmap);
-            computeManiaAnalysis();
+
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
@@ -346,8 +346,7 @@ namespace osu.Game.Screens.SelectV2
 
             // Ez功能
             ezTagDisplay.UpdateBeatmap(null);
-            maniaAnalysisBindable = null;
-            maniaAnalysisCancellationSource?.Cancel();
+            clearManiaAnalysisBinding();
         }
 
         private void updateKPS((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
@@ -370,13 +369,6 @@ namespace osu.Game.Screens.SelectV2
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 Schedule(updateKeyCount);
             }
-        }
-
-        private void computeManiaAnalysis()
-        {
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = null;
-            maniaAnalysisBindable = null;
         }
 
         private void requestManiaAnalysisBindable()
@@ -421,9 +413,7 @@ namespace osu.Game.Screens.SelectV2
                 starDifficultyCancellationSource?.Cancel();
                 starDifficultyCancellationSource = null;
 
-                maniaAnalysisCancellationSource?.Cancel();
-                maniaAnalysisCancellationSource = null;
-                maniaAnalysisBindable = null;
+                clearManiaAnalysisBinding();
             }
 
             // If we just became visible, pull latest mania analysis value to initialise UI.
@@ -447,6 +437,15 @@ namespace osu.Game.Screens.SelectV2
 
             backgroundBorder.Colour = diffColour;
             difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
+        }
+
+        private void clearManiaAnalysisBinding()
+        {
+            maniaAnalysisCancellationSource?.Cancel();
+            maniaAnalysisCancellationSource = null;
+
+            maniaAnalysisBindable?.UnbindAll();
+            maniaAnalysisBindable = null;
         }
 
         private void updateKeyCount()
