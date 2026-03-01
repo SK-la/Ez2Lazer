@@ -32,40 +32,31 @@ namespace osu.Game.LAsEzExtensions.Analysis
     /// 参考 <see cref="BeatmapDifficultyCache"/> 的中心化缓存模式：
     /// - 单线程 <see cref="ThreadedTaskScheduler"/> 控制后台计算并发，避免拖动滚动条时造成卡顿。
     /// - 统一监听当前 ruleset/mods 及 mod 设置变化，批量更新所有已追踪的 bindable。
-    /// - 缓存 key 包含 mod 设置（依赖 mod 的相等性/哈希语义），避免“切/调 mod 不重算”。
+    /// - 缓存 key 包含 mod 设置（依赖 mod 的相等性/哈希语义），避免"切/调 mod 不重算"。
     /// </summary>
-    public partial class EzBeatmapManiaAnalysisCache : MemoryCachingComponent<ManiaAnalysisCacheLookup, EzAnalysisResult?>
+    public partial class EzAnalysisCache : MemoryCachingComponent<EzAnalysisCacheLookup, EzAnalysisResult?>
     {
         private static int computeFailCount;
 
-        // (Removed runtime instrumentation counters)
-        // 太多同时更新会导致卡顿；官方 star cache 使用 1 线程，但我们可以尝试略微提高并发以加快可见项响应。
-        // 这里将高优先级并发从 1 增加到 2 来观察是否能减少感知延迟，同时保留低优先级为 1。
-        private readonly ThreadedTaskScheduler highPriorityScheduler = new ThreadedTaskScheduler(2, nameof(EzBeatmapManiaAnalysisCache));
-        private readonly ThreadedTaskScheduler lowPriorityScheduler = new ThreadedTaskScheduler(1, $"{nameof(EzBeatmapManiaAnalysisCache)} (Warmup)");
-
-        private readonly ManualResetEventSlim highPriorityIdleEvent = new ManualResetEventSlim(true);
-
-        // A small gate to avoid flooding SQLite with too many concurrent readers.
-        private readonly SemaphoreSlim persistenceReadGate = new SemaphoreSlim(4, 4);
-
-        // Deduplicate in-flight computations so multiple requests for the same lookup reuse the same Task
-        private readonly ConcurrentDictionary<ManiaAnalysisCacheLookup, Task<EzAnalysisResult?>> inflightComputations =
-            new ConcurrentDictionary<ManiaAnalysisCacheLookup, Task<EzAnalysisResult?>>();
-
-        private static readonly AsyncLocal<int> low_priority_scope_depth = new AsyncLocal<int>();
-
+        private readonly ThreadedTaskScheduler updateScheduler = new ThreadedTaskScheduler(1, nameof(EzAnalysisCache));
         private readonly WeakList<BindableManiaBeatmapAnalysis> trackedBindables = new WeakList<BindableManiaBeatmapAnalysis>();
         private readonly List<CancellationTokenSource> linkedCancellationSources = new List<CancellationTokenSource>();
         private readonly object bindableUpdateLock = new object();
 
         private CancellationTokenSource trackedUpdateCancellationSource = new CancellationTokenSource();
 
-        [Resolved]
-        private BeatmapManager beatmapManager { get; set; } = null!;
+        private readonly SemaphoreSlim persistenceReadGate = new SemaphoreSlim(4, 4);
+
+        private readonly ConcurrentDictionary<EzAnalysisCacheLookup, Task<EzAnalysisResult?>> inflightComputations =
+            new ConcurrentDictionary<EzAnalysisCacheLookup, Task<EzAnalysisResult?>>();
+
+        private static readonly AsyncLocal<int> low_priority_scope_depth = new AsyncLocal<int>();
 
         [Resolved]
         private EzAnalysisPersistentStore persistentStore { get; set; } = null!;
+
+        [Resolved]
+        private BeatmapManager beatmapManager { get; set; } = null!;
 
         [Resolved(CanBeNull = true)]
         private Bindable<RulesetInfo> currentRuleset { get; set; } = null!;
@@ -78,17 +69,15 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private int modsRevision;
 
-        // Limit in-memory cache size.
-        // - When persistence is available, keep a small working set (current page) in memory.
-        // - When persistence is unavailable/disabled, allow a slightly larger set to reduce recomputation.
-        private const int max_in_memory_entries_with_persistence = 24;
-        private const int max_in_memory_entries_without_persistence = 48;
-        private readonly ConcurrentQueue<ManiaAnalysisCacheLookup> cacheInsertionOrder = new ConcurrentQueue<ManiaAnalysisCacheLookup>();
+        // 限制内存缓存大小。
+        // - 当持久化可用时，在内存中保持一个小的工作集（当前页面）。
+        // - 当持久化不可用/禁用时，允许稍大的集合以减少重新计算。
+        private const int max_in_memory_entries = 8;
+        private readonly ConcurrentQueue<EzAnalysisCacheLookup> cacheInsertionOrder = new ConcurrentQueue<EzAnalysisCacheLookup>();
 
-        // We avoid modifying the official MemoryCachingComponent by keeping our own set of cached keys.
-        // Eviction is then performed by calling Invalidate(key == oldest), which is O(n) over the base cache,
-        // but n is bounded to a small working set (24/48) so this is fine.
-        private readonly ConcurrentDictionary<ManiaAnalysisCacheLookup, byte> cachedLookups = new ConcurrentDictionary<ManiaAnalysisCacheLookup, byte>();
+        // 我们通过保持自己的缓存键集合来避免修改官方的 MemoryCachingComponent。
+        // 然后通过调用 Invalidate(key == oldest) 执行驱逐，这对基础缓存是 O(n) 的，
+        private readonly ConcurrentDictionary<EzAnalysisCacheLookup, byte> cachedLookups = new ConcurrentDictionary<EzAnalysisCacheLookup, byte>();
         private int cachedLookupsCount;
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致。
@@ -120,8 +109,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
         protected override bool CacheNullValues => false;
 
         /// <summary>
-        /// Marks the current async flow as low-priority (warmup). Any cache misses triggered within the returned scope
-        /// will be executed on the low-priority scheduler.
+        /// 将当前异步流标记为低优先级（预热）。在返回的作用域内触发的任何缓存未命中
+        /// 都将在低优先级调度程序上执行。
         /// </summary>
         public IDisposable BeginLowPriorityScope()
         {
@@ -130,33 +119,29 @@ namespace osu.Game.LAsEzExtensions.Analysis
         }
 
         /// <summary>
-        /// Warm up the persistent store only (no-mod baseline) without populating the in-memory cache.
-        /// Intended for startup warmup to avoid retaining a large set of results in memory.
+        /// 仅预热持久化存储（无 mod 基线）而不填充内存缓存。
+        /// 旨在启动时预热以避免在内存中保留大量结果集。
         /// </summary>
         public Task WarmupPersistentOnlyAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
             if (!EzAnalysisPersistentStore.Enabled)
                 return Task.CompletedTask;
 
-            // Only mania is supported.
+            // 仅支持 mania。
             if (beatmapInfo.Ruleset is not RulesetInfo rulesetInfo || rulesetInfo.OnlineID != 3)
                 return Task.CompletedTask;
 
-            // Always run as low-priority and never compete with visible computations.
-            // Warmup should be classified via BeginLowPriorityScope so that other code can
-            // correctly distinguish warmup flows (e.g. persistence read gating). Additionally,
-            // limit concurrent persistent reads to avoid flooding SQLite during warmup.
+            // 始终以低优先级运行，从不与可见计算竞争。
+            // 预热应通过 BeginLowPriorityScope 进行分类，以便其他代码可以正确区分预热流程（例如持久化读取门控）。
+            // 此外，限制并发持久化读取以避免在预热期间淹没 SQLite。
             return Task.Factory.StartNew(() =>
             {
-                // Mark this async flow as low-priority for classification elsewhere.
+                // 将此异步流标记为低优先级以便在其他地方进行分类。
                 using (BeginLowPriorityScope())
                 {
-                    highPriorityIdleEvent.Wait(cancellationToken);
+                    var lookup = new EzAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null);
 
-                    // No mods: only baseline is persisted.
-                    var lookup = new ManiaAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null);
-
-                    // First, gate and probe the persistent store to avoid flooding readers.
+                    // 首先，门控并探测持久化存储以避免淹没读取器。
                     bool persistedExists = false;
 
                     if (EzAnalysisPersistentStore.Enabled)
@@ -175,41 +160,29 @@ namespace osu.Game.LAsEzExtensions.Analysis
                         }
                         catch (OperationCanceledException)
                         {
-                            // cancellation requested - abort warmup for this item.
+                            // 请求取消 - 中止此项的预热。
                             return;
                         }
                         catch
                         {
-                            // ignore persistence probe failures and fall through to compute.
+                            // 忽略持久化探测失败并继续计算。
                         }
                         finally
                         {
                             if (gateAcquired)
                             {
-                                try { persistenceReadGate.Release(); }
-                                catch { }
+                                persistenceReadGate.Release();
                             }
                         }
                     }
 
-                    // Only compute and store baseline if a persisted entry does not already exist.
+                    // 仅当持久化条目尚不存在时才计算并存储基线。
                     if (!persistedExists)
                     {
-                        try
-                        {
-                            computeAnalysis(lookup, cancellationToken);
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            // ignore cancellations during warmup
-                        }
-                        catch
-                        {
-                            // ignore failures; warmup should not crash.
-                        }
+                        computeAnalysis(lookup, cancellationToken);
                     }
                 }
-            }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, lowPriorityScheduler);
+            }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, updateScheduler);
         }
 
         public IBindable<EzAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
@@ -251,12 +224,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 return Task.FromResult<EzAnalysisResult?>(null);
 
             // Use the original constructor that handles mod cloning and signature computation
-            var lookup = new ManiaAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
+            var lookup = new EzAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
 
             return getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay);
         }
 
-        private async Task<EzAnalysisResult?> getAndMaybeEvictAsync(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
+        private async Task<EzAnalysisResult?> getAndMaybeEvictAsync(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
         {
             EzAnalysisResult? result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
 
@@ -267,11 +240,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 if (cachedLookups.TryAdd(lookup, 0))
                     Interlocked.Increment(ref cachedLookupsCount);
 
-                int maxEntries = EzAnalysisPersistentStore.Enabled
-                    ? max_in_memory_entries_with_persistence
-                    : max_in_memory_entries_without_persistence;
-
-                while (Volatile.Read(ref cachedLookupsCount) > maxEntries && cacheInsertionOrder.TryDequeue(out var toRemove))
+                while (Volatile.Read(ref cachedLookupsCount) > max_in_memory_entries && cacheInsertionOrder.TryDequeue(out var toRemove))
                 {
                     if (!cachedLookups.TryRemove(toRemove, out _))
                         continue;
@@ -284,24 +253,24 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return result;
         }
 
-        protected override Task<EzAnalysisResult?> ComputeValueAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token = default)
+        protected override Task<EzAnalysisResult?> ComputeValueAsync(EzAnalysisCacheLookup lookup, CancellationToken token = default)
         {
             return computeValueWithDedupAsync(lookup, token);
         }
 
-        private async Task<EzAnalysisResult?> computeValueWithDedupAsync(ManiaAnalysisCacheLookup lookup, CancellationToken token)
+        private async Task<EzAnalysisResult?> computeValueWithDedupAsync(EzAnalysisCacheLookup lookup, CancellationToken token)
         {
-            // If a computation for this lookup is already in-flight, reuse it.
-            // Important: the computation itself should not be cancelled by any single requester.
-            // Panels get recycled and cancel their tokens aggressively (eg. when off-screen), but we still
-            // want shared computations to complete so results can be reused.
+            // 如果此查找的计算已经在进行中，则重用它。
+            // 重要：计算本身不应被任何单个请求者取消。
+            // 面板会被回收并积极取消其令牌（例如当离屏时），但我们仍然
+            // 希望共享计算完成以便结果可以重用。
             var existing = inflightComputations.GetOrAdd(lookup, lookupKey =>
             {
                 var task = computeValueInternalCore(lookup, CancellationToken.None);
 
-                // Remove the entry when the task completes (best-effort), but only if the value matches.
+                // 当任务完成时移除条目（尽力而为），但仅当值匹配时。
                 task.ContinueWith(
-                    completedTask => inflightComputations.TryRemove(new KeyValuePair<ManiaAnalysisCacheLookup, Task<EzAnalysisResult?>>(lookup, task)),
+                    completedTask => inflightComputations.TryRemove(new KeyValuePair<EzAnalysisCacheLookup, Task<EzAnalysisResult?>>(lookup, task)),
                     CancellationToken.None,
                     TaskContinuationOptions.ExecuteSynchronously,
                     TaskScheduler.Default);
@@ -309,7 +278,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 return task;
             });
 
-            // Allow individual callers to cancel waiting without cancelling the shared computation.
+            // 允许各个调用者取消等待而不取消共享计算。
             try
             {
                 return await existing.WaitAsync(token).ConfigureAwait(false);
@@ -320,16 +289,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
             }
         }
 
-        private async Task<EzAnalysisResult?> computeValueInternalCore(ManiaAnalysisCacheLookup lookup, CancellationToken token)
+        private async Task<EzAnalysisResult?> computeValueInternalCore(EzAnalysisCacheLookup lookup, CancellationToken token)
         {
-            // Quick path: if a persisted no-mod baseline exists, return it without entering the single-thread compute queue.
-            // This avoids head-of-line blocking where one expensive miss would delay many cheap hits.
+            // 快速路径：如果存在持久化的无 mod 基线，则返回它而不进入单线程计算队列。
+            // 这避免了队头阻塞，其中一个昂贵的未命中会延迟许多便宜的命中。
             if (lookup.OrderedMods.Length == 0 && EzAnalysisPersistentStore.Enabled)
             {
-                // Use low_priority_scope_depth to distinguish warmup/background flows from visible flows.
-                // Warmup flows will call BeginLowPriorityScope and set the async-local depth > 0.
-                // We gate only warmup/background flows to limit DB concurrency; visible flows use
-                // the fast-path read to avoid UI stalls.
+                // 使用 low_priority_scope_depth 来区分预热/后台流程与可见流程。
+                // 预热流程将调用 BeginLowPriorityScope 并设置异步本地深度 > 0。
+                // 我们只对预热/后台流程进行门控以限制数据库并发；可见流程使用
+                // 快速路径读取以避免 UI 停滞。
                 if (low_priority_scope_depth.Value > 0)
                 {
                     bool gateAcquired = false;
@@ -358,7 +327,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     }
                     catch
                     {
-                        // Ignore persistence failures and fall back to compute.
+                        // 忽略持久化失败并回退到计算。
                     }
                     finally
                     {
@@ -389,22 +358,17 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     }
                     catch
                     {
-                        // Ignore persistence failures and fall back to compute.
+                        // 忽略持久化失败并回退到计算。
                     }
                 }
             }
 
-            bool isLowPriority = low_priority_scope_depth.Value > 0;
-            var scheduler = isLowPriority ? lowPriorityScheduler : highPriorityScheduler;
+            var scheduler = updateScheduler;
 
             var task = Task.Factory.StartNew(() =>
             {
                 if (CheckExists(lookup, out var existing))
                     return existing;
-
-                // Warmup: never compete with visible/high-priority computations.
-                if (isLowPriority)
-                    highPriorityIdleEvent.Wait(token);
 
                 return computeAnalysis(lookup, token);
             }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, scheduler);
@@ -412,9 +376,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return await task.ConfigureAwait(false);
         }
 
-        // enter/exit high-priority work helpers removed; gating uses ManualResetEventSlim directly.
+        // 进入/退出高优先级工作助手已移除；门控直接使用 ManualResetEventSlim。
 
-        private EzAnalysisResult? computeAnalysis(ManiaAnalysisCacheLookup lookup, CancellationToken cancellationToken)
+        private EzAnalysisResult? computeAnalysis(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken)
         {
             try
             {
@@ -436,8 +400,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                 var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(playableBeatmap);
 
-                // Apply rate-adjust mods (DT/HT etc.) to KPS values.
-                // These mods affect effective time progression, so KPS should scale with rate.
+                // 将速率调整 mods（DT/HT 等）应用于 KPS 值。
+                // 这些 mods 影响有效时间进程，因此 KPS 应该随速率缩放。
                 double rate = getRateAdjustMultiplier(lookup.OrderedMods);
 
                 if (!Precision.AlmostEquals(rate, 1.0))
@@ -491,8 +455,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private static double getRateAdjustMultiplier(Mod[] mods)
         {
-            // Prefer the generic ruleset mechanism: any mod implementing IApplicableToRate should contribute.
-            // Apply in mod order to match beatmap conversion / gameplay application semantics.
+            // 优先使用通用规则集机制：任何实现 IApplicableToRate 的 mod 都应该贡献。
+            // 按 mod 顺序应用以匹配谱面转换/游戏应用语义。
             try
             {
                 double rate = 1.0;
@@ -563,16 +527,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
                                     CancellationToken cancellationToken = default,
                                     int computationDelay = 0)
         {
-            // If the bindable is already cancelled, do nothing.
+            // 如果 bindable 已经被取消，则什么都不做。
             if (cancellationToken.IsCancellationRequested)
                 return;
 
-            // Capture the bindable's own cancellation token for checking in the scheduled callback.
-            // We should only skip setting the value if the bindable itself is disposed/cancelled,
-            // not if a new mod change triggered another update cycle.
+            // 捕获 bindable 自己的取消令牌以在计划的回调中检查。
+            // 我们应该只在 bindable 本身被处置/取消时才跳过设置值，
+            // 而不是在新的 mod 变化触发另一个更新周期时。
             var bindableCancellationToken = bindable.CancellationToken;
 
-            // Request the analysis. Apply the result only when the task completes successfully.
+            // 请求分析。仅当任务成功完成时才应用结果。
             _ = applyAsync();
 
             async Task applyAsync()
@@ -585,8 +549,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
                     Schedule(() =>
                     {
-                        // Only check the bindable's own token, not the linked update token.
-                        // This ensures we always apply the latest result even if another update cycle started.
+                        // 只检查 bindable 自己的令牌，而不是链接的更新令牌。
+                        // 这确保我们总是应用最新结果，即使另一个更新周期开始了。
                         if (bindableCancellationToken.IsCancellationRequested)
                             return;
 
@@ -595,11 +559,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 }
                 catch (OperationCanceledException)
                 {
-                    // Ignore cancellations.
+                    // 忽略取消。
                 }
                 catch
                 {
-                    // Ignore failures; they should not crash the UI.
+                    // 忽略失败；它们不应该使 UI 崩溃。
                 }
             }
         }
@@ -611,9 +575,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             modSettingChangeTracker?.Dispose();
 
             cancelTrackedBindableUpdate();
-            highPriorityScheduler.Dispose();
-            lowPriorityScheduler.Dispose();
-            highPriorityIdleEvent.Dispose();
+            updateScheduler.Dispose();
         }
 
         private class BindableManiaBeatmapAnalysis : Bindable<EzAnalysisResult>

@@ -889,7 +889,7 @@ namespace osu.Game.Screens.SelectV2
         private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+        private EzAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         /// <remarks>
         /// FOOTGUN WARNING: this being sorted on the realm side before detaching is IMPORTANT.

@@ -73,7 +73,7 @@ namespace osu.Game.Screens.SelectV2
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+        private EzAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;

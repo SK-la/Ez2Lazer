@@ -234,7 +234,7 @@ namespace osu.Game
         public readonly Bindable<Dictionary<ModType, IReadOnlyList<Mod>>> AvailableMods = new Bindable<Dictionary<ModType, IReadOnlyList<Mod>>>(new Dictionary<ModType, IReadOnlyList<Mod>>());
 
         private BeatmapDifficultyCache difficultyCache;
-        private EzBeatmapManiaAnalysisCache maniaAnalysisCache;
+        private EzAnalysisCache maniaAnalysisCache;
         private IBeatmapUpdater beatmapUpdater;
 
         private UserLookupCache userCache;
@@ -369,7 +369,7 @@ namespace osu.Game
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
             dependencies.Cache(new EzAnalysisPersistentStore(Storage));
-            dependencies.Cache(maniaAnalysisCache = new EzBeatmapManiaAnalysisCache());
+            dependencies.Cache(maniaAnalysisCache = new EzAnalysisCache());
 
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
             dependencies.Cache(ScoreDownloader = new ScoreModelDownloader(ScoreManager, API));

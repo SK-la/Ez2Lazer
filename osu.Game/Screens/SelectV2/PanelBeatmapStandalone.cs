@@ -54,7 +54,7 @@ namespace osu.Game.Screens.SelectV2
         #region Ez功能
 
         [Resolved]
-        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+        private EzAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;

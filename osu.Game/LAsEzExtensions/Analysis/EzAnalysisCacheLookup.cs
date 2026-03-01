@@ -12,7 +12,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
-    public readonly struct ManiaAnalysisCacheLookup : IEquatable<ManiaAnalysisCacheLookup>
+    public readonly struct EzAnalysisCacheLookup : IEquatable<EzAnalysisCacheLookup>
     {
         public readonly BeatmapInfo BeatmapInfo;
         public readonly RulesetInfo Ruleset;
@@ -21,19 +21,16 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         private static int modSnapshotFailCount;
 
-        public ManiaAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo ruleset, IEnumerable<Mod>? mods)
+        public EzAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo? ruleset, IEnumerable<Mod>? mods)
         {
             BeatmapInfo = beatmapInfo;
-            Ruleset = ruleset;
-            // IMPORTANT: mod application order matters for beatmap conversion.
-            // WorkingBeatmap.GetPlayableBeatmap() applies mods in the order provided.
-            // Do not reorder here (eg. by Acronym), otherwise analysis may run on a different
-            // playable beatmap than gameplay, which can cause incorrect results or crashes.
+            Ruleset = ruleset ?? BeatmapInfo.Ruleset;
+            // 重要：mod 应用顺序对谱面转换很重要。
             OrderedMods = createModSnapshot(mods);
-            // IMPORTANT: some custom mods (notably many YuLiangSSS mods) lazily assign a random seed during ApplyToBeatmap
-            // (eg. Seed.Value ??= RNG.Next()). Because our cache key includes mod settings, such mutation would change
-            // Mod.GetHashCode()/Equals() during computation and corrupt dictionary usage.
-            // Pre-fill missing seeds deterministically on the cloned snapshot to keep cache keys stable.
+            // 重要：一些自定义 mods会在 ApplyToBeatmap 期间懒惰地分配随机种子
+            //（例如 Seed.Value ??= RNG.Next()）。因为我们的缓存键包含 mod 设置，这种变异会在计算过程中改变
+            // Mod.GetHashCode()/Equals() 并破坏字典使用。
+            // 在克隆的快照上确定性地预填充缺失的种子以保持缓存键稳定。
             initialiseDeterministicSeedsIfRequired(OrderedMods, beatmapInfo);
             ModsSignature = computeModsSignature(OrderedMods);
         }
@@ -44,14 +41,14 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 var hash = new HashCode();
 
-                // Include order. Order matters for conversion & gameplay.
+                // 包含顺序。顺序对转换和游戏很重要。
                 for (int i = 0; i < orderedMods.Length; i++)
                 {
                     var mod = orderedMods[i];
                     hash.Add(mod.GetType());
 
-                    // Mirror Mod.GetHashCode() semantics but decouple from mod instance mutation after signature is computed.
-                    // Only settings exposed via [SettingSource] are included.
+                    // 镜像 Mod.GetHashCode() 语义，但在计算签名后与 mod 实例变异解耦。
+                    // 仅包含通过 [SettingSource] 公开的设置。
                     foreach (var setting in mod.SettingsBindables)
                         hash.Add(setting.GetUnderlyingSettingValue());
                 }
@@ -67,7 +64,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             unchecked
             {
-                // Base seed derived from beatmap identity.
+                // 基础种子来源于谱面身份。
                 int baseSeed = 17;
                 baseSeed = baseSeed * 31 + beatmapInfo.ID.GetHashCode();
                 baseSeed = baseSeed * 31 + (beatmapInfo.Hash.GetHashCode(StringComparison.Ordinal));
@@ -80,12 +77,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     if (hasSeed.Seed.Value != null)
                         continue;
 
-                    // Mix in the mod type to avoid all seeded mods sharing the same seed.
+                    // 混合 mod 类型以避免所有带种子的 mods 共享相同的种子。
                     int seed = baseSeed;
                     seed = seed * 31 + orderedMods[i].GetType().FullName!.GetHashCode(StringComparison.Ordinal);
                     seed = seed * 31 + i;
 
-                    // Ensure non-null.
+                    // 确保非空。
                     if (seed == 0)
                         seed = 1;
 
@@ -109,8 +106,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 }
                 catch
                 {
-                    // If cloning fails, fall back to using the original instance.
-                    // This is not ideal for caching, but is better than breaking analysis entirely.
+                    // 如果克隆失败，则回退到使用原始实例。
+                    // 这对缓存来说并不理想，但比完全破坏分析要好。
                     if (Interlocked.Increment(ref modSnapshotFailCount) <= 10)
                         Logger.Log($"[EzBeatmapManiaAnalysisCache] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.", LoggingTarget.Runtime, LogLevel.Important);
 
@@ -121,10 +118,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return list.ToArray();
         }
 
-        public bool Equals(ManiaAnalysisCacheLookup other) => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
-                                                              && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
-                                                              && Ruleset.Equals(other.Ruleset)
-                                                              && ModsSignature == other.ModsSignature;
+        public bool Equals(EzAnalysisCacheLookup other)
+            => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
+               && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
+               && Ruleset.Equals(other.Ruleset)
+               && ModsSignature == other.ModsSignature;
 
         public override int GetHashCode()
         {
@@ -134,7 +132,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
             hashCode.Add(BeatmapInfo.Hash);
             hashCode.Add(Ruleset.ShortName);
 
-            // Use precomputed signature rather than mod instances to avoid key mutation during analysis.
             hashCode.Add(ModsSignature);
 
             return hashCode.ToHashCode();

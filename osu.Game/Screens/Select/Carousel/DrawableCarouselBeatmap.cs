@@ -90,7 +90,7 @@ namespace osu.Game.Screens.Select.Carousel
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+        private EzAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         [Resolved]
         private BeatmapSetOverlay? beatmapOverlay { get; set; }

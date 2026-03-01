@@ -25,7 +25,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
     /// - 游戏进行中 / 高性能会话期间自动 sleep，避免抢占。
     /// - 作为长任务在后台运行，不阻塞启动。
     /// </summary>
-    public partial class EzManiaAnalysisWarmupProcessor : Component
+    public partial class EzAnalysisWarmupProcessor : Component
     {
         protected Task ProcessingTask { get; private set; } = null!;
 
@@ -36,7 +36,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         private RealmAccess realmAccess { get; set; } = null!;
 
         [Resolved]
-        private EzBeatmapManiaAnalysisCache maniaAnalysisCache { get; set; } = null!;
+        private EzAnalysisCache maniaAnalysisCache { get; set; } = null!;
 
         [Resolved]
         private EzAnalysisPersistentStore persistentStore { get; set; } = null!;
@@ -96,7 +96,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 {
                     totalBeatmaps++;
 
-                    bool isMania = b.Ruleset.OnlineID == 3 || string.Equals(b.Ruleset.ShortName, "mania", StringComparison.OrdinalIgnoreCase);
+                    bool isMania = b.Ruleset.OnlineID == 3;
 
                     if (isMania)
                     {
