@@ -17,7 +17,7 @@ using osu.Game.Screens.Play;
 
 namespace osu.Game.LAsEzExtensions.Mods
 {
-    public class ModReconcile : Mod, IApplicableToHUD
+    public class ModReconcile : Mod, IApplicableToHUD, IApplicableToHealthProcessor, IApplicableFailOverride
     {
         public override string Name => "Reconcile";
         public override string Acronym => "RC";
@@ -29,14 +29,16 @@ namespace osu.Game.LAsEzExtensions.Mods
         public override bool ValidForFreestyleAsRequiredMod => false;
         public override IconUsage? Icon => FontAwesome.Solid.Handshake;
 
+        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_RETRY_ENABLED_LABEL), nameof(ReconcileStrings.RECONCILE_RETRY_ENABLED_DESCRIPTION))]
+        public BindableBool Restart { get; } = new BindableBool();
+
         [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_REWIND_ENABLED_LABEL), nameof(ReconcileStrings.RECONCILE_REWIND_ENABLED_DESCRIPTION))]
-        public BindableBool RewindEnabled { get; } = new BindableBool(false);
+        public BindableBool RewindEnabled { get; } = new BindableBool();
 
-        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_ENABLE_MISS_LABEL), nameof(ReconcileStrings.RECONCILE_ENABLE_MISS_DESCRIPTION))]
-        public BindableBool EnableMissCondition { get; } = new BindableBool(false);
+        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_ENABLE_MISS_LABEL))]
+        public BindableBool EnableMissCondition { get; } = new BindableBool();
 
-        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_MISS_JUDGEMENT_LABEL), nameof(ReconcileStrings.RECONCILE_MISS_JUDGEMENT_DESCRIPTION),
-            SettingControlType = typeof(SettingsEnumDropdown<HitResult>))]
+        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_MISS_JUDGEMENT_LABEL), SettingControlType = typeof(SettingsEnumDropdown<HitResult>))]
         public Bindable<HitResult> MissJudgement { get; } = new Bindable<HitResult>(HitResult.Miss);
 
         [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_MISS_COUNT_LABEL), nameof(ReconcileStrings.RECONCILE_MISS_COUNT_DESCRIPTION))]
@@ -47,7 +49,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 1
         };
 
-        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_ENABLE_ACC_LABEL), nameof(ReconcileStrings.RECONCILE_ENABLE_ACC_DESCRIPTION))]
+        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_ENABLE_ACC_LABEL))]
         public BindableBool EnableAccCondition { get; } = new BindableBool(false);
 
         [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_ACC_THRESHOLD_LABEL), nameof(ReconcileStrings.RECONCILE_ACC_THRESHOLD_DESCRIPTION))]
@@ -58,7 +60,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             Precision = 0.1
         };
 
-        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_ENABLE_HEALTH_LABEL), nameof(ReconcileStrings.RECONCILE_ENABLE_HEALTH_DESCRIPTION))]
+        [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_ENABLE_HEALTH_LABEL))]
         public BindableBool EnableHealthCondition { get; } = new BindableBool(true);
 
         [SettingSource(typeof(ReconcileStrings), nameof(ReconcileStrings.RECONCILE_HEALTH_THRESHOLD_LABEL), nameof(ReconcileStrings.RECONCILE_HEALTH_THRESHOLD_DESCRIPTION))]
@@ -67,6 +69,17 @@ namespace osu.Game.LAsEzExtensions.Mods
             MinValue = 10,
             MaxValue = 90,
         };
+
+        public bool PerformFail() => true;
+
+        public bool RestartOnFail => Restart.Value;
+
+        internal Action? TriggerFailureDelegate;
+
+        public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
+        {
+            TriggerFailureDelegate = healthProcessor.TriggerFailure;
+        }
 
         public void ApplyToHUD(HUDOverlay overlay)
         {
@@ -172,6 +185,15 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         private void handleTrigger(double currentTime, TriggerState triggerState)
         {
+            // 重试功能优先级最高
+            if (mod.Restart.Value && mod.TriggerFailureDelegate != null)
+            {
+                mod.TriggerFailureDelegate();
+                resetCounts();
+                return;
+            }
+
+            // 回溯功能次之
             if (rewindEnabled.Value)
             {
                 double? targetTime = getRewindTargetTime(triggerState);
@@ -185,6 +207,7 @@ namespace osu.Game.LAsEzExtensions.Mods
                 }
             }
 
+            // 默认暂停
             if (player.Pause())
             {
                 resetCounts();
@@ -300,37 +323,38 @@ namespace osu.Game.LAsEzExtensions.Mods
     public static class ReconcileStrings
     {
         public static readonly LocalisableString RECONCILE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "满足条件时暂停，可选回溯到上一个目标位置。",
-            "Pause when conditions are met, optionally rewinding to the previous target position.");
+            "满足条件时暂停，或重试，或回溯到上一个位置。条件可以叠加。",
+            "Pause, retry, or rewind to a previous position when the selected conditions are met. Conditions can be combined.");
 
-        public static readonly LocalisableString RECONCILE_ENABLE_MISS_LABEL = new EzLocalizationManager.EzLocalisableString("启用判定计数", "Enable judgement count");
+        public static readonly LocalisableString RECONCILE_RETRY_ENABLED_LABEL = new EzLocalizationManager.EzLocalisableString("自动重试", "Auto-retry");
 
-        public static readonly LocalisableString RECONCILE_ENABLE_MISS_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("当指定判定累计到阈值时触发", "Trigger when the selected judgement reaches the threshold.");
+        public static readonly LocalisableString RECONCILE_RETRY_ENABLED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "触发后自动重试当前谱面，替换原本的自动暂停。",
+            "Automatically retry the current map upon trigger, replacing the default auto-pause behavior.");
 
-        public static readonly LocalisableString RECONCILE_MISS_JUDGEMENT_LABEL = new EzLocalizationManager.EzLocalisableString("判定类型", "Judgement Type");
-        public static readonly LocalisableString RECONCILE_MISS_JUDGEMENT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择要计数的判定类型", "Select the judgement to count.");
-        public static readonly LocalisableString RECONCILE_MISS_COUNT_LABEL = new EzLocalizationManager.EzLocalisableString("判定计数阈值", "Judgement Count Threshold");
-        public static readonly LocalisableString RECONCILE_MISS_COUNT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("达到该数量时触发暂停", "Trigger pause when this count is reached.");
-        public static readonly LocalisableString RECONCILE_ENABLE_ACC_LABEL = new EzLocalizationManager.EzLocalisableString("启用Acc条件", "Enable accuracy condition");
-        public static readonly LocalisableString RECONCILE_ENABLE_ACC_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("当Acc低于阈值时触发", "Trigger when accuracy falls below the threshold.");
-        public static readonly LocalisableString RECONCILE_ACC_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("Acc阈值(%)", "Accuracy Threshold (%)");
-        public static readonly LocalisableString RECONCILE_ACC_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("低于此Acc触发暂停", "Trigger pause when accuracy is below this value.");
-        public static readonly LocalisableString RECONCILE_ENABLE_HEALTH_LABEL = new EzLocalizationManager.EzLocalisableString("启用血量条件", "Enable health condition");
-        public static readonly LocalisableString RECONCILE_ENABLE_HEALTH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("当血量低于阈值时触发", "Trigger when health falls below the threshold.");
-        public static readonly LocalisableString RECONCILE_HEALTH_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("血量阈值(%)", "Health Threshold (%)");
-        public static readonly LocalisableString RECONCILE_HEALTH_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("低于此血量触发暂停", "Trigger pause when health is below this value.");
-
-        public static readonly LocalisableString RECONCILE_REWIND_ENABLED_LABEL = new EzLocalizationManager.EzLocalisableString("启用回溯", "Enable rewind");
+        public static readonly LocalisableString RECONCILE_REWIND_ENABLED_LABEL = new EzLocalizationManager.EzLocalisableString("自动回溯", "Auto rewind");
 
         public static readonly LocalisableString RECONCILE_REWIND_ENABLED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "触发后回溯到目标位置再暂停。规则："
+            "触发后回溯到目标位置。规则："
             + "\n判定回溯到阈值的2/3处；"
             + "\nAcc回溯到阈值+(100-阈值)/3；"
             + "\n血量回溯到阈值+(100-阈值)*0.8。",
-            "Rewind to the target position before pausing. Rules: "
+            "Rewind to the target position. Rules: "
             + "\nJudgement rewinds to 2/3 of the threshold; "
             + "\nAcc rewinds to threshold+(100-threshold)/3; "
             + "\nHealth rewinds to threshold+(100-threshold)*0.8.");
+
+        public static readonly LocalisableString RECONCILE_ENABLE_MISS_LABEL = new EzLocalizationManager.EzLocalisableString("启用判定计数", "Enable judgement count");
+        public static readonly LocalisableString RECONCILE_MISS_JUDGEMENT_LABEL = new EzLocalizationManager.EzLocalisableString("判定类型", "Judgement Type");
+        public static readonly LocalisableString RECONCILE_MISS_COUNT_LABEL = new EzLocalizationManager.EzLocalisableString("判定计数阈值", "Judgement Count Threshold");
+        public static readonly LocalisableString RECONCILE_MISS_COUNT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("达到该数量时触发", "Trigger when this count is reached.");
+
+        public static readonly LocalisableString RECONCILE_ENABLE_ACC_LABEL = new EzLocalizationManager.EzLocalisableString("启用Acc条件", "Enable accuracy condition");
+        public static readonly LocalisableString RECONCILE_ACC_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("Acc阈值(%)", "Accuracy Threshold (%)");
+        public static readonly LocalisableString RECONCILE_ACC_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("低于此Acc触发", "Trigger when accuracy is below this value.");
+
+        public static readonly LocalisableString RECONCILE_ENABLE_HEALTH_LABEL = new EzLocalizationManager.EzLocalisableString("启用血量条件", "Enable health condition");
+        public static readonly LocalisableString RECONCILE_HEALTH_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("血量阈值(%)", "Health Threshold (%)");
+        public static readonly LocalisableString RECONCILE_HEALTH_THRESHOLD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("低于此血量触发", "Trigger when health is below this value.");
     }
 }
