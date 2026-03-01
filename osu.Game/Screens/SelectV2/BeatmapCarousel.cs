@@ -157,7 +157,7 @@ namespace osu.Game.Screens.SelectV2
             if (!shouldUseXxySrForDifficultyOperations || beatmap.Ruleset.OnlineID != 3)
                 return beatmap.StarRating;
 
-            var analysis = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods.Value, cancellationToken).ConfigureAwait(false);
+            var analysis = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods: null, cancellationToken).ConfigureAwait(false);
             return analysis?.Details.XxySr ?? beatmap.StarRating;
         }
 
