@@ -801,7 +801,7 @@ WHERE beatmap_id = $id;
 
                             try
                             {
-                                writePendingEntryToConnection(connection, pw.Beatmap, pw.Analysis);
+                                writePendingEntryToConnection(connection, pw.Beatmap, pw.Analysis, transaction);
 
                                 // Only remove if the pending entry we wrote is still the latest.
                                 if (pendingWrites.TryGetValue(id, out var latest) && latest.Timestamp == pw.Timestamp)
@@ -832,9 +832,10 @@ WHERE beatmap_id = $id;
             }
         }
 
-        private void writePendingEntryToConnection(SqliteConnection connection, BeatmapInfo beatmap, EzAnalysisResult analysis)
+        private void writePendingEntryToConnection(SqliteConnection connection, BeatmapInfo beatmap, EzAnalysisResult analysis, SqliteTransaction? transaction = null)
         {
             using var cmd = connection.CreateCommand();
+            cmd.Transaction = transaction;
 
             string kpsListJson = JsonSerializer.Serialize(analysis.Summary.KpsList);
             string columnCountsJson = JsonSerializer.Serialize(analysis.Details.ColumnCounts);
@@ -901,6 +902,7 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
                 if (hasColumn(connection, "mania_analysis", "last_updated"))
                 {
                     using var upd = connection.CreateCommand();
+                    upd.Transaction = transaction;
                     upd.CommandText = "UPDATE mania_analysis SET last_updated = $ts WHERE beatmap_id = $id";
                     upd.Parameters.AddWithValue("$ts", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
                     upd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
