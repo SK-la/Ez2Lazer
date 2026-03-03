@@ -8,8 +8,8 @@ namespace osu.Game.LAsEzExtensions.Localization
     public static class EzSongSelectStrings
     {
         public static readonly EzLocalizationManager.EzLocalisableString SAVE_TO_COLLECTION = new EzLocalizationManager.EzLocalisableString(
-            "将当前过滤结果保存到",
-            "Save current filter result to");
+            "将当前过滤结果保存到收藏夹",
+            "Add all visible beatmaps to collection");
 
         public static readonly EzLocalizationManager.EzLocalisableString REMOVE_FROM_COLLECTION = new EzLocalizationManager.EzLocalisableString(
             "从收藏夹移除当前过滤结果",
@@ -21,7 +21,7 @@ namespace osu.Game.LAsEzExtensions.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString PARTIALLY_OVERLAPPED = new EzLocalizationManager.EzLocalisableString(
             "筛选结果与收藏夹部分重",
-            "The filter result is partially overlapped with the collection");
+            "The visible beatmaps is partially overlapped with the collection");
 
         public  static readonly EzLocalizationManager.EzLocalisableString SELECT_ACTION_FOR_OVERLAP = new EzLocalizationManager.EzLocalisableString(
             " 个谱面已存在。请选择要执行的操作：",

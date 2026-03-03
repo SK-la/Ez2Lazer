@@ -3,30 +3,21 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using osu.Framework.Allocation;
-using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Localisation;
-using osu.Game.Database;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
-using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
-using osu.Game.Overlays.Dialog;
 using osu.Game.Resources.Localisation.Web;
 using osuTK;
-using Realms;
-using CommonStrings = osu.Game.Resources.Localisation.Web.CommonStrings;
 
 namespace osu.Game.Collections
 {
@@ -42,27 +33,8 @@ namespace osu.Game.Collections
 
         private BasicSearchTextBox searchTextBox = null!;
         private DrawableCollectionList list = null!;
-        private SaveToCollectionDropdown saveToCollectionDropdown = null!;
-        private RoundedButton saveFilteredResultsButton = null!;
 
-        private readonly BindableList<CollectionFilterMenuItem> saveToCollectionItems = new BindableList<CollectionFilterMenuItem>();
-
-        private IDisposable? saveCollectionsSubscription;
-
-        private Func<IEnumerable<BeatmapInfo>>? filteredBeatmapsProvider;
-
-        public Func<IEnumerable<BeatmapInfo>>? FilteredBeatmapsProvider
-        {
-            get => filteredBeatmapsProvider;
-            set
-            {
-                filteredBeatmapsProvider = value;
-                updateSaveButtonState();
-            }
-        }
-
-        [Resolved]
-        private RealmAccess realm { get; set; } = null!;
+        public Func<IEnumerable<BeatmapInfo>>? FilteredBeatmapsProvider { get; set; }
 
         [Resolved]
         private MusicController? musicController { get; set; }
@@ -154,13 +126,12 @@ namespace osu.Game.Collections
                                             {
                                                 list = new DrawableCollectionList
                                                 {
-                                                    Padding = new MarginPadding { Top = 90, Bottom = 50 },
+                                                    Padding = new MarginPadding { Vertical = 50 },
                                                     RelativeSizeAxes = Axes.Both,
                                                 },
                                                 searchTextBox = new BasicSearchTextBox
                                                 {
                                                     RelativeSizeAxes = Axes.X,
-                                                    Y = 45,
                                                     Height = 40,
                                                     ReleaseFocusOnCommit = false,
                                                     HoldFocus = true,
@@ -177,45 +148,6 @@ namespace osu.Game.Collections
                                                         new NewCollectionEntryItem()
                                                     }
                                                 },
-                                                new GridContainer
-                                                {
-                                                    RelativeSizeAxes = Axes.X,
-                                                    Height = 40,
-                                                    ColumnDimensions = new[]
-                                                    {
-                                                        new Dimension(GridSizeMode.AutoSize),
-                                                        new Dimension(GridSizeMode.Absolute, 10),
-                                                        new Dimension(),
-                                                        new Dimension(GridSizeMode.Absolute, 10),
-                                                        new Dimension(GridSizeMode.AutoSize),
-                                                    },
-                                                    Content = new[]
-                                                    {
-                                                        new[]
-                                                        {
-                                                            new OsuSpriteText
-                                                            {
-                                                                Anchor = Anchor.CentreLeft,
-                                                                Origin = Anchor.CentreLeft,
-                                                                Text = EzSongSelectStrings.SAVE_TO_COLLECTION,
-                                                                Font = OsuFont.GetFont(size: 16),
-                                                            },
-                                                            Empty(),
-                                                            saveToCollectionDropdown = new SaveToCollectionDropdown
-                                                            {
-                                                                RelativeSizeAxes = Axes.X,
-                                                            },
-                                                            Empty(),
-                                                            saveFilteredResultsButton = new RoundedButton
-                                                            {
-                                                                Width = 90,
-                                                                Height = 40,
-                                                                Text = "Save",
-                                                                Action = saveFilteredResults,
-                                                            },
-                                                        }
-                                                    }
-                                                }
                                             }
                                         },
                                     }
@@ -235,18 +167,12 @@ namespace osu.Game.Collections
             {
                 list.SearchTerm = searchTextBox.Current.Value;
             });
-
-            saveToCollectionDropdown.ItemSource = saveToCollectionItems;
-            saveToCollectionDropdown.Current.BindValueChanged(_ => updateSaveButtonState(), true);
-
-            saveCollectionsSubscription = realm.RegisterForNotifications(r => r.All<BeatmapCollection>().OrderBy(c => c.Name), saveCollectionsChanged);
         }
 
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
             duckOperation?.Dispose();
-            saveCollectionsSubscription?.Dispose();
         }
 
         protected override void PopIn()
@@ -300,145 +226,12 @@ namespace osu.Game.Collections
             }
         }
 
-        private void saveCollectionsChanged(IRealmCollection<BeatmapCollection> collections, ChangeSet? changes)
+        internal void RequestBatchAddToCollection(Live<BeatmapCollection> collection)
         {
-            var selectedId = saveToCollectionDropdown.Current.Value?.Collection?.ID;
-
-            saveToCollectionItems.Clear();
-            saveToCollectionItems.AddRange(collections.Select(c => new CollectionFilterMenuItem(c.ToLive(realm))));
-
-            if (saveToCollectionItems.Count > 0)
-            {
-                var selectedItem = saveToCollectionItems.FirstOrDefault(i => i.Collection?.ID == selectedId) ?? saveToCollectionItems[0];
-                saveToCollectionDropdown.Current.Value = selectedItem;
-            }
-
-            updateSaveButtonState();
-        }
-
-        private void updateSaveButtonState()
-        {
-            var currentId = saveToCollectionDropdown.Current.Value?.Collection?.ID;
-            bool hasTarget = currentId != null && saveToCollectionItems.Any(item => item.Collection?.ID == currentId);
-            bool hasProvider = FilteredBeatmapsProvider != null;
-            saveFilteredResultsButton.Enabled.Value = hasTarget && hasProvider;
-        }
-
-        private void saveFilteredResults()
-        {
-            var provider = FilteredBeatmapsProvider;
-            var collection = saveToCollectionDropdown.Current.Value?.Collection;
-
-            if (provider == null || collection == null)
-                return;
-
-            var hashes = provider().Select(b => b.MD5Hash)
-                                   .Where(h => !string.IsNullOrEmpty(h))
-                                   .Distinct()
-                                   .ToList();
-
-            if (hashes.Count == 0)
-                return;
-
-            // Read existing entries from the collection to determine overlap.
-            var existing = collection.PerformRead(c => c.BeatmapMD5Hashes.ToList());
-            var intersection = existing.Intersect(hashes).ToList();
-
-            // Case 1: collection already contains all filtered results -> offer bulk remove.
-            if (intersection.Count == hashes.Count)
-            {
-                Schedule(() => dialogOverlay?.Push(new SimplePopupDialog(
-                    FontAwesome.Solid.Trash,
-                    EzSongSelectStrings.REMOVE_FROM_COLLECTION,
-                    EzSongSelectStrings.REMOVE_FROM_COLLECTION_TOOLTIP,
-                    new PopupDialogButton[]
-                    {
-                        new PopupDialogCancelButton { Text = CommonStrings.ButtonsCancel },
-                        new PopupDialogDangerousButton
-                        {
-                            Text = AccountsStrings.UserTotpButtonRemove,
-                            Action = () => Task.Run(() => collection.PerformWrite(c =>
-                            {
-                                foreach (string h in intersection)
-                                    c.BeatmapMD5Hashes.Remove(h);
-                            }))
-                        }
-                    })));
-
-                return;
-            }
-
-            // Case 2: partial overlap -> let user choose to add remaining or remove overlapping parts.
-            if (intersection.Count > 0)
-            {
-                var toAdd = hashes.Except(existing).ToList();
-                var toRemove = intersection;
-
-                Schedule(() => dialogOverlay?.Push(new SimplePopupDialog(
-                    FontAwesome.Solid.Question,
-                    EzSongSelectStrings.PARTIALLY_OVERLAPPED,
-                    $"{intersection.Count}{EzSongSelectStrings.SELECT_ACTION_FOR_OVERLAP}",
-                    new PopupDialogButton[]
-                    {
-                        new PopupDialogCancelButton { Text = CommonStrings.ButtonsCancel },
-                        new PopupDialogOkButton
-                        {
-                            Text = EzSongSelectStrings.ADD_DIFFERENCE,
-                            Action = () =>
-                            {
-                                if (toAdd.Count == 0) return;
-
-                                Task.Run(() => collection.PerformWrite(c =>
-                                {
-                                    foreach (string h in toAdd)
-                                    {
-                                        if (!c.BeatmapMD5Hashes.Contains(h))
-                                            c.BeatmapMD5Hashes.Add(h);
-                                    }
-                                }));
-                            }
-                        },
-                        new PopupDialogDangerousButton
-                        {
-                            Text = EzSongSelectStrings.REMOVE_INTERSECTION,
-                            Action = () => Task.Run(() => collection.PerformWrite(c =>
-                            {
-                                foreach (string h in toRemove)
-                                    c.BeatmapMD5Hashes.Remove(h);
-                            }))
-                        }
-                    })));
-
-                return;
-            }
-
-            Task.Run(() => collection.PerformWrite(c =>
-            {
-                foreach (string hash in hashes)
-                {
-                    if (!c.BeatmapMD5Hashes.Contains(hash))
-                        c.BeatmapMD5Hashes.Add(hash);
-                }
-            }));
-        }
-
-        private partial class SaveToCollectionDropdown : OsuDropdown<CollectionFilterMenuItem>
-        {
-            protected override LocalisableString GenerateItemText(CollectionFilterMenuItem item) => item.CollectionName;
-        }
-
-        /// <summary>
-        /// A minimal concrete <see cref="PopupDialog"/> used for inline confirmation prompts in this dialog.
-        /// </summary>
-        private partial class SimplePopupDialog : PopupDialog
-        {
-            public SimplePopupDialog(IconUsage icon, LocalisableString header, LocalisableString body, PopupDialogButton[] buttons)
-            {
-                Icon = icon;
-                HeaderText = header;
-                BodyText = body;
-                Buttons = buttons;
-            }
+            BatchAddToCollectionHandler.RequestSaveToCollection(
+                collection,
+                FilteredBeatmapsProvider,
+                dialog => Schedule(() => dialogOverlay?.Push(dialog)));
         }
     }
 }
