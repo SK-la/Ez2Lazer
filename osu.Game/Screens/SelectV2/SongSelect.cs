@@ -578,7 +578,7 @@ namespace osu.Game.Screens.SelectV2
         /// </summary>
         /// <param name="beatmap">The beatmap which should be selected. If not provided, the current globally selected beatmap will be used.</param>
         /// <param name="startAction">The action to perform if conditions are met to be able to proceed. May not be invoked if in an invalid state.</param>
-        public void SelectAndRun(BeatmapInfo beatmap, Action startAction)
+        protected void SelectAndRun(BeatmapInfo beatmap, Action startAction)
         {
             if (!this.IsCurrentScreen())
                 return;
@@ -773,11 +773,20 @@ namespace osu.Game.Screens.SelectV2
                 beginLooping();
             }
 
+            Beatmap.BindValueChanged(updateVariousState, true);
+        }
+
+        private void updateVariousState(ValueChangedEvent<WorkingBeatmap> e)
+        {
+            if (!this.IsCurrentScreen())
+                return;
+
             ensureGlobalBeatmapValid();
 
             ensurePlayingSelected();
             updateBackgroundDim();
-            fetchOnlineInfo(force: true);
+            updateWedgeVisibility();
+            fetchOnlineInfo(force: ReferenceEquals(e.OldValue, e.NewValue));
         }
 
         private void onLeavingScreen()
@@ -786,6 +795,8 @@ namespace osu.Game.Screens.SelectV2
 
             if (manageCollectionsDialog?.FilteredBeatmapsProvider == getFilteredBeatmaps)
                 manageCollectionsDialog.FilteredBeatmapsProvider = null;
+
+            Beatmap.ValueChanged -= updateVariousState;
 
             modSelectOverlay.SelectedMods.UnbindFrom(Mods);
             modSelectOverlay.Beatmap.UnbindFrom(Beatmap);
