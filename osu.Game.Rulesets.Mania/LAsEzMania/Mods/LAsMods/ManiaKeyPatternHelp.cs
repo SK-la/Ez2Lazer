@@ -36,6 +36,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
     public static class ManiaKeyPatternHelp
     {
+        private const double add_note_alignment_tolerance = 6.0;
+        private const double add_note_min_column_gap = 8.0;
+
         internal readonly struct WindowContext
         {
             public readonly double BeatLength;
@@ -475,17 +478,22 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
         internal static bool TryAddNoteFromOrderedCandidates(ManiaBeatmap beatmap, IReadOnlyList<int> candidates, double time)
         {
+            double alignedTime = AlignTimeToNearbyRow(beatmap, time, add_note_alignment_tolerance);
+
             for (int i = 0; i < candidates.Count; i++)
             {
                 int column = candidates[i];
 
-                if (IsHoldOccupyingColumn(beatmap, column, time))
+                if (IsHoldOccupyingColumn(beatmap, column, alignedTime))
                     continue;
 
-                if (HasNoteAtTime(beatmap, column, time))
+                if (HasNoteAtTime(beatmap, column, alignedTime))
                     return false;
 
-                beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
+                if (hasAnyObjectInColumnNearTime(beatmap, column, alignedTime, add_note_min_column_gap))
+                    return false;
+
+                beatmap.HitObjects.Add(new Note { Column = column, StartTime = alignedTime });
                 return true;
             }
 
@@ -498,7 +506,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                                                       Random rng,
                                                       double time)
         {
-            int pickedIndex = pickIndexAvoidingHolds(beatmap, candidates, weights, rng, time);
+            double alignedTime = AlignTimeToNearbyRow(beatmap, time, add_note_alignment_tolerance);
+
+            int pickedIndex = pickIndexAvoidingHolds(beatmap, candidates, weights, rng, alignedTime);
             if (pickedIndex < 0)
                 return false;
 
@@ -506,11 +516,53 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             candidates.RemoveAt(pickedIndex);
             weights?.RemoveAt(pickedIndex);
 
-            if (HasNoteAtTime(beatmap, column, time))
+            if (HasNoteAtTime(beatmap, column, alignedTime))
                 return false;
 
-            beatmap.HitObjects.Add(new Note { Column = column, StartTime = time });
+            if (hasAnyObjectInColumnNearTime(beatmap, column, alignedTime, add_note_min_column_gap))
+                return false;
+
+            beatmap.HitObjects.Add(new Note { Column = column, StartTime = alignedTime });
             return true;
+        }
+
+        internal static double AlignTimeToNearbyRow(ManiaBeatmap beatmap, double time, double tolerance = 3.0)
+        {
+            double bestTime = time;
+            double bestDelta = tolerance;
+
+            foreach (var obj in beatmap.HitObjects)
+            {
+                double delta = Math.Abs(obj.StartTime - time);
+
+                if (delta > bestDelta)
+                    continue;
+
+                bestDelta = delta;
+                bestTime = obj.StartTime;
+            }
+
+            return bestTime;
+        }
+
+        private static bool hasAnyObjectInColumnNearTime(ManiaBeatmap beatmap, int column, double time, double minGap, ManiaHitObject? ignore = null)
+        {
+            if (minGap <= 0)
+                return false;
+
+            foreach (var obj in beatmap.HitObjects)
+            {
+                if (ReferenceEquals(obj, ignore))
+                    continue;
+
+                if (obj.Column != column)
+                    continue;
+
+                if (Math.Abs(obj.StartTime - time) < minGap)
+                    return true;
+            }
+
+            return false;
         }
 
         // Placement helpers (shared rule: hold occupied -> reselect, note exists -> skip).
@@ -630,6 +682,52 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             }
 
             return false;
+        }
+
+        internal static bool IsWithinBeatFraction(double deltaTime, ManiaBeatmap beatmap, double referenceTime, double beatFraction, double tolerance = 0.5)
+        {
+            double beatLength = beatmap.ControlPointInfo.TimingPointAt(referenceTime).BeatLength;
+
+            if (beatLength <= 0)
+                return false;
+
+            double threshold = beatLength * Math.Max(0, beatFraction);
+            return deltaTime <= threshold + tolerance;
+        }
+
+        internal static void RemoveSameColumnRunsWithinBeatFraction(ManiaBeatmap beatmap, double windowStart, double windowEnd, double beatFraction, double tolerance = 0.5)
+        {
+            var toRemove = new HashSet<ManiaHitObject>();
+
+            foreach (var group in beatmap.HitObjects.OfType<Note>().GroupBy(o => o.Column))
+            {
+                Note? previous = null;
+
+                foreach (var note in group.OrderBy(o => o.StartTime))
+                {
+                    if (note.StartTime < windowStart - tolerance || note.StartTime > windowEnd + tolerance)
+                        continue;
+
+                    if (previous == null)
+                    {
+                        previous = note;
+                        continue;
+                    }
+
+                    double delta = note.StartTime - previous.StartTime;
+
+                    if (IsWithinBeatFraction(delta, beatmap, previous.StartTime, beatFraction, tolerance))
+                    {
+                        toRemove.Add(note);
+                        continue;
+                    }
+
+                    previous = note;
+                }
+            }
+
+            foreach (var obj in toRemove)
+                beatmap.HitObjects.Remove(obj);
         }
 
         internal static void Shuffle<T>(IList<T> list, Random rng)

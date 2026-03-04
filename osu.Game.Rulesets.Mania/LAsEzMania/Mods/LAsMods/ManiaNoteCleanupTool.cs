@@ -32,12 +32,12 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             //     beatmap.HitObjects.AddRange(resolved);
             // }
 
-            // 2) 去除重叠并降低密度
+            // 去除重叠并降低密度
             CleanOverlapNotes(beatmap);
-            // 3) 在同一列中强制最小间隙
-            EnforceMinimumGaps(beatmap);
-            // 4) Enforce hold-release gap and convert too-short holds to notes.
+            // Enforce hold-release gap and convert too-short holds to notes.
             EnforceHoldReleaseGap(beatmap);
+            // 调整/转换可能再次引入过小间距，做一次最终兜底。
+            EnforceMinimumGaps(beatmap);
         }
 
         /// <summary>
@@ -84,9 +84,21 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                 return 0;
 
             double startTime = beatmap.HitObjects.Min(h => h.StartTime);
-            double beatLength = beatmap.ControlPointInfo.TimingPointAt(startTime).BeatLength;
-            double gap = beatLength / beat;
-            return Math.Clamp(gap, 30, beatLength / beat * 2);
+            return getMinimumGapAtTime(beatmap, startTime, beat);
+        }
+
+        private static double getMinimumGapAtTime(ManiaBeatmap beatmap, double time, int beat = 8)
+        {
+            int safeBeatDivisor = Math.Max(1, beat);
+            double beatLength = beatmap.ControlPointInfo.TimingPointAt(time).BeatLength;
+
+            if (beatLength <= 0)
+                return 30;
+
+            double beatGap = beatLength / safeBeatDivisor;
+
+            // 保留“按节拍”判定，同时使用 30ms 作为保守下限，避免高速段阈值过小。
+            return Math.Max(30, beatGap);
         }
 
         /// <summary>
@@ -98,7 +110,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             if (beatmap.HitObjects.Count == 0)
                 return;
 
-            double minGapMs = GetMinimumGapMs(beatmap);
             int targetKeys = beatmap.TotalColumns;
 
             var byColumn = beatmap.HitObjects.ToList().GroupBy(o => Math.Clamp(o.Column, 0, Math.Max(0, targetKeys - 1)));
@@ -107,53 +118,24 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             foreach (var colGroup in byColumn)
             {
                 var list = colGroup.OrderBy(o => o.StartTime).ToList();
-                if (list.Count == 0) continue;
+                if (list.Count == 0)
+                    continue;
 
-                // 第一步：预先移除极度密集的音符（> 1/8 拍）作为快速预处理
-                var denseFiltered = new List<ManiaHitObject> { list[0] };
+                var kept = new List<ManiaHitObject> { list[0] };
 
                 for (int i = 1; i < list.Count; i++)
                 {
-                    var prev = denseFiltered.Last();
-                    var curr = list[i];
-
-                    if (curr.StartTime - prev.StartTime < minGapMs)
-                        continue; // 丢弃当前音符（过于密集）
-
-                    denseFiltered.Add(curr);
-                }
-
-                // 第二步：应用最小间隙规则，包含向前查看的三连处理
-                var kept = new List<ManiaHitObject> { denseFiltered[0] };
-                int idx = 0;
-
-                while (++idx < denseFiltered.Count)
-                {
                     var prev = kept.Last();
-                    var cur = denseFiltered[idx];
+                    var current = list[i];
 
-                    double prevEnd = prev is HoldNote ph ? ph.EndTime : prev.StartTime;
-                    double gap = cur.StartTime - prevEnd;
+                    double prevEnd = prev is HoldNote prevHold ? prevHold.EndTime : prev.StartTime;
+                    double requiredGap = getMinimumGapAtTime(beatmap, prevEnd);
+                    double actualGap = current.StartTime - prevEnd;
 
-                    if (gap >= minGapMs)
-                    {
-                        kept.Add(cur);
+                    if (actualGap < requiredGap)
                         continue;
-                    }
 
-                    // 间隙过小：尝试向前查看并删除中间音符
-                    if (idx + 1 < denseFiltered.Count)
-                    {
-                        var next = denseFiltered[idx + 1];
-                        double nextGap = next.StartTime - prevEnd;
-
-                        if (nextGap >= minGapMs)
-                        {
-                            // 删除当前（中间）音符，前进到下一个
-                            idx++; // will move to next in outer loop
-                            kept.Add(next);
-                        }
-                    }
+                    kept.Add(current);
                 }
 
                 survivors.AddRange(kept);
@@ -172,7 +154,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
         /// <param name="beat"></param>
         internal static void EnforceHoldReleaseGap(ManiaBeatmap beatmap, int beat = 8)
         {
-            double minGapMs = GetMinimumGapMs(beatmap, beat);
             if (beatmap.HitObjects.Count == 0)
                 return;
 
@@ -188,6 +169,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                         continue;
 
                     var next = list[i + 1];
+                    double minGapMs = getMinimumGapAtTime(beatmap, next.StartTime, beat);
                     double gap = next.StartTime - hold.EndTime;
 
                     if (gap >= minGapMs)

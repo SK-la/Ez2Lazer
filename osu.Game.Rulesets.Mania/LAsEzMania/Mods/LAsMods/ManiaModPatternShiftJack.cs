@@ -268,6 +268,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                                                      Random rng,
                                                      double timeTolerance)
         {
+            double alignedTime = ManiaKeyPatternHelp.AlignTimeToNearbyRow(beatmap, time, timeTolerance);
+
             // 不允许在整拍（1/1）上添加 note。
             if (addNote)
             {
@@ -275,14 +277,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
                 if (beatLength > 0)
                 {
-                    double mod = time % beatLength;
+                    double mod = alignedTime % beatLength;
                     if (mod <= timeTolerance || Math.Abs(beatLength - mod) <= timeTolerance)
                         return false;
                 }
             }
 
             int totalColumns = Math.Max(1, beatmap.TotalColumns);
-            var sourceNotes = ManiaKeyPatternHelp.GetNotesAtTime(windowObjects, time, timeTolerance);
+            var sourceNotes = ManiaKeyPatternHelp.GetNotesAtTime(windowObjects, alignedTime, timeTolerance);
 
             if (sourceNotes.Count == 0)
                 return false;
@@ -292,8 +294,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
             for (int column = 0; column < totalColumns; column++)
             {
-                bool hasPrev = time - quarter >= 0 && ManiaKeyPatternHelp.HasNoteAtTime(beatmap, column, time - quarter, null, timeTolerance);
-                bool hasNext = ManiaKeyPatternHelp.HasNoteAtTime(beatmap, column, time + quarter, null, timeTolerance);
+                bool hasPrev = alignedTime - quarter >= 0 && ManiaKeyPatternHelp.HasNoteAtTime(beatmap, column, alignedTime - quarter, null, timeTolerance);
+                bool hasNext = ManiaKeyPatternHelp.HasNoteAtTime(beatmap, column, alignedTime + quarter, null, timeTolerance);
 
                 if (hasPrev && hasNext)
                     bothSides.Add(column);
@@ -339,18 +341,18 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
                     if (addNote)
                     {
-                        if (ManiaKeyPatternHelp.HasNoteAtTime(beatmap, targetColumn, time, null, timeTolerance))
+                        if (ManiaKeyPatternHelp.HasNoteAtTime(beatmap, targetColumn, alignedTime, null, timeTolerance))
                             continue;
 
-                        if (ManiaKeyPatternHelp.IsHoldOccupyingColumn(beatmap, targetColumn, time, null, timeTolerance))
+                        if (ManiaKeyPatternHelp.IsHoldOccupyingColumn(beatmap, targetColumn, alignedTime, null, timeTolerance))
                             continue;
                     }
                     else
                     {
-                        if (ManiaKeyPatternHelp.HasNoteAtTime(beatmap, targetColumn, time, source, timeTolerance))
+                        if (ManiaKeyPatternHelp.HasNoteAtTime(beatmap, targetColumn, alignedTime, source, timeTolerance))
                             continue;
 
-                        if (ManiaKeyPatternHelp.IsHoldOccupyingColumn(beatmap, targetColumn, time, source, timeTolerance))
+                        if (ManiaKeyPatternHelp.IsHoldOccupyingColumn(beatmap, targetColumn, alignedTime, source, timeTolerance))
                             continue;
                     }
 
@@ -365,7 +367,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                 available.RemoveAt(targetIndex);
 
                 if (addNote)
-                    beatmap.HitObjects.Add(new Note { Column = target, StartTime = time });
+                    beatmap.HitObjects.Add(new Note { Column = target, StartTime = alignedTime });
                 else
                     source.Column = target;
 

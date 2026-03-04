@@ -24,6 +24,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 {
     public class ManiaModPatternShift : Mod, IApplicableAfterBeatmapConversion, IApplicableToBeatmapConverter, IHasSeed, IHasApplyOrder
     {
+        private const double min_column_spacing_ms = 8;
+
         public override string Name => "Pattern Shift";
 
         public override string Acronym => "PS";
@@ -250,14 +252,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
                 foreach (var note in chord.Notes)
                 {
-                    int column = chooseColumn(keyCount, lastColumnTime, lastNote, rng, note.StartTime);
+                    int column = chooseColumn(keyCount, lastColumnTime, lastNote, rng, note.StartTime, min_column_spacing_ms);
                     if (column < 0)
                         continue;
 
                     if (usedColumns.Contains(column))
                         continue;
 
-                    if (hasAssignedNoteAtTime(placedNotes, column, note.StartTime))
+                    if (hasAssignedNoteAtTime(placedNotes, column, note.StartTime, min_column_spacing_ms))
                         continue;
 
                     note.AssignedColumn = column;
@@ -272,14 +274,26 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             }
         }
 
-        private static int chooseColumn(int keys, double[] lastUsedTime, int lastNote, Random rng, double currentTime)
+        private static int chooseColumn(int keys, double[] lastUsedTime, int lastNote, Random rng, double currentTime, double minSpacingMs)
         {
             var candidates = new List<int>();
 
+            double safeTime = currentTime - Math.Max(0, minSpacingMs);
+
             for (int i = 0; i < keys; i++)
             {
-                if (lastUsedTime[i] <= currentTime)
+                if (lastUsedTime[i] <= safeTime)
                     candidates.Add(i);
+            }
+
+            // 若严格最小间隔下无可用列，退化到旧逻辑，避免过多丢 note。
+            if (candidates.Count == 0)
+            {
+                for (int i = 0; i < keys; i++)
+                {
+                    if (lastUsedTime[i] <= currentTime)
+                        candidates.Add(i);
+                }
             }
 
             if (candidates.Count == 0)

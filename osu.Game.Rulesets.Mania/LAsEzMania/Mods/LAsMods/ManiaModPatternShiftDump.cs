@@ -101,6 +101,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
             int direction = lastCol == firstCol ? (rng.Next(0, 2) == 0 ? -1 : 1) : (lastCol > firstCol ? 1 : -1);
             int prevTarget = firstCol;
+            int lastAssignedColumn = firstCol;
+            double lastAssignedTime = groups[0].time;
 
             for (int g = 1; g < groups.Count; g++)
             {
@@ -108,25 +110,48 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                 if (time < windowStart - TIME_TOLERANCE || time > windowEnd + TIME_TOLERANCE)
                     continue;
 
+                double delta = time - lastAssignedTime;
+                bool forbidSameColumnWithPrevious = ManiaKeyPatternHelp.IsWithinBeatFraction(delta, beatmap, lastAssignedTime, 1.0 / 2.0, TIME_TOLERANCE);
+
+                int? forbiddenColumn = forbidSameColumnWithPrevious ? lastAssignedColumn : null;
+
                 int minCol = direction > 0 ? prevTarget + 1 : 0;
                 int maxCol = direction > 0 ? totalColumns - 1 : prevTarget - 1;
 
-                if (!tryPickNearestColumn(beatmap, cur, time, minCol, maxCol, out int chosen))
+                if (!tryPickNearestColumn(beatmap, cur, time, minCol, maxCol, out int chosen, forbiddenColumn))
                 {
                     // 允许保持不下降的单调（非严格）
                     minCol = direction > 0 ? prevTarget : 0;
                     maxCol = direction > 0 ? totalColumns - 1 : prevTarget;
 
-                    if (!tryPickNearestColumn(beatmap, cur, time, minCol, maxCol, out chosen))
-                        continue;
+                    if (!tryPickNearestColumn(beatmap, cur, time, minCol, maxCol, out chosen, forbiddenColumn))
+                    {
+                        // 最后兜底：允许在全列找一个可用列，但仍禁止与前一个在 1/2 beat 内同列。
+                        if (!tryPickNearestColumn(beatmap, cur, time, 0, totalColumns - 1, out chosen, forbiddenColumn))
+                        {
+                            if (forbidSameColumnWithPrevious && cur.Column == lastAssignedColumn)
+                            {
+                                beatmap.HitObjects.Remove(cur);
+                                continue;
+                            }
+
+                            lastAssignedColumn = cur.Column;
+                            lastAssignedTime = time;
+                            prevTarget = cur.Column;
+                            continue;
+                        }
+                    }
                 }
 
                 cur.Column = chosen;
                 prevTarget = chosen;
+                lastAssignedColumn = chosen;
+                lastAssignedTime = time;
             }
 
             // 大间隙单调滑梯：首尾间隔至少 1/2 拍才添加
             tryAddLargeGapSlide(beatmap, windowObjects, groups, beatLength, rng, settings);
+            ManiaKeyPatternHelp.RemoveSameColumnRunsWithinBeatFraction(beatmap, windowStart, windowEnd, 1.0 / 2.0, TIME_TOLERANCE);
         }
 
         private static void tryAddLargeGapSlide(ManiaBeatmap beatmap,
@@ -195,7 +220,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                                                  double time,
                                                  int minCol,
                                                  int maxCol,
-                                                 out int chosen)
+                                                 out int chosen,
+                                                 int? forbiddenColumn = null)
         {
             int totalColumns = Math.Max(1, beatmap.TotalColumns);
             int clampedMin = Math.Clamp(minCol, 0, totalColumns - 1);
@@ -209,7 +235,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
             for (int col = clampedMin; col <= clampedMax; col++)
             {
-                if (!isColumnAvailable(beatmap, obj, col, time))
+                if ((forbiddenColumn.HasValue && col == forbiddenColumn.Value) || !isColumnAvailable(beatmap, obj, col, time))
                     continue;
 
                 int dist = Math.Abs(col - obj.Column);
