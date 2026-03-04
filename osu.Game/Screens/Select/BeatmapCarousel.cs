@@ -33,7 +33,6 @@ using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using Realms;
 
@@ -151,13 +150,15 @@ namespace osu.Game.Screens.Select
 
         private bool shouldUseXxySrForDifficultyOperations => xxySrFilterSetting.Value && ruleset.Value.OnlineID == 3;
 
-        private async Task<double> getDifficultyForOperationsAsync(BeatmapInfo beatmap, CancellationToken cancellationToken)
+        private Task<double> getDifficultyForOperationsAsync(BeatmapInfo beatmap, CancellationToken cancellationToken)
         {
             if (!shouldUseXxySrForDifficultyOperations || beatmap.Ruleset.OnlineID != 3)
-                return beatmap.StarRating;
+                return Task.FromResult(beatmap.StarRating);
 
-            var analysis = await maniaAnalysisCache.GetAnalysisAsync(beatmap, ruleset.Value, mods: null, cancellationToken).ConfigureAwait(false);
-            return analysis?.Details.XxySr ?? beatmap.StarRating;
+            if (maniaAnalysisCache.TryGetBaselineXxySr(beatmap, ruleset.Value, out double xxySr))
+                return Task.FromResult(xxySr);
+
+            return Task.FromResult(beatmap.StarRating);
         }
 
         protected override void LoadComplete()
@@ -820,8 +821,6 @@ namespace osu.Game.Screens.Select
 
         public int LastFilterPanels { get; private set; }
 
-        public int FilterRuns => filterRuns;
-
         public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
         {
             bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
@@ -883,9 +882,6 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
-
-        [Resolved]
-        private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
         [Resolved]
         private EzAnalysisCache maniaAnalysisCache { get; set; } = null!;

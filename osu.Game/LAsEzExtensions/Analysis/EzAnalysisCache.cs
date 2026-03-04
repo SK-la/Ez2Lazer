@@ -229,6 +229,35 @@ namespace osu.Game.LAsEzExtensions.Analysis
             return getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay);
         }
 
+        public bool TryGetBaselineXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
+        {
+            xxySr = 0;
+
+            if (beatmapInfo is not BeatmapInfo localBeatmapInfo)
+                return false;
+
+            var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
+
+            if (localRulesetInfo == null || localRulesetInfo.OnlineID != 3)
+                return false;
+
+            var lookup = new EzAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods: null);
+
+            if (CheckExists(lookup, out var existing) && existing?.Details.XxySr is double cachedXxySr)
+            {
+                xxySr = cachedXxySr;
+                return true;
+            }
+
+            if (EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted) && persisted.Details.XxySr is double persistedXxySr)
+            {
+                xxySr = persistedXxySr;
+                return true;
+            }
+
+            return false;
+        }
+
         private async Task<EzAnalysisResult?> getAndMaybeEvictAsync(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
         {
             EzAnalysisResult? result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);

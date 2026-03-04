@@ -305,6 +305,8 @@ namespace osu.Game.Screens.Select
                 else
                 {
                     csSelector.Show();
+                    xxySrFilterButton.Hide();
+                    kpcDropdown.Hide();
                 }
             });
             mods.BindValueChanged(m =>
