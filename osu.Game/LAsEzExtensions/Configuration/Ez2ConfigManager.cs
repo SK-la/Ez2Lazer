@@ -12,7 +12,7 @@ using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.LAsEzExtensions.HUD;
 using osu.Game.LAsEzExtensions.Online;
-using osu.Game.Screens.SelectV2;
+using osu.Game.Screens.Select;
 
 namespace osu.Game.LAsEzExtensions.Configuration
 {

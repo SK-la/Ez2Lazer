@@ -603,7 +603,7 @@ namespace osu.Game.Tests.NonVisual.Filtering
 
             public void Filter(FilterCriteria criteria)
             {
-                Filtered.Value = !BeatmapCarouselFilterMatching.CheckCriteriaMatch(BeatmapInfo, criteria);
+                Filtered.Value = !BeatmapCarouselFilterMatching.CheckCriteriaMatch(BeatmapInfo, criteria, 0);
             }
         }
 

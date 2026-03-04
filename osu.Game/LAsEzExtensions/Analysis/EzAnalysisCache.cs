@@ -21,7 +21,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Screens.SelectV2;
+using osu.Game.Screens.Select;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 

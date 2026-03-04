@@ -7,7 +7,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.SelectV2
+namespace osu.Game.Screens.Select
 {
     public partial class EzKpsDisplay : CompositeDrawable
     {

@@ -14,7 +14,7 @@ using osu.Game.Overlays;
 using osu.Game.Storyboards;
 using osuTK;
 
-namespace osu.Game.Screens.SelectV2
+namespace osu.Game.Screens.Select
 {
     /// <summary>
     /// 用于在难度卡底部显示标签的组件，包括用户标签、视频标签、故事版标签
