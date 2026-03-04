@@ -26,6 +26,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
         private Bindable<string> keyModeId = new Bindable<string>();
         private readonly BindableBool isMultiSelectMode = new BindableBool();
         private readonly Dictionary<int, HashSet<string>> modeSelections = new Dictionary<int, HashSet<string>>();
+        private int currentRulesetId = -1;
 
         private ShearedButton labelButton = null!;
         private ShearedCsModeTabControl tabControl = null!;
@@ -123,7 +124,22 @@ namespace osu.Game.LAsEzExtensions.UserInterface
 
         private void onRulesetChanged(ValueChangedEvent<RulesetInfo> e)
         {
+            if (currentRulesetId >= 0)
+                modeSelections[currentRulesetId] = new HashSet<string>(SelectedModeIds);
+
             int id = e.NewValue.OnlineID;
+            currentRulesetId = id;
+
+            var validIds = CsItemIds.GetModesForRuleset(id)
+                                    .Select(m => m.Id)
+                                    .ToHashSet();
+
+            if (!modeSelections.TryGetValue(id, out var selectionForRuleset))
+                selectionForRuleset = parseModeIds(keyModeId.Value);
+
+            selectionForRuleset.IntersectWith(validIds);
+            SetSelection(selectionForRuleset);
+            modeSelections[id] = new HashSet<string>(selectionForRuleset);
 
             if (id == 1) // Taiko
             {
@@ -150,10 +166,10 @@ namespace osu.Game.LAsEzExtensions.UserInterface
 
         private void updateValue()
         {
-            int currentRulesetId = ruleset.Value.OnlineID;
+            int activeRulesetId = ruleset.Value.OnlineID;
 
-            if (!modeSelections.ContainsKey(currentRulesetId))
-                modeSelections[currentRulesetId] = new HashSet<string>();
+            if (!modeSelections.ContainsKey(activeRulesetId))
+                modeSelections[activeRulesetId] = new HashSet<string>();
 
             HashSet<string> selectedModes = SelectedModeIds;
 
@@ -173,8 +189,8 @@ namespace osu.Game.LAsEzExtensions.UserInterface
                 }
             }
 
-            modeSelections[currentRulesetId] = selectedModes;
-            tabControl.UpdateForRuleset(currentRulesetId);
+            modeSelections[activeRulesetId] = new HashSet<string>(selectedModes);
+            tabControl.UpdateForRuleset(activeRulesetId);
             tabControl.UpdateTabItemUI(selectedModes);
             tabControl.IsMultiSelectMode = isMultiSelectMode.Value;
         }
