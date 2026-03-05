@@ -15,7 +15,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Sprites;
 using osu.Game.LAsEzExtensions.Localization;
-using osu.Game.Localisation.SkinComponents;
+using osu.Game.LAsEzExtensions.Screens;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Skinning;
@@ -34,6 +34,7 @@ namespace osu.Game.LAsEzExtensions.HUD
     {
         private const float axis_label_padding = 52f;
         private const float axis_label_offset = 16f;
+        private const float axis_label_alpha = 1f;
 
         private float[] parameterRatios = new float[6];
         private float[] parameterValues = new float[6];
@@ -54,17 +55,17 @@ namespace osu.Game.LAsEzExtensions.HUD
 
         public float MaxAr { get; set; } = 10f;
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP))]
-        public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 210, 110));
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 210, 230));
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR_TOOLTIP))]
-        public BindableColour4 BaseAreaColour { get; } = new BindableColour4(new Color4(255, 255, 200, 30));
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR), nameof(EzHUDStrings.RADAR_BASE_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 BaseAreaColour { get; } = new BindableColour4(new Color4(255, 255, 200, 128));
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_DATA_LINE_COLOUR_TOOLTIP))]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_LINE_COLOUR), nameof(EzHUDStrings.RADAR_DATA_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 DataLineColour { get; } = new BindableColour4(new Color4(255, 230, 128, 230));
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR_TOOLTIP))]
-        public BindableColour4 DataAreaColour { get; } = new BindableColour4(new Color4(255, 215, 0, 95));
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR), nameof(EzHUDStrings.RADAR_DATA_AREA_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 DataAreaColour { get; } = new BindableColour4(new Color4(255, 215, 0, 128));
 
         public int AxisCount
         {
@@ -153,6 +154,11 @@ namespace osu.Game.LAsEzExtensions.HUD
         {
             base.LoadComplete();
 
+            bindPreserveAlpha(BaseLineColour);
+            bindPreserveAlpha(BaseAreaColour);
+            bindPreserveAlpha(DataLineColour);
+            bindPreserveAlpha(DataAreaColour);
+
             BaseLineColour.BindValueChanged(_ => applyChartColours(), true);
             BaseAreaColour.BindValueChanged(_ => applyChartColours(), true);
             DataLineColour.BindValueChanged(_ => applyChartColours(), true);
@@ -186,6 +192,26 @@ namespace osu.Game.LAsEzExtensions.HUD
 
             ruleset.BindValueChanged(_ => updateParameterRatios(difficultyBindable?.Value ?? default), true);
         }
+
+        private static void bindPreserveAlpha(BindableColour4 colourBindable)
+        {
+            colourBindable.BindValueChanged(e =>
+            {
+                bool rgbChanged =
+                    !nearlyEqual(e.OldValue.R, e.NewValue.R) ||
+                    !nearlyEqual(e.OldValue.G, e.NewValue.G) ||
+                    !nearlyEqual(e.OldValue.B, e.NewValue.B);
+
+                bool alphaChanged = !nearlyEqual(e.OldValue.A, e.NewValue.A);
+
+                if (!rgbChanged || !alphaChanged)
+                    return;
+
+                colourBindable.Value = new Color4(e.NewValue.R, e.NewValue.G, e.NewValue.B, e.OldValue.A);
+            });
+        }
+
+        private static bool nearlyEqual(float x, float y) => Math.Abs(x - y) < 0.0001f;
 
         private void updateParameterRatios(StarDifficulty difficulty)
         {
@@ -253,7 +279,7 @@ namespace osu.Game.LAsEzExtensions.HUD
             chart.Invalidate(Invalidation.DrawNode);
 
             foreach (var text in axisTexts)
-                text.Colour = DataLineColour.Value;
+                text.Colour = withFixedAlpha(DataLineColour.Value);
         }
 
         private void ensureAxisTexts()
@@ -274,7 +300,7 @@ namespace osu.Game.LAsEzExtensions.HUD
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Colour = DataLineColour.Value,
+                    Colour = withFixedAlpha(DataLineColour.Value),
                 };
 
                 drawables[i] = axisTexts[i];
@@ -326,6 +352,8 @@ namespace osu.Game.LAsEzExtensions.HUD
                 _ => value.ToString("0.0"),
             };
         }
+
+        private static Color4 withFixedAlpha(Color4 colour) => new Color4(colour.R, colour.G, colour.B, axis_label_alpha);
 
         protected override void Dispose(bool isDisposing)
         {
