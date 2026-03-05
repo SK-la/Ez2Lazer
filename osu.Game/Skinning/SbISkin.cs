@@ -69,20 +69,7 @@ namespace osu.Game.Skinning
                         case GlobalSkinnableContainers.SongSelect:
                             var songSelectComponents = new DefaultSkinComponentsContainer(c =>
                             {
-                                // var dim = c.OfType<LAsSkinCom6DimPanel>().FirstOrDefault();
-                                //
-                                // if (dim != null)
-                                // {
-                                //     dim.Anchor = Anchor.Centre;
-                                //     dim.Origin = Anchor.Centre;
-                                // }
-                            })
-                            {
-                                // Children = new Drawable[]
-                                // {
-                                //     new LAsSkinCom6DimPanel(),
-                                // }
-                            };
+                            });
 
                             return songSelectComponents;
 

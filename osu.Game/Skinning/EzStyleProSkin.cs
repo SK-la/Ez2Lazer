@@ -89,15 +89,9 @@ namespace osu.Game.Skinning
                                 {
                                     dim.Anchor = Anchor.BottomCentre;
                                     dim.Origin = Anchor.Centre;
-                                    dim.Position = new Vector2(-80, -150);
+                                    dim.Position = new Vector2(0, -150);
                                 }
-                            })
-                            {
-                                // Children = new Drawable[]
-                                // {
-                                //     new LAsSkinCom6DimPanel(),
-                                // }
-                            };
+                            });
 
                             return songSelectComponents;
 
