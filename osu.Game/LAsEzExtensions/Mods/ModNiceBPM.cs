@@ -6,10 +6,14 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Judgements;
@@ -18,10 +22,12 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.Screens.Play;
+using osuTK;
 
 namespace osu.Game.LAsEzExtensions.Mods
 {
-    public class ModNiceBPM : Mod, IApplicableToRate, IApplicableToDrawableHitObject, IApplicableToBeatmap, IUpdatableByPlayfield
+    public partial class ModNiceBPM : Mod, IApplicableToRate, IApplicableToDrawableHitObject, IApplicableToBeatmap, IUpdatableByPlayfield, IApplicableToHUD
     {
         public override string Name => "Nice BPM";
 
@@ -282,6 +288,11 @@ namespace osu.Game.LAsEzExtensions.Mods
             sample.AddAdjustment(AdjustableProperty.Frequency, SpeedChange);
         }
 
+        public void ApplyToHUD(HUDOverlay overlay)
+        {
+            overlay.Add(new NiceBPMRateDisplay(SpeedChange));
+        }
+
         public void Update(Playfield playfield)
         {
             SpeedChange.Value = Interpolation.DampContinuously(SpeedChange.Value, targetRate, 50, playfield.Clock.ElapsedFrameTime);
@@ -466,6 +477,43 @@ namespace osu.Game.LAsEzExtensions.Mods
             // 根据一致性缩放速率调整
             targetRate = Interpolation.Lerp(targetRate, recentRates.Average(), Math.Abs(consistency) / (recent_rate_count - 1d));
         }
+
+        private partial class NiceBPMRateDisplay : CompositeDrawable
+        {
+            private readonly BindableNumber<double> sourceRate;
+            private readonly BindableDouble displayedRate = new BindableDouble();
+
+            private OsuSpriteText rateText = null!;
+
+            public NiceBPMRateDisplay(BindableNumber<double> sourceRate)
+            {
+                this.sourceRate = sourceRate;
+
+                AutoSizeAxes = Axes.Both;
+                Anchor = Anchor.BottomLeft;
+                Origin = Anchor.BottomLeft;
+                Position = new Vector2(16, -16);
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                InternalChild = rateText = new OsuSpriteText
+                {
+                    Font = OsuFont.Default.With(size: 24),
+                };
+
+                displayedRate.BindTo(sourceRate);
+                displayedRate.BindValueChanged(rate => rateText.Text = $"Speed: {rate.NewValue:0.00}x", true);
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                base.Dispose(isDisposing);
+                displayedRate.UnbindAll();
+            }
+        }
     }
 
     public static class NiceBPMStrings
@@ -476,7 +524,7 @@ namespace osu.Game.LAsEzExtensions.Mods
         public static readonly LocalisableString FREE_BPM_LABEL = new EzLocalizationManager.EzLocalisableString("初始BPM", "Initial BPM");
         public static readonly LocalisableString FREE_BPM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置BPM值以调整初始播放速度", "BPM to speed");
         public static readonly LocalisableString ENABLE_DYNAMIC_BPM_LABEL = new EzLocalizationManager.EzLocalisableString("启用动态BPM", "Enable Dynamic BPM");
-        public static readonly LocalisableString ENABLE_DYNAMIC_BPM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("基于表现启用动态BPM调整", "Enable dynamic BPM adjustment based on performance");
+        public static readonly LocalisableString ENABLE_DYNAMIC_BPM_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("基于判定表现进行动态BPM调整，过滤P判", "Enable dynamic BPM adjustment based on performance");
         public static readonly LocalisableString MIN_ALLOWABLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString("最小允许速率", "Min Allowable Rate");
         public static readonly LocalisableString MIN_ALLOWABLE_RATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动态BPM调整的最小速率", "Minimum rate for dynamic BPM adjustment");
         public static readonly LocalisableString MAX_ALLOWABLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString("最大允许速率", "Max Allowable Rate");
