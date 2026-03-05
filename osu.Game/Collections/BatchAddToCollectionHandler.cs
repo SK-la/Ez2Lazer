@@ -124,7 +124,7 @@ namespace osu.Game.Collections
                     },
                     new PopupDialogDangerousButton
                     {
-                        Text = EzSongSelectStrings.REMOVE_FROM_COLLECTION,
+                        Text = EzSongSelectStrings.REMOVE_INTERSECTION,
                         Action = onRemoveIntersection,
                     },
                     new PopupDialogCancelButton

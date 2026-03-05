@@ -821,6 +821,8 @@ namespace osu.Game.Screens.Select
 
         public int LastFilterPanels { get; private set; }
 
+        public int FilterRuns => filterRuns;
+
         public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
         {
             bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);

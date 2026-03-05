@@ -15,6 +15,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osuTK;
@@ -84,7 +85,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
                                 Shear = new Vector2(0),
-                                TooltipText = "Clear selection",
+                                TooltipText = EzSongSelectStrings.CLEAR_SELECTION,
                             },
                             tabControl = new ShearedCsModeTabControl
                             {
@@ -98,7 +99,7 @@ namespace osu.Game.LAsEzExtensions.UserInterface
                                 Shear = new Vector2(0),
                                 Text = "K +",
                                 Height = 30f,
-                                TooltipText = "Enable multi-select",
+                                TooltipText = EzSongSelectStrings.MULTI_SELECT_BUTTON_TOOLTIP,
                             }
                         }
                     }

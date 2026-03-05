@@ -43,5 +43,13 @@ namespace osu.Game.LAsEzExtensions.Localization
             "按键音预览：\n0 关闭; \n1 蓝灯开启 (全量音效预览); \n2 黄灯开启 (全量音效预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",
             "Key sound preview: \n0 Off; \n1 BlueLight (keypress triggers samples); "
             + "\n2 GoldLight (preserve preview in song select; in gameplay auto-play note samples, keypresses no longer trigger sample playback)");
+
+        public static readonly LocalisableString CLEAR_SELECTION = new EzLocalizationManager.EzLocalisableString(
+            "点此处可清除过滤选择。\n(CS: cs ±0.5)",
+            "Click here to clear the filter selection.\n(CS: cs ±0.5)");
+
+        public static readonly LocalisableString MULTI_SELECT_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "多选模式",
+            "Multi-select mode");
     }
 }
