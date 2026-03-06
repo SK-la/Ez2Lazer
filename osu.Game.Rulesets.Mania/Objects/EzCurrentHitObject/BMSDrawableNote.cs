@@ -24,7 +24,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
+            {
                 ApplyResult(HitResult.Miss);
+                return;
+            }
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
@@ -81,7 +84,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
+            {
                 ApplyResult(HitResult.Miss);
+                return;
+            }
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
@@ -128,7 +134,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
+            {
                 ApplyResult(HitResult.Miss);
+                return;
+            }
 
             if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
                 adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
