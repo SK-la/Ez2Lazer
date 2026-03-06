@@ -15,6 +15,7 @@ using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Online;
@@ -336,7 +337,8 @@ namespace osu.Game.Screens.Play
 
             if (Ruleset.Value.OnlineID == 3 && (hitMode != EzEnumHitMode.Lazer || !hasDefaultCutoffValues))
             {
-                Logger.Log($"[EzMania]Score submission blocked by custom rating settings (HitMode={hitMode}, CutoffA={accCutoffABindable.Value:0.####}, CutoffS={accCutoffSBindable.Value:0.####}).");
+                Logger.Log($"[EzMania]Score submission blocked by custom rating settings (HitMode={hitMode}, CutoffA={accCutoffABindable.Value:0.####}, CutoffS={accCutoffSBindable.Value:0.####})."
+                  , Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return Task.CompletedTask;
             }
 
@@ -346,13 +348,13 @@ namespace osu.Game.Screens.Play
 
             if (Ruleset.Value.OnlineID == 3 && !offsetManiaBindable.IsDefault)
             {
-                Logger.Log($"[EzMania]Score submission blocked by offset settings.");
+                Logger.Log($"[EzMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return Task.CompletedTask;
             }
 
             if (Ruleset.Value.OnlineID != 3 && !offsetNonStdBindable.IsDefault)
             {
-                Logger.Log($"[EzNoMania]Score submission blocked by offset settings.");
+                Logger.Log($"[EzNoMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return Task.CompletedTask;
             }
 

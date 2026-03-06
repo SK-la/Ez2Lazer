@@ -15,6 +15,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Skinning;
 using osuTK;
@@ -281,8 +282,7 @@ namespace osu.Game.LAsEzExtensions
             else
             {
                 string frameFile = $"{basePath}.png";
-                Logger.Log($"[EzLocalTextureFactory] Loading JudgementLine Frame: {frameFile}",
-                    LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"[EzLocalTextureFactory] Loading JudgementLine Frame: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 var texture = textureStore.Get(frameFile);
 
                 frames.Add(texture);
@@ -353,8 +353,7 @@ namespace osu.Game.LAsEzExtensions
 
                 if (texture == null) break;
 
-                Logger.Log($"[EzLocalTextureFactory] Added Stage Frames: {basePath}_{i}.png",
-                    LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"[EzLocalTextureFactory] Added Stage Frames: {basePath}_{i}.png", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 frames.Add(texture);
             }
@@ -365,8 +364,7 @@ namespace osu.Game.LAsEzExtensions
 
                 if (texture != null)
                 {
-                    Logger.Log($"[EzLocalTextureFactory] Added Stage Frame: {basePath}",
-                        LoggingTarget.Runtime, LogLevel.Debug);
+                    Logger.Log($"[EzLocalTextureFactory] Added Stage Frame: {basePath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     frames.Add(texture);
                 }
             }
@@ -418,8 +416,7 @@ namespace osu.Game.LAsEzExtensions
 
                     if (texture == null) break;
 
-                    Logger.Log($"[EzLocalTextureFactory] Added Keys Frames: {basePath}_{i}",
-                        LoggingTarget.Runtime, LogLevel.Debug);
+                    Logger.Log($"[EzLocalTextureFactory] Added Keys Frames: {basePath}_{i}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                     frames.Add(texture);
                 }
@@ -431,8 +428,7 @@ namespace osu.Game.LAsEzExtensions
 
                     if (texture != null)
                     {
-                        Logger.Log($"[EzLocalTextureFactory] Added Keys Frame: {basePath}",
-                            LoggingTarget.Runtime, LogLevel.Debug);
+                        Logger.Log($"[EzLocalTextureFactory] Added Keys Frame: {basePath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                         frames.Add(texture);
                     }
                 }
@@ -465,9 +461,6 @@ namespace osu.Game.LAsEzExtensions
 
                 if (frames.Count > 0)
                 {
-                    Logger.Log($"[EzLocalTextureFactory] global_cache Caching {frames.Count} frames for {cacheKey}",
-                        LoggingTarget.Runtime, LogLevel.Debug);
-
                     var newEntry = new CacheEntry(frames, true);
                     global_cache.TryAdd(cacheKey, newEntry);
                 }
@@ -482,8 +475,7 @@ namespace osu.Game.LAsEzExtensions
 
             if (count1 > 0)
             {
-                Logger.Log($"[EzLocalTextureFactory] Clearing note_ratio_cache ({count1})",
-                    LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"[EzLocalTextureFactory] Clearing note_ratio_cache ({count1})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 note_ratio_cache.Clear();
             }
@@ -492,8 +484,7 @@ namespace osu.Game.LAsEzExtensions
 
             if (count2 > 0)
             {
-                Logger.Log($"[EzLocalTextureFactory] Clearing global_cache ({count2})",
-                    LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"[EzLocalTextureFactory] Clearing global_cache ({count2})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 global_cache.Clear();
             }
         }

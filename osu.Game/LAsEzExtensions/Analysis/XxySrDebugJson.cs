@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -98,14 +99,14 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 Logger.Log(
                     FormatAbnormalSr(beatmap, "xxySR_null", null, xxySr),
-                    EzAnalysisPersistentStore.LOGGER_NAME,
+                    Ez2ConfigManager.LOGGER_NAME,
                     LogLevel.Error);
             }
             else if (Math.Abs(star.Value - xxySr.Value) > 3)
             {
                 Logger.Log(
                     FormatAbnormalSr(beatmap, "xxySR_large_diff", star, xxySr),
-                    EzAnalysisPersistentStore.LOGGER_NAME,
+                    Ez2ConfigManager.LOGGER_NAME,
                     LogLevel.Error);
             }
         }

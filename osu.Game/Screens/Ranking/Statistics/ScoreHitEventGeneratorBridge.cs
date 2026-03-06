@@ -9,6 +9,7 @@ using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Statistics;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -89,7 +90,7 @@ namespace osu.Game.Screens.Ranking.Statistics
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, $"HitEvent generation via bridge failed. ruleset={score.ScoreInfo.Ruleset.ShortName}", EzAnalysisPersistentStore.LOGGER_NAME);
+                Logger.Error(ex, $"HitEvent generation via bridge failed. ruleset={score.ScoreInfo.Ruleset.ShortName}", Ez2ConfigManager.LOGGER_NAME);
                 return null;
             }
         }
@@ -152,7 +153,7 @@ namespace osu.Game.Screens.Ranking.Statistics
                 }
             }
 
-            Logger.Log($"No HitEvent generator found for ruleset={key}. Skipping local generation.", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Debug);
+            Logger.Log($"No HitEvent generator found for ruleset={key}. Skipping local generation.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             return null;
         }
     }

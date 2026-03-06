@@ -4,6 +4,7 @@
 using System;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Online;
 
@@ -23,7 +24,7 @@ namespace osu.Game.Online
                     // 任何从服务器获取资源的事件都会引发这个日志输出
                     if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri1) || !uri1.Host.EndsWith(@".ppy.sh", StringComparison.OrdinalIgnoreCase))
                     {
-                        Logger.Log($@"[Ez2Lazer] Using Custom ApiUrl {url}", LoggingTarget.Network, LogLevel.Important);
+                        Logger.Log($@"[Ez2Lazer] Using Custom ApiUrl {url}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                     }
                     #endif
 

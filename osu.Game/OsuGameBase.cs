@@ -115,7 +115,7 @@ namespace osu.Game
             if (Ez2ConfigManager != null)
             {
                 var serverPreset = Ez2ConfigManager.Get<ServerPreset>(Ez2Setting.ServerPreset);
-                Logger.Log($"[Ez] Using server preset: {serverPreset}");
+                Logger.Log($"[EzServer] Using server preset: {serverPreset}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 return serverPreset switch
                 {
@@ -125,7 +125,7 @@ namespace osu.Game
                 };
             }
 
-            Logger.Log("[Ez] Switch server failed: Ez2ConfigManager not initialized. Falling back to default configuration.");
+            Logger.Log("[EzServer] Switch server failed: Ez2ConfigManager not initialized. Falling back to default configuration.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
             // 否则使用默认配置
             return UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();

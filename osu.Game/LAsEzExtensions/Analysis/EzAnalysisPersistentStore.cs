@@ -14,6 +14,7 @@ using Microsoft.Data.Sqlite;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -37,7 +38,6 @@ namespace osu.Game.LAsEzExtensions.Analysis
         /// </summary>
         public static bool Enabled = true;
 
-        public static readonly string LOGGER_NAME = "ez_runtime";
         public static readonly string DATABASE_FILENAME = $@"mania-analysis_v{ANALYSIS_VERSION}.sqlite";
 
         // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
@@ -105,7 +105,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     // forcing a full recompute (when changes are only schema/serialization related).
                     tryClonePreviousDatabaseIfMissing();
 
-                    Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", LOGGER_NAME, LogLevel.Important);
+                    Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
                     using var connection = openConnection();
 
@@ -275,7 +275,7 @@ LIMIT 1;
 
                 if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_hash mismatch for {beatmap.ID}: stored={storedHash} runtime={beatmap.Hash}", LOGGER_NAME, LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_hash mismatch for {beatmap.ID}: stored={storedHash} runtime={beatmap.Hash}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -284,7 +284,7 @@ LIMIT 1;
                 // - If stored md5 is present, require it to match.
                 if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_md5 mismatch for {beatmap.ID}: stored={storedMd5} runtime={beatmap.MD5Hash}", LOGGER_NAME, LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_md5 mismatch for {beatmap.ID}: stored={storedMd5} runtime={beatmap.MD5Hash}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -329,7 +329,7 @@ LIMIT 1;
                 // Validate the analysis result to ensure it's reasonable
                 if (!isValidAnalysisResult(result))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", LOGGER_NAME, LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] Invalid analysis result for {beatmap.ID}, ignoring cached data.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
@@ -339,7 +339,7 @@ LIMIT 1;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.", LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.", Ez2ConfigManager.LOGGER_NAME);
                 return false;
             }
         }
@@ -362,7 +362,7 @@ LIMIT 1;
             // Validate the analysis result before storing
             if (!isValidAnalysisResult(analysis))
             {
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", LOGGER_NAME, LogLevel.Debug);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 return;
             }
 
@@ -387,7 +387,7 @@ LIMIT 1;
                 // 对比两个结果是否有差异
                 if (hasDifference(storedAnalysis, analysis))
                 {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", LOGGER_NAME, LogLevel.Debug);
+                    Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     Store(beatmap, analysis);
                 }
             }
@@ -508,7 +508,7 @@ LIMIT 1;
             // Validate the analysis result before storing
             if (!isValidAnalysisResult(analysis))
             {
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", LOGGER_NAME, LogLevel.Debug);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Refusing to store invalid analysis result for {beatmap.ID}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 return;
             }
 
@@ -707,13 +707,12 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             try
             {
                 File.Copy(bestCandidate, dbPath);
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Cloned DB from v{bestVersion} to v{ANALYSIS_VERSION}: {Path.GetFileName(bestCandidate)} -> {Path.GetFileName(dbPath)}",
-                    LoggingTarget.Database);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Cloned DB from v{bestVersion} to v{ANALYSIS_VERSION}: {Path.GetFileName(bestCandidate)} -> {Path.GetFileName(dbPath)}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             }
             catch (Exception e)
             {
                 // If cloning fails, we simply fall back to creating a fresh DB and recomputing as needed.
-                Logger.Error(e, "[EzManiaAnalysisPersistentStore] Failed to clone previous DB; falling back to fresh database.");
+                Logger.Error(e, "[EzManiaAnalysisPersistentStore] Failed to clone previous DB; falling back to fresh database.", Ez2ConfigManager.LOGGER_NAME);
             }
         }
 
@@ -924,7 +923,7 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
                 return;
 
             // 重建表，删除不识别的列
-            Logger.Log($"[EzManiaAnalysisPersistentStore] Found unrecognized columns: {string.Join(", ", unrecognizedColumns)}; rebuilding table.", LoggingTarget.Database);
+            Logger.Log($"[EzManiaAnalysisPersistentStore] Found unrecognized columns: {string.Join(", ", unrecognizedColumns)}; rebuilding table.", Ez2ConfigManager.LOGGER_NAME);
 
             rebuildTableWithoutUnrecognizedColumns(connection, unrecognizedColumns);
         }

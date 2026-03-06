@@ -9,19 +9,14 @@ using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions.UserInterface
 {
-    public partial class ShearedTriStateButton : ShearedButton
+    public partial class ShearedKSPreviewButton : ShearedButton
     {
         public Bindable<KeySoundPreviewMode> State = new Bindable<KeySoundPreviewMode>();
-
-        public ShearedTriStateButton(float? width = null)
-            : base(width)
-        {
-        }
 
         protected override void LoadComplete()
         {
             Action = () => State.Value = (KeySoundPreviewMode)(((int)State.Value + 1) % 3);
-            Logger.Log(State.Value.ToString());
+            Logger.Log($@"[Ez]KeySoundPreviewMode: {State.Value.ToString()}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             State.BindValueChanged(_ => UpdateState(), true);
 
             base.LoadComplete();

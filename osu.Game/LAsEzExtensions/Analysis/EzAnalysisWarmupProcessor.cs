@@ -11,6 +11,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Performance;
@@ -72,13 +73,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             if (!EzAnalysisPersistentStore.Enabled)
             {
-                Logger.Log("Mania analysis persistence is disabled; skipping warmup.", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("Mania analysis persistence is disabled; skipping warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
             }
 
             List<(Guid id, string hash)> beatmaps = new List<(Guid id, string hash)>();
 
-            Logger.Log("Querying for mania beatmaps to warm up analysis cache...", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+            Logger.Log("Querying for mania beatmaps to warm up analysis cache...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
             realmAccess.Run(r =>
             {
@@ -125,12 +126,12 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 }
 
                 Logger.Log($"Warmup beatmap query summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}",
-                    EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
                 if (maniaTotal == 0)
                 {
                     string dist = string.Join(", ", rulesetDistribution.OrderByDescending(kvp => kvp.Value).Take(10).Select(kvp => $"{kvp.Key}={kvp.Value}"));
-                    Logger.Log($"Warmup beatmap ruleset distribution (first 2000): {dist}", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+                    Logger.Log($"Warmup beatmap ruleset distribution (first 2000): {dist}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 }
             });
 
@@ -143,13 +144,13 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             if (needingRecompute.Count == 0)
             {
-                Logger.Log("No beatmaps require mania analysis warmup.", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("No beatmaps require mania analysis warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
             }
 
-            Logger.Log($"Found {needingRecompute.Count} beatmaps which require mania analysis warmup.", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+            Logger.Log($"Found {needingRecompute.Count} beatmaps which require mania analysis warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
-            Logger.Log($"Starting mania analysis warmup. total={needingRecompute.Count}", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+            Logger.Log($"Starting mania analysis warmup. total={needingRecompute.Count}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
             var notification = showProgressNotification(needingRecompute.Count, "Precomputing mania analysis for beatmaps", "beatmaps' mania analysis has been precomputed");
 
@@ -187,7 +188,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 }
                 catch (Exception e)
                 {
-                    Logger.Log($"Background mania analysis warmup failed on {beatmap}: {e}", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+                    Logger.Log($"Background mania analysis warmup failed on {beatmap}: {e}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                     ++failedCount;
                 }
 
@@ -242,7 +243,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             if (notificationOverlay == null)
             {
-                Logger.Log("INotificationOverlay is null; mania analysis warmup progress notification will not be shown.", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("INotificationOverlay is null; mania analysis warmup progress notification will not be shown.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return null;
             }
 
@@ -261,7 +262,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 try
                 {
                     notificationOverlay?.Post(notification);
-                    Logger.Log("Posted mania analysis warmup progress notification.", EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Important);
+                    Logger.Log("Posted mania analysis warmup progress notification.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 }
                 catch (Exception e)
                 {

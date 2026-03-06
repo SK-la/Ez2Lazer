@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -56,7 +57,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 catch (Exception ex)
                 {
                     if (Interlocked.Increment(ref invokeFailCount) <= 10)
-                        Logger.Error(ex, $"xxy_SR bridge invoke exception with clockRate. beatmapType={beatmap.GetType().FullName}, clockRate={clockRate}", EzAnalysisPersistentStore.LOGGER_NAME);
+                        Logger.Error(ex, $"xxy_SR bridge invoke exception with clockRate. beatmapType={beatmap.GetType().FullName}, clockRate={clockRate}", Ez2ConfigManager.LOGGER_NAME);
                 }
             }
 
@@ -74,7 +75,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
             catch (Exception ex)
             {
                 if (Interlocked.Exchange(ref resolveFailLogged, 1) == 0)
-                    Logger.Error(ex, $"xxy_SR bridge resolve exception for {calculator_type_name}.{calculator_method_name}.", EzAnalysisPersistentStore.LOGGER_NAME);
+                    Logger.Error(ex, $"xxy_SR bridge resolve exception for {calculator_type_name}.{calculator_method_name}.", Ez2ConfigManager.LOGGER_NAME);
 
                 return null;
             }

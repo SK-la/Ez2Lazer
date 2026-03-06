@@ -5,6 +5,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using osu.Framework.Logging;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions.Analysis
 {
@@ -286,7 +287,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 $"graph(set count/ms/KB pts)={graphCount}/{graphTotalMs:F2}/{graphTotalKb:F1} pts={graphPoints} avg={graphAvgMs:F2}ms/{graphAvgKb:F1}KB " +
                 $"kpc(upd count/ms/KB cols bar)={kpcCount}/{kpcTotalMs:F2}/{kpcTotalKb:F1} cols={kpcCols} bar={kpcBar} avg={kpcAvgMs:F2}ms/{kpcAvgKb:F1}KB " +
                 $"cache={cacheSize}/{cacheLimit} evict={evict} inflight(H/L)={highInflight}/{lowInflight}",
-                EzAnalysisPersistentStore.LOGGER_NAME,
+                Ez2ConfigManager.LOGGER_NAME,
                 LogLevel.Important);
         }
     }

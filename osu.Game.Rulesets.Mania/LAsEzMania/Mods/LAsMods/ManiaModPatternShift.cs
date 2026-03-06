@@ -128,26 +128,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            applyToBeatmapInternal((ManiaBeatmap)beatmap, null);
-        }
-
-        public void ApplyToWorkingBeatmap(WorkingBeatmap workingBeatmap)
-        {
-            ArgumentNullException.ThrowIfNull(workingBeatmap);
-
-            double trackLength = 0;
-
-            try
-            {
-                if (workingBeatmap.TrackLoaded)
-                    trackLength = workingBeatmap.Track.Length;
-            }
-            catch
-            {
-                trackLength = 0;
-            }
-
-            applyToBeatmapInternal((ManiaBeatmap)workingBeatmap.Beatmap, workingBeatmap.Waveform, trackLength);
+            applyToBeatmapInternal((ManiaBeatmap)beatmap);
         }
 
         private static List<PatternShiftChord> buildChords(List<PatternShiftNote> notes)
@@ -553,7 +534,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             }
         }
 
-        private void applyToBeatmapInternal(ManiaBeatmap maniaBeatmap, Waveform? waveform, double? trackLength = null)
+        private void applyToBeatmapInternal(ManiaBeatmap maniaBeatmap)
         {
             Seed.Value ??= RNG.Next();
             var rng = new Random(Seed.Value.Value);

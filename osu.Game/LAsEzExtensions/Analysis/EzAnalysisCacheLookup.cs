@@ -7,6 +7,7 @@ using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 
@@ -109,7 +110,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     // 如果克隆失败，则回退到使用原始实例。
                     // 这对缓存来说并不理想，但比完全破坏分析要好。
                     if (Interlocked.Increment(ref modSnapshotFailCount) <= 10)
-                        Logger.Log($"[EzBeatmapManiaAnalysisCache] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.", LoggingTarget.Runtime, LogLevel.Important);
+                        Logger.Log($"[EzBeatmapManiaAnalysisCache] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
                     list.Add(mod);
                 }

@@ -7,6 +7,7 @@ using osu.Framework.Audio.EzLatency;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
+using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
@@ -139,18 +140,14 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             if (!stats.HasData)
             {
-                Logger.Log("[EzOsuLatency] No latency data available for analysis", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log("[EzOsuLatency] No latency data available for analysis", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 return;
             }
 
             // 输出统计日志
-            string message1 =
-                $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, Input→Audio: {stats.AvgInputToPlayback:F2}ms, Audio→Judgement: {stats.AvgPlaybackToJudge:F2}ms (based on {stats.RecordCount} complete records)";
-            string message2 =
-                $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
+            string message = $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
 
-            Logger.Log($"[EzOsuLatency] Latency Analysis: {message1}");
-            Logger.Log($"[EzOsuLatency] Latency Analysis: \n{message2}", LoggingTarget.Runtime, LogLevel.Important);
+            Logger.Log($"[EzOsuLatency] Latency Analysis: {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
             // 显示通知
             notificationOverlay?.Post(new SimpleNotification
@@ -215,11 +212,11 @@ namespace osu.Game.LAsEzExtensions.Audio
                 string extra = $" | input_struct=(in={inputData.InputTime:F2}, key={inputData.KeyValue ?? "-"}, judge={inputData.JudgeTime:F2}, play={inputData.PlaybackTime:F2})" +
                                $" | hw_struct=(driver={hw.DriverTime:F2}, out_hw={hw.OutputHardwareTime:F2}, in_hw={hw.InputHardwareTime:F2}, diff={hw.LatencyDifference:F2})";
 
-                Logger.Log(line + extra, LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log(line + extra, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                Logger.Log($"InputAudioLatencyTracker: failed to handle new record: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log($"InputAudioLatencyTracker: failed to handle new record: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
             }
         }
     }

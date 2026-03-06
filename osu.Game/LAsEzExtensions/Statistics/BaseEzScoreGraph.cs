@@ -13,6 +13,7 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -123,7 +124,7 @@ namespace osu.Game.LAsEzExtensions.Statistics
             double accuracy = v1ScoreProcessor.AccuracyClassic.Value;
             long totalScore = v1ScoreProcessor.TotalScore.Value;
 
-            Logger.Log($"[V1 ScoreProcessor]: {accuracy * 100:F2}%, Score: {totalScore / 10000}w");
+            Logger.Log($"[V1 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
             // Set properties instead of returning
             V1Accuracy = accuracy;
@@ -173,7 +174,7 @@ namespace osu.Game.LAsEzExtensions.Statistics
             double accuracy = v2ScoreProcessor.Accuracy.Value;
             long totalScore = v2ScoreProcessor.TotalScore.Value;
 
-            Logger.Log($"[V2 ScoreProcessor] Accuracy: {accuracy * 100:F2}%, Score: {totalScore / 10000}w");
+            Logger.Log($"[V2 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
             // Set properties instead of returning
             V2Accuracy = accuracy;

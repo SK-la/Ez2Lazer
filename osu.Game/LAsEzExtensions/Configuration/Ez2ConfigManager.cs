@@ -18,6 +18,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 {
     public class Ez2ConfigManager : IniConfigManager<Ez2Setting>, IGameplaySettings
     {
+        public static readonly string LOGGER_NAME = "ez_runtime";
         protected override string Filename => "EzSkinSettings.ini";
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;

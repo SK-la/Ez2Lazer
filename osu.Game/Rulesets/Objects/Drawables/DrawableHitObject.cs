@@ -166,8 +166,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         private IBindable<double> offsetBindable;
 
-        // cached config for autoplay behaviour
-        private Ez2ConfigManager ezConfig;
+        [Resolved(CanBeNull = true)]
+        private Ez2ConfigManager ezConfig { get; set; }
+
         private ScheduledDelegate autoplayDelegate;
 
         /// <summary>
@@ -211,7 +212,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
         }
 
         [BackgroundDependencyLoader]
-        private void load(IGameplaySettings gameplaySettings, ISkinSource skinSource, Ez2ConfigManager ezConfig)
+        private void load(IGameplaySettings gameplaySettings, ISkinSource skinSource)
         {
             positionalHitsoundsLevel.BindTo(gameplaySettings.PositionalHitsoundsLevel);
             comboColourBrightness.BindTo(gameplaySettings.ComboColourNormalisationAmount);
@@ -224,9 +225,6 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             CurrentSkin = skinSource;
             CurrentSkin.SourceChanged += skinSourceChanged;
-
-            // cache config reference for autoplay scheduling
-            this.ezConfig = ezConfig;
 
             // Choose the appropriate offset bindable once during load to avoid runtime reflection/namespace checks.
             if (ezConfig != null && drawableRuleset != null)
@@ -341,7 +339,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 UpdateComboColour();
             }
 
-            // Schedule one-shot autoplay of this object's samples when configured to do so.
+            // 自动触发音效
             try
             {
                 bool isAutoPlayPlus = autoPlaySnapshot?.IsAutoPlayPlus ?? (ezConfig != null && ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) == KeySoundPreviewMode.AutoPlayPlus);
@@ -370,7 +368,6 @@ namespace osu.Game.Rulesets.Objects.Drawables
             }
             catch
             {
-                // be defensive; don't let scheduling failures affect hitobject application
             }
         }
 

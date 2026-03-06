@@ -437,8 +437,8 @@ namespace osu.Game.LAsEzExtensions.Audio
                 sampleScheduler.NextHitSoundIndex = findNextValidIndex(sampleScheduler.ScheduledHitSounds, 0, physicalTime - trigger_tolerance);
                 sampleScheduler.NextStoryboardSampleIndex = findNextValidIndex(sampleScheduler.ScheduledStoryboardSamples, 0, physicalTime - trigger_tolerance);
 
-                // 清理已停止的活动通道
-                sampleScheduler.ActiveChannels.RemoveAll(c => !c.Playing);
+                // 清理已停止的活动通道并归还资源
+                cleanupInactiveChannels();
             }
 
             double logicalTime = physicalTime;
@@ -520,8 +520,31 @@ namespace osu.Game.LAsEzExtensions.Audio
                 else break;
             }
 
-            sampleScheduler.ActiveChannels.RemoveAll(c => !c.Playing);
+            cleanupInactiveChannels();
             playback.LastTrackTime = logicalTimeForEvents;
+        }
+
+        private void cleanupInactiveChannels()
+        {
+            for (int i = sampleScheduler.ActiveChannels.Count - 1; i >= 0; i--)
+            {
+                var channel = sampleScheduler.ActiveChannels[i];
+
+                if (channel.Playing)
+                    continue;
+
+                try
+                {
+                    if (!channel.IsDisposed && !channel.ManualFree)
+                        channel.Dispose();
+                }
+                catch
+                {
+                    // Ignore disposal errors.
+                }
+
+                sampleScheduler.ActiveChannels.RemoveAt(i);
+            }
         }
 
         private void triggerHitSound(HitSampleInfo[] samples)

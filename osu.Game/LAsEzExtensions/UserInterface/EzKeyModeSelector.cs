@@ -78,12 +78,14 @@ namespace osu.Game.LAsEzExtensions.UserInterface
                     {
                         new Drawable[]
                         {
-                            labelButton = new ShearedButton(50, 30)
+                            labelButton = new ShearedButton()
                             {
                                 Text = "Keys",
                                 TextSize = 16,
                                 Anchor = Anchor.Centre,
                                 Origin = Anchor.Centre,
+                                AutoSizeAxes = Axes.X,
+                                Height = 30f,
                                 Shear = new Vector2(0),
                                 TooltipText = EzSongSelectStrings.CLEAR_SELECTION,
                             },

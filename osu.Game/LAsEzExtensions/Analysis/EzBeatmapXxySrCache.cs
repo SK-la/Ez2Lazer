@@ -15,6 +15,7 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 
@@ -143,7 +144,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
                     Logger.Log(
                         $"xxy_SR aborted: playableBeatmap has 0 hitobjects. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}",
-                        EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Error);
+                        Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                     return null;
                 }
 
@@ -153,7 +154,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 // Defensive: avoid propagating invalid values to UI.
                 if (double.IsNaN(sr) || double.IsInfinity(sr))
                 {
-                    Logger.Log($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}", EzAnalysisPersistentStore.LOGGER_NAME,
+                    Logger.Log($"xxy_SR returned invalid value (NaN/Infinity). beatmapId={lookup.BeatmapInfo.ID} ruleset={lookup.Ruleset.ShortName}", Ez2ConfigManager.LOGGER_NAME,
                         LogLevel.Error);
                     return null;
                 }
@@ -164,7 +165,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
                     Logger.Log(
                         $"xxy_SR abnormal value: {sr}. hitobjects={playableBeatmap.HitObjects.Count} beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}",
-                        EzAnalysisPersistentStore.LOGGER_NAME, LogLevel.Error);
+                        Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 }
 
                 return sr;
@@ -178,7 +179,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
                 // 只记录异常：用于排查“值偏差非常大/计算失败导致空 pill”。
                 string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
                 Logger.Error(ex, $"xxy_SR compute exception. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}",
-                    EzAnalysisPersistentStore.LOGGER_NAME);
+                    Ez2ConfigManager.LOGGER_NAME);
                 return null;
             }
         }

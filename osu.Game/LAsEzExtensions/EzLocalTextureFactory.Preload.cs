@@ -4,6 +4,8 @@
 using System;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
+using osu.Game.LAsEzExtensions.Analysis;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions
 {
@@ -29,8 +31,7 @@ namespace osu.Game.LAsEzExtensions
             try
             {
                 string currentNoteSetName = noteSetName.Value;
-                Logger.Log($"[EzLocalTextureFactory] Starting preload for note set: {currentNoteSetName}",
-                    LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"[EzLocalTextureFactory] Starting preload for note set: {currentNoteSetName}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 foreach (string component in preload_components)
                     preloadComponent(component, currentNoteSetName);
@@ -38,16 +39,12 @@ namespace osu.Game.LAsEzExtensions
                 await Task.CompletedTask.ConfigureAwait(false);
 
                 preloadCompleted = true;
-                Logger.Log($"[EzLocalTextureFactory] Preload completed for {preload_components.Length} components",
-                    LoggingTarget.Runtime, LogLevel.Debug);
-
-                Logger.Log($"[EzLocalTextureFactory] Cache stats after preload: {global_cache.Count} frame sets",
-                    LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"[EzLocalTextureFactory] Preload completed for {preload_components.Length} components", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                Logger.Log($"[EzLocalTextureFactory] Cache stats after preload: {global_cache.Count} frame sets", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                Logger.Log($"[EzLocalTextureFactory] Preload failed: {ex.Message}",
-                    LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log($"[EzLocalTextureFactory] Preload failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
             }
             finally
             {
@@ -73,8 +70,7 @@ namespace osu.Game.LAsEzExtensions
             }
             catch (Exception ex)
             {
-                Logger.Log($"[EzLocalTextureFactory] Failed to preload {component}: {ex.Message}",
-                    LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log($"[EzLocalTextureFactory] Failed to preload {component}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
             }
         }
 

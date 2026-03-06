@@ -305,7 +305,7 @@ namespace osu.Game.Screens.Select
         {
             float availableWidth = DrawWidth - playCount.DrawWidth - favouriteButton.DrawWidth - lengthStatistic.DrawWidth - bpmStatistic.DrawWidth - statisticsFlow.Spacing.X * 3 - SongSelect.WEDGE_CONTENT_MARGIN * 2;
             kpsGraph.Width = availableWidth;
-            // Logger.Log($"[EzTest] T: {DrawWidth}, {playCount.DrawWidth}, {favouriteButton.DrawWidth}, {lengthStatistic.DrawWidth}, {bpmStatistic.DrawWidth}");
+            // Logger.Log($"[EzTest] T: {DrawWidth}, {playCount.DrawWidth}, {favouriteButton.DrawWidth}, {lengthStatistic.DrawWidth}, {bpmStatistic.DrawWidth}", EzAnalysisPersistentStore.LOGGER_NAME);
         }
 
         private CancellationTokenSource? onlineDisplayCancellationSource;
