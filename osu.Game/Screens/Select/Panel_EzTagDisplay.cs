@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables.Cards;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Storyboards;
@@ -29,6 +30,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private BeatmapManager beatmaps { get; set; } = null!;
+
+        [Resolved]
+        private ISongSelect? songSelect { get; set; }
 
         public EzTagDisplay()
         {
@@ -58,15 +62,12 @@ namespace osu.Game.Screens.Select
             if (beatmapInfo?.BeatmapSet == null || storyboard == null)
                 return;
 
-            int iconCount = 0;
-
             // 检查是否有视频（通过 Storyboard Video 层）
             bool hasVideo = storyboard.GetLayer("Video").Elements.Any(e => e is StoryboardVideo);
 
             if (hasVideo)
             {
                 tagFlow.Add(new VideoIconPill { Scale = new Vector2(0.8f) });
-                iconCount++;
             }
 
             // 检查是否有视觉故事版（Sprite/Animation，排除 Video 和 Sample 音效）
@@ -77,7 +78,6 @@ namespace osu.Game.Screens.Select
             if (hasStoryboard)
             {
                 tagFlow.Add(new StoryboardIconPill { Scale = new Vector2(0.8f) });
-                iconCount++;
             }
 
             // 添加用户标签（不受图标数量影响）
@@ -85,7 +85,10 @@ namespace osu.Game.Screens.Select
 
             foreach (string tag in userTags)
             {
-                tagFlow.Add(new SimpleTag(tag));
+                tagFlow.Add(new SimpleTag(tag)
+                {
+                    Action = () => songSelect?.Search($@"tag=""{tag}""!"),
+                });
             }
 
             // 如果没有任何标签，显示提示
@@ -95,7 +98,7 @@ namespace osu.Game.Screens.Select
             // }
         }
 
-        private partial class SimpleTag : CompositeDrawable
+        private partial class SimpleTag : OsuClickableContainer
         {
             private readonly string tagText;
 
@@ -111,19 +114,23 @@ namespace osu.Game.Screens.Select
                 CornerRadius = 3;
                 Masking = true;
 
-                InternalChildren = new Drawable[]
+                Child = new Container
                 {
-                    new Box
+                    AutoSizeAxes = Axes.Both,
+                    Children = new Drawable[]
                     {
-                        RelativeSizeAxes = Axes.Both,
-                        Colour = colourProvider.Background3,
-                    },
-                    new OsuSpriteText
-                    {
-                        Text = tagText,
-                        Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
-                        Colour = colourProvider.Content2,
-                        Margin = new MarginPadding { Horizontal = 4, Vertical = 1 },
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = colourProvider.Background3,
+                        },
+                        new OsuSpriteText
+                        {
+                            Text = tagText,
+                            Font = OsuFont.GetFont(size: 10, weight: FontWeight.SemiBold),
+                            Colour = colourProvider.Content2,
+                            Margin = new MarginPadding { Horizontal = 4, Vertical = 1 },
+                        }
                     }
                 };
             }
