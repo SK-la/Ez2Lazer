@@ -54,9 +54,6 @@ namespace osu.Game.Screens.Play
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; }
 
-        [Resolved]
-        private AudioManager audioManager { get; set; }
-
         [CanBeNull]
         private InputAudioLatencyTracker latencyTracker;
 
@@ -331,24 +328,31 @@ namespace osu.Game.Screens.Play
                 return Task.CompletedTask;
             }
 
-            double accCutoffA = ezConfig.Get<double>(Ez2Setting.AccuracyCutoffA);
-            double accCutoffS = ezConfig.Get<double>(Ez2Setting.AccuracyCutoffS);
+            var accCutoffABindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA);
+            var accCutoffSBindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS);
+            bool hasDefaultCutoffValues = accCutoffABindable.IsDefault || accCutoffSBindable.IsDefault;
             // 如果当前所选的 HitMode 不是 Lazer，则强制跳过上传成绩
             var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode);
 
-            if (hitMode != EzEnumHitMode.Lazer || accCutoffA != 90.0 || accCutoffS != 95.0)
+            if (Ruleset.Value.OnlineID == 3 && (hitMode != EzEnumHitMode.Lazer || !hasDefaultCutoffValues))
             {
-                // Logger.Log("非 Lazer 模式，跳过上传成绩");
+                Logger.Log($"[EzMania]Score submission blocked by custom rating settings (HitMode={hitMode}, CutoffA={accCutoffABindable.Value:0.####}, CutoffS={accCutoffSBindable.Value:0.####}).");
                 return Task.CompletedTask;
             }
 
             // 如果任一 offsetPlus 设置非0，则禁止上传成绩以防止不公平的分数提交
-            double offsetMania = ezConfig.Get<double>(Ez2Setting.OffsetPlusMania);
-            double offsetNonStd = ezConfig.Get<double>(Ez2Setting.OffsetPlusNonMania);
+            var offsetManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+            var offsetNonStdBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
 
-            if (offsetMania != 0.0 || offsetNonStd != 0.0)
+            if (Ruleset.Value.OnlineID == 3 && !offsetManiaBindable.IsDefault)
             {
-                Logger.Log("OffsetPlus 设置非0，已禁止上传成绩以保证公平性.");
+                Logger.Log($"[EzMania]Score submission blocked by offset settings.");
+                return Task.CompletedTask;
+            }
+
+            if (Ruleset.Value.OnlineID != 3 && !offsetNonStdBindable.IsDefault)
+            {
+                Logger.Log($"[EzNoMania]Score submission blocked by offset settings.");
                 return Task.CompletedTask;
             }
 
