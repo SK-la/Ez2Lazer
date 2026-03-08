@@ -325,5 +325,31 @@ namespace osu.Game.LAsEzExtensions.Screens
 
             return selector;
         }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                colorSettingsEnabled?.UnbindAll();
+                columnTypeListSelectBindable?.UnbindAll();
+
+                foreach (var bindable in colorBindables.Values)
+                    bindable.UnbindAll();
+
+                foreach (var selectors in columnSelectorCache.Values)
+                {
+                    foreach (var selector in selectors)
+                    {
+                        if (selector.Parent == null)
+                            selector.Dispose();
+                    }
+                }
+
+                columnSelectorCache.Clear();
+                colorBindables.Clear();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }

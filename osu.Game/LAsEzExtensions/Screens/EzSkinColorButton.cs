@@ -202,5 +202,13 @@ namespace osu.Game.LAsEzExtensions.Screens
         }
 
         public override bool HandlePositionalInput => Action != null;
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                Action = null;
+
+            base.Dispose(isDisposing);
+        }
     }
 }

@@ -22,7 +22,9 @@ namespace osu.Game.LAsEzExtensions.HUD
         public Bindable<EzEnumGameThemeName> FontName { get; }
 
         private readonly Func<char, string> getLookup;
-        private GlyphStore glyphStore = null!;
+        private GlyphStore? glyphStore;
+        private TextureLoaderStore? textureLoader;
+        private TextureStore? localSkinStore;
 
         protected override char FixedWidthReferenceCharacter => '6';
 
@@ -42,8 +44,8 @@ namespace osu.Game.LAsEzExtensions.HUD
             Storage gameStorage = host.Storage;
 
             var userResourceStore = new StorageBackedResourceStore(gameStorage);
-            var textureLoader = new TextureLoaderStore(userResourceStore);
-            var localSkinStore = new TextureStore(renderer, textureLoader);
+            textureLoader = new TextureLoaderStore(userResourceStore);
+            localSkinStore = new TextureStore(renderer, textureLoader);
 
             FontName.BindValueChanged(e =>
             {
@@ -58,6 +60,26 @@ namespace osu.Game.LAsEzExtensions.HUD
         }
 
         protected override TextBuilder CreateTextBuilder(ITexturedGlyphLookupStore store) => base.CreateTextBuilder(glyphStore);
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                try
+                {
+                    FontName.UnbindAll();
+                }
+                catch
+                {
+                }
+
+                glyphStore?.ClearCache();
+                localSkinStore?.Dispose();
+                textureLoader?.Dispose();
+            }
+
+            base.Dispose(isDisposing);
+        }
 
         private class GlyphStore : ITexturedGlyphLookupStore
         {
@@ -142,6 +164,8 @@ namespace osu.Game.LAsEzExtensions.HUD
             }
 
             public Task<ITexturedCharacterGlyph?> GetAsync(string fontName, char character) => Task.Run(() => Get(fontName, character));
+
+            public void ClearCache() => cache.Clear();
         }
     }
 }

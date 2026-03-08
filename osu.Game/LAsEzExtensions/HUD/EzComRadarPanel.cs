@@ -357,10 +357,24 @@ namespace osu.Game.LAsEzExtensions.HUD
 
         protected override void Dispose(bool isDisposing)
         {
+            if (isDisposing)
+            {
+                BaseLineColour.UnbindAll();
+                BaseAreaColour.UnbindAll();
+                DataLineColour.UnbindAll();
+                DataAreaColour.UnbindAll();
+
+                beatmap.UnbindAll();
+                mods.UnbindAll();
+                ruleset.UnbindAll();
+
+                difficultyCancellationSource?.Cancel();
+                difficultyCancellationSource?.Dispose();
+                difficultyBindable?.UnbindAll();
+                modSettingTracker?.Dispose();
+            }
+
             base.Dispose(isDisposing);
-            difficultyCancellationSource?.Cancel();
-            difficultyBindable?.UnbindAll();
-            modSettingTracker?.Dispose();
         }
     }
 
@@ -429,6 +443,14 @@ namespace osu.Game.LAsEzExtensions.HUD
             image[0, 0] = new Rgba32(255, 255, 255, 255);
             texture.SetData(new TextureUpload(image));
             return texture;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                whitePixel?.Dispose();
+
+            base.Dispose(isDisposing);
         }
 
         public void SetData(IReadOnlyList<float> ratios)

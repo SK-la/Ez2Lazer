@@ -76,6 +76,14 @@ namespace osu.Game.LAsEzExtensions.Screens
                     Current = { BindTarget = Current }
                 }
             };
+
+            protected override void Dispose(bool isDisposing)
+            {
+                if (isDisposing)
+                    current.UnbindAll();
+
+                base.Dispose(isDisposing);
+            }
         }
     }
 }

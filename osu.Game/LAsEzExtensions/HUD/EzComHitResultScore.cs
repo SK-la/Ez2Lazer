@@ -499,6 +499,7 @@ namespace osu.Game.LAsEzExtensions.HUD
         protected override void Dispose(bool isDisposing)
         {
             PlaybackFps.UnbindAll();
+            NameDropdown.UnbindAll();
             processor.NewJudgement -= processorNewJudgement;
             gameplayClockContainer.OnSeek -= Clear;
             base.Dispose(isDisposing);

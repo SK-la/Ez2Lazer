@@ -145,5 +145,13 @@ namespace osu.Game.LAsEzExtensions.UserInterface
                 ? colours.Orange1
                 : colourProvider?.Background5 ?? Color4.Black.Opacity(0.75f);
         }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                current.UnbindAll();
+
+            base.Dispose(isDisposing);
+        }
     }
 }

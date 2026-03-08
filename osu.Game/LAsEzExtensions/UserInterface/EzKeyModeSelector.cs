@@ -206,6 +206,25 @@ namespace osu.Game.LAsEzExtensions.UserInterface
             return new HashSet<string>(value.Split(','));
         }
 
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                keyModeId?.UnbindAll();
+                isMultiSelectMode?.UnbindAll();
+                ruleset?.UnbindAll();
+
+                tabControl?.Current?.UnbindAll();
+                multiSelectButton?.Active?.UnbindAll();
+                labelButton.Action = null;
+
+                SelectedModeIds.Clear();
+                modeSelections.Clear();
+            }
+
+            base.Dispose(isDisposing);
+        }
+
         public partial class ShearedCsModeTabControl : OsuTabControl<string>
         {
             private HashSet<string> currentSelection = new HashSet<string>();

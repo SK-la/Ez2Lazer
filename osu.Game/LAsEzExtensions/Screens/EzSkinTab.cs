@@ -291,5 +291,22 @@ namespace osu.Game.LAsEzExtensions.Screens
                 Logger.Error(ex, $"EzSkinTab Load {type} FolderSets Error");
             }
         }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                nameOfNote?.UnbindAll();
+                nameOfStage?.UnbindAll();
+                nameOfGameTheme?.UnbindAll();
+
+                refreshSkinButton.Action = null;
+
+                availableNoteSets.Clear();
+                availableStageSets.Clear();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }

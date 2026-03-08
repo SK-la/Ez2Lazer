@@ -102,5 +102,16 @@ namespace osu.Game.LAsEzExtensions.HUD
 
             return targetHeight / textureHeight;
         }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                FontName.UnbindAll();
+                UseLazerFont.UnbindAll();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }

@@ -62,5 +62,18 @@ namespace osu.Game.LAsEzExtensions.HUD
             Text = new EzScoreText();
             return Text;
         }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                FontNameDropdown.UnbindAll();
+                ShowLabel.UnbindAll();
+                BoxAlpha.UnbindAll();
+                AccentColour.UnbindAll();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }
