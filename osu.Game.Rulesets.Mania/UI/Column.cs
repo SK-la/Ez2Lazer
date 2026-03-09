@@ -163,8 +163,6 @@ namespace osu.Game.Rulesets.Mania.UI
                 return;
 
             NoteSetChanged?.Invoke();
-            NoteSizeChanged?.Invoke();
-            NoteColourChanged?.Invoke();
         }
 
         private void onNoteColourChanged()
@@ -175,8 +173,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private void onNoteSizeChanged()
         {
             NoteSizeChanged?.Invoke();
-            NoteColourChanged?.Invoke();
         }
+
+        private void onNoteSizeBindableChanged(ValueChangedEvent<Vector2> _) => onNoteSizeChanged();
 
         private void onSourceChanged()
         {
@@ -197,8 +196,8 @@ namespace osu.Game.Rulesets.Mania.UI
             NewResult += OnNewResult;
 
             NoteSetBindable.BindValueChanged(onNoteSetChanged);
+            NoteSizeBindable.BindValueChanged(onNoteSizeBindableChanged);
             ezConfig.OnNoteColourChanged += onNoteColourChanged;
-            ezConfig.OnNoteSizeChanged += onNoteSizeChanged;
             hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue));
         }
 
@@ -215,8 +214,8 @@ namespace osu.Game.Rulesets.Mania.UI
             if (ezConfig.IsNotNull())
             {
                 NoteSetBindable.ValueChanged -= onNoteSetChanged;
+                NoteSizeBindable.ValueChanged -= onNoteSizeBindableChanged;
                 ezConfig.OnNoteColourChanged -= onNoteColourChanged;
-                ezConfig.OnNoteSizeChanged -= onNoteSizeChanged;
             }
         }
 

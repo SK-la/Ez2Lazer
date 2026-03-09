@@ -36,6 +36,7 @@ namespace osu.Game.LAsEzExtensions
         private static readonly ConcurrentDictionary<string, float> note_ratio_cache = new ConcurrentDictionary<string, float>();
 
         private readonly Dictionary<string, TextureLoaderStore> loaderStoreCache = new Dictionary<string, TextureLoaderStore>();
+        private readonly Dictionary<NoteSizeCacheKey, Bindable<Vector2>> noteSizeBindables = new Dictionary<NoteSizeCacheKey, Bindable<Vector2>>();
         private readonly Ez2ConfigManager ezSkinConfig;
 
         private readonly LargeTextureStore stageTextureStore;
@@ -50,8 +51,6 @@ namespace osu.Game.LAsEzExtensions
 
         // scheduling guard to batch multiple bindable changes into one refresh
         private bool textureRefreshScheduled;
-
-        private Vector2 tempNoteSize;
 
         private readonly struct CacheEntry : IEquatable<CacheEntry>
         {
@@ -75,6 +74,26 @@ namespace osu.Game.LAsEzExtensions
             public override bool Equals(object? obj) => obj is CacheEntry other && Equals(other);
 
             public override int GetHashCode() => HashCode.Combine(Textures, HasComponent, LastAccess);
+        }
+
+        private readonly struct NoteSizeCacheKey : IEquatable<NoteSizeCacheKey>
+        {
+            public readonly int KeyMode;
+            public readonly int ColumnIndex;
+            public readonly bool NoSpecial;
+
+            public NoteSizeCacheKey(int keyMode, int columnIndex, bool noSpecial)
+            {
+                KeyMode = keyMode;
+                ColumnIndex = columnIndex;
+                NoSpecial = noSpecial;
+            }
+
+            public bool Equals(NoteSizeCacheKey other) => KeyMode == other.KeyMode && ColumnIndex == other.ColumnIndex && NoSpecial == other.NoSpecial;
+
+            public override bool Equals(object? obj) => obj is NoteSizeCacheKey other && Equals(other);
+
+            public override int GetHashCode() => HashCode.Combine(KeyMode, ColumnIndex, NoSpecial);
         }
 
         public EzLocalTextureFactory(Ez2ConfigManager ezSkinConfig,
@@ -101,12 +120,12 @@ namespace osu.Game.LAsEzExtensions
             stageTextureStore = new LargeTextureStore(renderer, limitedLoader);
             stageTextureStore.AddTextureSource(baseTextureLoaderStore);
 
-            noteSetName = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
-            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
-            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
-            specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
-            noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
+            noteSetName = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName).GetBoundCopy();
+            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName).GetBoundCopy();
+            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth).GetBoundCopy();
+            specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor).GetBoundCopy();
+            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition).GetBoundCopy();
+            noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth).GetBoundCopy();
 
             // Batch refresh: subscribe once and schedule a single refresh per frame when any relevant config changes.
             void scheduleTextureRefresh()
@@ -119,8 +138,7 @@ namespace osu.Game.LAsEzExtensions
                     textureRefreshScheduled = false;
                     // Clear caches and let consumers lazily reload textures on next access.
                     ClearGlobalCache();
-                    lock (loaderStoreCache)
-                        loaderStoreCache.Clear();
+                    refreshCachedNoteSizes();
                 });
             }
 
@@ -153,26 +171,36 @@ namespace osu.Game.LAsEzExtensions
 
         public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex, bool? noSpecial = null)
         {
-            var result = new Bindable<Vector2>();
-            bool isSpecialColumn = noSpecial != true && ezSkinConfig.IsSpecialColumnFast(keyMode, columnIndex);
+            var cacheKey = new NoteSizeCacheKey(keyMode, columnIndex, noSpecial == true);
 
-            void updateNoteSize()
+            lock (noteSizeBindables)
             {
-                float ratio = GetRatio();
-                float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
-                float y = (float)noteHeightScaleToWidth.Value * ratio * x;
-                tempNoteSize.X = x;
-                tempNoteSize.Y = y;
-                result.Value = tempNoteSize;
+                if (!noteSizeBindables.TryGetValue(cacheKey, out var source))
+                {
+                    source = new Bindable<Vector2>(calculateNoteSize(cacheKey));
+                    noteSizeBindables[cacheKey] = source;
+                }
+
+                return source.GetBoundCopy();
             }
+        }
 
-            columnWidth.BindValueChanged(_ => updateNoteSize());
-            specialFactor.BindValueChanged(_ => updateNoteSize());
-            noteHeightScaleToWidth.BindValueChanged(_ => updateNoteSize());
-            noteSetName.BindValueChanged(_ => updateNoteSize());
+        private Vector2 calculateNoteSize(NoteSizeCacheKey cacheKey)
+        {
+            bool isSpecialColumn = !cacheKey.NoSpecial && ezSkinConfig.IsSpecialColumnFast(cacheKey.KeyMode, cacheKey.ColumnIndex);
+            float ratio = GetRatio();
+            float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
+            float y = (float)noteHeightScaleToWidth.Value * ratio * x;
+            return new Vector2(x, y);
+        }
 
-            updateNoteSize();
-            return result;
+        private void refreshCachedNoteSizes()
+        {
+            lock (noteSizeBindables)
+            {
+                foreach (var pair in noteSizeBindables)
+                    pair.Value.Value = calculateNoteSize(pair.Key);
+            }
         }
 
         private string getComponentPath(string noteName, string component)
@@ -495,19 +523,12 @@ namespace osu.Game.LAsEzExtensions
         {
             if (isDisposing)
             {
-                // Unbind to avoid leaking handlers
-                try
-                {
-                    noteSetName.UnbindAll();
-                    stageName.UnbindAll();
-                    columnWidth.UnbindAll();
-                    specialFactor.UnbindAll();
-                    hitPositonBindable.UnbindAll();
-                    noteHeightScaleToWidth.UnbindAll();
-                }
-                catch
-                {
-                }
+                noteSetName.UnbindAll();
+                stageName.UnbindAll();
+                columnWidth.UnbindAll();
+                specialFactor.UnbindAll();
+                hitPositonBindable.UnbindAll();
+                noteHeightScaleToWidth.UnbindAll();
 
                 // 只清理实例级别的缓存，全局缓存留给 ClearGlobalCache 处理
                 lock (loaderStoreCache)
@@ -521,19 +542,27 @@ namespace osu.Game.LAsEzExtensions
                     loaderStoreCache.Clear();
                 }
 
-                note_ratio_cache.Clear();
+                ClearGlobalCache();
+
+                lock (noteSizeBindables)
+                {
+                    foreach (var bindable in noteSizeBindables.Values)
+                        bindable.UnbindAll();
+
+                    noteSizeBindables.Clear();
+                }
             }
 
             base.Dispose(isDisposing);
         }
     }
 
-    public enum EzAnimationType
-    {
-        Note,
-        Hit,
-        Stage,
-        Key,
-        Health,
-    }
+    // public enum EzAnimationType
+    // {
+    //     Note,
+    //     Hit,
+    //     Stage,
+    //     Key,
+    //     Health,
+    // }
 }

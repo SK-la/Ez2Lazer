@@ -51,8 +51,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        private Action? noteSizeChangedHandler;
-
         private double bpm;
         private double beatInterval;
         private int keyMode;
@@ -79,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             stageName.BindTo(ezSkinInfo.StageName);
             hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
-            column.NoteSizeBindable.BindTo(noteSize);
+            noteSize.BindTo(column.NoteSizeBindable);
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm * 64;
@@ -107,10 +105,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             stageName.BindValueChanged(_ => loadAnimation(), true);
             hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
-
-            // Subscribe to global Ez config changes.
-            noteSizeChangedHandler = OnConfigChanged;
-            ezSkinConfig.OnNoteSizeChanged += noteSizeChangedHandler;
+            noteSize.BindValueChanged(_ => OnConfigChanged());
         }
 
         protected virtual string KeySuffix
@@ -197,17 +192,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 upSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(1);
                 downSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
             }
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                if (noteSizeChangedHandler != null)
-                    ezSkinConfig.OnNoteSizeChanged -= noteSizeChangedHandler;
-            }
-
-            base.Dispose(isDisposing);
         }
 
         private static readonly HashSet<string> free_size_stages = new HashSet<string>
