@@ -64,11 +64,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
             initializeEvents();
         }
 
-        // Save debounce machinery: schedule delayed Save() to coalesce rapid writes.
-        private readonly object saveLock = new object();
-        private System.Threading.Timer? saveTimer;
-        private const int save_debounce_ms = 50;
-
         // Cache of bindables returned by GetBindable to avoid creating multiple instances
         private readonly object bindableCacheLock = new object();
         private readonly Dictionary<Ez2Setting, object> bindableCache = new Dictionary<Ez2Setting, object>();
@@ -227,38 +222,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
             catch (NotSupportedException)
             {
             }
-        }
-
-        public void SetColumnTypes(int keyMode, IReadOnlyList<EzColumnType> columnTypes)
-        {
-            ArgumentNullException.ThrowIfNull(columnTypes);
-
-            try
-            {
-                var setting = getColumnTypeListSetting(keyMode);
-                int targetLength = Math.Max(keyMode, columnTypes.Count);
-                byte[] updatedTypes = new byte[targetLength];
-
-                for (int i = 0; i < targetLength; i++)
-                    updatedTypes[i] = i < columnTypes.Count ? (byte)columnTypes[i] : getDefaultColumnTypeByte(keyMode, i);
-
-                KeyModeColumnData current = getOrBuildKeyModeColumnData(keyMode);
-                if (areTypesEqual(current.Types, updatedTypes))
-                    return;
-
-                applyColumnTypesAndPersist(keyMode, setting, updatedTypes);
-            }
-            catch (NotSupportedException)
-            {
-            }
-        }
-
-        public void SetColumnType(int keyMode, int columnIndex, string colorType)
-        {
-            if (!tryParseColumnType(colorType, out var parsed))
-                parsed = EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
-
-            SetColumnType(keyMode, columnIndex, parsed);
         }
 
         private static Ez2Setting getColumnTypeListSetting(int keyMode)
@@ -456,9 +419,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             return new KeyModeColumnData(types, mask);
         }
 
-        // Compatibility caches removed: runtime compact data is authoritative.
-
-        private static Ez2Setting getColorSetting(EzColumnType colorType) => column_type_to_setting.TryGetValue(colorType, out var setting) ? setting : Ez2Setting.ColumnTypeA;
+        private static Ez2Setting getColorSetting(EzColumnType colorType) => column_type_to_setting.GetValueOrDefault(colorType, Ez2Setting.ColumnTypeA);
 
         private static byte getDefaultColumnTypeByte(int keyMode, int index) => (byte)EzColumnTypeManager.GetColumnType(keyMode, index);
 
@@ -577,63 +538,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         public new void SetValue<T>(Ez2Setting lookup, T value)
         {
             base.SetValue(lookup, value);
-            scheduleSave();
-        }
-
-        public new void Save()
-        {
-            base.Save();
-
-            // If a save was pending, cancel the timer.
-            lock (saveLock)
-            {
-                saveTimer?.Dispose();
-                saveTimer = null;
-            }
-        }
-
-        private void scheduleSave()
-        {
-            lock (saveLock)
-            {
-                // reset timer to fire after debounce period
-                if (saveTimer == null)
-                {
-                    saveTimer = new System.Threading.Timer(_ =>
-                    {
-                        try
-                        {
-                            base.Save();
-                        }
-                        catch
-                        {
-                        }
-                        finally
-                        {
-                            lock (saveLock)
-                            {
-                                saveTimer?.Dispose();
-                                saveTimer = null;
-                            }
-                        }
-                    }, null, save_debounce_ms, System.Threading.Timeout.Infinite);
-                }
-                else
-                {
-                    saveTimer.Change(save_debounce_ms, System.Threading.Timeout.Infinite);
-                }
-            }
-        }
-
-        public void FlushSave()
-        {
-            lock (saveLock)
-            {
-                saveTimer?.Dispose();
-                saveTimer = null;
-            }
-
-            base.Save();
         }
 
         IBindable<float> IGameplaySettings.ComboColourNormalisationAmount => null!;
