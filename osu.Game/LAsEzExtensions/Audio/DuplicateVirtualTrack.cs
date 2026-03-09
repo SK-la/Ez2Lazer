@@ -161,13 +161,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             beatmapTrackMuteAdjustment = null;
             mutedOriginalTrack = null;
 
-            // 停止并释放候选轨（若为独立实例）
-            if (activeCandidateTrack != null)
-            {
-                activeCandidateTrack.Stop();
-                activeCandidateTrack = null;
-                ownsCandidateTrack = false;
-            }
+            releaseActiveCandidateTrack();
 
             lastLoopStartGameplayTime = null;
 
@@ -179,6 +173,36 @@ namespace osu.Game.LAsEzExtensions.Audio
                 gameplayClockContainer.OnSeek -= seekHandler;
 
             base.Dispose(isDisposing);
+        }
+
+        private void releaseActiveCandidateTrack()
+        {
+            if (activeCandidateTrack == null)
+                return;
+
+            try
+            {
+                activeCandidateTrack.Stop();
+            }
+            catch (Exception ex)
+            {
+                log($"failed to stop active candidate track during release: {ex}");
+            }
+
+            if (ownsCandidateTrack)
+            {
+                try
+                {
+                    activeCandidateTrack.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    log($"failed to dispose owned candidate track: {ex}");
+                }
+            }
+
+            activeCandidateTrack = null;
+            ownsCandidateTrack = false;
         }
 
         protected override void UpdateAfterChildren()
@@ -771,13 +795,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                     log($"restored candidate track.Looping to {prevCandidateLooping.Value}");
                 }
 
-                if (ownsCandidateTrack)
-                {
-                    // do any necessary cleanup for owned track instances if required
-                }
-
-                activeCandidateTrack = null;
-                ownsCandidateTrack = false;
+                releaseActiveCandidateTrack();
             }
 
             // 恢复之前添加的音量调整（如果存在）。

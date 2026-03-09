@@ -181,7 +181,7 @@ namespace osu.Game.LAsEzExtensions
                     noteSizeBindables[cacheKey] = source;
                 }
 
-                return source.GetBoundCopy();
+                return source;
             }
         }
 

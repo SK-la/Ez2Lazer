@@ -55,9 +55,6 @@ namespace osu.Game.Screens.Play
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; }
 
-        [CanBeNull]
-        private InputAudioLatencyTracker latencyTracker;
-
         private readonly object scoreSubmissionLock = new object();
         private TaskCompletionSource<bool> scoreSubmissionSource;
 
@@ -85,20 +82,6 @@ namespace osu.Game.Screens.Play
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
             });
-
-            // 保存配置实例并初始化延迟追踪
-            latencyTracker = new InputAudioLatencyTracker(ezConfig);
-            latencyTracker?.Initialize(ScoreProcessor);
-
-            // Ensure tracker is started for testing scenarios in SubmittingPlayer
-            try
-            {
-                latencyTracker?.Start();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"InputAudioLatencyTracker failed to Start: {ex.Message}", level: LogLevel.Error);
-            }
         }
 
         protected override GameplayClockContainer CreateGameplayClockContainer(WorkingBeatmap beatmap, double gameplayStart) => new MasterGameplayClockContainer(beatmap, gameplayStart)
@@ -284,7 +267,7 @@ namespace osu.Game.Screens.Play
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());
 
             // 生成延迟报告
-            latencyTracker?.GenerateLatencyReport();
+            LatencyTracker?.GenerateLatencyReport();
 
             return exiting;
         }
@@ -348,13 +331,13 @@ namespace osu.Game.Screens.Play
 
             if (Ruleset.Value.OnlineID == 3 && !offsetManiaBindable.IsDefault)
             {
-                Logger.Log($"[EzMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("[EzMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return Task.CompletedTask;
             }
 
             if (Ruleset.Value.OnlineID != 3 && !offsetNonStdBindable.IsDefault)
             {
-                Logger.Log($"[EzNoMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("[EzNoMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return Task.CompletedTask;
             }
 

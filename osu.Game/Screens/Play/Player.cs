@@ -213,6 +213,8 @@ namespace osu.Game.Screens.Play
 
         protected GameplayClockContainer GameplayClockContainer { get; private set; }
 
+        protected InputAudioLatencyTracker LatencyTracker { get; private set; }
+
         public DimmableStoryboard DimmableStoryboard { get; private set; }
 
         /// <summary>
@@ -259,6 +261,13 @@ namespace osu.Game.Screens.Play
             gameActive.BindValueChanged(_ => updatePauseOnFocusLostState(), true);
         }
 
+        private void scheduleGameplayTextureCleanup()
+        {
+            var beatmapSkin = Beatmap.Value?.Skin as Skin;
+            beatmapSkin?.RecycleTextures(disposeAtlas: true);
+            beatmapSkin?.RecycleSamples();
+        }
+
         protected override void Update()
         {
             base.Update();
@@ -278,7 +287,7 @@ namespace osu.Game.Screens.Play
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(OsuConfigManager config, OsuGameBase game, CancellationToken cancellationToken)
+        private void load(OsuConfigManager config, OsuGameBase game, CancellationToken cancellationToken, Ez2ConfigManager ez2Config)
         {
             var gameplayMods = Mods.Value.Select(m => m.DeepClone()).ToArray();
 
@@ -317,14 +326,13 @@ namespace osu.Game.Screens.Play
 
             dependencies.CacheAs(ScoreProcessor);
 
-            // Initialize InputAudioLatencyTracker if available in DI
+            // 初始化InputAudioLatencyTracker
             if (GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.InputAudioLatencyTracker))
             {
-                var ezConfig = dependencies.Get<Ez2ConfigManager>();
-                var tracker = new InputAudioLatencyTracker(ezConfig);
-                dependencies.CacheAs(tracker);
-                tracker.Initialize(ScoreProcessor);
-                tracker.Start();
+                LatencyTracker = new InputAudioLatencyTracker(ez2Config);
+                dependencies.CacheAs(LatencyTracker);
+                LatencyTracker.Initialize(ScoreProcessor);
+                LatencyTracker.Start();
             }
 
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
@@ -790,6 +798,17 @@ namespace osu.Game.Screens.Play
 
             // return samplePlaybackDisabled.Value to what is defined by the beatmap's current state
             updateSampleDisabledState();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                LatencyTracker?.Dispose();
+                LatencyTracker = null;
+            }
+
+            base.Dispose(isDisposing);
         }
 
         /// <summary>
@@ -1280,6 +1299,9 @@ namespace osu.Game.Screens.Play
             musicController.ResetTrackAdjustments();
 
             fadeOut();
+
+            if (!isRestarting)
+                scheduleGameplayTextureCleanup();
 
             return base.OnExiting(e);
         }

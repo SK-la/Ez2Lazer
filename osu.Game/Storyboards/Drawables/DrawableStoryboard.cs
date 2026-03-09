@@ -100,11 +100,6 @@ namespace osu.Game.Storyboards.Drawables
             if (clock != null)
                 Clock = clock;
 
-            dependencies.CacheAs(typeof(TextureStore),
-                new TextureStore(host.Renderer, host.CreateTextureLoaderStore(
-                    CreateResourceLookupStore()
-                ), false, scaleAdjust: 1));
-
             foreach (var layer in Storyboard.Layers)
             {
                 cancellationToken?.ThrowIfCancellationRequested();

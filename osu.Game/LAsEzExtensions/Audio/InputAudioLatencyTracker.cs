@@ -33,6 +33,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         private readonly EzLatencyManager latencyManager;
         private Bindable<bool>? inputAudioLatencyConfigBindable;
         private Action<ValueChangedEvent<bool>>? inputAudioLatencyConfigHandler;
+        private Action<ValueChangedEvent<bool>>? enabledChangedHandler;
 
         /// <summary>
         /// Global instance for unified access
@@ -53,6 +54,9 @@ namespace osu.Game.LAsEzExtensions.Audio
             Logger.Log("InputAudioLatencyTracker.Initialize called", LoggingTarget.Runtime, LogLevel.Debug);
             scoreProcessor = processor;
 
+            // Start each gameplay session from a clean latency dataset.
+            latencyManager.ClearStatistics();
+
             // 将 Ez2Setting 的启用状态绑定到 EzLatencyManager
             inputAudioLatencyConfigBindable = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker);
             // Avoid BindTo here to prevent repeated double-binding errors when Initialize is called multiple times.
@@ -64,13 +68,15 @@ namespace osu.Game.LAsEzExtensions.Audio
             latencyManager.OnNewRecord += OnLatencyRecordGenerated;
 
             // 绑定启用状态变化，控制生命周期
-            latencyManager.Enabled.BindValueChanged(enabled =>
+            enabledChangedHandler = enabled =>
             {
                 if (enabled.NewValue)
                     Start();
                 else
                     Stop();
-            }, true);
+            };
+
+            latencyManager.Enabled.BindValueChanged(enabledChangedHandler, true);
         }
 
         private bool started;
@@ -156,6 +162,8 @@ namespace osu.Game.LAsEzExtensions.Audio
                     $"Latency analysis complete!\nInput→Judge: {stats.AvgInputToJudge:F1}ms\nInput→Audio: {stats.AvgInputToPlayback:F1}ms\nAudio→Judge: {stats.AvgPlaybackToJudge:F1}ms\nRecords: {stats.RecordCount}",
                 Icon = FontAwesome.Solid.ChartLine,
             });
+
+            latencyManager.ClearStatistics();
         }
 
         private void OnNewJudgement(JudgementResult result)
@@ -185,10 +193,14 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             // 解绑事件
             latencyManager.OnNewRecord -= OnLatencyRecordGenerated;
-            latencyManager.Dispose();
+
+            if (enabledChangedHandler != null)
+                latencyManager.Enabled.ValueChanged -= enabledChangedHandler;
 
             if (inputAudioLatencyConfigBindable != null && inputAudioLatencyConfigHandler != null)
                 inputAudioLatencyConfigBindable.ValueChanged -= inputAudioLatencyConfigHandler;
+
+            latencyManager.ClearStatistics();
 
             Instance = null;
         }

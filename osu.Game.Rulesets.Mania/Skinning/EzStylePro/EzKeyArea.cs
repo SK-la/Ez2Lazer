@@ -222,5 +222,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             TANOc2,
             TECHNIKA,
         }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                stageName.UnbindBindings();
+                hitPositonBindable.UnbindBindings();
+                noteSize.UnbindBindings();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }

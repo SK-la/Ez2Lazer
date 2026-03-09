@@ -95,5 +95,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         // }
 
         // private void invalidateLayout() => layout.Invalidate();
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                noteSetName.UnbindBindings();
+                hitPositonBindable.UnbindBindings();
+                columnWidth.UnbindBindings();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 }

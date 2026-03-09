@@ -217,6 +217,11 @@ namespace osu.Game.Rulesets.Mania.UI
                 NoteSizeBindable.ValueChanged -= onNoteSizeBindableChanged;
                 ezConfig.OnNoteColourChanged -= onNoteColourChanged;
             }
+
+            NoteSetBindable.UnbindBindings();
+            NoteSizeBindable.UnbindBindings();
+            EzColumnColourBindable.UnbindBindings();
+            hitModeBindable.UnbindBindings();
         }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
