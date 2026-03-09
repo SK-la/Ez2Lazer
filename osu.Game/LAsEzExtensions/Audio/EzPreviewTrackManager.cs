@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
@@ -12,12 +14,12 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Skinning;
 using osu.Game.Storyboards;
 
 namespace osu.Game.LAsEzExtensions.Audio
@@ -40,35 +42,31 @@ namespace osu.Game.LAsEzExtensions.Audio
         private const double trigger_tolerance = 15; // ms 容差
 
         private const double max_dynamic_preview_length = 60000; // 动态扩展最长 ms
+        private const int max_cached_beatmaps = 3; // LRU 缓存：最多保留最近 3 首歌曲的样本
+
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
         private readonly PlaybackState playback = new PlaybackState();
-        public readonly Bindable<IBeatmap> Beatmap = new Bindable<IBeatmap>();
 
         private Track? currentTrack;
         private IWorkingBeatmap? currentBeatmap;
         private ScheduledDelegate? updateDelegate;
         private Container audioContainer = null!;
-        private ISampleStore sampleStore = null!;
+        private ISampleStore? fallbackSampleStore;
+        private ISampleStore? previewSampleStore;
+        private IBeatmapSetInfo? lastPreviewSet;
+
+        // LRU 缓存：按 BeatmapSetID 缓存样本数据
+        private readonly LinkedList<string> beatmapAccessOrder = new LinkedList<string>();
+        private readonly Dictionary<string, BeatmapSampleCache> sampleCache = new Dictionary<string, BeatmapSampleCache>();
 
         [Resolved]
         protected AudioManager AudioManager { get; private set; } = null!;
-
-        [Resolved]
-        private ISkinSource skinSource { get; set; } = null!;
 
         /// <summary>
         /// 覆盖预览起点时间（毫秒）。
         /// 若为 null，则使用谱面元数据的预览时间（PreviewTime）。
         /// </summary>
         public double? OverridePreviewStartTime { get; set; }
-
-        /// <summary>
-        /// 重置循环状态，用于在开始新预览时清除之前的循环进度。
-        /// </summary>
-        public void ResetLoopState()
-        {
-            playback.ResetPlaybackProgress();
-        }
 
         private bool ownsCurrentTrack;
 
@@ -77,6 +75,18 @@ namespace osu.Game.LAsEzExtensions.Audio
         protected override void Dispose(bool isDisposing)
         {
             StopPreview();
+
+            if (isDisposing)
+            {
+                EnabledBindable.UnbindAll();
+                sampleScheduler.Reset();
+                sampleCache.Clear();
+                beatmapAccessOrder.Clear();
+            }
+
+            previewSampleStore?.Dispose();
+            previewSampleStore = null;
+
             base.Dispose(isDisposing);
         }
 
@@ -94,6 +104,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 return false;
 
             StopPreview();
+            resetPreviewSampleStoreForSet(beatmap);
 
             currentBeatmap = beatmap;
             currentTrack = CreateTrack(beatmap, out ownsCurrentTrack);
@@ -128,7 +139,8 @@ namespace osu.Game.LAsEzExtensions.Audio
                     currentTrack.Dispose();
             }
 
-            clearEnhancedElements();
+            // 保存到缓存而不是完全清空
+            saveCurrentBeatmapToCache();
             currentBeatmap = null;
             currentTrack = null;
             playback.ResetPlaybackProgress();
@@ -137,7 +149,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         [BackgroundDependencyLoader]
         private void load()
         {
-            sampleStore = AudioManager.Samples;
+            fallbackSampleStore = AudioManager.Samples;
 
             InternalChild = audioContainer = new Container
             {
@@ -156,6 +168,69 @@ namespace osu.Game.LAsEzExtensions.Audio
             //         }
             //     });
             // }, false);
+        }
+
+        private void resetPreviewSampleStoreForSet(IWorkingBeatmap beatmap)
+        {
+            var newSet = getBeatmapSet(beatmap);
+
+            if (previewSampleStore != null && !EqualityComparer<IBeatmapSetInfo?>.Default.Equals(newSet, lastPreviewSet))
+            {
+                previewSampleStore.Dispose();
+                previewSampleStore = null;
+            }
+
+            lastPreviewSet = newSet;
+
+            previewSampleStore ??= createPreviewSampleStore();
+        }
+
+        private static IBeatmapSetInfo? getBeatmapSet(IWorkingBeatmap beatmap) => beatmap.BeatmapInfo?.BeatmapSet;
+
+        private ISampleStore createPreviewSampleStore()
+        {
+            var source = fallbackSampleStore ?? AudioManager.Samples;
+            var store = new ResourceStore<byte[]>(new SampleStreamResourceStore(source));
+            var preview = AudioManager.GetSampleStore(store, AudioManager.SampleMixer);
+
+            // Allow .ogg lookups in addition to the default wav/mp3.
+            preview.AddExtension(@"ogg");
+            return preview;
+        }
+
+        private sealed class SampleStreamResourceStore : IResourceStore<byte[]>
+        {
+            private readonly ISampleStore source;
+
+            public SampleStreamResourceStore(ISampleStore source)
+            {
+                this.source = source;
+            }
+
+            public byte[] Get(string name)
+            {
+                using (var stream = source.GetStream(name))
+                {
+                    if (stream == null)
+                        return null;
+
+                    using (var memory = new MemoryStream())
+                    {
+                        stream.CopyTo(memory);
+                        return memory.ToArray();
+                    }
+                }
+            }
+
+            public Task<byte[]> GetAsync(string name, CancellationToken cancellationToken = default) => Task.Run(() => Get(name), cancellationToken);
+
+            public Stream GetStream(string name) => source.GetStream(name);
+
+            public IEnumerable<string> GetAvailableResources() => source.GetAvailableResources();
+
+            public void Dispose()
+            {
+            }
         }
 
         // 快速判定：遍历命中对象直到达到阈值即返回 true。
@@ -193,8 +268,7 @@ namespace osu.Game.LAsEzExtensions.Audio
         /// </summary>
         private void startEnhancedPreview(IWorkingBeatmap beatmap)
         {
-            double longestHitTime = 0;
-            double longestStoryboardTime = 0;
+            double longestHitTime;
 
             void collectLongest(HitObject ho)
             {
@@ -204,27 +278,23 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             try
             {
-                var playableBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
+                // 尝试从缓存恢复
+                bool cacheHit = restoreFromCache(beatmap);
+
+                if (!cacheHit)
+                {
+                    // 缓存未命中，需要重新准备并保存
+                    var playableBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
+                    prepareScheduledData(playableBeatmap, beatmap.Storyboard);
+                }
 
                 beatmap.PrepareTrackForPreview(true);
                 playback.PreviewStartTime = OverridePreviewStartTime ?? beatmap.BeatmapInfo.Metadata.PreviewTime;
                 if (playback.PreviewStartTime < 0 || playback.PreviewStartTime > (currentTrack?.Length ?? 0))
                     playback.PreviewStartTime = (currentTrack?.Length ?? 0) * 0.4;
 
-                foreach (var ho in playableBeatmap.HitObjects)
-                    collectLongest(ho);
-
-                if (beatmap.Storyboard?.Layers != null)
-                {
-                    foreach (var layer in beatmap.Storyboard.Layers)
-                    {
-                        foreach (var element in layer.Elements)
-                        {
-                            if (element is StoryboardSampleInfo s)
-                                longestStoryboardTime = Math.Max(longestStoryboardTime, s.StartTime);
-                        }
-                    }
-                }
+                longestHitTime = sampleScheduler.LongestHitTime;
+                double longestStoryboardTime = sampleScheduler.LongestStoryboardTime;
 
                 double longestEventTime = Math.Max(longestHitTime, longestStoryboardTime);
                 double defaultEnd = playback.PreviewStartTime + preview_window_length;
@@ -251,7 +321,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                 playback.ShortBgmOneShotMode = false;
                 playback.ShortBgmMutedAfterFirstLoop = false;
 
-                // 判定一次性短BGM模式：
+                // 判定一次性短 BGM 模式：
                 // 若主音频非常短（<10s），则将其视为短 BGM，在循环时在第一次循环后静音（从而实现“播放一次可听，后续不再循环”的效果），
                 // 同时保留命中音效与故事板音效的触发逻辑。
                 if (currentTrack != null)
@@ -259,11 +329,6 @@ namespace osu.Game.LAsEzExtensions.Audio
                     if (currentTrack.Length < 10000 || longestEventTime > (currentTrack.Length + 5000))
                         playback.ShortBgmOneShotMode = true;
                 }
-
-                prepareHitSounds(playableBeatmap, playback.PreviewEndTime);
-
-                prepareStoryboardSamples(beatmap.Storyboard, playback.PreviewEndTime);
-                // preloadSamples();
 
                 if (sampleScheduler.ScheduledHitSounds.Count == 0 && sampleScheduler.ScheduledStoryboardSamples.Count == 0)
                 {
@@ -300,8 +365,14 @@ namespace osu.Game.LAsEzExtensions.Audio
         private void prepareHitSounds(IBeatmap beatmap, double previewEndTime)
         {
             sampleScheduler.ScheduledHitSounds.Clear();
+            sampleScheduler.LongestHitTime = 0;
+
             foreach (var ho in beatmap.HitObjects)
+            {
                 schedule(ho, previewEndTime);
+                sampleScheduler.LongestHitTime = Math.Max(sampleScheduler.LongestHitTime, ho.StartTime);
+            }
+
             sampleScheduler.ScheduledHitSounds.Sort((a, b) => a.Time.CompareTo(b.Time));
 
             void schedule(HitObject ho, double end)
@@ -323,6 +394,8 @@ namespace osu.Game.LAsEzExtensions.Audio
         private void prepareStoryboardSamples(Storyboard? storyboard, double previewEndTime)
         {
             sampleScheduler.ScheduledStoryboardSamples.Clear();
+            sampleScheduler.LongestStoryboardTime = 0;
+
             if (storyboard?.Layers == null) return;
 
             foreach (var layer in storyboard.Layers)
@@ -337,6 +410,7 @@ namespace osu.Game.LAsEzExtensions.Audio
                             Sample = s,
                             HasTriggered = false
                         });
+                        sampleScheduler.LongestStoryboardTime = Math.Max(sampleScheduler.LongestStoryboardTime, s.StartTime);
                     }
                 }
             }
@@ -582,34 +656,19 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
         }
 
-        // 多级检索：谱面 skin -> 全局 skinSource -> sampleStore (LookupNames) -> Gameplay/ 回退
+        // 仅使用谱面资源解析样本，不走皮肤与全局样本库。
         private IEnumerable<ISample?> fetchSamplesForInfo(HitSampleInfo info, bool preloadOnly = false)
         {
-            // 1. 谱面皮肤
-            var s = currentBeatmap?.Skin.GetSample(info);
-            if (s != null) yield return s;
-
-            // 2. 全局皮肤源
-            var global = skinSource.GetSample(info);
-            if (global != null) yield return global;
-
-            // 3. LookupNames 走样本库
-            foreach (string name in info.LookupNames)
-            {
-                // LookupNames 通常包含 Gameplay/ 前缀；若没有尝试补全
-                ISample? storeSample = sampleStore.Get(name) ?? sampleStore.Get($"Gameplay/{name}");
-                if (storeSample != null) yield return storeSample;
-            }
-
-            // 4. 兜底（兼容 legacy 组合）
-            yield return sampleStore.Get($"Gameplay/{info.Bank}-{info.Name}");
+            var sample = currentBeatmap?.Skin.GetSample(info);
+            if (sample != null)
+                yield return sample;
         }
 
         private void triggerStoryboardSample(StoryboardSampleInfo sampleInfo)
         {
             try
             {
-                var (sample, _, tried) = fetchStoryboardSample(sampleInfo);
+                var (sample, _, _) = fetchStoryboardSample(sampleInfo);
 
                 if (sample == null)
                 {
@@ -638,7 +697,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         /// <summary>
         /// 统一 storyboard 样本获取逻辑。返回 (sample, 命中的key, 尝试列表)
-        /// 顺序：缓存 -> beatmap skin -> 全局 skin -> sampleStore.LookupNames -> sampleStore 原Path 变体
+        /// 顺序：缓存 -> beatmap skin
         /// </summary>
         private (ISample? sample, string chosenKey, List<string> tried) fetchStoryboardSample(StoryboardSampleInfo info, bool preload = false)
         {
@@ -668,33 +727,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             var beatmapSkinSample = currentBeatmap?.Skin.GetSample(info);
             consider(beatmapSkinSample, "beatmapSkin:" + normalizedPath);
 
-            // 3. 全局皮肤
-            var globalSkinSample = skinSource.GetSample(info);
-            consider(globalSkinSample, "globalSkin:" + normalizedPath);
-
-            // 4. LookupNames in sampleStore
-            foreach (string name in info.LookupNames)
-            {
-                string key = name.Replace('\\', '/');
-                var s = sampleStore.Get(key);
-                consider(s, "store:" + key);
-                if (selected != null) break;
-            }
-
-            // 5. 额外尝试：去扩展名或补 wav/mp3 (有些 beatmap 在 LookupNames 第二项无扩展)
-            if (selected == null)
-            {
-                string withoutExt = Path.ChangeExtension(normalizedPath, null);
-
-                foreach (string ext in new[] { ".wav", ".ogg", ".mp3" })
-                {
-                    var s = sampleStore.Get(withoutExt + ext);
-                    consider(s, "store-extra:" + withoutExt + ext);
-                    if (selected != null) break;
-                }
-            }
-
-            // 6. 写缓存（即使 null 也缓存，避免重复磁盘尝试；预加载阶段写入，触发阶段复用）
+            // 3. 写缓存（即使 null 也缓存，避免重复磁盘尝试；预加载阶段写入，触发阶段复用）
             sampleScheduler.StoryboardSampleCache[normalizedPath] = selected;
 
             return (selected, chosenKey, tried);
@@ -705,22 +738,9 @@ namespace osu.Game.LAsEzExtensions.Audio
             // 停止并释放所有仍在播放的样本通道，避免依赖最终化器来回收短期通道
             foreach (var channel in sampleScheduler.ActiveChannels)
             {
-                try
-                {
-                    channel.Stop();
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    if (!channel.IsDisposed && !channel.ManualFree)
-                        channel.Dispose();
-                }
-                catch
-                {
-                }
+                channel.Stop();
+                if (!channel.IsDisposed && !channel.ManualFree)
+                    channel.Dispose();
             }
 
             sampleScheduler.Reset();
@@ -728,6 +748,93 @@ namespace osu.Game.LAsEzExtensions.Audio
             playback.ShortBgmMutedAfterFirstLoop = false;
             // 避免在非更新线程直接操作 InternalChildren 导致 InvalidThreadForMutationException
             Schedule(() => audioContainer.Clear());
+        }
+
+        /// <summary>
+        /// 准备调度数据（命中音效和故事板样本）。
+        /// </summary>
+        private void prepareScheduledData(IBeatmap beatmap, Storyboard? storyboard)
+        {
+            prepareHitSounds(beatmap, playback.PreviewEndTime);
+            prepareStoryboardSamples(storyboard, playback.PreviewEndTime);
+        }
+
+        /// <summary>
+        /// 保存当前谱面的样本数据到 LRU 缓存。
+        /// </summary>
+        private void saveCurrentBeatmapToCache()
+        {
+            if (currentBeatmap == null || currentBeatmap.BeatmapInfo?.BeatmapSet?.OnlineID <= 0)
+                return;
+
+            string beatmapSetId = currentBeatmap.BeatmapInfo!.BeatmapSet!.OnlineID.ToString();
+
+            // 保存到缓存
+            if (!sampleCache.TryGetValue(beatmapSetId, out var value))
+            {
+                value = new BeatmapSampleCache();
+                sampleCache[beatmapSetId] = value;
+            }
+
+            var cache = value;
+            cache.ScheduledHitSounds = sampleScheduler.ScheduledHitSounds.ToArray();
+            cache.ScheduledStoryboardSamples = sampleScheduler.ScheduledStoryboardSamples.ToArray();
+            cache.StoryboardSampleCache = new Dictionary<string, ISample?>(sampleScheduler.StoryboardSampleCache);
+            cache.LongestHitTime = sampleScheduler.LongestHitTime;
+            cache.LongestStoryboardTime = sampleScheduler.LongestStoryboardTime;
+
+            // 更新访问顺序（LRU）
+            beatmapAccessOrder.Remove(beatmapSetId);
+            beatmapAccessOrder.AddFirst(beatmapSetId);
+
+            // 如果超过缓存上限，移除最旧的
+            while (beatmapAccessOrder.Count > max_cached_beatmaps)
+            {
+                string? oldest = beatmapAccessOrder.Last?.Value;
+
+                if (oldest != null)
+                {
+                    sampleCache.Remove(oldest);
+                    beatmapAccessOrder.RemoveLast();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 尝试从缓存恢复谱面的样本数据。
+        /// </summary>
+        private bool restoreFromCache(IWorkingBeatmap beatmap)
+        {
+            if (beatmap.BeatmapInfo?.BeatmapSet?.OnlineID <= 0)
+                return false;
+
+            string beatmapSetId = beatmap.BeatmapInfo!.BeatmapSet!.OnlineID.ToString();
+
+            if (!sampleCache.TryGetValue(beatmapSetId, out var cache))
+                return false;
+
+            // 从缓存恢复数据（使用 Clear + AddRange 方式避免 readonly 字段赋值错误）
+            sampleScheduler.ScheduledHitSounds.Clear();
+            sampleScheduler.ScheduledHitSounds.AddRange(cache.ScheduledHitSounds);
+
+            sampleScheduler.ScheduledStoryboardSamples.Clear();
+            sampleScheduler.ScheduledStoryboardSamples.AddRange(cache.ScheduledStoryboardSamples);
+
+            sampleScheduler.StoryboardSampleCache.Clear();
+
+            foreach (var kvp in cache.StoryboardSampleCache)
+            {
+                sampleScheduler.StoryboardSampleCache[kvp.Key] = kvp.Value;
+            }
+
+            sampleScheduler.LongestHitTime = cache.LongestHitTime;
+            sampleScheduler.LongestStoryboardTime = cache.LongestStoryboardTime;
+
+            // 更新访问顺序（LRU）
+            beatmapAccessOrder.Remove(beatmapSetId);
+            beatmapAccessOrder.AddFirst(beatmapSetId);
+
+            return true;
         }
 
         private struct ScheduledHitSound
@@ -838,6 +945,10 @@ namespace osu.Game.LAsEzExtensions.Audio
             public int NextHitSoundIndex;
             public int NextStoryboardSampleIndex;
 
+            // 用于缓存的最长事件时间
+            public double LongestHitTime;
+            public double LongestStoryboardTime;
+
             public void ResetIndices()
             {
                 NextHitSoundIndex = 0;
@@ -850,8 +961,22 @@ namespace osu.Game.LAsEzExtensions.Audio
                 ScheduledHitSounds.Clear();
                 ScheduledStoryboardSamples.Clear();
                 StoryboardSampleCache.Clear();
+                LongestHitTime = 0;
+                LongestStoryboardTime = 0;
                 ResetIndices();
             }
+        }
+
+        /// <summary>
+        /// 用于 LRU 缓存的谱面样本数据结构。
+        /// </summary>
+        private sealed class BeatmapSampleCache
+        {
+            public ScheduledHitSound[] ScheduledHitSounds { get; set; } = Array.Empty<ScheduledHitSound>();
+            public ScheduledStoryboardSample[] ScheduledStoryboardSamples { get; set; } = Array.Empty<ScheduledStoryboardSample>();
+            public Dictionary<string, ISample?> StoryboardSampleCache { get; set; } = new Dictionary<string, ISample?>();
+            public double LongestHitTime { get; set; }
+            public double LongestStoryboardTime { get; set; }
         }
 
         protected virtual Track? CreateTrack(IWorkingBeatmap beatmap, out bool ownsTrack)

@@ -167,7 +167,7 @@ namespace osu.Game.Screens.Select
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
         private Bindable<KeySoundPreviewMode> keySoundPreview = null!;
-        private EzPreviewTrackManager ezPreviewManager = null!;
+        private readonly EzPreviewTrackManager ezPreviewManager = new EzPreviewTrackManager();
 
         private IDisposable? modSelectOverlayRegistration;
 
@@ -321,7 +321,6 @@ namespace osu.Game.Screens.Select
                 updateBackgroundDim();
             });
 
-            ezPreviewManager = new EzPreviewTrackManager();
             AddInternal(ezPreviewManager);
             keySoundPreview = ezConfig.GetBindable<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
@@ -399,22 +398,22 @@ namespace osu.Game.Screens.Select
                     logo?.FadeTo(v.NewValue == Visibility.Visible ? 0f : 1f, 200, Easing.OutQuint);
             });
 
-            Beatmap.BindValueChanged(_ =>
-            {
-                if (!this.IsCurrentScreen())
-                    return;
-
-                ensureGlobalBeatmapValid();
-
-                ensurePlayingSelected();
-                updateBackgroundDim();
-                updateWedgeVisibility();
-                fetchOnlineInfo();
-            });
+            // Beatmap.BindValueChanged(_ =>
+            // {
+            //     if (!this.IsCurrentScreen())
+            //         return;
+            //
+            //     ensureGlobalBeatmapValid();
+            //
+            //     ensurePlayingSelected();
+            //     updateBackgroundDim();
+            //     updateWedgeVisibility();
+            //     fetchOnlineInfo();
+            // });
 
             keySoundPreview.BindValueChanged(e =>
             {
-                Logger.Log("[Key sound preview mode] changed to " + e.NewValue);
+                Logger.Log("[Key sound preview mode] changed to " + e.NewValue, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 ezPreviewManager.EnabledBindable.Value = e.NewValue != 0;
                 ensureTrackLooping(Beatmap.Value, TrackChangeDirection.None);
                 ensurePlayingSelected();
