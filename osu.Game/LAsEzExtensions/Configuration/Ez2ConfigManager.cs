@@ -122,6 +122,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
             SetDefault(Ez2Setting.GameplayDisableCmdSpace, true);
             SetDefault(Ez2Setting.AsioSampleRate, 48000);
+            SetDefault(Ez2Setting.AsioBufferSize, 128);
             SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
 
             SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
@@ -624,6 +625,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         // 音频相关
         AsioSampleRate,
+        AsioBufferSize,
         InputAudioLatencyTracker,
 
         // 来自拉取

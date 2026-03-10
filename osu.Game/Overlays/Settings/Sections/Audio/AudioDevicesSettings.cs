@@ -30,6 +30,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private FormDropdown<int>? sampleRateDropdown;
 
+        private FormDropdown<int>? bufferSizeDropdown;
+
         private AudioDeviceDropdown dropdown = null!;
 
         private FormCheckBox? wasapiExperimental;
@@ -64,6 +66,16 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 {
                     Keywords = new[] { "sample", "rate", "frequency" },
                 });
+                Add(new SettingsItemV2(bufferSizeDropdown = new FormDropdown<int>
+                {
+                    Caption = "ASIO Buffer Size(Testing)",
+                    HintText = "Lower is lower latency, but too low may crackle or fail to start. Default is 128.",
+                    Current = ezConfig.GetBindable<int>(Ez2Setting.AsioBufferSize),
+                    Items = AudioExtensions.COMMON_BUFFER_SIZES,
+                })
+                {
+                    Keywords = new[] { "asio", "buffer", "latency" },
+                });
                 Add(new SettingsItemV2(wasapiExperimental = new FormCheckBox
                 {
                     Caption = AudioSettingsStrings.WasapiLabel,
@@ -75,13 +87,20 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     Note = { BindTarget = wasapiExperimentalNote },
                 });
 
-                // Setup ASIO sample rate synchronization
-                audio.SetupAsioSampleRateSync(actualSampleRate =>
+                // Setup ASIO configuration synchronization.
+                audio.SetupAsioConfigurationSync(actualSampleRate =>
                 {
                     Schedule(() =>
                     {
-                        // Logger.Log($"ASIO sync: actualSampleRate={actualSampleRate}", LoggingTarget.Runtime, LogLevel.Debug);
+                        ensureDropdownContainsValue(sampleRateDropdown, actualSampleRate);
                         sampleRateDropdown.Current.Value = actualSampleRate;
+                    });
+                }, actualBufferSize =>
+                {
+                    Schedule(() =>
+                    {
+                        ensureDropdownContainsValue(bufferSizeDropdown, actualBufferSize);
+                        bufferSizeDropdown.Current.Value = actualBufferSize;
                     });
                 });
 
@@ -92,6 +111,14 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     Logger.Log($"User set sample rate to {e.NewValue}Hz", LoggingTarget.Runtime, LogLevel.Debug);
                     audio.SetPreferredAsioSampleRate(e.NewValue);
                 };
+                bufferSizeDropdown.Current.ValueChanged += e =>
+                {
+                    Logger.Log($"User set ASIO buffer size to {e.NewValue}", LoggingTarget.Runtime, LogLevel.Debug);
+                    audio.SetAsioBufferSize(e.NewValue);
+                };
+
+                audio.SetPreferredAsioSampleRate(sampleRateDropdown.Current.Value);
+                audio.SetAsioBufferSize(bufferSizeDropdown.Current.Value);
             }
 
             audio.OnNewDevice += onDeviceChanged;
@@ -113,13 +140,34 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     wasapiExperimentalNote.Value = null;
             }
 
+            bool isAsio = _.Contains("(ASIO)");
+
             if (sampleRateDropdown != null)
             {
-                if (_.Contains("(ASIO)"))
+                if (isAsio)
                     sampleRateDropdown.Show();
                 else
                     sampleRateDropdown.Hide();
             }
+
+            if (bufferSizeDropdown != null)
+            {
+                if (isAsio)
+                    bufferSizeDropdown.Show();
+                else
+                    bufferSizeDropdown.Hide();
+            }
+        }
+
+        private static void ensureDropdownContainsValue(FormDropdown<int>? dropdown, int value)
+        {
+            if (dropdown == null)
+                return;
+
+            if (dropdown.Items.Contains(value))
+                return;
+
+            dropdown.Items = dropdown.Items.Append(value).Distinct().OrderBy(v => v).ToList();
         }
 
         private void updateItems()
