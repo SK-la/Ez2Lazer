@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
         {
             var mod = new ManiaModSpaceBody
             {
-                SpaceBeat = { Value = 2.0 }
+                BeatGap = { Value = 2.0 }
             };
 
             CreateModTest(new ModTestData
@@ -72,7 +72,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Mods
         {
             var mod = new ManiaModSpaceBody
             {
-                SpaceBeat = { Value = 8.0 }
+                BeatGap = { Value = 8.0 }
             };
 
             CreateModTest(new ModTestData

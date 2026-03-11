@@ -38,11 +38,22 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
         public override bool ValidForFreestyleAsRequiredMod => false;
         public override Type[] IncompatibleMods => new[] { typeof(ManiaModHoldOff) };
 
-        [SettingSource(typeof(SpaceBodyStrings), nameof(SpaceBodyStrings.SPACE_BODY_LABEL), nameof(SpaceBodyStrings.SPACE_BODY_GAP_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
-        public BindableNumber<double> SpaceBeat { get; } = new BindableDouble(4)
+        [SettingSource(typeof(SpaceBodyStrings), nameof(SpaceBodyStrings.BEAT_GAP_LABEL), nameof(SpaceBodyStrings.BEAT_GAP_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
+        public BindableNumber<double> BeatGap { get; } = new BindableDouble(4)
         {
             MinValue = 1,
             MaxValue = 16,
+            Precision = 1
+        };
+
+        [SettingSource(typeof(SpaceBodyStrings), nameof(SpaceBodyStrings.USE_MS_GAP_LABEL), nameof(SpaceBodyStrings.USE_MS_GAP_DESCRIPTION))]
+        public BindableBool UseMsGap { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(SpaceBodyStrings), nameof(SpaceBodyStrings.MS_GAP_LABEL), nameof(SpaceBodyStrings.MS_GAP_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
+        public BindableNumber<double> MsGap { get; } = new BindableDouble(50)
+        {
+            MinValue = 10,
+            MaxValue = 200,
             Precision = 1
         };
 
@@ -99,9 +110,20 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                     // 长按音符结束时的拍长。
                     double beatLength = beatmap.ControlPointInfo.TimingPointAt(locations[i + 1].startTime).BeatLength;
 
-                    // 减少持续时间最多1/4拍，以确保没有瞬时音符。
+                    // 减少持续时间最多 1/4 拍，以确保没有瞬时音符。
                     // duration = Math.Max(duration / 2, duration - beatLength / 4);
-                    duration = Math.Max(duration / 2, duration - beatLength / SpaceBeat.Value);
+                    if (!UseMsGap.Value)
+                    {
+                        // 使用基于节拍的间隙（受 BPM/SV 影响）
+                        duration = Math.Max(duration / 2, duration - beatLength / BeatGap.Value);
+                    }
+                    else
+                    {
+                        // 使用固定时间间隙（毫秒，不受 BPM 影响）
+                        double gapMs = MsGap.Value;
+                        // 确保间隙不超过可用时长，至少保留一半时长作为音符
+                        duration = Math.Max(duration / 2, duration - gapMs);
+                    }
 
                     newColumnObjects.Add(new HoldNote
                     {
@@ -148,7 +170,11 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
         {
             get
             {
-                yield return ("Space Beat", $"1/{SpaceBeat.Value}");
+                if (!UseMsGap.Value)
+                    yield return ("Space Beat", $"1/{BeatGap.Value}");
+                else
+                    yield return ("Space Gap", $"{MsGap.Value}ms");
+                
                 yield return ("Shield", Shield.Value ? "On" : "Off");
             }
         }
@@ -156,10 +182,18 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
     public static class SpaceBodyStrings
     {
-        public static readonly LocalisableString SPACE_BODY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("全LN面海，可调面缝", "Full LN, adjustable gaps");
-        public static readonly LocalisableString SPACE_BODY_LABEL = new EzLocalizationManager.EzLocalisableString("全反键缝隙", "Space Body");
-        public static readonly LocalisableString SPACE_BODY_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整前后两个面之间的间隔缝隙", "Full LN, adjustable gaps");
+        public static readonly LocalisableString SPACE_BODY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("全 LN 面海，可调面缝", "Full-LN, adjustable gaps");
+
+        public static readonly LocalisableString BEAT_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("反键节拍缝隙", "Full-LN beat gap");
+        public static readonly LocalisableString BEAT_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("按 Bpm 节拍设置首尾缝隙，SV 影响结果", "Set gap by BPM beats, affected by SV");
+
+        public static readonly LocalisableString USE_MS_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("使用固定时间缝隙", "Use ms gap");
+        public static readonly LocalisableString USE_MS_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("替换为固定时间的缝隙，不受 SV 影响", "Use fixed time gap, unaffected by SV");
+
+        public static readonly LocalisableString MS_GAP_LABEL = new EzLocalizationManager.EzLocalisableString("反键时间缝隙", "Full-LN ms gap");
+        public static readonly LocalisableString MS_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整前后两个面之间的间隔缝隙", "Adjust gap between two full-LN notes");
+
         public static readonly LocalisableString ADD_SHIELD_LABEL = new EzLocalizationManager.EzLocalisableString("添加盾型", "Add Shield");
-        public static readonly LocalisableString ADD_SHIELD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("将每个面尾添加盾牌键型", "Add shield notes in the sea");
+        public static readonly LocalisableString ADD_SHIELD_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("将每个面尾添加盾牌键型", "Add shield notes at the end of each LN");
     }
 }
