@@ -1,7 +1,8 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -17,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.UI
         protected override Container<Drawable> Content { get; }
 
         private readonly DrawSizePreservingFillContainer scalingContainer;
-        private readonly BufferedContainer perspectiveContainer;
+        private BufferedContainer? perspectiveContainer;
 
         private readonly DrawableManiaRuleset drawableManiaRuleset;
         private Bindable<double> maniaPseudo3DRotation = null!;
@@ -28,23 +29,36 @@ namespace osu.Game.Rulesets.Mania.UI
         public ManiaPlayfieldAdjustmentContainer(DrawableManiaRuleset drawableManiaRuleset)
         {
             this.drawableManiaRuleset = drawableManiaRuleset;
+
             InternalChild = scalingContainer = new DrawSizePreservingFillContainer
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 RelativeSizeAxes = Axes.Both,
-                Child = perspectiveContainer = new BufferedContainer(pixelSnapping: true)
+            };
+
+            Content = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+            };
+
+            var rotation = GlobalConfigStore.EzConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation);
+
+            if (!rotation.IsDefault)
+            {
+                scalingContainer.Child = perspectiveContainer = new BufferedContainer(pixelSnapping: true)
                 {
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
                     RelativeSizeAxes = Axes.Both,
                     DrawOriginal = false,
-                    Child = Content = new Container
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                    }
-                }
-            };
+                    Child = Content
+                };
+            }
+            else
+            {
+                scalingContainer.Child = Content;
+            }
         }
 
         [BackgroundDependencyLoader]
@@ -59,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.UI
             float angle = (float)maniaPseudo3DRotation.Value;
             float t = angle / 75f;
 
-            perspectiveContainer.VerticalPerspective = t;
+            if (perspectiveContainer != null) perspectiveContainer.VerticalPerspective = t;
         }
 
         protected override void Update()
