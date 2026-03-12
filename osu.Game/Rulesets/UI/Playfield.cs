@@ -375,8 +375,7 @@ namespace osu.Game.Rulesets.UI
         /// <typeparam name="TDrawable">The <see cref="DrawableHitObject"/> receiver for <typeparamref name="TObject"/>s.</typeparam>
         public void RegisterPool<TObject, TDrawable>(int initialSize, int? maximumSize = null)
             where TObject : HitObject
-            where TDrawable : DrawableHitObject, new()
-            => RegisterPool<TObject, TDrawable>(new DrawablePool<TDrawable>(initialSize, maximumSize));
+            where TDrawable : DrawableHitObject, new() => RegisterPool<TObject, TDrawable>(new DrawablePool<TDrawable>(initialSize, maximumSize));
 
         /// <summary>
         /// Registers a custom <see cref="DrawableHitObject"/> pool with this <see cref="DrawableRuleset"/> which is to be used whenever
@@ -495,6 +494,18 @@ namespace osu.Game.Rulesets.UI
             }
 
             protected override PoolableSkinnableSample CreateNewDrawable() => base.CreateNewDrawable().With(d => d.Apply(sampleInfo));
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (isDisposing)
+            {
+                // 只清空字典引用
+                // pool 会随着 Playfield 的 disposal 被自动处理。
+                samplePools.Clear();
+            }
         }
 
         #endregion
