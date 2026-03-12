@@ -3,6 +3,8 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Game.LAsEzExtensions;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK;
 
@@ -17,6 +19,17 @@ namespace osu.Game.Rulesets.UI.Scrolling
 
         public new ScrollingHitObjectContainer HitObjectContainer => (ScrollingHitObjectContainer)base.HitObjectContainer;
 
+        public IEzSkinInfo EzSkinInfo => ezSkinInfo;
+
+        [Cached(Type = typeof(IEzSkinInfo))]
+        private readonly EzSkinInfo ezSkinInfo = new EzSkinInfo();
+
+        [Resolved]
+        protected Ez2ConfigManager EzConfig { get; private set; } = null!;
+
+        [Resolved]
+        protected EzLocalTextureFactory EzFactory { get; private set; } = null!;
+
         [Resolved]
         public IScrollingInfo ScrollingInfo { get; private set; } = null!;
 
@@ -24,6 +37,7 @@ namespace osu.Game.Rulesets.UI.Scrolling
         private void load()
         {
             Direction.BindTo(ScrollingInfo.Direction);
+            ezSkinInfo.BindTo(EzConfig);
         }
 
         /// <summary>

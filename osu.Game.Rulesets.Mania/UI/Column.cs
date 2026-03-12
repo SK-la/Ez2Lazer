@@ -90,18 +90,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private ISkinSource skin { get; set; } = null!;
 
         [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
-
-        [Resolved]
-        private EzLocalTextureFactory factory { get; set; } = null!;
-
-        [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
-
-        public IEzSkinInfo EzSkinInfo => ezSkinInfo;
-
-        [Cached(Type = typeof(IEzSkinInfo))]
-        private readonly EzSkinInfo ezSkinInfo = new EzSkinInfo();
 
         public readonly IBindable<string> NoteSetBindable = new Bindable<string>();
         public readonly Bindable<Vector2> NoteSizeBindable = new Bindable<Vector2>();
@@ -116,7 +105,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig)
         {
             SkinnableDrawable keyArea;
-            ezSkinInfo.BindTo(ezConfig);
+
             skin.SourceChanged += onSourceChanged;
             onSourceChanged();
 
@@ -149,12 +138,12 @@ namespace osu.Game.Rulesets.Mania.UI
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
-            keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
+            keySoundPreviewMode = EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
+            hitModeBindable = EzConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
             configurePools(hitModeBindable.Value);
             NoteSetBindable.BindTo(EzSkinInfo.NoteSetName);
-            NoteSizeBindable.BindTo(factory.GetNoteSize(stageDefinition.Columns, Index));
-            EzColumnColourBindable = ezConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
+            NoteSizeBindable.BindTo(EzFactory.GetNoteSize(stageDefinition.Columns, Index));
+            EzColumnColourBindable = EzConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
         }
 
         private void onNoteSetChanged(ValueChangedEvent<string> e)
@@ -197,7 +186,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
             NoteSetBindable.BindValueChanged(onNoteSetChanged);
             NoteSizeBindable.BindValueChanged(onNoteSizeBindableChanged);
-            ezConfig.OnNoteColourChanged += onNoteColourChanged;
+            EzConfig.OnNoteColourChanged += onNoteColourChanged;
             hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue));
         }
 
@@ -205,23 +194,16 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
-
-            base.Dispose(isDisposing);
-
-            if (skin.IsNotNull())
-                skin.SourceChanged -= onSourceChanged;
-
-            if (ezConfig.IsNotNull())
-            {
-                NoteSetBindable.ValueChanged -= onNoteSetChanged;
-                NoteSizeBindable.ValueChanged -= onNoteSizeBindableChanged;
-                ezConfig.OnNoteColourChanged -= onNoteColourChanged;
-            }
-
+            skin.SourceChanged -= onSourceChanged;
+            NoteSetBindable.ValueChanged -= onNoteSetChanged;
+            NoteSizeBindable.ValueChanged -= onNoteSizeBindableChanged;
+            EzConfig.OnNoteColourChanged -= onNoteColourChanged;
             NoteSetBindable.UnbindBindings();
             NoteSizeBindable.UnbindBindings();
             EzColumnColourBindable.UnbindBindings();
             hitModeBindable.UnbindBindings();
+
+            base.Dispose(isDisposing);
         }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)

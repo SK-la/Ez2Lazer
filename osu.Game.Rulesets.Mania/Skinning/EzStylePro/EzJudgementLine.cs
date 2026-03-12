@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
@@ -17,20 +18,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<double> columnWidth = new BindableDouble();
         private readonly IBindable<string> noteSetName = new Bindable<string>();
 
-        // private readonly LayoutValue layout = new LayoutValue(Invalidation.DrawSize);
-
         private Container sprite = null!;
+        private TextureAnimation? container;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
 
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
-
-        // public EzJudgementLine()
-        // {
-        //     // AddLayout(layout);
-        // }
 
         [BackgroundDependencyLoader]
         private void load(IEzSkinInfo ezSkinInfo)
@@ -60,18 +55,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
             noteSetName.BindValueChanged(_ => OnDrawableChanged(), true);
-
-            // hitPositonBindable.BindValueChanged(_ => invalidateLayout(), true);
-            // columnWidth.BindValueChanged(_ => invalidateLayout(), true);
         }
 
         protected void OnDrawableChanged()
         {
             sprite.Clear();
-
-            var container = factory.CreateAnimation("JudgementLine");
+            container?.ClearFrames();
+            container = factory.CreateAnimation("JudgementLine");
             sprite.Add(container);
-            // invalidateLayout();
         }
 
         private void updateSizes()
@@ -82,19 +73,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             sprite.Scale = new Vector2(scale);
             sprite.Y = 384f + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
         }
-
-        // protected override void Update()
-        // {
-        //     base.Update();
-        //
-        //     if (!layout.IsValid)
-        //     {
-        //         updateSizes();
-        //         layout.Validate();
-        //     }
-        // }
-
-        // private void invalidateLayout() => layout.Invalidate();
 
         protected override void Dispose(bool isDisposing)
         {

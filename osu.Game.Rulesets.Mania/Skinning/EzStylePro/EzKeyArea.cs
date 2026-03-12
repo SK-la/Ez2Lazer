@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm * 64;
 
-            bool isFreeSize = free_size_stages.Contains(stageName.Value);
+            bool isFreeSize = EzProHelper.FREE_SIZE_STAGES.Contains(stageName.Value);
 
             if (isFreeSize)
             {
@@ -192,35 +192,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 upSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(1);
                 downSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
             }
-        }
-
-        private static readonly HashSet<string> free_size_stages = new HashSet<string>
-        {
-            "AZURE_EXPRESSION",
-            "Celeste_Lumiere",
-            "EC_Wheel",
-            "EVOLVE",
-            "Fortress3_Gear",
-            "Fortress3_Modern",
-            "GC",
-            "NIGHT_FALL",
-            "TANOc2",
-            "TECHNIKA",
-        };
-
-        public enum EzEnumGameThemeNameForFreeSize
-        {
-            // ReSharper disable InconsistentNaming
-            AZURE_EXPRESSION,
-            Celeste_Lumiere,
-            EC_Wheel,
-            EVOLVE,
-            Fortress3_Gear,
-            Fortress3_Modern,
-            GC,
-            NIGHT_FALL,
-            TANOc2,
-            TECHNIKA,
         }
 
         protected override void Dispose(bool isDisposing)
