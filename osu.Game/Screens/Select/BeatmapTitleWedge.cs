@@ -294,9 +294,12 @@ namespace osu.Game.Screens.Select
                         : LocalisableString.Interpolate($"{bpmMin}-{bpmMax} ({SongSelectStrings.MostlyBPM(mostCommonBPM)})");
 
                     // 计算并展示 KPS 折线（非阻塞，粗略采样）
-                    var (_, _, kpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
+                    var (_, _, kpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(working.Value.Beatmap, buckets: 64);
                     kpsGraph.SetPoints(kpsList);
                     updateKPSGraphSize();
+
+                    // 由于 bpmStatistic.Text 变化会触发布局动画（100ms），需要延迟更新 KPS 图表尺寸以确保获取正确的宽度
+                    Scheduler.Add(updateKPSGraphSize);
                 });
             }, token);
         }
