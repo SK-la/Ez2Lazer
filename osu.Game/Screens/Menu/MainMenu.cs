@@ -29,6 +29,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.IO;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
+using osu.Game.Online.Matchmaking;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.SkinEditor;
@@ -37,7 +38,6 @@ using osu.Game.Rulesets;
 using osu.Game.Screens.Backgrounds;
 using osu.Game.Screens.Edit;
 using osu.Game.Screens.OnlinePlay.DailyChallenge;
-using osu.Game.Screens.OnlinePlay.Matchmaking.Intro;
 using osu.Game.Screens.OnlinePlay.Multiplayer;
 using osu.Game.Screens.OnlinePlay.Playlists;
 using osu.Game.Screens.Select;
@@ -160,7 +160,8 @@ namespace osu.Game.Screens.Menu
                             },
                             OnSolo = loadSongSelect,
                             OnMultiplayer = () => this.Push(new Multiplayer()),
-                            OnMatchmaking = joinOrLeaveMatchmakingQueue,
+                            OnQuickPlay = loadQuickPlay,
+                            OnRankedPlay = loadRankedPlay,
                             OnPlaylists = () => this.Push(new Playlists()),
                             OnDailyChallenge = room =>
                             {
@@ -483,7 +484,9 @@ namespace osu.Game.Screens.Menu
 
         private void loadSongSelect() => this.Push(new SoloSongSelect());
 
-        private void joinOrLeaveMatchmakingQueue() => this.Push(new ScreenIntro());
+        private void loadQuickPlay() => this.Push(new OnlinePlay.Matchmaking.Intro.ScreenIntro(MatchmakingPoolType.QuickPlay));
+
+        private void loadRankedPlay() => this.Push(new OnlinePlay.Matchmaking.Intro.ScreenIntro(MatchmakingPoolType.RankedPlay));
 
         private partial class MobileDisclaimerDialog : PopupDialog
         {
@@ -498,7 +501,7 @@ namespace osu.Game.Screens.Menu
                 {
                     new PopupDialogOkButton
                     {
-                        Text = "Understood",
+                        Text = ButtonSystemStrings.MobileDisclaimerOkButton,
                         Action = confirmed,
                     },
                 };
