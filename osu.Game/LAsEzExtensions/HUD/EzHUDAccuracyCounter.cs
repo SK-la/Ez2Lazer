@@ -199,6 +199,22 @@ namespace osu.Game.LAsEzExtensions.HUD
         {
         }
 
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                // 解绑所有 Bindable
+                FlowDirection.UnbindAll();
+                Font.UnbindAll();
+                AccuracyDisplay1.UnbindAll();
+                AccuracyDisplay2.UnbindAll();
+                AccuracyDisplay3.UnbindAll();
+                AccuracyDisplay4.UnbindAll();
+            }
+
+            base.Dispose(isDisposing);
+        }
+
         private FillDirection getFillDirection(Direction flow)
         {
             switch (flow)

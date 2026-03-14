@@ -4,7 +4,6 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
@@ -12,7 +11,6 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
-using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
@@ -69,6 +67,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private float leftColumnSpacing;
         private float rightColumnSpacing;
+
+        private bool isDisposed;
 
         public Column(int index, bool isSpecial)
         {
@@ -148,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void onNoteSetChanged(ValueChangedEvent<string> e)
         {
-            if (string.IsNullOrEmpty(e.NewValue))
+            if (isDisposed || string.IsNullOrEmpty(e.NewValue))
                 return;
 
             NoteSetChanged?.Invoke();
@@ -156,11 +156,17 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void onNoteColourChanged()
         {
+            if (isDisposed)
+                return;
+
             NoteColourChanged?.Invoke();
         }
 
         private void onNoteSizeChanged()
         {
+            if (isDisposed)
+                return;
+
             NoteSizeChanged?.Invoke();
         }
 
@@ -168,6 +174,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void onSourceChanged()
         {
+            if (isDisposed)
+                return;
+
             AccentColour.Value = skin.GetManiaSkinConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour, Index)?.Value ?? Color4.Black;
 
             leftColumnSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
@@ -192,16 +201,28 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override void Dispose(bool isDisposing)
         {
+            if (isDisposed)
+                return;
+
+            isDisposed = true;
+
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
             skin.SourceChanged -= onSourceChanged;
             NoteSetBindable.ValueChanged -= onNoteSetChanged;
             NoteSizeBindable.ValueChanged -= onNoteSizeBindableChanged;
             EzConfig.OnNoteColourChanged -= onNoteColourChanged;
+
+            // Unbind all bindable bindings to prevent memory leaks
             NoteSetBindable.UnbindBindings();
             NoteSizeBindable.UnbindBindings();
             EzColumnColourBindable.UnbindBindings();
             hitModeBindable.UnbindBindings();
+
+            // Clear events to prevent any remaining references
+            NoteSetChanged = null;
+            NoteSizeChanged = null;
+            NoteColourChanged = null;
 
             base.Dispose(isDisposing);
         }

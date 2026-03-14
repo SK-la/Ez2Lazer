@@ -50,6 +50,9 @@ namespace osu.Game.LAsEzExtensions.HUD
             FontName.BindValueChanged(e =>
             {
                 Font = new FontUsage(FontName.Value.ToString(), 1);
+
+                // 清理旧的 GlyphStore 缓存，防止每次切换字体时，缓存堆积
+                glyphStore?.ClearCache();
                 glyphStore = new GlyphStore(localSkinStore, getLookup);
 
                 foreach (char c in new[] { '.', '%', 'c', 'e', 'l', 'j' })
