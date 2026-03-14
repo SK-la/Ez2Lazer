@@ -100,6 +100,9 @@ namespace osu.Game.Storyboards.Drawables
             if (clock != null)
                 Clock = clock;
 
+            // 没有这个会无法加载故事版
+            dependencies.CacheAs(typeof(TextureStore), new TextureStore(host.Renderer, host.CreateTextureLoaderStore(CreateResourceLookupStore()), false, scaleAdjust: 1));
+
             foreach (var layer in Storyboard.Layers)
             {
                 cancellationToken?.ThrowIfCancellationRequested();

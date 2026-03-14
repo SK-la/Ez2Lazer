@@ -261,13 +261,6 @@ namespace osu.Game.Screens.Play
             gameActive.BindValueChanged(_ => updatePauseOnFocusLostState(), true);
         }
 
-        private void scheduleGameplayTextureCleanup()
-        {
-            var beatmapSkin = Beatmap.Value?.Skin as Skin;
-            beatmapSkin?.RecycleTextures(disposeAtlas: true);
-            beatmapSkin?.RecycleSamples();
-        }
-
         protected override void Update()
         {
             base.Update();
@@ -1305,9 +1298,6 @@ namespace osu.Game.Screens.Play
             musicController.ResetTrackAdjustments();
 
             fadeOut();
-
-            if (!isRestarting)
-                scheduleGameplayTextureCleanup();
 
             return base.OnExiting(e);
         }

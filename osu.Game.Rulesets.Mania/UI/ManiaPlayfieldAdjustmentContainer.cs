@@ -18,7 +18,7 @@ namespace osu.Game.Rulesets.Mania.UI
         protected override Container<Drawable> Content { get; }
 
         private readonly DrawSizePreservingFillContainer scalingContainer;
-        private BufferedContainer? perspectiveContainer;
+        private readonly BufferedContainer? perspectiveContainer;
 
         private readonly DrawableManiaRuleset drawableManiaRuleset;
         private Bindable<double> maniaPseudo3DRotation = null!;

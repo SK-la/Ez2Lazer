@@ -4,6 +4,7 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
@@ -11,6 +12,7 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
+using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Audio;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Judgements;
@@ -63,12 +65,9 @@ namespace osu.Game.Rulesets.Mania.UI
         public readonly Bindable<Color4> AccentColour = new Bindable<Color4>(Color4.Black);
 
         private IBindable<bool> touchOverlay = null!;
-        private KeySoundPreviewMode keySoundPreviewMode;
 
         private float leftColumnSpacing;
         private float rightColumnSpacing;
-
-        private bool isDisposed;
 
         public Column(int index, bool isSpecial)
         {
@@ -92,11 +91,23 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private EzLocalTextureFactory ezFactory { get; set; } = null!;
+
+        [Cached(Type = typeof(IEzSkinInfo))]
+        private readonly EzSkinInfo ezSkinInfo = new EzSkinInfo();
+
+        public IEzSkinInfo EzSkinInfo => ezSkinInfo;
+
         public readonly IBindable<string> NoteSetBindable = new Bindable<string>();
         public readonly Bindable<Vector2> NoteSizeBindable = new Bindable<Vector2>();
         public Bindable<Colour4> EzColumnColourBindable = new Bindable<Colour4>();
         private Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
 
+        private KeySoundPreviewMode keySoundPreviewMode;
         public event Action? NoteSetChanged;
         public event Action? NoteSizeChanged;
         public event Action? NoteColourChanged;
@@ -135,20 +146,21 @@ namespace osu.Game.Rulesets.Mania.UI
             BackgroundContainer.Add(background);
             TopLevelContainer.Add(HitObjectArea.Explosions.CreateProxy());
 
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
+            configurePools(hitModeBindable.Value);
+
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
 
-            keySoundPreviewMode = EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-            hitModeBindable = EzConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
-            configurePools(hitModeBindable.Value);
+            keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
             NoteSetBindable.BindTo(EzSkinInfo.NoteSetName);
-            NoteSizeBindable.BindTo(EzFactory.GetNoteSize(stageDefinition.Columns, Index));
-            EzColumnColourBindable = EzConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
+            NoteSizeBindable.BindTo(ezFactory.GetNoteSize(stageDefinition.Columns, Index));
+            EzColumnColourBindable = ezConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
         }
 
         private void onNoteSetChanged(ValueChangedEvent<string> e)
         {
-            if (isDisposed || string.IsNullOrEmpty(e.NewValue))
+            if (string.IsNullOrEmpty(e.NewValue))
                 return;
 
             NoteSetChanged?.Invoke();
@@ -156,17 +168,11 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void onNoteColourChanged()
         {
-            if (isDisposed)
-                return;
-
             NoteColourChanged?.Invoke();
         }
 
         private void onNoteSizeChanged()
         {
-            if (isDisposed)
-                return;
-
             NoteSizeChanged?.Invoke();
         }
 
@@ -174,9 +180,6 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void onSourceChanged()
         {
-            if (isDisposed)
-                return;
-
             AccentColour.Value = skin.GetManiaSkinConfig<Color4>(LegacyManiaSkinConfigurationLookups.ColumnBackgroundColour, Index)?.Value ?? Color4.Black;
 
             leftColumnSpacing = skin.GetConfig<ManiaSkinConfigurationLookup, float>(
@@ -195,23 +198,26 @@ namespace osu.Game.Rulesets.Mania.UI
 
             NoteSetBindable.BindValueChanged(onNoteSetChanged);
             NoteSizeBindable.BindValueChanged(onNoteSizeBindableChanged);
-            EzConfig.OnNoteColourChanged += onNoteColourChanged;
+            ezConfig.OnNoteColourChanged += onNoteColourChanged;
             hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue));
         }
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposed)
-                return;
-
-            isDisposed = true;
-
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
-            skin.SourceChanged -= onSourceChanged;
-            NoteSetBindable.ValueChanged -= onNoteSetChanged;
-            NoteSizeBindable.ValueChanged -= onNoteSizeBindableChanged;
-            EzConfig.OnNoteColourChanged -= onNoteColourChanged;
+
+            base.Dispose(isDisposing);
+
+            if (skin.IsNotNull())
+                skin.SourceChanged -= onSourceChanged;
+
+            if (ezConfig.IsNotNull())
+            {
+                NoteSetBindable.ValueChanged -= onNoteSetChanged;
+                NoteSizeBindable.ValueChanged -= onNoteSizeBindableChanged;
+                ezConfig.OnNoteColourChanged -= onNoteColourChanged;
+            }
 
             // Unbind all bindable bindings to prevent memory leaks
             NoteSetBindable.UnbindBindings();
@@ -223,8 +229,6 @@ namespace osu.Game.Rulesets.Mania.UI
             NoteSetChanged = null;
             NoteSizeChanged = null;
             NoteColourChanged = null;
-
-            base.Dispose(isDisposing);
         }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)

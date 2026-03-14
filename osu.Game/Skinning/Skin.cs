@@ -166,11 +166,6 @@ namespace osu.Game.Skinning
             Samples = samples;
         }
 
-        public void RecycleTextures(bool disposeAtlas = false)
-        {
-            Textures?.ClearCache(disposeAtlas);
-        }
-
         protected virtual IResourceStore<TextureUpload> CreateTextureLoaderStore(IStorageResourceProvider resources, IResourceStore<byte[]> storage)
             => new MaxDimensionLimitedTextureLoaderStore(resources.CreateTextureLoaderStore(storage));
 
