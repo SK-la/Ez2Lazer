@@ -190,7 +190,8 @@ namespace osu.Game.Rulesets.Mania.UI
             for (int i = 0; i < definition.Columns; i++)
             {
                 bool isSpecial = definition.IsSpecialColumn(i);
-                // bool isSpecial = ezSkinConfig.IsSpecialColumn(definition.Columns, i);
+                // 必须使用全局静态，类型构造时无法获取自动注入
+                // bool isSpecial = GlobalConfigStore.EzConfig.IsSpecialColumnFast(definition.Columns, i);
 
                 var action = columnStartAction;
                 columnStartAction++;
@@ -225,7 +226,7 @@ namespace osu.Game.Rulesets.Mania.UI
             if (gameplayBackdropSource != null)
             {
                 updateBackdropCaptureSources();
-                gameplayBackdropSource.SourcesChanged += onBackdropSourcesChanged;
+                gameplayBackdropSource.SourcesChanged += updateBackdropCaptureSources;
             }
 
             skin.SourceChanged += onSkinChanged;
@@ -275,7 +276,7 @@ namespace osu.Game.Rulesets.Mania.UI
             NewResult -= OnNewResult;
 
             if (gameplayBackdropSource != null)
-                gameplayBackdropSource.SourcesChanged -= onBackdropSourcesChanged;
+                gameplayBackdropSource.SourcesChanged -= updateBackdropCaptureSources;
 
             base.Dispose(isDisposing);
 
@@ -318,11 +319,6 @@ namespace osu.Game.Rulesets.Mania.UI
             // Due to masking differences, it is not possible to get the width of the columns container automatically
             // While masking on effectively only the Y-axis, so we need to set the width of the bar line container manually
             barLineContainer.Width = columnFlow.Width;
-        }
-
-        private void onBackdropSourcesChanged()
-        {
-            updateBackdropCaptureSources();
         }
 
         private void updateBackdropCaptureSources()

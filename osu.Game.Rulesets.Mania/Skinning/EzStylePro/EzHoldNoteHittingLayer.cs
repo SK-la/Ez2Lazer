@@ -23,11 +23,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             AlphaEquation = BlendingEquation.Add,
         };
 
-        protected override bool BoolUpdateColor => false;
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
-        private TextureAnimation? animation;
-
         public readonly IBindable<double> HitPosition = new BindableDouble();
+
+        private TextureAnimation? animation;
 
         public EzHoldNoteHittingLayer()
         {
@@ -38,19 +37,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezProSkinInfo)
+        private void load(IEzSkinInfo ezSkinInfo)
         {
-            HitPosition.BindTo(ezProSkinInfo.HitPosition);
+            HitPosition.BindTo(ezSkinInfo.HitPosition);
+            HitPosition.BindValueChanged(_ => UpdateDrawable());
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            // HitPosition is bound in BackgroundDependencyLoader; ensure UpdateSize reacts to changes
-            HitPosition.BindValueChanged(_ => UpdateSize(), true);
+
+            Scheduler.AddOnce(UpdateDrawable);
 
             if (animation == null)
-                OnDrawableChanged();
+                UpdateTexture();
+
             IsHitting.BindValueChanged(hitting =>
             {
                 ClearTransforms();
@@ -73,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Alpha = 0;
         }
 
-        protected override void OnDrawableChanged()
+        protected override void UpdateTexture()
         {
             ClearInternal();
             string[] componentsToTry = { "longnoteflare", "noteflaregood", "noteflare" };
@@ -88,23 +89,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     {
                         animation.Loop = true;
                         AddInternal(animation);
-                        UpdateSize();
                         break;
                     }
 
                     animation.Dispose();
                 }
             }
-
-            if (animation == null || animation.FrameCount == 0)
-            {
-                UpdateColor();
-            }
         }
 
-        protected override void UpdateSize()
+        protected override void UpdateDrawable()
         {
-            base.UpdateSize();
             float v = -(float)HitPosition.Value - NoteSize.Value.Y / 2;
             Position = new Vector2(0, v);
         }

@@ -18,8 +18,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public abstract partial class EzNoteBase : CompositeDrawable
     {
-        protected virtual bool BoolUpdateColor => true;
-        protected virtual bool UseColorization => true;
+        protected virtual bool UseColorization => false;
         protected virtual bool ShowSeparators => false;
 
         protected Container? LineContainer { get; private set; }
@@ -37,12 +36,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        protected readonly IBindable<Colour4> ColumnColorBindable = new Bindable<Colour4>();
-        protected readonly IBindable<string> NoteSetName = new Bindable<string>();
+        protected readonly IBindable<string> NoteSetBindable = new Bindable<string>();
         protected readonly IBindable<bool> EnabledColor = new Bindable<bool>();
         protected readonly IBindable<Vector2> NoteSize = new Bindable<Vector2>();
+
         protected int KeyMode;
         protected int ColumnIndex;
+
+        private Colour4 lastNoteColor = Colour4.White;
+        private bool lastNoteColorCached;
 
         [BackgroundDependencyLoader]
         private void load(IEzSkinInfo ezSkinInfo)
@@ -50,7 +52,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             KeyMode = StageDefinition.Columns;
             ColumnIndex = Column.Index;
 
-            createSeparators();
+            if (ShowSeparators) createSeparators();
+
             MainContainer = new Container
             {
                 RelativeSizeAxes = Axes.Both,
@@ -58,7 +61,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Origin = Anchor.Centre,
             };
             AddInternal(MainContainer); //允许多个子元素
-            Scheduler.AddOnce(OnDrawableChanged);
+
+            NoteSetBindable.BindTo(ezSkinInfo.NoteSetName);
+            EnabledColor.BindTo(ezSkinInfo.ColorSettingsEnabled);
+            NoteSize.BindTo(Column.EzNoteSizeBindable);
+            NoteSize.BindValueChanged(_ => OnNoteSizeChanged());
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            // Use a per-column watcher to avoid creating an event handler delegate per-note.
+            ColumnWatcher.GetOrCreate(Column).Add(this);
+
+            Scheduler.AddOnce(OnNoteSetChanged);
         }
 
         private void createSeparators()
@@ -85,62 +101,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 FillMode = FillMode.Stretch,
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
-                Alpha = ShowSeparators ? 1f : 0f,
+                // Alpha = ShowSeparators ? 1f : 0f,
                 Children = [noteSeparatorsL, noteSeparatorsR]
             };
 
             AddInternal(LineContainer);
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            EnabledColor.BindTo(EzSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled));
-            NoteSetName.BindTo(Column.NoteSetBindable);
-            NoteSize.BindTo(Column.NoteSizeBindable);
-
-            // Use a per-column watcher to avoid creating an event handler delegate per-note.
-            ColumnWatcher.GetOrCreate(Column).Add(this);
-
-            UpdateSize();
-        }
-
-        private Colour4 lastNoteColor = Colour4.White;
-        private bool lastNoteColorCached;
-
-        private void OnNoteSetChanged()
-        {
-            if (string.IsNullOrEmpty(NoteSetName.Value))
-                return;
-
-            MainContainer?.Clear();
-            lastNoteColorCached = false;
-
-            Scheduler.AddOnce(OnDrawableChanged);
-        }
-
-        protected virtual void UpdateSize()
-        {
-            lastNoteColorCached = false;
-            UpdateColor();
-
-            // if (LineContainer?.Children != null)
-            // {
-            //     foreach (var child in LineContainer.Children)
-            //     {
-            //         if (child is EzNoteSideLine sideLine)
-            //             sideLine.UpdateTrackLineHeight();
-            //     }
-            // }
-        }
+        protected virtual void UpdateTexture() { }
+        protected virtual void UpdateDrawable() { }
 
         protected virtual void UpdateColor()
         {
             // TODO： 命中HMT面条时，考虑是否跳过面头着色，只更新面身。
             // 或者单独做一个着色拓展设置，比如“仅着色面身”“着色面头和面身”“不着色”等等。
             // 或者，不着色时，使用新的开关拓展，在Middle中进一步单独管理着色
-            if (MainContainer != null)
+            if (MainContainer != null && UseColorization)
             {
                 Colour4 targetColor = NoteColor;
 
@@ -151,26 +127,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     lastNoteColorCached = true;
                 }
             }
+        }
 
-            // if (LineContainer?.Children != null)
-            // {
-            //     foreach (var child in LineContainer.Children)
-            //     {
-            //         if (child is EzNoteSideLine sideLine)
-            //             sideLine.UpdateGlowEffect(NoteColor);
-            //     }
-            // }
+        private void OnNoteSetChanged()
+        {
+            if (string.IsNullOrEmpty(NoteSetBindable.Value))
+                return;
+
+            MainContainer?.Clear();
+            Scheduler.AddOnce(UpdateTexture);
+            OnNoteSizeChanged();
+        }
+
+        private void OnNoteSizeChanged()
+        {
+            Scheduler.AddOnce(UpdateDrawable);
+            OnColourChanged();
         }
 
         private void OnColourChanged()
         {
             lastNoteColorCached = false;
-            UpdateColor();
-        }
-
-        private void OnNoteSizeChanged()
-        {
-            UpdateSize();
+            Scheduler.AddOnce(UpdateColor);
         }
 
         protected virtual Colour4 NoteColor
@@ -180,7 +158,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (!EnabledColor.Value || !UseColorization)
                     return Colour4.White;
 
-                return Column.EzColumnColourBindable?.Value ?? Colour4.White;
+                return Column.EzNoteColourBindable?.Value ?? Colour4.White;
             }
         }
 
@@ -188,7 +166,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (EnabledColor.Value) return "white";
+                if (EnabledColor.Value || !UseColorization) return "white";
 
                 EzColumnType keyType = EzSkinConfig.GetColumnTypeFast(KeyMode, ColumnIndex);
 
@@ -204,8 +182,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
         }
 
-        protected virtual void OnDrawableChanged() { }
-
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
@@ -218,8 +194,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         // Forwarders used by ColumnWatcher when broadcasting per-column changes to instances.
         internal void ForwardOnNoteSetChanged() => OnNoteSetChanged();
-        internal void ForwardOnColourChanged() => OnColourChanged();
         internal void ForwardOnNoteSizeChanged() => OnNoteSizeChanged();
+        internal void ForwardOnColourChanged() => OnColourChanged();
 
         private class ColumnWatcher
         {
@@ -229,9 +205,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             public ColumnWatcher(Column column)
             {
                 this.column = column;
-                column.NoteSetChanged += onNoteSetChanged;
-                column.NoteColourChanged += onNoteColourChanged;
-                column.NoteSizeChanged += onNoteSizeChanged;
+                column.NoteSetChanged += watcherNoteSetChanged;
+                column.NoteColourChanged += watcherNoteColourChanged;
+                column.NoteSizeChanged += watcherNoteSizeChanged;
             }
 
             public void Add(EzNoteBase note)
@@ -245,7 +221,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 notes.RemoveAll(wr => !wr.TryGetTarget(out var target) || ReferenceEquals(target, note));
             }
 
-            private void onNoteSetChanged()
+            private void watcherNoteSetChanged()
             {
                 // iterate backwards and remove dead weak references in-place to avoid
                 // allocating a large temporary array when the column has many notes.
@@ -259,7 +235,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             }
 
-            private void onNoteColourChanged()
+            private void watcherNoteColourChanged()
             {
                 for (int i = notes.Count - 1; i >= 0; i--)
                 {
@@ -271,7 +247,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             }
 
-            private void onNoteSizeChanged()
+            private void watcherNoteSizeChanged()
             {
                 for (int i = notes.Count - 1; i >= 0; i--)
                 {
@@ -285,9 +261,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             public void Unsubscribe()
             {
-                column.NoteSetChanged -= onNoteSetChanged;
-                column.NoteColourChanged -= onNoteColourChanged;
-                column.NoteSizeChanged -= onNoteSizeChanged;
+                column.NoteSetChanged -= watcherNoteSetChanged;
+                column.NoteColourChanged -= watcherNoteColourChanged;
+                column.NoteSizeChanged -= watcherNoteSizeChanged;
             }
 
             public bool IsEmpty => notes.All(wr => !wr.TryGetTarget(out _));

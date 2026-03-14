@@ -5,7 +5,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
-using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
@@ -15,20 +14,18 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Skinning;
 using osuTK;
 
 namespace osu.Game.LAsEzExtensions
 {
-    [Cached]
     public partial class EzLocalTextureFactory : CompositeDrawable
     {
         // private const int max_stage_frames = 120;
         private const int max_frames_to_load = 240;
         private const double default_frame_length = 1000.0 / 60.0 * 4;
-        private const float default_stage_body_height = 247f;
+        private const float default_stage_body_height = 247f; // 不要删，Ez-Stage 的默认判定线高度
         private const float square_ratio_threshold = 0.75f;
 
         private static readonly object cleanup_lock = new object();
@@ -37,7 +34,7 @@ namespace osu.Game.LAsEzExtensions
 
         private readonly Dictionary<string, TextureLoaderStore> loaderStoreCache = new Dictionary<string, TextureLoaderStore>();
         private readonly Dictionary<NoteSizeCacheKey, Bindable<Vector2>> noteSizeBindables = new Dictionary<NoteSizeCacheKey, Bindable<Vector2>>();
-        private readonly Ez2ConfigManager ezSkinConfig;
+        private readonly Ez2ConfigManager ezConfig;
 
         private readonly LargeTextureStore stageTextureStore;
         private readonly TextureStore textureStore;
@@ -46,11 +43,13 @@ namespace osu.Game.LAsEzExtensions
         private readonly Bindable<string> stageName;
         private readonly Bindable<double> columnWidth;
         private readonly Bindable<double> specialFactor;
-        private readonly Bindable<double> hitPositonBindable;
         private readonly Bindable<double> noteHeightScaleToWidth;
-
-        // scheduling guard to batch multiple bindable changes into one refresh
-        private bool textureRefreshScheduled;
+        private readonly IBindable<bool> colorSettingsEnabled;
+        private readonly Bindable<Colour4> columnTypeA;
+        private readonly Bindable<Colour4> columnTypeB;
+        private readonly Bindable<Colour4> columnTypeS;
+        private readonly Bindable<Colour4> columnTypeE;
+        private readonly Bindable<Colour4> columnTypeP;
 
         private readonly struct CacheEntry : IEquatable<CacheEntry>
         {
@@ -96,11 +95,11 @@ namespace osu.Game.LAsEzExtensions
             public override int GetHashCode() => HashCode.Combine(KeyMode, ColumnIndex, NoSpecial);
         }
 
-        public EzLocalTextureFactory(Ez2ConfigManager ezSkinConfig,
+        public EzLocalTextureFactory(Ez2ConfigManager ezConfig,
                                      IRenderer renderer,
                                      Storage hostStorage)
         {
-            this.ezSkinConfig = ezSkinConfig;
+            this.ezConfig = ezConfig;
 
             const string base_path = "EzResources/";
 
@@ -120,40 +119,156 @@ namespace osu.Game.LAsEzExtensions
             stageTextureStore = new LargeTextureStore(renderer, limitedLoader);
             stageTextureStore.AddTextureSource(baseTextureLoaderStore);
 
-            noteSetName = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName).GetBoundCopy();
-            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName).GetBoundCopy();
-            columnWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth).GetBoundCopy();
-            specialFactor = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor).GetBoundCopy();
-            hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition).GetBoundCopy();
-            noteHeightScaleToWidth = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth).GetBoundCopy();
+            columnWidth = ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            specialFactor = ezConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            noteHeightScaleToWidth = ezConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
 
-            // Batch refresh: subscribe once and schedule a single refresh per frame when any relevant config changes.
-            void scheduleTextureRefresh()
+            noteSetName = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+            stageName = ezConfig.GetBindable<string>(Ez2Setting.StageName);
+
+            // 绑定颜色设置，用于通知颜色变化
+            colorSettingsEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            columnTypeA = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
+            columnTypeB = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
+            columnTypeS = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
+            columnTypeE = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
+            columnTypeP = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
+
+            initializeDrawableEvents();
+            initializeSizeEvents();
+            initializeColourEvents();
+        }
+
+        #region 事件发布
+
+        private void scheduleTextureRefresh()
+        {
+            // 使用 Scheduler.AddOnce 而不是 Schedule，确保即使时钟暂停也能执行
+            Scheduler.AddOnce(() =>
             {
-                if (textureRefreshScheduled) return;
+                ClearGlobalCache();
+                refreshCachedNoteSizes();
+            });
+        }
 
-                textureRefreshScheduled = true;
-                Schedule(() =>
-                {
-                    textureRefreshScheduled = false;
-                    // Clear caches and let consumers lazily reload textures on next access.
-                    ClearGlobalCache();
-                    refreshCachedNoteSizes();
-                });
-            }
+        public event Action? OnNoteSizeChanged;
+        public event Action? OnNoteColourChanged;
 
-            // Subscribe and reuse the same schedule lambda for different generic Bindable<T>
+        private void initializeDrawableEvents()
+        {
             noteSetName.BindValueChanged(_ => scheduleTextureRefresh(), true);
             stageName.BindValueChanged(_ => scheduleTextureRefresh(), true);
+        }
+
+        private void initializeSizeEvents()
+        {
             columnWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
             specialFactor.BindValueChanged(_ => scheduleTextureRefresh(), true);
-            hitPositonBindable.BindValueChanged(_ => scheduleTextureRefresh(), true);
             noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
+
+            columnWidth.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+            specialFactor.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+            noteHeightScaleToWidth.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+
+            var columnWidthStyleBindable = ezConfig.GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
+            var holdTailMaskHeightBindable = ezConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
+
+            columnWidthStyleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
+            holdTailMaskHeightBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
         }
+
+        private void initializeColourEvents()
+        {
+            var holdTailAlphaBindable = ezConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
+            var customColour = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            var colorABindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
+            var colorBBindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
+            var colorSBindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
+            var colorEBindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
+            var colorPBindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
+
+            holdTailAlphaBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            customColour.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorABindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorBBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorSBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorEBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorPBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+        }
+
+        #endregion
 
         #region 工具方法
 
+        public Texture? GetGlobalTexture(string component)
+        {
+            string cacheKey = $"{component}";
+
+            lock (cleanup_lock)
+            {
+                if (global_cache.TryGetValue(cacheKey, out var cachedEntry))
+                {
+                    if (cachedEntry.Textures != null && cachedEntry.Textures.Count > 0)
+                    {
+                        global_cache.TryUpdate(cacheKey, cachedEntry.UpdateAccess(), cachedEntry);
+                        return cachedEntry.Textures[0];
+                    }
+
+                    global_cache.TryRemove(cacheKey, out _);
+                }
+
+                string path = component;
+                var texture = textureStore.Get(path);
+
+                if (texture != null)
+                {
+                    texture.ScaleAdjust = 2f;
+                    var frames = new List<Texture> { texture };
+                    var newEntry = new CacheEntry(frames, true);
+                    global_cache.TryAdd(cacheKey, newEntry);
+                }
+
+                return texture;
+            }
+        }
+
         // public bool IsSquareNote(string component) => GetRatio(component) >= square_ratio_threshold;
+
+        /// <summary>
+        /// 获取单个纹理，带缓存支持。
+        /// </summary>
+        public Texture? GetTexture(string component)
+        {
+            string currentNoteSetName = noteSetName.Value;
+            string cacheKey = $"{currentNoteSetName}_single_{component}";
+
+            lock (cleanup_lock)
+            {
+                if (global_cache.TryGetValue(cacheKey, out var cachedEntry))
+                {
+                    if (cachedEntry.Textures != null && cachedEntry.Textures.Count > 0)
+                    {
+                        global_cache.TryUpdate(cacheKey, cachedEntry.UpdateAccess(), cachedEntry);
+                        return cachedEntry.Textures[0];
+                    }
+
+                    global_cache.TryRemove(cacheKey, out _);
+                }
+
+                string path = getComponentPath(currentNoteSetName, component);
+                var texture = textureStore.Get(path);
+
+                if (texture != null)
+                {
+                    texture.ScaleAdjust = 2f;
+                    var frames = new List<Texture> { texture };
+                    var newEntry = new CacheEntry(frames, true);
+                    global_cache.TryAdd(cacheKey, newEntry);
+                }
+
+                return texture;
+            }
+        }
 
         public float GetRatio()
         {
@@ -179,6 +294,12 @@ namespace osu.Game.LAsEzExtensions
                 {
                     source = new Bindable<Vector2>(calculateNoteSize(cacheKey));
                     noteSizeBindables[cacheKey] = source;
+
+                    // 绑定到刷新事件，当尺寸相关参数变化时自动更新
+                    OnNoteSizeChanged += () =>
+                    {
+                        source.Value = calculateNoteSize(cacheKey);
+                    };
                 }
 
                 return source;
@@ -187,7 +308,7 @@ namespace osu.Game.LAsEzExtensions
 
         private Vector2 calculateNoteSize(NoteSizeCacheKey cacheKey)
         {
-            bool isSpecialColumn = !cacheKey.NoSpecial && ezSkinConfig.IsSpecialColumnFast(cacheKey.KeyMode, cacheKey.ColumnIndex);
+            bool isSpecialColumn = !cacheKey.NoSpecial && ezConfig.IsSpecialColumnFast(cacheKey.KeyMode, cacheKey.ColumnIndex);
             float ratio = GetRatio();
             float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
             float y = (float)noteHeightScaleToWidth.Value * ratio * x;
@@ -212,11 +333,14 @@ namespace osu.Game.LAsEzExtensions
         {
             try
             {
-                if (global_cache.TryGetValue(path, out var cacheEntry) &&
-                    cacheEntry.Textures is not null && cacheEntry.Textures.Count > 0)
+                lock (cleanup_lock)
                 {
-                    var firstFrame = cacheEntry.Textures[0];
-                    return firstFrame.Height / (float)firstFrame.Width;
+                    if (global_cache.TryGetValue(path, out var cacheEntry) &&
+                        cacheEntry.Textures is not null && cacheEntry.Textures.Count > 0)
+                    {
+                        var firstFrame = cacheEntry.Textures[0];
+                        return firstFrame.Height / (float)firstFrame.Width;
+                    }
                 }
 
                 var sb = new StringBuilder(path.Length + 8);
@@ -253,7 +377,7 @@ namespace osu.Game.LAsEzExtensions
         /// <param name="component"></param>
         /// <param name="isFlare">是否为光效</param>
         /// <returns></returns>
-        public virtual TextureAnimation CreateAnimation(string component, bool? isFlare = null)
+        public TextureAnimation CreateAnimation(string component, bool? isFlare = null)
         {
             bool isHit = isFlare is true;
 
@@ -323,7 +447,7 @@ namespace osu.Game.LAsEzExtensions
 
         #region Stage Creation
 
-        public virtual Container CreateStage(string component)
+        public Container CreateStage(string component)
         {
             var container = new Container
             {
@@ -400,7 +524,7 @@ namespace osu.Game.LAsEzExtensions
             return frames;
         }
 
-        public virtual TextureAnimation CreateStageKeys(string component, string? keySuffix = null)
+        public TextureAnimation CreateStageKeys(string component, string? keySuffix = null)
         {
             var frames = getCachedStageKeysFrames(component, keySuffix);
             var animation = new TextureAnimation
@@ -508,12 +632,15 @@ namespace osu.Game.LAsEzExtensions
                 note_ratio_cache.Clear();
             }
 
-            int count2 = global_cache.Count;
-
-            if (count2 > 0)
+            lock (global_cache)
             {
-                Logger.Log($"[EzLocalTextureFactory] Clearing global_cache ({count2})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                global_cache.Clear();
+                int count2 = global_cache.Count;
+
+                if (count2 > 0)
+                {
+                    Logger.Log($"[EzLocalTextureFactory] Clearing global_cache ({count2})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    global_cache.Clear();
+                }
             }
         }
 
@@ -527,8 +654,13 @@ namespace osu.Game.LAsEzExtensions
                 stageName.UnbindAll();
                 columnWidth.UnbindAll();
                 specialFactor.UnbindAll();
-                hitPositonBindable.UnbindAll();
                 noteHeightScaleToWidth.UnbindAll();
+                colorSettingsEnabled.UnbindAll();
+                columnTypeA.UnbindAll();
+                columnTypeB.UnbindAll();
+                columnTypeS.UnbindAll();
+                columnTypeE.UnbindAll();
+                columnTypeP.UnbindAll();
 
                 // 只清理实例级别的缓存，全局缓存留给 ClearGlobalCache 处理
                 lock (loaderStoreCache)

@@ -9,6 +9,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzNote : EzNoteBase
     {
+        protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;
 
         [BackgroundDependencyLoader]
@@ -18,14 +19,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             FillMode = FillMode.Fill;
         }
 
-        protected override void OnDrawableChanged()
+        protected override void UpdateTexture()
         {
             var animation = Factory.CreateAnimation($"{ColorPrefix}note");
 
             if (animation is TextureAnimation textureAnimation && textureAnimation.FrameCount == 0)
             {
                 animation.Dispose();
-                UpdateColor();
                 return;
             }
 
@@ -34,14 +34,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 MainContainer.Clear();
                 MainContainer.Child = animation;
             }
-
-            UpdateSize();
-            UpdateColor();
         }
 
-        protected override void UpdateSize()
+        protected override void UpdateDrawable()
         {
-            base.UpdateSize();
             float v = NoteSize.Value.Y;
             Height = v;
         }

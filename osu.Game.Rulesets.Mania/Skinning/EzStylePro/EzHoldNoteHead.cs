@@ -10,6 +10,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteHead : EzNoteBase
     {
+        protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;
 
         [BackgroundDependencyLoader]
@@ -19,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             FillMode = FillMode.Fill;
         }
 
-        protected override void OnDrawableChanged()
+        protected override void UpdateTexture()
         {
             string newComponentName = $"{ColorPrefix}longnote/head";
 
@@ -61,12 +62,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             }
 
-            Schedule(UpdateSize);
+            Schedule(UpdateDrawable);
         }
 
-        protected override void UpdateSize()
+        protected override void UpdateDrawable()
         {
-            base.UpdateSize();
             float v = NoteSize.Value.Y;
             Height = v;
 

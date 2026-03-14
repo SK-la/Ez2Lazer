@@ -1,14 +1,13 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Layout;
 using osu.Game.LAsEzExtensions;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -16,23 +15,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzStageBottom : CompositeDrawable
     {
         private readonly IBindable<double> hitPositonBindable = new BindableDouble();
-        private readonly IBindable<double> columnWidth = new BindableDouble();
-        private readonly IBindable<double> specialFactor = new BindableDouble();
-        private readonly IBindable<string> stageName = new Bindable<string>();
+        private Bindable<string> stageName = null!;
 
-        private readonly LayoutValue layout = new LayoutValue(Invalidation.DrawSize);
-        private Container sprite = null!;
-        private int cs;
-
-        protected virtual bool OpenEffect => true;
-
-        public EzStageBottom()
-        {
-            AddLayout(layout);
-        }
-
-        [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
+        private readonly Container sprite;
+        private float totalWidth;
 
         [Resolved]
         private EzLocalTextureFactory factory { get; set; } = null!;
@@ -40,31 +26,31 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
+        public EzStageBottom()
         {
             RelativeSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            InternalChild =
-                sprite = new Container
-                {
-                    RelativeSizeAxes = Axes.None,
-                    FillMode = FillMode.Fill,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                };
+            InternalChild = sprite = new Container
+            {
+                RelativeSizeAxes = Axes.None,
+                FillMode = FillMode.Fill,
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+            };
+        }
 
-            cs = stageDefinition.Columns;
+        [BackgroundDependencyLoader]
+        private void load(IEzSkinInfo ezSkinInfo)
+        {
+            stageName = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+            stageName.BindValueChanged(_ => OnSkinChanged(), true);
 
             hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
-            columnWidth.BindTo(ezSkinInfo.ColumnWidth);
-            specialFactor.BindTo(ezSkinInfo.SpecialFactor);
-            stageName.BindTo(ezSkinInfo.StageName);
-            stageName.BindValueChanged(_ => OnSkinChanged(), true);
-            hitPositonBindable.BindValueChanged(_ => invalidateLayout(), true);
-            columnWidth.BindValueChanged(_ => invalidateLayout(), true);
+            hitPositonBindable.BindValueChanged(_ => updatePosition());
+
+            factory.OnNoteSizeChanged += updatePosition;
         }
 
         private void OnSkinChanged()
@@ -76,12 +62,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             // var judgeLine = new EzJudgementLine();
             // sprite.Add(judgeLine);
-            invalidateLayout();
+
+            updatePosition();
         }
 
-        private void updateSizes()
+        private void updatePosition()
         {
-            float actualPanelWidth = DrawWidth; //ezSkinConfig.GetTotalWidth(cs);
+            totalWidth = DrawWidth;
+            float actualPanelWidth = totalWidth;
             float scale = actualPanelWidth / 412.0f;
 
             sprite.Scale = new Vector2(scale);
@@ -97,17 +85,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             //     : 0;
         }
 
-        protected override void Update()
+        protected override void Dispose(bool isDisposing)
         {
-            base.Update();
+            base.Dispose(isDisposing);
 
-            if (!layout.IsValid)
-            {
-                updateSizes();
-                layout.Validate();
-            }
+            factory.OnNoteSizeChanged -= updatePosition;
         }
-
-        private void invalidateLayout() => layout.Invalidate();
     }
 }

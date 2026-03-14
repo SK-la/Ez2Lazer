@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -33,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(DrawableHitObject? drawableObject)
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             if (MainContainer != null)
             {
@@ -46,17 +47,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     },
                 };
             }
+
+            tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
+            tailMaskHeight.BindValueChanged(_ => UpdateDrawable(), true);
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
+        // protected override void LoadComplete()
+        // {
+        //     base.LoadComplete();
+        //
+        //     tailMaskHeight = Column.EzSkinInfo.HoldTailMaskHeight;
+        //     tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
+        // }
 
-            tailMaskHeight = Column.EzSkinInfo.HoldTailMaskHeight;
-            tailMaskHeight.BindValueChanged(_ => UpdateSize(), true);
-        }
-
-        protected override void OnDrawableChanged()
+        protected override void UpdateTexture()
         {
             topContainer?.Expire();
             bodyContainer?.Expire();
@@ -90,13 +94,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 MainContainer.Clear();
                 MainContainer.Children = [bodyContainer, topContainer];
             }
-
-            Schedule(UpdateSize);
         }
 
-        protected override void UpdateSize()
+        protected override void UpdateDrawable()
         {
-            base.UpdateSize();
             tailHeight = (float)tailMaskHeight.Value;
 
             if (topContainer != null)

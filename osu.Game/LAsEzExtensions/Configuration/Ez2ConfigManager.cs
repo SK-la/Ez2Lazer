@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Text;
+using JetBrains.Annotations;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics;
@@ -61,7 +62,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
         public Ez2ConfigManager(Storage storage)
             : base(storage)
         {
-            initializeEvents();
         }
 
         // Cache of bindables returned by GetBindable to avoid creating multiple instances
@@ -77,7 +77,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.GlobalHitPosition, false);
             SetDefault(Ez2Setting.GlobalTextureName, 4);
 
-            SetDefault(Ez2Setting.ColumnWidth, 60, 5, 400.0, 1.0);
+            SetDefault(Ez2Setting.ColumnWidth, 80, 5, 400.0, 1.0);
             SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
             SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
@@ -164,6 +164,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
             SetDefault(Ez2Setting.ManiaHoldTailAlpha, 1.0, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
+            SetDefault(Ez2Setting.ManiaLNGradientEnable, true);
         }
 
         #region 列类型管理
@@ -237,6 +238,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         #region 公共方法
 
+        [UsedImplicitly]
         public float GetTotalWidth(int keyMode)
         {
             // Hot path: read runtime compact data once and operate on locals only.
@@ -272,18 +274,22 @@ namespace osu.Game.LAsEzExtensions.Configuration
             return (float)total;
         }
 
+        [UsedImplicitly]
         public Colour4 GetColumnColor(int keyMode, int columnIndex)
         {
             EzColumnType colorType = GetColumnType(keyMode, columnIndex);
             return Get<Colour4>(getColorSetting(colorType));
         }
 
+        [UsedImplicitly]
         public Bindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
         {
             EzColumnType colorType = GetColumnType(keyMode, columnIndex);
-            return GetBindable<Colour4>(getColorSetting(colorType));
+            var colorSetting = getColorSetting(colorType);
+            return GetBindable<Colour4>(colorSetting).GetBoundCopy();
         }
 
+        [UsedImplicitly]
         public bool IsSpecialColumn(int keyMode, int columnIndex)
         {
             return GetColumnType(keyMode, columnIndex) == EzColumnType.S;
@@ -483,46 +489,6 @@ namespace osu.Game.LAsEzExtensions.Configuration
 
         #endregion
 
-        #region 事件发布
-
-        // public event Action? OnPositionChanged;
-        public event Action? OnNoteSizeChanged;
-        public event Action? OnNoteColourChanged;
-
-        private void initializeEvents()
-        {
-            var columnWidthBindable = GetBindable<double>(Ez2Setting.ColumnWidth);
-            var specialFactorBindable = GetBindable<double>(Ez2Setting.SpecialFactor);
-            var columnWidthStyleBindable = GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
-            var noteHeightScaleBindable = GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
-            var holdTailMaskHeightBindable = GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
-
-            columnWidthBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-            specialFactorBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-            columnWidthStyleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-            noteHeightScaleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-            holdTailMaskHeightBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-
-            var holdTailAlphaBindable = GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
-            var colorSettingsEnabledBindable = GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
-
-            var colorABindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
-            var colorBBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
-            var colorSBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
-            var colorEBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
-            var colorPBindable = GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
-
-            holdTailAlphaBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorSettingsEnabledBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorABindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorBBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorSBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorEBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorPBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-        }
-
-        #endregion
-
         public new Bindable<T> GetBindable<T>(Ez2Setting setting)
         {
             lock (bindableCacheLock)
@@ -599,6 +565,7 @@ namespace osu.Game.LAsEzExtensions.Configuration
         ManiaPseudo3DRotation,
         ManiaHoldTailAlpha,
         ManiaHoldTailMaskGradientHeight,
+        ManiaLNGradientEnable,
 
         // 着色系统
         ColorSettingsEnabled,

@@ -7,6 +7,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
@@ -17,6 +18,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzHoldNoteMiddle : EzNoteBase, IHoldNoteBody
     {
+        protected override bool UseColorization => true;
+        protected override bool ShowSeparators => true;
+
         private IBindable<bool> isHitting = null!;
         private IBindable<double> tailAlpha = null!;
         private IBindable<double> tailMaskHeight = null!;
@@ -42,24 +46,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(DrawableHitObject drawableObject)
+        private void load(DrawableHitObject drawableObject, IEzSkinInfo ezSkinInfo)
         {
+            tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
+            tailAlpha = ezSkinInfo.HoldTailAlpha;
+
             holdNote = (DrawableHoldNote)drawableObject;
+
             isHitting = holdNote.IsHolding;
+            isHitting.BindValueChanged(onIsHittingChanged, true);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            tailMaskHeight = Column.EzSkinInfo.HoldTailMaskHeight;
-            tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
-
-            isHitting.BindValueChanged(onIsHittingChanged, true);
-
-            // Column will notify notes about EzSkinInfo-driven size changes via NoteSizeChanged; avoid per-note BindValueChanged
-            // ensure initial size/state matches current config
-            UpdateSize();
+            UpdateDrawable();
             // 确保光效层被正确初始化
             if (lightContainer == null)
                 OnLightChanged();
@@ -119,7 +121,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             hittingLayer?.Recycle();
         }
 
-        protected override void OnDrawableChanged()
+        protected override void UpdateTexture()
         {
             // 清理之前的光效层和容器
             if (lightContainer != null)
@@ -191,15 +193,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             // 重新初始化光效层
             OnLightChanged();
-
             resetLayoutCache();
-            Schedule(UpdateSize);
+            // 立即刷新 + 下一帧刷新，确保 HoldNote 布局稳定
+            Schedule(UpdateDrawable);
         }
 
-        protected override void UpdateSize()
+        protected override void UpdateDrawable()
         {
-            base.UpdateSize();
             tailHeight = NoteSize.Value.Y * 0.5f;
+
+            // 当设置为负值时，隐藏 topContainer；非负值时显示
+            if (topContainer != null)
+                topContainer.Alpha = tailMaskHeight.Value >= 0 ? 1 : 0;
 
             if (topContainer?.Child is Container topInner)
             {
@@ -216,7 +221,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 bodyInnerContainer.Y = -tailHeight;
             }
 
-            // TODO: V3版应该增加一个顶部Dot标识，以免常规图无法分辨正确的面尾
+            // TODO: V3 版应该增加一个顶部 Dot 标识，以免常规图无法分辨正确的面尾
         }
 
         protected override void UpdateColor()
@@ -251,9 +256,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 float drawHeightMinusHalf = DrawHeight - tailHeight;
                 float middleHeight = Math.Max(drawHeightMinusHalf, tailHeight);
 
-                float targetBodyHeight = tailMaskHeight.Value > 0
+                // 当 maskHeight 为正值时，缩短中间部分并下移 top；为负值时，延长中间部分实现上移效果
+                float targetBodyHeight = tailMaskHeight.Value >= 0
                     ? middleHeight - (float)tailMaskHeight.Value + 1
-                    : middleHeight + 2;
+                    : middleHeight + MathF.Abs((float)tailMaskHeight.Value) + 2;
 
                 if (layoutChanged(lastBodyContainerHeight, targetBodyHeight))
                 {
@@ -276,8 +282,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             lastTopContainerY = float.NaN;
         }
 
-        private static bool layoutChanged(float oldValue, float newValue)
-            => float.IsNaN(oldValue) || MathF.Abs(oldValue - newValue) > 0.001f;
+        private static bool layoutChanged(float oldValue, float newValue) => float.IsNaN(oldValue) || MathF.Abs(oldValue - newValue) > 0.001f;
 
         protected override void Dispose(bool isDisposing)
         {

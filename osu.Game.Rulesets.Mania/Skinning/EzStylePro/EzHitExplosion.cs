@@ -23,8 +23,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             AlphaEquation = BlendingEquation.Add,
         };
 
-        protected override bool BoolUpdateColor => false;
-
         // public override bool RemoveWhenNotAlive => true;
 
         private TextureAnimation? primaryAnimation;
@@ -43,11 +41,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             Origin = Anchor.BottomCentre;
         }
 
-        protected override void OnDrawableChanged()
+        protected override void UpdateTexture()
         {
-            base.OnDrawableChanged();
-
-            // 清理旧动画
             MainContainer?.Clear();
 
             primaryAnimation = Factory.CreateAnimation("noteflare", true);
@@ -63,9 +58,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
         }
 
-        protected override void UpdateSize()
+        protected override void UpdateDrawable()
         {
-            base.UpdateSize();
             float moveY = NoteSize.Value.Y / 2;
             // baseYPosition = LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION - (float)hitPosition.Value - moveY;
             Position = new Vector2(0, -moveY);
@@ -85,8 +79,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 goodAnimation.GotoFrame(0);
                 // goodAnimation.Restart();
             }
-
-            Schedule(UpdateSize);
         }
     }
 }

@@ -200,6 +200,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         case ManiaSkinComponents.Note:
                             return new EzNote();
 
+                        case ManiaSkinComponents.HitTarget:
+                            return new EzHitTarget();
+
+                        case ManiaSkinComponents.HitExplosion:
+                            return new EzHitExplosion();
+                        // return HitExplosionPool.Rent();
+
                         case ManiaSkinComponents.HoldNoteHead:
                             return new EzHoldNoteHead();
 
@@ -207,15 +214,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                             return new EzHoldNoteMiddle();
 
                         case ManiaSkinComponents.HoldNoteTail:
-                            // return new EzHoldNoteTail();
-                            return Drawable.Empty();
-
-                        case ManiaSkinComponents.HitTarget:
-                            return new EzHitTarget();
-
-                        case ManiaSkinComponents.HitExplosion:
-                            return new EzHitExplosion();
-                        // return HitExplosionPool.Rent();
+                            return new EzHoldNoteTail();
+                        // return Drawable.Empty();
 
                         case ManiaSkinComponents.StageBackground:
                             return new EzStageBottom();

@@ -56,7 +56,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 }
             };
 
-            columnColour = column.EzColumnColourBindable;
+            columnColour = column.EzNoteColourBindable;
             columnColour.BindValueChanged(colour =>
                 {
                     var c = colour.NewValue;

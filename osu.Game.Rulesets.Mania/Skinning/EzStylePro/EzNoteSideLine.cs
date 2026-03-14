@@ -4,32 +4,31 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Rulesets.Mania.UI;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzNoteSideLine : CompositeDrawable
     {
-        private Drawable separator = null!;
         private readonly IBindable<double> noteTrackLineHeight = new BindableDouble();
 
-        [Resolved]
-        private TextureStore textures { get; set; } = null!;
+        private Drawable separator = null!;
 
-        [Resolved]
-        private Column column { get; set; } = null!;
+        private static Texture? sharedTexture;
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo _)
+        private void load(IEzSkinInfo ezSkinInfo, TextureStore textures)
         {
             AlwaysPresent = true;
-            var texture = textures.Get("EzResources/note/NoteSideLine.png");
+
+            // 使用共享纹理避免重复加载
+            sharedTexture ??= textures.Get("EzResources/note/NoteSideLine.png");
+
+            var texture = sharedTexture;
 
             InternalChild = new Container
             {
@@ -56,6 +55,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     }
                 }
             };
+
+            noteTrackLineHeight.BindTo(ezSkinInfo.NoteTrackLineHeight);
+            noteTrackLineHeight.BindValueChanged(UpdateTrackLineHeight, true);
         }
 
         public void UpdateTrackLineHeight(ValueChangedEvent<double> v)
@@ -63,20 +65,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             separator.Height = (float)v.NewValue;
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-            noteTrackLineHeight.BindTo(column.EzSkinInfo.NoteTrackLineHeight);
-            noteTrackLineHeight.BindValueChanged(UpdateTrackLineHeight, true);
-        }
-
-        public void UpdateGlowEffect(Colour4 color)
-        {
-            separator.Colour = new ColourInfo
-            {
-                TopLeft = color,
-                BottomRight = color.Lighten(1.05f),
-            };
-        }
+        // public void UpdateGlowEffect(Colour4 color)
+        // {
+        //     separator.Colour = new ColourInfo
+        //     {
+        //         TopLeft = color,
+        //         BottomRight = color.Lighten(1.05f),
+        //     };
+        // }
     }
 }

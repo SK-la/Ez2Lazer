@@ -6,26 +6,27 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     internal partial class EzHitTarget : EzNote
     {
-        protected override bool BoolUpdateColor => false;
         protected override bool UseColorization => false;
         protected override bool ShowSeparators => false;
 
-        protected override string ColorPrefix => "white";
-
-        private IBindable<double> hitTargetFloatFixed = null!;
-        private IBindable<double> hitTargetAlpha = null!;
+        private readonly IBindable<double> hitTargetFloatFixed = new Bindable<double>();
+        private readonly IBindable<double> hitTargetAlpha = new Bindable<double>();
 
         [Resolved]
         private IBeatmap beatmap { get; set; } = null!;
 
         [Resolved]
         private IGameplayClock gameplayClock { get; set; } = null!;
+
+        private double beatInterval;
+        private bool requiresUpdate;
 
         public EzHitTarget()
         {
@@ -35,26 +36,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
-        }
-
-        private double beatInterval;
-        private bool requiresUpdate = true;
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            hitTargetAlpha = Column.EzSkinInfo.HitTargetAlpha;
-            // use column-led notifications; set initial alpha
-            Alpha = (float)hitTargetAlpha.Value;
-
-            hitTargetFloatFixed = Column.EzSkinInfo.HitTargetFloatFixed;
 
             calculateBeatInterval();
+
+            hitTargetFloatFixed.BindTo(ezSkinInfo.HitTargetFloatFixed);
+            hitTargetFloatFixed.BindValueChanged(_ =>
+            {
+                updatePosition();
+            }, true);
+
+            hitTargetAlpha.BindTo(ezSkinInfo.HitTargetAlpha);
+            hitTargetAlpha.BindValueChanged(_ => Alpha = (float)hitTargetAlpha.Value, true);
+
             requiresUpdate = true;
         }
 

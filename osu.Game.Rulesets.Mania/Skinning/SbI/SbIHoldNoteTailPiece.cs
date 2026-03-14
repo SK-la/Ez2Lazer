@@ -4,16 +4,17 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     public partial class SbIHoldNoteTailPiece : SbINotePiece
     {
-        [Resolved]
-        private DrawableHitObject? drawableObject { get; set; }
-
         private IBindable<double> tailAlpha = null!;
+
+        // [Resolved]
+        // private DrawableHitObject? drawableObject { get; set; }
 
         // private SbIHoldNoteHittingLayer hittingLayer { get; set; }
 
@@ -25,42 +26,48 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load()
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             if (MainContainer != null)
             {
                 MainContainer.Rotation = 180;
             }
 
-            if (drawableObject != null)
-            {
-                drawableObject.HitObjectApplied += hitObjectApplied;
-            }
-        }
+            // if (drawableObject != null)
+            // {
+            //     drawableObject.HitObjectApplied += hitObjectApplied;
+            // }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
+            tailAlpha = ezSkinInfo.HoldTailAlpha;
             tailAlpha.BindValueChanged(alpha =>
             {
                 Alpha = (float)alpha.NewValue;
             }, true);
         }
 
-        private void hitObjectApplied(DrawableHitObject drawableHitObject)
-        {
-            // var holdNoteTail = (DrawableHoldNoteTail)drawableHitObject;
+        // protected override void LoadComplete()
+        // {
+        //     base.LoadComplete();
+        //
+        //     tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
+        //     tailAlpha.BindValueChanged(alpha =>
+        //     {
+        //         Alpha = (float)alpha.NewValue;
+        //     }, true);
+        // }
 
-            // hittingLayer.Recycle();
-            //
-            // hittingLayer.AccentColour.UnbindBindings();
-            // hittingLayer.AccentColour.BindTo(holdNoteTail.HoldNote.AccentColour);
-            //
-            // hittingLayer.IsHitting.UnbindBindings();
-            // ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHitting);
-        }
+        // private void hitObjectApplied(DrawableHitObject drawableHitObject)
+        // {
+        //     var holdNoteTail = (DrawableHoldNoteTail)drawableHitObject;
+        //
+        //     hittingLayer.Recycle();
+        //
+        //     hittingLayer.AccentColour.UnbindBindings();
+        //     hittingLayer.AccentColour.BindTo(holdNoteTail.HoldNote.AccentColour);
+        //
+        //     hittingLayer.IsHitting.UnbindBindings();
+        //     ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHitting);
+        // }
 
         // protected override void Update()
         // {
@@ -68,12 +75,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         //     Height = DrawWidth / DrawWidth;
         // }
 
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (drawableObject != null)
-                drawableObject.HitObjectApplied -= hitObjectApplied;
-        }
+        // protected override void Dispose(bool isDisposing)
+        // {
+        //     base.Dispose(isDisposing);
+        //
+        //     if (drawableObject != null)
+        //         drawableObject.HitObjectApplied -= hitObjectApplied;
+        // }
     }
 }

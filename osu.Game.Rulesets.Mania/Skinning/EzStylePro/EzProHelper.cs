@@ -7,6 +7,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public static class EzProHelper
     {
+        /// <summary>
+        /// Ez系列皮肤中的特殊尺寸白名单
+        /// </summary>
         public static readonly HashSet<string> FREE_SIZE_STAGES = new HashSet<string>
         {
             "AZURE_EXPRESSION",

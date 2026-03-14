@@ -23,9 +23,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private readonly IBindable<string> stageName = new Bindable<string>();
-        private readonly IBindable<double> hitPositonBindable = new BindableDouble();
-        private readonly Bindable<Vector2> noteSize = new Bindable<Vector2>();
+        private IBindable<string> stageNameBindable = null!;
+        private IBindable<double> hitPositonBindable = null!;
+        private Bindable<Vector2> noteSizeBindable = null!;
 
         private Container sprite = null!;
         private TextureAnimation? upSprite;
@@ -62,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
+        private void load(Column column, IEzSkinInfo ezSkinInfo)
         {
             sprite = new Container
             {
@@ -75,14 +75,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             keyMode = stageDefinition.Columns;
             columnIndex = column.Index;
 
-            stageName.BindTo(ezSkinInfo.StageName);
-            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
-            noteSize.BindTo(column.NoteSizeBindable);
+            stageNameBindable = ezSkinInfo.StageName;
+            hitPositonBindable = ezSkinInfo.HitPosition;
+            noteSizeBindable = column.EzNoteSizeBindable;
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
             beatInterval = 60000 / bpm * 64;
 
-            bool isFreeSize = EzProHelper.FREE_SIZE_STAGES.Contains(stageName.Value);
+            bool isFreeSize = EzProHelper.FREE_SIZE_STAGES.Contains(stageNameBindable.Value);
 
             if (isFreeSize)
             {
@@ -103,9 +103,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             base.LoadComplete();
 
-            stageName.BindValueChanged(_ => loadAnimation(), true);
+            stageNameBindable.BindValueChanged(_ => loadAnimation(), true);
             hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
-            noteSize.BindValueChanged(_ => OnConfigChanged());
+            noteSizeBindable.BindValueChanged(_ => OnConfigChanged());
         }
 
         protected virtual string KeySuffix
@@ -157,7 +157,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnConfigChanged()
         {
-            float actualPanelWidth = noteSize.Value.X;
+            float actualPanelWidth = noteSizeBindable.Value.X;
             float baseWidth = 410f / keyMode;
             float newScale = 2f * (actualPanelWidth / baseWidth);
             float newY = 768f - (float)hitPositonBindable.Value + 2f;
@@ -198,9 +198,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (isDisposing)
             {
-                stageName.UnbindBindings();
+                stageNameBindable.UnbindBindings();
                 hitPositonBindable.UnbindBindings();
-                noteSize.UnbindBindings();
+                noteSizeBindable.UnbindBindings();
             }
 
             base.Dispose(isDisposing);

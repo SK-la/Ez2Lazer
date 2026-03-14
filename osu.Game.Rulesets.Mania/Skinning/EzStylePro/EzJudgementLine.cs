@@ -15,7 +15,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzJudgementLine : CompositeDrawable
     {
         private readonly IBindable<double> hitPositonBindable = new BindableDouble();
-        private readonly IBindable<double> columnWidth = new BindableDouble();
         private readonly IBindable<string> noteSetName = new Bindable<string>();
 
         private Container sprite = null!;
@@ -47,14 +46,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             };
 
             noteSetName.BindTo(ezSkinInfo.NoteSetName);
-            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
-            columnWidth.BindTo(ezSkinInfo.ColumnWidth);
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
             noteSetName.BindValueChanged(_ => OnDrawableChanged(), true);
+
+            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
+            hitPositonBindable.BindValueChanged(_ => updateSizes(), true);
         }
 
         protected void OnDrawableChanged()
@@ -63,6 +58,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             container?.ClearFrames();
             container = factory.CreateAnimation("JudgementLine");
             sprite.Add(container);
+
+            Scheduler.AddOnce(updateSizes);
         }
 
         private void updateSizes()
@@ -80,7 +77,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 noteSetName.UnbindBindings();
                 hitPositonBindable.UnbindBindings();
-                columnWidth.UnbindBindings();
             }
 
             base.Dispose(isDisposing);

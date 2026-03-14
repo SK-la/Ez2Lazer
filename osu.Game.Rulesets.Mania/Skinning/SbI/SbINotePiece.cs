@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Objects.Drawables;
 using osuTK.Graphics;
@@ -18,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     {
         public IBindable<double> NoteAccentRatio = new Bindable<double>(1f);
         public Bindable<double> NoteHeight = new Bindable<double>(8);
-        public Bindable<double> CornerRadiusBindable = new Bindable<double>(0);
+        public Bindable<double> CornerRadiusBindable = new Bindable<double>();
 
         private readonly IBindable<Colour4> columnColour = new Bindable<Colour4>();
 
@@ -39,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         // }
 
         [BackgroundDependencyLoader(true)]
-        private void load(DrawableHitObject? drawableObject)
+        private void load(IEzSkinInfo ezSkinInfo)
         {
             CornerRadius = (float)CornerRadiusBindable.Value;
 
@@ -75,22 +76,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 };
             }
 
-            columnColour.BindTo(Column.EzColumnColourBindable);
+            columnColour.BindTo(Column.EzNoteColourBindable);
             columnColour.BindValueChanged(onAccentChanged, true);
+
+            NoteAccentRatio = ezSkinInfo.NoteHeightScaleToWidth;
+            UpdateDrawable();
         }
 
-        protected override void LoadComplete()
+        // protected override void LoadComplete()
+        // {
+        //     base.LoadComplete();
+        //
+        //     NoteAccentRatio = Column.EzSkinInfo.NoteHeightScaleToWidth;
+        //     UpdateSize();
+        // }
+
+        protected override void UpdateDrawable()
         {
-            base.LoadComplete();
-
-            NoteAccentRatio = Column.EzSkinInfo.NoteHeightScaleToWidth;
-            UpdateSize();
-        }
-
-        protected override void UpdateSize()
-        {
-            base.UpdateSize();
-
             float fixedA = NoteAccentRatio.Value > 5
                 ? (float)NoteAccentRatio.Value * 1.5f
                 : NoteAccentRatio.Value > 2

@@ -27,141 +27,108 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     /// </summary>
     public partial class EzColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private readonly IBindable<Colour4> columnColourLocal = new Bindable<Colour4>();
-        private readonly IBindable<double> hitPosition = new BindableDouble();
+        private Sprite hitOverlay = null!;
+        private Box? separator;
+        private static Texture? sharedTexture;
+
+        private Bindable<Colour4> colourBindable = null!;
+        private Bindable<double> hitPosition = null!;
         private Color4 brightColour;
         private Color4 dimColour;
 
-        private Sprite hitOverlay = null!;
-        private Box separator = null!;
-
-        private bool shouldDrawSeparator;
+        private bool hasSeparator;
 
         [Resolved]
-        protected Column Column { get; private set; } = null!;
+        private Column column { get; set; } = null!;
 
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
-        [Resolved]
-        private TextureStore textures { get; set; } = null!;
-
         public EzColumnBackground()
         {
-            Anchor = Anchor.BottomLeft;
-            Origin = Anchor.BottomLeft;
             RelativeSizeAxes = Axes.Both;
         }
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
+        private void load(Ez2ConfigManager ezConfig, TextureStore textures)
         {
-            var texture = textures.Get("EzResources/note/ColumnLight.png");
+            // 计算 drawSeparator 结果（基于不变的列数和列索引）
+            hasSeparator = stageDefinition.HasSeparator(column.Index);
+            sharedTexture ??= textures.Get("EzResources/note/ColumnLight.png");
 
             hitOverlay = new Sprite
             {
                 Name = "Hit Overlay",
                 RelativeSizeAxes = Axes.X,
-                Anchor = Anchor.BottomLeft,
-                Origin = Anchor.BottomLeft,
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
                 // Blending = BlendingParameters.Additive,
                 Alpha = 0,
-                Texture = texture,
+                Texture = sharedTexture,
             };
 
-            separator = new Box
-            {
-                Name = "Separator",
-                Anchor = Anchor.TopRight,
-                Origin = Anchor.TopCentre,
-                Width = 2,
-                Colour = Color4.White.Opacity(0.5f),
-                Alpha = 0,
-            };
-
-            // 计算 drawSeparator 结果（基于不变的列数和列索引）
-            shouldDrawSeparator = stageDefinition.HasSeparator(Column.Index);
-
-            applyAccent(Column.AccentColour.Value);
-
-            hitPosition.BindTo(ezSkinInfo.HitPosition);
-            hitPosition.BindValueChanged(_ => updateSeparator(), true);
+            hitPosition = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            hitPosition.BindValueChanged(_ => updateSeparator());
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            bool hasSeparator = false;
-
-            foreach (var child in Column.BackgroundContainer.Children)
+            if (hasSeparator)
             {
-                if (child is Box b && b.Name == "Separator")
+                separator = new Box
                 {
-                    hasSeparator = true;
-                    break;
-                }
+                    Name = "Separator",
+                    Anchor = Anchor.TopRight,
+                    Origin = Anchor.TopCentre,
+                    Width = 2,
+                    Colour = Color4.White.Opacity(0.5f),
+                    Alpha = 0,
+                };
+
+                column.BackgroundContainer.Add(separator);
             }
 
-            if (!hasSeparator)
-                Column.BackgroundContainer.Add(separator);
+            if (!column.BackgroundContainer.Children.Contains(hitOverlay))
+                column.BackgroundContainer.Add(hitOverlay);
 
-            if (!Column.BackgroundContainer.Children.Contains(hitOverlay))
-                Column.BackgroundContainer.Add(hitOverlay);
+            Scheduler.AddOnce(updateSeparator);
 
-            // Now bind to column colour (Column may not have been ready during load).
-            columnColourLocal.BindTo(Column.EzColumnColourBindable);
-            // apply current accent immediately and subscribe to future changes
-            columnColourLocal.BindValueChanged(e => applyAccent(e.NewValue), true);
+            colourBindable = column.EzNoteColourBindable.GetBoundCopy();
+            colourBindable.BindValueChanged(v =>
+            {
+                var baseColour = v.NewValue;
+                brightColour = baseColour.Opacity(0.6f);
+                dimColour = baseColour.Opacity(0);
+
+                hitOverlay.Colour = ColourInfo.GradientVertical(dimColour, brightColour);
+            }, true);
         }
 
         private void updateSeparator()
         {
             float h = DrawHeight - (float)hitPosition.Value;
-            hitOverlay.Y = -(float)hitPosition.Value;
             hitOverlay.Height = h;
-            separator.Height = h;
-            separator.Alpha = shouldDrawSeparator ? 0.25f : 0;
-        }
 
-        protected virtual Color4 NoteColor
-        {
-            get
+            if (separator != null)
             {
-                var c = Column.EzColumnColourBindable.Value;
-                return new Color4(c.R, c.G, c.B, c.A);
+                separator.Height = h;
+                separator.Alpha = hasSeparator ? 0.25f : 0;
             }
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
-            if (e.Action == Column.Action.Value)
-            {
-                var noteColour = NoteColor;
-                brightColour = noteColour.Opacity(0.9f);
-                dimColour = noteColour.Opacity(0);
-                hitOverlay.Colour = ColourInfo.GradientVertical(dimColour, brightColour);
+            if (e.Action == column.Action.Value)
                 hitOverlay.FadeTo(1, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
-            }
-
             return false;
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
-            if (e.Action == Column.Action.Value)
+            if (e.Action == column.Action.Value)
                 hitOverlay.FadeTo(0, 250, Easing.OutQuint);
-        }
-
-        private void applyAccent(Colour4 baseCol)
-        {
-            var baseColor4 = new Color4(baseCol.R, baseCol.G, baseCol.B, baseCol.A);
-            var newColour = baseColor4.Darken(3);
-            if (newColour.A != 0)
-                newColour = newColour.Opacity(0.8f);
-            hitOverlay.Colour = newColour;
-            brightColour = baseColor4.Opacity(0.6f);
-            dimColour = baseColor4.Opacity(0);
         }
     }
 }

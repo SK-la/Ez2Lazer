@@ -55,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly OrderedHitPolicy hitPolicy;
         public Container UnderlayElements => HitObjectArea.UnderlayElements;
 
-        public GameplaySampleTriggerSource SampleTriggerSource { get; private set; } = null!;
+        private GameplaySampleTriggerSource sampleTriggerSource = null!;
 
         /// <summary>
         /// Whether this is a special (ie. scratch) column.
@@ -89,32 +89,36 @@ namespace osu.Game.Rulesets.Mania.UI
         private ISkinSource skin { get; set; } = null!;
 
         [Resolved]
-        private StageDefinition stageDefinition { get; set; } = null!;
-
-        [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private EzLocalTextureFactory ezFactory { get; set; } = null!;
 
-        [Cached(Type = typeof(IEzSkinInfo))]
-        private readonly EzSkinInfo ezSkinInfo = new EzSkinInfo();
+        // 保留备用，以后有精力对比一下全局注入和列级缓存的差异
+        // [Cached(Type = typeof(IEzSkinInfo))]
+        // private readonly EzSkinInfo ezSkinInfo = new EzSkinInfo();
+        //
+        // public IEzSkinInfo EzSkinInfo => ezSkinInfo;
 
-        public IEzSkinInfo EzSkinInfo => ezSkinInfo;
-
-        public readonly IBindable<string> NoteSetBindable = new Bindable<string>();
-        public readonly Bindable<Vector2> NoteSizeBindable = new Bindable<Vector2>();
-        public Bindable<Colour4> EzColumnColourBindable = new Bindable<Colour4>();
-        private Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
+        public Bindable<Colour4> EzNoteColourBindable = new Bindable<Colour4>(Color4.White);
+        public Bindable<Vector2> EzNoteSizeBindable = null!;
+        public Bindable<string> EzNoteSetNameBindable = null!;
+        private Bindable<EzEnumHitMode> hitModeBindable = null!;
 
         private KeySoundPreviewMode keySoundPreviewMode;
-        public event Action? NoteSetChanged;
-        public event Action? NoteSizeChanged;
-        public event Action? NoteColourChanged;
+
+        // 存储对本地事件的引用，以便在 Dispose 中正确取消订阅
+        private Action onNoteSizeChangedHandler = null!;
+        private Action onNoteColourChangedHandler = null!;
 
         [BackgroundDependencyLoader]
-        private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig)
+        private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, StageDefinition stageDefinition)
         {
+            keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
+            EzNoteSizeBindable = ezFactory.GetNoteSize(stageDefinition.Columns, Index);
+            EzNoteColourBindable = ezConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
+            EzNoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+
             SkinnableDrawable keyArea;
 
             skin.SourceChanged += onSourceChanged;
@@ -123,7 +127,7 @@ namespace osu.Game.Rulesets.Mania.UI
             InternalChildren = new Drawable[]
             {
                 hitExplosionPool = new DrawablePool<PoolableHitExplosion>(5),
-                SampleTriggerSource = new GameplaySampleTriggerSource(HitObjectContainer),
+                sampleTriggerSource = new GameplaySampleTriggerSource(HitObjectContainer),
                 HitObjectArea,
                 keyArea = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
                 {
@@ -147,36 +151,11 @@ namespace osu.Game.Rulesets.Mania.UI
             TopLevelContainer.Add(HitObjectArea.Explosions.CreateProxy());
 
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
-            configurePools(hitModeBindable.Value);
+            hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue), true);
 
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
-
-            keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-            NoteSetBindable.BindTo(EzSkinInfo.NoteSetName);
-            NoteSizeBindable.BindTo(ezFactory.GetNoteSize(stageDefinition.Columns, Index));
-            EzColumnColourBindable = ezConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
         }
-
-        private void onNoteSetChanged(ValueChangedEvent<string> e)
-        {
-            if (string.IsNullOrEmpty(e.NewValue))
-                return;
-
-            NoteSetChanged?.Invoke();
-        }
-
-        private void onNoteColourChanged()
-        {
-            NoteColourChanged?.Invoke();
-        }
-
-        private void onNoteSizeChanged()
-        {
-            NoteSizeChanged?.Invoke();
-        }
-
-        private void onNoteSizeBindableChanged(ValueChangedEvent<Vector2> _) => onNoteSizeChanged();
 
         private void onSourceChanged()
         {
@@ -191,15 +170,25 @@ namespace osu.Game.Rulesets.Mania.UI
                                      ?.Value ?? Stage.COLUMN_SPACING;
         }
 
+        public event Action? NoteSetChanged;
+        public event Action? NoteSizeChanged;
+        public event Action? NoteColourChanged;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
             NewResult += OnNewResult;
 
-            NoteSetBindable.BindValueChanged(onNoteSetChanged);
-            NoteSizeBindable.BindValueChanged(onNoteSizeBindableChanged);
-            ezConfig.OnNoteColourChanged += onNoteColourChanged;
-            hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue));
+            // 绑定 EzLocalTextureFactory 的广播事件，实现实时刷新
+            onNoteSizeChangedHandler = () => NoteSizeChanged?.Invoke();
+            onNoteColourChangedHandler = () => NoteColourChanged?.Invoke();
+
+            ezFactory.OnNoteSizeChanged += onNoteSizeChangedHandler;
+            ezFactory.OnNoteColourChanged += onNoteColourChangedHandler;
+
+            EzNoteSetNameBindable.BindValueChanged(_ => NoteSetChanged?.Invoke());
+            EzNoteSizeBindable.BindValueChanged(_ => NoteSizeChanged?.Invoke());
+            EzNoteColourBindable.BindValueChanged(_ => NoteColourChanged?.Invoke());
         }
 
         protected override void Dispose(bool isDisposing)
@@ -212,20 +201,15 @@ namespace osu.Game.Rulesets.Mania.UI
             if (skin.IsNotNull())
                 skin.SourceChanged -= onSourceChanged;
 
-            if (ezConfig.IsNotNull())
-            {
-                NoteSetBindable.ValueChanged -= onNoteSetChanged;
-                NoteSizeBindable.ValueChanged -= onNoteSizeBindableChanged;
-                ezConfig.OnNoteColourChanged -= onNoteColourChanged;
-            }
-
-            // Unbind all bindable bindings to prevent memory leaks
-            NoteSetBindable.UnbindBindings();
-            NoteSizeBindable.UnbindBindings();
-            EzColumnColourBindable.UnbindBindings();
+            // 解绑所有绑定和事件
+            EzNoteSizeBindable.UnbindBindings();
+            EzNoteColourBindable.UnbindBindings();
             hitModeBindable.UnbindBindings();
 
-            // Clear events to prevent any remaining references
+            // 解除对 EzLocalTextureFactory 事件的订阅
+            ezFactory.OnNoteSizeChanged -= onNoteSizeChangedHandler;
+            ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
+
             NoteSetChanged = null;
             NoteSizeChanged = null;
             NoteColourChanged = null;
@@ -235,7 +219,7 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
             dependencies.CacheAs<IBindable<ManiaAction>>(Action);
-            dependencies.CacheAs(EzSkinInfo);
+            // dependencies.CacheAs(EzSkinInfo);
 
             return dependencies;
         }
@@ -270,7 +254,7 @@ namespace osu.Game.Rulesets.Mania.UI
             InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
 
             if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
-                SampleTriggerSource.Play();
+                sampleTriggerSource.Play();
             return true;
         }
 

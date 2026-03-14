@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Drawables;
 
@@ -14,17 +15,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     public partial class EzHoldNoteTail : EzNoteBase
     {
         private readonly EzHoldNoteHittingLayer hittingLayer = new EzHoldNoteHittingLayer();
+
         private TextureAnimation? animation;
         private Container container = null!;
 
-        private IBindable<bool> enabledColor = null!;
+        private readonly IBindable<bool> enabledColor = new Bindable<bool>();
         private IBindable<double> tailAlpha = null!;
+        private IBindable<double> tailMaskHeight = null!;
 
         [Resolved]
         private DrawableHitObject? drawableObject { get; set; }
 
         [BackgroundDependencyLoader(true)]
-        private void load(DrawableHitObject? drawableObject)
+        private void load(DrawableHitObject? drawableObject, IEzSkinInfo ezSkinInfo)
         {
             RelativeSizeAxes = Axes.Both;
             Alpha = 0f;
@@ -36,17 +39,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
+
+            enabledColor.BindTo(ezSkinInfo.ColorSettingsEnabled);
+            tailAlpha = ezSkinInfo.HoldTailAlpha;
+            tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
+
+            // 当设置为负值时显示 tail，非负值时隐藏
+            tailMaskHeight.BindValueChanged(maskHeight =>
+            {
+                Alpha = maskHeight.NewValue < 0 ? (float)tailAlpha.Value : 0f;
+            }, true);
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            enabledColor = Column.EzSkinInfo.ColorSettingsEnabled;
-            tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
-            // Column-level notifications will trigger UpdateSize/UpdateColor; set initial alpha now
-            Alpha = (float)tailAlpha.Value;
-        }
+        // protected override void LoadComplete()
+        // {
+        //     base.LoadComplete();
+        //
+        //     // 当设置为负值时显示 tail，非负值时隐藏
+        //     tailMaskHeight.BindValueChanged(maskHeight =>
+        //     {
+        //         Alpha = maskHeight.NewValue < 0 ? (float)tailAlpha.Value : 0f;
+        //     }, true);
+        // }
 
         protected override void Dispose(bool isDisposing)
         {
@@ -58,7 +72,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected virtual string ComponentSuffix => "longnote/tail";
         protected virtual string ComponentName => $"{ColorPrefix}{ComponentSuffix}";
 
-        protected override void OnDrawableChanged()
+        protected override void UpdateTexture()
         {
             ClearInternal();
             animation = Factory.CreateAnimation(ComponentName);
@@ -97,6 +111,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // hittingLayer.AccentColour.UnbindBindings();
             // hittingLayer.AccentColour.BindTo(holdNoteTail.HoldNote.AccentColour);
 
+            // 先解绑再绑定，避免重复绑定异常
+            ((IBindable<bool>)hittingLayer.IsHitting).UnbindBindings();
             ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHolding);
         }
     }

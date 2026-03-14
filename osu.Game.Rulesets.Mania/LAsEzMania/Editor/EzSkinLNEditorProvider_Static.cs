@@ -194,10 +194,6 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Editor
                 columnDependency = new Column(column, isSpecial: false);
                 columnDependency.Action.Value = action;
 
-                // Provide fallback preview values before column load completes.
-                columnDependency.NoteSizeBindable.Value = new Vector2(preview_column_width, preview_column_width);
-                columnDependency.EzColumnColourBindable.Value = Colour4.White;
-
                 InternalChildren = new Drawable[]
                 {
                     // Keep a hidden live column in hierarchy so custom skins depending on Column-initialised
@@ -213,6 +209,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Editor
                         RelativeSizeAxes = Axes.Both,
                     }
                 };
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                columnDependency.EzNoteSizeBindable.Value = new Vector2(preview_column_width, preview_column_width);
+                columnDependency.EzNoteColourBindable.Value = Colour4.White;
             }
 
             protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
