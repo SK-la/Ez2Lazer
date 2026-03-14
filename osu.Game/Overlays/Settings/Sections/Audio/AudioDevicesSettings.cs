@@ -124,11 +124,9 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             audio.OnNewDevice += onDeviceChanged;
             audio.OnLostDevice += onDeviceChanged;
             dropdown.Current = audio.AudioDevice;
-
-            onDeviceChanged(string.Empty);
         }
 
-        private void onDeviceChanged(string _)
+        private void onDeviceChanged(string name)
         {
             updateItems();
 
@@ -140,7 +138,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                     wasapiExperimentalNote.Value = null;
             }
 
-            bool isAsio = _.Contains("(ASIO)");
+            bool isAsio = name.Contains("ASIO");
 
             if (sampleRateDropdown != null)
             {
