@@ -8,6 +8,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -111,7 +112,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
             }
             catch (Exception ex)
             {
-                Logger.Log($"[ManiaModKrrN2Nc] Failed to update stages: {ex.Message}");
+                Logger.Log($"[ManiaModKrrN2Nc] Failed to update stages: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
             }
         }
     }

@@ -102,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                 // 处理自定义列重排
                 if (EnableCustomReorder.Value && !string.IsNullOrWhiteSpace(CustomReorderColumn.Value) && !customReorderApplied)
                 {
-                    Logger.Log($"[ManiaModCleanColumn] Calling applyCustomReorder with reorderRule: {CustomReorderColumn.Value}");
+                    Logger.Log($"[ManiaModCleanColumn] Calling applyCustomReorder with reorderRule: {CustomReorderColumn.Value}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     applyCustomReorder(maniaBeatmap, CustomReorderColumn.Value, keys1);
                     keys2 = (int)maniaBeatmap.Difficulty.CircleSize;
                     customReorderApplied = true;
@@ -193,7 +193,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
                 // 使用当前（转换后）hit objects作为输入，并按时间重建新谱面（类似 ManiaModNtoM 的做法）
                 var sourceHitObjects = beatmap.HitObjects.ToList();
-                Logger.Log($"[ManiaModCleanColumn] Using {sourceHitObjects.Count} source hit objects for reordering");
+                Logger.Log($"[ManiaModCleanColumn] Using {sourceHitObjects.Count} source hit objects for reordering", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 // 构建列映射、清空列表和长按列表
                 Dictionary<int, int> columnMapping = new Dictionary<int, int>();
@@ -222,7 +222,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                     {
                         int randomSourceCol = sourceColumns > 0 ? random.Next(0, sourceColumns) : 0;
                         columnMapping[targetPos] = randomSourceCol;
-                        Logger.Log($"[ManiaModCleanColumn] Column {targetPos} randomly mapped to source column {randomSourceCol}");
+                        Logger.Log($"[ManiaModCleanColumn] Column {targetPos} randomly mapped to source column {randomSourceCol}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     }
                     else if (char.IsDigit(c))
                     {
@@ -240,7 +240,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                         }
                         else if (sourceCol >= sourceColumns)
                         {
-                            Logger.Log($"[ManiaModCleanColumn] Digit mapping at pos {targetPos} ({desired}) out of range, clamping to last source column {sourceColumns - 1}");
+                            Logger.Log($"[ManiaModCleanColumn] Digit mapping at pos {targetPos} ({desired}) out of range, clamping to last source column {sourceColumns - 1}",
+                                Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                             sourceCol = sourceColumns - 1;
                         }
 
@@ -270,9 +271,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                 }
 
                 for (int i = 0; i < sourceColumns; i++)
-                    Logger.Log($"[ManiaModCleanColumn] Original column {i} has {counts[i]} notes");
+                    Logger.Log($"[ManiaModCleanColumn] Original column {i} has {counts[i]} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-                Logger.Log($"[ManiaModCleanColumn] Column mapping: {string.Join(", ", columnMapping.Select(kv => $"{kv.Key}->{kv.Value}"))}");
+                Logger.Log($"[ManiaModCleanColumn] Column mapping: {string.Join(", ", columnMapping.Select(kv => $"{kv.Key}->{kv.Value}"))}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 // 按时间重建：先把所有源 note 转为时间序列 locations，然后根据反向映射把 note 放到目标列
                 var locations = sourceHitObjects.OfType<Note>().Select(n => (
@@ -338,7 +339,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                 // 添加贯穿长按列
                 foreach (int hc in holdColumns)
                 {
-                    Logger.Log($"[ManiaModCleanColumn] Column {hc} gets punishment hold note");
+                    Logger.Log($"[ManiaModCleanColumn] Column {hc} gets punishment hold note", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     newObjects.Add(new PunishmentHoldNote
                     {
                         Column = hc,
@@ -348,7 +349,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                     });
                 }
 
-                Logger.Log($"[ManiaModCleanColumn] Final result: {newObjects.Count} notes in {reorderRule.Length} columns");
+                Logger.Log($"[ManiaModCleanColumn] Final result: {newObjects.Count} notes in {reorderRule.Length} columns", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 // 记录每个目标列的来源与最终 note 数量，便于调试空列问题
                 for (int t = 0; t < reorderRule.Length; t++)
@@ -365,9 +366,9 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
 
                     int count = newObjects.Count(h => h.Column == t);
                     if (count == 0)
-                        Logger.Log($"[ManiaModCleanColumn] WARNING: target column {t} ({info}) has 0 notes after rebuild");
+                        Logger.Log($"[ManiaModCleanColumn] WARNING: target column {t} ({info}) has 0 notes after rebuild", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     else
-                        Logger.Log($"[ManiaModCleanColumn] target column {t} ({info}) has {count} notes");
+                        Logger.Log($"[ManiaModCleanColumn] target column {t} ({info}) has {count} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 }
 
                 // 更新谱面总列数以匹配重排后的列数，避免难度计算中基于 TotalColumns 分配数组时发生越界
@@ -376,11 +377,11 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
                     beatmap.Stages.Clear();
                     beatmap.Stages.Add(new StageDefinition(reorderRule.Length));
                     beatmap.Difficulty.CircleSize = reorderRule.Length;
-                    Logger.Log($"[ManiaModCleanColumn] Updated beatmap stages and Difficulty.CircleSize to {reorderRule.Length}");
+                    Logger.Log($"[ManiaModCleanColumn] Updated beatmap stages and Difficulty.CircleSize to {reorderRule.Length}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"[ManiaModCleanColumn] Failed to update stages: {ex.Message}");
+                    Logger.Log($"[ManiaModCleanColumn] Failed to update stages: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 }
 
                 beatmap.HitObjects = newObjects.OrderBy(h => h.StartTime).ToList();
@@ -397,18 +398,18 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods
         public static readonly LocalisableString CLEAN_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("整理Column, 排序、删除轨道中的note", "Clean Column, Sort, Delete notes in the column.");
         public static readonly LocalisableString DELETE_S_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除S列", "Delete S Column Type");
 
-        public static readonly LocalisableString DELETE_S_COLUMN_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("开启时删除标记了S Column Type的列", "Delete columns marked with S column type when enabled");
+        public static readonly LocalisableString DELETE_S_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了S Column Type的列",
+            "Delete columns marked with S column type when enabled");
 
         public static readonly LocalisableString DELETE_P_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除P列", "Delete P Column Type");
 
-        public static readonly LocalisableString DELETE_P_COLUMN_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("开启时删除标记了P Column Type的列", "Delete columns marked with P column type when enabled");
+        public static readonly LocalisableString DELETE_P_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了P Column Type的列",
+            "Delete columns marked with P column type when enabled");
 
         public static readonly LocalisableString DELETE_E_COLUMN_LABEL = new EzLocalizationManager.EzLocalisableString("删除E列", "Delete E Column Type");
 
-        public static readonly LocalisableString DELETE_E_COLUMN_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("开启时删除标记了E Column Type的列", "Delete columns marked with E column type when enabled");
+        public static readonly LocalisableString DELETE_E_COLUMN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("开启时删除标记了E Column Type的列",
+            "Delete columns marked with E column type when enabled");
 
         public static readonly LocalisableString ENABLE_CUSTOM_DELETE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义删除列", "Enable Custom Delete");
 

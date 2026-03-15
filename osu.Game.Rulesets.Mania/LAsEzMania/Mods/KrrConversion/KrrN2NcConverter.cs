@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using osu.Framework.Logging;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.LAsEzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.Objects;
@@ -14,17 +15,14 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion
 {
     public static class KrrN2NcConverter
     {
-        internal static (NoteMatrix matrix, List<int> timeAxis) BuildMatrix(ManiaBeatmap beatmap, List<ManiaHitObject> notes, int cols, bool expandHoldBody)
-            => buildMatrix(beatmap, notes, cols, expandHoldBody);
+        internal static (NoteMatrix matrix, List<int> timeAxis) BuildMatrix(ManiaBeatmap beatmap, List<ManiaHitObject> notes, int cols, bool expandHoldBody) =>
+            buildMatrix(beatmap, notes, cols, expandHoldBody);
 
-        internal static Span<double> GenerateBeatLengthAxis(Span<int> timeAxis, List<ManiaHitObject> maniaObjects, ManiaBeatmap beatmap)
-            => generateBeatLengthAxis(timeAxis, maniaObjects, beatmap);
+        internal static Span<double> GenerateBeatLengthAxis(Span<int> timeAxis, List<ManiaHitObject> maniaObjects, ManiaBeatmap beatmap) => generateBeatLengthAxis(timeAxis, maniaObjects, beatmap);
 
-        internal static Span<int> GenerateEndTimeIndex(List<ManiaHitObject> maniaObjects)
-            => generateEndTimeIndex(maniaObjects);
+        internal static Span<int> GenerateEndTimeIndex(List<ManiaHitObject> maniaObjects) => generateEndTimeIndex(maniaObjects);
 
-        internal static Span<int> GenerateOrgColIndex(NoteMatrix matrix)
-            => generateOrgColIndex(matrix);
+        internal static Span<int> GenerateOrgColIndex(NoteMatrix matrix) => generateOrgColIndex(matrix);
 
         internal static NoteMatrix DoKeys(NoteMatrix matrix,
                                           Span<int> endTimeIndexAxis,
@@ -36,8 +34,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion
                                           int maxKeys,
                                           int minKeys,
                                           double convertTime,
-                                          Random random)
-            => doKeys(matrix, endTimeIndexAxis, timeAxis, beatlengthAxis, orgColIndex, originalKeys, targetKeys, maxKeys, minKeys, convertTime, random);
+                                          Random random) => doKeys(matrix, endTimeIndexAxis, timeAxis, beatlengthAxis, orgColIndex, originalKeys, targetKeys, maxKeys, minKeys, convertTime, random);
 
         public static void Transform(ManiaBeatmap beatmap, KrrOptions? options)
         {
@@ -217,8 +214,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion
             return uniqueEndTimes.OrderBy(t => t).ToList();
         }
 
-        private static int toTimeKey(double time)
-            => (int)Math.Round(time);
+        private static int toTimeKey(double time) => (int)Math.Round(time);
 
         private static Span<double> generateBeatLengthAxis(Span<int> timeAxis, List<ManiaHitObject> maniaObjects, ManiaBeatmap beatmap)
         {
@@ -401,7 +397,7 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.KrrConversion
             }
             catch (Exception ex)
             {
-                Logger.Log($"[KrrN2NcConverter] Convert failed: {ex.Message}");
+                Logger.Log($"[KrrN2NcConverter] Convert failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 throw;
             }
         }

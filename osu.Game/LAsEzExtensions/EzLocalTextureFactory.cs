@@ -237,8 +237,7 @@ namespace osu.Game.LAsEzExtensions
             }
             catch (Exception ex)
             {
-                Logger.Log($"Error calculating ratio for {path}: {ex.Message}",
-                    LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log($"Error calculating ratio for {path}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 return 1.0f;
             }
         }
@@ -498,11 +497,11 @@ namespace osu.Game.LAsEzExtensions
         }
     }
 }
-    // public enum EzAnimationType
-    // {
-    //     Note,
-    //     Hit,
-    //     Stage,
-    //     Key,
-    //     Health,
-    // }
+// public enum EzAnimationType
+// {
+//     Note,
+//     Hit,
+//     Stage,
+//     Key,
+//     Health,
+// }

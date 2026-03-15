@@ -84,8 +84,8 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
         public static void LogAbnormalSr(BeatmapInfo? beatmap, double? star, double? xxySr, Guid beatmapId, ref Guid? loggedAbnormalId)
         {
-            if (!enabled)
-                return;
+            // if (!enabled)
+            //     return;
 
             if (beatmap == null || star == null)
                 return;

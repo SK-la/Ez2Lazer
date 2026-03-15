@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -74,15 +75,9 @@ namespace osu.Game.LAsEzExtensions.Analysis
 
             if (estimatedIntervals > log_estimated_threshold)
             {
-                try
-                {
-                    Logger.Log(
-                        $"[OptimizedBeatmapCalculator] large estimatedIntervals={estimatedIntervals} bpm={beatmap.BeatmapInfo.BPM} interval={interval} songEndTime={songEndTime} hitObjects={hitObjects.Count}");
-                }
-                catch
-                {
-                    // Ignore logging failures
-                }
+                Logger.Log(
+                    $"[OptimizedBeatmapCalculator] large estimatedIntervals={estimatedIntervals} bpm={beatmap.BeatmapInfo.BPM} interval={interval} songEndTime={songEndTime} hitObjects={hitObjects.Count}",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
 
             if (estimatedIntervals > max_estimated_intervals)

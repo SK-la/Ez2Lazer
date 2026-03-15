@@ -8,6 +8,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions.HUD
 {
@@ -38,7 +39,7 @@ namespace osu.Game.LAsEzExtensions.HUD
             loadGameThemes(storage);
 
             isLoaded = true;
-            Logger.Log("EzResourceManager: GameTheme resources loaded successfully", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log("EzResourceManager: GameTheme resources loaded successfully", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
 
         /// <summary>
@@ -61,13 +62,13 @@ namespace osu.Game.LAsEzExtensions.HUD
                 if (!Directory.Exists(dataFolderPath))
                 {
                     Directory.CreateDirectory(dataFolderPath);
-                    Logger.Log($"EzResourceManager: Created GameTheme directory: {dataFolderPath}", LoggingTarget.Runtime);
+                    Logger.Log($"EzResourceManager: Created GameTheme directory: {dataFolderPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 }
 
                 string[] directories = Directory.GetDirectories(dataFolderPath);
                 AvailableGameThemes.AddRange(directories.Select(Path.GetFileName).Where(name => !string.IsNullOrEmpty(name))!);
 
-                Logger.Log($"EzResourceManager: Found {AvailableGameThemes.Count} GameTheme sets in {dataFolderPath}", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"EzResourceManager: Found {AvailableGameThemes.Count} GameTheme sets in {dataFolderPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
             catch (Exception ex)
             {

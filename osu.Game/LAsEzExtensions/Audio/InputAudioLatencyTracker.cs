@@ -51,7 +51,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
         public void Initialize(ScoreProcessor processor)
         {
-            Logger.Log("InputAudioLatencyTracker.Initialize called", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log("InputAudioLatencyTracker.Initialize called", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             scoreProcessor = processor;
 
             // Start each gameplay session from a clean latency dataset.
@@ -87,7 +87,7 @@ namespace osu.Game.LAsEzExtensions.Audio
 
             started = true;
 
-            Logger.Log("InputAudioLatencyTracker.Start called", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log("InputAudioLatencyTracker.Start called", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
             if (scoreProcessor != null)
                 scoreProcessor.NewJudgement += OnNewJudgement;
@@ -151,7 +151,8 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
 
             // 输出统计日志
-            string message = $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
+            string message =
+                $"Input→Judgement: {stats.AvgInputToJudge:F2}ms, \nInput→Audio: {stats.AvgInputToPlayback:F2}ms, \nAudio→Judgement: {stats.AvgPlaybackToJudge:F2}ms \n(based on {stats.RecordCount} complete records)";
 
             Logger.Log($"[EzOsuLatency] Latency Analysis: {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 

@@ -543,8 +543,7 @@ LIMIT 1;
             }
         }
 
-        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps)
-            => GetBeatmapsNeedingRecompute(beatmaps, progress: null);
+        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps) => GetBeatmapsNeedingRecompute(beatmaps, progress: null);
 
         public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps, Action<int, int>? progress)
         {
@@ -663,8 +662,7 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             cmd.ExecuteNonQuery();
         }
 
-        private static bool canUpgradeInPlace(int storedVersion)
-            => storedVersion >= min_inplace_upgrade_version && storedVersion <= ANALYSIS_VERSION;
+        private static bool canUpgradeInPlace(int storedVersion) => storedVersion >= min_inplace_upgrade_version && storedVersion <= ANALYSIS_VERSION;
 
         private void tryClonePreviousDatabaseIfMissing()
         {
@@ -707,7 +705,8 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             try
             {
                 File.Copy(bestCandidate, dbPath);
-                Logger.Log($"[EzManiaAnalysisPersistentStore] Cloned DB from v{bestVersion} to v{ANALYSIS_VERSION}: {Path.GetFileName(bestCandidate)} -> {Path.GetFileName(dbPath)}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log($"[EzManiaAnalysisPersistentStore] Cloned DB from v{bestVersion} to v{ANALYSIS_VERSION}: {Path.GetFileName(bestCandidate)} -> {Path.GetFileName(dbPath)}",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             }
             catch (Exception e)
             {
@@ -923,7 +922,7 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
                 return;
 
             // 重建表，删除不识别的列
-            Logger.Log($"[EzManiaAnalysisPersistentStore] Found unrecognized columns: {string.Join(", ", unrecognizedColumns)}; rebuilding table.", Ez2ConfigManager.LOGGER_NAME);
+            Logger.Log($"[EzManiaAnalysisPersistentStore] Found unrecognized columns: {string.Join(", ", unrecognizedColumns)}; rebuilding table.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
 
             rebuildTableWithoutUnrecognizedColumns(connection, unrecognizedColumns);
         }

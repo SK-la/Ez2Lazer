@@ -258,7 +258,7 @@ namespace osu.Game.LAsEzExtensions.Screens
             //     targetList = availableGameThemes;
             else
             {
-                Logger.Log($"Unknown resource type: {type}", LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log($"Unknown resource type: {type}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return;
             }
 
@@ -266,7 +266,7 @@ namespace osu.Game.LAsEzExtensions.Screens
 
             if (!resource_paths.TryGetValue(type, out string? relativePath))
             {
-                Logger.Log($"Unknown resource type: {type}", LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log($"Unknown resource type: {type}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return;
             }
 
@@ -278,13 +278,13 @@ namespace osu.Game.LAsEzExtensions.Screens
                 if (!Directory.Exists(dataFolderPath))
                 {
                     Directory.CreateDirectory(dataFolderPath);
-                    Logger.Log($"EzSkinTab create {type} Path: {dataFolderPath}");
+                    Logger.Log($"EzSkinTab create {type} Path: {dataFolderPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 }
 
                 string[] directories = Directory.GetDirectories(dataFolderPath);
                 targetList.AddRange(directories.Select(Path.GetFileName).Where(name => !string.IsNullOrEmpty(name))!);
 
-                Logger.Log($"Found {targetList.Count} {type} sets in {dataFolderPath}", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"Found {targetList.Count} {type} sets in {dataFolderPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
             catch (Exception ex)
             {

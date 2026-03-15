@@ -16,6 +16,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Overlays.Settings;
 using osuTK.Graphics;
 
@@ -87,7 +88,7 @@ namespace osu.Game.LAsEzExtensions.HUD
             }
             catch (Exception ex)
             {
-                Logger.Log($"Failed to load GameTheme folders: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log($"Failed to load GameTheme folders: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
             }
 
             return themes;

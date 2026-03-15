@@ -5,6 +5,7 @@ using System;
 using osu.Framework;
 using osu.Framework.Audio;
 using osu.Framework.Logging;
+using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions.Audio
 {
@@ -20,7 +21,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             audioManager.OnAsioDeviceConfigurationChanged += (sampleRate, bufferSize) =>
             {
                 int intSampleRate = (int)sampleRate;
-                Logger.Log($"ASIO device initialized with sample rate {intSampleRate}Hz and buffer size {bufferSize}", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"ASIO device initialized with sample rate {intSampleRate}Hz and buffer size {bufferSize}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 onSampleRateChanged(intSampleRate);
                 onBufferSizeChanged(bufferSize);
             };

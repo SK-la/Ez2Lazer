@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Screens.Play;
 
 namespace osu.Game.LAsEzExtensions.Audio
@@ -34,14 +35,14 @@ namespace osu.Game.LAsEzExtensions.Audio
                     return;
             }
 
-            Logger.Log($"{log_prefix} {message}", LoggingTarget.Runtime);
+            Logger.Log($"{log_prefix} {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
 
         private void debug(string message)
         {
             if (!diagnosticsEnabled) return;
 
-            Logger.Log($"{log_prefix} [DEBUG] {message}", LoggingTarget.Runtime);
+            Logger.Log($"{log_prefix} [DEBUG] {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
 
         private bool startRequested;

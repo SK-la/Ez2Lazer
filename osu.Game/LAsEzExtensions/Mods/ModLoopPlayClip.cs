@@ -306,7 +306,7 @@ namespace osu.Game.LAsEzExtensions.Mods
         {
             if (pendingWorkingBeatmap == null)
             {
-                Logger.Log("[ModLoopPlayClip] ApplyToHUD: beatmap is null.", LoggingTarget.Runtime, LogLevel.Error);
+                Logger.Log("[ModLoopPlayClip] ApplyToHUD: beatmap is null.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return;
             }
 
@@ -395,7 +395,7 @@ namespace osu.Game.LAsEzExtensions.Mods
             // 获取谱面特定偏移
             double audioLeadIn = beatmap.Beatmap.AudioLeadIn;
             double beatmapOffset = beatmap.Beatmap.CountdownOffset;
-            Logger.Log($"[ModLoopPlayClip] AudioLeadIn = {audioLeadIn}, Beatmap CountdownOffset = {beatmapOffset}");
+            Logger.Log($"[ModLoopPlayClip] AudioLeadIn = {audioLeadIn}, Beatmap CountdownOffset = {beatmapOffset}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             return audioLeadIn + beatmapOffset;
         }
 
@@ -474,8 +474,8 @@ namespace osu.Game.LAsEzExtensions.Mods
 
         public static readonly LocalisableString CONSTANT_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("无SV变速", "Constant Speed");
 
-        public static readonly LocalisableString CONSTANT_SPEED_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("去除SV变速。（恒定速度/忽略谱面中的变速）", "Constant Speed. No more tricky speed changes.(恒定速度/忽略谱面中的变速)");
+        public static readonly LocalisableString CONSTANT_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("去除SV变速。（恒定速度/忽略谱面中的变速）",
+            "Constant Speed. No more tricky speed changes.(恒定速度/忽略谱面中的变速)");
 
         public static readonly LocalisableString CUT_START_TIME_LABEL = new EzLocalizationManager.EzLocalisableString("切片开始时间", "Cut Start Time");
         public static readonly LocalisableString CUT_START_TIME_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("切片开始时间, 默认是秒。推荐通过谱面编辑器A-B控件设置，可自动输入", "Cut StartTime. Default is second.");

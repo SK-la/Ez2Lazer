@@ -61,11 +61,11 @@ namespace osu.Game.LAsEzExtensions.Analysis
             {
                 if (t.Exception?.InnerException is ObjectDisposedException)
                 {
-                    Logger.Log("Finished mania analysis warmup aborted during shutdown");
+                    Logger.Log("Finished mania analysis warmup aborted during shutdown", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
                     return;
                 }
 
-                Logger.Log("Finished background mania analysis warmup!");
+                Logger.Log("Finished background mania analysis warmup!", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             });
         }
 
@@ -276,7 +276,7 @@ namespace osu.Game.LAsEzExtensions.Analysis
         {
             while (localUserPlayInfo?.PlayingState.Value != LocalUserPlayingState.NotPlaying || highPerformanceSessionManager?.IsSessionActive == true)
             {
-                Logger.Log("Mania analysis warmup sleeping due to active gameplay...");
+                Logger.Log("Mania analysis warmup sleeping due to active gameplay...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 Thread.Sleep(TimeToSleepDuringGameplay);
             }
         }

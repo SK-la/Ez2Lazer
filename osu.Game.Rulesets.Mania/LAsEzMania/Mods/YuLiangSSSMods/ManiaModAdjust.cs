@@ -14,6 +14,7 @@ using osu.Framework.Logging;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.LAsEzExtensions.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
@@ -411,7 +412,8 @@ namespace osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods
                 var groups = obj.HitObjects.GroupBy(c => c.Column).OrderBy(c => c.Key);
                 // int note = obj.HitObjects.Select(h => h.GetEndTime() != h.StartTime).Count();
                 // int note = obj.HitObjects.Count - note;
-                foreach (var column in groups) Logger.Log($"Column {column.Key + 1}: {column.Count()} notes", level: LogLevel.Important);
+                foreach (var column in groups)
+                    Logger.Log($"Column {column.Key + 1}: {column.Count()} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 //Logger.Log($"Test:\nThis beatmap has {obj.HitObjects.Count} HitObjects.\n", level: LogLevel.Important);
             }
 

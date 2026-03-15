@@ -19,6 +19,7 @@ using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
+using osu.Game.LAsEzExtensions.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Storyboards;
 
@@ -110,7 +111,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             currentTrack = CreateTrack(beatmap, out ownsCurrentTrack);
 
             if (currentTrack == null)
-                Logger.Log("EzPreviewTrackManager: currentTrack is null (falling back?)");
+                Logger.Log("EzPreviewTrackManager: currentTrack is null (falling back?)", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
             playback.ResetPlaybackProgress();
 
@@ -357,7 +358,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: startEnhancedPreview error: {ex}");
+                Logger.Log($"EzPreviewTrackManager: startEnhancedPreview error: {ex}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 clearEnhancedElements();
             }
         }
@@ -476,7 +477,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: Preload error {ex.Message}");
+                Logger.Log($"EzPreviewTrackManager: Preload error {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
         }
 
@@ -652,7 +653,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: triggerHitSound error: {ex}");
+                Logger.Log($"EzPreviewTrackManager: triggerHitSound error: {ex}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
         }
 
@@ -691,7 +692,7 @@ namespace osu.Game.LAsEzExtensions.Audio
             }
             catch (Exception ex)
             {
-                Logger.Log($"EzPreviewTrackManager: triggerStoryboardSample error: {ex}");
+                Logger.Log($"EzPreviewTrackManager: triggerStoryboardSample error: {ex}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
         }
 
