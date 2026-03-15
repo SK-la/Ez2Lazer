@@ -111,11 +111,20 @@ namespace osu.Game.Rulesets.Mania.UI
         private Action onNoteSizeChangedHandler = null!;
         private Action onNoteColourChangedHandler = null!;
 
+        // 缓存计算参数，避免闭包捕获
+        private int cachedKeyMode;
+        private bool? cachedNoSpecial;
+
         [BackgroundDependencyLoader]
         private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, StageDefinition stageDefinition)
         {
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-            EzNoteSizeBindable = ezFactory.GetNoteSize(stageDefinition.Columns, Index);
+
+            // 缓存计算参数，避免每次创建闭包
+            cachedKeyMode = stageDefinition.Columns;
+            cachedNoSpecial = null;
+
+            EzNoteSizeBindable = ezFactory.GetNoteSize(cachedKeyMode, Index, cachedNoSpecial);
             EzNoteColourBindable = ezConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
             EzNoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
 
@@ -179,8 +188,12 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
             NewResult += OnNewResult;
 
-            // 绑定 EzLocalTextureFactory 的广播事件，实现实时刷新
-            onNoteSizeChangedHandler = () => NoteSizeChanged?.Invoke();
+            // 使用缓存的参数创建 Action，避免闭包捕获和重复计算
+            onNoteSizeChangedHandler = () =>
+            {
+                EzNoteSizeBindable.Value = ezFactory.GetNoteSize(cachedKeyMode, Index, cachedNoSpecial).Value;
+            };
+
             onNoteColourChangedHandler = () => NoteColourChanged?.Invoke();
 
             ezFactory.OnNoteSizeChanged += onNoteSizeChangedHandler;
@@ -196,23 +209,18 @@ namespace osu.Game.Rulesets.Mania.UI
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
 
-            base.Dispose(isDisposing);
-
-            if (skin.IsNotNull())
-                skin.SourceChanged -= onSourceChanged;
-
-            // 解绑所有绑定和事件
-            EzNoteSizeBindable.UnbindBindings();
-            EzNoteColourBindable.UnbindBindings();
-            hitModeBindable.UnbindBindings();
-
             // 解除对 EzLocalTextureFactory 事件的订阅
-            ezFactory.OnNoteSizeChanged -= onNoteSizeChangedHandler;
             ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
+            ezFactory.OnNoteSizeChanged -= onNoteSizeChangedHandler;
 
             NoteSetChanged = null;
             NoteSizeChanged = null;
             NoteColourChanged = null;
+
+            base.Dispose(isDisposing);
+
+            if (skin.IsNotNull())
+                skin.SourceChanged -= onSourceChanged;
         }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)

@@ -135,8 +135,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 return;
 
             MainContainer?.Clear();
+            // 纹理切换后会通过 EzLocalTextureFactory.scheduleTextureRefresh() 自动触发 OnNoteSizeChanged
+            // 这里只需要更新纹理即可
             Scheduler.AddOnce(UpdateTexture);
-            OnNoteSizeChanged();
+            Scheduler.AddOnce(UpdateDrawable);
         }
 
         private void OnNoteSizeChanged()

@@ -194,6 +194,7 @@ namespace osu.Game.Rulesets.Mania.UI
                     BarLines.ForEach(Playfield.Add);
                 }
             }, true);
+
             // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
             Schedule(() =>
             {

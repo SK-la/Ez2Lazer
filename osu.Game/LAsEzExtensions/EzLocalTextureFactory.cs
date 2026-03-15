@@ -28,14 +28,10 @@ namespace osu.Game.LAsEzExtensions
         private const float default_stage_body_height = 247f; // 不要删，Ez-Stage 的默认判定线高度
         private const float square_ratio_threshold = 0.75f;
 
-        private static readonly object cleanup_lock = new object();
-        private static readonly ConcurrentDictionary<string, CacheEntry> global_cache = new ConcurrentDictionary<string, CacheEntry>();
+        private readonly Dictionary<string, TextureLoaderStore> loaderStoreCache = new Dictionary<string, TextureLoaderStore>();
         private static readonly ConcurrentDictionary<string, float> note_ratio_cache = new ConcurrentDictionary<string, float>();
 
-        private readonly Dictionary<string, TextureLoaderStore> loaderStoreCache = new Dictionary<string, TextureLoaderStore>();
-        private readonly Dictionary<NoteSizeCacheKey, Bindable<Vector2>> noteSizeBindables = new Dictionary<NoteSizeCacheKey, Bindable<Vector2>>();
         private readonly Ez2ConfigManager ezConfig;
-
         private readonly LargeTextureStore stageTextureStore;
         private readonly TextureStore textureStore;
 
@@ -50,30 +46,6 @@ namespace osu.Game.LAsEzExtensions
         private readonly Bindable<Colour4> columnTypeS;
         private readonly Bindable<Colour4> columnTypeE;
         private readonly Bindable<Colour4> columnTypeP;
-
-        private readonly struct CacheEntry : IEquatable<CacheEntry>
-        {
-            public readonly List<Texture>? Textures;
-            public readonly bool HasComponent;
-            public readonly DateTime LastAccess;
-
-            public CacheEntry(List<Texture>? textures, bool hasComponent)
-            {
-                Textures = textures;
-                HasComponent = hasComponent;
-                LastAccess = DateTime.UtcNow;
-            }
-
-            public CacheEntry UpdateAccess() => new CacheEntry(Textures, HasComponent);
-
-            public bool Equals(CacheEntry other) => ReferenceEquals(Textures, other.Textures) &&
-                                                    HasComponent == other.HasComponent &&
-                                                    LastAccess.Equals(other.LastAccess);
-
-            public override bool Equals(object? obj) => obj is CacheEntry other && Equals(other);
-
-            public override int GetHashCode() => HashCode.Combine(Textures, HasComponent, LastAccess);
-        }
 
         private readonly struct NoteSizeCacheKey : IEquatable<NoteSizeCacheKey>
         {
@@ -146,8 +118,9 @@ namespace osu.Game.LAsEzExtensions
             // 使用 Scheduler.AddOnce 而不是 Schedule，确保即使时钟暂停也能执行
             Scheduler.AddOnce(() =>
             {
-                ClearGlobalCache();
-                refreshCachedNoteSizes();
+                // 强制重新计算比例并刷新尺寸
+                GetRatio(forceRecalculate: true);
+                OnNoteSizeChanged?.Invoke();
             });
         }
 
@@ -200,110 +173,41 @@ namespace osu.Game.LAsEzExtensions
 
         #region 工具方法
 
-        public Texture? GetGlobalTexture(string component)
-        {
-            string cacheKey = $"{component}";
-
-            lock (cleanup_lock)
-            {
-                if (global_cache.TryGetValue(cacheKey, out var cachedEntry))
-                {
-                    if (cachedEntry.Textures != null && cachedEntry.Textures.Count > 0)
-                    {
-                        global_cache.TryUpdate(cacheKey, cachedEntry.UpdateAccess(), cachedEntry);
-                        return cachedEntry.Textures[0];
-                    }
-
-                    global_cache.TryRemove(cacheKey, out _);
-                }
-
-                string path = component;
-                var texture = textureStore.Get(path);
-
-                if (texture != null)
-                {
-                    texture.ScaleAdjust = 2f;
-                    var frames = new List<Texture> { texture };
-                    var newEntry = new CacheEntry(frames, true);
-                    global_cache.TryAdd(cacheKey, newEntry);
-                }
-
-                return texture;
-            }
-        }
-
-        // public bool IsSquareNote(string component) => GetRatio(component) >= square_ratio_threshold;
-
         /// <summary>
-        /// 获取单个纹理，带缓存支持。
+        /// 获取单个纹理。
         /// </summary>
         public Texture? GetTexture(string component)
         {
             string currentNoteSetName = noteSetName.Value;
-            string cacheKey = $"{currentNoteSetName}_single_{component}";
+            string path = getComponentPath(currentNoteSetName, component);
 
-            lock (cleanup_lock)
-            {
-                if (global_cache.TryGetValue(cacheKey, out var cachedEntry))
-                {
-                    if (cachedEntry.Textures != null && cachedEntry.Textures.Count > 0)
-                    {
-                        global_cache.TryUpdate(cacheKey, cachedEntry.UpdateAccess(), cachedEntry);
-                        return cachedEntry.Textures[0];
-                    }
-
-                    global_cache.TryRemove(cacheKey, out _);
-                }
-
-                string path = getComponentPath(currentNoteSetName, component);
-                var texture = textureStore.Get(path);
-
-                if (texture != null)
-                {
-                    texture.ScaleAdjust = 2f;
-                    var frames = new List<Texture> { texture };
-                    var newEntry = new CacheEntry(frames, true);
-                    global_cache.TryAdd(cacheKey, newEntry);
-                }
-
-                return texture;
-            }
+            // 直接从 TextureStore 获取，不缓存
+            return textureStore.Get(path);
         }
 
-        public float GetRatio()
+        public float GetRatio(bool forceRecalculate = false)
         {
             string noteSet = noteSetName.Value;
 
-            float ratio = note_ratio_cache.GetOrAdd(noteSet, ns =>
+            // 如果强制重新计算或缓存中没有，则重新计算
+            if (forceRecalculate || !note_ratio_cache.TryGetValue(noteSet, out float ratio))
             {
-                string path = getComponentPath(ns, "whitenote"); // Use a representative component
+                string path = getComponentPath(noteSet, "whitenote");
                 float calculatedRatio = calculateRatio(path);
-                return calculatedRatio >= square_ratio_threshold ? 1.0f : calculatedRatio;
-            });
+                ratio = calculatedRatio >= square_ratio_threshold ? 1.0f : calculatedRatio;
+
+                // 更新缓存
+                note_ratio_cache.AddOrUpdate(noteSet, ratio, (_, _) => ratio);
+            }
 
             return ratio;
         }
 
         public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex, bool? noSpecial = null)
         {
+            // 当 Note/Column销毁时，Bindable会被 GC自动回收，避免内存泄漏
             var cacheKey = new NoteSizeCacheKey(keyMode, columnIndex, noSpecial == true);
-
-            lock (noteSizeBindables)
-            {
-                if (!noteSizeBindables.TryGetValue(cacheKey, out var source))
-                {
-                    source = new Bindable<Vector2>(calculateNoteSize(cacheKey));
-                    noteSizeBindables[cacheKey] = source;
-
-                    // 绑定到刷新事件，当尺寸相关参数变化时自动更新
-                    OnNoteSizeChanged += () =>
-                    {
-                        source.Value = calculateNoteSize(cacheKey);
-                    };
-                }
-
-                return source;
-            }
+            return new Bindable<Vector2>(calculateNoteSize(cacheKey));
         }
 
         private Vector2 calculateNoteSize(NoteSizeCacheKey cacheKey)
@@ -315,15 +219,6 @@ namespace osu.Game.LAsEzExtensions
             return new Vector2(x, y);
         }
 
-        private void refreshCachedNoteSizes()
-        {
-            lock (noteSizeBindables)
-            {
-                foreach (var pair in noteSizeBindables)
-                    pair.Value.Value = calculateNoteSize(pair.Key);
-            }
-        }
-
         private string getComponentPath(string noteName, string component)
         {
             return $"note/{noteName}/{component}";
@@ -333,16 +228,7 @@ namespace osu.Game.LAsEzExtensions
         {
             try
             {
-                lock (cleanup_lock)
-                {
-                    if (global_cache.TryGetValue(path, out var cacheEntry) &&
-                        cacheEntry.Textures is not null && cacheEntry.Textures.Count > 0)
-                    {
-                        var firstFrame = cacheEntry.Textures[0];
-                        return firstFrame.Height / (float)firstFrame.Width;
-                    }
-                }
-
+                // 直接加载纹理计算比例，不使用缓存
                 var sb = new StringBuilder(path.Length + 8);
                 Texture? texture = textureStore.Get(sb.Append(path).Append("/000.png").ToString()) ??
                                    textureStore.Get(sb.Clear().Append(path).Append("/001.png").ToString());
@@ -399,17 +285,11 @@ namespace osu.Game.LAsEzExtensions
             if (component == "JudgementLine")
                 FillMode = FillMode.Fill;
 
-            var frames = getCachedTextureFrames(component);
+            // 直接加载纹理帧，不缓存
+            var frames = loadNotesFrames(component, noteSetName.Value);
             animation.AddFrames(frames);
 
             return animation;
-        }
-
-        private List<Texture> getCachedTextureFrames(string component)
-        {
-            string currentNoteSetName = noteSetName.Value;
-            string cacheKey = $"{currentNoteSetName}_{component}";
-            return getOrAddCachedFrames(cacheKey, () => loadNotesFrames(component, currentNoteSetName));
         }
 
         private List<Texture> loadNotesFrames(string component, string noteSetName)
@@ -526,7 +406,8 @@ namespace osu.Game.LAsEzExtensions
 
         public TextureAnimation CreateStageKeys(string component, string? keySuffix = null)
         {
-            var frames = getCachedStageKeysFrames(component, keySuffix);
+            // 直接加载纹理帧，不缓存
+            var frames = loadStageKeysFrames(component, keySuffix);
             var animation = new TextureAnimation
             {
                 Anchor = Anchor.TopCentre,
@@ -538,13 +419,6 @@ namespace osu.Game.LAsEzExtensions
             animation.AddFrames(frames);
 
             return animation;
-        }
-
-        private List<Texture> getCachedStageKeysFrames(string component, string? keySuffix = null)
-        {
-            string currentStageName = stageName.Value;
-            string cacheKey = $"{currentStageName}_{component}_{keySuffix}";
-            return getOrAddCachedFrames(cacheKey, () => loadStageKeysFrames(component, keySuffix));
         }
 
         private List<Texture> loadStageKeysFrames(string component, string? keySuffix = null)
@@ -591,61 +465,6 @@ namespace osu.Game.LAsEzExtensions
 
         #endregion
 
-        #region 缓存管理
-
-        private List<Texture> getOrAddCachedFrames(string cacheKey, Func<List<Texture>> factory)
-        {
-            // 双重检查锁定以确保线程安全，获取或添加缓存纹理
-            lock (cleanup_lock)
-            {
-                if (global_cache.TryGetValue(cacheKey, out var cachedEntry))
-                {
-                    if (cachedEntry.Textures != null && cachedEntry.Textures.Count > 0)
-                    {
-                        global_cache.TryUpdate(cacheKey, cachedEntry.UpdateAccess(), cachedEntry);
-                        return cachedEntry.Textures;
-                    }
-
-                    global_cache.TryRemove(cacheKey, out _);
-                }
-
-                var frames = factory();
-
-                if (frames.Count > 0)
-                {
-                    var newEntry = new CacheEntry(frames, true);
-                    global_cache.TryAdd(cacheKey, newEntry);
-                }
-
-                return frames;
-            }
-        }
-
-        public static void ClearGlobalCache()
-        {
-            int count1 = note_ratio_cache.Count;
-
-            if (count1 > 0)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Clearing note_ratio_cache ({count1})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
-                note_ratio_cache.Clear();
-            }
-
-            lock (global_cache)
-            {
-                int count2 = global_cache.Count;
-
-                if (count2 > 0)
-                {
-                    Logger.Log($"[EzLocalTextureFactory] Clearing global_cache ({count2})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                    global_cache.Clear();
-                }
-            }
-        }
-
-        #endregion
-
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
@@ -662,7 +481,7 @@ namespace osu.Game.LAsEzExtensions
                 columnTypeE.UnbindAll();
                 columnTypeP.UnbindAll();
 
-                // 只清理实例级别的缓存，全局缓存留给 ClearGlobalCache 处理
+                // 清理纹理加载器
                 lock (loaderStoreCache)
                 {
                     foreach (var loader in loaderStoreCache.Values)
@@ -673,22 +492,12 @@ namespace osu.Game.LAsEzExtensions
                 {
                     loaderStoreCache.Clear();
                 }
-
-                ClearGlobalCache();
-
-                lock (noteSizeBindables)
-                {
-                    foreach (var bindable in noteSizeBindables.Values)
-                        bindable.UnbindAll();
-
-                    noteSizeBindables.Clear();
-                }
             }
 
             base.Dispose(isDisposing);
         }
     }
-
+}
     // public enum EzAnimationType
     // {
     //     Note,
@@ -697,4 +506,3 @@ namespace osu.Game.LAsEzExtensions
     //     Key,
     //     Health,
     // }
-}

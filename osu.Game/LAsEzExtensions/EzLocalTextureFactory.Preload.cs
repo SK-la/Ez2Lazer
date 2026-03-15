@@ -4,7 +4,6 @@
 using System;
 using System.Threading.Tasks;
 using osu.Framework.Logging;
-using osu.Game.LAsEzExtensions.Analysis;
 using osu.Game.LAsEzExtensions.Configuration;
 
 namespace osu.Game.LAsEzExtensions
@@ -17,6 +16,7 @@ namespace osu.Game.LAsEzExtensions
         {
             "whitenote", "bluenote", "greennote",
             "noteflare", "noteflaregood", "longnoteflare",
+            "longnote/body", "longnote/head", "longnote/tail"
         };
 
         private static volatile bool isPreloading;
@@ -40,7 +40,6 @@ namespace osu.Game.LAsEzExtensions
 
                 preloadCompleted = true;
                 Logger.Log($"[EzLocalTextureFactory] Preload completed for {preload_components.Length} components", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                Logger.Log($"[EzLocalTextureFactory] Cache stats after preload: {global_cache.Count} frame sets", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
             catch (Exception ex)
             {
@@ -56,16 +55,30 @@ namespace osu.Game.LAsEzExtensions
         {
             try
             {
-                string cacheKey = $"{noteSetName}_{component}";
+                // 构建纹理路径
+                string path = $"note/{noteSetName}/{component}";
 
-                if (global_cache.ContainsKey(cacheKey)) return;
-
-                var frames = loadNotesFrames(component, noteSetName);
-
-                if (frames.Count > 0)
+                // 预加载动画帧（000.png, 001.png, ...）
+                for (int i = 0; i < max_frames_to_load; i++)
                 {
-                    var newEntry = new CacheEntry(frames, true);
-                    global_cache.TryAdd(cacheKey, newEntry);
+                    string frameFile = $"{path}/{i:D3}.png";
+                    var texture = textureStore.Get(frameFile);
+
+                    if (texture == null)
+                        break; // 没有更多帧了
+
+                    // 触发纹理加载（不保存，只让 TextureStore 缓存）
+                    Logger.Log($"[EzLocalTextureFactory] Preloaded: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                }
+
+                // 额外预加载带颜色的变体（如果需要）
+                if (component.StartsWith("white", StringComparison.Ordinal))
+                {
+                    string blueComponent = component.Replace("white", "blue");
+                    string greenComponent = component.Replace("white", "green");
+
+                    preloadColorVariant(blueComponent, noteSetName);
+                    preloadColorVariant(greenComponent, noteSetName);
                 }
             }
             catch (Exception ex)
@@ -74,43 +87,28 @@ namespace osu.Game.LAsEzExtensions
             }
         }
 
-        // private async Task preloadStageTextures()
-        // {
-        //     try
-        //     {
-        //         string currentStageName = stageName.Value;
-        //         Logger.Log($"[EzLocalTextureFactory] Preloading stage textures for: {currentStageName}",
-        //             LoggingTarget.Runtime, LogLevel.Debug);
-        //
-        //         var stagePaths = new List<string>
-        //         {
-        //             $"Stage/{currentStageName}/Stage/fivekey/Body",
-        //             $"Stage/{currentStageName}/Stage/GrooveLight",
-        //             $"Stage/{currentStageName}/Stage/eightkey/keybase/KeyBase",
-        //             $"Stage/{currentStageName}/Stage/eightkey/keypress/KeyBase",
-        //             $"Stage/{currentStageName}/Stage/eightkey/keypress/KeyPress",
-        //         };
-        //
-        //         foreach (string path in stagePaths)
-        //         {
-        //             // For stage textures, skip preloading to avoid conflicts with runtime loading
-        //             // var texture = largeTextureStore.Get($"{path}.png");
-        //             // if (texture != null)
-        //             //     loadedCount++;
-        //
-        //             Logger.Log($"[EzLocalTextureFactory] Skipping preload for stage texture {path}",
-        //                 LoggingTarget.Runtime, LogLevel.Debug);
-        //
-        //             // Simulate loading delay if needed
-        //             // await Task.Delay(10).ConfigureAwait(false);
-        //         }
-        //     }
-        //     catch (Exception ex)
-        //     {
-        //         Logger.Log($"[EzLocalTextureFactory] Stage texture preload failed: {ex.Message}",
-        //             LoggingTarget.Runtime, LogLevel.Error);
-        //     }
-        // }
+        private void preloadColorVariant(string component, string noteSetName)
+        {
+            try
+            {
+                string path = $"note/{noteSetName}/{component}";
+
+                for (int i = 0; i < max_frames_to_load; i++)
+                {
+                    string frameFile = $"{path}/{i:D3}.png";
+                    var texture = textureStore.Get(frameFile);
+
+                    if (texture == null)
+                        break;
+
+                    Logger.Log($"[EzLocalTextureFactory] Preloaded color variant: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[EzLocalTextureFactory] Failed to preload color variant {component}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+            }
+        }
 
         private void resetPreloadState()
         {
