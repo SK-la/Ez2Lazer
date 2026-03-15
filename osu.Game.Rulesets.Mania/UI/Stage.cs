@@ -79,7 +79,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = null!;
 
-        private const bool show_blur_debug_outline = false;
+        private bool showBlur => GlobalConfigStore.EzConfig.Get<double>(Ez2Setting.ColumnBlur) > 0;
 
         private readonly Box dimBox;
         private readonly BackdropBlurDrawable stageBackdropBlur;
@@ -107,8 +107,8 @@ namespace osu.Game.Rulesets.Mania.UI
                     RelativeSizeAxes = Axes.Both,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    PassthroughByDrawOrder = false,
-                    StrictCaptureTargetsMode = false,
+                    PassthroughByDrawOrder = !showBlur,
+                    StrictCaptureTargetsMode = !showBlur,
                     // FrameBufferScale = new Vector2(0.2f),
                     CaptureFrameInterval = 3,
                     MaxCapturesPerSecond = 300,
