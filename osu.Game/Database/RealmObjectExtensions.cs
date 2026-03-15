@@ -8,6 +8,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using AutoMapper;
 using AutoMapper.Internal;
+using Microsoft.Extensions.Logging;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
@@ -17,6 +18,7 @@ using osu.Game.Rulesets;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
 using Realms;
+using LogLevel = osu.Framework.Logging.LogLevel;
 
 namespace osu.Game.Database
 {
@@ -97,7 +99,7 @@ namespace osu.Game.Database
                         m.Ignore();
                 });
             });
-        }).CreateMapper();
+        }, new LoggerFactory()).CreateMapper();
 
         private static readonly IMapper mapper = new MapperConfiguration(c =>
         {
@@ -127,7 +129,7 @@ namespace osu.Game.Database
                      }
                  }
              });
-        }).CreateMapper();
+        }, new LoggerFactory()).CreateMapper();
 
         /// <summary>
         /// A slightly optimised mapper that avoids double-fetches in cyclic reference.
@@ -150,7 +152,7 @@ namespace osu.Game.Database
              .MaxDepth(1)
              // This is not required as it will be populated in the `AfterMap` call from the `BeatmapInfo`'s parent.
              .ForMember(b => b.BeatmapSet, cc => cc.Ignore());
-        }).CreateMapper();
+        }, new LoggerFactory()).CreateMapper();
 
         private static void applyCommonConfiguration(IMapperConfigurationExpression c)
         {
