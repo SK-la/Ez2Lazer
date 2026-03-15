@@ -805,6 +805,10 @@ namespace osu.Game.Screens.Play
             {
                 LatencyTracker?.Dispose();
                 LatencyTracker = null;
+
+                // 清理 BackdropSource 的引用，防止阻止 Drawable 的 GC 回收
+                BackdropSource.SetBeatmapBackgroundSource(null);
+                BackdropSource.SetStoryboardSource(null);
             }
 
             base.Dispose(isDisposing);

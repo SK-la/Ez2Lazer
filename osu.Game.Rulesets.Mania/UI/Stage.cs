@@ -110,8 +110,8 @@ namespace osu.Game.Rulesets.Mania.UI
                     PassthroughByDrawOrder = false,
                     StrictCaptureTargetsMode = false,
                     // FrameBufferScale = new Vector2(0.2f),
-                    CaptureFrameInterval = 1,
-                    MaxCapturesPerSecond = 0,
+                    CaptureFrameInterval = 3,
+                    MaxCapturesPerSecond = 300,
                 },
 #if DEBUG
                 // 调试用的边框，显示模糊区域
