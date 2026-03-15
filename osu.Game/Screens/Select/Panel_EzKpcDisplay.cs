@@ -195,9 +195,13 @@ namespace osu.Game.Screens.Select
                     normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
                 }
 
-                // store a copy for immediate refresh on mode changes
-                lastKnownColumns = new int[kc];
-                lastKnownHolds = new int[kc];
+                // 复用已有数组，避免重复分配
+                if (lastKnownColumns == null || lastKnownColumns.Length < kc)
+                    lastKnownColumns = new int[kc];
+
+                if (lastKnownHolds == null || lastKnownHolds.Length < kc)
+                    lastKnownHolds = new int[kc];
+
                 Array.Copy(normalized, lastKnownColumns, kc);
                 Array.Copy(normalizedHold, lastKnownHolds, kc);
                 lastKnownCount = kc;
@@ -211,25 +215,28 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        /// <summary>
-        /// Array-backed overload to avoid Dictionary allocations on hot paths when callers already have normalized buffers.
-        /// </summary>
-        public void UpdateColumnCounts(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
-        {
-            // store a copy for immediate refresh on mode changes
-            lastKnownColumns = new int[columns];
-            lastKnownHolds = new int[columns];
-
-            for (int i = 0; i < columns; i++)
-            {
-                lastKnownColumns[i] = i < columnNoteCounts.Length ? columnNoteCounts[i] : 0;
-                lastKnownHolds[i] = (holdNoteCounts != null && i < holdNoteCounts.Length) ? holdNoteCounts[i] : 0;
-            }
-
-            lastKnownCount = columns;
-
-            updateDisplay(columnNoteCounts, holdNoteCounts, columns);
-        }
+        // /// <summary>
+        // /// Array-backed overload to avoid Dictionary allocations on hot paths when callers already have normalized buffers.
+        // /// </summary>
+        // public void UpdateColumnCounts(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        // {
+        //     // 复用已有数组，避免重复分配
+        //     if (lastKnownColumns == null || lastKnownColumns.Length < columns)
+        //         lastKnownColumns = new int[columns];
+        //
+        //     if (lastKnownHolds == null || lastKnownHolds.Length < columns)
+        //         lastKnownHolds = new int[columns];
+        //
+        //     for (int i = 0; i < columns; i++)
+        //     {
+        //         lastKnownColumns[i] = i < columnNoteCounts.Length ? columnNoteCounts[i] : 0;
+        //         lastKnownHolds[i] = (holdNoteCounts != null && i < holdNoteCounts.Length) ? holdNoteCounts[i] : 0;
+        //     }
+        //
+        //     lastKnownCount = columns;
+        //
+        //     updateDisplay(columnNoteCounts, holdNoteCounts, columns);
+        // }
 
         private void updateDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
         {
