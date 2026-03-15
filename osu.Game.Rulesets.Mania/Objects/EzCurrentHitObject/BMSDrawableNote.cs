@@ -41,8 +41,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
                     return;
 
-                // Dispatch transient poor result to processors without ending lifecycle.
-                DispatchNewResult(HitResult.Poor);
+                DispatchNewResult();
                 return;
             }
 
@@ -101,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
                     return;
 
-                DispatchNewResult(HitResult.Poor);
+                DispatchNewResult();
                 return;
             }
 
@@ -159,7 +158,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
                     return;
 
-                DispatchNewResult(HitResult.Poor);
+                DispatchNewResult();
                 return;
             }
 

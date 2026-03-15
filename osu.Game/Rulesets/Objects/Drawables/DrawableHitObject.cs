@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -162,14 +162,10 @@ namespace osu.Game.Rulesets.Objects.Drawables
         private DrawableRuleset drawableRuleset { get; set; }
 
         [Resolved(CanBeNull = true)]
-        private DrawableRulesetDependencies.AutoPlaySnapshot autoPlaySnapshot { get; set; }
-
-        private IBindable<double> offsetBindable;
-
-        [Resolved(CanBeNull = true)]
         private Ez2ConfigManager ezConfig { get; set; }
 
         private ScheduledDelegate autoplayDelegate;
+        private IBindable<double> offsetBindable;
 
         /// <summary>
         /// Whether the initialization logic in <see cref="Playfield" /> has applied.
@@ -340,34 +336,28 @@ namespace osu.Game.Rulesets.Objects.Drawables
             }
 
             // 自动触发音效
-            try
-            {
-                bool isAutoPlayPlus = autoPlaySnapshot?.IsAutoPlayPlus ?? (ezConfig != null && ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) == KeySoundPreviewMode.AutoPlayPlus);
+            bool isAutoPlayPlus = GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) == KeySoundPreviewMode.AutoPlayPlus;
 
-                if (isAutoPlayPlus)
+            if (isAutoPlayPlus)
+            {
+                autoplayDelegate?.Cancel();
+
+                double delay = HitObject.StartTime - Time.Current;
+                if (delay < 0) delay = 0;
+
+                autoplayDelegate = Scheduler.AddDelayed(() =>
                 {
-                    autoplayDelegate?.Cancel();
+                    if (Judged) return;
 
-                    double delay = HitObject.StartTime - Time.Current;
-                    if (delay < 0) delay = 0;
-
-                    autoplayDelegate = Scheduler.AddDelayed(() =>
+                    // Ensure samples are loaded before attempting to play them.
+                    if (!samplesLoaded)
                     {
-                        if (Judged) return;
+                        samplesLoaded = true;
+                        LoadSamples();
+                    }
 
-                        // Ensure samples are loaded before attempting to play them.
-                        if (!samplesLoaded)
-                        {
-                            samplesLoaded = true;
-                            LoadSamples();
-                        }
-
-                        PlaySamples();
-                    }, delay);
-                }
-            }
-            catch
-            {
+                    PlaySamples();
+                }, delay);
             }
         }
 
@@ -808,13 +798,12 @@ namespace osu.Game.Rulesets.Objects.Drawables
         }
 
         /// <summary>
-        /// 这个方法会触发 <see cref="OnNewResult"/> 事件，但不会将当前 <see cref="DrawableHitObject"/> 标记为已判定。
-        /// This is useful for rulesets which want to report intermediate results (e.g. "poor") that should be
-        /// counted by processors but should not terminate the object's lifecycle.
+        /// 分发新的判定结果，但不会将当前 <see cref="DrawableHitObject"/> 标记为已判定。
+        /// 适用于需要报告中间结果（如 "poor"）的规则集，这些结果应被计数器统计但不应终止物体的生命周期。
         /// </summary>
         /// <remarks>
-        /// This will populate timing information on the <see cref="Result"/> and invoke <see cref="OnNewResult"/>,
-        /// but will not call <see cref="UpdateState"/> or set the entry as judged.
+        /// 此方法会填充 <see cref="Result"/> 的时间信息并触发 <see cref="OnNewResult"/> 事件，
+        /// 但不会调用 <see cref="UpdateState"/> 或将该条目标记为已判定。
         /// </remarks>
         protected void DispatchNewResult()
         {
@@ -828,10 +817,10 @@ namespace osu.Game.Rulesets.Objects.Drawables
         }
 
         /// <summary>
-        /// Dispatch a transient judgement result without mutating the stored <see cref="Result"/>.
-        /// Useful for reporting intermediate results (eg. poor) while keeping the object's lifecycle unchanged.
+        /// 分发一个瞬时的判定结果，不修改存储的 <see cref="Result"/>。
+        /// 适用于报告中间结果（如 "poor"），同时保持物体的生命周期状态不变。
         /// </summary>
-        /// <param name="transientType">The temporary <see cref="HitResult"/> to report.</param>
+        /// <param name="transientType">要报告的临时 <see cref="HitResult"/>。</param>
         protected void DispatchNewResult(HitResult transientType)
         {
             var transient = CreateResult(HitObject.Judgement);

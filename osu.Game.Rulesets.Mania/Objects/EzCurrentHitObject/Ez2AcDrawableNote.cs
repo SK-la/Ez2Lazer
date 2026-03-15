@@ -42,7 +42,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             if ((timeOffset >= 0 && HoldNote.IsHolding.Value) || (timeOffset <= 20 && HoldNote.Tail.IsHit))
             {
-                return;
             }
             else if (timeOffset > 0)
             {
@@ -82,12 +81,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             if (timeOffset > -HitObject.HitWindows.WindowFor(HitResult.Miss) &&
                 timeOffset < -HitObject.HitWindows.WindowFor(HitResult.Poor))
             {
-                if (HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
-                {
-                    DispatchNewResult(HitResult.Poor);
-                }
+                if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
+                    return;
 
-                return;
+                DispatchNewResult(HitResult.Poor);
             }
 
             base.CheckForResult(userTriggered, timeOffset);
