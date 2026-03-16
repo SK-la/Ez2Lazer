@@ -12,6 +12,7 @@ using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Rulesets.UI;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -230,10 +231,21 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 for (int i = notes.Count - 1; i >= 0; i--)
                 {
                     var wr = notes[i];
-                    if (wr.TryGetTarget(out var target))
-                        target.ForwardOnNoteSetChanged();
-                    else
+
+                    if (!wr.TryGetTarget(out var target))
+                    {
                         notes.RemoveAt(i);
+                        continue;
+                    }
+
+                    // If the note is no longer part of a Playfield (e.g. returned to a pool), treat it as removed.
+                    if (target.FindClosestParent<Playfield>() == null)
+                    {
+                        notes.RemoveAt(i);
+                        continue;
+                    }
+
+                    target.ForwardOnNoteSetChanged();
                 }
             }
 
@@ -242,10 +254,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 for (int i = notes.Count - 1; i >= 0; i--)
                 {
                     var wr = notes[i];
-                    if (wr.TryGetTarget(out var target))
-                        target.ForwardOnColourChanged();
-                    else
+
+                    if (!wr.TryGetTarget(out var target))
+                    {
                         notes.RemoveAt(i);
+                        continue;
+                    }
+
+                    if (target.FindClosestParent<Playfield>() == null)
+                    {
+                        notes.RemoveAt(i);
+                        continue;
+                    }
+
+                    target.ForwardOnColourChanged();
                 }
             }
 
@@ -254,10 +276,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 for (int i = notes.Count - 1; i >= 0; i--)
                 {
                     var wr = notes[i];
-                    if (wr.TryGetTarget(out var target))
-                        target.ForwardOnNoteSizeChanged();
-                    else
+
+                    if (!wr.TryGetTarget(out var target))
+                    {
                         notes.RemoveAt(i);
+                        continue;
+                    }
+
+                    if (target.FindClosestParent<Playfield>() == null)
+                    {
+                        notes.RemoveAt(i);
+                        continue;
+                    }
+
+                    target.ForwardOnNoteSizeChanged();
                 }
             }
 
@@ -270,17 +302,33 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             public bool IsEmpty => notes.All(wr => !wr.TryGetTarget(out _));
 
-            private static readonly Dictionary<Column, ColumnWatcher> watchers = new Dictionary<Column, ColumnWatcher>();
+            private static readonly Dictionary<WeakReference<Column>, ColumnWatcher> watchers = new Dictionary<WeakReference<Column>, ColumnWatcher>();
             private static readonly object watcher_lock = new object();
 
             public static ColumnWatcher GetOrCreate(Column c)
             {
                 lock (watcher_lock)
                 {
-                    if (!watchers.TryGetValue(c, out var w))
+                    // Clean up dead references first
+                    cleanupDeadReferences();
+
+                    // Try to find existing watcher for this column
+                    ColumnWatcher? w = null;
+
+                    foreach (var kvp in watchers)
+                    {
+                        if (kvp.Key.TryGetTarget(out var target) && ReferenceEquals(target, c))
+                        {
+                            w = kvp.Value;
+                            break;
+                        }
+                    }
+
+                    if (w == null)
                     {
                         w = new ColumnWatcher(c);
-                        watchers[c] = w;
+                        var weakRef = new WeakReference<Column>(c);
+                        watchers[weakRef] = w;
                     }
 
                     return w;
@@ -291,7 +339,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 lock (watcher_lock)
                 {
-                    if (!watchers.TryGetValue(c, out var w))
+                    ColumnWatcher? w = null;
+                    WeakReference<Column>? keyToRemove = null;
+
+                    foreach (var kvp in watchers)
+                    {
+                        if (kvp.Key.TryGetTarget(out var target) && ReferenceEquals(target, c))
+                        {
+                            w = kvp.Value;
+                            keyToRemove = kvp.Key;
+                            break;
+                        }
+                    }
+
+                    if (w == null)
                         return;
 
                     w.Remove(note);
@@ -299,8 +360,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     if (w.IsEmpty)
                     {
                         w.Unsubscribe();
-                        watchers.Remove(c);
+                        if (keyToRemove != null)
+                            watchers.Remove(keyToRemove);
                     }
+                }
+            }
+
+            private static void cleanupDeadReferences()
+            {
+                // Remove entries where the Column has been garbage collected
+                var keysToRemove = watchers.Keys.Where(k => !k.TryGetTarget(out _)).ToList();
+
+                foreach (var key in keysToRemove)
+                {
+                    watchers.Remove(key);
                 }
             }
         }

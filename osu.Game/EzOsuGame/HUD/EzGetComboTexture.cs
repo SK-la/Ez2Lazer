@@ -21,6 +21,7 @@ namespace osu.Game.EzOsuGame.HUD
     {
         public Bindable<EzEnumGameThemeName> FontName { get; }
 
+        private IResourceStore<byte[]>? store;
         private readonly Func<char, string> getLookup;
         private GlyphStore? glyphStore;
         private TextureLoaderStore? textureLoader;
@@ -43,8 +44,8 @@ namespace osu.Game.EzOsuGame.HUD
             // TODO: 需要测试资源管理，以及退回方案
             Storage gameStorage = host.Storage;
 
-            var userResourceStore = new StorageBackedResourceStore(gameStorage);
-            textureLoader = new TextureLoaderStore(userResourceStore);
+            store = new StorageBackedResourceStore(gameStorage);
+            textureLoader = new TextureLoaderStore(store);
             localSkinStore = new TextureStore(renderer, textureLoader);
 
             FontName.BindValueChanged(e =>
@@ -68,13 +69,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (isDisposing)
             {
-                try
-                {
-                    FontName.UnbindAll();
-                }
-                catch
-                {
-                }
+                FontName.UnbindAll();
 
                 glyphStore?.ClearCache();
                 localSkinStore?.Dispose();

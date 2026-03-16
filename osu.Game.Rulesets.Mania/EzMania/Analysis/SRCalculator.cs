@@ -22,11 +22,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         public static double RescaleHighThreshold { get; set; } = 8.0;
         public static double LnIntegralMultiplier { get; set; } = 4.0;
 
-        /// <summary>
-        ///     Singleton entry point for SR calculations.
-        /// </summary>
-        public static SRCalculator Instance { get; } = new SRCalculator();
-
         #region 工具方法
 
         /// <summary>
@@ -148,7 +143,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
             if (cross == null || cross[0] == -1)
             {
-                Console.WriteLine($"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
+                Console.WriteLine($@"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
                 throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
             }
 

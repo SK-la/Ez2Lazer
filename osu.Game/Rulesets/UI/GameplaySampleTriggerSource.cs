@@ -36,7 +36,8 @@ namespace osu.Game.Rulesets.UI
         [Resolved]
         private IGameplayClock? gameplayClock { get; set; }
 
-        private KeySoundPreviewMode keySoundPreviewMode;
+        private bool isAutoPlay => GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode)
+                                   == KeySoundPreviewMode.AutoPlayPlus;
 
         private HitObject? lastAutoPlayedObject;
 
@@ -57,15 +58,6 @@ namespace osu.Game.Rulesets.UI
                     })
                 }
             };
-        }
-
-        [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager? ezConfig)
-        {
-            if (ezConfig != null)
-            {
-                keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-            }
         }
 
         /// <summary>
@@ -93,7 +85,6 @@ namespace osu.Game.Rulesets.UI
             {
                 // 如果相同的音效正在播放，打断并重放
                 existing.Stop();
-                ApplySampleInfo(existing, samples);
                 existing.Play();
                 return;
             }
@@ -119,13 +110,13 @@ namespace osu.Game.Rulesets.UI
             base.Update();
 
             if (gameplayClock?.IsRewinding == true)
+            {
                 mostValidObject = null;
-            // reset auto-play state on rewind
-            if (gameplayClock?.IsRewinding == true)
                 lastAutoPlayedObject = null;
+            }
 
             // Auto-play notes when KeySoundPreviewMode == 2
-            if (keySoundPreviewMode == KeySoundPreviewMode.AutoPlayPlus)
+            if (isAutoPlay)
             {
                 double referenceTime = getReferenceTime();
                 var obj = GetMostValidObject();

@@ -11,19 +11,19 @@ using JetBrains.Annotations;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
-using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
-using osu.Framework.Graphics.Primitives;
 using osu.Game.Audio;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
-using osu.Game.Rulesets.Objects.Pooling;
 using osu.Game.Skinning;
 using osuTK;
+using osu.Game.Rulesets.Objects.Pooling;
+using osu.Framework.Extensions.ObjectExtensions;
+using osu.Framework.Graphics.Primitives;
 
 namespace osu.Game.Rulesets.UI
 {
@@ -375,7 +375,8 @@ namespace osu.Game.Rulesets.UI
         /// <typeparam name="TDrawable">The <see cref="DrawableHitObject"/> receiver for <typeparamref name="TObject"/>s.</typeparam>
         public void RegisterPool<TObject, TDrawable>(int initialSize, int? maximumSize = null)
             where TObject : HitObject
-            where TDrawable : DrawableHitObject, new() => RegisterPool<TObject, TDrawable>(new DrawablePool<TDrawable>(initialSize, maximumSize));
+            where TDrawable : DrawableHitObject, new()
+            => RegisterPool<TObject, TDrawable>(new DrawablePool<TDrawable>(initialSize, maximumSize));
 
         /// <summary>
         /// Registers a custom <see cref="DrawableHitObject"/> pool with this <see cref="DrawableRuleset"/> which is to be used whenever

@@ -48,7 +48,8 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             if (beatmap.BeatmapInfo.BPM > 0) hitWindows.BPM = beatmap.BeatmapInfo.BPM;
             double sr = skills[0].DifficultyValue() * difficulty_multiplier;
 
-            sr = AdditionalMethod(beatmap, mods, skills, clockRate, sr);
+            // 此方法用于开启mod后，修改star数值。暂时禁用
+            // sr = AdditionalMethod(beatmap, mods, skills, clockRate, sr);
 
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {
@@ -68,11 +69,7 @@ namespace osu.Game.Rulesets.Mania.Difficulty
 
             if (mods.Any(m => m is ModStarRatingRebirth))
             {
-                var xxySRFilter = GlobalConfigStore.EzConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
-
-                sr = xxySRFilter.Value
-                    ? SRCalculator.CalculateSR(beatmap, clockRate)
-                    : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier;
+                sr = SRCalculator.CalculateSR(beatmap, clockRate);
             }
 
             return sr;

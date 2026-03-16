@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private bool showBlur => GlobalConfigStore.EzConfig.Get<double>(Ez2Setting.ColumnBlur) > 0;
 
         private readonly Box dimBox;
-        private readonly BackdropBlurDrawable stageBackdropBlur;
+        private readonly BackdropBlurDrawable? stageBackdropBlur;
         private readonly SkinnableDrawable stageForeground;
 
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
@@ -102,17 +102,20 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
-                stageBackdropBlur = new BackdropBlurDrawable
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    PassthroughByDrawOrder = !showBlur,
-                    StrictCaptureTargetsMode = !showBlur,
-                    // FrameBufferScale = new Vector2(0.2f),
-                    CaptureFrameInterval = 3,
-                    MaxCapturesPerSecond = 300,
-                },
+                (stageBackdropBlur = showBlur
+                    ? new BackdropBlurDrawable
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        EffectEnabled = true,
+                        PassthroughByDrawOrder = false,
+                        StrictCaptureTargetsMode = false,
+                        // FrameBufferScale = new Vector2(0.2f),
+                        CaptureFrameInterval = 3,
+                        MaxCapturesPerSecond = 300,
+                    }
+                    : null) ?? Empty(),
 #if DEBUG
                 // 调试用的边框，显示模糊区域
                 new Container
@@ -229,7 +232,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 gameplayBackdropSource.SourcesChanged += updateBackdropCaptureSources;
             }
 
-            skin.SourceChanged += onSkinChanged;
+            currentSkin.SourceChanged += onSkinChanged;
             onSkinChanged();
 
             osuConfigDim = osuConfig.GetBindable<double>(OsuSetting.DimLevel);
@@ -244,8 +247,12 @@ namespace osu.Game.Rulesets.Mania.UI
             columnBlur.BindValueChanged(v =>
             {
                 float sigma = (float)v.NewValue * 50;
-                stageBackdropBlur.BlurSigma = new Vector2(sigma);
-                stageBackdropBlur.EffectEnabled = sigma > 0.01f;
+
+                if (stageBackdropBlur != null)
+                {
+                    stageBackdropBlur.BlurSigma = new Vector2(sigma);
+                    stageBackdropBlur.EffectEnabled = sigma > 0.01f;
+                }
             }, true);
 
             var stagePanelEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.StagePanelEnabled);
@@ -277,6 +284,20 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (gameplayBackdropSource != null)
                 gameplayBackdropSource.SourcesChanged -= updateBackdropCaptureSources;
+
+            // 清理模糊容器的引用，释放 D3D11 渲染目标资源
+            if (stageBackdropBlur != null)
+            {
+                // 先禁用效果，防止清理过程中继续捕获
+                stageBackdropBlur.EffectEnabled = false;
+                
+                // 断开所有捕获目标
+                stageBackdropBlur.CaptureTarget = null;
+                stageBackdropBlur.CaptureTargets.Clear();
+                
+                // 强制过期并移除
+                stageBackdropBlur.Expire();
+            }
 
             base.Dispose(isDisposing);
 
@@ -323,7 +344,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private void updateBackdropCaptureSources()
         {
-            if (gameplayBackdropSource == null)
+            if (gameplayBackdropSource == null || stageBackdropBlur == null)
                 return;
 
             Drawable preferredSource = gameplayBackdropSource.StoryboardPreferred
@@ -334,12 +355,37 @@ namespace osu.Game.Rulesets.Mania.UI
                 ? gameplayBackdropSource.BeatmapBackgroundSource
                 : gameplayBackdropSource.StoryboardSource;
 
-            stageBackdropBlur.CaptureTarget = preferredSource ?? fallbackSource;
+            Drawable newTarget = preferredSource ?? fallbackSource;
 
-            stageBackdropBlur.CaptureTargets.Clear();
+            // 避免重复设置相同的值
+            if (stageBackdropBlur.CaptureTarget == newTarget &&
+                (newTarget == null || (stageBackdropBlur.CaptureTargets.Count == 1 && stageBackdropBlur.CaptureTargets[0] == newTarget)))
+                return;
 
-            if (preferredSource != null)
-                stageBackdropBlur.CaptureTargets.Add(preferredSource);
+            // 先禁用效果，防止在修改过程中触发捕获
+            bool wasEnabled = stageBackdropBlur.EffectEnabled;
+            if (wasEnabled)
+                stageBackdropBlur.EffectEnabled = false;
+
+            stageBackdropBlur.CaptureTarget = newTarget;
+
+            // 只在必要时更新 CaptureTargets
+            if (newTarget != null)
+            {
+                if (stageBackdropBlur.CaptureTargets.Count != 1 || stageBackdropBlur.CaptureTargets[0] != newTarget)
+                {
+                    stageBackdropBlur.CaptureTargets.Clear();
+                    stageBackdropBlur.CaptureTargets.Add(newTarget);
+                }
+            }
+            else
+            {
+                stageBackdropBlur.CaptureTargets.Clear();
+            }
+
+            // 恢复效果状态
+            if (wasEnabled)
+                stageBackdropBlur.EffectEnabled = true;
         }
     }
 }

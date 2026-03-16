@@ -129,14 +129,14 @@ namespace osu.Game.EzOsuGame
 
         private void initializeDrawableEvents()
         {
-            noteSetName.BindValueChanged(_ => scheduleTextureRefresh(), true);
-            stageName.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            noteSetName.BindValueChanged(_ => scheduleTextureRefresh());
+            stageName.BindValueChanged(_ => scheduleTextureRefresh());
         }
 
         private void initializeSizeEvents()
         {
-            columnWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
-            specialFactor.BindValueChanged(_ => scheduleTextureRefresh(), true);
+            columnWidth.BindValueChanged(_ => scheduleTextureRefresh());
+            specialFactor.BindValueChanged(_ => scheduleTextureRefresh());
             noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
 
             columnWidth.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());

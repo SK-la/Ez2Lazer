@@ -405,8 +405,6 @@ namespace osu.Game.EzOsuGame.Analysis
             return await task.ConfigureAwait(false);
         }
 
-        // 进入/退出高优先级工作助手已移除；门控直接使用 ManualResetEventSlim。
-
         private EzAnalysisResult? computeAnalysis(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken)
         {
             try
