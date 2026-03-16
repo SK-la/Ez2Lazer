@@ -5,7 +5,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Graphics;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings.Sections.Maintenance;
 
@@ -24,7 +23,6 @@ namespace osu.Game.Overlays.Settings.Sections
         {
             Children = new Drawable[]
             {
-                new AnalysisSettings(),
                 new GeneralSettings(),
                 new BeatmapSettings(),
                 new SkinSettings(),

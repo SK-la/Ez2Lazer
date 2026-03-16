@@ -57,12 +57,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             };
 
             noteTrackLineHeight.BindTo(ezSkinInfo.NoteTrackLineHeight);
-            noteTrackLineHeight.BindValueChanged(UpdateTrackLineHeight, true);
+            noteTrackLineHeight.BindValueChanged(_ => UpdateTrackLineHeight(), true);
         }
 
-        public void UpdateTrackLineHeight(ValueChangedEvent<double> v)
+        public void UpdateTrackLineHeight()
         {
-            separator.Height = (float)v.NewValue;
+            separator.Height = (float)noteTrackLineHeight.Value;
         }
 
         // public void UpdateGlowEffect(Colour4 color)

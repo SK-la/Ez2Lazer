@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Localisation;
@@ -38,6 +39,7 @@ namespace osu.Game.Overlays
                 new InputSection(createSubPanel(new KeyBindingPanel())),
                 new UserInterfaceSection(),
                 new GameplaySection(),
+                new EzGameSection(),
                 new RulesetSection(),
                 new AudioSection(),
                 new GraphicsSection(),

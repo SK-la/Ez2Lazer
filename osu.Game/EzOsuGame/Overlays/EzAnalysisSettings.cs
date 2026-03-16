@@ -4,13 +4,14 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
 
-namespace osu.Game.EzOsuGame.Configuration
+namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class AnalysisSettings : SettingsSubsection
+    public partial class EzAnalysisSettings : SettingsSubsection
     {
         protected override LocalisableString Header => "Analysis";
 

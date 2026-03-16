@@ -7,8 +7,6 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Scoring;
 
@@ -19,7 +17,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
         protected override LocalisableString Header => CommonStrings.General;
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
+        private void load(OsuConfigManager config)
         {
             Children = new Drawable[]
             {
@@ -31,26 +29,6 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 {
                     Keywords = new[] { "scoring" },
                     ApplyClassicDefault = c => ((IHasCurrentValue<ScoringMode>)c).Current.Value = ScoringMode.Classic,
-                },
-                new SettingsItemV2(new FormSliderBar<double>
-                {
-                    Caption = EzSettingsStrings.ACCURACY_CUTOFF_S,
-                    Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS),
-                    KeyboardStep = 0.01f,
-                    DisplayAsPercentage = true,
-                })
-                {
-                    Keywords = new[] { "mania", "acc" }
-                },
-                new SettingsItemV2(new FormSliderBar<double>
-                {
-                    Caption = EzSettingsStrings.ACCURACY_CUTOFF_A,
-                    Current = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA),
-                    KeyboardStep = 0.01f,
-                    DisplayAsPercentage = true,
-                })
-                {
-                    Keywords = new[] { "mania", "acc" }
                 },
                 new SettingsItemV2(new FormCheckBox
                 {

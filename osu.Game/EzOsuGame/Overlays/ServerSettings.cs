@@ -5,14 +5,15 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
-using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Online;
+using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Settings;
 
-namespace osu.Game.EzOsuGame.Online
+namespace osu.Game.EzOsuGame.Overlays
 {
     public partial class ServerSettings : SettingsSubsection
     {
