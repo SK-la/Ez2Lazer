@@ -5,10 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
-using osu.Game.Rulesets.Mania.LAsEzMania.Mods.YuLiangSSSMods;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -76,11 +76,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
             // SS is expected as long as all hitobjects have been hit with either a GREAT or PERFECT result.
 
-            bool anyImperfect =
-                results.GetValueOrDefault(HitResult.Good) > 0
-                || results.GetValueOrDefault(HitResult.Ok) > 0
-                || results.GetValueOrDefault(HitResult.Meh) > 0
-                || results.GetValueOrDefault(HitResult.Miss) > 0;
+            bool anyImperfect = results.GetValueOrDefault(HitResult.Good) > 0
+                                || results.GetValueOrDefault(HitResult.Ok) > 0
+                                || results.GetValueOrDefault(HitResult.Meh) > 0
+                                || results.GetValueOrDefault(HitResult.Miss) > 0;
 
             return anyImperfect ? rank : ScoreRank.X;
         }

@@ -12,8 +12,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.LAsEzExtensions.Audio;
-using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.EzOsuGame.Audio;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.Audio

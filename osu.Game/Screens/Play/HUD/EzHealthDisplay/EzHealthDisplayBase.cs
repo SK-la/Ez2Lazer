@@ -4,7 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.LAsEzExtensions;
+using osu.Game.EzOsuGame;
 
 namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
 {

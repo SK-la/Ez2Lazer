@@ -13,9 +13,9 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.UI;
 using osuTK.Graphics;
 

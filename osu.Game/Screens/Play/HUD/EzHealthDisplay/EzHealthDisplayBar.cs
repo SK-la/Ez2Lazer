@@ -3,7 +3,7 @@
 
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.LAsEzExtensions;
+using osu.Game.EzOsuGame;
 using osuTK;
 using osuTK.Graphics;
 

@@ -5,7 +5,7 @@ using osu.Framework.Configuration.Tracking;
 using osu.Game.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Configuration;
-using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Configuration

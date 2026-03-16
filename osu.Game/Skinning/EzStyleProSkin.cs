@@ -13,7 +13,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Extensions;
 using osu.Game.IO;
-using osu.Game.LAsEzExtensions.HUD;
+using osu.Game.EzOsuGame.HUD;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Play.HUD.JudgementCounter;
 using osu.Game.Skinning.Components;
@@ -252,7 +252,6 @@ namespace osu.Game.Skinning
             return null;
         }
 
-        private static Color4 getComboColour(IHasComboColours source, int colourIndex)
-            => source.ComboColours![colourIndex % source.ComboColours.Count];
+        private static Color4 getComboColour(IHasComboColours source, int colourIndex) => source.ComboColours![colourIndex % source.ComboColours.Count];
     }
 }

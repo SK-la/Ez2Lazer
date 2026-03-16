@@ -2,7 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics.Containers;
-using osu.Game.LAsEzExtensions;
+using osu.Game.EzOsuGame;
 
 namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
 {

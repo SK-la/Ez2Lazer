@@ -13,7 +13,7 @@ using osu.Framework.Utils;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.LAsEzMania.HUD;
+using osu.Game.Rulesets.Mania.EzMania.HUD;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 using osuTK.Graphics;
@@ -54,17 +54,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
             // updateOffsetText(Result);
         }
 
-        protected override SpriteText CreateJudgementText() =>
-            new OsuSpriteText
-            {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Colour = Color4.White,
-                Blending = BlendingParameters.Additive,
-                Spacing = new Vector2(2, 0),
-                Font = OsuFont.Default.With(size: 22, weight: FontWeight.Regular),
-                AllowMultiline = true,
-            };
+        protected override SpriteText CreateJudgementText() => new OsuSpriteText
+        {
+            Anchor = Anchor.Centre,
+            Origin = Anchor.Centre,
+            Colour = Color4.White,
+            Blending = BlendingParameters.Additive,
+            Spacing = new Vector2(2, 0),
+            Font = OsuFont.Default.With(size: 22, weight: FontWeight.Regular),
+            AllowMultiline = true,
+        };
 
         /// <summary>
         /// Plays the default animation for this judgement piece.

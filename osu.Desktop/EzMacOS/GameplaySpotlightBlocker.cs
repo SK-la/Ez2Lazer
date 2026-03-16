@@ -9,7 +9,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osuTK.Input;
 using osu.Game.Screens.Play;
-using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Desktop.EzMacOS
 {

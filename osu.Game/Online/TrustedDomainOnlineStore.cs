@@ -4,9 +4,8 @@
 using System;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
-using osu.Game.LAsEzExtensions.Analysis;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.LAsEzExtensions.Online;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Online;
 
 namespace osu.Game.Online
 {

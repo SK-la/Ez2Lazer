@@ -12,7 +12,7 @@ using osu.Framework.Layout;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Configuration;
-using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Screens.Backgrounds;

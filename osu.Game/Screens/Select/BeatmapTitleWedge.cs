@@ -20,8 +20,8 @@ using osu.Game.Extensions;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
-using osu.Game.LAsEzExtensions.Analysis;
-using osu.Game.LAsEzExtensions.UserInterface;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -306,7 +306,8 @@ namespace osu.Game.Screens.Select
 
         private void updateKPSGraphSize()
         {
-            float availableWidth = DrawWidth - playCount.DrawWidth - favouriteButton.DrawWidth - lengthStatistic.DrawWidth - bpmStatistic.DrawWidth - statisticsFlow.Spacing.X * 3 - SongSelect.WEDGE_CONTENT_MARGIN * 2;
+            float availableWidth = DrawWidth - playCount.DrawWidth - favouriteButton.DrawWidth - lengthStatistic.DrawWidth - bpmStatistic.DrawWidth - statisticsFlow.Spacing.X * 3
+                                   - SongSelect.WEDGE_CONTENT_MARGIN * 2;
             kpsGraph.Width = availableWidth;
             // Logger.Log($"[EzTest] T: {DrawWidth}, {playCount.DrawWidth}, {favouriteButton.DrawWidth}, {lengthStatistic.DrawWidth}, {bpmStatistic.DrawWidth}", EzAnalysisPersistentStore.LOGGER_NAME);
         }

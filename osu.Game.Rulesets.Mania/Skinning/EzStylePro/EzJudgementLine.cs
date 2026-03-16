@@ -6,8 +6,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
-using osu.Game.LAsEzExtensions;
-using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Configuration;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro

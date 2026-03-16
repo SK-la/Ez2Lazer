@@ -21,12 +21,12 @@ using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Database;
 using osu.Game.Input.Bindings;
 using osu.Game.Input.Handlers;
-using osu.Game.LAsEzExtensions;
-using osu.Game.LAsEzExtensions.Configuration;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Rulesets.Mania.LAsEZMania;
+using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
@@ -279,8 +279,7 @@ namespace osu.Game.Rulesets.Mania.UI
             return matched;
         }
 
-        protected override int GetScrollSpeedAdjustmentAmount(KeyBindingPressEvent<GlobalAction> e)
-            => e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt) ? 5 : 1;
+        protected override int GetScrollSpeedAdjustmentAmount(KeyBindingPressEvent<GlobalAction> e) => e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt) ? 5 : 1;
 
         protected override void AdjustScrollSpeed(int amount) => configScrollSpeed.Value += amount;
 

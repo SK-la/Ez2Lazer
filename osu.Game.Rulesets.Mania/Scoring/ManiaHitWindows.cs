@@ -3,8 +3,8 @@
 
 using System;
 using osu.Game.Beatmaps;
-using osu.Game.LAsEzExtensions.Configuration;
-using osu.Game.Rulesets.Mania.LAsEZMania.Helper;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring

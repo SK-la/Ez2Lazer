@@ -2,7 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Localisation;
-using osu.Game.LAsEzExtensions.Localization;
+using osu.Game.EzOsuGame.Localization;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.LAsEzExtensions.Localization;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Dialog;
 
 namespace osu.Game.Collections
