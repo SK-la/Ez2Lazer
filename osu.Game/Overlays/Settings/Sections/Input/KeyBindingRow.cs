@@ -525,7 +525,6 @@ namespace osu.Game.Overlays.Settings.Sections.Input
         private void tryPersistKeyBinding(RealmKeyBinding keyBinding, bool advanceToNextBinding, bool restoringDefaults = false)
         {
             List<RealmKeyBinding> bindings = GetAllSectionBindings();
-
             RealmKeyBinding? existingBinding = keyBinding.KeyCombination.Equals(new KeyCombination(InputKey.None))
                 ? null
                 : bindings.FirstOrDefault(other => isConflictingBinding(keyBinding, other, restoringDefaults));

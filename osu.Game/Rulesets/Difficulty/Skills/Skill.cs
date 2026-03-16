@@ -20,11 +20,6 @@ namespace osu.Game.Rulesets.Difficulty.Skills
         /// </summary>
         protected IReadOnlyList<Mod> Mods => mods;
 
-        /// <summary>
-        /// List of calculated per-object difficulties, populated by Process
-        /// </summary>
-        protected readonly List<double> ObjectDifficulties = new List<double>();
-
         private readonly Mod[] mods;
 
         protected Skill(Mod[] mods)
@@ -42,7 +37,5 @@ namespace osu.Game.Rulesets.Difficulty.Skills
         /// Returns the calculated difficulty value representing all <see cref="DifficultyHitObject"/>s that have been processed up to this point.
         /// </summary>
         public abstract double DifficultyValue();
-
-        public IReadOnlyList<double> GetObjectDifficulties() => ObjectDifficulties;
     }
 }

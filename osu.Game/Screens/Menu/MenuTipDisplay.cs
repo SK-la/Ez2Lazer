@@ -17,8 +17,8 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
-using osu.Game.Localisation;
 using osuTK;
+using osu.Game.Localisation;
 
 namespace osu.Game.Screens.Menu
 {

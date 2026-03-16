@@ -220,8 +220,7 @@ namespace osu.Game.Screens.Edit.Submission
                     Beatmap.Value.BeatmapSetInfo.Beatmaps.Where(b => b.OnlineID > 0).Select(b => (uint)b.OnlineID).ToArray(),
                     (uint)Beatmap.Value.BeatmapSetInfo.Beatmaps.Count(b => b.OnlineID <= 0),
                     settings);
-                log(
-                    $"Updating existing beatmap set (id:{createRequest.BeatmapSetID} beatmapsToKeep:[{string.Join(",", createRequest.BeatmapsToKeep)}] beatmapsToCreate:{createRequest.BeatmapsToCreate})");
+                log($"Updating existing beatmap set (id:{createRequest.BeatmapSetID} beatmapsToKeep:[{string.Join(",", createRequest.BeatmapsToKeep)}] beatmapsToCreate:{createRequest.BeatmapsToCreate})");
             }
             else
             {

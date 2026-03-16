@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using osu.Framework.Graphics.UserInterface;
 using osu.Game.Audio;
@@ -18,7 +17,7 @@ namespace osu.Game.Screens.Edit.Compose.Components.Timeline
             : base(hitObject)
         {
             if (hitObject is not IHasRepeats)
-                throw new ArgumentException($"HitObject must implement {nameof(IHasRepeats)}", nameof(hitObject));
+                throw new System.ArgumentException($"HitObject must implement {nameof(IHasRepeats)}", nameof(hitObject));
 
             NodeIndex = nodeIndex;
         }

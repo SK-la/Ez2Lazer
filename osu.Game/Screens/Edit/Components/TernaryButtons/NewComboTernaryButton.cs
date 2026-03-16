@@ -100,8 +100,7 @@ namespace osu.Game.Screens.Edit.Components.TernaryButtons
                 pickerButton.SelectedHitObject.Value = hasCombo;
                 pickerButton.Icon.Alpha = expanded.Value ? 1 : 0;
 
-                mainButtonContainer.TransformTo(nameof(mainButtonContainer.Padding), new MarginPadding { Right = targetPickerButtonWidth + 5 }, ExpandingContainer.TRANSITION_DURATION,
-                    Easing.OutQuint);
+                mainButtonContainer.TransformTo(nameof(mainButtonContainer.Padding), new MarginPadding { Right = targetPickerButtonWidth + 5 }, ExpandingContainer.TRANSITION_DURATION, Easing.OutQuint);
                 mainButton.Icon.MoveToX(expanded.Value ? 10 : 2.5f, ExpandingContainer.TRANSITION_DURATION, Easing.OutQuint);
             }
             else
