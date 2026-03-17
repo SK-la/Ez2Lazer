@@ -251,7 +251,7 @@ namespace osu.Game.Screens.Ranking
                 buttons.Add(new FavouriteButton(Score.BeatmapInfo.BeatmapSet));
 
             // 底部增加按钮
-            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             buttons.Add(new HitModeButton(hitModeBindable));
 
             // Add settings button (placeholder)

@@ -313,7 +313,7 @@ namespace osu.Game.Screens.Play
             var accCutoffSBindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS);
             bool hasDefaultCutoffValues = accCutoffABindable.IsDefault || accCutoffSBindable.IsDefault;
             // 如果当前所选的 HitMode 不是 Lazer，则强制跳过上传成绩
-            var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.HitMode);
+            var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
 
             if (Ruleset.Value.OnlineID == 3 && (hitMode != EzEnumHitMode.Lazer || !hasDefaultCutoffValues))
             {

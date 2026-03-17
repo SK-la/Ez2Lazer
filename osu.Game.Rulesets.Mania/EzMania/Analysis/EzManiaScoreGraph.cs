@@ -69,7 +69,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         private void load()
         {
             // Bind to the global hit mode setting so that switching hit modes updates our helpers and redraws.
-            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
                 hitWindows1.HitMode = v.NewValue;

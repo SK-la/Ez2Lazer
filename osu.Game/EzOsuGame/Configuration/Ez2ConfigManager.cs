@@ -156,9 +156,9 @@ namespace osu.Game.EzOsuGame.Configuration
 
         private void initializeManiaDefaults()
         {
-            SetDefault(Ez2Setting.HitMode, EzEnumHitMode.Lazer);
-            SetDefault(Ez2Setting.CustomHealthMode, EzEnumHealthMode.Lazer);
-            SetDefault(Ez2Setting.CustomPoorHitResultBool, true);
+            SetDefault(Ez2Setting.ManiaHitMode, EzEnumHitMode.Lazer);
+            SetDefault(Ez2Setting.ManiaHealthMode, EzEnumHealthMode.Lazer);
+            SetDefault(Ez2Setting.BmsPoorHitResultEnable, true);
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
@@ -603,9 +603,9 @@ namespace osu.Game.EzOsuGame.Configuration
         OffsetPlusMania,
         OffsetPlusNonMania,
 
-        HitMode,
-        CustomHealthMode,
-        CustomPoorHitResultBool,
+        ManiaHitMode,
+        ManiaHealthMode,
+        BmsPoorHitResultEnable,
         ManiaBarLinesBool,
 
         // 服务器配置

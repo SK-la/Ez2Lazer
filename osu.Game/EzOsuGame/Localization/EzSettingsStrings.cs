@@ -7,7 +7,8 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public static class EzSettingsStrings
     {
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez游玩设置", "Ez Gameplay Settings");
+#region 分散设置
+
         public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE = new EzLocalizationManager.EzLocalisableString("缩放游戏模式", "Scaling Game Mode");
 
         public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
@@ -17,9 +18,6 @@ namespace osu.Game.EzOsuGame.Localization
             "The Scaling Game Mode will automatically adjust the size of UI elements based on the current game mode."
             + "\nWhen enabled, UI elements will be scaled according to the current game mode to provide a more suitable visual experience."
             + "\nFor example, in Mania mode, UI elements will be scaled down to accommodate more columns, while in other modes they will remain at their default size.");
-
-        public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_S = new EzLocalizationManager.EzLocalisableString("Acc S评级线(Mania)", "Accuracy Cutoff S (Mania)");
-        public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_A = new EzLocalizationManager.EzLocalisableString("Acc A评级线(Mania)", "Accuracy Cutoff A (Mania)");
 
         public static readonly EzLocalizationManager.EzLocalisableString DISABLE_CMD_SPACE = new EzLocalizationManager.EzLocalisableString("游戏时禁用 Cmd+Space (聚焦搜索) ",
             "Disable Cmd+Space (Spotlight) during gameplay");
@@ -32,6 +30,18 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SETTINGS_TITLE = new EzLocalizationManager.EzLocalisableString("设置", "Settings");
         public static readonly EzLocalizationManager.EzLocalisableString SAVE_BUTTON = new EzLocalizationManager.EzLocalisableString("保存", "Save");
         public static readonly EzLocalizationManager.EzLocalisableString CANCEL_BUTTON = new EzLocalizationManager.EzLocalisableString("取消", "Cancel");
+
+#endregion
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez游玩设置", "Ez Gameplay Settings");
+
+#region 机制类
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Mania 设置", "Ez Mania Settings");
+
+        public static readonly EzLocalizationManager.EzLocalisableString SCORE_SUBMIT_WARNING = new EzLocalizationManager.EzLocalisableString("当前锁定成绩上传", "Currently locking score submission");
+        public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_S = new EzLocalizationManager.EzLocalisableString("Acc S评级线(Mania)", "Accuracy Cutoff S (Mania)");
+        public static readonly EzLocalizationManager.EzLocalisableString ACCURACY_CUTOFF_A = new EzLocalizationManager.EzLocalisableString("Acc A评级线(Mania)", "Accuracy Cutoff A (Mania)");
 
         public static readonly EzLocalizationManager.EzLocalisableString OFFSET_PLUS_MANIA = new EzLocalizationManager.EzLocalisableString("高阶Offset修正(Mania)", "Advanced Offset Plus (Mania)");
 
@@ -49,6 +59,52 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n可以根绝所有输入延迟。（测试性功能！锁定成绩上传）",
             "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
             + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
+
+        public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "(Mania) Hit Mode");
+
+        public static readonly LocalisableString HIT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Mania 判定系统, 获得不同音游的打击体验, 但是不保证所有模式都完全一比一复刻"
+            + "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
+            + "\n 305     300      200      100     50     Miss    Poor"
+            + "\n16.67    33.33    116.67      -      250    250    500    IIDX"
+            + "\n15.00   30.00   60.00      -     200    1000  1000   LR2 Hard"
+            + "\n15.00   45.00    112.00     -      165     500    500   Raja Normal"
+            + "\n20.00  60.00   150.00    -      500    500    500   Raja Easy",
+            "(Mania) Hit Mode, get different rhythm game hit experiences, but not guaranteed to perfectly replicate all modes"
+            + "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
+            + "\n 305     300      200      100     50     Miss    Poor"
+            + "\n16.67    33.33    116.67      -      250    250    500    IIDX"
+            + "\n15.00   30.00   60.00      -     200    1000  1000   LR2 Hard"
+            + "\n15.00   45.00    112.00     -      165     500    500   Raja Normal"
+            + "\n20.00  60.00   150.00    -      500    500    500   Raja Easy");
+
+        public static readonly LocalisableString HEALTH_MODE = new EzLocalizationManager.EzLocalisableString("Mania 血量系统", "(Mania) Health Mode");
+
+        public static readonly LocalisableString HEALTH_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
+            + "\n 305    300    200   100    50   Miss       -"
+            + "\n0.4%   0.3%   0.1%    0%   -1%   - 6%     -0%  Lazer"
+            + "\n——— ——— ——— ——— ——— ——— ——— ——— ——— ———"
+            + "\nKool        -   Good       -   Bad   Miss         -"
+            + "\n0.3%   0.0%   0.2%    0%   -1%   - 5%     -0%  O2 Easy"
+            + "\n0.2%   0.0%   0.1%    0%   -7%   - 4%     -0%  O2 Normal"
+            + "\n0.1%   0.0%   0.0%    0%   -5%   - 3%     -0%  O2 Hard"
+            + "\n——— ——— ——— ——— ——— ——— ——— ——— ——— ———"
+            + "\nKool   Cool   Good      -   Bad   Poor  []Poor"
+            + "\n0.4%   0.3%    0.1%    0%   -1%   - 5%      -5%  Ez2Ac"
+            + "\n1.6%   1.6%    0.0%    0%   -5%   - 9%      -5%  IIDX Hard"
+            + "\n1.0%   1.0%    0.5%    0%   -6%   -10%      -2%  LR2 Hard"
+            + "\n1.2%   1.2%    0.6%    0%   -3%   - 6%      -2%  raja normal");
+
+        public static readonly LocalisableString POOR_HIT_RESULT = new EzLocalizationManager.EzLocalisableString("增加 Poor 判定类型", "Additional Poor HitResult");
+
+        public static readonly LocalisableString POOR_HIT_RESULT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "Pool判定类型只在BMS系血量系统下生效, 用于严格扣血, 不影响Combo、Score\n"
+            + "一个note可触发多个Pool判定, 只有早于Miss时才会触发, 不存在晚Pool",
+            "The Poor HitResult type only takes effect under the BMS Health Mode, used for strict health deduction, does not affect Combo or Score\n"
+            + "One note can trigger multiple Poor hit results, and it will only trigger if it is earlier than Miss, there is no late Poor");
+
+#endregion
 
         public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString("输入音频延迟追踪器", "Input Audio Latency Tracker");
 

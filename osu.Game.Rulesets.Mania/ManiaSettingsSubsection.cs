@@ -25,9 +25,6 @@ namespace osu.Game.Rulesets.Mania
         protected Bindable<double> BaseSpeedBindable = null!;
         protected Bindable<double> TimePerSpeedBindable = null!;
         protected Bindable<double> SpeedBindable = null!;
-        protected Bindable<EzEnumHealthMode> CustomHealthModeBindable = null!;
-
-        private SettingsItemV2 poorHitResultCheckBox = null!;
 
         public ManiaSettingsSubsection(ManiaRuleset ruleset)
             : base(ruleset)
@@ -42,37 +39,9 @@ namespace osu.Game.Rulesets.Mania
             BaseSpeedBindable = config.GetBindable<double>(ManiaRulesetSetting.ScrollBaseSpeed);
             TimePerSpeedBindable = config.GetBindable<double>(ManiaRulesetSetting.ScrollTimePerSpeed);
             SpeedBindable = config.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed);
-            CustomHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.CustomHealthMode);
 
             Children = new Drawable[]
             {
-                new SettingsItemV2(new FormEnumDropdown<EzEnumHitMode>
-                {
-                    Caption = EzManiaSettingsStrings.HIT_MODE,
-                    HintText = EzManiaSettingsStrings.HIT_MODE_TOOLTIP,
-                    Current = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode),
-                })
-                {
-                    Keywords = new[] { "mania" }
-                },
-                new SettingsItemV2(new FormEnumDropdown<EzEnumHealthMode>
-                {
-                    Caption = EzManiaSettingsStrings.HEALTH_MODE,
-                    HintText = EzManiaSettingsStrings.HEALTH_MODE_TOOLTIP,
-                    Current = CustomHealthModeBindable,
-                })
-                {
-                    Keywords = new[] { "mania" }
-                },
-                poorHitResultCheckBox = new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzManiaSettingsStrings.POOR_HIT_RESULT,
-                    HintText = EzManiaSettingsStrings.POOR_HIT_RESULT_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.CustomPoorHitResultBool),
-                })
-                {
-                    Keywords = new[] { "mania" }
-                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = EzManiaSettingsStrings.MANIA_BAR_LINES_BOOL,
@@ -172,22 +141,6 @@ namespace osu.Game.Rulesets.Mania
 #pragma warning restore CS0618 // Type or member is obsolete
                 }));
             }
-
-            CustomHealthModeBindable.BindValueChanged(e =>
-            {
-                switch (e.NewValue)
-                {
-                    case EzEnumHealthMode.IIDX_HD:
-                    case EzEnumHealthMode.LR2_HD:
-                    case EzEnumHealthMode.Raja_NM:
-                        poorHitResultCheckBox.Show();
-                        break;
-
-                    default:
-                        poorHitResultCheckBox.Hide();
-                        break;
-                }
-            }, true);
         }
     }
 }

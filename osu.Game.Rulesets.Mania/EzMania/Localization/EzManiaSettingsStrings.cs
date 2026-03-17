@@ -8,50 +8,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Localization
 {
     public static class EzManiaSettingsStrings
     {
-        public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "(Mania) Hit Mode");
-
-        public static readonly LocalisableString HIT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "Mania 判定系统, 获得不同音游的打击体验, 但是不保证所有模式都完全一比一复刻"
-            + "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\n 305     300      200      100     50     Miss    Poor"
-            + "\n16.67    33.33    116.67      -      250    250    500    IIDX"
-            + "\n15.00   30.00   60.00      -     200    1000  1000   LR2 Hard"
-            + "\n15.00   45.00    112.00     -      165     500    500   Raja Normal"
-            + "\n20.00  60.00   150.00    -      500    500    500   Raja Easy",
-            "(Mania) Hit Mode, get different rhythm game hit experiences, but not guaranteed to perfectly replicate all modes"
-            + "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\n 305     300      200      100     50     Miss    Poor"
-            + "\n16.67    33.33    116.67      -      250    250    500    IIDX"
-            + "\n15.00   30.00   60.00      -     200    1000  1000   LR2 Hard"
-            + "\n15.00   45.00    112.00     -      165     500    500   Raja Normal"
-            + "\n20.00  60.00   150.00    -      500    500    500   Raja Easy");
-
-        public static readonly LocalisableString HEALTH_MODE = new EzLocalizationManager.EzLocalisableString("Mania 血量系统", "(Mania) Health Mode");
-
-        public static readonly LocalisableString HEALTH_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\n 305    300    200   100    50   Miss       -"
-            + "\n0.4%   0.3%   0.1%    0%   -1%   - 6%     -0%  Lazer"
-            + "\n——— ——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\nKool        -   Good       -   Bad   Miss         -"
-            + "\n0.3%   0.0%   0.2%    0%   -1%   - 5%     -0%  O2 Easy"
-            + "\n0.2%   0.0%   0.1%    0%   -7%   - 4%     -0%  O2 Normal"
-            + "\n0.1%   0.0%   0.0%    0%   -5%   - 3%     -0%  O2 Hard"
-            + "\n——— ——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\nKool   Cool   Good      -   Bad   Poor  []Poor"
-            + "\n0.4%   0.3%    0.1%    0%   -1%   - 5%      -5%  Ez2Ac"
-            + "\n1.6%   1.6%    0.0%    0%   -5%   - 9%      -5%  IIDX Hard"
-            + "\n1.0%   1.0%    0.5%    0%   -6%   -10%      -2%  LR2 Hard"
-            + "\n1.2%   1.2%    0.6%    0%   -3%   - 6%      -2%  raja normal");
-
-        public static readonly LocalisableString POOR_HIT_RESULT = new EzLocalizationManager.EzLocalisableString("增加 Poor 判定类型", "Additional Poor HitResult");
-
-        public static readonly LocalisableString POOR_HIT_RESULT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "Pool判定类型只在BMS系血量系统下生效, 用于严格扣血, 不影响Combo、Score\n"
-            + "一个note可触发多个Pool判定, 只有早于Miss时才会触发, 不存在晚Pool",
-            "The Poor HitResult type only takes effect under the BMS Health Mode, used for strict health deduction, does not affect Combo or Score\n"
-            + "One note can trigger multiple Poor hit results, and it will only trigger if it is earlier than Miss, there is no late Poor");
-
         public static readonly LocalisableString MANIA_BAR_LINES_BOOL = new EzLocalizationManager.EzLocalisableString("启用强制显示小节线", "Force Display Bar Lines");
 
         public static readonly LocalisableString MANIA_BAR_LINES_BOOL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(

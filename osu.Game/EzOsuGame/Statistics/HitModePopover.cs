@@ -50,12 +50,12 @@ namespace osu.Game.EzOsuGame.Statistics
             [BackgroundDependencyLoader]
             private void load(Ez2ConfigManager ezConfig)
             {
-                hitModeBindable.BindTo(ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode));
+                hitModeBindable.BindTo(ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode));
                 Children = new[]
                 {
                     new OsuMenu(Direction.Vertical, true)
                     {
-                        Items = Enum.GetValues<EzEnumHitMode>().Select(mode => new OsuMenuItem(mode.ToString(), MenuItemType.Standard, () => ezConfig.SetValue(Ez2Setting.HitMode, mode))).ToArray(),
+                        Items = Enum.GetValues<EzEnumHitMode>().Select(mode => new OsuMenuItem(mode.ToString(), MenuItemType.Standard, () => ezConfig.SetValue(Ez2Setting.ManiaHitMode, mode))).ToArray(),
                         MaxHeight = 375,
                     },
                 };

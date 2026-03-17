@@ -169,7 +169,7 @@ namespace osu.Game.Rulesets.Mania.UI
             globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
             barLinesBindable = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool);
-            hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.HitMode);
+            hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
         }
 
         protected override void LoadComplete()
