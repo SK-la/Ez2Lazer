@@ -236,6 +236,11 @@ namespace osu.Game.EzOsuGame.Statistics
                         : userFileStorage.GetStream(file.File.GetStoragePath());
                 }
 
+                 // 只处理当前规则集的谱面，其他规则集直接排除
+                if (!beatmap.Ruleset.MatchesOnlineID(beatmapInfo.Ruleset))
+                    return null;
+
+                // 当前规则集：应用 mods 转换
                 var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmap);
                 var playableBeatmap = workingBeatmap.GetPlayableBeatmap(beatmap.Ruleset, mods);
 
