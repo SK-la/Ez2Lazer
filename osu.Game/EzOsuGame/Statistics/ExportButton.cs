@@ -193,7 +193,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                     var zipWriterOptions = new ZipWriterOptions(CompressionType.Deflate)
                     {
-                        ArchiveEncoding = useFixedEncoding ? ZipArchiveReader.DEFAULT_ENCODING : new ArchiveEncoding(Encoding.UTF8, Encoding.UTF8)
+                        ArchiveEncoding = useFixedEncoding ? ZipArchiveReader.DEFAULT_ENCODING : new ArchiveEncoding()
                     };
 
                     using var writer = new ZipWriter(outStream, zipWriterOptions);
