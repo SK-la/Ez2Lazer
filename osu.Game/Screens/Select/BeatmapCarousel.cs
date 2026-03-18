@@ -67,6 +67,25 @@ namespace osu.Game.Screens.Select
         /// </summary>
         public int MatchedBeatmapsCount => Filters.Last().BeatmapItemsCount;
 
+        public IReadOnlyList<BeatmapInfo> GetFilteredBeatmaps()
+        {
+            var filteredBeatmaps = new HashSet<BeatmapInfo>();
+            var carouselItems = GetCarouselItems();
+
+            if (carouselItems == null)
+                return filteredBeatmaps.ToList();
+
+            foreach (var item in carouselItems)
+            {
+                if (item.Model is not GroupedBeatmap groupedBeatmap)
+                    continue;
+
+                filteredBeatmaps.Add(groupedBeatmap.Beatmap);
+            }
+
+            return filteredBeatmaps.ToList();
+        }
+
         protected override float GetSpacingBetweenPanels(CarouselItem top, CarouselItem bottom)
         {
             // Group panels do not overlap with any other panel but should overlap with themselves.

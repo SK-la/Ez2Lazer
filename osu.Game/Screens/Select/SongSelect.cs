@@ -39,6 +39,7 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -376,7 +377,8 @@ namespace osu.Game.Screens.Select
             new FooterButtonOptions
             {
                 Hotkey = GlobalAction.ToggleBeatmapOptions,
-            }
+            },
+            new FooterButtonEzUtils(carousel.GetFilteredBeatmaps, () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo)
         };
 
         protected override void LoadComplete()

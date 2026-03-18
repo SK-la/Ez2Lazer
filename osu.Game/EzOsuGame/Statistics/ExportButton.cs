@@ -37,9 +37,6 @@ namespace osu.Game.EzOsuGame.Statistics
 {
     public partial class ExportButton : GrayButton, IHasPopover
     {
-        private const string exported_beatmap_creator_prefix = "Ez2Lazer Mods=";
-        private const string no_mod_acronym = "none";
-
         private readonly BeatmapInfo beatmapInfo;
         private readonly IReadOnlyList<Mod> mods;
 
@@ -154,7 +151,7 @@ namespace osu.Game.EzOsuGame.Statistics
                     var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
                     var playableBeatmap = workingBeatmap.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
 
-                    applyExportMetadata(playableBeatmap, mods);
+                    BeatmapExportUtils.ApplyExportMetadata(playableBeatmap, mods);
 
                     using (var outStream = exportStorage.CreateFileSafely(filename))
                     using (var writer = new StreamWriter(outStream, Encoding.UTF8, 1024, true))
@@ -250,7 +247,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmap);
                 var playableBeatmap = workingBeatmap.GetPlayableBeatmap(beatmap.Ruleset, mods);
 
-                applyExportMetadata(playableBeatmap, mods);
+                BeatmapExportUtils.ApplyExportMetadata(playableBeatmap, mods);
 
                 var stream = new MemoryStream();
                 using (var sw = new StreamWriter(stream, Encoding.UTF8, 1024, true))
@@ -258,15 +255,6 @@ namespace osu.Game.EzOsuGame.Statistics
 
                 stream.Seek(0, SeekOrigin.Begin);
                 return stream;
-            }
-
-            private static void applyExportMetadata(IBeatmap beatmap, IReadOnlyList<Mod> mods)
-            {
-                string modAcronyms = mods.Count > 0
-                    ? string.Join("+", mods.Select(mod => mod.Acronym))
-                    : no_mod_acronym;
-
-                beatmap.Metadata.Author.Username = $"{exported_beatmap_creator_prefix}{modAcronyms}";
             }
 
             private static string createBeatmapFilenameFromMetadata(BeatmapInfo beatmap)
