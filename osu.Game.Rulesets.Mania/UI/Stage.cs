@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private OsuConfigManager osuConfig { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
-        private Player.GameplayBackdropSource? gameplayBackdropSource { get; set; }
+        private IBackdropCaptureSourceProvider? backdropCaptureSourceProvider { get; set; }
 
         private Bindable<double> osuConfigDim = null!;
         private Bindable<double> columnDim = null!;
@@ -227,11 +227,8 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             currentSkin = skin;
 
-            if (gameplayBackdropSource != null)
-            {
-                syncBackdropCaptureSources();
-                gameplayBackdropSource.SourcesChanged += syncBackdropCaptureSources;
-            }
+            if (stageBackdropBlur != null)
+                stageBackdropBlur.CaptureSourceProvider = backdropCaptureSourceProvider;
 
             currentSkin.SourceChanged += onSkinChanged;
             onSkinChanged();
@@ -284,9 +281,6 @@ namespace osu.Game.Rulesets.Mania.UI
             // must happen before children are disposed in base call to prevent illegal accesses to the judgement pool.
             NewResult -= OnNewResult;
 
-            if (gameplayBackdropSource != null)
-                gameplayBackdropSource.SourcesChanged -= syncBackdropCaptureSources;
-
             // 清理模糊容器的引用，释放 D3D11 渲染目标资源
             if (stageBackdropBlur != null)
             {
@@ -294,6 +288,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 stageBackdropBlur.EffectEnabled = false;
 
                 // 断开所有捕获目标
+                stageBackdropBlur.CaptureSourceProvider = null;
                 stageBackdropBlur.CaptureTarget = null;
                 stageBackdropBlur.CaptureTargets.Clear();
 
@@ -344,64 +339,12 @@ namespace osu.Game.Rulesets.Mania.UI
             barLineContainer.Width = columnFlow.Width;
         }
 
-        private void syncBackdropCaptureSources()
-        {
-            if (gameplayBackdropSource == null || stageBackdropBlur == null)
-                return;
-
-            Drawable? storyboardSource = gameplayBackdropSource.StoryboardSource;
-            Drawable? beatmapBackgroundSource = gameplayBackdropSource.BeatmapBackgroundSource;
-
-            bool unchanged = stageBackdropBlur.CaptureTarget == null
-                             && captureTargetsMatch(stageBackdropBlur.CaptureTargets, storyboardSource, beatmapBackgroundSource);
-
-            if (!unchanged)
-            {
-                stageBackdropBlur.EffectEnabled = false;
-                stageBackdropBlur.CaptureTarget = null;
-                stageBackdropBlur.CaptureTargets.Clear();
-
-                if (storyboardSource != null)
-                    stageBackdropBlur.CaptureTargets.Add(storyboardSource);
-
-                if (beatmapBackgroundSource != null && beatmapBackgroundSource != storyboardSource)
-                    stageBackdropBlur.CaptureTargets.Add(beatmapBackgroundSource);
-            }
-
-            updateBackdropBlurState();
-        }
-
-        private static bool captureTargetsMatch(System.Collections.Generic.IReadOnlyList<Drawable> targets, Drawable? storyboardSource, Drawable? beatmapBackgroundSource)
-        {
-            int expectedCount = 0;
-
-            if (storyboardSource != null)
-                expectedCount++;
-
-            if (beatmapBackgroundSource != null && beatmapBackgroundSource != storyboardSource)
-                expectedCount++;
-
-            if (targets.Count != expectedCount)
-                return false;
-
-            int index = 0;
-
-            if (storyboardSource != null && targets[index++] != storyboardSource)
-                return false;
-
-            if (beatmapBackgroundSource != null && beatmapBackgroundSource != storyboardSource && targets[index] != beatmapBackgroundSource)
-                return false;
-
-            return true;
-        }
-
         private void updateBackdropBlurState()
         {
             if (stageBackdropBlur == null)
                 return;
 
-            bool hasExplicitTarget = stageBackdropBlur.CaptureTarget != null || stageBackdropBlur.CaptureTargets.Count > 0;
-            stageBackdropBlur.EffectEnabled = blurEnabledByConfig && hasExplicitTarget;
+            stageBackdropBlur.EffectEnabled = blurEnabledByConfig;
         }
     }
 }

@@ -4,6 +4,7 @@
 #nullable disable
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -107,11 +108,14 @@ namespace osu.Game.Screens.Play
         // 公开以供外部检查当前状态。
         public readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
 
+        [Cached(typeof(IBackdropCaptureSourceProvider))]
         [Cached]
         public readonly GameplayBackdropSource BackdropSource = new GameplayBackdropSource();
 
-        public class GameplayBackdropSource
+        public class GameplayBackdropSource : IBackdropCaptureSourceProvider
         {
+            private readonly List<Drawable> captureSources = new List<Drawable>();
+
             public Drawable BeatmapBackgroundSource { get; private set; }
 
             public Drawable StoryboardSource { get; private set; }
@@ -120,12 +124,15 @@ namespace osu.Game.Screens.Play
 
             public event Action SourcesChanged;
 
+            public IReadOnlyList<Drawable> CaptureSources => captureSources;
+
             public void SetStoryboardSource(DimmableStoryboard source)
             {
                 if (StoryboardSource == source)
                     return;
 
                 StoryboardSource = source;
+                updateCaptureSources();
                 SourcesChanged?.Invoke();
             }
 
@@ -135,6 +142,7 @@ namespace osu.Game.Screens.Play
                     return;
 
                 BeatmapBackgroundSource = source;
+                updateCaptureSources();
                 SourcesChanged?.Invoke();
             }
 
@@ -144,6 +152,17 @@ namespace osu.Game.Screens.Play
                     return;
 
                 StoryboardPreferred = preferred;
+            }
+
+            private void updateCaptureSources()
+            {
+                captureSources.Clear();
+
+                if (BeatmapBackgroundSource != null)
+                    captureSources.Add(BeatmapBackgroundSource);
+
+                if (StoryboardSource != null && StoryboardSource != BeatmapBackgroundSource)
+                    captureSources.Add(StoryboardSource);
             }
         }
 
