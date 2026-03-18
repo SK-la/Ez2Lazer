@@ -78,6 +78,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<double> osuConfigDim = null!;
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = null!;
+        private bool blurEnabledByConfig;
 
         private bool showBlur => GlobalConfigStore.EzConfig.Get<double>(Ez2Setting.ColumnBlur) > 0;
 
@@ -108,7 +109,7 @@ namespace osu.Game.Rulesets.Mania.UI
                         RelativeSizeAxes = Axes.Both,
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
-                        EffectEnabled = true,
+                        EffectEnabled = false,
                         PassthroughByDrawOrder = false,
                         StrictCaptureTargetsMode = false,
                         // FrameBufferScale = new Vector2(0.2f),
@@ -247,11 +248,12 @@ namespace osu.Game.Rulesets.Mania.UI
             columnBlur.BindValueChanged(v =>
             {
                 float sigma = (float)v.NewValue * 50;
+                blurEnabledByConfig = sigma > 0.01f;
 
                 if (stageBackdropBlur != null)
                 {
                     stageBackdropBlur.BlurSigma = new Vector2(sigma);
-                    stageBackdropBlur.EffectEnabled = sigma > 0.01f;
+                    updateBackdropBlurState();
                 }
             }, true);
 
@@ -290,11 +292,11 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 // 先禁用效果，防止清理过程中继续捕获
                 stageBackdropBlur.EffectEnabled = false;
-                
+
                 // 断开所有捕获目标
                 stageBackdropBlur.CaptureTarget = null;
                 stageBackdropBlur.CaptureTargets.Clear();
-                
+
                 // 强制过期并移除
                 stageBackdropBlur.Expire();
             }
@@ -360,12 +362,13 @@ namespace osu.Game.Rulesets.Mania.UI
             // 避免重复设置相同的值
             if (stageBackdropBlur.CaptureTarget == newTarget &&
                 (newTarget == null || (stageBackdropBlur.CaptureTargets.Count == 1 && stageBackdropBlur.CaptureTargets[0] == newTarget)))
+            {
+                updateBackdropBlurState();
                 return;
+            }
 
             // 先禁用效果，防止在修改过程中触发捕获
-            bool wasEnabled = stageBackdropBlur.EffectEnabled;
-            if (wasEnabled)
-                stageBackdropBlur.EffectEnabled = false;
+            stageBackdropBlur.EffectEnabled = false;
 
             stageBackdropBlur.CaptureTarget = newTarget;
 
@@ -383,9 +386,16 @@ namespace osu.Game.Rulesets.Mania.UI
                 stageBackdropBlur.CaptureTargets.Clear();
             }
 
-            // 恢复效果状态
-            if (wasEnabled)
-                stageBackdropBlur.EffectEnabled = true;
+            updateBackdropBlurState();
+        }
+
+        private void updateBackdropBlurState()
+        {
+            if (stageBackdropBlur == null)
+                return;
+
+            bool hasExplicitTarget = stageBackdropBlur.CaptureTarget != null || stageBackdropBlur.CaptureTargets.Count > 0;
+            stageBackdropBlur.EffectEnabled = blurEnabledByConfig && hasExplicitTarget;
         }
     }
 }
