@@ -18,6 +18,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.IO.Archives;
@@ -36,6 +37,9 @@ namespace osu.Game.EzOsuGame.Statistics
 {
     public partial class ExportButton : GrayButton, IHasPopover
     {
+        private const string exported_beatmap_creator_prefix = "Ez2Lazer Mods=";
+        private const string no_mod_acronym = "none";
+
         private readonly BeatmapInfo beatmapInfo;
         private readonly IReadOnlyList<Mod> mods;
 
@@ -46,7 +50,7 @@ namespace osu.Game.EzOsuGame.Statistics
             this.mods = mods;
 
             Size = new Vector2(75, 30);
-            TooltipText = "Export";
+            TooltipText = ExportStrings.EXPORT_BUTTON_TOOLTIP;
         }
 
         [BackgroundDependencyLoader]
@@ -150,6 +154,8 @@ namespace osu.Game.EzOsuGame.Statistics
                     var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
                     var playableBeatmap = workingBeatmap.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
 
+                    applyExportMetadata(playableBeatmap, mods);
+
                     using (var outStream = exportStorage.CreateFileSafely(filename))
                     using (var writer = new StreamWriter(outStream, Encoding.UTF8, 1024, true))
                         new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(writer);
@@ -244,6 +250,8 @@ namespace osu.Game.EzOsuGame.Statistics
                 var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmap);
                 var playableBeatmap = workingBeatmap.GetPlayableBeatmap(beatmap.Ruleset, mods);
 
+                applyExportMetadata(playableBeatmap, mods);
+
                 var stream = new MemoryStream();
                 using (var sw = new StreamWriter(stream, Encoding.UTF8, 1024, true))
                     new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(sw);
@@ -252,11 +260,28 @@ namespace osu.Game.EzOsuGame.Statistics
                 return stream;
             }
 
+            private static void applyExportMetadata(IBeatmap beatmap, IReadOnlyList<Mod> mods)
+            {
+                string modAcronyms = mods.Count > 0
+                    ? string.Join("+", mods.Select(mod => mod.Acronym))
+                    : no_mod_acronym;
+
+                beatmap.Metadata.Author.Username = $"{exported_beatmap_creator_prefix}{modAcronyms}";
+            }
+
             private static string createBeatmapFilenameFromMetadata(BeatmapInfo beatmap)
             {
                 var metadata = beatmap.Metadata;
                 return $"{metadata.Artist} - {metadata.Title} ({metadata.Author.Username}) [{beatmap.DifficultyName}].osu";
             }
+        }
+
+        private static class ExportStrings
+        {
+            // internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON = new EzLocalizationManager.EzLocalisableString("导出", "Export");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+                "导出当前Mods转换后的谱面", "Export the currently converted beatmap with mods applied");
         }
     }
 }
