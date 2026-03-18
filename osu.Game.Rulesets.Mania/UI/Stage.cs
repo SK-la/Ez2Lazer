@@ -110,8 +110,6 @@ namespace osu.Game.Rulesets.Mania.UI
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                         EffectEnabled = false,
-                        PassthroughByDrawOrder = false,
-                        StrictCaptureTargetsMode = false,
                         // FrameBufferScale = new Vector2(0.2f),
                         CaptureFrameInterval = 3,
                         MaxCapturesPerSecond = 300,
