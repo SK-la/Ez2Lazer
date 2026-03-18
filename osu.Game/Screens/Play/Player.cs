@@ -144,7 +144,6 @@ namespace osu.Game.Screens.Play
                     return;
 
                 StoryboardPreferred = preferred;
-                SourcesChanged?.Invoke();
             }
         }
 

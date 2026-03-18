@@ -229,8 +229,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             if (gameplayBackdropSource != null)
             {
-                updateBackdropCaptureSources();
-                gameplayBackdropSource.SourcesChanged += updateBackdropCaptureSources;
+                syncBackdropCaptureSources();
+                gameplayBackdropSource.SourcesChanged += syncBackdropCaptureSources;
             }
 
             currentSkin.SourceChanged += onSkinChanged;
@@ -285,7 +285,7 @@ namespace osu.Game.Rulesets.Mania.UI
             NewResult -= OnNewResult;
 
             if (gameplayBackdropSource != null)
-                gameplayBackdropSource.SourcesChanged -= updateBackdropCaptureSources;
+                gameplayBackdropSource.SourcesChanged -= syncBackdropCaptureSources;
 
             // 清理模糊容器的引用，释放 D3D11 渲染目标资源
             if (stageBackdropBlur != null)
@@ -344,49 +344,55 @@ namespace osu.Game.Rulesets.Mania.UI
             barLineContainer.Width = columnFlow.Width;
         }
 
-        private void updateBackdropCaptureSources()
+        private void syncBackdropCaptureSources()
         {
             if (gameplayBackdropSource == null || stageBackdropBlur == null)
                 return;
 
-            Drawable preferredSource = gameplayBackdropSource.StoryboardPreferred
-                ? gameplayBackdropSource.StoryboardSource
-                : gameplayBackdropSource.BeatmapBackgroundSource;
+            Drawable? storyboardSource = gameplayBackdropSource.StoryboardSource;
+            Drawable? beatmapBackgroundSource = gameplayBackdropSource.BeatmapBackgroundSource;
 
-            Drawable fallbackSource = gameplayBackdropSource.StoryboardPreferred
-                ? gameplayBackdropSource.BeatmapBackgroundSource
-                : gameplayBackdropSource.StoryboardSource;
+            bool unchanged = stageBackdropBlur.CaptureTarget == null
+                             && captureTargetsMatch(stageBackdropBlur.CaptureTargets, storyboardSource, beatmapBackgroundSource);
 
-            Drawable newTarget = preferredSource ?? fallbackSource;
-
-            // 避免重复设置相同的值
-            if (stageBackdropBlur.CaptureTarget == newTarget &&
-                (newTarget == null || (stageBackdropBlur.CaptureTargets.Count == 1 && stageBackdropBlur.CaptureTargets[0] == newTarget)))
+            if (!unchanged)
             {
-                updateBackdropBlurState();
-                return;
-            }
-
-            // 先禁用效果，防止在修改过程中触发捕获
-            stageBackdropBlur.EffectEnabled = false;
-
-            stageBackdropBlur.CaptureTarget = newTarget;
-
-            // 只在必要时更新 CaptureTargets
-            if (newTarget != null)
-            {
-                if (stageBackdropBlur.CaptureTargets.Count != 1 || stageBackdropBlur.CaptureTargets[0] != newTarget)
-                {
-                    stageBackdropBlur.CaptureTargets.Clear();
-                    stageBackdropBlur.CaptureTargets.Add(newTarget);
-                }
-            }
-            else
-            {
+                stageBackdropBlur.EffectEnabled = false;
+                stageBackdropBlur.CaptureTarget = null;
                 stageBackdropBlur.CaptureTargets.Clear();
+
+                if (storyboardSource != null)
+                    stageBackdropBlur.CaptureTargets.Add(storyboardSource);
+
+                if (beatmapBackgroundSource != null && beatmapBackgroundSource != storyboardSource)
+                    stageBackdropBlur.CaptureTargets.Add(beatmapBackgroundSource);
             }
 
             updateBackdropBlurState();
+        }
+
+        private static bool captureTargetsMatch(System.Collections.Generic.IReadOnlyList<Drawable> targets, Drawable? storyboardSource, Drawable? beatmapBackgroundSource)
+        {
+            int expectedCount = 0;
+
+            if (storyboardSource != null)
+                expectedCount++;
+
+            if (beatmapBackgroundSource != null && beatmapBackgroundSource != storyboardSource)
+                expectedCount++;
+
+            if (targets.Count != expectedCount)
+                return false;
+
+            int index = 0;
+
+            if (storyboardSource != null && targets[index++] != storyboardSource)
+                return false;
+
+            if (beatmapBackgroundSource != null && beatmapBackgroundSource != storyboardSource && targets[index] != beatmapBackgroundSource)
+                return false;
+
+            return true;
         }
 
         private void updateBackdropBlurState()
