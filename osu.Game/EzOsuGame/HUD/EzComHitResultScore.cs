@@ -40,9 +40,6 @@ namespace osu.Game.EzOsuGame.HUD
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
 
-        // 预览纹理基础路径
-        public string TextureBasePath => @"EzResources/enumBase/enumJudgement";
-
         // [SettingSource("Effect Type", "Effect Type")]
         // public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
         //
@@ -335,16 +332,19 @@ namespace osu.Game.EzOsuGame.HUD
                         Origin = Anchor.Centre,
                         Scale = new Vector2(1.5f),
                         Alpha = 1,
-                        Texture = textures.Get("EzResources/AllCombo/ALL-COMBO2.png")
+                        Texture = textures.Get(@$"{EzModifyPath.FULL_COMBO}/full-combo.png")
                     }
                 };
 
                 AddInternal(fullComboSprite);
+                fullComboSprite.FadeIn(50).Then().FadeOut(3000);
 
-                fullComboSound = sampleStore.Get("EzResources/AllCombo/full_combo_sound");
-                fullComboSprite.FadeIn(50).Then().FadeOut(5000);
-
+                fullComboSound = sampleStore.Get(@$"{EzModifyPath.FULL_COMBO}/full-combo-sound.ogg");
                 fullComboSound?.Play();
+            }
+            else
+            {
+                fullComboSprite?.Expire();
             }
         }
 
