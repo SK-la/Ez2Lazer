@@ -195,6 +195,31 @@ namespace osu.Game.Tests.Beatmaps.Formats
         }
 
         [Test]
+        public void TestEndTimeForDisplayIgnoresTrailingInvisibleTransforms()
+        {
+            var sprite = new StoryboardSprite("test.png", Anchor.Centre, Vector2.Zero);
+
+            sprite.Commands.AddAlpha(Easing.None, 1000, 2000, 0, 1);
+            sprite.Commands.AddAlpha(Easing.None, 3000, 4000, 1, 0);
+            sprite.Commands.AddScale(Easing.None, 4000, 10000, 1, 2);
+
+            ClassicAssert.AreEqual(4000, sprite.EndTimeForDisplay);
+        }
+
+        [Test]
+        public void TestEndTimeForDisplayIgnoresTrailingInvisibleLoopTransforms()
+        {
+            var sprite = new StoryboardSprite("test.png", Anchor.Centre, Vector2.Zero);
+            var loop = sprite.AddLoopingGroup(2000, 2);
+
+            loop.AddAlpha(Easing.None, 0, 500, 0, 1);
+            loop.AddAlpha(Easing.None, 500, 1000, 1, 0);
+            loop.AddScale(Easing.None, 1000, 1500, 1, 2);
+
+            ClassicAssert.AreEqual(6000, sprite.EndTimeForDisplay);
+        }
+
+        [Test]
         public void TestDecodeVariableWithSuffix()
         {
             var decoder = new LegacyStoryboardDecoder();
