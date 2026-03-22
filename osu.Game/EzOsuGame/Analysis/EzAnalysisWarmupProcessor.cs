@@ -28,6 +28,10 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public partial class EzAnalysisWarmupProcessor : Component
     {
+        // 诊断开关：用于快速排除“启动预热导致内存无法回收”的问题。
+        // 设为 true 时，无论配置如何都强制跳过预热。
+        private bool forceDisableWarmupForDiagnostics { get; set; } = false;
+
         protected Task ProcessingTask { get; private set; } = null!;
 
         [Resolved]
@@ -41,6 +45,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         [Resolved]
         private EzAnalysisPersistentStore persistentStore { get; set; } = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved(CanBeNull = true)]
         private INotificationOverlay? notificationOverlay { get; set; }
@@ -69,8 +76,24 @@ namespace osu.Game.EzOsuGame.Analysis
             });
         }
 
+        private bool isWarmupEnabled() =>
+            ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled)
+            && EzAnalysisPersistentStore.Enabled;
+
         private void populateManiaAnalysis()
         {
+            if (forceDisableWarmupForDiagnostics)
+            {
+                Logger.Log("Ez analysis warmup is force-disabled by internal diagnostic switch.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return;
+            }
+
+            if (!ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled))
+            {
+                Logger.Log("Ez analysis sqlite cache is disabled; skipping warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return;
+            }
+
             if (!EzAnalysisPersistentStore.Enabled)
             {
                 Logger.Log("Mania analysis persistence is disabled; skipping warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
@@ -159,6 +182,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
             foreach (Guid id in needingRecompute)
             {
+                if (!isWarmupEnabled())
+                {
+                    Logger.Log("Ez analysis warmup interrupted because switches were disabled during processing.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    break;
+                }
+
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 

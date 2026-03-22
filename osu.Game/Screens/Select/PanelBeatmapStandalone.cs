@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -69,6 +70,8 @@ namespace osu.Game.Screens.Select
 
         private IBindable<EzAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
+        private IBindable<bool> ezAnalysisCacheEnabled = new BindableBool(true);
+        private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
 
         private bool maniaWasVisible;
 
@@ -267,14 +270,31 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
+            ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
+            ezAnalysisCacheEnabled.BindValueChanged(_ =>
+            {
+                clearManiaAnalysisBinding();
+                resetManiaAnalysisDisplay();
+            }, true);
+
+            ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+            ezAnalysisSqliteEnabled.BindValueChanged(_ =>
+            {
+                clearManiaAnalysisBinding();
+                requestManiaAnalysisBindable();
+            });
+
             ruleset.BindValueChanged(_ =>
             {
+                clearManiaAnalysisBinding();
+                requestManiaAnalysisBindable();
                 resetManiaAnalysisDisplay();
                 updateKeyCount();
             }, true);
 
             mods.BindValueChanged(_ =>
             {
+                clearManiaAnalysisBinding();
                 requestManiaAnalysisBindable();
                 updateKeyCount();
             }, true);
@@ -283,6 +303,12 @@ namespace osu.Game.Screens.Select
             {
                 Expanded.Value = s.NewValue;
                 spreadDisplay.Enabled.Value = s.NewValue;
+
+                if (s.NewValue && Item?.IsVisible == true)
+                {
+                    clearManiaAnalysisBinding();
+                    requestManiaAnalysisBindable();
+                }
             }, true);
 
             var kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
@@ -318,6 +344,13 @@ namespace osu.Game.Screens.Select
 
         private void resetManiaAnalysisDisplay()
         {
+            if (!ezAnalysisCacheEnabled.Value && !ezAnalysisSqliteEnabled.Value)
+            {
+                ezKpcDisplay.Hide();
+                displayXxySR.Hide();
+                return;
+            }
+
             if (ruleset.Value.OnlineID == 3)
             {
                 ezKpcDisplay.Show();
@@ -373,13 +406,19 @@ namespace osu.Game.Screens.Select
 
         private void requestManiaAnalysisBindable()
         {
-            if (maniaAnalysisBindable != null || Item == null)
+            if ((!ezAnalysisCacheEnabled.Value && !ezAnalysisSqliteEnabled.Value) || maniaAnalysisBindable != null || Item == null)
                 return;
+
+            bool isActivePanel = Item.IsVisible;
+            bool requiresRecomputeForCorrectness = !ezAnalysisSqliteEnabled.Value || mods.Value.Any();
+            bool requiresRecomputeForValidation = Selected.Value;
+            bool allowRecompute = ezAnalysisCacheEnabled.Value && isActivePanel && (requiresRecomputeForCorrectness || requiresRecomputeForValidation);
 
             maniaAnalysisCancellationSource?.Cancel();
             maniaAnalysisCancellationSource = new CancellationTokenSource();
 
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token, computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token,
+                computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE, allowRecompute: allowRecompute);
             maniaAnalysisBindable.BindValueChanged(result =>
             {
                 updateKPS((result.NewValue.Summary.AverageKps, result.NewValue.Summary.MaxKps, result.NewValue.Summary.KpsList),

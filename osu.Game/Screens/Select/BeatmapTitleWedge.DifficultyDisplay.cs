@@ -19,6 +19,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
@@ -44,6 +45,9 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
+            // [Resolved]
+            // private Ez2ConfigManager ezConfig { get; set; } = null!;
+
             private ModSettingChangeTracker? settingChangeTracker;
 
             [Resolved]
@@ -60,6 +64,9 @@ namespace osu.Game.Screens.Select
             private DifficultyStatisticsDisplay countStatisticsDisplay = null!;
             private DifficultyStatisticsDisplay difficultyStatisticsDisplay = null!;
             private EzKpcDisplay ezKpcDisplay = null!;
+
+            // 无性能问题，所以不使用开关绑定，始终开启
+            // private IBindable<bool> ezAnalysisCacheEnabled = new BindableBool(true);
 
             private CancellationTokenSource? cancellationSource;
 
@@ -225,6 +232,9 @@ namespace osu.Game.Screens.Select
             {
                 base.LoadComplete();
 
+                // ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
+                // ezAnalysisCacheEnabled.BindValueChanged(_ => Scheduler.AddOnce(updateDisplay), true);
+
                 // it is not uncommon for the beatmap and the ruleset to change in conjunction during a single update frame.
                 // in that process, it is possible for the global bindable triad (beatmap / ruleset / mods) to briefly be partially invalid in combination (e.g. mods invalid for given ruleset).
                 // `updateDisplay()` will initiate a difficulty calculation, and if it is allowed to run in that invalid intermediate state, it will loudly fail.
@@ -282,6 +292,8 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
+                    ezKpcDisplay.Reset();
+                    ezKpcDisplay.Hide();
                     return;
                 }
 
@@ -295,30 +307,26 @@ namespace osu.Game.Screens.Select
                                                     .ToList();
 
                     // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
-                    try
+                    if (ruleset.Value != null && ruleset.Value.OnlineID == 3)
                     {
-                        if (ruleset.Value != null && ruleset.Value.OnlineID == 3)
+                        var (columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetCountsOnly(playableBeatmap);
+                        Schedule(() =>
                         {
-                            var (columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetCountsOnly(playableBeatmap);
-                            Schedule(() =>
-                            {
-                                if (cancellationToken.IsCancellationRequested)
-                                    return;
+                            if (cancellationToken.IsCancellationRequested)
+                                return;
 
-                                ezKpcDisplay.Show();
-                                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts);
-                            });
-                        }
-                        else
-                        {
-                            // 非 Mania 情况隐藏组件
-                            Schedule(() => ezKpcDisplay.Hide());
-                        }
+                            ezKpcDisplay.Show();
+                            ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts);
+                        });
                     }
-                    catch
+                    else
                     {
-                        // 忽略分析错误，保持组件隐藏或原样
-                        Schedule(() => ezKpcDisplay.Hide());
+                        // 非 Mania 情况隐藏组件
+                        Schedule(() =>
+                        {
+                            ezKpcDisplay.Reset();
+                            ezKpcDisplay.Hide();
+                        });
                     }
 
                     Schedule(() =>

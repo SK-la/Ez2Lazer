@@ -32,7 +32,8 @@ namespace osu.Game.EzOsuGame.Analysis
     /// 仅用于 mania 的选歌面板分析缓存（KPS/每列 notes/scratch）。
     /// 参考 <see cref="BeatmapDifficultyCache"/> 的中心化缓存模式：
     /// - 单线程 <see cref="ThreadedTaskScheduler"/> 控制后台计算并发，避免拖动滚动条时造成卡顿。
-    /// - 统一监听当前 ruleset/mods 及 mod 设置变化，批量更新所有已追踪的 bindable。
+    /// - 默认本地优先（内存缓存/持久化）读取，避免快速切图时频繁重算。
+    /// - 仅活动面板（由调用方显式传入 allowRecompute）执行实时重算并回写持久化。
     /// - 缓存 key 包含 mod 设置（依赖 mod 的相等性/哈希语义），避免"切/调 mod 不重算"。
     /// </summary>
     public partial class EzAnalysisCache : MemoryCachingComponent<EzAnalysisCacheLookup, EzAnalysisResult?>
@@ -64,6 +65,12 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private Bindable<IReadOnlyList<Mod>> currentMods { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private IBindable<bool> ezAnalysisEnabled = new BindableBool(true);
+        private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
+
         private ModSettingChangeTracker? modSettingChangeTracker;
         private ScheduledDelegate? debouncedModSettingsChange;
 
@@ -86,6 +93,20 @@ namespace osu.Game.EzOsuGame.Analysis
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            ezAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
+            ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+
+            ezAnalysisEnabled.BindValueChanged(v =>
+            {
+                if (!v.NewValue)
+                {
+                    disableAnalysisRuntime();
+                    return;
+                }
+
+                Scheduler.AddOnce(updateTrackedBindables);
+            }, true);
 
             currentRuleset.BindValueChanged(_ => Scheduler.AddOnce(updateTrackedBindables));
 
@@ -124,7 +145,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public Task WarmupPersistentOnlyAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
-            if (!EzAnalysisPersistentStore.Enabled)
+            if (!ezAnalysisSqliteEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.CompletedTask;
 
             // 仅支持 mania。
@@ -185,63 +206,69 @@ namespace osu.Game.EzOsuGame.Analysis
             }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, updateScheduler);
         }
 
-        public IBindable<EzAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0)
+        /// <summary>
+        /// 获取面板分析 bindable。
+        /// 默认仅本地读取；当 <paramref name="allowRecompute"/> 为 true 时允许实时重算。
+        /// </summary>
+        public IBindable<EzAnalysisResult> GetBindableAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken = default, int computationDelay = 0,
+                                                               bool allowRecompute = false)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
 
             var bindable = new BindableManiaBeatmapAnalysis(beatmapInfo, cancellationToken);
 
-            if (localBeatmapInfo == null)
+            if (localBeatmapInfo == null || (!ezAnalysisEnabled.Value && !ezAnalysisSqliteEnabled.Value))
                 return bindable;
 
-            updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay);
-
-            lock (bindableUpdateLock)
-                trackedBindables.Add(bindable);
-
-            if (cancellationToken.CanBeCanceled)
-            {
-                cancellationToken.Register(() =>
-                {
-                    lock (bindableUpdateLock)
-                        trackedBindables.Remove(bindable);
-                });
-            }
+            updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay, allowRecompute);
 
             return bindable;
         }
 
-        public async Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo,
-                                                              IRulesetInfo? rulesetInfo = null,
-                                                              IEnumerable<Mod>? mods = null,
-                                                              CancellationToken cancellationToken = default,
-                                                              int computationDelay = 0)
+        /// <summary>
+        /// 获取分析结果。
+        /// - allowRecompute=false：仅返回内存缓存/持久化结果（本地优先）。
+        /// - allowRecompute=true：允许执行实时重算（用于活动 panel 纠偏）。
+        /// </summary>
+        public Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo,
+                                                        IRulesetInfo? rulesetInfo = null,
+                                                        IEnumerable<Mod>? mods = null,
+                                                        CancellationToken cancellationToken = default,
+                                                        int computationDelay = 0,
+                                                        bool allowRecompute = false)
         {
+            // 两个开关都关闭时，既不读本地也不做重算。
+            if (!ezAnalysisEnabled.Value && !ezAnalysisSqliteEnabled.Value)
+                return Task.FromResult<EzAnalysisResult?>(null);
+
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
             var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
 
             if (localBeatmapInfo == null || localRulesetInfo == null)
-                return null;
+                return Task.FromResult<EzAnalysisResult?>(null);
 
-            // Use the original constructor that handles mod cloning and signature computation
             var lookup = new EzAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
 
-            var computed = await getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
+            // 仅从本地内存/持久化读取，保证面板低开销展示。
+            if (CheckExists(lookup, out var existing) && existing.HasValue)
+                return Task.FromResult(existing);
 
-            if (computed.HasValue)
-                return computed;
+            if (ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persistedFallback))
+                return Task.FromResult<EzAnalysisResult?>(persistedFallback);
 
-            // 关键回退：实时计算失败/禁用时，不能阻断本地持久化缓存值的加载。
-            // 持久化数据是 no-mod 基线，用于提供可见面板的兜底展示。
-            if (EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted))
-                return persisted;
+            // 重算路径仅由 global 开关控制。
+            if (allowRecompute && ezAnalysisEnabled.Value)
+                return getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay);
 
-            return null;
+            return Task.FromResult<EzAnalysisResult?>(null);
         }
 
         public bool TryGetBaselineXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
         {
             xxySr = 0;
+
+            if (!ezAnalysisEnabled.Value && !ezAnalysisSqliteEnabled.Value)
+                return false;
 
             if (beatmapInfo is not BeatmapInfo localBeatmapInfo)
                 return false;
@@ -259,7 +286,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return true;
             }
 
-            if (EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted) && persisted.Details.XxySr is double persistedXxySr)
+            if (ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted) && persisted.Details.XxySr is double persistedXxySr)
             {
                 xxySr = persistedXxySr;
                 return true;
@@ -332,9 +359,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private async Task<EzAnalysisResult?> computeValueInternalCore(EzAnalysisCacheLookup lookup, CancellationToken token)
         {
+            if (!ezAnalysisEnabled.Value)
+                return null;
+
             // 快速路径：如果存在持久化的无 mod 基线，则返回它而不进入单线程计算队列。
             // 这避免了队头阻塞，其中一个昂贵的未命中会延迟许多便宜的命中。
-            if (lookup.OrderedMods.Length == 0 && EzAnalysisPersistentStore.Enabled)
+            if (lookup.OrderedMods.Length == 0 && ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled)
             {
                 // 使用 low_priority_scope_depth 来区分预热/后台流程与可见流程。
                 // 预热流程将调用 BeginLowPriorityScope 并设置异步本地深度 > 0。
@@ -417,12 +447,14 @@ namespace osu.Game.EzOsuGame.Analysis
             return await task.ConfigureAwait(false);
         }
 
-        private EzAnalysisResult? computeAnalysis(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken)
+        private EzAnalysisResult? computeAnalysis(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken, bool allowPersistedFastPath = true)
         {
             try
             {
+                bool persistenceEnabled = ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled;
+
                 // 无mod快速路径：尝试直接从持久化存储获取结果
-                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
+                if (allowPersistedFastPath && lookup.OrderedMods.Length == 0 && persistenceEnabled && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                 {
                     return persisted;
                 }
@@ -468,7 +500,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 var details = new ManiaDetails(columnCounts, holdNoteCounts, xxySr);
                 var analysis = new EzAnalysisResult(summary, details);
 
-                if (lookup.OrderedMods.Length == 0 && analysis.Details.ColumnCounts.Count > 0)
+                if (lookup.OrderedMods.Length == 0 && persistenceEnabled && analysis.Details.ColumnCounts.Count > 0)
                 {
                     persistentStore.StoreIfDifferent(lookup.BeatmapInfo, analysis);
                 }
@@ -526,6 +558,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private void updateTrackedBindables()
         {
+            if (!ezAnalysisEnabled.Value)
+                return;
+
             if (currentRuleset.Value == null)
                 return;
 
@@ -535,8 +570,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 foreach (var b in trackedBindables)
                 {
-                    // 只重算仍"活跃"的 bindable：离屏/回收的面板会取消 token。
-                    // 这样可以确保计算预算优先服务当前可见内容。
+                    // 兼容性路径：仅当外部主动向 trackedBindables 注册时才会触发。
+                    // 目前 panel 调用链默认不注册 tracked bindable，主要走按需请求模式。
                     if (b.CancellationToken.IsCancellationRequested)
                         continue;
 
@@ -571,8 +606,12 @@ namespace osu.Game.EzOsuGame.Analysis
                                     IRulesetInfo? rulesetInfo,
                                     IEnumerable<Mod>? mods,
                                     CancellationToken cancellationToken = default,
-                                    int computationDelay = 0)
+                                    int computationDelay = 0,
+                                    bool allowRecompute = false)
         {
+            if (!ezAnalysisEnabled.Value && !ezAnalysisSqliteEnabled.Value)
+                return;
+
             // 如果 bindable 已经被取消，则什么都不做。
             if (cancellationToken.IsCancellationRequested)
                 return;
@@ -589,7 +628,7 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 try
                 {
-                    var analysis = await GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, cancellationToken, computationDelay).ConfigureAwait(false);
+                    var analysis = await GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, cancellationToken, computationDelay, allowRecompute).ConfigureAwait(false);
                     if (analysis == null)
                         return;
 
@@ -622,6 +661,23 @@ namespace osu.Game.EzOsuGame.Analysis
 
             cancelTrackedBindableUpdate();
             updateScheduler.Dispose();
+        }
+
+        private void disableAnalysisRuntime()
+        {
+            debouncedModSettingsChange?.Cancel();
+
+            cancelTrackedBindableUpdate();
+
+            inflightComputations.Clear();
+            cachedLookups.Clear();
+            Interlocked.Exchange(ref cachedLookupsCount, 0);
+
+            while (cacheInsertionOrder.TryDequeue(out _))
+            {
+            }
+
+            Invalidate(_ => true);
         }
 
         private class BindableManiaBeatmapAnalysis : Bindable<EzAnalysisResult>

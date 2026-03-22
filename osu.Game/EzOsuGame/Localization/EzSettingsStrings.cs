@@ -43,6 +43,26 @@ namespace osu.Game.EzOsuGame.Localization
             "开启后将隐藏主界面底部的在线新闻/广告轮播图。",
             "When enabled, the online news/advertisement banner at the bottom of the main menu will be hidden.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析重算", "Enable Ez analysis recomputation");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "重算开关。开启后允许活动面板进行实时分析计算并刷新显示；关闭后不进行重算。"
+            + "\n注意：该开关不控制 SQLite 本地读取与预热（由下方 SQLite 开关单独控制）。",
+            "Recomputation switch. When enabled, active panels can run real-time analysis and refresh displayed values; when disabled, no recomputation is performed."
+            + "\nNote: This switch does not control SQLite local reads or warmup (handled independently by the SQLite switch below).");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析本地数据（SQLite）", "Enable Ez analysis local data (SQLite)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "本地数据开关。独立控制 SQLite 本地读取/写入与启动预热。"
+            + "\n开启：面板可读取本地持久化分析数据，并在启动时执行预热。"
+            + "\n关闭：不读取 SQLite 本地数据，也不执行预热。",
+            "Local-data switch. Independently controls SQLite local read/write and startup warmup."
+            + "\nEnabled: Panels can read persisted local analysis data and startup warmup runs."
+            + "\nDisabled: No SQLite local reads and no warmup.");
+
 #region 机制类
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Mania 设置", "Ez Mania Settings");

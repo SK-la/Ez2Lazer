@@ -57,6 +57,7 @@ namespace osu.Game.Screens.Select
 
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
         private Bindable<bool> xxySrFilterSetting = null!;
+        private Bindable<bool> ezAnalysisCacheEnabled = null!;
 
         private readonly LoadingLayer loading;
 
@@ -163,11 +164,12 @@ namespace osu.Game.Screens.Select
             detachedBeatmaps = beatmapStore.GetBeatmapSets(cancellationToken);
             loadSamples(audio);
             xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
+            ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
 
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
         }
 
-        private bool shouldUseXxySrForDifficultyOperations => xxySrFilterSetting.Value && ruleset.Value.OnlineID == 3;
+        private bool shouldUseXxySrForDifficultyOperations => ezAnalysisCacheEnabled.Value && xxySrFilterSetting.Value && ruleset.Value.OnlineID == 3;
 
         private Task<double> getDifficultyForOperationsAsync(BeatmapInfo beatmap, CancellationToken cancellationToken)
         {

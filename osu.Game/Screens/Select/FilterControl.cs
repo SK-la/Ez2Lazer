@@ -291,26 +291,7 @@ namespace osu.Game.Screens.Select
             ruleset.BindValueChanged(_ =>
             {
                 updateCriteria();
-                int id = ruleset.Value.OnlineID;
-
-                if (id == 3)
-                {
-                    csSelector.Show();
-                    xxySrFilterButton.Show();
-                    kpcDropdown.Show();
-                }
-                else if (id == 1) // Taiko
-                {
-                    csSelector.Hide();
-                    xxySrFilterButton.Hide();
-                    kpcDropdown.Show();
-                }
-                else
-                {
-                    csSelector.Show();
-                    xxySrFilterButton.Hide();
-                    kpcDropdown.Hide();
-                }
+                updateEzControlVisibility();
             });
             mods.BindValueChanged(m =>
             {
@@ -368,8 +349,37 @@ namespace osu.Game.Screens.Select
             csSelector.Current.BindValueChanged(_ => updateCriteria());
             xxySrFilterButton.Active.BindValueChanged(_ => updateCriteria());
 
+            updateEzControlVisibility();
             updateVisibleResultsActionAvailability();
             updateCriteria();
+        }
+
+        private void updateEzControlVisibility()
+        {
+            int id = ruleset.Value.OnlineID;
+
+            if (id == 3)
+            {
+                csSelector.Show();
+
+                xxySrFilterButton.Show();
+                kpcDropdown.Show();
+
+                return;
+            }
+
+            if (id == 1) // Taiko
+            {
+                csSelector.Hide();
+                xxySrFilterButton.Hide();
+                kpcDropdown.Show();
+
+                return;
+            }
+
+            csSelector.Show();
+            xxySrFilterButton.Hide();
+            kpcDropdown.Hide();
         }
 
         private void updateVisibleResultsActionAvailability()
