@@ -5,13 +5,16 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Drawables.Cards;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
+using osu.Game.Resources.Localisation.Web;
 using osu.Game.Storyboards;
 using osuTK;
 
@@ -23,10 +26,12 @@ namespace osu.Game.Screens.Select
     public partial class EzTagDisplay : CompositeDrawable
     {
         private const int max_visible_tags = 10;
+        private const float tag_corner_radius = 3;
 
         private readonly FillFlowContainer tagFlow;
         private BeatmapInfo? beatmapInfo;
         private Storyboard? storyboard;
+        private bool tagDisplayEnabled => true;
 
         [Resolved]
         private BeatmapManager beatmaps { get; set; } = null!;
@@ -51,6 +56,14 @@ namespace osu.Game.Screens.Select
         public void UpdateBeatmap(BeatmapInfo? beatmap)
         {
             beatmapInfo = beatmap;
+
+            if (!tagDisplayEnabled)
+            {
+                storyboard = null;
+                tagFlow.Clear();
+                return;
+            }
+
             storyboard = beatmap != null ? beatmaps.GetWorkingBeatmap(beatmap).Storyboard : null;
             updateTags();
         }
@@ -62,23 +75,17 @@ namespace osu.Game.Screens.Select
             if (beatmapInfo?.BeatmapSet == null || storyboard == null)
                 return;
 
-            // 检查是否有视频（通过 Storyboard Video 层）
             bool hasVideo = storyboard.GetLayer("Video").Elements.Any(e => e is StoryboardVideo);
 
             if (hasVideo)
-            {
-                tagFlow.Add(new VideoIconPill { Scale = new Vector2(0.8f) });
-            }
+                tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo));
 
-            // 检查是否有视觉故事版（Sprite/Animation，排除 Video 和 Sample 音效）
             bool hasStoryboard = storyboard.Layers
                                            .SelectMany(l => l.Elements)
                                            .Any(e => e is StoryboardSprite && e is not StoryboardVideo);
 
             if (hasStoryboard)
-            {
-                tagFlow.Add(new StoryboardIconPill { Scale = new Vector2(0.8f) });
-            }
+                tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard));
 
             // 添加用户标签（不受图标数量影响）
             var userTags = beatmapInfo.Metadata.UserTags.Take(max_visible_tags);
@@ -98,6 +105,46 @@ namespace osu.Game.Screens.Select
             // }
         }
 
+        private partial class IconTag : CompositeDrawable, IHasTooltip
+        {
+            private readonly IconUsage icon;
+            public LocalisableString TooltipText { get; }
+
+            public IconTag(IconUsage icon, LocalisableString tooltipText)
+            {
+                this.icon = icon;
+                TooltipText = tooltipText;
+
+                AutoSizeAxes = Axes.Both;
+                CornerRadius = tag_corner_radius;
+                Masking = true;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OverlayColourProvider colourProvider)
+            {
+                InternalChild = new Container
+                {
+                    AutoSizeAxes = Axes.Both,
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = colourProvider.Background3,
+                        },
+                        new SpriteIcon
+                        {
+                            Icon = icon,
+                            Size = new Vector2(10),
+                            Colour = colourProvider.Content2,
+                            Margin = new MarginPadding { Horizontal = 2, Vertical = 1 },
+                        }
+                    }
+                };
+            }
+        }
+
         private partial class SimpleTag : OsuClickableContainer
         {
             private readonly string tagText;
@@ -111,7 +158,7 @@ namespace osu.Game.Screens.Select
             [BackgroundDependencyLoader]
             private void load(OverlayColourProvider colourProvider)
             {
-                CornerRadius = 3;
+                CornerRadius = tag_corner_radius;
                 Masking = true;
 
                 Child = new Container
