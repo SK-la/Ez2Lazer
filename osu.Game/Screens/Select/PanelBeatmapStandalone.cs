@@ -328,19 +328,18 @@ namespace osu.Game.Screens.Select
         {
             if (!ezAnalysisCacheEnabled.Value)
             {
-                ezKpcDisplay.Hide();
+                ezKpcDisplay.SetState(null);
                 displayXxySR.Hide();
                 return;
             }
 
             if (ruleset.Value.OnlineID == 3)
             {
-                ezKpcDisplay.Show();
                 displayXxySR.Show();
             }
             else
             {
-                ezKpcDisplay.Hide();
+                ezKpcDisplay.SetState(null);
                 displayXxySR.Hide();
             }
         }
@@ -380,7 +379,7 @@ namespace osu.Game.Screens.Select
 
             if (columnCounts != null)
             {
-                ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts);
+                ezKpcDisplay.SetState(columnCounts, holdNoteCounts);
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 Schedule(updateKeyCount);
             }

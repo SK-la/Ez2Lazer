@@ -24,7 +24,6 @@ namespace osu.Game.Screens.Select
 
         private readonly List<NumberColumnEntry> numberEntries = new List<NumberColumnEntry>();
         private readonly List<BarChartColumnEntry> barEntries = new List<BarChartColumnEntry>();
-        private readonly Box backgroundBox;
         private FillFlowContainer? columnNotesContainer;
         private OsuSpriteText? headerText;
         private Container? modePlaceholder;
@@ -50,7 +49,7 @@ namespace osu.Game.Screens.Select
                 RelativeSizeAxes = Axes.Y,
                 Children = new Drawable[]
                 {
-                    backgroundBox = new Box
+                    new Box
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = Colour4.Black.Opacity(0.6f),
@@ -161,11 +160,27 @@ namespace osu.Game.Screens.Select
         }
 
         /// <summary>
+        /// 设置 KPC 显示状态。传入 null 或空字典时隐藏并重置；传入有效数据时显示并更新。
+        /// </summary>
+        public void SetState(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdCounts = null)
+        {
+            if (columnCounts == null || columnCounts.Count == 0)
+            {
+                reset();
+                Hide();
+                return;
+            }
+
+            updateColumnCounts(columnCounts, holdCounts);
+            Show();
+        }
+
+        /// <summary>
         /// 更新列音符数量显示
         /// </summary>
         /// <param name="columnNoteCounts">每列的音符数量</param>
         /// <param name="holdNoteCounts">面条数量</param>
-        public void UpdateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
+        private void updateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             if (columnNoteCounts.Count == 0)
             {
@@ -215,7 +230,7 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        public void Reset()
+        private void reset()
         {
             modePlaceholder?.Clear();
             columnNotesContainer = null;
@@ -711,7 +726,7 @@ namespace osu.Game.Screens.Select
             if (isDisposing)
             {
                 KpcDisplayModeBindable.UnbindAll();
-                Reset();
+                reset();
             }
 
             base.Dispose(isDisposing);
