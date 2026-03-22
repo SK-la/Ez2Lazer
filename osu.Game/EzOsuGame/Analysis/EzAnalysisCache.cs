@@ -46,12 +46,18 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly object bindableUpdateLock = new object();
 
         private CancellationTokenSource trackedUpdateCancellationSource = new CancellationTokenSource();
+        private CancellationTokenSource computationsCancellationSource = new CancellationTokenSource();
 
         private readonly SemaphoreSlim persistenceReadGate = new SemaphoreSlim(4, 4);
 
         private readonly ConcurrentDictionary<EzAnalysisCacheLookup, Task<EzAnalysisResult?>> inflightComputations = new ConcurrentDictionary<EzAnalysisCacheLookup, Task<EzAnalysisResult?>>();
 
         private static readonly AsyncLocal<int> low_priority_scope_depth = new AsyncLocal<int>();
+
+        /// <summary>
+        /// 是否当前在低优先级预热流程中。
+        /// </summary>
+        private bool isLowPriorityFlow => low_priority_scope_depth.Value > 0;
 
         [Resolved]
         private EzAnalysisPersistentStore persistentStore { get; set; } = null!;
@@ -295,6 +301,28 @@ namespace osu.Game.EzOsuGame.Analysis
             return false;
         }
 
+        /// <summary>
+        /// 在 panel 被销毁时主动清除其分析缓存，避免缓存堆积。
+        /// 特别考虑快速滚动列表时，panel 可能被快速创建和销毁。
+        /// </summary>
+        public void InvalidateBeatmapAnalysis(BeatmapInfo? beatmapInfo)
+        {
+            if (beatmapInfo is null)
+                return;
+
+            // 从内存缓存中移除所有与此 beatmap 相关的条目
+            var keysToRemove = cachedLookups.Keys.Where(k => k.BeatmapInfo.ID == beatmapInfo.ID).ToList();
+
+            foreach (var key in keysToRemove)
+            {
+                if (cachedLookups.TryRemove(key, out _))
+                {
+                    Interlocked.Decrement(ref cachedLookupsCount);
+                    Invalidate(k => k.Equals(key));
+                }
+            }
+        }
+
         private async Task<EzAnalysisResult?> getAndMaybeEvictAsync(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
         {
             EzAnalysisResult? result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
@@ -321,6 +349,49 @@ namespace osu.Game.EzOsuGame.Analysis
             return result;
         }
 
+        /// <summary>
+        /// 尝试从持久化存储获取分析结果。
+        /// 根据当前的优先级作用域（预热 vs 可见）决定是否使用门控来限制数据库并发。
+        /// </summary>
+        private async Task<EzAnalysisResult?> tryGetPersistentResultAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // 预热流程（低优先级）需要门控以避免淹没 SQLite。
+                if (isLowPriorityFlow)
+                {
+                    bool gateAcquired = false;
+
+                    try
+                    {
+                        await persistenceReadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        gateAcquired = true;
+
+                        return await Task.Run<EzAnalysisResult?>(() => persistentStore.TryGet(beatmapInfo, out var persisted) ? persisted : null, cancellationToken).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        if (gateAcquired)
+                            persistenceReadGate.Release();
+                    }
+                }
+                else
+                {
+                    // 可见流程（高优先级）跳过门控以避免 UI 停滞。
+                    return await Task.Run<EzAnalysisResult?>(() => persistentStore.TryGet(beatmapInfo, out var persisted) ? persisted : null, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch
+            {
+                // 忽略持久化失败并回退到计算。
+                return null;
+            }
+        }
+
         protected override Task<EzAnalysisResult?> ComputeValueAsync(EzAnalysisCacheLookup lookup, CancellationToken token = default)
         {
             return computeValueWithDedupAsync(lookup, token);
@@ -334,7 +405,7 @@ namespace osu.Game.EzOsuGame.Analysis
             // 希望共享计算完成以便结果可以重用。
             var existing = inflightComputations.GetOrAdd(lookup, lookupKey =>
             {
-                var task = computeValueInternalCore(lookup, CancellationToken.None);
+                var task = computeValueInternalCore(lookup, computationsCancellationSource.Token);
 
                 // 当任务完成时移除条目（尽力而为），但仅当值匹配时。
                 task.ContinueWith(
@@ -366,72 +437,9 @@ namespace osu.Game.EzOsuGame.Analysis
             // 这避免了队头阻塞，其中一个昂贵的未命中会延迟许多便宜的命中。
             if (lookup.OrderedMods.Length == 0 && ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled)
             {
-                // 使用 low_priority_scope_depth 来区分预热/后台流程与可见流程。
-                // 预热流程将调用 BeginLowPriorityScope 并设置异步本地深度 > 0。
-                // 我们只对预热/后台流程进行门控以限制数据库并发；可见流程使用
-                // 快速路径读取以避免 UI 停滞。
-                if (low_priority_scope_depth.Value > 0)
-                {
-                    bool gateAcquired = false;
-
-                    try
-                    {
-                        await persistenceReadGate.WaitAsync(token).ConfigureAwait(false);
-                        gateAcquired = true;
-
-                        var persistedResult = await Task.Run<EzAnalysisResult?>(() =>
-                        {
-                            if (persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
-                            {
-                                return persisted;
-                            }
-
-                            return null;
-                        }, token).ConfigureAwait(false);
-
-                        if (persistedResult != null)
-                            return persistedResult;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return null;
-                    }
-                    catch
-                    {
-                        // 忽略持久化失败并回退到计算。
-                    }
-                    finally
-                    {
-                        if (gateAcquired)
-                            persistenceReadGate.Release();
-                    }
-                }
-                else
-                {
-                    try
-                    {
-                        var persistedResult = await Task.Run<EzAnalysisResult?>(() =>
-                        {
-                            if (persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
-                            {
-                                return persisted;
-                            }
-
-                            return null;
-                        }, token).ConfigureAwait(false);
-
-                        if (persistedResult != null)
-                            return persistedResult;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return null;
-                    }
-                    catch
-                    {
-                        // 忽略持久化失败并回退到计算。
-                    }
-                }
+                var persistedResult = await tryGetPersistentResultAsync(lookup.BeatmapInfo, token).ConfigureAwait(false);
+                if (persistedResult != null)
+                    return persistedResult;
             }
 
             var scheduler = updateScheduler;
@@ -660,6 +668,10 @@ namespace osu.Game.EzOsuGame.Analysis
             modSettingChangeTracker?.Dispose();
 
             cancelTrackedBindableUpdate();
+
+            computationsCancellationSource?.Cancel();
+            computationsCancellationSource?.Dispose();
+
             updateScheduler.Dispose();
         }
 
@@ -667,7 +679,21 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             debouncedModSettingsChange?.Cancel();
 
+            // 清理 mod 设置追踪器，停止对 mod 变化的监听
+            modSettingChangeTracker?.Dispose();
+            modSettingChangeTracker = null;
+
             cancelTrackedBindableUpdate();
+
+            // 取消所有正在运行的计算，防止关闭后继续占用内存
+            computationsCancellationSource.Cancel();
+            computationsCancellationSource = new CancellationTokenSource();
+
+            // 清空所有追踪的 bindables 及其引用
+            lock (bindableUpdateLock)
+            {
+                trackedBindables.Clear();
+            }
 
             inflightComputations.Clear();
             cachedLookups.Clear();

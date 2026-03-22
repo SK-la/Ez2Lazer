@@ -362,6 +362,12 @@ namespace osu.Game.Screens.Select
 
             ezTagDisplay.UpdateBeatmap(null);
             clearManiaAnalysisBinding();
+
+            // 主动清除本 panel 的分析缓存以防止在快速滚动时缓存堆积
+            // 这会立即从内存缓存中移除与此 beatmap 相关的所有分析结果
+            if (Item != null)
+                maniaAnalysisCache.InvalidateBeatmapAnalysis(((GroupedBeatmap)Item.Model).Beatmap);
+
             scratchText = null;
         }
 
