@@ -616,7 +616,7 @@ namespace osu.Game.Screens.Select
             debounceQueueSelection(groupedBeatmap.Beatmap);
         }
 
-        private bool ensureGlobalBeatmapValid()
+        private bool ensureGlobalBeatmapValid(bool refetch = false)
         {
             if (!this.IsCurrentScreen())
                 return false;
@@ -628,8 +628,9 @@ namespace osu.Game.Screens.Select
             if (IsFiltering)
                 return false;
 
-            // Refetch to be confident that the current selection is still valid. It may have been deleted or hidden.
-            var currentBeatmap = beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, true);
+            // Refetch only if explicitly requested (e.g. when returning to screen after potential external changes).
+            // Avoid refetching during normal beatmap selection to prevent unnecessary cache invalidation and memory spikes.
+            var currentBeatmap = beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, refetch);
             bool validSelection = checkBeatmapValidForSelection(currentBeatmap.BeatmapInfo);
 
             if (validSelection)
@@ -706,7 +707,8 @@ namespace osu.Game.Screens.Select
             this.FadeIn(fade_duration, Easing.OutQuint);
             onArrivingAtScreen();
 
-            ensureGlobalBeatmapValid();
+            // Refetch required here to ensure selection is still valid after potential external changes (deletion, hiding, etc.)
+            ensureGlobalBeatmapValid(refetch: true);
 
             detailsArea.Refresh();
 
