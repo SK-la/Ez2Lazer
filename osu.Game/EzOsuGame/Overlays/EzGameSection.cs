@@ -24,6 +24,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             Children = new Drawable[]
             {
+                new EzUISettings(),
                 new EzGameSettings(),
                 new ServerSettings(),
                 new EzAnalysisSettings(),

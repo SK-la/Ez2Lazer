@@ -129,6 +129,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.XxySRFilter, false);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.EzSelectCsMode, "");
+            SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             initializeManiaDefaults();
 
             // 判定偏移修正（以毫秒计）
@@ -533,6 +534,7 @@ namespace osu.Game.EzOsuGame.Configuration
         KeySoundPreviewMode,
         XxySRFilter,
         KpcDisplayMode,
+        HideMainMenuOnlineBanner,
 
         ColumnTypeListSelect,
         EzSelectCsMode,
