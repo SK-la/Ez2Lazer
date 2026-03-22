@@ -292,8 +292,7 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
-                    ezKpcDisplay.Reset();
-                    ezKpcDisplay.Hide();
+                    ezKpcDisplay.SetState(null);
                     return;
                 }
 
@@ -315,18 +314,13 @@ namespace osu.Game.Screens.Select
                             if (cancellationToken.IsCancellationRequested)
                                 return;
 
-                            ezKpcDisplay.Show();
-                            ezKpcDisplay.UpdateColumnCounts(columnCounts, holdNoteCounts);
+                            ezKpcDisplay.SetState(columnCounts, holdNoteCounts);
                         });
                     }
                     else
                     {
                         // 非 Mania 情况隐藏组件
-                        Schedule(() =>
-                        {
-                            ezKpcDisplay.Reset();
-                            ezKpcDisplay.Hide();
-                        });
+                        Schedule(() => ezKpcDisplay.SetState(null));
                     }
 
                     Schedule(() =>
