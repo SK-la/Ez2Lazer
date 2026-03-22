@@ -42,6 +42,9 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private EzAnalysisPersistentStore persistentStore { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
         [Resolved(CanBeNull = true)]
         private INotificationOverlay? notificationOverlay { get; set; }
 
@@ -69,8 +72,25 @@ namespace osu.Game.EzOsuGame.Analysis
             });
         }
 
+        private bool isWarmupEnabled() =>
+            ezConfig.Get<bool>(Ez2Setting.EzAnalysisCacheEnabled)
+            && ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled)
+            && EzAnalysisPersistentStore.Enabled;
+
         private void populateManiaAnalysis()
         {
+            if (!ezConfig.Get<bool>(Ez2Setting.EzAnalysisCacheEnabled))
+            {
+                Logger.Log("Ez analysis cache is disabled; skipping warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return;
+            }
+
+            if (!ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled))
+            {
+                Logger.Log("Ez analysis sqlite cache is disabled; skipping warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return;
+            }
+
             if (!EzAnalysisPersistentStore.Enabled)
             {
                 Logger.Log("Mania analysis persistence is disabled; skipping warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
@@ -159,6 +179,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
             foreach (Guid id in needingRecompute)
             {
+                if (!isWarmupEnabled())
+                {
+                    Logger.Log("Ez analysis warmup interrupted because switches were disabled during processing.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    break;
+                }
+
                 if (notification?.State == ProgressNotificationState.Cancelled)
                     break;
 

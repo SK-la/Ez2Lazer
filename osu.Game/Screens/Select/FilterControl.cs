@@ -97,6 +97,7 @@ namespace osu.Game.Screens.Select
         public event Action<FilterCriteria>? CriteriaChanged;
 
         private FilterCriteria currentCriteria = null!;
+        private IBindable<bool> ezAnalysisCacheEnabled = null!;
 
         private IDisposable? collectionsSubscription;
 
@@ -284,33 +285,25 @@ namespace osu.Game.Screens.Select
             ezConfig.BindWith(Ez2Setting.KpcDisplayMode, kpcDropdown.Current);
             ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, ksPreviewButton.State);
+            ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
             config.BindWith(OsuSetting.ShowConvertedBeatmaps, showConvertedBeatmapsButton.Active);
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
             config.BindWith(OsuSetting.SongSelectGroupMode, groupDropdown.Current);
 
+            ezAnalysisCacheEnabled.BindValueChanged(v =>
+            {
+                if (!v.NewValue)
+                    xxySrFilterButton.Active.Value = false;
+
+                updateAnalysisControlVisibility();
+                updateCriteria();
+            }, true);
+
             ruleset.BindValueChanged(_ =>
             {
                 updateCriteria();
-                int id = ruleset.Value.OnlineID;
-
-                if (id == 3)
-                {
-                    csSelector.Show();
-                    xxySrFilterButton.Show();
-                    kpcDropdown.Show();
-                }
-                else if (id == 1) // Taiko
-                {
-                    csSelector.Hide();
-                    xxySrFilterButton.Hide();
-                    kpcDropdown.Show();
-                }
-                else
-                {
-                    csSelector.Show();
-                    xxySrFilterButton.Hide();
-                    kpcDropdown.Hide();
-                }
+                updateRulesetControlVisibility();
+                updateAnalysisControlVisibility();
             });
             mods.BindValueChanged(m =>
             {
@@ -368,8 +361,47 @@ namespace osu.Game.Screens.Select
             csSelector.Current.BindValueChanged(_ => updateCriteria());
             xxySrFilterButton.Active.BindValueChanged(_ => updateCriteria());
 
+            updateRulesetControlVisibility();
+            updateAnalysisControlVisibility();
             updateVisibleResultsActionAvailability();
             updateCriteria();
+        }
+
+        private void updateRulesetControlVisibility()
+        {
+            int id = ruleset.Value.OnlineID;
+
+            if (id == 3)
+            {
+                csSelector.Show();
+
+                xxySrFilterButton.Show();
+                kpcDropdown.Show();
+
+                return;
+            }
+
+            if (id == 1) // Taiko
+            {
+                csSelector.Hide();
+                xxySrFilterButton.Hide();
+                kpcDropdown.Show();
+
+                return;
+            }
+
+            csSelector.Show();
+            xxySrFilterButton.Hide();
+            kpcDropdown.Hide();
+        }
+
+        private void updateAnalysisControlVisibility()
+        {
+            if (ezAnalysisCacheEnabled.Value)
+                return;
+
+            xxySrFilterButton.Hide();
+            kpcDropdown.Hide();
         }
 
         private void updateVisibleResultsActionAvailability()

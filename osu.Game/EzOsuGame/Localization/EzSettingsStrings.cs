@@ -43,6 +43,28 @@ namespace osu.Game.EzOsuGame.Localization
             "开启后将隐藏主界面底部的在线新闻/广告轮播图。",
             "When enabled, the online news/advertisement banner at the bottom of the main menu will be hidden.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析功能", "Enable Ez analysis feature");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "总开关。启用 EzAnalysis 功能，包括但不限于选歌界面显示的："
+            + "\nKPS(每秒按键数, 通用)"
+            + "\nKPC(每列note数, mania专有)"
+            + "\nXXY SR(sunnyxxy谱面评级, mania专有)",
+            "Master switch. Enables EzAnalysis features, including but not limited to the following displayed on the song selection screen:"
+            + "\nKPS(Keys Per Second, universal)"
+            + "\nKPC(Keys Per Column, mania-only)"
+            + "\nXXY SR(sunnyxxy Beatmap Star-Rating-Rebirth, mania-only)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("启用 Ez 分析 SQLite 缓存/预热", "Enable Ez analysis SQLite cache/warmup");
+
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "仅控制预热与 SQLite 持久化读写。关闭后仍可进行实时分析计算（若总开关开启）。"
+            + "\n谱面分析预热：在启动时预计算noMod谱面数据，批量缓存到Sqlite数据库，以加速选歌界面的数据加载和分析性能。",
+            "Only controls the warmup and SQLite persistent read/write. Real-time analysis calculations can still be performed when disabled (if the master switch is enabled)."
+            + "\nBeatmap analysis warmup: Pre-calculates noMod beatmap data at startup and batches it into a SQLite database to speed up loading and analysis performance of the song selection screen.");
+
 #region 机制类
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Mania 设置", "Ez Mania Settings");

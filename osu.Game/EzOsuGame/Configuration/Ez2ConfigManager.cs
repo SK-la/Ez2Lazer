@@ -127,6 +127,8 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
             SetDefault(Ez2Setting.XxySRFilter, false);
+            SetDefault(Ez2Setting.EzAnalysisCacheEnabled, true);
+            SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.EzSelectCsMode, "");
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
@@ -533,6 +535,8 @@ namespace osu.Game.EzOsuGame.Configuration
         // 界面设置
         KeySoundPreviewMode,
         XxySRFilter,
+        EzAnalysisCacheEnabled,
+        EzAnalysisSqliteEnabled,
         KpcDisplayMode,
         HideMainMenuOnlineBanner,
 

@@ -270,6 +270,7 @@ namespace osu.Game
         private readonly BindableNumber<double> globalTrackVolumeAdjust = new BindableNumber<double>(global_track_volume_adjust);
 
         private Bindable<string> frameworkLocale = null!;
+        private IBindable<bool> ezAnalysisSqliteEnabled;
 
         private IBindable<LocalisationParameters> localisationParameters = null!;
 
@@ -309,6 +310,10 @@ namespace osu.Game
 
             // 初始化并注册EzSkinSettingsManager
             Ez2ConfigManager = new Ez2ConfigManager(Storage);
+            ezAnalysisSqliteEnabled = Ez2ConfigManager.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+            EzAnalysisPersistentStore.Enabled = ezAnalysisSqliteEnabled.Value;
+            ezAnalysisSqliteEnabled.BindValueChanged(v => EzAnalysisPersistentStore.Enabled = v.NewValue, true);
+
             GlobalConfigStore.Config = LocalConfig;
             GlobalConfigStore.EzConfig = Ez2ConfigManager;
             dependencies.Cache(Ez2ConfigManager);

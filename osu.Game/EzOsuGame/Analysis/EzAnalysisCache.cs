@@ -64,6 +64,12 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private Bindable<IReadOnlyList<Mod>> currentMods { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private IBindable<bool> ezAnalysisEnabled = new BindableBool(true);
+        private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
+
         private ModSettingChangeTracker? modSettingChangeTracker;
         private ScheduledDelegate? debouncedModSettingsChange;
 
@@ -86,6 +92,20 @@ namespace osu.Game.EzOsuGame.Analysis
         protected override void LoadComplete()
         {
             base.LoadComplete();
+
+            ezAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
+            ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+
+            ezAnalysisEnabled.BindValueChanged(v =>
+            {
+                if (!v.NewValue)
+                {
+                    disableAnalysisRuntime();
+                    return;
+                }
+
+                Scheduler.AddOnce(updateTrackedBindables);
+            }, true);
 
             currentRuleset.BindValueChanged(_ => Scheduler.AddOnce(updateTrackedBindables));
 
@@ -124,7 +144,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public Task WarmupPersistentOnlyAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
-            if (!EzAnalysisPersistentStore.Enabled)
+            if (!ezAnalysisEnabled.Value || !ezAnalysisSqliteEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.CompletedTask;
 
             // 仅支持 mania。
@@ -191,7 +211,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var bindable = new BindableManiaBeatmapAnalysis(beatmapInfo, cancellationToken);
 
-            if (localBeatmapInfo == null)
+            if (localBeatmapInfo == null || !ezAnalysisEnabled.Value)
                 return bindable;
 
             updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay);
@@ -217,6 +237,9 @@ namespace osu.Game.EzOsuGame.Analysis
                                                               CancellationToken cancellationToken = default,
                                                               int computationDelay = 0)
         {
+            if (!ezAnalysisEnabled.Value)
+                return null;
+
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
             var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
 
@@ -233,7 +256,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             // 关键回退：实时计算失败/禁用时，不能阻断本地持久化缓存值的加载。
             // 持久化数据是 no-mod 基线，用于提供可见面板的兜底展示。
-            if (EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted))
+            if (ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted))
                 return persisted;
 
             return null;
@@ -242,6 +265,9 @@ namespace osu.Game.EzOsuGame.Analysis
         public bool TryGetBaselineXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
         {
             xxySr = 0;
+
+            if (!ezAnalysisEnabled.Value)
+                return false;
 
             if (beatmapInfo is not BeatmapInfo localBeatmapInfo)
                 return false;
@@ -332,9 +358,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private async Task<EzAnalysisResult?> computeValueInternalCore(EzAnalysisCacheLookup lookup, CancellationToken token)
         {
+            if (!ezAnalysisEnabled.Value)
+                return null;
+
             // 快速路径：如果存在持久化的无 mod 基线，则返回它而不进入单线程计算队列。
             // 这避免了队头阻塞，其中一个昂贵的未命中会延迟许多便宜的命中。
-            if (lookup.OrderedMods.Length == 0 && EzAnalysisPersistentStore.Enabled)
+            if (lookup.OrderedMods.Length == 0 && ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled)
             {
                 // 使用 low_priority_scope_depth 来区分预热/后台流程与可见流程。
                 // 预热流程将调用 BeginLowPriorityScope 并设置异步本地深度 > 0。
@@ -421,8 +450,10 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             try
             {
+                bool persistenceEnabled = ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled;
+
                 // 无mod快速路径：尝试直接从持久化存储获取结果
-                if (lookup.OrderedMods.Length == 0 && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
+                if (lookup.OrderedMods.Length == 0 && persistenceEnabled && persistentStore.TryGet(lookup.BeatmapInfo, out var persisted))
                 {
                     return persisted;
                 }
@@ -468,7 +499,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 var details = new ManiaDetails(columnCounts, holdNoteCounts, xxySr);
                 var analysis = new EzAnalysisResult(summary, details);
 
-                if (lookup.OrderedMods.Length == 0 && analysis.Details.ColumnCounts.Count > 0)
+                if (lookup.OrderedMods.Length == 0 && persistenceEnabled && analysis.Details.ColumnCounts.Count > 0)
                 {
                     persistentStore.StoreIfDifferent(lookup.BeatmapInfo, analysis);
                 }
@@ -526,6 +557,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private void updateTrackedBindables()
         {
+            if (!ezAnalysisEnabled.Value)
+                return;
+
             if (currentRuleset.Value == null)
                 return;
 
@@ -573,6 +607,9 @@ namespace osu.Game.EzOsuGame.Analysis
                                     CancellationToken cancellationToken = default,
                                     int computationDelay = 0)
         {
+            if (!ezAnalysisEnabled.Value)
+                return;
+
             // 如果 bindable 已经被取消，则什么都不做。
             if (cancellationToken.IsCancellationRequested)
                 return;
@@ -622,6 +659,23 @@ namespace osu.Game.EzOsuGame.Analysis
 
             cancelTrackedBindableUpdate();
             updateScheduler.Dispose();
+        }
+
+        private void disableAnalysisRuntime()
+        {
+            debouncedModSettingsChange?.Cancel();
+
+            cancelTrackedBindableUpdate();
+
+            inflightComputations.Clear();
+            cachedLookups.Clear();
+            Interlocked.Exchange(ref cachedLookupsCount, 0);
+
+            while (cacheInsertionOrder.TryDequeue(out _))
+            {
+            }
+
+            Invalidate(_ => true);
         }
 
         private class BindableManiaBeatmapAnalysis : Bindable<EzAnalysisResult>

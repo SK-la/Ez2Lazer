@@ -65,6 +65,7 @@ namespace osu.Game.Screens.Select
         private IBindable<EzAnalysisResult>? maniaAnalysisBindable;
         private CancellationTokenSource? maniaAnalysisCancellationSource;
         private bool maniaWasVisible;
+        private IBindable<bool> ezAnalysisCacheEnabled = new BindableBool(true);
 
         private int keyCount;
         private string? scratchText;
@@ -253,6 +254,13 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
+            ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
+            ezAnalysisCacheEnabled.BindValueChanged(_ =>
+            {
+                clearManiaAnalysisBinding();
+                resetManiaAnalysisDisplay();
+            }, true);
+
             ruleset.BindValueChanged(_ =>
             {
                 resetManiaAnalysisDisplay();
@@ -294,6 +302,13 @@ namespace osu.Game.Screens.Select
 
         private void resetManiaAnalysisDisplay()
         {
+            if (!ezAnalysisCacheEnabled.Value)
+            {
+                ezKpcDisplay.Hide();
+                displayXxySR.Hide();
+                return;
+            }
+
             if (ruleset.Value.OnlineID == 3)
             {
                 ezKpcDisplay.Show();
@@ -355,7 +370,7 @@ namespace osu.Game.Screens.Select
 
         private void requestManiaAnalysisBindable()
         {
-            if (maniaAnalysisBindable != null || Item == null)
+            if (!ezAnalysisCacheEnabled.Value || maniaAnalysisBindable != null || Item == null)
                 return;
 
             maniaAnalysisCancellationSource?.Cancel();
