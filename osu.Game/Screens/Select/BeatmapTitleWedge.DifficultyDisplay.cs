@@ -283,6 +283,7 @@ namespace osu.Game.Screens.Select
 
                 if (!ezAnalysisCacheEnabled.Value)
                 {
+                    ezKpcDisplay.Reset();
                     ezKpcDisplay.Hide();
                 }
 
@@ -295,6 +296,8 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
+                    ezKpcDisplay.Reset();
+                    ezKpcDisplay.Hide();
                     return;
                 }
 
@@ -323,7 +326,11 @@ namespace osu.Game.Screens.Select
                     else
                     {
                         // 非 Mania 情况隐藏组件
-                        Schedule(() => ezKpcDisplay.Hide());
+                        Schedule(() =>
+                        {
+                            ezKpcDisplay.Reset();
+                            ezKpcDisplay.Hide();
+                        });
                     }
 
                     Schedule(() =>

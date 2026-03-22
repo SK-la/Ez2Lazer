@@ -215,6 +215,21 @@ namespace osu.Game.Screens.Select
             }
         }
 
+        public void Reset()
+        {
+            modePlaceholder?.Clear();
+            columnNotesContainer = null;
+            headerText = null;
+
+            numberEntries.Clear();
+            barEntries.Clear();
+            currentColumnCount = 0;
+
+            lastKnownColumns = null;
+            lastKnownHolds = null;
+            lastKnownCount = 0;
+        }
+
         // /// <summary>
         // /// Array-backed overload to avoid Dictionary allocations on hot paths when callers already have normalized buffers.
         // /// </summary>
@@ -690,6 +705,17 @@ namespace osu.Game.Screens.Select
         }
 
         #endregion
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                KpcDisplayModeBindable.UnbindAll();
+                Reset();
+            }
+
+            base.Dispose(isDisposing);
+        }
     }
 
     /// <summary>
