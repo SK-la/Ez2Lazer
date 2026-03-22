@@ -108,8 +108,8 @@ namespace osu.Game.Rulesets.Mania.UI
         private KeySoundPreviewMode keySoundPreviewMode;
 
         // 存储对本地事件的引用，以便在 Dispose 中正确取消订阅
-        private Action onNoteSizeChangedHandler = null!;
-        private Action onNoteColourChangedHandler = null!;
+        private Action? onNoteSizeChangedHandler;
+        private Action? onNoteColourChangedHandler;
 
         // 缓存计算参数，避免闭包捕获
         private int cachedKeyMode;
@@ -210,8 +210,14 @@ namespace osu.Game.Rulesets.Mania.UI
             NewResult -= OnNewResult;
 
             // 解除对 EzLocalTextureFactory 事件的订阅
-            ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
-            ezFactory.OnNoteSizeChanged -= onNoteSizeChangedHandler;
+            if (ezFactory.IsNotNull())
+            {
+                if (onNoteColourChangedHandler != null)
+                    ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
+
+                if (onNoteSizeChangedHandler != null)
+                    ezFactory.OnNoteSizeChanged -= onNoteSizeChangedHandler;
+            }
 
             NoteSetChanged = null;
             NoteSizeChanged = null;

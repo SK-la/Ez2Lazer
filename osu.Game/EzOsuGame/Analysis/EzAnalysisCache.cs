@@ -211,22 +211,32 @@ namespace osu.Game.EzOsuGame.Analysis
             return bindable;
         }
 
-        public Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo,
-                                                        IRulesetInfo? rulesetInfo = null,
-                                                        IEnumerable<Mod>? mods = null,
-                                                        CancellationToken cancellationToken = default,
-                                                        int computationDelay = 0)
+        public async Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo,
+                                                              IRulesetInfo? rulesetInfo = null,
+                                                              IEnumerable<Mod>? mods = null,
+                                                              CancellationToken cancellationToken = default,
+                                                              int computationDelay = 0)
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
             var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
 
             if (localBeatmapInfo == null || localRulesetInfo == null)
-                return Task.FromResult<EzAnalysisResult?>(null);
+                return null;
 
             // Use the original constructor that handles mod cloning and signature computation
             var lookup = new EzAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
 
-            return getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay);
+            var computed = await getAndMaybeEvictAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
+
+            if (computed.HasValue)
+                return computed;
+
+            // 关键回退：实时计算失败/禁用时，不能阻断本地持久化缓存值的加载。
+            // 持久化数据是 no-mod 基线，用于提供可见面板的兜底展示。
+            if (EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted))
+                return persisted;
+
+            return null;
         }
 
         public bool TryGetBaselineXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
@@ -264,10 +274,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (result.HasValue)
             {
-                cacheInsertionOrder.Enqueue(lookup);
-
+                // 仅在新 key 首次加入内存缓存时入队，避免重复命中导致队列无限增长。
                 if (cachedLookups.TryAdd(lookup, 0))
+                {
                     Interlocked.Increment(ref cachedLookupsCount);
+                    cacheInsertionOrder.Enqueue(lookup);
+                }
 
                 while (Volatile.Read(ref cachedLookupsCount) > max_in_memory_entries && cacheInsertionOrder.TryDequeue(out var toRemove))
                 {
@@ -478,6 +490,12 @@ namespace osu.Game.EzOsuGame.Analysis
                 }
 
                 return null;
+            }
+            finally
+            {
+                // 主动释放此谱面的 working beatmap 缓存，避免在选歌切换中累积大量已分析谱面的可玩对象驻留内存。
+                // 已经被调用方持有的实例不受影响；这里只清理 manager 层面的可复用缓存引用。
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(lookup.BeatmapInfo);
             }
         }
 
