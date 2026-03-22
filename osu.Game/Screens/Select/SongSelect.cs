@@ -125,6 +125,7 @@ namespace osu.Game.Screens.Select
         private SkinnableContainer skinnableContent = null!;
 
         private GridContainer mainGridContainer = null!;
+        private BeatmapPreviewTabOverlay beatmapPreviewTabOverlay = null!;
 
         private NoResultsPlaceholder noResultsPlaceholder = null!;
 
@@ -298,6 +299,11 @@ namespace osu.Game.Screens.Select
                                         },
                                     }
                                 },
+                                beatmapPreviewTabOverlay = new BeatmapPreviewTabOverlay
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Depth = float.MinValue,
+                                }
                             }
                         },
                     }
@@ -378,7 +384,11 @@ namespace osu.Game.Screens.Select
             {
                 Hotkey = GlobalAction.ToggleBeatmapOptions,
             },
-            new FooterButtonEzUtils(carousel.GetFilteredBeatmaps, () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo)
+            new FooterButtonEzUtils(
+                carousel.GetFilteredBeatmaps,
+                () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo,
+                () => beatmapPreviewTabOverlay.Toggle(),
+                () => beatmapPreviewTabOverlay.TogglePreviewMode())
         };
 
         protected override void LoadComplete()
@@ -770,6 +780,8 @@ namespace osu.Game.Screens.Select
             }
 
             Beatmap.BindValueChanged(updateVariousState, true);
+
+            beatmapPreviewTabOverlay.RestoreRememberedState();
         }
 
         private void updateVariousState(ValueChangedEvent<WorkingBeatmap> e)
@@ -783,6 +795,8 @@ namespace osu.Game.Screens.Select
             updateBackgroundDim();
             updateWedgeVisibility();
             fetchOnlineInfo(force: ReferenceEquals(e.OldValue, e.NewValue));
+
+            beatmapPreviewTabOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value);
         }
 
         private void onLeavingScreen()
@@ -798,6 +812,8 @@ namespace osu.Game.Screens.Select
             modSelectOverlay.Beatmap.UnbindFrom(Beatmap);
 
             updateWedgeVisibility();
+
+            beatmapPreviewTabOverlay.SuspendForScreenExit();
 
             endLooping();
         }
