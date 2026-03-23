@@ -6,18 +6,33 @@ using System.Collections.Generic;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
+    /// 综合分析结果，包含概要与详细两部分。UI 应默认使用 `Summary`，只有在需要时再访问 `Details`。
+    /// </summary>
+    public readonly record struct EzAnalysisResult
+    {
+        public readonly KpsSummary KpsSummary;
+        public readonly EzManiaSummary EzManiaSummary;
+
+        public EzAnalysisResult(KpsSummary kpsSummary, EzManiaSummary ezManiaSummary)
+        {
+            KpsSummary = kpsSummary;
+            EzManiaSummary = ezManiaSummary;
+        }
+    }
+
+    /// <summary>
     /// 轻量级的 KPS 概要，用于 UI 快速展示/下采样。
     /// </summary>
     public readonly struct KpsSummary
     {
-        public readonly double AverageKps;
-        public readonly double MaxKps;
+        public readonly double AvgKPS;
+        public readonly double MaxKPS;
         public readonly List<double> KpsList;
 
-        public KpsSummary(double averageKps, double maxKps, List<double> kpsList)
+        public KpsSummary(double avgKPS, double maxKps, List<double> kpsList)
         {
-            AverageKps = averageKps;
-            MaxKps = maxKps;
+            AvgKPS = avgKPS;
+            MaxKPS = maxKps;
             KpsList = kpsList;
         }
     }
@@ -25,32 +40,17 @@ namespace osu.Game.EzOsuGame.Analysis
     /// <summary>
     /// 更详细的 mania 统计信息：列统计、长按统计、scratch 描述与可选的 xxy_sr。
     /// </summary>
-    public readonly struct ManiaDetails
+    public readonly struct EzManiaSummary
     {
         public readonly Dictionary<int, int> ColumnCounts;
         public readonly Dictionary<int, int> HoldNoteCounts;
         public readonly double? XxySr;
 
-        public ManiaDetails(Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts, double? xxySr)
+        public EzManiaSummary(Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts, double? xxySr)
         {
             ColumnCounts = columnCounts;
             HoldNoteCounts = holdNoteCounts;
             XxySr = xxySr;
-        }
-    }
-
-    /// <summary>
-    /// 综合分析结果，包含概要与详细两部分。UI 应默认使用 `Summary`，只有在需要时再访问 `Details`。
-    /// </summary>
-    public readonly struct EzAnalysisResult
-    {
-        public readonly KpsSummary Summary;
-        public readonly ManiaDetails Details;
-
-        public EzAnalysisResult(KpsSummary summary, ManiaDetails details)
-        {
-            Summary = summary;
-            Details = details;
         }
     }
 }

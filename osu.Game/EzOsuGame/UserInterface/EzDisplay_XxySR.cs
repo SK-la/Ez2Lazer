@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
@@ -16,25 +17,32 @@ using osu.Game.Overlays;
 using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
+using osu.Game.EzOsuGame.Analysis;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// A pill that displays xxy_SR (mania).
+    /// 模仿 StarRatingDisplay 形式的显示XxySR
     /// </summary>
-    public partial class EzDisplayXxySR : CompositeDrawable, IHasCurrentValue<double?>
+    public partial class EzDisplayXxySR : CompositeDrawable, IHasCurrentValue<EzManiaSummary>
     {
+        // private readonly bool animated;
         private readonly Box background;
-        private readonly SpriteIcon moonIcon;
+        private readonly SpriteIcon srIcon;
         private readonly OsuSpriteText srText;
 
-        private readonly BindableWithCurrent<double?> current = new BindableWithCurrent<double?>();
+        private readonly BindableWithCurrent<EzManiaSummary> current = new BindableWithCurrent<EzManiaSummary>();
 
-        public Bindable<double?> Current
+        public Bindable<EzManiaSummary> Current
         {
             get => current.Current;
             set => current.Current = value;
         }
+
+        // public Color4 DisplayedDifficultyColour => background.Colour;
+        // public Color4 DisplayedDifficultyTextColour => srText.Colour;
+        // private readonly Bindable<double> displayedStars = new BindableDouble();
+        // public IBindable<double> DisplayedStars => displayedStars;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
@@ -42,9 +50,11 @@ namespace osu.Game.EzOsuGame.UserInterface
         [Resolved]
         private OverlayColourProvider? colourProvider { get; set; }
 
-        public EzDisplayXxySR(double? initialValue = null)
+        public EzDisplayXxySR(EzManiaSummary ezManiaSummary, bool animated = false)
         {
-            Current.Value = initialValue;
+            // this.animated = animated;
+
+            Current.Value = ezManiaSummary;
 
             AutoSizeAxes = Axes.Both;
 
@@ -75,7 +85,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         {
                             new[]
                             {
-                                moonIcon = new SpriteIcon
+                                srIcon = new SpriteIcon
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -103,7 +113,28 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             base.LoadComplete();
 
-            Current.BindValueChanged(v => updateDisplay(v.NewValue), true);
+            Current.BindValueChanged(c =>
+            {
+                // if (animated)
+                //     // Animation roughly matches `StarCounter`'s implementation.
+                //     this.TransformBindableTo(displayedStars, c.NewValue.XxySr, 100 + 80 * Math.Abs(c.NewValue.XxySr - c.OldValue.XxySr), Easing.OutQuint);
+                // else
+                //     displayedStars.Value = c.NewValue.XxySr;
+                if (c.NewValue.XxySr.HasValue)
+                    updateDisplay(c.NewValue.XxySr.Value);
+            });
+
+            // displayedStars.Value = Current.Value.XxySr;
+            //
+            // displayedStars.BindValueChanged(s =>
+            // {
+            //     srText.Text = s.NewValue < 0 ? "-" : s.NewValue.FormatStarRating();
+            //
+            //     background.Colour = colours.ForStarDifficulty(s.NewValue);
+            //
+            //     srIcon.Colour = colours.ForStarDifficultyText(s.NewValue);
+            //     srText.Colour = colours.ForStarDifficultyText(s.NewValue);
+            // }, true);
         }
 
         private void updateDisplay(double? sr)
@@ -114,7 +145,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 // Placeholder state: keep the pill background subtle, but ensure icon/text remain visible.
                 background.Colour = colourProvider?.Background5 ?? Color4Extensions.FromHex("303d47");
-                moonIcon.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
+                srIcon.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
                 srText.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
                 return;
             }
@@ -137,21 +168,13 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             background.Colour = colours.ForStarDifficulty(sr.Value);
 
-            moonIcon.Colour = sr.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF
+            srIcon.Colour = sr.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF
                 ? colours.Orange1
                 : colourProvider?.Background5 ?? Color4Extensions.FromHex("303d47");
 
             srText.Colour = sr.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF
                 ? colours.Orange1
                 : colourProvider?.Background5 ?? Color4.Black.Opacity(0.75f);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                current.UnbindAll();
-
-            base.Dispose(isDisposing);
         }
     }
 }

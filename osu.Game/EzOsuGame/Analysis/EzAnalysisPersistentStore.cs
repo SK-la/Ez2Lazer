@@ -322,7 +322,7 @@ LIMIT 1;
                 }
 
                 var summary = new KpsSummary(averageKps, maxKps, kpsList);
-                var details = new ManiaDetails(columnCounts, holdNoteCounts, xxySr);
+                var details = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
 
                 result = new EzAnalysisResult(summary, details);
 
@@ -367,7 +367,7 @@ LIMIT 1;
             }
 
             // 跳过空谱面（no notes）- 不需要存储和管理
-            if (analysis.Details.ColumnCounts.Count == 0)
+            if (analysis.EzManiaSummary.ColumnCounts.Count == 0)
                 return;
 
             try
@@ -443,7 +443,7 @@ LIMIT 1;
                     var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
 
                     var summary = new KpsSummary(averageKps, maxKps, kpsList);
-                    var details = new ManiaDetails(columnCounts, holdNoteCounts, xxySr);
+                    var details = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
                     result = new EzAnalysisResult(summary, details);
 
                     return true;
@@ -463,37 +463,37 @@ LIMIT 1;
         {
             // 检查 xxysr 差异（最重要）
             // 如果 stored 是 null 而 computed 有值，必须更新
-            if (!stored.Details.XxySr.HasValue && computed.Details.XxySr.HasValue)
+            if (!stored.EzManiaSummary.XxySr.HasValue && computed.EzManiaSummary.XxySr.HasValue)
                 return true;
 
             // 如果都有值，比较数值是否相同
-            if (stored.Details.XxySr.HasValue && computed.Details.XxySr.HasValue)
+            if (stored.EzManiaSummary.XxySr.HasValue && computed.EzManiaSummary.XxySr.HasValue)
             {
-                if (!stored.Details.XxySr.Value.Equals(computed.Details.XxySr.Value))
+                if (!stored.EzManiaSummary.XxySr.Value.Equals(computed.EzManiaSummary.XxySr.Value))
                     return true;
             }
 
             // 检查 KPS 相关数据
-            if (!stored.Summary.AverageKps.Equals(computed.Summary.AverageKps) || !stored.Summary.MaxKps.Equals(computed.Summary.MaxKps))
+            if (!stored.KpsSummary.AvgKPS.Equals(computed.KpsSummary.AvgKPS) || !stored.KpsSummary.MaxKPS.Equals(computed.KpsSummary.MaxKPS))
                 return true;
 
             // 检查列统计
-            if (stored.Details.ColumnCounts.Count != computed.Details.ColumnCounts.Count)
+            if (stored.EzManiaSummary.ColumnCounts.Count != computed.EzManiaSummary.ColumnCounts.Count)
                 return true;
 
-            foreach (var kvp in computed.Details.ColumnCounts)
+            foreach (var kvp in computed.EzManiaSummary.ColumnCounts)
             {
-                if (!stored.Details.ColumnCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
+                if (!stored.EzManiaSummary.ColumnCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
                     return true;
             }
 
             // 检查长按统计
-            if (stored.Details.HoldNoteCounts.Count != computed.Details.HoldNoteCounts.Count)
+            if (stored.EzManiaSummary.HoldNoteCounts.Count != computed.EzManiaSummary.HoldNoteCounts.Count)
                 return true;
 
-            foreach (var kvp in computed.Details.HoldNoteCounts)
+            foreach (var kvp in computed.EzManiaSummary.HoldNoteCounts)
             {
-                if (!stored.Details.HoldNoteCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
+                if (!stored.EzManiaSummary.HoldNoteCounts.TryGetValue(kvp.Key, out int storedCount) || storedCount != kvp.Value)
                     return true;
             }
 
@@ -513,7 +513,7 @@ LIMIT 1;
             }
 
             // 跳过空谱面（no notes）- 不需要存储和管理
-            if (analysis.Details.ColumnCounts.Count == 0)
+            if (analysis.EzManiaSummary.ColumnCounts.Count == 0)
                 return;
 
             // Enqueue pending write and return quickly. Background writer will flush to SQLite.
@@ -835,9 +835,9 @@ WHERE beatmap_id = $id;
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
 
-            string kpsListJson = JsonSerializer.Serialize(analysis.Summary.KpsList);
-            string columnCountsJson = JsonSerializer.Serialize(analysis.Details.ColumnCounts);
-            string holdNoteCountsJson = JsonSerializer.Serialize(analysis.Details.HoldNoteCounts);
+            string kpsListJson = JsonSerializer.Serialize(analysis.KpsSummary.KpsList);
+            string columnCountsJson = JsonSerializer.Serialize(analysis.EzManiaSummary.ColumnCounts);
+            string holdNoteCountsJson = JsonSerializer.Serialize(analysis.EzManiaSummary.HoldNoteCounts);
 
             cmd.CommandText = @"
 INSERT INTO mania_analysis(
@@ -880,12 +880,12 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
             cmd.Parameters.AddWithValue("$hash", beatmap.Hash);
             cmd.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
             cmd.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
-            cmd.Parameters.AddWithValue("$avg", analysis.Summary.AverageKps);
-            cmd.Parameters.AddWithValue("$max", analysis.Summary.MaxKps);
+            cmd.Parameters.AddWithValue("$avg", analysis.KpsSummary.AvgKPS);
+            cmd.Parameters.AddWithValue("$max", analysis.KpsSummary.MaxKPS);
             cmd.Parameters.AddWithValue("$kps", kpsListJson);
 
-            if (analysis.Details.XxySr.HasValue)
-                cmd.Parameters.AddWithValue("$xxy", analysis.Details.XxySr.Value);
+            if (analysis.EzManiaSummary.XxySr.HasValue)
+                cmd.Parameters.AddWithValue("$xxy", analysis.EzManiaSummary.XxySr.Value);
             else
                 cmd.Parameters.AddWithValue("$xxy", DBNull.Value);
 
@@ -1015,7 +1015,7 @@ FROM mania_analysis;
         /// </summary>
         private static bool isValidAnalysisResult(EzAnalysisResult result)
         {
-            if (result.Details.XxySr.HasValue && (double.IsNaN(result.Details.XxySr.Value) || double.IsInfinity(result.Details.XxySr.Value)))
+            if (result.EzManiaSummary.XxySr.HasValue && (double.IsNaN(result.EzManiaSummary.XxySr.Value) || double.IsInfinity(result.EzManiaSummary.XxySr.Value)))
                 return false;
 
             return true;

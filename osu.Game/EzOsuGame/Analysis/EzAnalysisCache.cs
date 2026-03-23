@@ -286,13 +286,13 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var lookup = new EzAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods: null);
 
-            if (CheckExists(lookup, out var existing) && existing?.Details.XxySr is double cachedXxySr)
+            if (CheckExists(lookup, out var existing) && existing?.EzManiaSummary.XxySr is double cachedXxySr)
             {
                 xxySr = cachedXxySr;
                 return true;
             }
 
-            if (ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted) && persisted.Details.XxySr is double persistedXxySr)
+            if (ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted) && persisted.EzManiaSummary.XxySr is double persistedXxySr)
             {
                 xxySr = persistedXxySr;
                 return true;
@@ -505,10 +505,10 @@ namespace osu.Game.EzOsuGame.Analysis
                 kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
 
                 var summary = new KpsSummary(averageKps, maxKps, kpsList);
-                var details = new ManiaDetails(columnCounts, holdNoteCounts, xxySr);
+                var details = new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
                 var analysis = new EzAnalysisResult(summary, details);
 
-                if (lookup.OrderedMods.Length == 0 && persistenceEnabled && analysis.Details.ColumnCounts.Count > 0)
+                if (lookup.OrderedMods.Length == 0 && persistenceEnabled && analysis.EzManiaSummary.ColumnCounts.Count > 0)
                 {
                     persistentStore.StoreIfDifferent(lookup.BeatmapInfo, analysis);
                 }
@@ -669,8 +669,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             cancelTrackedBindableUpdate();
 
-            computationsCancellationSource?.Cancel();
-            computationsCancellationSource?.Dispose();
+            computationsCancellationSource.Cancel();
+            computationsCancellationSource.Dispose();
 
             updateScheduler.Dispose();
         }
