@@ -36,12 +36,13 @@ namespace osu.Game.EzOsuGame.Analysis
     /// - 仅活动面板（由调用方显式传入 allowRecompute）执行实时重算并回写持久化。
     /// - 缓存 key 包含 mod 设置（依赖 mod 的相等性/哈希语义），避免"切/调 mod 不重算"。
     /// </summary>
-    public partial class EzAnalysisCache : MemoryCachingComponent<EzAnalysisCacheLookup, EzAnalysisResult?>
+    public partial class EzAnalysisCache : MemoryCachingComponent<EzAnalysisLookupCache, EzAnalysisResult?>
     {
         private static int computeFailCount;
 
         private readonly ThreadedTaskScheduler updateScheduler = new ThreadedTaskScheduler(1, nameof(EzAnalysisCache));
-        private readonly WeakList<BindableManiaBeatmapAnalysis> trackedBindables = new WeakList<BindableManiaBeatmapAnalysis>();
+        private readonly ThreadedTaskScheduler lowPriorityUpdateScheduler = new ThreadedTaskScheduler(1, $"{nameof(EzAnalysisCache)}LowPriority");
+        private readonly WeakList<BindableBeatmapEzAnalysis> trackedBindables = new WeakList<BindableBeatmapEzAnalysis>();
         private readonly List<CancellationTokenSource> linkedCancellationSources = new List<CancellationTokenSource>();
         private readonly object bindableUpdateLock = new object();
 
@@ -50,7 +51,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private readonly SemaphoreSlim persistenceReadGate = new SemaphoreSlim(4, 4);
 
-        private readonly ConcurrentDictionary<EzAnalysisCacheLookup, Task<EzAnalysisResult?>> inflightComputations = new ConcurrentDictionary<EzAnalysisCacheLookup, Task<EzAnalysisResult?>>();
+        private readonly ConcurrentDictionary<EzAnalysisLookupCache, InflightComputation> inflightComputations = new ConcurrentDictionary<EzAnalysisLookupCache, InflightComputation>();
 
         private static readonly AsyncLocal<int> low_priority_scope_depth = new AsyncLocal<int>();
 
@@ -81,26 +82,28 @@ namespace osu.Game.EzOsuGame.Analysis
         private ScheduledDelegate? debouncedModSettingsChange;
 
         private int modsRevision;
+        private int activeHighPriorityComputations;
 
         // 限制内存缓存大小。
         // - 当持久化可用时，在内存中保持一个小的工作集（当前页面）。
         // - 当持久化不可用/禁用时，允许稍大的集合以减少重新计算。
         private const int max_in_memory_entries = 8;
-        private readonly ConcurrentQueue<EzAnalysisCacheLookup> cacheInsertionOrder = new ConcurrentQueue<EzAnalysisCacheLookup>();
+        private readonly ConcurrentQueue<EzAnalysisLookupCache> cacheInsertionOrder = new ConcurrentQueue<EzAnalysisLookupCache>();
 
         // 我们通过保持自己的缓存键集合来避免修改官方的 MemoryCachingComponent。
         // 然后通过调用 Invalidate(key == oldest) 执行驱逐，这对基础缓存是 O(n) 的，
-        private readonly ConcurrentDictionary<EzAnalysisCacheLookup, byte> cachedLookups = new ConcurrentDictionary<EzAnalysisCacheLookup, byte>();
+        private readonly ConcurrentDictionary<EzAnalysisLookupCache, byte> cachedLookups = new ConcurrentDictionary<EzAnalysisLookupCache, byte>();
         private int cachedLookupsCount;
 
         // 与 SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE 保持一致。
         private const int mod_settings_debounce = SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE + 10;
+        private const int low_priority_yield_delay_ms = 50;
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            ezAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
+            ezAnalysisEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
             ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
 
             ezAnalysisEnabled.BindValueChanged(v =>
@@ -166,50 +169,62 @@ namespace osu.Game.EzOsuGame.Analysis
                 // 将此异步流标记为低优先级以便在其他地方进行分类。
                 using (BeginLowPriorityScope())
                 {
-                    var lookup = new EzAnalysisCacheLookup(beatmapInfo, rulesetInfo, mods: null);
+                    ThreadPriority previousPriority = Thread.CurrentThread.Priority;
 
-                    // 首先，门控并探测持久化存储以避免淹没读取器。
-                    bool persistedExists = false;
-
-                    if (EzAnalysisPersistentStore.Enabled)
+                    try
                     {
-                        bool gateAcquired = false;
+                        Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
 
-                        try
+                        var lookup = new EzAnalysisLookupCache(beatmapInfo, mods: null);
+
+                        // 首先，门控并探测持久化存储以避免淹没读取器。
+                        bool persistedExists = false;
+
+                        if (EzAnalysisPersistentStore.Enabled)
                         {
-                            persistenceReadGate.Wait(cancellationToken);
-                            gateAcquired = true;
+                            bool gateAcquired = false;
 
-                            if (persistentStore.TryGet(lookup.BeatmapInfo, out _))
+                            try
                             {
-                                persistedExists = true;
+                                persistenceReadGate.Wait(cancellationToken);
+                                gateAcquired = true;
+
+                                if (persistentStore.TryGet(lookup.BeatmapInfo, out _))
+                                {
+                                    persistedExists = true;
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                // 请求取消 - 中止此项的预热。
+                                return;
+                            }
+                            catch
+                            {
+                                // 忽略持久化探测失败并继续计算。
+                            }
+                            finally
+                            {
+                                if (gateAcquired)
+                                {
+                                    persistenceReadGate.Release();
+                                }
                             }
                         }
-                        catch (OperationCanceledException)
+
+                        // 仅当持久化条目尚不存在时才计算并存储基线。
+                        if (!persistedExists)
                         {
-                            // 请求取消 - 中止此项的预热。
-                            return;
-                        }
-                        catch
-                        {
-                            // 忽略持久化探测失败并继续计算。
-                        }
-                        finally
-                        {
-                            if (gateAcquired)
-                            {
-                                persistenceReadGate.Release();
-                            }
+                            waitForHighPriorityComputationsToDrain(cancellationToken);
+                            computeAnalysis(lookup, cancellationToken);
                         }
                     }
-
-                    // 仅当持久化条目尚不存在时才计算并存储基线。
-                    if (!persistedExists)
+                    finally
                     {
-                        computeAnalysis(lookup, cancellationToken);
+                        Thread.CurrentThread.Priority = previousPriority;
                     }
                 }
-            }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, updateScheduler);
+            }, cancellationToken, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, lowPriorityUpdateScheduler);
         }
 
         /// <summary>
@@ -221,7 +236,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
 
-            var bindable = new BindableManiaBeatmapAnalysis(beatmapInfo, cancellationToken);
+            var bindable = new BindableBeatmapEzAnalysis(beatmapInfo, cancellationToken);
 
             if (localBeatmapInfo == null || (!ezAnalysisEnabled.Value && !ezAnalysisSqliteEnabled.Value))
                 return bindable;
@@ -237,7 +252,6 @@ namespace osu.Game.EzOsuGame.Analysis
         /// - allowRecompute=true：允许执行实时重算（用于活动 panel 纠偏）。
         /// </summary>
         public Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo,
-                                                        IRulesetInfo? rulesetInfo = null,
                                                         IEnumerable<Mod>? mods = null,
                                                         CancellationToken cancellationToken = default,
                                                         int computationDelay = 0,
@@ -248,12 +262,12 @@ namespace osu.Game.EzOsuGame.Analysis
                 return Task.FromResult<EzAnalysisResult?>(null);
 
             var localBeatmapInfo = beatmapInfo as BeatmapInfo;
-            var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
+            var localRulesetInfo = (beatmapInfo.Ruleset) as RulesetInfo;
 
             if (localBeatmapInfo == null || localRulesetInfo == null)
                 return Task.FromResult<EzAnalysisResult?>(null);
 
-            var lookup = new EzAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods);
+            var lookup = new EzAnalysisLookupCache(localBeatmapInfo, mods);
 
             // 仅从本地内存/持久化读取，保证面板低开销展示。
             if (CheckExists(lookup, out var existing) && existing.HasValue)
@@ -269,22 +283,17 @@ namespace osu.Game.EzOsuGame.Analysis
             return Task.FromResult<EzAnalysisResult?>(null);
         }
 
-        public bool TryGetBaselineXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
+        public bool TryGetXxySr(IBeatmapInfo beatmapInfo, out double xxySr)
         {
             xxySr = 0;
 
-            if (!ezAnalysisEnabled.Value && !ezAnalysisSqliteEnabled.Value)
+            if (!ezAnalysisSqliteEnabled.Value)
                 return false;
 
             if (beatmapInfo is not BeatmapInfo localBeatmapInfo)
                 return false;
 
-            var localRulesetInfo = (rulesetInfo ?? beatmapInfo.Ruleset) as RulesetInfo;
-
-            if (localRulesetInfo == null || localRulesetInfo.OnlineID != 3)
-                return false;
-
-            var lookup = new EzAnalysisCacheLookup(localBeatmapInfo, localRulesetInfo, mods: null);
+            var lookup = new EzAnalysisLookupCache(localBeatmapInfo, mods: null);
 
             if (CheckExists(lookup, out var existing) && existing?.EzManiaSummary.XxySr is double cachedXxySr)
             {
@@ -292,7 +301,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return true;
             }
 
-            if (ezAnalysisSqliteEnabled.Value && EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted) && persisted.EzManiaSummary.XxySr is double persistedXxySr)
+            if (EzAnalysisPersistentStore.Enabled && persistentStore.TryGet(localBeatmapInfo, out var persisted) && persisted.EzManiaSummary.XxySr is double persistedXxySr)
             {
                 xxySr = persistedXxySr;
                 return true;
@@ -323,7 +332,7 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private async Task<EzAnalysisResult?> getAndMaybeEvictAsync(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken, int computationDelay)
+        private async Task<EzAnalysisResult?> getAndMaybeEvictAsync(EzAnalysisLookupCache lookup, CancellationToken cancellationToken, int computationDelay)
         {
             EzAnalysisResult? result = await GetAsync(lookup, cancellationToken, computationDelay).ConfigureAwait(false);
 
@@ -392,43 +401,71 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        protected override Task<EzAnalysisResult?> ComputeValueAsync(EzAnalysisCacheLookup lookup, CancellationToken token = default)
+        protected override Task<EzAnalysisResult?> ComputeValueAsync(EzAnalysisLookupCache lookup, CancellationToken token = default)
         {
-            return computeValueWithDedupAsync(lookup, token);
+            var computation = inflightComputations.GetOrAdd(lookup, createInflightComputation);
+            computation.AddRequester();
+
+            return observeInflightComputationAsync(lookup, computation, token);
         }
 
-        private async Task<EzAnalysisResult?> computeValueWithDedupAsync(EzAnalysisCacheLookup lookup, CancellationToken token)
+        private async Task<EzAnalysisResult?> observeInflightComputationAsync(EzAnalysisLookupCache lookup, InflightComputation computation, CancellationToken token)
         {
-            // 如果此查找的计算已经在进行中，则重用它。
-            // 重要：计算本身不应被任何单个请求者取消。
-            // 面板会被回收并积极取消其令牌（例如当离屏时），但我们仍然
-            // 希望共享计算完成以便结果可以重用。
-            var existing = inflightComputations.GetOrAdd(lookup, lookupKey =>
-            {
-                var task = computeValueInternalCore(lookup, computationsCancellationSource.Token);
+            var lease = new InflightRequestLease(this, lookup, computation);
 
-                // 当任务完成时移除条目（尽力而为），但仅当值匹配时。
-                task.ContinueWith(
-                    completedTask => inflightComputations.TryRemove(new KeyValuePair<EzAnalysisCacheLookup, Task<EzAnalysisResult?>>(lookup, task)),
-                    CancellationToken.None,
-                    TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
+            using var cancellationRegistration = token.CanBeCanceled
+                ? token.Register(static state => ((InflightRequestLease)state!).Release(), lease)
+                : default;
 
-                return task;
-            });
-
-            // 允许各个调用者取消等待而不取消共享计算。
             try
             {
-                return await existing.WaitAsync(token).ConfigureAwait(false);
+                if (token.IsCancellationRequested)
+                    return null;
+
+                return await computation.Task.WaitAsync(token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
                 return null;
             }
+            finally
+            {
+                lease.Release();
+            }
         }
 
-        private async Task<EzAnalysisResult?> computeValueInternalCore(EzAnalysisCacheLookup lookup, CancellationToken token)
+        private InflightComputation createInflightComputation(EzAnalysisLookupCache key)
+        {
+            var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(computationsCancellationSource.Token);
+            var computation = new InflightComputation(cancellationSource)
+            {
+                Task = computeValueInternalCore(key, cancellationSource.Token)
+            };
+            computation.Task.ContinueWith(
+                static (_, state) =>
+                {
+                    var continuationState = (InflightContinuationState)state!;
+                    continuationState.Owner.inflightComputations.TryRemove(new KeyValuePair<EzAnalysisLookupCache, InflightComputation>(continuationState.Lookup, continuationState.Computation));
+                    continuationState.Computation.CancellationSource.Dispose();
+                },
+                new InflightContinuationState(this, key, computation),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+
+            return computation;
+        }
+
+        private void releaseInflightComputation(EzAnalysisLookupCache lookup, InflightComputation computation)
+        {
+            if (!computation.ReleaseRequester())
+                return;
+
+            computation.CancellationSource.Cancel();
+            inflightComputations.TryRemove(new KeyValuePair<EzAnalysisLookupCache, InflightComputation>(lookup, computation));
+        }
+
+        private async Task<EzAnalysisResult?> computeValueInternalCore(EzAnalysisLookupCache lookup, CancellationToken token)
         {
             if (!ezAnalysisEnabled.Value)
                 return null;
@@ -442,20 +479,33 @@ namespace osu.Game.EzOsuGame.Analysis
                     return persistedResult;
             }
 
-            var scheduler = updateScheduler;
+            var scheduler = isLowPriorityFlow ? lowPriorityUpdateScheduler : updateScheduler;
 
             var task = Task.Factory.StartNew(() =>
             {
+                bool isLowPriority = isLowPriorityFlow;
+
+                if (!isLowPriority)
+                    Interlocked.Increment(ref activeHighPriorityComputations);
+
                 if (CheckExists(lookup, out var existing))
                     return existing;
 
-                return computeAnalysis(lookup, token);
+                try
+                {
+                    return computeAnalysis(lookup, token);
+                }
+                finally
+                {
+                    if (!isLowPriority)
+                        Interlocked.Decrement(ref activeHighPriorityComputations);
+                }
             }, token, TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, scheduler);
 
             return await task.ConfigureAwait(false);
         }
 
-        private EzAnalysisResult? computeAnalysis(EzAnalysisCacheLookup lookup, CancellationToken cancellationToken, bool allowPersistedFastPath = true)
+        private EzAnalysisResult? computeAnalysis(EzAnalysisLookupCache lookup, CancellationToken cancellationToken, bool allowPersistedFastPath = true)
         {
             try
             {
@@ -564,6 +614,15 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
+        private void waitForHighPriorityComputationsToDrain(CancellationToken cancellationToken)
+        {
+            while (Volatile.Read(ref activeHighPriorityComputations) > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Thread.Sleep(low_priority_yield_delay_ms);
+            }
+        }
+
         private void updateTrackedBindables()
         {
             if (!ezAnalysisEnabled.Value)
@@ -609,11 +668,7 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private void updateBindable(BindableManiaBeatmapAnalysis bindable,
-                                    BeatmapInfo beatmapInfo,
-                                    IRulesetInfo? rulesetInfo,
-                                    IEnumerable<Mod>? mods,
-                                    CancellationToken cancellationToken = default,
+        private void updateBindable(BindableBeatmapEzAnalysis bindable, BeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods, CancellationToken cancellationToken = default,
                                     int computationDelay = 0,
                                     bool allowRecompute = false)
         {
@@ -636,7 +691,7 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 try
                 {
-                    var analysis = await GetAnalysisAsync(beatmapInfo, rulesetInfo, mods, cancellationToken, computationDelay, allowRecompute).ConfigureAwait(false);
+                    var analysis = await GetAnalysisAsync(beatmapInfo, mods, cancellationToken, computationDelay, allowRecompute).ConfigureAwait(false);
                     if (analysis == null)
                         return;
 
@@ -673,6 +728,7 @@ namespace osu.Game.EzOsuGame.Analysis
             computationsCancellationSource.Dispose();
 
             updateScheduler.Dispose();
+            lowPriorityUpdateScheduler.Dispose();
         }
 
         private void disableAnalysisRuntime()
@@ -706,15 +762,69 @@ namespace osu.Game.EzOsuGame.Analysis
             Invalidate(_ => true);
         }
 
-        private class BindableManiaBeatmapAnalysis : Bindable<EzAnalysisResult>
+        private class BindableBeatmapEzAnalysis : Bindable<EzAnalysisResult>
         {
             public readonly IBeatmapInfo BeatmapInfo;
             public readonly CancellationToken CancellationToken;
 
-            public BindableManiaBeatmapAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken)
+            public BindableBeatmapEzAnalysis(IBeatmapInfo beatmapInfo, CancellationToken cancellationToken)
             {
                 BeatmapInfo = beatmapInfo;
                 CancellationToken = cancellationToken;
+            }
+        }
+
+        private sealed class InflightComputation
+        {
+            private int requesterCount;
+
+            public readonly CancellationTokenSource CancellationSource;
+            public Task<EzAnalysisResult?> Task = null!;
+
+            public InflightComputation(CancellationTokenSource cancellationSource)
+            {
+                CancellationSource = cancellationSource;
+            }
+
+            public void AddRequester() => Interlocked.Increment(ref requesterCount);
+
+            public bool ReleaseRequester() => Interlocked.Decrement(ref requesterCount) == 0;
+        }
+
+        private sealed class InflightRequestLease
+        {
+            private readonly EzAnalysisCache owner;
+            private readonly EzAnalysisLookupCache lookup;
+            private readonly InflightComputation computation;
+            private int released;
+
+            public InflightRequestLease(EzAnalysisCache owner, EzAnalysisLookupCache lookup, InflightComputation computation)
+            {
+                this.owner = owner;
+                this.lookup = lookup;
+                this.computation = computation;
+            }
+
+            public void Release()
+            {
+                if (Interlocked.Exchange(ref released, 1) != 0)
+                    return;
+
+                owner.releaseInflightComputation(lookup, computation);
+            }
+        }
+
+        private sealed class InflightContinuationState
+        {
+            public readonly EzAnalysisCache Owner;
+            public readonly EzAnalysisLookupCache Lookup;
+            public readonly InflightComputation Computation;
+
+            public InflightContinuationState(EzAnalysisCache owner, EzAnalysisLookupCache lookup, InflightComputation computation)
+            {
+                Owner = owner;
+                Lookup = lookup;
+                Computation = computation;
             }
         }
 

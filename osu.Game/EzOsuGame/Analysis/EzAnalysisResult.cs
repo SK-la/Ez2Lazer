@@ -42,9 +42,13 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public readonly struct EzManiaSummary
     {
+        public static readonly EzManiaSummary EMPTY = new EzManiaSummary(new Dictionary<int, int>(), new Dictionary<int, int>(), 0);
+
         public readonly Dictionary<int, int> ColumnCounts;
         public readonly Dictionary<int, int> HoldNoteCounts;
         public readonly double? XxySr;
+
+        public bool HasData => (ColumnCounts?.Count > 0) || (HoldNoteCounts?.Count > 0) || XxySr.HasValue;
 
         public EzManiaSummary(Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts, double? xxySr)
         {

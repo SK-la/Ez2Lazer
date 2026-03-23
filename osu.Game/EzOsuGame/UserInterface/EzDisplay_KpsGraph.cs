@@ -5,27 +5,28 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Lines;
+using osu.Framework.Graphics.Primitives;
+using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Rendering.Vertices;
+using osu.Framework.Graphics.Shaders;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Textures;
 using osu.Framework.Input.Events;
-using osu.Framework.Layout;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.EzOsuGame.Analysis;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
     public partial class EzDisplayKpsGraph : CompositeDrawable
     {
-        private const int max_draw_points = OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS;
+        private const float line_thickness = 2f;
+        private const int max_display_points = 128;
 
-        private readonly LayoutValue pathCached = new LayoutValue(Invalidation.DrawSize);
-        private readonly Path path;
-
-        // private readonly BufferedContainer bufferedHost;
+        private readonly KpsLineDrawable graphDrawable;
 
         private float[] values;
 
@@ -33,10 +34,9 @@ namespace osu.Game.EzOsuGame.UserInterface
         public float ActualMinValue { get; private set; } = float.NaN;
         public float? MaxValue { get; set; }
         public float? MinValue { get; set; }
-        private const double transform_duration = 1000;
 
-        private readonly Container<Path> maskingContainer;
         private int valuesCount;
+        private bool hasData;
 
         /// <summary>
         /// 是否启用悬浮显示当前横坐标的 KPS 值（仅在外部显式开启时创建相关容器）。
@@ -64,20 +64,15 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         public EzDisplayKpsGraph()
         {
-            AddInternal(maskingContainer = new Container<Path>
+            AddInternal(new Container
             {
                 Masking = true,
                 RelativeSizeAxes = Axes.Both,
-                Child = path = new SmoothPath
+                Child = graphDrawable = new KpsLineDrawable
                 {
-                    AutoSizeAxes = Axes.None,
                     RelativeSizeAxes = Axes.Both,
-                    PathRadius = 1.5f,
-                    Colour = Colour4.CornflowerBlue
                 }
             });
-
-            AddLayout(pathCached);
         }
 
         private void createHoverContainers()
@@ -122,25 +117,41 @@ namespace osu.Game.EzOsuGame.UserInterface
                 return;
 
             int count = source.Count;
-            valuesCount = count;
 
             if (count == 0)
             {
+                // 空数据时仅在有旧数据的情况下做一次清理，避免高频重复无效更新。
+                if (!hasData && valuesCount == 0)
+                    return;
+
+                hasData = false;
+                valuesCount = 0;
                 ActualMaxValue = float.NaN;
                 ActualMinValue = float.NaN;
-                pathCached.Invalidate();
+
+                // maskingContainer.ClearTransforms();
+                // maskingContainer.Width = 1;
+                graphDrawable.Clear();
                 return;
             }
 
-            if (values == null || values.Length < count)
-                values = new float[count];
+            int sampledCount = Math.Min(count, max_display_points);
+
+            if (values == null || values.Length < sampledCount)
+                values = new float[sampledCount];
 
             float max = float.MinValue;
             float min = float.MaxValue;
+            bool same = hasData && valuesCount == sampledCount;
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < sampledCount; i++)
             {
-                float v = (float)source[i];
+                int sourceIndex = getSourceIndex(i, sampledCount, count);
+                float v = (float)source[sourceIndex];
+
+                if (same && values[i] != v)
+                    same = false;
+
                 values[i] = v;
                 if (v > max) max = v;
                 if (v < min) min = v;
@@ -152,21 +163,25 @@ namespace osu.Game.EzOsuGame.UserInterface
             ActualMaxValue = max;
             ActualMinValue = min;
 
-            pathCached.Invalidate();
+            hasData = true;
+            valuesCount = sampledCount;
 
-            maskingContainer.Width = 0;
-            maskingContainer.ResizeWidthTo(1, transform_duration, Easing.OutQuint);
+            if (same)
+                return;
+
+            graphDrawable.SetValues(values, valuesCount, ActualMinValue, ActualMaxValue, line_thickness);
+
+            // // 直接显示完整图表，避免从左到右的展开动画。
+            // maskingContainer.ClearTransforms();
+            // maskingContainer.Width = 1;
         }
 
-        protected override void Update()
+        private static int getSourceIndex(int index, int sampledCount, int sourceCount)
         {
-            base.Update();
+            if (sampledCount <= 1 || sourceCount <= 1)
+                return 0;
 
-            if (!pathCached.IsValid)
-            {
-                applyPath();
-                pathCached.Validate();
-            }
+            return (int)Math.Clamp(MathF.Round(index / (float)(sampledCount - 1) * (sourceCount - 1)), 0, sourceCount - 1);
         }
 
         protected override bool OnHover(HoverEvent e)
@@ -214,14 +229,14 @@ namespace osu.Game.EzOsuGame.UserInterface
                 return;
             }
 
-            // 将屏幕空间坐标转换到 path 的本地坐标，以考虑 path 的实际绘制宽度与 PathRadius
+            // 将屏幕空间坐标转换到图表容器的本地坐标，以匹配当前线段布局。
             var thisLocal = ToLocalSpace(screenSpaceMousePos);
-            var pathLocal = path.ToLocalSpace(screenSpaceMousePos);
+            var graphLocal = graphDrawable.ToLocalSpace(screenSpaceMousePos);
 
-            float availableWidth = Math.Max(0, path.DrawWidth - 2 * path.PathRadius);
-            if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth - 2 * path.PathRadius);
+            float availableWidth = Math.Max(0, graphDrawable.DrawWidth);
+            if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth);
 
-            float xInAvailable = Math.Clamp(pathLocal.X - path.PathRadius, 0, availableWidth);
+            float xInAvailable = Math.Clamp(graphLocal.X, 0, availableWidth);
 
             int denom = Math.Max(1, valuesCount - 1);
             int index = 0;
@@ -236,40 +251,187 @@ namespace osu.Game.EzOsuGame.UserInterface
             hoverLabel.Y = -(hoverLabel.DrawHeight + 4);
         }
 
-        private void applyPath()
+        private partial class KpsLineDrawable : Drawable
         {
-            path.ClearVertices();
+            private readonly List<float> points = new List<float>();
+            private float minValue;
+            private float maxValue;
+            private float thickness;
+            private long version;
 
-            int count = valuesCount;
-            if (count <= 0)
-                return;
+            private Texture texture = null!;
+            private IShader shader = null!;
 
-            // Use the path's own draw size so vertices are in the path's local space.
-            float availableWidth = Math.Max(0, path.DrawWidth - 2 * path.PathRadius);
-            float availableHeight = Math.Max(0, path.DrawHeight - 2 * path.PathRadius);
-
-            // Fallback to parent draw size if path hasn't been sized yet.
-            if (availableWidth <= 0) availableWidth = Math.Max(0, DrawWidth - 2 * path.PathRadius);
-            if (availableHeight <= 0) availableHeight = Math.Max(0, DrawHeight - 2 * path.PathRadius);
-
-            // Map points across the actual number of values so the graph fills the container.
-            int denom = Math.Max(1, count - 1);
-
-            for (int i = 0; i < count; i++)
+            [BackgroundDependencyLoader]
+            private void load(IRenderer renderer, ShaderManager shaders)
             {
-                // account for the radius margin so vertices are inset by PathRadius on all sides
-                float x = path.PathRadius + (count == 1 ? 0f : i / (float)denom * availableWidth);
-                float y = path.PathRadius + GetYPosition(values[i]) * availableHeight;
-                path.AddVertex(new Vector2(x, y));
+                texture = renderer.WhitePixel;
+                shader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE);
             }
-        }
 
-        protected float GetYPosition(float value)
-        {
-            if (ActualMaxValue == ActualMinValue)
-                return value > 1 ? 0 : 1;
+            public void SetValues(float[] source, int count, float minValue, float maxValue, float thickness)
+            {
+                points.Clear();
 
-            return (ActualMaxValue - value) / (ActualMaxValue - ActualMinValue);
+                for (int i = 0; i < count; i++)
+                    points.Add(source[i]);
+
+                this.minValue = minValue;
+                this.maxValue = maxValue;
+                this.thickness = thickness;
+                version++;
+
+                Invalidate(Invalidation.DrawNode);
+            }
+
+            public void Clear()
+            {
+                if (points.Count == 0)
+                    return;
+
+                points.Clear();
+                version++;
+                Invalidate(Invalidation.DrawNode);
+            }
+
+            protected override DrawNode CreateDrawNode() => new KpsLineDrawNode(this);
+
+            private class KpsLineDrawNode : DrawNode
+            {
+                private Texture texture = null!;
+                private IShader shader = null!;
+                private readonly List<float> points = new List<float>();
+                private Vector2 drawSize;
+                private float minValue;
+                private float maxValue;
+                private float thickness;
+                private long version = -1;
+
+                private IVertexBatch<TexturedVertex2D> quadBatch;
+
+                protected new KpsLineDrawable Source => (KpsLineDrawable)base.Source;
+
+                public KpsLineDrawNode(KpsLineDrawable source)
+                    : base(source)
+                {
+                }
+
+                public override void ApplyState()
+                {
+                    base.ApplyState();
+
+                    texture = Source.texture;
+                    shader = Source.shader;
+                    drawSize = Source.DrawSize;
+                    minValue = Source.minValue;
+                    maxValue = Source.maxValue;
+                    thickness = Source.thickness;
+
+                    if (version == Source.version)
+                        return;
+
+                    points.Clear();
+                    points.AddRange(Source.points);
+                    version = Source.version;
+                }
+
+                protected override void Draw(IRenderer renderer)
+                {
+                    base.Draw(renderer);
+
+                    if (points.Count < 2 || !texture.Available)
+                        return;
+
+                    shader.Bind();
+
+                    if (!renderer.BindTexture(texture))
+                        return;
+
+                    quadBatch ??= renderer.CreateQuadBatch<TexturedVertex2D>(Math.Min(points.Count - 1, 1024), 4);
+
+                    renderer.PushLocalMatrix(DrawInfo.Matrix);
+
+                    RectangleF textureRect = texture.GetTextureRect();
+                    Vector4 textureRectangle = new Vector4(0, 0, 1, 1);
+                    Vector2 blendRange = Vector2.One;
+                    var add = quadBatch.AddAction;
+
+                    float halfThickness = thickness / 2f;
+                    int denominator = Math.Max(1, points.Count - 1);
+
+                    for (int i = 0; i < points.Count - 1; i++)
+                    {
+                        Vector2 start = new Vector2(i / (float)denominator * drawSize.X, getYPosition(points[i]) * drawSize.Y);
+                        Vector2 end = new Vector2((i + 1) / (float)denominator * drawSize.X, getYPosition(points[i + 1]) * drawSize.Y);
+
+                        Vector2 direction = end - start;
+                        float length = direction.Length;
+
+                        if (length <= 0)
+                            continue;
+
+                        direction /= length;
+                        Vector2 extension = direction * halfThickness;
+                        Vector2 perpendicular = new Vector2(-direction.Y, direction.X) * halfThickness;
+
+                        Vector2 topLeft = start - extension - perpendicular;
+                        Vector2 topRight = end + extension - perpendicular;
+                        Vector2 bottomRight = end + extension + perpendicular;
+                        Vector2 bottomLeft = start - extension + perpendicular;
+
+                        add(new TexturedVertex2D(renderer)
+                        {
+                            Position = topLeft,
+                            TexturePosition = textureRect.TopLeft,
+                            TextureRect = textureRectangle,
+                            BlendRange = blendRange,
+                            Colour = Colour4.CornflowerBlue
+                        });
+                        add(new TexturedVertex2D(renderer)
+                        {
+                            Position = topRight,
+                            TexturePosition = textureRect.TopRight,
+                            TextureRect = textureRectangle,
+                            BlendRange = blendRange,
+                            Colour = Colour4.CornflowerBlue
+                        });
+                        add(new TexturedVertex2D(renderer)
+                        {
+                            Position = bottomRight,
+                            TexturePosition = textureRect.BottomRight,
+                            TextureRect = textureRectangle,
+                            BlendRange = blendRange,
+                            Colour = Colour4.CornflowerBlue
+                        });
+                        add(new TexturedVertex2D(renderer)
+                        {
+                            Position = bottomLeft,
+                            TexturePosition = textureRect.BottomLeft,
+                            TextureRect = textureRectangle,
+                            BlendRange = blendRange,
+                            Colour = Colour4.CornflowerBlue
+                        });
+                    }
+
+                    quadBatch.Draw();
+                    renderer.PopLocalMatrix();
+                    shader.Unbind();
+                }
+
+                private float getYPosition(float value)
+                {
+                    if (maxValue == minValue)
+                        return value > 1 ? 0 : 1;
+
+                    return (maxValue - value) / (maxValue - minValue);
+                }
+
+                protected override void Dispose(bool isDisposing)
+                {
+                    base.Dispose(isDisposing);
+                    quadBatch?.Dispose();
+                }
+            }
         }
     }
 }

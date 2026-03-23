@@ -22,9 +22,9 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.EZ_ANALYSIS_ENABLED,
-                    HintText = EzSettingsStrings.EZ_ANALYSIS_ENABLED_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled),
+                    Caption = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED,
+                    HintText = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled),
                 })
                 {
                     Keywords = new[] { "analysis", "ez", "song select", "kps", "kpc" }

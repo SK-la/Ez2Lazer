@@ -11,16 +11,32 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.EzOsuGame.Analysis;
 using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Screens.Select
 {
-    public partial class EzKpcDisplay : CompositeDrawable
+    public partial class EzKpcDisplay : CompositeDrawable, IHasCurrentValue<EzManiaSummary>
     {
         public Bindable<KpcDisplayMode> KpcDisplayModeBindable { get; } = new Bindable<KpcDisplayMode>(KpcDisplayMode.BarChart);
+
+        private readonly BindableWithCurrent<EzManiaSummary> current = new BindableWithCurrent<EzManiaSummary>();
+
+        public Bindable<EzManiaSummary> Current
+        {
+            get => current.Current;
+            set => current.Current = value;
+        }
+
+        public EzManiaSummary ManiaSummary
+        {
+            get => Current.Value;
+            set => Current.Value = value;
+        }
 
         private readonly List<NumberColumnEntry> numberEntries = new List<NumberColumnEntry>();
         private readonly List<BarChartColumnEntry> barEntries = new List<BarChartColumnEntry>();
@@ -29,7 +45,6 @@ namespace osu.Game.Screens.Select
         private Container? modePlaceholder;
 
         private int currentColumnCount;
-        private readonly Container? rootContainer;
 
         // last received data so mode switches can immediately refresh
         private int[]? lastKnownColumns;
@@ -38,10 +53,12 @@ namespace osu.Game.Screens.Select
 
         public EzKpcDisplay()
         {
+            Current.Value = EzManiaSummary.EMPTY;
+
             AutoSizeAxes = Axes.X;
             RelativeSizeAxes = Axes.Y;
 
-            rootContainer = new Container
+            InternalChild = new Container
             {
                 Masking = true,
                 CornerRadius = 5,
@@ -53,31 +70,33 @@ namespace osu.Game.Screens.Select
                     {
                         RelativeSizeAxes = Axes.Both,
                         Colour = Colour4.Black.Opacity(0.6f),
+                    },
+                    modePlaceholder = new Container
+                    {
+                        Anchor = Anchor.CentreLeft,
+                        Origin = Anchor.CentreLeft,
+                        AutoSizeAxes = Axes.Both,
                     }
                 }
             };
-
-            InternalChild = rootContainer;
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            modePlaceholder = new Container
-            {
-                Anchor = Anchor.CentreLeft,
-                Origin = Anchor.CentreLeft,
-                AutoSizeAxes = Axes.Both,
-            };
-
-            rootContainer?.Add(modePlaceholder);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            KpcDisplayModeBindable.BindValueChanged(e => buildForMode(e.NewValue), true);
+            KpcDisplayModeBindable.BindValueChanged(e =>
+            {
+                buildForMode(e.NewValue);
+                refresh();
+            }, true);
+
+            Current.BindValueChanged(_ => refresh());
         }
 
         private void buildForMode(KpcDisplayMode mode)
@@ -159,20 +178,25 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        /// <summary>
-        /// 设置 KPC 显示状态。传入 null 或空字典时隐藏并重置；传入有效数据时显示并更新。
-        /// </summary>
-        public void SetState(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdCounts = null)
+        private void refresh()
         {
-            if (columnCounts == null || columnCounts.Count == 0)
+            if (!ManiaSummary.HasData)
             {
-                reset();
                 Hide();
                 return;
             }
 
-            updateColumnCounts(columnCounts, holdCounts);
+            ensureModeBuilt();
+            updateColumnCounts(ManiaSummary.ColumnCounts, ManiaSummary.HoldNoteCounts);
             Show();
+        }
+
+        private void ensureModeBuilt()
+        {
+            if (modePlaceholder == null || columnNotesContainer != null)
+                return;
+
+            buildForMode(KpcDisplayModeBindable.Value);
         }
 
         /// <summary>
@@ -230,9 +254,9 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        private void reset()
+        private void releaseState()
         {
-            modePlaceholder?.Clear();
+            modePlaceholder = null;
             columnNotesContainer = null;
             headerText = null;
 
@@ -244,29 +268,6 @@ namespace osu.Game.Screens.Select
             lastKnownHolds = null;
             lastKnownCount = 0;
         }
-
-        // /// <summary>
-        // /// Array-backed overload to avoid Dictionary allocations on hot paths when callers already have normalized buffers.
-        // /// </summary>
-        // public void UpdateColumnCounts(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
-        // {
-        //     // 复用已有数组，避免重复分配
-        //     if (lastKnownColumns == null || lastKnownColumns.Length < columns)
-        //         lastKnownColumns = new int[columns];
-        //
-        //     if (lastKnownHolds == null || lastKnownHolds.Length < columns)
-        //         lastKnownHolds = new int[columns];
-        //
-        //     for (int i = 0; i < columns; i++)
-        //     {
-        //         lastKnownColumns[i] = i < columnNoteCounts.Length ? columnNoteCounts[i] : 0;
-        //         lastKnownHolds[i] = (holdNoteCounts != null && i < holdNoteCounts.Length) ? holdNoteCounts[i] : 0;
-        //     }
-        //
-        //     lastKnownCount = columns;
-        //
-        //     updateDisplay(columnNoteCounts, holdNoteCounts, columns);
-        // }
 
         private void updateDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
         {
@@ -726,7 +727,8 @@ namespace osu.Game.Screens.Select
             if (isDisposing)
             {
                 KpcDisplayModeBindable.UnbindAll();
-                reset();
+                Current.UnbindAll();
+                releaseState();
             }
 
             base.Dispose(isDisposing);

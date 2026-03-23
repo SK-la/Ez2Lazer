@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
@@ -20,11 +21,8 @@ using osu.Game.Screens.Play;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 在启动阶段后台预热 mania analysis 缓存。
-    /// 机制对齐官方 <see cref="BackgroundDataStoreProcessor"/>：
-    /// - 使用 <see cref="ProgressNotification"/> 展示进度并允许用户取消。
-    /// - 游戏进行中 / 高性能会话期间自动 sleep，避免抢占。
-    /// - 作为长任务在后台运行，不阻塞启动。
+    /// 启动阶段只做一次全量扫描，确定哪些 mania 谱面缺失/过期。
+    /// 运行阶段仅在当前选中谱面命中待补算集合时，执行一次低优先级重算。
     /// </summary>
     public partial class EzAnalysisWarmupProcessor : Component
     {
@@ -49,6 +47,9 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
+        [Resolved]
+        private IBindable<WorkingBeatmap> currentBeatmap { get; set; } = null!;
+
         [Resolved(CanBeNull = true)]
         private INotificationOverlay? notificationOverlay { get; set; }
 
@@ -58,51 +59,68 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private IHighPerformanceSessionManager? highPerformanceSessionManager { get; set; }
 
+        private IBindable<bool> ezAnalysisRecomputeEnabled = new BindableBool(true);
+        private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
+
         protected virtual int TimeToSleepDuringGameplay => 30000;
+
+        private readonly object pendingBeatmapLock = new object();
+        private readonly HashSet<Guid> pendingBeatmapIds = new HashSet<Guid>();
+        private readonly HashSet<Guid> inFlightBeatmapIds = new HashSet<Guid>();
+
+        private volatile bool pendingScanCompleted;
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            ProcessingTask = Task.Factory.StartNew(populateManiaAnalysis, TaskCreationOptions.LongRunning).ContinueWith(t =>
+            ezAnalysisRecomputeEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
+            ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+
+            currentBeatmap.BindValueChanged(beatmap => queueSelectedBeatmapRecomputeIfRequired(beatmap.NewValue), true);
+
+            ProcessingTask = Task.Factory.StartNew(scanBeatmapsNeedingWarmup, TaskCreationOptions.LongRunning).ContinueWith(t =>
             {
                 if (t.Exception?.InnerException is ObjectDisposedException)
                 {
-                    Logger.Log("Finished mania analysis warmup aborted during shutdown", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
+                    Logger.Log("Finished mania analysis startup scan aborted during shutdown", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
                     return;
                 }
 
-                Logger.Log("Finished background mania analysis warmup!", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                pendingScanCompleted = true;
+                Schedule(() => queueSelectedBeatmapRecomputeIfRequired(currentBeatmap.Value));
+
+                Logger.Log("Finished background mania analysis startup scan.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             });
         }
 
-        private bool isWarmupEnabled() =>
-            ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled)
+        private bool isStartupWarmupScanEnabled() =>
+            ezAnalysisSqliteEnabled.Value
             && EzAnalysisPersistentStore.Enabled;
 
-        private void populateManiaAnalysis()
+        private bool isRuntimeSelectedBeatmapRecomputeEnabled() =>
+            ezAnalysisRecomputeEnabled.Value;
+
+        private void scanBeatmapsNeedingWarmup()
         {
             if (forceDisableWarmupForDiagnostics)
             {
-                Logger.Log("Ez analysis warmup is force-disabled by internal diagnostic switch.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("Ez analysis warmup scan is force-disabled by internal diagnostic switch.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
             }
 
-            if (!ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled))
+            if (!isStartupWarmupScanEnabled())
             {
-                Logger.Log("Ez analysis sqlite cache is disabled; skipping warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                return;
-            }
-
-            if (!EzAnalysisPersistentStore.Enabled)
-            {
-                Logger.Log("Mania analysis persistence is disabled; skipping warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log(ezAnalysisSqliteEnabled.Value
+                        ? "Mania analysis persistence is disabled; skipping startup scan."
+                        : "Ez analysis sqlite cache is disabled; skipping startup scan.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
             }
 
             List<(Guid id, string hash)> beatmaps = new List<(Guid id, string hash)>();
 
-            Logger.Log("Querying for mania beatmaps to warm up analysis cache...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+            Logger.Log("Querying for mania beatmaps requiring analysis recompute...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
             realmAccess.Run(r =>
             {
@@ -148,164 +166,130 @@ namespace osu.Game.EzOsuGame.Analysis
                     beatmaps.Add((b.ID, b.Hash));
                 }
 
-                Logger.Log($"Warmup beatmap query summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}",
+                Logger.Log($"Startup scan beatmap summary: total={totalBeatmaps}, total_with_set={totalWithSet}, mania_total={maniaTotal}, mania_with_set={maniaWithSet}, mania_hidden={maniaHidden}",
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
                 if (maniaTotal == 0)
                 {
                     string dist = string.Join(", ", rulesetDistribution.OrderByDescending(kvp => kvp.Value).Take(10).Select(kvp => $"{kvp.Key}={kvp.Value}"));
-                    Logger.Log($"Warmup beatmap ruleset distribution (first 2000): {dist}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    Logger.Log($"Startup scan ruleset distribution (first 2000): {dist}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 }
             });
 
             if (beatmaps.Count == 0)
                 return;
 
-            // 增量：只重算缺失/过期（hash/version 不匹配）的条目。
-            // 与官方 star rating 进度通知一致：只在确实需要做“预计算”时展示一条 ProgressNotification。
             var needingRecompute = persistentStore.GetBeatmapsNeedingRecompute(beatmaps);
 
             if (needingRecompute.Count == 0)
             {
-                Logger.Log("No beatmaps require mania analysis warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("No beatmaps require mania analysis recompute.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
             }
 
-            Logger.Log($"Found {needingRecompute.Count} beatmaps which require mania analysis warmup.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-
-            Logger.Log($"Starting mania analysis warmup. total={needingRecompute.Count}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-
-            var notification = showProgressNotification(needingRecompute.Count, "Precomputing mania analysis for beatmaps", "beatmaps' mania analysis has been precomputed");
-
-            int processedCount = 0;
-            int failedCount = 0;
-
-            foreach (Guid id in needingRecompute)
+            lock (pendingBeatmapLock)
             {
-                if (!isWarmupEnabled())
-                {
-                    Logger.Log("Ez analysis warmup interrupted because switches were disabled during processing.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                    break;
-                }
+                pendingBeatmapIds.Clear();
 
-                if (notification?.State == ProgressNotificationState.Cancelled)
-                    break;
+                foreach (Guid id in needingRecompute)
+                    pendingBeatmapIds.Add(id);
+            }
 
-                updateNotificationProgress(notification, processedCount, needingRecompute.Count);
+            Logger.Log($"Startup scan found {needingRecompute.Count} beatmaps requiring mania analysis recompute. Runtime recompute will only process the selected beatmap from this set.",
+                Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+
+            postWarmupSummaryNotification(needingRecompute.Count);
+        }
+
+        private void queueSelectedBeatmapRecomputeIfRequired(WorkingBeatmap? workingBeatmap)
+        {
+            if (!pendingScanCompleted || !isRuntimeSelectedBeatmapRecomputeEnabled())
+                return;
+
+            var beatmapInfo = workingBeatmap?.BeatmapInfo;
+
+            if (beatmapInfo == null || beatmapInfo.Ruleset.OnlineID != 3)
+                return;
+
+            bool shouldQueue;
+
+            lock (pendingBeatmapLock)
+            {
+                shouldQueue = pendingBeatmapIds.Contains(beatmapInfo.ID) && inFlightBeatmapIds.Add(beatmapInfo.ID);
+            }
+
+            if (!shouldQueue)
+                return;
+
+            Task.Factory.StartNew(() => recomputeSelectedBeatmap(beatmapInfo), TaskCreationOptions.LongRunning);
+        }
+
+        private void recomputeSelectedBeatmap(BeatmapInfo beatmapInfo)
+        {
+            try
+            {
+                if (!isRuntimeSelectedBeatmapRecomputeEnabled())
+                    return;
 
                 sleepIfRequired();
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(beatmapInfo.ID)?.Detach()) ?? beatmapInfo;
 
-                if (beatmap == null)
-                {
-                    ++failedCount;
-                    continue;
-                }
+                maniaAnalysisCache.WarmupPersistentOnlyAsync(beatmap, CancellationToken.None)
+                                  .GetAwaiter()
+                                  .GetResult();
 
-                try
-                {
-                    // 仅预热 no-mod 的缓存项：与官方 star 预计算一致（基础值持久化/复用），modded 部分仍按需计算。
-                    // 关键：warmup 绝不阻塞可见项。
-                    // - 等待当前所有高优先级（可见项）计算完成后再启动 warmup。
-                    // - 启用持久化时，仅预热 SQLite，不把所有结果长期留在内存缓存里。
-                    maniaAnalysisCache.WarmupPersistentOnlyAsync(beatmap, CancellationToken.None)
-                                      .GetAwaiter()
-                                      .GetResult();
+                lock (pendingBeatmapLock)
+                    pendingBeatmapIds.Remove(beatmapInfo.ID);
 
-                    ++processedCount;
-                }
-                catch (Exception e)
-                {
-                    Logger.Log($"Background mania analysis warmup failed on {beatmap}: {e}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                    ++failedCount;
-                }
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
-                if (processedCount % 50 == 0)
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                Logger.Log($"Completed selected-beatmap mania analysis recompute for {beatmapInfo}. Remaining pending={getPendingBeatmapCount()}.",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
-
-            completeNotification(notification, processedCount, needingRecompute.Count, failedCount);
-        }
-
-        private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)
-        {
-            if (notification == null)
-                return;
-
-            Schedule(() =>
+            catch (Exception e)
             {
-                notification.Text = notification.Text.ToString().Split('(').First().TrimEnd() + $" ({processedCount} of {totalCount})";
-                notification.Progress = (float)processedCount / totalCount;
-            });
-
-            if (processedCount % 100 == 0)
-                Logger.Log($"Warmup progress: {processedCount} of {totalCount}");
-        }
-
-        private void completeNotification(ProgressNotification? notification, int processedCount, int totalCount, int failedCount)
-        {
-            if (notification == null)
-                return;
-
-            Schedule(() =>
-            {
-                if (processedCount == totalCount)
-                {
-                    notification.CompletionText = $"{processedCount} {notification.CompletionText}";
-                    notification.Progress = 1;
-                    notification.State = ProgressNotificationState.Completed;
-                }
-                else
-                {
-                    notification.Text = $"{processedCount} of {totalCount} {notification.CompletionText}";
-
-                    if (failedCount > 0)
-                        notification.Text += $" Check logs for issues with {failedCount} failed items.";
-
-                    notification.State = ProgressNotificationState.Cancelled;
-                }
-            });
-        }
-
-        private ProgressNotification? showProgressNotification(int totalCount, string running, string completed)
-        {
-            if (notificationOverlay == null)
-            {
-                Logger.Log("INotificationOverlay is null; mania analysis warmup progress notification will not be shown.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                return null;
+                Logger.Log($"Selected-beatmap mania analysis recompute failed on {beatmapInfo}: {e}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             }
-
-            if (totalCount <= 0)
-                return null;
-
-            ProgressNotification notification = new ProgressNotification
+            finally
             {
-                Text = running,
-                CompletionText = completed,
-                State = ProgressNotificationState.Active
-            };
+                lock (pendingBeatmapLock)
+                    inFlightBeatmapIds.Remove(beatmapInfo.ID);
+            }
+        }
+
+        private int getPendingBeatmapCount()
+        {
+            lock (pendingBeatmapLock)
+                return pendingBeatmapIds.Count;
+        }
+
+        private void postWarmupSummaryNotification(int totalCount)
+        {
+            if (notificationOverlay == null || totalCount <= 0)
+                return;
 
             Schedule(() =>
             {
                 try
                 {
-                    notificationOverlay?.Post(notification);
-                    Logger.Log("Posted mania analysis warmup progress notification.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    notificationOverlay.Post(new SimpleNotification
+                    {
+                        Text = $"Ez analysis scan found {totalCount} beatmaps needing recompute. Runtime recompute is limited to the selected beatmap only."
+                    });
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(e, "Failed to post mania analysis warmup notification.");
+                    Logger.Error(e, "Failed to post mania analysis recompute summary notification.");
                 }
             });
-            return notification;
         }
 
         private void sleepIfRequired()
         {
             while (localUserPlayInfo?.PlayingState.Value != LocalUserPlayingState.NotPlaying || highPerformanceSessionManager?.IsSessionActive == true)
             {
-                Logger.Log("Mania analysis warmup sleeping due to active gameplay...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                Logger.Log("Mania analysis recompute is sleeping due to active gameplay...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 Thread.Sleep(TimeToSleepDuringGameplay);
             }
         }

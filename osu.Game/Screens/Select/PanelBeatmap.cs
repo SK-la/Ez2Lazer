@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -14,6 +13,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics;
@@ -60,17 +60,14 @@ namespace osu.Game.Screens.Select
         private EzDisplayXxySR displayXxySR = null!;
         private EzTagDisplay ezTagDisplay = null!;
 
-        // private IBindable<bool>? xxySrFilterSetting;
-        // private Bindable<KpcDisplayMode> kpcMode = null!;
-
-        private IBindable<EzAnalysisResult>? maniaAnalysisBindable;
-        private CancellationTokenSource? maniaAnalysisCancellationSource;
-        private bool maniaWasVisible;
+        private IBindable<EzAnalysisResult>? ezAnalysisBindable;
+        private CancellationTokenSource? ezAnalysisCancellationSource;
         private IBindable<bool> ezAnalysisCacheEnabled = new BindableBool(true);
         private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
+        private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
-        private int keyCount;
         private string? scratchText;
+        private const int mania_ui_update_throttle_ms = 15;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -203,7 +200,7 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        displayXxySR = new EzDisplayXxySR
+                                        displayXxySR = new EzDisplayXxySR(default, true)
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
@@ -256,32 +253,20 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
-            ezAnalysisCacheEnabled.BindValueChanged(_ =>
-            {
-                clearManiaAnalysisBinding();
-                resetManiaAnalysisDisplay();
-            }, true);
+            var kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
+            ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
 
+            ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
             ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
-            ezAnalysisSqliteEnabled.BindValueChanged(_ =>
-            {
-                clearManiaAnalysisBinding();
-                requestManiaAnalysisBindable();
-            });
 
             ruleset.BindValueChanged(_ =>
             {
-                clearManiaAnalysisBinding();
-                requestManiaAnalysisBindable();
                 resetManiaAnalysisDisplay();
                 updateKeyCount();
             }, true);
 
             mods.BindValueChanged(_ =>
             {
-                clearManiaAnalysisBinding();
-                requestManiaAnalysisBindable();
                 updateKeyCount();
             }, true);
 
@@ -289,13 +274,10 @@ namespace osu.Game.Screens.Select
             {
                 if (s.NewValue && Item?.IsVisible == true)
                 {
-                    clearManiaAnalysisBinding();
-                    requestManiaAnalysisBindable();
+                    computeEzAnalysis();
                 }
             });
 
-            var kpcMode = ezConfig.GetBindable<KpcDisplayMode>(Ez2Setting.KpcDisplayMode);
-            ezKpcDisplay.KpcDisplayModeBindable.BindTo(kpcMode);
             var xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
             xxySrFilterSetting.BindValueChanged(value =>
             {
@@ -315,28 +297,25 @@ namespace osu.Game.Screens.Select
             difficultyText.Text = beatmap.DifficultyName;
             authorText.Text = BeatmapsetsStrings.ShowDetailsMappedBy(beatmap.Metadata.Author.Username);
 
-            ezTagDisplay.UpdateBeatmap(beatmap);
-
             computeStarRating();
+            ezTagDisplay.Beatmap = beatmap;
+            computeEzAnalysis();
             updateKeyCount();
         }
 
         private void resetManiaAnalysisDisplay()
         {
-            if (!ezAnalysisCacheEnabled.Value && !ezAnalysisSqliteEnabled.Value)
-            {
-                ezKpcDisplay.SetState(null);
-                displayXxySR.Hide();
+            if (Item == null)
                 return;
-            }
 
-            if (ruleset.Value.OnlineID == 3)
+            if (ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled.Value || ezAnalysisSqliteEnabled.Value))
             {
                 displayXxySR.Show();
             }
             else
             {
-                ezKpcDisplay.SetState(null);
+                ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY;
+                displayXxySR.Current.Value = default;
                 displayXxySR.Hide();
             }
         }
@@ -360,60 +339,80 @@ namespace osu.Game.Screens.Select
 
             starDifficultyCancellationSource?.Cancel();
 
-            ezTagDisplay.UpdateBeatmap(null);
-            clearManiaAnalysisBinding();
+            clearEzAnalysisBinding(resetDisplay: true);
+        }
 
-            // 主动清除本 panel 的分析缓存以防止在快速滚动时缓存堆积
-            // 这会立即从内存缓存中移除与此 beatmap 相关的所有分析结果
-            if (Item != null)
-                maniaAnalysisCache.InvalidateBeatmapAnalysis(((GroupedBeatmap)Item.Model).Beatmap);
+        private void clearEzAnalysisBinding(bool resetDisplay = false)
+        {
+            scheduledEzAnalysisUpdate?.Cancel();
+            scheduledEzAnalysisUpdate = null;
 
+            ezAnalysisBindable?.UnbindAll();
+            ezAnalysisBindable = null;
+
+            ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
+            ezAnalysisCancellationSource = null;
+
+            if (!resetDisplay)
+                return;
+
+            ezTagDisplay.Beatmap = null;
             scratchText = null;
+            ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY;
+            displayXxySR.Current.Value = default;
+            ezDisplayKpsGraph.SetPoints(Array.Empty<double>());
+            ezKpsDisplay.SetKps(0, 0);
         }
 
-        private void updateKPS((double averageKps, double maxKps, List<double> kpsList) result, Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
+        private void updateKPS(EzAnalysisResult ezAnalysisResult)
         {
-            if (Item == null || Item.IsVisible != true)
+            if (Item?.IsVisible != true)
                 return;
 
-            var (averageKps, maxKps, kpsList) = result;
+            double avgKPS = ezAnalysisResult.KpsSummary.AvgKPS;
+            double maxKps = ezAnalysisResult.KpsSummary.MaxKPS;
+            var kpsList = ezAnalysisResult.KpsSummary.KpsList;
 
-            ezKpsDisplay.SetKps(averageKps, maxKps);
+            var columnCounts = ezAnalysisResult.EzManiaSummary.ColumnCounts;
 
-            // Update KPS graph with the KPS list
-            if (kpsList.Count > 0)
-            {
-                ezDisplayKpsGraph.SetPoints(kpsList);
-            }
+            scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
+            updateKeyCount();
+            ezKpsDisplay.SetKps(avgKPS, maxKps);
+            ezKpcDisplay.ManiaSummary = ezAnalysisResult.EzManiaSummary;
+            ezDisplayKpsGraph.SetPoints(kpsList);
 
-            if (columnCounts != null)
-            {
-                ezKpcDisplay.SetState(columnCounts, holdNoteCounts);
-                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
-                Schedule(updateKeyCount);
-            }
+            if (ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled.Value || ezAnalysisSqliteEnabled.Value))
+                displayXxySR.Current.Value = ezAnalysisResult;
         }
 
-        private void requestManiaAnalysisBindable()
+        private void computeEzAnalysis()
         {
-            if ((!ezAnalysisCacheEnabled.Value && !ezAnalysisSqliteEnabled.Value) || maniaAnalysisBindable != null || Item == null)
+            clearEzAnalysisBinding();
+
+            if (!ezAnalysisCacheEnabled.Value && !ezAnalysisSqliteEnabled.Value)
                 return;
 
-            bool isActivePanel = Item.IsVisible;
-            bool requiresRecomputeForCorrectness = !ezAnalysisSqliteEnabled.Value || mods.Value.Any();
-            bool requiresRecomputeForValidation = Selected.Value;
-            bool allowRecompute = ezAnalysisCacheEnabled.Value && isActivePanel && (requiresRecomputeForCorrectness || requiresRecomputeForValidation);
+            ezAnalysisCancellationSource = new CancellationTokenSource();
 
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = new CancellationTokenSource();
+            if (Item == null)
+                return;
 
-            maniaAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, maniaAnalysisCancellationSource.Token,
-                computationDelay: SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE, allowRecompute: allowRecompute);
-            maniaAnalysisBindable.BindValueChanged(result =>
+            bool allowRecompute = ezAnalysisCacheEnabled.Value && Item.IsVisible;
+
+            ezAnalysisBindable = maniaAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token,
+                SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE, allowRecompute);
+            ezAnalysisBindable.BindValueChanged(result =>
             {
-                updateKPS((result.NewValue.Summary.AverageKps, result.NewValue.Summary.MaxKps, result.NewValue.Summary.KpsList),
-                    result.NewValue.Details.ColumnCounts, result.NewValue.Details.HoldNoteCounts);
-                displayXxySR.Current.Value = result.NewValue.Details.XxySr;
+                scheduledEzAnalysisUpdate?.Cancel();
+                scheduledEzAnalysisUpdate = Scheduler.AddDelayed(() =>
+                {
+                    if (Item?.IsVisible != true)
+                        return;
+
+                    updateKPS(result.NewValue);
+                    scheduledEzAnalysisUpdate = null;
+                }, mania_ui_update_throttle_ms);
             }, false);
         }
 
@@ -442,7 +441,8 @@ namespace osu.Game.Screens.Select
                 starDifficultyCancellationSource?.Cancel();
                 starDifficultyCancellationSource = null;
 
-                clearManiaAnalysisBinding();
+                ezAnalysisCancellationSource?.Cancel();
+                ezAnalysisCancellationSource = null;
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.
@@ -466,26 +466,6 @@ namespace osu.Game.Screens.Select
             {
                 difficultyIcon.Colour = starRatingDisplay.DisplayedDifficultyTextColour;
             }
-
-            // If we just became visible, pull latest mania analysis value to initialise UI.
-            if (!maniaWasVisible && Item?.IsVisible == true)
-            {
-                maniaWasVisible = true;
-                // If we haven't requested the bindable yet, do so now.
-                requestManiaAnalysisBindable();
-            }
-
-            if (maniaWasVisible && Item?.IsVisible != true)
-                maniaWasVisible = false;
-        }
-
-        private void clearManiaAnalysisBinding()
-        {
-            maniaAnalysisCancellationSource?.Cancel();
-            maniaAnalysisCancellationSource = null;
-
-            maniaAnalysisBindable?.UnbindAll();
-            maniaAnalysisBindable = null;
         }
 
         private void updateKeyCount()
@@ -498,7 +478,7 @@ namespace osu.Game.Screens.Select
                 // Account for mania differences locally for now.
                 // Eventually this should be handled in a more modular way, allowing rulesets to add more information to the panel.
                 ILegacyRuleset legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
-                keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
+                int keyCount = legacyRuleset.GetKeyCount(beatmap, mods.Value);
 
                 keyCountText.Alpha = 1;
                 keyCountText.Text = scratchText ?? $"[{keyCount}K] ";

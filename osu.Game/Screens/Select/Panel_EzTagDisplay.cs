@@ -29,7 +29,21 @@ namespace osu.Game.Screens.Select
         private const float tag_corner_radius = 3;
 
         private readonly FillFlowContainer tagFlow;
-        private BeatmapInfo? beatmapInfo;
+
+        private BeatmapInfo? beatmap;
+
+        public BeatmapInfo? Beatmap
+        {
+            get => beatmap;
+            set
+            {
+                beatmap = value;
+
+                if (IsLoaded)
+                    updateSubscription();
+            }
+        }
+
         private Storyboard? storyboard;
         private bool tagDisplayEnabled => true;
 
@@ -53,10 +67,8 @@ namespace osu.Game.Screens.Select
             };
         }
 
-        public void UpdateBeatmap(BeatmapInfo? beatmap)
+        private void updateSubscription()
         {
-            beatmapInfo = beatmap;
-
             if (!tagDisplayEnabled)
             {
                 storyboard = null;
@@ -72,7 +84,7 @@ namespace osu.Game.Screens.Select
         {
             tagFlow.Clear();
 
-            if (beatmapInfo?.BeatmapSet == null || storyboard == null)
+            if (beatmap?.BeatmapSet == null || storyboard == null)
                 return;
 
             bool hasVideo = storyboard.GetLayer("Video").Elements.Any(e => e is StoryboardVideo);
@@ -88,7 +100,7 @@ namespace osu.Game.Screens.Select
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard));
 
             // 添加用户标签（不受图标数量影响）
-            var userTags = beatmapInfo.Metadata.UserTags.Take(max_visible_tags);
+            var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
 
             foreach (string tag in userTags)
             {
@@ -103,6 +115,17 @@ namespace osu.Game.Screens.Select
             // {
             //     tagFlow.Add(new SimpleTag("No tags") { Alpha = 0.5f });
             // }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                beatmap = null;
+                storyboard = null;
+            }
+
+            base.Dispose(isDisposing);
         }
 
         private partial class IconTag : CompositeDrawable, IHasTooltip

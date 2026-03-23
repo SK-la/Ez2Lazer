@@ -196,7 +196,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// 快速仅统计列计数与长按计数（单次遍历，避免 KPS 相关开销）。
         /// </summary>
-        public static (Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts) GetCountsOnly(IBeatmap beatmap)
+        public static EzManiaSummary GetEzManiaSummary(IBeatmap beatmap)
         {
             var columnCounts = new Dictionary<int, int>();
             var holdNoteCounts = new Dictionary<int, int>();
@@ -211,7 +211,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 }
             }
 
-            return (columnCounts, holdNoteCounts);
+            return new EzManiaSummary(columnCounts, holdNoteCounts, 0);
         }
 
         /// <summary>
@@ -275,9 +275,21 @@ namespace osu.Game.EzOsuGame.Analysis
             if (estimatedIntervals > max_estimated_intervals)
                 estimatedIntervals = max_estimated_intervals;
 
-            var kpsList = new List<double>(estimatedIntervals);
+            int sampledPointCount = Math.Min(DEFAULT_KPS_GRAPH_POINTS, estimatedIntervals);
+            var kpsList = new List<double>(sampledPointCount);
             var columnCounts = new Dictionary<int, int>();
             var holdNoteCounts = new Dictionary<int, int>();
+
+            int[]? sampledIndices = null;
+
+            if (estimatedIntervals > DEFAULT_KPS_GRAPH_POINTS)
+            {
+                sampledIndices = new int[DEFAULT_KPS_GRAPH_POINTS];
+                int lastIndex = estimatedIntervals - 1;
+
+                for (int i = 0; i < DEFAULT_KPS_GRAPH_POINTS; i++)
+                    sampledIndices[i] = (int)((long)i * lastIndex / (DEFAULT_KPS_GRAPH_POINTS - 1));
+            }
 
             // 同时处理KPS和列统计
             var hitObjectsArray = hitObjects as HitObject[] ?? hitObjects.ToArray();
@@ -301,6 +313,10 @@ namespace osu.Game.EzOsuGame.Analysis
             // KPS计算
             double currentTime = 0;
             int currentIndex = 0;
+            int intervalIndex = 0;
+            int sampledIndex = 0;
+            double sum = 0;
+            double max = 0;
 
             while (currentTime < songEndTime)
             {
@@ -315,21 +331,36 @@ namespace osu.Game.EzOsuGame.Analysis
                     endIdx++;
 
                 int hits = endIdx - startIdx;
-                kpsList.Add(hits / (interval / 1000.0));
+                double kps = hits / (interval / 1000.0);
+
+                sum += kps;
+                if (intervalIndex == 0 || kps > max)
+                    max = kps;
+
+                if (sampledIndices == null)
+                {
+                    kpsList.Add(kps);
+                }
+                else if (sampledIndex < sampledIndices.Length && intervalIndex == sampledIndices[sampledIndex])
+                {
+                    kpsList.Add(kps);
+                    sampledIndex++;
+                }
 
                 // 防护：在极端情况下限制桶数，避免无限迭代导致 OOM
-                if (kpsList.Count >= max_estimated_intervals)
+                intervalIndex++;
+
+                if (intervalIndex >= max_estimated_intervals)
                     break;
 
                 currentTime += interval;
                 currentIndex = startIdx;
             }
 
-            if (kpsList.Count == 0)
+            if (intervalIndex == 0)
                 return (0, 0, kpsList, columnCounts, holdNoteCounts);
 
-            double average = kpsList.Sum() / kpsList.Count;
-            double max = kpsList.Max();
+            double average = sum / intervalIndex;
 
             return (average, max, kpsList, columnCounts, holdNoteCounts);
         }

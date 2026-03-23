@@ -24,16 +24,16 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// <summary>
     /// 模仿 StarRatingDisplay 形式的显示XxySR
     /// </summary>
-    public partial class EzDisplayXxySR : CompositeDrawable, IHasCurrentValue<EzManiaSummary>
+    public partial class EzDisplayXxySR : CompositeDrawable, IHasCurrentValue<EzAnalysisResult>
     {
         // private readonly bool animated;
         private readonly Box background;
         private readonly SpriteIcon srIcon;
         private readonly OsuSpriteText srText;
 
-        private readonly BindableWithCurrent<EzManiaSummary> current = new BindableWithCurrent<EzManiaSummary>();
+        private readonly BindableWithCurrent<EzAnalysisResult> current = new BindableWithCurrent<EzAnalysisResult>();
 
-        public Bindable<EzManiaSummary> Current
+        public Bindable<EzAnalysisResult> Current
         {
             get => current.Current;
             set => current.Current = value;
@@ -50,11 +50,11 @@ namespace osu.Game.EzOsuGame.UserInterface
         [Resolved]
         private OverlayColourProvider? colourProvider { get; set; }
 
-        public EzDisplayXxySR(EzManiaSummary ezManiaSummary, bool animated = false)
+        public EzDisplayXxySR(EzAnalysisResult ezAnalysisResult, bool animated = false)
         {
             // this.animated = animated;
 
-            Current.Value = ezManiaSummary;
+            Current.Value = ezAnalysisResult;
 
             AutoSizeAxes = Axes.Both;
 
@@ -120,9 +120,8 @@ namespace osu.Game.EzOsuGame.UserInterface
                 //     this.TransformBindableTo(displayedStars, c.NewValue.XxySr, 100 + 80 * Math.Abs(c.NewValue.XxySr - c.OldValue.XxySr), Easing.OutQuint);
                 // else
                 //     displayedStars.Value = c.NewValue.XxySr;
-                if (c.NewValue.XxySr.HasValue)
-                    updateDisplay(c.NewValue.XxySr.Value);
-            });
+                updateDisplay(c.NewValue.EzManiaSummary.XxySr);
+            }, true);
 
             // displayedStars.Value = Current.Value.XxySr;
             //
@@ -175,6 +174,14 @@ namespace osu.Game.EzOsuGame.UserInterface
             srText.Colour = sr.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF
                 ? colours.Orange1
                 : colourProvider?.Background5 ?? Color4.Black.Opacity(0.75f);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+                Current.UnbindAll();
+
+            base.Dispose(isDisposing);
         }
     }
 }

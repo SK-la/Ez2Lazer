@@ -13,7 +13,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
-    public readonly struct EzAnalysisCacheLookup : IEquatable<EzAnalysisCacheLookup>
+    public readonly struct EzAnalysisLookupCache : IEquatable<EzAnalysisLookupCache>
     {
         public readonly BeatmapInfo BeatmapInfo;
         public readonly RulesetInfo Ruleset;
@@ -22,10 +22,10 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private static int modSnapshotFailCount;
 
-        public EzAnalysisCacheLookup(BeatmapInfo beatmapInfo, RulesetInfo? ruleset, IEnumerable<Mod>? mods)
+        public EzAnalysisLookupCache(BeatmapInfo beatmapInfo, IEnumerable<Mod>? mods)
         {
             BeatmapInfo = beatmapInfo;
-            Ruleset = ruleset ?? BeatmapInfo.Ruleset;
+            Ruleset = BeatmapInfo.Ruleset;
             // 重要：mod 应用顺序对谱面转换很重要。
             OrderedMods = createModSnapshot(mods);
             // 重要：一些自定义 mods会在 ApplyToBeatmap 期间懒惰地分配随机种子
@@ -110,8 +110,10 @@ namespace osu.Game.EzOsuGame.Analysis
                     // 如果克隆失败，则回退到使用原始实例。
                     // 这对缓存来说并不理想，但比完全破坏分析要好。
                     if (Interlocked.Increment(ref modSnapshotFailCount) <= 10)
+                    {
                         Logger.Log($"[EzBeatmapManiaAnalysisCache] Mod.DeepClone() failed for {mod.GetType().FullName}. Falling back to original instance.", Ez2ConfigManager.LOGGER_NAME,
                             LogLevel.Important);
+                    }
 
                     list.Add(mod);
                 }
@@ -120,7 +122,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return list.ToArray();
         }
 
-        public bool Equals(EzAnalysisCacheLookup other) => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
+        public bool Equals(EzAnalysisLookupCache other) => BeatmapInfo.ID.Equals(other.BeatmapInfo.ID)
                                                            && string.Equals(BeatmapInfo.Hash, other.BeatmapInfo.Hash, StringComparison.Ordinal)
                                                            && Ruleset.Equals(other.Ruleset)
                                                            && ModsSignature == other.ModsSignature;
@@ -131,8 +133,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             hashCode.Add(BeatmapInfo.ID);
             hashCode.Add(BeatmapInfo.Hash);
-            hashCode.Add(Ruleset.ShortName);
-
+            hashCode.Add(Ruleset.OnlineID);
             hashCode.Add(ModsSignature);
 
             return hashCode.ToHashCode();

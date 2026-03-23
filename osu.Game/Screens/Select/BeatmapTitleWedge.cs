@@ -201,7 +201,7 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            // ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
+            // ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
             // ezAnalysisCacheEnabled.BindValueChanged(_ =>
             // {
             //     updateAnalysisDisplay();

@@ -232,7 +232,7 @@ namespace osu.Game.Screens.Select
             {
                 base.LoadComplete();
 
-                // ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisCacheEnabled);
+                // ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
                 // ezAnalysisCacheEnabled.BindValueChanged(_ => Scheduler.AddOnce(updateDisplay), true);
 
                 // it is not uncommon for the beatmap and the ruleset to change in conjunction during a single update frame.
@@ -292,7 +292,7 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
-                    ezKpcDisplay.SetState(null);
+                    ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY;
                     return;
                 }
 
@@ -308,19 +308,19 @@ namespace osu.Game.Screens.Select
                     // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
                     if (ruleset.Value != null && ruleset.Value.OnlineID == 3)
                     {
-                        var (columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetCountsOnly(playableBeatmap);
+                        var maniaSummary = OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
                         Schedule(() =>
                         {
                             if (cancellationToken.IsCancellationRequested)
                                 return;
 
-                            ezKpcDisplay.SetState(columnCounts, holdNoteCounts);
+                            ezKpcDisplay.ManiaSummary = maniaSummary;
                         });
                     }
                     else
                     {
                         // 非 Mania 情况隐藏组件
-                        Schedule(() => ezKpcDisplay.SetState(null));
+                        Schedule(() => ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY);
                     }
 
                     Schedule(() =>

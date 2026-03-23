@@ -43,10 +43,10 @@ namespace osu.Game.EzOsuGame.Localization
             "开启后将隐藏主界面底部的在线新闻/广告轮播图。",
             "When enabled, the online news/advertisement banner at the bottom of the main menu will be hidden.");
 
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_ENABLED =
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED =
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析重算", "Enable Ez analysis recomputation");
 
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "重算开关。开启后允许活动面板进行实时分析计算并刷新显示；关闭后不进行重算。"
             + "\n注意：该开关不控制 SQLite 本地读取与预热（由下方 SQLite 开关单独控制）。",
             "Recomputation switch. When enabled, active panels can run real-time analysis and refresh displayed values; when disabled, no recomputation is performed."
