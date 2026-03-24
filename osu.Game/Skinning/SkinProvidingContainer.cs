@@ -244,6 +244,10 @@ namespace osu.Game.Skinning
                 if (i.skin is ISkinSource source)
                     source.SourceChanged -= TriggerSourceChanged;
             }
+
+            // 清空所有皮肤源，释放对其的引用
+            // 这允许TextureStore和SampleStore缓存被正确垃圾回收
+            skinSources = Array.Empty<(ISkin skin, DisableableSkinSource wrapped)>();
         }
 
         private class DisableableSkinSource : ISkin
