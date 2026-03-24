@@ -64,35 +64,61 @@ namespace osu.Game.EzOsuGame.Configuration
         {
         }
 
-        // Cache of bindables returned by GetBindable to avoid creating multiple instances
-        private readonly object bindableCacheLock = new object();
-        private readonly Dictionary<Ez2Setting, object> bindableCache = new Dictionary<Ez2Setting, object>();
-
         protected override void InitialiseDefaults()
         {
-            #region 皮肤类
+            #region 全局游戏与界面设置
 
+            SetDefault(Ez2Setting.ScalingGameMode, ScalingGameMode.Mania);
+            SetDefault(Ez2Setting.GameplayDisableCmdSpace, true);
+
+            SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
+            SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
+
+            SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
+            SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
+            SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
+
+            SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
+            SetDefault(Ez2Setting.XxySRFilter, false);
+            SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
+            SetDefault(Ez2Setting.EzSelectCsMode, string.Empty);
             SetDefault(Ez2Setting.ColumnTypeListSelect, 4);
-            SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzStyleProOnly);
-            SetDefault(Ez2Setting.GlobalHitPosition, false);
+
+            #endregion
+
+            #region 音频与输入
+
+            SetDefault(Ez2Setting.AsioSampleRate, 48000);
+            SetDefault(Ez2Setting.AsioBufferSize, 128);
+            SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
+
+            SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
+            SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
+
+            #endregion
+
+            #region 皮肤与舞台资源
+
             SetDefault(Ez2Setting.GlobalTextureName, 4);
-
-            SetDefault(Ez2Setting.ColumnWidth, 80, 5, 400.0, 1.0);
-            SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
-            SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
-            SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
-            SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
-
+            SetDefault(Ez2Setting.GameThemeName, EzEnumGameThemeName.Celeste_Lumiere);
             SetDefault(Ez2Setting.NoteSetName, "lucenteclat");
             SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
             SetDefault(Ez2Setting.StagePanelEnabled, true);
-            SetDefault(Ez2Setting.GameThemeName, EzEnumGameThemeName.Celeste_Lumiere);
+
+            SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzStyleProOnly);
+            SetDefault(Ez2Setting.ColumnWidth, 80, 5, 400.0, 1.0);
+            SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
+
+            SetDefault(Ez2Setting.GlobalHitPosition, false);
+            SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
+            SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
+            SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
             SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 10, 0.1);
             SetDefault(Ez2Setting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             #endregion
 
-            #region 列类型、着色系统
+            #region 列着色与配色系统
 
             SetDefault(Ez2Setting.ColumnDim, 0.5, 0.0, 1, 0.01);
             SetDefault(Ez2Setting.ColumnBlur, 0.3, 0.0, 1, 0.01);
@@ -115,30 +141,14 @@ namespace osu.Game.EzOsuGame.Configuration
 
             #endregion
 
-            SetDefault(Ez2Setting.AccuracyCutoffS, 0.95, 0.95, 1, 0.005);
-            SetDefault(Ez2Setting.AccuracyCutoffA, 0.9, 0.9, 1, 0.005);
+            #region Mania 专属行为
 
-            SetDefault(Ez2Setting.ScalingGameMode, ScalingGameMode.Mania);
-
-            SetDefault(Ez2Setting.GameplayDisableCmdSpace, true);
-            SetDefault(Ez2Setting.AsioSampleRate, 48000);
-            SetDefault(Ez2Setting.AsioBufferSize, 128);
-            SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
-
-            SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
-            SetDefault(Ez2Setting.XxySRFilter, false);
-            SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
-            SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
-            SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
-            SetDefault(Ez2Setting.EzSelectCsMode, "");
-            SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             initializeManiaDefaults();
 
-            // 判定偏移修正（以毫秒计）
-            SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
-            SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
+            #endregion
 
-            // 服务器配置
+            #region 服务器与账号
+
             SetDefault(Ez2Setting.ServerPreset, ServerPreset.Official);
             SetDefault(Ez2Setting.CustomApiUrl, string.Empty);
             SetDefault(Ez2Setting.CustomWebsiteUrl, string.Empty);
@@ -155,6 +165,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ServerGuToken, string.Empty);
             SetDefault(Ez2Setting.ServerManualUsername, string.Empty);
             SetDefault(Ez2Setting.ServerManualToken, string.Empty);
+
+            #endregion
         }
 
         private void initializeManiaDefaults()
@@ -492,24 +504,6 @@ namespace osu.Game.EzOsuGame.Configuration
 
         #endregion
 
-        public new Bindable<T> GetBindable<T>(Ez2Setting setting)
-        {
-            lock (bindableCacheLock)
-            {
-                if (bindableCache.TryGetValue(setting, out object? existing))
-                    return (Bindable<T>)existing;
-
-                var b = base.GetBindable<T>(setting);
-                bindableCache[setting] = b!;
-                return b;
-            }
-        }
-
-        public new void SetValue<T>(Ez2Setting lookup, T value)
-        {
-            base.SetValue(lookup, value);
-        }
-
         IBindable<float> IGameplaySettings.ComboColourNormalisationAmount => null!;
         IBindable<float> IGameplaySettings.PositionalHitsoundsLevel => null!;
 
@@ -532,49 +526,61 @@ namespace osu.Game.EzOsuGame.Configuration
 
     public enum Ez2Setting
     {
-        // 界面设置
+        // 全局游戏与界面设置
+        ScalingGameMode,
+        GameplayDisableCmdSpace,
+        AccuracyCutoffS,
+        AccuracyCutoffA,
+
         KeySoundPreviewMode,
         XxySRFilter,
         EzAnalysisRecEnabled,
         EzAnalysisSqliteEnabled,
         KpcDisplayMode,
         HideMainMenuOnlineBanner,
-
-        ColumnTypeListSelect,
         EzSelectCsMode,
+        ColumnTypeListSelect,
 
-        // 全局开关
-        ScalingGameMode,
-        AccuracyCutoffS,
-        AccuracyCutoffA,
+        // 音频与输入
+        AsioSampleRate,
+        AsioBufferSize,
+        InputAudioLatencyTracker,
+        OffsetPlusMania,
+        OffsetPlusNonMania,
+
+        // 皮肤与舞台资源
         ColumnWidthStyle,
         GlobalHitPosition,
+        GlobalTextureName,
+        GameThemeName,
 
-        // 皮肤设置
+        NoteSetName,
+        StageName,
+        StagePanelEnabled,
+
         ColumnWidth,
         SpecialFactor,
-
-        // Ez专属
         HitPosition,
         HitTargetFloatFixed,
         HitTargetAlpha,
         NoteHeightScaleToWidth,
         NoteTrackLineHeight,
-        NoteSetName,
-        StageName,
-        StagePanelEnabled,
 
-        GlobalTextureName,
-        GameThemeName,
-
-        // Mania 长按尾部相关（EzSkinEditor 用）
+        // Mania 专属行为
+        ManiaHitMode,
+        ManiaHealthMode,
+        BmsPoorHitResultEnable,
+        ManiaBarLinesBool,
         ManiaPseudo3DRotation,
         ManiaHoldTailAlpha,
         ManiaHoldTailMaskGradientHeight,
         ManiaLNGradientEnable,
 
-        // 着色系统
+        // 列着色与配色系统
         ColorSettingsEnabled,
+        ColumnDim,
+        ColumnBlur,
+
         ColumnTypeOf4K,
         ColumnTypeOf5K,
         ColumnTypeOf6K,
@@ -593,29 +599,9 @@ namespace osu.Game.EzOsuGame.Configuration
         ColumnTypeS,
         ColumnTypeE,
         ColumnTypeP,
-        ColumnBlur,
-        ColumnDim,
 
-        // 音频相关
-        AsioSampleRate,
-        AsioBufferSize,
-        InputAudioLatencyTracker,
-
-        // 来自拉取
-        GameplayDisableCmdSpace,
-
-        // Mania游戏专属设置
-        // 判定偏移修正（以毫秒计）
-        OffsetPlusMania,
-        OffsetPlusNonMania,
-
-        ManiaHitMode,
-        ManiaHealthMode,
-        BmsPoorHitResultEnable,
-        ManiaBarLinesBool,
-
-        // 服务器配置
-        ServerPreset, // 服务器预设选项
+        // 服务器与账号
+        ServerPreset,
 
         CustomApiUrl,
         CustomWebsiteUrl,
