@@ -520,12 +520,22 @@ namespace osu.Game.Rulesets.Mania
 
         public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
         {
+            // Clear any stale mod override so that toggling mods off correctly reverts to the global hit mode.
+            ManiaHitWindows.ClearModOverride();
+
             // a special touch-up of key count is required to the original difficulty, since key conversion mods are not `IApplicableToDifficulty`
             var originalDifficulty = new BeatmapDifficulty(beatmapInfo.Difficulty)
             {
                 CircleSize = ManiaBeatmapConverter.GetColumnCount(LegacyBeatmapConversionDifficultyInfo.FromBeatmapInfo(beatmapInfo), [])
             };
             var adjustedDifficulty = GetAdjustedDisplayDifficulty(beatmapInfo, mods);
+
+            // 单独接口追踪Mod中的变化
+            var range = mods.OfType<IManiaHitRangeProvider>().FirstOrDefault()?.GetDisplayHitRange(beatmapInfo);
+
+            if (range != null)
+                ManiaHitWindows.SetModOverride(range.Value);
+
             var colours = new OsuColour();
 
             yield return new RulesetBeatmapAttribute(SongSelectStrings.KeyCount, @"KC", originalDifficulty.CircleSize, adjustedDifficulty.CircleSize, 18)
@@ -533,7 +543,7 @@ namespace osu.Game.Rulesets.Mania
                 Description = "Affects the number of key columns on the playfield."
             };
 
-            var hitWindows = new ManiaHitWindows();
+            var hitWindows = new ManiaHitWindows { BPM = beatmapInfo.BPM };
             hitWindows.SetDifficulty(adjustedDifficulty.OverallDifficulty);
             hitWindows.IsConvert = !beatmapInfo.Ruleset.Equals(RulesetInfo);
             hitWindows.ClassicModActive = mods.Any(m => m is ManiaModClassic);

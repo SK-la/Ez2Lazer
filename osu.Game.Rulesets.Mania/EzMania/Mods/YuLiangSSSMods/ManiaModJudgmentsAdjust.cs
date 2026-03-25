@@ -151,24 +151,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             MaxValue = 500
         };
 
-        public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
-
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
-        {
-            CustomHitRange.BindValueChanged(_ => updateCustomHitRange());
-            PerfectHit.BindValueChanged(_ => updateCustomHitRange());
-            GreatHit.BindValueChanged(_ => updateCustomHitRange());
-            GoodHit.BindValueChanged(_ => updateCustomHitRange());
-            OkHit.BindValueChanged(_ => updateCustomHitRange());
-            MehHit.BindValueChanged(_ => updateCustomHitRange());
-            MissHit.BindValueChanged(_ => updateCustomHitRange());
-        }
-
-        private void updateCustomHitRange()
         {
             if (CustomHitRange.Value)
             {
-                HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
+                ManiaHitWindows.SetModOverride(new ManiaModifyHitRange(
                     PerfectHit.Value,
                     GreatHit.Value,
                     GoodHit.Value,
@@ -179,7 +166,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             }
             else
             {
-                HitWindows.ResetRange();
+                ManiaHitWindows.ClearModOverride();
             }
         }
 
@@ -191,16 +178,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         public override void ResetSettingsToDefaults()
         {
             base.ResetSettingsToDefaults();
-
-            CustomHitRange.UnbindAll();
-            PerfectHit.UnbindAll();
-            GreatHit.UnbindAll();
-            GoodHit.UnbindAll();
-            OkHit.UnbindAll();
-            MehHit.UnbindAll();
-            MissHit.UnbindAll();
-
-            HitWindows.ResetRange();
+            ManiaHitWindows.ClearModOverride();
         }
     }
 

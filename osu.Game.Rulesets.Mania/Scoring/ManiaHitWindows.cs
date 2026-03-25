@@ -11,6 +11,15 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public readonly record struct ManiaModifyHitRange(double Perfect, double Great, double Good, double Ok, double Meh, double Miss, double Poor = 0);
 
+    /// <summary>
+    /// Implement this on any mod that provides custom hit ranges for song-select display
+    /// but does not go through <c>IApplicableToDifficulty</c>.
+    /// </summary>
+    public interface IManiaHitRangeProvider
+    {
+        ManiaModifyHitRange? GetDisplayHitRange(IBeatmapInfo beatmapInfo);
+    }
+
     public class ManiaHitWindows : HitWindows
     {
         public static readonly DifficultyRange PERFECT_WINDOW_RANGE = new DifficultyRange(22.4D, 19.4D, 13.9D);
@@ -107,13 +116,17 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        private static bool modifyHitWindows;
+        public bool ModifyHitWindows { get; private set; }
 
-        public bool ModifyHitWindows
-        {
-            get => modifyHitWindows;
-            set => modifyHitWindows = value;
-        }
+        /// <summary>
+        /// Static mod override. When set, <see cref="WindowFor"/> returns these values
+        /// regardless of instance-level calculations, ensuring mod custom ranges
+        /// survive per-HitObject ManiaHitWindows re-creation during gameplay.
+        /// </summary>
+        private static ManiaModifyHitRange? modOverride;
+
+        public static void SetModOverride(ManiaModifyHitRange range) => modOverride = range;
+        public static void ClearModOverride() => modOverride = null;
 
         private double perfect;
         private double great;
@@ -123,7 +136,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double miss;
         private double pool;
 
-        private static double bpm = 200;
+        private static double bpm;
 
         public double BPM
         {
@@ -137,6 +150,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         public bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
+
+        public ManiaHitWindows()
+        {
+            setHitMode();
+            updateWindows();
+        }
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -280,6 +299,22 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public override double WindowFor(HitResult result)
         {
+            // Mod override takes absolute priority — survives per-HitObject instance re-creation.
+            if (modOverride is { } mo)
+            {
+                return result switch
+                {
+                    HitResult.Perfect => mo.Perfect,
+                    HitResult.Great => mo.Great,
+                    HitResult.Good => mo.Good,
+                    HitResult.Ok => mo.Ok,
+                    HitResult.Meh => mo.Meh,
+                    HitResult.Miss => mo.Miss,
+                    HitResult.Poor => mo.Poor == 0 ? mo.Miss : mo.Poor,
+                    _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
+                };
+            }
+
             switch (result)
             {
                 case HitResult.Poor:

@@ -13,7 +13,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 {
-    public class ManiaModNewJudgement : Mod, IApplicableToBeatmap
+    public class ManiaModNewJudgement : Mod, IApplicableToBeatmap, IManiaHitRangeProvider
     {
         public override string Name => "New Judgement";
 
@@ -26,8 +26,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
         public override double ScoreMultiplier => 1.0;
-
-        public ManiaHitWindows HitWindows { get; set; } = new ManiaHitWindows();
 
         [SettingSource("Custom BPM", SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> BPM { get; set; } = new Bindable<int?>();
@@ -65,7 +63,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             }
         }
 
-        private void updateHitRanges()
+        public ManiaModifyHitRange ComputeHitRanges()
         {
             double perBeatLength = 60 / BeatmapBPM * 1000;
             if (BPM.Value is not null) perBeatLength = 60 / (double)BPM.Value * 1000;
@@ -83,35 +81,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             double mehRange = perBeatLength / (Divide.Value / 3);
             double missRange = perBeatLength / (Divide.Value / 3.5);
 
-            HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
+            return new ManiaModifyHitRange(
                 perfectRange,
                 greatRange,
                 goodRange,
                 okRange,
                 mehRange,
                 missRange
-            ));
+            );
+        }
+
+        public ManiaModifyHitRange? GetDisplayHitRange(IBeatmapInfo beatmapInfo)
+        {
+            BeatmapBPM = beatmapInfo.BPM;
+            return ComputeHitRanges();
         }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
-            BeatmapBPM = beatmap.BeatmapInfo.BPM > 0
-                ? beatmap.BeatmapInfo.BPM
-                : 200;
+            BeatmapBPM = beatmap.BeatmapInfo.BPM;
 
-            // Bind value-changed after beatmap is applied to avoid modifying global
-            // HitWindows before the mod is actually in effect.
-            Divide.UnbindAll();
-            Divide.BindValueChanged(_ => updateHitRanges(), false);
-
-            updateHitRanges();
+            ManiaHitWindows.SetModOverride(ComputeHitRanges());
         }
 
         public override void ResetSettingsToDefaults()
         {
             base.ResetSettingsToDefaults();
-            Divide.UnbindAll();
-            HitWindows.ResetRange();
+            ManiaHitWindows.ClearModOverride();
         }
     }
 
