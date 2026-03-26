@@ -222,7 +222,7 @@ namespace osu.Game.Screens.Select
                         break;
 
                     case MatchMode.IsolatedPhrase:
-                        result = Regex.IsMatch(value, $@"(^|\s){Regex.Escape(searchTerm)}($|\s)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+                        result = Regex.IsMatch(value, $@"(^|\b){Regex.Escape(searchTerm)}($|\b)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
                         break;
 
                     case MatchMode.FullPhrase:
