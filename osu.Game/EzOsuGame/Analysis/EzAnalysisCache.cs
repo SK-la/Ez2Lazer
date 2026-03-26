@@ -857,7 +857,7 @@ namespace osu.Game.EzOsuGame.Analysis
             Stream IWorkingBeatmap.GetStream(string storagePath) => working.GetStream(storagePath);
             void IWorkingBeatmap.BeginAsyncLoad() => working.BeginAsyncLoad();
             void IWorkingBeatmap.CancelAsyncLoad() => working.CancelAsyncLoad();
-            void IWorkingBeatmap.PrepareTrackForPreview(bool looping, double offsetFromPreviewPoint) => working.PrepareTrackForPreview(looping, offsetFromPreviewPoint);
+            void IWorkingBeatmap.PrepareTrackForPreview(bool looping, double? offsetFromPreviewPoint) => working.PrepareTrackForPreview(looping, offsetFromPreviewPoint);
         }
     }
 }

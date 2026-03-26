@@ -164,9 +164,6 @@ namespace osu.Game
         [Resolved]
         private FrameworkConfigManager frameworkConfig { get; set; }
 
-        private const int non_gameplay_draw_multiplier = 4;
-        private const int maximum_sane_draw_fps = 8000;
-
         private Bindable<FrameSync> frameSyncMode;
 
         private GameHost gameHost;
@@ -1068,32 +1065,6 @@ namespace osu.Game
             frameSyncMode = frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
             frameSyncMode.BindValueChanged(_ => Schedule(updateDrawLimiter), true);
 
-            gameHost?.Window?.CurrentDisplayMode.BindValueChanged(_ => Schedule(updateDrawLimiter), true);
-
-            var languages = Enum.GetValues<Language>();
-
-            var mappings = languages.Select(language =>
-            {
-#if DEBUG
-                if (language == Language.debug)
-                    return new LocaleMapping("debug", new DebugLocalisationStore());
-#endif
-
-                string cultureCode = language.ToCultureCode();
-
-                try
-                {
-                    return new LocaleMapping(new ResourceManagerLocalisationStore(cultureCode));
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, $"Could not load localisations for language \"{cultureCode}\"");
-                    return null;
-                }
-            }).Where(m => m != null);
-
-            Localisation.AddLocaleMappings(mappings);
-
             // The next time this is updated is in UpdateAfterChildren, which occurs too late and results
             // in the cursor being shown for a few frames during the intro.
             // This prevents the cursor from showing until we have a screen with CursorVisible = true
@@ -1801,18 +1772,18 @@ namespace osu.Game
 
             // For invalid refresh rates let's assume 60 Hz as it is most common.
             if (refreshRate <= 0)
-                refreshRate = 120;
+                refreshRate = 240;
 
             int drawLimiter;
             bool shouldVSync;
-            bool shouldThrottleTextureUploads;
+            // bool shouldThrottleTextureUploads;
 
             if (gameplayScreenActive)
             {
                 // gameplay 期间遵循玩家配置的帧同步（FrameSync）。
                 drawLimiter = refreshRate;
                 shouldVSync = false;
-                shouldThrottleTextureUploads = false;
+                // shouldThrottleTextureUploads = false;
 
                 if (frameSyncMode != null)
                 {
@@ -1841,34 +1812,34 @@ namespace osu.Game
             else
             {
                 // 非 gameplay 场景强制按显示器刷新率的 4 倍绘制。
-                drawLimiter = refreshRate * non_gameplay_draw_multiplier;
+                drawLimiter = refreshRate * 4;
 
                 // 额外强制关闭 VSync，避免 draw 被量化到刷新率（并尽量避免 OpenGL 下类似 glFinish 的额外停顿）。
                 shouldVSync = false;
 
                 // UI 界面在快速滚动时可能会大量流式加载纹理（封面/背景等）。
                 // 通过限制“每帧上传预算”来降低帧时间尖刺。
-                shouldThrottleTextureUploads = true;
+                // shouldThrottleTextureUploads = false;
             }
 
             // 仅对 draw 应用与 framework 类似的“合理上限”限制。
             if (!gameHost.AllowBenchmarkUnlimitedFrames)
-                drawLimiter = Math.Min(maximum_sane_draw_fps, drawLimiter);
+                drawLimiter = Math.Min(8000, drawLimiter);
 
             gameHost.MaximumDrawHz = drawLimiter;
 
             gameHost.SetVerticalSync(shouldVSync);
 
-            if (shouldThrottleTextureUploads)
-            {
-                // 偏保守的默认值：优先保证交互流畅，代价是缩略图/封面加载完成会稍慢。
-                // 前者提高随机速度，后者提高顺序速度。
-                gameHost.SetTextureUploadLimits(maxTexturesUploadedPerFrame: 12, maxPixelsUploadedPerFrame: 1024 * 1024);
-            }
-            else
-            {
-                gameHost.RestoreTextureUploadLimits();
-            }
+            // if (shouldThrottleTextureUploads)
+            // {
+            //     // 偏保守的默认值：优先保证交互流畅，代价是缩略图/封面加载完成会稍慢。
+            //     // 前者提高随机速度，后者提高顺序速度。
+            //     gameHost.SetTextureUploadLimits(maxTexturesUploadedPerFrame: 12, maxPixelsUploadedPerFrame: 1024 * 1024);
+            // }
+            // else
+            // {
+            //     gameHost.RestoreTextureUploadLimits();
+            // }
         }
 
         private void screenPushed(IScreen lastScreen, IScreen newScreen) => ScreenChanged((OsuScreen)lastScreen, (OsuScreen)newScreen);
