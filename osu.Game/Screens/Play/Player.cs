@@ -346,6 +346,11 @@ namespace osu.Game.Screens.Play
                 LatencyTracker.Start();
             }
 
+            // [Ez] Wire judgment diagnostics, sub-frame correction, and timing trace to config toggles.
+            EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
+            EzOsuGame.Timing.EzSubFrameCorrection.Enabled = ez2Config.Get<bool>(Ez2Setting.EzSubFrameCorrectionEnabled);
+            EzOsuGame.Diagnostics.EzTimingTrace.Enabled = ez2Config.Get<bool>(Ez2Setting.EzTimingTraceEnabled);
+
             HealthProcessor = gameplayMods.OfType<IApplicableHealthProcessor>().FirstOrDefault()?.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
             HealthProcessor ??= ruleset.CreateHealthProcessor(playableBeatmap.HitObjects[0].StartTime);
             HealthProcessor.ApplyBeatmap(playableBeatmap);
@@ -896,8 +901,14 @@ namespace osu.Game.Screens.Play
         /// <remarks>
         /// Once set, this can *only* be cancelled by rewinding, ie. if <see cref="JudgementProcessor.HasCompleted">ScoreProcessor.HasCompleted</see> becomes <see langword="false"/>.
         /// Even if the user requests an exit, it will forcefully proceed to the results screen (see special case in <see cref="OnExiting"/>).
+        /// A timeout fallback is used to force preparation if the results flow stalls.
         /// </remarks>
         private ScheduledDelegate resultsDisplayDelegate;
+
+        /// <summary>
+        /// The Time.Current value when the results were queued. Used for fallback timeout checks.
+        /// </summary>
+        private double resultsDisplayQueuedTime;
 
         /// <summary>
         /// A task which asynchronously prepares a completed score for display at results.
@@ -914,6 +925,11 @@ namespace osu.Game.Screens.Play
             if (!this.IsCurrentScreen())
                 return;
 
+            // [Ez] Snapshot key state on every invocation to trace completion / revert races.
+            EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                "CheckScoreCompleted",
+                $"hasCompleted={ScoreProcessor.HasCompleted.Value} hasFailed={GameplayState.HasFailed} hasPassed={GameplayState.HasPassed} delegateNull={resultsDisplayDelegate == null}");
+
             // Handle cases of arriving at this method when not in a completed state.
             // - When a storyboard completion triggered this call earlier than gameplay finishes.
             // - When a replay has been rewound before a queued resultsDisplayDelegate has run.
@@ -923,6 +939,7 @@ namespace osu.Game.Screens.Play
             // Maybe this can be improved with further refactoring.
             if (!ScoreProcessor.HasCompleted.Value)
             {
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("CheckScoreCompleted.Revert", "HasCompleted=false – cancelling delegate, resetting HasPassed");
                 resultsDisplayDelegate?.Cancel();
                 resultsDisplayDelegate = null;
 
@@ -934,7 +951,10 @@ namespace osu.Game.Screens.Play
 
             // Only show the completion screen if the player hasn't failed
             if (GameplayState.HasFailed)
+            {
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("CheckScoreCompleted.Failed", "HasFailed=true – skipping results");
                 return;
+            }
 
             GameplayState.HasPassed = true;
 
@@ -948,10 +968,12 @@ namespace osu.Game.Screens.Play
             // Alternatively, the user may press the outro skip button, forcing immediate display of the results screen.
             if (storyboardStillRunning)
             {
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("CheckScoreCompleted.Storyboard", "Storyboard still running – waiting for outro");
                 skipOutroOverlay.Show();
                 return;
             }
 
+            EzOsuGame.Diagnostics.EzTimingTrace.Record("CheckScoreCompleted.Passed", "Queuing progressToResults(withDelay=true)");
             progressToResults(true);
         }
 
@@ -974,10 +996,31 @@ namespace osu.Game.Screens.Play
             double delay = withDelay ? RESULTS_DISPLAY_DELAY : 0;
 
             resultsDisplayDelegate?.Cancel();
+            resultsDisplayQueuedTime = Time.Current;
+
             resultsDisplayDelegate = new ScheduledDelegate(() =>
             {
+                const double fallback_timeout_ms = 5000;
+
+                // [Ez] Trace every delegate tick to diagnose result-screen stalls.
+                EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                    "ResultsDelegate.Tick",
+                    $"taskNull={prepareScoreForDisplayTask == null} taskStatus={prepareScoreForDisplayTask?.Status.ToString() ?? "-"} waitMs={(int)(Time.Current - resultsDisplayQueuedTime)} hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed}");
+
+                // If prepare task hasn't been started yet, attempt to start it. If it still cannot be
+                // started due to transient conditions (eg. HasCompleted flipping), force a preparation
+                // after a timeout to avoid indefinite stalls.
                 if (prepareScoreForDisplayTask == null)
                 {
+                    // Force prepare if we've been waiting too long.
+                    if (Time.Current - resultsDisplayQueuedTime > fallback_timeout_ms)
+                    {
+                        Logger.Log("[Player] results preparation delayed; forcing prepareAndImportScoreAsync(forceImport:true)", level: LogLevel.Important);
+                        EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.ForcedImport", $"Fallback triggered after {fallback_timeout_ms}ms");
+                        prepareAndImportScoreAsync(forceImport: true);
+                        return;
+                    }
+
                     // Try importing score since the task hasn't been invoked yet.
                     prepareAndImportScoreAsync();
                     return;
@@ -992,6 +1035,7 @@ namespace osu.Game.Screens.Play
                 if (prepareScoreForDisplayTask.GetResultSafely() == null)
                 {
                     // If score import did not occur, we do not want to show the results screen.
+                    EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.NullScore", "prepareScoreForDisplayTask returned null – results screen suppressed");
                     return;
                 }
 
@@ -999,6 +1043,7 @@ namespace osu.Game.Screens.Play
                     // This player instance may already be in the process of exiting.
                     return;
 
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("ResultsDelegate.Push", "Navigating to results screen");
                 OnShowingResults?.Invoke();
                 this.Push(CreateResults(prepareScoreForDisplayTask.GetResultSafely()));
             }, Time.Current + delay, 50);
@@ -1022,6 +1067,12 @@ namespace osu.Game.Screens.Play
 
             // We do not want to import the score in cases where we don't show results
             bool canShowResults = Configuration.ShowResults && ScoreProcessor.HasCompleted.Value && GameplayState.HasPassed;
+
+            // [Ez] Trace the canShowResults decision to expose HasCompleted race conditions.
+            EzOsuGame.Diagnostics.EzTimingTrace.Record(
+                "PrepareAndImport",
+                $"canShow={canShowResults} ShowResults={Configuration.ShowResults} hasCompleted={ScoreProcessor.HasCompleted.Value} hasPassed={GameplayState.HasPassed} force={forceImport}");
+
             if (!canShowResults && !forceImport)
                 return Task.FromResult<ScoreInfo>(null);
 
@@ -1268,6 +1319,16 @@ namespace osu.Game.Screens.Play
 
             StartGameplay();
             OnGameplayStarted?.Invoke();
+
+            // [Ez] Clear any stale diagnostic samples from a previous play.
+            if (EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
+                EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
+
+            if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
+            {
+                EzOsuGame.Diagnostics.EzTimingTrace.Clear();
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("GameplayStarted", $"beatmap={Beatmap.Value?.BeatmapInfo?.ToString() ?? "?"}");
+            }
         }
 
         /// <summary>
@@ -1316,6 +1377,29 @@ namespace osu.Game.Screens.Play
 
                 if (DrawableRuleset.ReplayScore == null)
                     ScoreProcessor.FailScore(Score.ScoreInfo);
+            }
+
+            // [Ez] Flush judgment diagnostics data to CSV on gameplay exit.
+            // Perform flush asynchronously to avoid blocking the UI/update thread
+            // in case disk IO is slow (antivirus, network drives, etc.).
+            if (EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
+            {
+                _ = Task.Run(() =>
+                {
+                    EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Flush();
+                    EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Clear();
+                });
+            }
+
+            // [Ez] Flush timing trace events to CSV on gameplay exit.
+            if (EzOsuGame.Diagnostics.EzTimingTrace.Enabled)
+            {
+                EzOsuGame.Diagnostics.EzTimingTrace.Record("GameplayExited", $"hasPassed={GameplayState.HasPassed} hasFailed={GameplayState.HasFailed} hasQuit={GameplayState.HasQuit}");
+                _ = Task.Run(() =>
+                {
+                    EzOsuGame.Diagnostics.EzTimingTrace.Flush();
+                    EzOsuGame.Diagnostics.EzTimingTrace.Clear();
+                });
             }
 
             // GameplayClockContainer performs seeks / start / stop operations on the beatmap's track.

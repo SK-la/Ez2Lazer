@@ -856,6 +856,37 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (offsetBindable != null)
                 timeOffset += offsetBindable.Value;
 
+            // [Ez] Sub-frame timing correction: compensate for judgment using previous frame's clock value.
+            // The key was pressed between the last FSC clock update and now; interpolate to the actual press time.
+            if (userTriggered)
+            {
+                long keyTs = Framework.Input.InputManager.EzSubFrameTimestamp;
+                double rate = (Clock as IGameplayClock)?.Rate ?? 1.0;
+                timeOffset += EzOsuGame.Timing.EzSubFrameCorrection.GetCorrectionMs(keyTs, rate);
+            }
+
+            // === Ez judgment timing diagnostics ===
+            if (userTriggered && EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
+            {
+                double interpDrift = 0, bassSource = 0, frameElapsed = Clock.ElapsedFrameTime;
+
+                if (drawableRuleset?.FrameStableClock is FrameStabilityContainer fsc
+                    && fsc.ParentGameplayClock is Screens.Play.GameplayClockContainer gcc)
+                {
+                    interpDrift = gcc.InterpolatedDrift;
+                    bassSource = gcc.BassSourceCurrentTime;
+                }
+
+                EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Record(
+                    Time.Current,
+                    HitObject.GetEndTime(),
+                    timeOffset,
+                    Time.Current, // interpClockTime = FSC ManualClock time
+                    bassSource,
+                    interpDrift,
+                    frameElapsed);
+            }
+
             CheckForResult(userTriggered, timeOffset);
 
             return Judged;

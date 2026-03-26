@@ -23,13 +23,28 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = EzSettingsStrings.INPUT_AUDIO_LATENCY_TRACKER,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.InputAudioLatencyTracker),
+                    Caption = EzSettingsStrings.INPUT_AUDIO_LATENCY_TRACKER,
                     HintText = EzSettingsStrings.INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP,
                 })
                 {
                     Keywords = new[] { "latency", "audio", "input" }
-                }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzJudgmentDiagEnabled),
+                    Caption = EzSettingsStrings.EZ_JUDGMENT_DIAG_ENABLED,
+                }),
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzSubFrameCorrectionEnabled),
+                    Caption = EzSettingsStrings.EZ_SUB_FRAME_CORRECTION_ENABLED,
+                }),
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzTimingTraceEnabled),
+                    Caption = EzSettingsStrings.EZ_TIMING_TRACE_ENABLED,
+                }),
             });
         }
     }

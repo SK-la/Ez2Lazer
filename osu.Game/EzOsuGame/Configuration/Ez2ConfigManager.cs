@@ -168,6 +168,14 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ServerManualToken, string.Empty);
 
             #endregion
+
+            #region 判定时序诊断与校正
+
+            SetDefault(Ez2Setting.EzJudgmentDiagEnabled, false);
+            SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, true);
+            SetDefault(Ez2Setting.EzTimingTraceEnabled, false);
+
+            #endregion
         }
 
         private void initializeManiaDefaults()
@@ -622,6 +630,11 @@ namespace osu.Game.EzOsuGame.Configuration
         ServerGuToken,
         ServerManualUsername,
         ServerManualToken,
+
+        // 判定时序诊断与校正
+        EzJudgmentDiagEnabled,
+        EzSubFrameCorrectionEnabled,
+        EzTimingTraceEnabled,
     }
 
     public enum EzColumnType : byte

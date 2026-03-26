@@ -7,6 +7,10 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public static class EzSettingsStrings
     {
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_JUDGMENT_DIAG_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 判定诊断", "Enable Ez Judgment Diagnostics");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_SUB_FRAME_CORRECTION_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 子帧修正", "Enable Ez Sub-frame Correction");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_TIMING_TRACE_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 时序追踪", "Enable Ez Timing Trace");
+
 #region 分散设置
 
         public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE = new EzLocalizationManager.EzLocalisableString("缩放游戏模式", "Scaling Game Mode");
