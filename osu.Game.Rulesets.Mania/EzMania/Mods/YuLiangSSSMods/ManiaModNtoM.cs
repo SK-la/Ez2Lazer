@@ -20,7 +20,7 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 {
-    public class ManiaModNtoM : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder, IApplicableToBeatmapConverter
+    public class ManiaModNtoM : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder, IApplicableToBeatmapConverter
     {
         public override string Name => "Nk to Mk Converter";
 

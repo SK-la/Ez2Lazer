@@ -273,6 +273,7 @@ namespace osu.Game.Scoring
 
                 if (!string.IsNullOrEmpty(StatisticsJson))
                 {
+                    // 保护自定义判定类型解析错误引发解析崩溃
                     try
                     {
                         var raw = JsonConvert.DeserializeObject<Dictionary<string, int>>(StatisticsJson);

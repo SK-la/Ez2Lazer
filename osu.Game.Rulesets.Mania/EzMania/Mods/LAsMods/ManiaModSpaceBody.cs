@@ -19,10 +19,10 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
     /// <summary>
-    /// 需要同时使用IApplicableAfterBeatmapConversion, IHasApplyOrder
+    /// 需要同时使用IApplicableAfterBeatmapConversion, IEzApplyOrder
     ///否则时序错误
     /// </summary>
-    public class ManiaModSpaceBody : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
+    public class ManiaModSpaceBody : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
     {
         public override string Name => "Space Body";
 

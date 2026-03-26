@@ -14,8 +14,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.Extensions;
 using osu.Game.Graphics.UserInterfaceV2;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation;
 using osu.Game.Screens.Play.PlayerSettings;
 using osuTK;
@@ -44,7 +42,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
         private OverlayColourProvider colourProvider { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(SessionAverageHitErrorTracker hitErrorTracker, Ez2ConfigManager ezConfig)
+        private void load(SessionAverageHitErrorTracker hitErrorTracker)
         {
             averageHitErrorHistory.BindTo(hitErrorTracker.AverageHitErrorHistory);
 
@@ -58,26 +56,6 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 Spacing = new Vector2(SettingsSection.ITEM_SPACING_V2),
                 Children = new Drawable[]
                 {
-                    new SettingsItemV2(new FormSliderBar<double>
-                    {
-                        Caption = EzSettingsStrings.OFFSET_PLUS_MANIA,
-                        HintText = EzSettingsStrings.OFFSET_PLUS_MANIA_TOOLTIP,
-                        RelativeSizeAxes = Axes.X,
-                        Current = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania),
-                        KeyboardStep = 1,
-                        LabelFormat = v => $"{v:N0} ms",
-                        TooltipFormat = BeatmapOffsetControl.GetOffsetExplanatoryText,
-                    }),
-                    new SettingsItemV2(new FormSliderBar<double>
-                    {
-                        Caption = EzSettingsStrings.OFFSET_PLUS_NON_MANIA,
-                        HintText = EzSettingsStrings.OFFSET_PLUS_NON_MANIA_TOOLTIP,
-                        RelativeSizeAxes = Axes.X,
-                        Current = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania),
-                        KeyboardStep = 1,
-                        LabelFormat = v => $"{v:N0} ms",
-                        TooltipFormat = BeatmapOffsetControl.GetOffsetExplanatoryText,
-                    }),
                     new SettingsItemV2(new FormSliderBar<double>
                     {
                         Caption = AudioSettingsStrings.AudioOffset,

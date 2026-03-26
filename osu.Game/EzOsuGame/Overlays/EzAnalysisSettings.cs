@@ -8,6 +8,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
+using osu.Game.Screens.Play.PlayerSettings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {

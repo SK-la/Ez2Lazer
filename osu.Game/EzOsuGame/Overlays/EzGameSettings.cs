@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays.Settings;
+using osu.Game.Screens.Play.PlayerSettings;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -16,16 +17,19 @@ namespace osu.Game.EzOsuGame.Overlays
     {
         protected override LocalisableString Header => EzSettingsStrings.EZ_GAME_SETTINGS_HEADER;
 
+        private readonly Bindable<bool> scoreSubmitWarning = new Bindable<bool>();
+        private readonly Bindable<SettingsNote.Data?> warningNote = new Bindable<SettingsNote.Data?>();
+
+        private SettingsItemV2 poorCheckBox = null!;
+
         private Bindable<double> sAcc = null!;
         private Bindable<double> aAcc = null!;
 
         private Bindable<EzEnumHitMode> maniaHitModeBindable = null!;
         private Bindable<EzEnumHealthMode> maniaHealthModeBindable = null!;
         private Bindable<bool> bmsPoorHitResultEnable = null!;
-        private readonly Bindable<bool> scoreSubmitWarning = new Bindable<bool>();
-
-        private SettingsItemV2 poorCheckBox = null!;
-        private readonly Bindable<SettingsNote.Data?> warningNote = new Bindable<SettingsNote.Data?>();
+        private Bindable<double> offsetManiaBindable = null!;
+        private Bindable<double> offsetNonManiaBindable = null!;
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
@@ -35,6 +39,8 @@ namespace osu.Game.EzOsuGame.Overlays
             maniaHitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             maniaHealthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
             bmsPoorHitResultEnable = ezConfig.GetBindable<bool>(Ez2Setting.BmsPoorHitResultEnable);
+            offsetManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+            offsetNonManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
 
             Children = new Drawable[]
             {
@@ -90,6 +96,26 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "ez", "mania", "bms" }
                 },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.OFFSET_PLUS_MANIA,
+                    HintText = EzSettingsStrings.OFFSET_PLUS_MANIA_TOOLTIP,
+                    RelativeSizeAxes = Axes.X,
+                    Current = offsetManiaBindable,
+                    KeyboardStep = 1,
+                    LabelFormat = v => $"{v:N0} ms",
+                    TooltipFormat = BeatmapOffsetControl.GetOffsetExplanatoryText,
+                }),
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.OFFSET_PLUS_NON_MANIA,
+                    HintText = EzSettingsStrings.OFFSET_PLUS_NON_MANIA_TOOLTIP,
+                    RelativeSizeAxes = Axes.X,
+                    Current =  offsetNonManiaBindable,
+                    KeyboardStep = 1,
+                    LabelFormat = v => $"{v:N0} ms",
+                    TooltipFormat = BeatmapOffsetControl.GetOffsetExplanatoryText,
+                }),
             };
 
             maniaHealthModeBindable.BindValueChanged(e =>
@@ -112,13 +138,18 @@ namespace osu.Game.EzOsuGame.Overlays
             maniaHealthModeBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
             aAcc.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
             sAcc.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
+            offsetManiaBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
+            offsetNonManiaBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
             scoreSubmitWarning.BindValueChanged(_ => Schedule(updateScoreSubmitWarning), true);
         }
 
         private void updateScoreSubmitWarning()
         {
             scoreSubmitWarning.Value = (!maniaHitModeBindable.IsDefault || !maniaHealthModeBindable.IsDefault
-                                                                        || !aAcc.IsDefault || !sAcc.IsDefault);
+                                                                        || !aAcc.IsDefault
+                                                                        || !sAcc.IsDefault
+                                                                        || !offsetManiaBindable.IsDefault
+                                                                        || !offsetNonManiaBindable.IsDefault);
 
             if (scoreSubmitWarning.Value)
             {

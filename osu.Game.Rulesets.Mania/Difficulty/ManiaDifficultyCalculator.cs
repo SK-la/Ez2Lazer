@@ -6,15 +6,12 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Extensions;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Difficulty.Skills;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Difficulty.Preprocessing;
 using osu.Game.Rulesets.Mania.Difficulty.Skills;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
-using osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.MathUtils;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
@@ -63,17 +60,17 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             return attributes;
         }
 
-        public double AdditionalMethod(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate, double originalValue)
-        {
-            double sr = originalValue;
-
-            if (mods.Any(m => m is ModStarRatingRebirth))
-            {
-                sr = SRCalculator.CalculateSR(beatmap, clockRate);
-            }
-
-            return sr;
-        }
+        // public double AdditionalMethod(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate, double originalValue)
+        // {
+        //     double sr = originalValue;
+        //
+        //     if (mods.Any(m => m is ModStarRatingRebirth))
+        //     {
+        //         sr = SRCalculator.CalculateSR(beatmap, clockRate);
+        //     }
+        //
+        //     return sr;
+        // }
 
         private static int maxComboForObject(HitObject hitObject)
         {

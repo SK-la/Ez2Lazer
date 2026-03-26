@@ -12,7 +12,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
     public readonly record struct ManiaModifyHitRange(double Perfect, double Great, double Good, double Ok, double Meh, double Miss, double Poor = 0);
 
     /// <summary>
-    /// Implement this on any mod that provides custom hit ranges for song-select display
+    /// 提供给Mod，实现自定义判定区间后刷新显示
     /// but does not go through <c>IApplicableToDifficulty</c>.
     /// </summary>
     public interface IManiaHitRangeProvider
@@ -119,9 +119,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public bool ModifyHitWindows { get; private set; }
 
         /// <summary>
-        /// Static mod override. When set, <see cref="WindowFor"/> returns these values
-        /// regardless of instance-level calculations, ensuring mod custom ranges
-        /// survive per-HitObject ManiaHitWindows re-creation during gameplay.
+        /// 用于静态Mod覆写，设置后切换自定义判定区间
+        /// <see cref="WindowFor"/>将返回这些值，不受实例级计算影响。
         /// </summary>
         private static ManiaModifyHitRange? modOverride;
 

@@ -8,7 +8,7 @@ namespace osu.Game.Rulesets.Mods
     /// <para></para>
     /// 目前主要用于 SummaryTimeline 将时间设置传递到 ManiaModLoopPlayClip。
     /// </summary>
-    public interface ILoopTimeRangeMod
+    public interface IEzLoopTimeRange
     {
         /// <summary>
         /// 更新循环时间范围。

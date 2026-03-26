@@ -220,7 +220,7 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary
 
             bool applied = false;
 
-            foreach (var rangeMod in ModUtils.FlattenMods(mods.Value).OfType<ILoopTimeRangeMod>())
+            foreach (var rangeMod in ModUtils.FlattenMods(mods.Value).OfType<IEzLoopTimeRange>())
             {
                 rangeMod.SetLoopTimeRange(start, end);
                 applied = true;

@@ -105,8 +105,8 @@ namespace osu.Game.Storyboards
                     latestEndTime = Math.Max(latestEndTime, l.StartTime + l.Duration * l.TotalIterations);
 
                 var alphaCommands = Commands.Alpha.Select(command => (command, displayEndTime: command.EndTime))
-                                          .Concat(loopingGroups.SelectMany(loop => loop.Alpha.Select(command => (command, displayEndTime: command.EndTime + loop.Duration * (loop.TotalIterations - 1)))))
-                                          .ToList();
+                                            .Concat(loopingGroups.SelectMany(loop => loop.Alpha.Select(command => (command, displayEndTime: command.EndTime + loop.Duration * (loop.TotalIterations - 1)))))
+                                            .ToList();
 
                 if (alphaCommands.Count > 0)
                 {

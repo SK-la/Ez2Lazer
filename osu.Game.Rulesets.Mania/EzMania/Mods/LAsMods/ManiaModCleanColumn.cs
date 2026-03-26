@@ -21,7 +21,7 @@ using osu.Game.Rulesets.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModCleanColumn : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
+    public class ManiaModCleanColumn : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
     {
         public override string Name => "Clean Column";
 

@@ -21,6 +21,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
         }
 
+        // 为Mod提供覆写，未来恢复此改动，使用更合适的方式实现Mod对LN判定的修改
         internal virtual void TriggerResult(bool hit)
         {
             if (AllJudged) return;

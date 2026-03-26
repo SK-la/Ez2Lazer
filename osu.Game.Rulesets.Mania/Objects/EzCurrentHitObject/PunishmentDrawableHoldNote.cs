@@ -4,12 +4,15 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
+using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.Mania.Objects.Drawables
+namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
     /// <summary>
+    /// 供 CC Mod <see cref="ManiaModCleanColumn"/> 使用的虚拟LN，实现特殊扣血机制
     /// Visualises a <see cref="PunishmentHoldNote"/> hit object with special punishment logic.
     /// </summary>
     public partial class PunishmentDrawableHoldNote : DrawableHoldNote

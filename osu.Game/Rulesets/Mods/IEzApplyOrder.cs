@@ -8,7 +8,7 @@ namespace osu.Game.Rulesets.Mods
     /// <para></para>主要帮助<see cref="IApplicableAfterBeatmapConversion"/> 在正确环节处理谱面。
     /// <para>处理顺序从0开始，数字越大，优先级越靠后。</para>
     /// </summary>
-    public interface IHasApplyOrder
+    public interface IEzApplyOrder
     {
         int ApplyOrder { get; }
     }

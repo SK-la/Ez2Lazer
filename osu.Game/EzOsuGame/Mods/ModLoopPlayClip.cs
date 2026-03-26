@@ -25,12 +25,12 @@ namespace osu.Game.EzOsuGame.Mods
     /// </summary>
     public class ModLoopPlayClip : Mod,
                                    IHasSeed,
-                                   ILoopTimeRangeMod,
+                                   IEzLoopTimeRange,
                                    IApplicableToPlayer,
                                    IApplicableToHUD,
                                    IApplicableFailOverride,
                                    IApplicableToRate,
-                                   IHasApplyOrder
+                                   IEzApplyOrder
     {
         public override string Name => "Loop Play Clip (No Fail)";
 

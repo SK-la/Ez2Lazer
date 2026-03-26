@@ -12,9 +12,9 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Timing;
 using osu.Game.Audio;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Objects.Drawables
 {
@@ -79,6 +79,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             Anchor = Origin = e.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
         }
 
+        // 在同一时间点上，note 不叠加播放重复的音效
         public override void PlaySamples()
         {
             if (Samples == null)
@@ -130,6 +131,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private string getSampleSetKey()
             => string.Join("|", HitObject.Samples.Cast<ISampleInfo>().Select(sample => string.Join(",", sample.LookupNames)));
 
+        // 清理掉已经失效的 sample trigger marker，避免字典无限增长
         private static void cleanupStaleSampleMarkers()
         {
             if (last_sample_triggers.Count == 0)

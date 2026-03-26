@@ -11,7 +11,7 @@ namespace osu.Game.Benchmarks
 {
     public class BenchmarkHitObject : BenchmarkTest
     {
-        [Params(1, 1000, 5000)]
+        [Params(1, 100, 1000)]
         public int Count { get; set; }
 
         [Params(false, true)]

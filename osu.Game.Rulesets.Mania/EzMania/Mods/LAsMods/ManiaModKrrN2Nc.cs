@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModKrrN2Nc : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IHasApplyOrder
+    public class ManiaModKrrN2Nc : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder
     {
         public override string Name => "Krr N2N Converter";
 

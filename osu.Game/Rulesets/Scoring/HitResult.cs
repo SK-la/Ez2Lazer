@@ -400,9 +400,9 @@ namespace osu.Game.Rulesets.Scoring
 
             if (result == HitResult.Poor || result == HitResult.Meh)
                 return true;
-#if DEBUG
-            Logger.Log($"Checking hit result {result} against range {minResult} to {maxResult}", LoggingTarget.Runtime, LogLevel.Debug);
-#endif
+// #if DEBUG
+//             Logger.Log($"Checking hit result {result} against range {minResult} to {maxResult}", LoggingTarget.Runtime, LogLevel.Debug);
+// #endif
             Debug.Assert(minResult <= maxResult);
             return result > minResult && result < maxResult;
         }

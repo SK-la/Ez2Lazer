@@ -14,7 +14,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModKrrLN : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
+    public class ManiaModKrrLN : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
     {
         public override string Name => "Krr LN Converter";
         public override string Acronym => "KLN";

@@ -14,7 +14,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 {
-    public class ManiaModKrrDP : Mod, IApplicableAfterBeatmapConversion, IHasApplyOrder
+    public class ManiaModKrrDP : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
     {
         public override string Name => "Krr DP Converter";
         public override string Acronym => "KDP";
