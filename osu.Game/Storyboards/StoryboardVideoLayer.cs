@@ -60,8 +60,11 @@ namespace osu.Game.Storyboards
 
                 if (drawableStoryboard?.Parent != null)
                 {
+                    // 计算视频自适应模式下的缩放比例（以父级高度为基准，宽度按比例缩放）。
+                    float baselineScale = drawableStoryboard.Parent.DrawHeight > 0 ? drawableStoryboard.Parent.DrawHeight / 480f : 1;
+
                     float width = drawableStoryboard.DrawWidth > 0 ? drawableStoryboard.Parent.DrawWidth / drawableStoryboard.DrawWidth : 1;
-                    float height = drawableStoryboard.DrawHeight > 0 ? drawableStoryboard.Parent.DrawHeight / drawableStoryboard.DrawHeight : 1;
+                    float height = baselineScale;
 
                     targetSize = new Vector2(width, height);
                 }

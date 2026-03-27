@@ -46,6 +46,15 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "main menu", "banner", "news", "advertisement", "ui" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.STORYBOARD_VIDEO_AUTO_SIZE,
+                    HintText = EzSettingsStrings.STORYBOARD_VIDEO_AUTO_SIZE_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.StoryboardAutoVideoSize),
+                })
+                {
+                    Keywords = new[] { "storyboard", "video", "size", "auto", "scaling", "ui" }
                 }
             });
         }

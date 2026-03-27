@@ -78,6 +78,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
 
+            SetDefault(Ez2Setting.StoryboardAutoVideoSize, true);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
             SetDefault(Ez2Setting.XxySRFilter, false);
             SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
@@ -526,18 +527,21 @@ namespace osu.Game.EzOsuGame.Configuration
 
     public enum Ez2Setting
     {
-        // 全局游戏与界面设置
+        // 游戏设置
         ScalingGameMode,
         GameplayDisableCmdSpace,
         AccuracyCutoffS,
         AccuracyCutoffA,
 
-        KeySoundPreviewMode,
-        XxySRFilter,
         EzAnalysisRecEnabled,
         EzAnalysisSqliteEnabled,
-        KpcDisplayMode,
         HideMainMenuOnlineBanner,
+        StoryboardAutoVideoSize,
+
+        // 界面功能
+        KeySoundPreviewMode,
+        XxySRFilter,
+        KpcDisplayMode,
         EzSelectCsMode,
         ColumnTypeListSelect,
 
