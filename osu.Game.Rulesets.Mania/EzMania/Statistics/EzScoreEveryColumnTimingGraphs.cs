@@ -8,15 +8,18 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics;
 
-namespace osu.Game.EzOsuGame.Statistics
+namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 {
     /// <summary>
-    /// 创建每列偏移分布
+    /// Mania专用的偏移分布图，显示每列判定偏移时间的分布情况.
+    /// <para></para>主要使用 <see cref="HitEvent"/> 中的 <see cref="HitEvent.TimeOffset"/> 来计算每列的平均偏移、稳定率等统计数据，并以图表和表格的形式展示出来。
     /// </summary>
-    public partial class CreateRotatedColumnGraphs : CompositeDrawable
+    public partial class EzScoreEveryColumnTimingGraphs : CompositeDrawable
     {
         private const float horizontal_spacing_ratio = 0.015f;
         private const float top_margin = 20;
@@ -27,9 +30,14 @@ namespace osu.Game.EzOsuGame.Statistics
         private float lastDrawWidth = -1;
         private float lastDrawHeight = -1;
 
-        public CreateRotatedColumnGraphs(List<IGrouping<int, HitEvent>> hitEventsByColumn)
+        public EzScoreEveryColumnTimingGraphs(ScoreInfo score)
         {
-            this.hitEventsByColumn = hitEventsByColumn;
+            hitEventsByColumn = score.HitEvents
+                                     .Where(e => e.HitObject is ManiaHitObject)
+                                     .GroupBy(e => ((ManiaHitObject)e.HitObject).Column)
+                                     .OrderBy(g => g.Key)
+                                     .ToList();
+
             RelativeSizeAxes = Axes.X;
         }
 

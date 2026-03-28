@@ -8,10 +8,10 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
@@ -19,33 +19,34 @@ using osu.Game.Scoring;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Analysis
+namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 {
     /// <summary>
     /// Mania判定偏移分布图的特定实现，扩展了BaseEzScoreGraph。
     /// 按Mania的判定方式重新过滤、计算了每个HitEvent的结果，并将其与原始结果进行比较，以分析偏移分布和准确性。
     /// 覆写判定区间计算以适应Mania的判定方式，并添加了对Classic模式下LN（长按键）判定的支持。
     /// </summary>
-    public partial class EzManiaScoreGraph : BaseEzScoreGraph
+    public partial class EzScoreGraphMania : EzScoreGraphBase
     {
         private readonly ManiaHitWindows maniaHitWindows = new ManiaHitWindows();
 
-        private readonly CustomHitWindowsHelper hitWindows1;
-        private readonly CustomHitWindowsHelper hitWindows2;
+        private readonly CustomHitWindowsHelper hitWindowsV1;
+        private readonly CustomHitWindowsHelper hitWindowsV2;
+
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
-        private readonly Bindable<double> offsetPlusMania = new Bindable<double>();
+        private Bindable<double> offsetPlusMania = new Bindable<double>(0);
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        public EzManiaScoreGraph(ScoreInfo score, IBeatmap beatmap)
+        public EzScoreGraphMania(ScoreInfo score, IBeatmap beatmap)
             : base(score, beatmap, new ManiaHitWindows())
         {
             maniaHitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
 
             // Initialize helpers here (after base ctor has run and static OD/HP have been set).
-            hitWindows1 = new CustomHitWindowsHelper { OverallDifficulty = OD };
-            hitWindows2 = new CustomHitWindowsHelper { OverallDifficulty = OD };
+            hitWindowsV1 = new CustomHitWindowsHelper { OverallDifficulty = OD };
+            hitWindowsV2 = new CustomHitWindowsHelper { OverallDifficulty = OD };
         }
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
@@ -72,8 +73,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
-                hitWindows1.HitMode = v.NewValue;
-                hitWindows2.HitMode = v.NewValue;
+                hitWindowsV1.HitMode = v.NewValue;
+                hitWindowsV2.HitMode = v.NewValue;
 
                 // Ensure mania windows re-evaluate based on global config and difficulty.
                 maniaHitWindows.ResetRange();
@@ -84,13 +85,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             }, true);
 
             // Bind to OffsetPlusMania so analysis reflects runtime correction and redraws when changed.
-            offsetPlusMania.BindTo(ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania));
-            offsetPlusMania.BindValueChanged(_ => Refresh());
+            offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+            offsetPlusMania.BindValueChanged(_ => Refresh(), true);
         }
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
         {
-            return hitWindows1.ResultFor(hitEvent.TimeOffset);
+            return hitWindowsV1.ResultFor(hitEvent.TimeOffset);
         }
 
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)

@@ -11,7 +11,7 @@ using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
+using osu.Game.Rulesets.Mania.EzMania.Statistics;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestEmptyScore()
         {
-            EzManiaScoreGraph graph = null;
+            EzScoreGraphMania graph = null;
 
             AddStep("Create graph with empty score", () =>
             {
@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.Tests
                     Mods = Array.Empty<Mod>()
                 };
 
-                Child = graph = new EzManiaScoreGraph(emptyScore, testBeatmap)
+                Child = graph = new EzScoreGraphMania(emptyScore, testBeatmap)
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
@@ -73,13 +73,13 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestPerfectScore()
         {
-            EzManiaScoreGraph graph = null;
+            EzScoreGraphMania graph = null;
 
             AddStep("Create graph with perfect score", () =>
             {
                 var perfectScore = createPerfectScore(testBeatmap);
 
-                Child = graph = new EzManiaScoreGraph(perfectScore, testBeatmap)
+                Child = graph = new EzScoreGraphMania(perfectScore, testBeatmap)
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
@@ -95,11 +95,11 @@ namespace osu.Game.Rulesets.Mania.Tests
         [Test]
         public void TestMixedResults()
         {
-            EzManiaScoreGraph graph = null;
+            EzScoreGraphMania graph = null;
 
             AddStep("Create graph with test score", () =>
             {
-                Child = graph = new EzManiaScoreGraph(testScore, testBeatmap)
+                Child = graph = new EzScoreGraphMania(testScore, testBeatmap)
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,

@@ -131,19 +131,4 @@ namespace osu.Game.EzOsuGame.Statistics
             });
         }
     }
-
-    public partial class EzJudgementsItem : SimpleStatisticItem<string>
-    {
-        public EzJudgementsItem(string display, string name = "Count", ColourInfo? colour = null)
-            : base(name)
-        {
-            Value = display;
-            Colour = colour ?? Colour4.White;
-        }
-
-        protected override LocalisableString DisplayValue(string? value)
-        {
-            return value ?? "N/A";
-        }
-    }
 }

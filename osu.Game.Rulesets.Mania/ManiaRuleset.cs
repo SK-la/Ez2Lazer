@@ -26,11 +26,10 @@ using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
-using osu.Game.Rulesets.Mania.EzMania.Analysis;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods;
+using osu.Game.Rulesets.Mania.EzMania.Statistics;
 using osu.Game.Rulesets.Mania.Mods;
-using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.Skinning.Argon;
@@ -451,45 +450,38 @@ namespace osu.Game.Rulesets.Mania
             };
         }
 
-        public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap)
+        public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
         {
-            var hitEventsByColumn = score.HitEvents
-                                         .Where(e => e.HitObject is ManiaHitObject)
-                                         .GroupBy(e => ((ManiaHitObject)e.HitObject).Column)
-                                         .OrderBy(g => g.Key)
-                                         .ToList();
-
-            var statistics = new List<StatisticItem>
+            new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
             {
-                new StatisticItem("Performance Breakdown", () => new PerformanceBreakdownChart(score, playableBeatmap)
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y
-                }),
-                new StatisticItem("Space Graph", () => new EzManiaScoreGraph(score, playableBeatmap)
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 200
-                }, true),
-                new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 120
-                }, true),
-                new StatisticItem("Column Timing Distributions", () => new CreateRotatedColumnGraphs(hitEventsByColumn)
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 250,
-                }, true),
-                new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
-                {
-                    new AverageHitError(score.HitEvents),
-                    new UnstableRate(score.HitEvents)
-                }), true)
-            };
-
-            return statistics.ToArray();
-        }
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y
+            }),
+            new StatisticItem("Space Graph", () => new EzScoreGraphMania(score, playableBeatmap)
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 200
+            }, true),
+            new StatisticItem("Timing Distribution", () => new HitEventTimingDistributionGraph(score.HitEvents)
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 120
+            }, true),
+            new StatisticItem("Every Column Timing Graphs", () => new EzScoreEveryColumnTimingGraphs(score)
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 250,
+            }, true),
+            new StatisticItem("HitResult Count", () => new EzScoreHitResultCountGraph(score)
+            {
+                RelativeSizeAxes = Axes.X
+            }, true),
+            new StatisticItem("Statistics", () => new SimpleStatisticTable(2, new SimpleStatisticItem[]
+            {
+                new AverageHitError(score.HitEvents),
+                new UnstableRate(score.HitEvents)
+            }), true)
+        };
 
         /// <seealso cref="ManiaHitWindows"/>
         public override BeatmapDifficulty GetAdjustedDisplayDifficulty(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
@@ -520,7 +512,7 @@ namespace osu.Game.Rulesets.Mania
 
         public override IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(IBeatmapInfo beatmapInfo, IReadOnlyCollection<Mod> mods)
         {
-            // Clear any stale mod override so that toggling mods off correctly reverts to the global hit mode.
+            // 清理残留
             ManiaHitWindows.ClearModOverride();
 
             // a special touch-up of key count is required to the original difficulty, since key conversion mods are not `IApplicableToDifficulty`

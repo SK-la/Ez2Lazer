@@ -35,6 +35,7 @@ using osu.Game.Skinning;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Rulesets.Taiko.Configuration;
@@ -280,7 +281,11 @@ namespace osu.Game.Rulesets.Taiko
                 {
                     new AverageHitError(timedHitEvents),
                     new UnstableRate(timedHitEvents)
-                }), true)
+                }), true),
+                new StatisticItem("HitResult Count", () => new EzScoreHitResultCountGraph(score)
+                {
+                    RelativeSizeAxes = Axes.X
+                }, true),
             };
         }
 

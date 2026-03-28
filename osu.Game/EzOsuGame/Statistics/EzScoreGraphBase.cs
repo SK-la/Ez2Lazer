@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.Statistics
     /// <summary>
     /// 基类分数图表，用于分析和可视化得分数据。
     /// </summary>
-    public abstract partial class BaseEzScoreGraph : CompositeDrawable
+    public abstract partial class EzScoreGraphBase : CompositeDrawable
     {
         protected readonly ScoreInfo Score;
         protected readonly IBeatmap Beatmap;
@@ -70,7 +70,7 @@ namespace osu.Game.EzOsuGame.Statistics
             return originalHitEvents.Where(e => e.Result.IsBasic()).ToList();
         }
 
-        protected BaseEzScoreGraph(ScoreInfo score, IBeatmap beatmap, HitWindows hitWindows)
+        protected EzScoreGraphBase(ScoreInfo score, IBeatmap beatmap, HitWindows hitWindows)
         {
             Score = score;
             HitWindows = hitWindows;
