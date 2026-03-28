@@ -13,9 +13,12 @@ using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -118,8 +121,6 @@ namespace osu.Game.Screens.Ranking.Statistics
             // Todo: The placement of this is temporary. Eventually we'll both generate the playable beatmap _and_ run through it in a background task to generate the hit events.
             Task.Run(() =>
             {
-                #region 接口反射后台加载结算
-
                 // 结算后加载一次分数，后台计算
                 var playable = workingBeatmap.GetPlayableBeatmap(newScore.Ruleset, newScore.Mods);
 
@@ -129,24 +130,47 @@ namespace osu.Game.Screens.Ranking.Statistics
                 {
                     // Only attempt generation when we have a local replay.
                     var databasedScore = scoreManager.GetScore(newScore);
+
                     if (databasedScore != null)
-                        generatedHitEvents = ScoreHitEventGeneratorBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
+                    {
+                        Logger.Log($"[EzScore] Score null: {newScore.OnlineID} ({databasedScore.ScoreInfo.HitEvents.Count}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                        // EzScoreReloadBridge.InitializeAllGenerators();
+                        //
+                        // try
+                        // {
+                        //     var ezTask = Task.Run(() => EzScoreServer.TryGenerate(databasedScore, playable, content, a => Schedule(a), loadCancellation.Token), loadCancellation.Token);
+                        //     var completed = Task.WhenAny(ezTask, Task.Delay(500, loadCancellation.Token)).GetAwaiter().GetResult();
+                        //
+                        //     if (completed == ezTask)
+                        //     {
+                        //         generatedHitEvents = ezTask.GetAwaiter().GetResult();
+                        //     }
+                        //     else
+                        //     {
+                        EzScoreReloadBridge.InitializeAllGenerators();
+                        generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
+                        //     }
+                        // }
+                        // catch
+                        // {
+                        //     // 取消时不再尝试生成
+                        //     generatedHitEvents = null;
+                        // }
+
+                        // generatedHitEvents = EzScoreServer.TryGenerate(databasedScore, playable, content, a => Schedule(a), loadCancellation.Token);
+                    }
+
+                    if (generatedHitEvents != null)
+                        newScore.HitEvents = generatedHitEvents;
                 }
 
-                return (playable, generatedHitEvents);
+                return playable;
             }, loadCancellation.Token).ContinueWith(task => Schedule(() =>
             {
-                var result = task.GetResultSafely();
-
-                if (result.generatedHitEvents != null)
-                    newScore.HitEvents = result.generatedHitEvents;
-
                 bool hitEventsAvailable = newScore.HitEvents.Count != 0;
                 Container<Drawable> container;
 
-                var statisticItems = CreateStatisticItems(newScore, result.playable).ToArray();
-
-                #endregion
+                var statisticItems = CreateStatisticItems(newScore, task.GetResultSafely()).ToArray();
 
                 if (!hitEventsAvailable && statisticItems.All(c => c.RequiresHitEvents))
                 {

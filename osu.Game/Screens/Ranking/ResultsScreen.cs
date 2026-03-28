@@ -67,10 +67,7 @@ namespace osu.Game.Screens.Ranking
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
-        private Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
-        private Bindable<double> offsetPlusMania = new Bindable<double>();
-
-        // private ScheduledDelegate? offsetPlusManiaScheduled;
+        private Bindable<EzEnumHitMode> hitModeBindable = null!;
 
         private bool skipExitTransition;
 
@@ -264,8 +261,6 @@ namespace osu.Game.Screens.Ranking
                 }
             });
 
-            // 添加一个与 OffsetPlusMania 双向绑定的滑条，显示在齿轮右侧
-            offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             buttons.Add(new FillFlowContainer
             {
                 AutoSizeAxes = Axes.Both,
@@ -284,7 +279,7 @@ namespace osu.Game.Screens.Ranking
                         // 不使用相对大小，使用固定宽度以避免与父容器 AutoSize 冲突
                         RelativeSizeAxes = Axes.None,
                         Width = 220,
-                        Current = offsetPlusMania,
+                        Current = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania)
                     }
                 }
             });
@@ -297,20 +292,11 @@ namespace osu.Game.Screens.Ranking
             hitModeBindable.BindValueChanged(v =>
             {
                 Score?.HitEvents.Clear();
+
+                // TODO: 此处应重新加载分数中的 List<HitEvent>
+
                 StatisticsPanel.Score.TriggerChange();
             });
-
-            // offsetPlusMania.BindValueChanged(v =>
-            // {
-            //     // debounce/defer handling by 100ms to avoid thrash when slider is dragged rapidly.
-            //     offsetPlusManiaScheduled?.Cancel();
-            //     offsetPlusManiaScheduled = Scheduler.AddDelayed(() =>
-            //     {
-            //         // 会引起重绘，除非以后实现更全面的影响，否则会先注释掉，让分析组件内部自己绑定回调
-            //         Score?.HitEvents.Clear();
-            //         StatisticsPanel.Score.TriggerChange();
-            //     }, 100);
-            // });
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
 

@@ -14,19 +14,40 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Utils;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Analysis
+namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 {
     /// <summary>
     /// Mania成绩的<see cref="HitEvent"/>生成器，通过将成绩的回放输入重新评估与提供的可玩谱面进行比较来生成<see cref="HitEvent"/>。
     /// <para>这个生成器主要用于结果/统计用途，其中<see cref="ScoreInfo.HitEvents"/>没有被持久化。</para>
-    /// <para>上游通过反射注册到<see cref="ScoreHitEventGeneratorBridge"/>，因此无法直接查看调用源。</para>
+    /// <para>上游通过反射注册到<see cref="EzScoreReloadBridge"/>，因此无法直接查看调用源。</para>
     /// </summary>
-    public sealed class ManiaScoreHitEventGenerator : IHitEventGenerator
+    public sealed class ManiaScoreHitEventGenerator : IScoreHitEventGenerator
     {
         public static ManiaScoreHitEventGenerator Instance { get; } = new ManiaScoreHitEventGenerator();
+
+        static ManiaScoreHitEventGenerator()
+        {
+            EzScoreReloadBridge.RegisterImplementation("mania", Instance);
+            EzScoreReloadBridge.RegisterImplementation("3", Instance);
+        }
+
+        public bool Validate(Score score)
+        {
+            if (score.ScoreInfo.Ruleset.OnlineID != 3)
+                return false;
+
+            var replay = score.Replay;
+
+            if (replay == null || replay.Frames.Count == 0)
+                return false;
+
+            if (replay.Frames.Any(f => f is not ManiaReplayFrame))
+                return false;
+
+            return true;
+        }
 
         /// <summary>
         /// Instance implementation of generator.
@@ -35,17 +56,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (score.ScoreInfo.Ruleset.OnlineID != 3)
-                return null;
-
             Replay replay = score.Replay;
-
-            // Legacy decoding should have produced mania frames.
-            if (replay?.Frames == null || replay.Frames.Count == 0)
-                return null;
-
-            if (replay.Frames.Any(f => f is not ManiaReplayFrame))
-                return null;
 
             var frames = replay.Frames.Cast<ManiaReplayFrame>().OrderBy(f => f.Time).ToList();
 
@@ -217,18 +228,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             }
 
             return hitEvents;
-        }
-
-        static ManiaScoreHitEventGenerator()
-        {
-            try
-            {
-                ScoreHitEventGeneratorBridge.Register(ManiaRuleset.SHORT_NAME, Instance);
-                ScoreHitEventGeneratorBridge.Register("3", Instance);
-            }
-            catch
-            {
-            }
         }
 
         private static void collectJudgementTargets(HitObject hitObject, List<HitObject> targets, CancellationToken cancellationToken)
