@@ -472,7 +472,7 @@ namespace osu.Game.Rulesets.Mania
                 RelativeSizeAxes = Axes.X,
                 Height = 250,
             }, true),
-            new StatisticItem("HitResult Count", () => new EzScoreHitResultCountGraph(score)
+            new StatisticItem("HitResult Count", () => new EzManiaScoreHitResultCountGraph(score)
             {
                 RelativeSizeAxes = Axes.X
             }, true),

@@ -18,6 +18,7 @@ namespace osu.Game.EzOsuGame.Statistics
     /// 规则集特定的分数命中事件生成器的静态工厂。
     /// 允许每个规则集注册自己的生成器实现，并根据分数的规则集自动选择合适的实现。
     /// </summary>
+    /// 在没有明确允许的情况下，禁止调用此方法
     public static class EzScoreReloadBridge
     {
         private static readonly ConcurrentDictionary<string, IScoreHitEventGenerator> registered_generators

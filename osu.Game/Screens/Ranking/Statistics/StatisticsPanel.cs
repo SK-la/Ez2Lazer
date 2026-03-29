@@ -134,30 +134,16 @@ namespace osu.Game.Screens.Ranking.Statistics
                     if (databasedScore != null)
                     {
                         Logger.Log($"[EzScore] Score null: {newScore.OnlineID} ({databasedScore.ScoreInfo.HitEvents.Count}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                        // EzScoreReloadBridge.InitializeAllGenerators();
-                        //
+
                         // try
                         // {
-                        //     var ezTask = Task.Run(() => EzScoreServer.TryGenerate(databasedScore, playable, content, a => Schedule(a), loadCancellation.Token), loadCancellation.Token);
-                        //     var completed = Task.WhenAny(ezTask, Task.Delay(500, loadCancellation.Token)).GetAwaiter().GetResult();
-                        //
-                        //     if (completed == ezTask)
-                        //     {
-                        //         generatedHitEvents = ezTask.GetAwaiter().GetResult();
-                        //     }
-                        //     else
-                        //     {
-                        EzScoreReloadBridge.InitializeAllGenerators();
-                        generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
-                        //     }
+                        //     generatedHitEvents = EzScoreServer.TryGenerate(databasedScore, playable, loadCancellation.Token);
                         // }
                         // catch
                         // {
-                        //     // 取消时不再尝试生成
-                        //     generatedHitEvents = null;
+                        EzScoreReloadBridge.InitializeAllGenerators();
+                        generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
                         // }
-
-                        // generatedHitEvents = EzScoreServer.TryGenerate(databasedScore, playable, content, a => Schedule(a), loadCancellation.Token);
                     }
 
                     if (generatedHitEvents != null)

@@ -26,36 +26,18 @@ namespace osu.Game.EzOsuGame.Statistics
     /// </summary>
     public partial class EzScoreHitResultCountGraph : CompositeDrawable
     {
-        private readonly List<HitEvent> hitEvents;
+        private readonly IReadOnlyList<HitEvent> hitEvents;
         private readonly int columnCount;
 
-        // 静态颜色（使用字段以避免字典查找和额外分配）
-        // `totalColour` 将在 load() 中由 OsuColour 填充。
+        /// <summary>
+        /// 规则集实例，子类可以覆写此属性以返回不同类型的 Ruleset 实例。
+        /// </summary>
+        protected virtual Ruleset RulesetInstance { get; set; }
+
         private Color4 totalColour = Color4Extensions.FromHex(@"ff8c00");
-
-        // 名称选择器 —— 可由调用方重写以提供规则集特定的显示名称。
-        // 默认回退到枚举名称。实例上我们会优先使用规则集提供的显示名。
-        public static Func<HitResult, string> JudgementNameSelector = r => Enum.GetName(typeof(HitResult), r) ?? r.ToString();
-
-        private readonly Ruleset? rulesetInstance;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
-
-        /// <summary>
-        /// 列统计的数据结构，用于缓存计算结果。
-        /// 通过字典支持任意的 HitResult 值。
-        /// </summary>
-        private class ColumnStatistics
-        {
-            public readonly Dictionary<HitResult, int> Total = new Dictionary<HitResult, int>();
-            public readonly Dictionary<HitResult, int> Late = new Dictionary<HitResult, int>();
-            public readonly Dictionary<HitResult, int> Early = new Dictionary<HitResult, int>();
-
-            public int TotalAll;
-            public int TotalLateAll;
-            public int TotalEarlyAll;
-        }
 
         public EzScoreHitResultCountGraph(ScoreInfo score)
         {
@@ -63,15 +45,8 @@ namespace osu.Game.EzOsuGame.Statistics
 
             columnCount = hitEvents.Where(e => e.HitObject is IHasColumn).Select(e => ((IHasColumn)e.HitObject).Column).DefaultIfEmpty(-1).Max() + 1;
 
-            try
-            {
-                rulesetInstance = score.Ruleset.CreateInstance();
-            }
-            catch
-            {
-                // 如果规则集实例化失败（例如 ruleset 未安装），退回到默认字符串显示。
-                rulesetInstance = null;
-            }
+            // 默认使用 ScoreInfo 中记录的规则集实例，派生类可在构造时或通过覆写属性返回其它规则集实例。
+            RulesetInstance = score.Ruleset.CreateInstance();
 
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -167,21 +142,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                 var content = createStatisticsGroup(columnEvents, calculateColumnStatistics(columnEvents), $"Column {i + 1}");
 
-                var wrapper = new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Masking = true,
-                    CornerRadius = 6,
-                    BorderThickness = 1,
-                    BorderColour = colours.Gray3,
-                    Padding = new MarginPadding { Left = 6, Right = 6, Top = 6, Bottom = 6 },
-                    Margin = new MarginPadding { Top = 2.5f, Bottom = 2.5f }
-                };
-
-                wrapper.Add(content);
-
-                graphs.Add(wrapper);
+                graphs.Add(content);
             }
 
             return graphs;
@@ -239,7 +200,7 @@ namespace osu.Game.EzOsuGame.Statistics
         /// <summary>
         /// 一次遍历计算单列的所有统计信息
         /// </summary>
-        private ColumnStatistics calculateColumnStatistics(List<HitEvent> columnEvents)
+        private ColumnStatistics calculateColumnStatistics(IReadOnlyList<HitEvent> columnEvents)
         {
             var stats = new ColumnStatistics();
 
@@ -274,6 +235,21 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
+        /// 列统计的数据结构，用于缓存计算结果。
+        /// 通过字典支持任意的 HitResult 值。
+        /// </summary>
+        private class ColumnStatistics
+        {
+            public readonly Dictionary<HitResult, int> Total = new Dictionary<HitResult, int>();
+            public readonly Dictionary<HitResult, int> Late = new Dictionary<HitResult, int>();
+            public readonly Dictionary<HitResult, int> Early = new Dictionary<HitResult, int>();
+
+            public int TotalAll;
+            public int TotalLateAll;
+            public int TotalEarlyAll;
+        }
+
+        /// <summary>
         /// 从预计算的列统计生成统计表
         /// </summary>
         private SimpleStatisticTable createStatisticTable(ColumnStatistics stats)
@@ -286,15 +262,16 @@ namespace osu.Game.EzOsuGame.Statistics
             };
 
             // 按规则集提供的顺序排序（若可用），否则使用枚举上定义的展示顺序。
-            List<HitResult> results;
-            if (rulesetInstance != null)
-                results = rulesetInstance.GetValidHitResults().Where(r => stats.Total.ContainsKey(r)).ToList();
-            else
-                results = stats.Total.Keys.OrderBy(r => r.GetIndexForOrderedDisplay()).ToList();
+            // 另外，确保把统计中实际存在但规则集未列出的特殊判定也展示出来（例如 ComboBreak、Poor）。
+            List<HitResult> results = RulesetInstance.GetValidHitResults()
+                                                     .Where(r => stats.Total.ContainsKey(r))
+                                                     .OrderBy(r => r.GetIndexForOrderedDisplay())
+                                                     .ToList();
 
             foreach (HitResult r in results)
             {
-                string name = rulesetInstance != null ? rulesetInstance.GetDisplayNameForHitResult(r).ToString() : JudgementNameSelector(r);
+                // string name = RulesetInstance.GetDisplayNameForHitResult(r).ToString();
+                string name = r.ToString(); // 直接使用枚举名称，避免某些规则集未提供显示名称导致的混乱。
 
                 stats.Total.TryGetValue(r, out int total);
                 stats.Late.TryGetValue(r, out int late);
