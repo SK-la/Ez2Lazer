@@ -6,6 +6,8 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Logging;
 
 namespace osu.Game.EzOsuGame.Diagnostics
@@ -19,7 +21,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <summary>是否启用采集（运行时可切换）。</summary>
         public static bool Enabled { get; set; }
 
-        private static readonly ConcurrentQueue<TraceEvent> events = new ConcurrentQueue<TraceEvent>();
+        private static ConcurrentQueue<TraceEvent> events = new ConcurrentQueue<TraceEvent>();
 
         /// <summary>采样上限，防止 OOM。</summary>
         private const int max_events = 10_000;
@@ -37,7 +39,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         /// <param name="tag">事件分类标签，例如 "CheckScoreCompleted"。</param>
         /// <param name="extra">附加键值信息，例如 "hasCompleted=True waitMs=1234"。</param>
-        public static void Record(string tag, string extra = "")
+        public static void Record(string? tag, string? extra = "")
         {
             if (!Enabled) return;
             if (events.Count >= max_events) return;
@@ -59,27 +61,36 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             int count = 0;
 
+            // Drain current queue snapshot.
             while (events.TryDequeue(out var e))
             {
                 count++;
                 sb.Append(e.WallMs.ToString("F3")).Append(',');
-                sb.Append(CsvEscape(e.Tag)).Append(',');
-                sb.AppendLine(CsvEscape(e.Extra));
+                sb.Append(csvEscape(e.Tag)).Append(',');
+                sb.AppendLine(csvEscape(e.Extra));
             }
 
-            string dir = GetDiagnosticsDirectory();
+            string dir = getDiagnosticsDirectory();
             string path = Path.Combine(dir, $"trace_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
 
             try
             {
-                File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
-                Logger.Log($"[EzTimingTrace] flushed {count} events to {path}");
+                string content = sb.ToString();
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await File.WriteAllTextAsync(path, content, Encoding.UTF8).ConfigureAwait(false);
+                        Logger.Log($"[EzTimingTrace] flushed {count} events to {path}");
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Logger.Log($"[EzTimingTrace] flush failed: {ex.Message}", level: LogLevel.Error); }
+                        catch { }
+                    }
+                });
             }
-            catch (Exception ex)
-            {
-                Logger.Log($"[EzTimingTrace] flush failed: {ex.Message}", level: LogLevel.Error);
-                return string.Empty;
-            }
+            catch { }
 
             return path;
         }
@@ -87,20 +98,22 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// <summary>丢弃所有待处理事件。</summary>
         public static void Clear()
         {
-            while (events.TryDequeue(out _)) { }
+            // Atomically replace the queue to avoid long-running dequeue loops on the caller thread.
+            Interlocked.Exchange(ref events, new ConcurrentQueue<TraceEvent>());
         }
 
-        private static string GetDiagnosticsDirectory()
+        private static string getDiagnosticsDirectory()
         {
             try
             {
-                var di = new System.IO.DirectoryInfo(System.AppContext.BaseDirectory);
+                var di = new DirectoryInfo(AppContext.BaseDirectory);
+
                 for (int i = 0; i < 8 && di != null; i++, di = di.Parent)
                 {
                     if (di.GetFiles("osu.sln").Length > 0 || di.GetDirectories(".git").Length > 0)
                     {
-                        var d = System.IO.Path.Combine(di.FullName, "diagnostics");
-                        System.IO.Directory.CreateDirectory(d);
+                        string d = Path.Combine(di.FullName, "diagnostics");
+                        Directory.CreateDirectory(d);
                         return d;
                     }
                 }
@@ -109,18 +122,21 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             try
             {
-                var d = System.IO.Path.Combine(System.Environment.CurrentDirectory, "diagnostics");
-                System.IO.Directory.CreateDirectory(d);
+                string d = Path.Combine(Environment.CurrentDirectory, "diagnostics");
+                Directory.CreateDirectory(d);
                 return d;
             }
             catch { }
 
-            var fallback = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop), "EzDiag");
-            try { System.IO.Directory.CreateDirectory(fallback); } catch { }
+            string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "EzDiag");
+
+            try { Directory.CreateDirectory(fallback); }
+            catch { }
+
             return fallback;
         }
 
-        private static string CsvEscape(string s)
+        private static string csvEscape(string s)
         {
             if (s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r'))
                 return '"' + s.Replace("\"", "\"\"") + '"';

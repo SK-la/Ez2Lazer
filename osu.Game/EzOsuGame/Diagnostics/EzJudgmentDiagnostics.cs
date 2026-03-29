@@ -6,6 +6,8 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using osu.Framework.Logging;
 
 namespace osu.Game.EzOsuGame.Diagnostics
@@ -21,7 +23,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         public static bool Enabled { get; set; }
 
-        private static readonly ConcurrentQueue<JudgmentSample> samples = new ConcurrentQueue<JudgmentSample>();
+        private static ConcurrentQueue<JudgmentSample> samples = new ConcurrentQueue<JudgmentSample>();
 
         /// <summary>采样上限，防止 OOM。</summary>
         private const int max_samples = 8000;
@@ -73,6 +75,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
             var sb = new StringBuilder();
             sb.AppendLine("WallMs,GameTime,NoteStart,TimeOffset,InterpClock,BassSource,Drift,FrameElapsed");
 
+            // Drain current queue snapshot into the CSV builder.
             while (samples.TryDequeue(out var s))
             {
                 sb.Append(s.WallMs.ToString("F3")).Append(',');
@@ -86,19 +89,28 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 sb.AppendLine();
             }
 
-            string dir = GetDiagnosticsDirectory();
+            string dir = getDiagnosticsDirectory();
             string path = Path.Combine(dir, $"judgment_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
 
+            // Perform actual disk IO on a background thread to avoid blocking callers.
             try
             {
-                File.WriteAllText(path, sb.ToString());
-                Logger.Log($"[EzJudgmentDiag] flushed to {path}");
+                string content = sb.ToString();
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await File.WriteAllTextAsync(path, content).ConfigureAwait(false);
+                        Logger.Log($"[EzJudgmentDiag] flushed to {path}");
+                    }
+                    catch (Exception ex)
+                    {
+                        try { Logger.Log($"[EzJudgmentDiag] flush failed: {ex.Message}", level: LogLevel.Error); }
+                        catch { }
+                    }
+                });
             }
-            catch (Exception ex)
-            {
-                Logger.Log($"[EzJudgmentDiag] flush failed: {ex.Message}", level: LogLevel.Error);
-                return string.Empty;
-            }
+            catch { }
 
             return path;
         }
@@ -108,21 +120,23 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         public static void Clear()
         {
-            while (samples.TryDequeue(out _)) { }
+            // Atomically replace the queue to avoid long-running dequeue loops on the caller thread.
+            Interlocked.Exchange(ref samples, new ConcurrentQueue<JudgmentSample>());
         }
 
-        private static string GetDiagnosticsDirectory()
+        private static string getDiagnosticsDirectory()
         {
             try
             {
                 // Try to locate repository root by searching upwards for osu.sln or a .git folder.
-                var di = new System.IO.DirectoryInfo(System.AppContext.BaseDirectory);
+                var di = new DirectoryInfo(AppContext.BaseDirectory);
+
                 for (int i = 0; i < 8 && di != null; i++, di = di.Parent)
                 {
                     if (di.GetFiles("osu.sln").Length > 0 || di.GetDirectories(".git").Length > 0)
                     {
-                        var d = System.IO.Path.Combine(di.FullName, "diagnostics");
-                        System.IO.Directory.CreateDirectory(d);
+                        string d = Path.Combine(di.FullName, "diagnostics");
+                        Directory.CreateDirectory(d);
                         return d;
                     }
                 }
@@ -131,14 +145,17 @@ namespace osu.Game.EzOsuGame.Diagnostics
 
             try
             {
-                var d = System.IO.Path.Combine(System.Environment.CurrentDirectory, "diagnostics");
-                System.IO.Directory.CreateDirectory(d);
+                string d = Path.Combine(Environment.CurrentDirectory, "diagnostics");
+                Directory.CreateDirectory(d);
                 return d;
             }
             catch { }
 
-            var fallback = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop), "EzDiag");
-            try { System.IO.Directory.CreateDirectory(fallback); } catch { }
+            string fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "EzDiag");
+
+            try { Directory.CreateDirectory(fallback); }
+            catch { }
+
             return fallback;
         }
     }

@@ -23,7 +23,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 {
     public partial class EzDisplayKpsGraph : CompositeDrawable
     {
-        private const float line_thickness = 2f;
+        private const float line_thickness = 1.5f;
         private const int max_display_points = 128;
 
         private readonly KpsLineDrawable graphDrawable;

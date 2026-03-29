@@ -1770,9 +1770,8 @@ namespace osu.Game
 
             int refreshRate = (int)MathF.Round(gameHost.Window.CurrentDisplayMode.Value.RefreshRate);
 
-            // For invalid refresh rates let's assume 60 Hz as it is most common.
-            if (refreshRate <= 0)
-                refreshRate = 240;
+            if (refreshRate <= 240)
+                refreshRate = 300;
 
             int drawLimiter;
             bool shouldVSync;
@@ -1789,12 +1788,6 @@ namespace osu.Game
                 {
                     switch (frameSyncMode.Value)
                     {
-                        case FrameSync.VSync:
-                        case FrameSync.Unlimited:
-                            drawLimiter = int.MaxValue;
-                            shouldVSync = frameSyncMode.Value == FrameSync.VSync;
-                            break;
-
                         case FrameSync.Limit2x:
                             drawLimiter *= 2;
                             break;
@@ -1805,6 +1798,11 @@ namespace osu.Game
 
                         case FrameSync.Limit8x:
                             drawLimiter *= 8;
+                            break;
+
+                        default:
+                            drawLimiter = int.MaxValue;
+                            shouldVSync = frameSyncMode.Value == FrameSync.VSync;
                             break;
                     }
                 }
@@ -1827,6 +1825,7 @@ namespace osu.Game
                 drawLimiter = Math.Min(8000, drawLimiter);
 
             gameHost.MaximumDrawHz = drawLimiter;
+            gameHost.MaximumInactiveHz = drawLimiter;
 
             gameHost.SetVerticalSync(shouldVSync);
 

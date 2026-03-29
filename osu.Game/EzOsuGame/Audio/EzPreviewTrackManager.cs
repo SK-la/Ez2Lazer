@@ -212,12 +212,9 @@ namespace osu.Game.EzOsuGame.Audio
             {
                 using (var stream = source.GetStream(name))
                 {
-                    if (stream == null)
-                        return null;
-
                     using (var memory = new MemoryStream())
                     {
-                        stream.CopyTo(memory);
+                        stream?.CopyTo(memory);
                         return memory.ToArray();
                     }
                 }

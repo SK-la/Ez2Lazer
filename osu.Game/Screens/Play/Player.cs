@@ -109,7 +109,6 @@ namespace osu.Game.Screens.Play
         public readonly Bindable<bool> StoryboardReplacesBackground = new Bindable<bool>();
 
         [Cached(typeof(IBackdropCaptureSourceProvider))]
-        [Cached]
         public readonly GameplayBackdropSource BackdropSource = new GameplayBackdropSource();
 
         public class GameplayBackdropSource : IBackdropCaptureSourceProvider
