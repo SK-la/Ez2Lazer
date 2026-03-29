@@ -123,7 +123,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             if (!userTriggered)
             {
                 if (!HitObject.HitWindows.CanBeHit(timeOffset))
-                    ApplyResult(HitResult.Miss);
+                    ApplyMinResult(); // 待定
 
                 return;
             }
