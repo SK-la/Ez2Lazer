@@ -23,11 +23,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private IBindable<string> stageNameBindable = null!;
-        private IBindable<double> hitPositonBindable = null!;
+        private readonly IBindable<double> hitPositonBindable = new Bindable<double>();
         private Bindable<Vector2> noteSizeBindable = null!;
+        private Bindable<string> stageNameBindable = null!;
 
-        private Container sprite = null!;
+        private readonly Container sprite;
         private TextureAnimation? upSprite;
         private TextureAnimation? downSprite;
         protected virtual bool IsKeyPress => true;
@@ -59,11 +59,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         public EzKeyArea()
         {
             RelativeSizeAxes = Axes.Both;
-        }
 
-        [BackgroundDependencyLoader]
-        private void load(Column column, IEzSkinInfo ezSkinInfo)
-        {
             sprite = new Container
             {
                 Anchor = Anchor.TopCentre,
@@ -71,12 +67,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 RelativeSizeAxes = Axes.X,
                 FillMode = FillMode.Stretch,
             };
+        }
 
+        [BackgroundDependencyLoader]
+        private void load(Column column, IEzSkinInfo ezSkinInfo)
+        {
             keyMode = stageDefinition.Columns;
             columnIndex = column.Index;
 
-            stageNameBindable = ezSkinInfo.StageName;
-            hitPositonBindable = ezSkinInfo.HitPosition;
+            stageNameBindable = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
+            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
             noteSizeBindable = column.EzNoteSizeBindable;
 
             bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
@@ -105,7 +105,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             stageNameBindable.BindValueChanged(_ => loadAnimation(), true);
             hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
-            noteSizeBindable.BindValueChanged(_ => OnConfigChanged());
+            noteSizeBindable.BindValueChanged(_ => OnConfigChanged(), true);
         }
 
         protected virtual string KeySuffix
@@ -148,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // downSprite.DefaultFrameLength = beatInterval;
             downSprite.Alpha = 0;
 
-            // sprite.Clear();
+            sprite.Clear();
             sprite.Add(upSprite);
             sprite.Add(downSprite);
 

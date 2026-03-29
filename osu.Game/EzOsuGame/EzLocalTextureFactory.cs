@@ -337,21 +337,17 @@ namespace osu.Game.EzOsuGame
                 // Height = default_stage_body_height,
                 // Masking = true,
             };
-            // hitPositonBindable.BindValueChanged(_ =>
-            // {
-            //     container.Y = ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
-            // }, true);
 
             string basePath = $"Stage/{stageName.Value}/Stage";
 
-            addStageComponent(container, $"{basePath}/eightkey/{component}");
-            addStageComponent(container, $"{basePath}/GrooveLight"); //此纹理需要修改正片叠底
-            addStageComponent(container, $"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject");
+            container.Add(getStageTextureAnimation($"{basePath}/eightkey/{component}"));
+            container.Add(getStageTextureAnimation($"{basePath}/GrooveLight")); //此纹理需要修改正片叠底
+            container.Add(getStageTextureAnimation($"{basePath}/{stageName.Value}_OverObject/{stageName.Value}_OverObject"));
 
             return container;
         }
 
-        private void addStageComponent(Container container, string basePath)
+        private TextureAnimation getStageTextureAnimation(string basePath)
         {
             var frames = loadStageComponentFrames(basePath);
             var animation = new TextureAnimation
@@ -371,7 +367,8 @@ namespace osu.Game.EzOsuGame
                 : Vector2.One;
 
             animation.AddFrames(frames);
-            container.Add(animation);
+
+            return animation;
         }
 
         private List<Texture> loadStageComponentFrames(string basePath)
