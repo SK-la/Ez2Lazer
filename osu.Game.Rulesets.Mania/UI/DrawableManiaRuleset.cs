@@ -194,22 +194,16 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
             }, true);
 
-            // 启动独立的异步任务，预加载EzPro皮肤中会用到的贴图
-            Schedule(() =>
+            // 立即触发并在主线程等待预加载完成，尽量在进入游戏前确保纹理上传完毕以避免首局卡顿。
+            try
             {
-                try
-                {
-                    var factory = Dependencies.Get<EzLocalTextureFactory>();
-
-                    if (factory != null)
-                        _ = factory.PreloadGameTextures();
-                }
-                catch (Exception ex)
-                {
-                    Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}",
-                        LoggingTarget.Runtime, LogLevel.Error);
-                }
-            });
+                var factory = Dependencies.Get<EzLocalTextureFactory>();
+                _ = factory.PreloadGameTextures();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+            }
         }
 
         private ManiaTouchInputArea? touchInputArea;

@@ -2,7 +2,10 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
 
@@ -14,8 +17,7 @@ namespace osu.Game.EzOsuGame
 
         private static readonly string[] preload_components =
         {
-            "whitenote", "bluenote", "greennote",
-            "noteflare", "noteflaregood", "longnoteflare",
+            "whitenote", "noteflare", "noteflaregood", "longnoteflare",
             "longnote/body", "longnote/head", "longnote/tail"
         };
 
@@ -33,13 +35,93 @@ namespace osu.Game.EzOsuGame
                 string currentNoteSetName = noteSetName.Value;
                 Logger.Log($"[EzLocalTextureFactory] Starting preload for note set: {currentNoteSetName}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-                foreach (string component in preload_components)
-                    preloadComponent(component, currentNoteSetName);
+                // 收集要强制加载的纹理路径（保持现有逻辑但不触发重复上传）
+                var allFramePaths = new List<string>();
 
-                await Task.CompletedTask.ConfigureAwait(false);
+                foreach (string component in preload_components)
+                {
+                    try
+                    {
+                        string path = $"note/{currentNoteSetName}/{component}";
+
+                        for (int i = 0; i < max_frames_to_load; i++)
+                        {
+                            string frameFile = $"{path}/{i:D3}.png";
+                            var texture = textureStore.Get(frameFile);
+
+                            if (texture == null)
+                                break;
+
+                            allFramePaths.Add(frameFile);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"[EzLocalTextureFactory] Failed to collect frames for {component}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+                    }
+                }
+
+                // 如果没有找到任何纹理，直接结束
+                if (allFramePaths.Count == 0)
+                {
+                    preloadCompleted = true;
+                    Logger.Log($"[EzLocalTextureFactory] Nothing to preload for note set: {currentNoteSetName}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    return;
+                }
+
+                // 在主线程中创建一个临时 Holder 并把要预热的 Sprite 通过 LoadComponentAsync 加载进 Holder，从而强制上传纹理到 GPU。
+                var loadTcs = new TaskCompletionSource<bool>();
+
+                Schedule(() =>
+                {
+                    var holder = new Container { Alpha = 0, RelativeSizeAxes = Framework.Graphics.Axes.Both };
+                    AddInternal(holder);
+
+                    var loadTasks = new List<Task>();
+
+                    foreach (string framePath in allFramePaths)
+                    {
+                        try
+                        {
+                            var texture = textureStore.Get(framePath);
+                            if (texture == null) continue;
+
+                            var sprite = new Sprite { Texture = texture, Alpha = 0 };
+
+                            var tcs = new TaskCompletionSource<bool>();
+                            loadTasks.Add(tcs.Task);
+
+                            // 异步加载 Sprite，并在加载完成后加入 holder。这样会触发框架在加载阶段把纹理上传到 GPU。
+                            LoadComponentAsync(sprite, s =>
+                            {
+                                holder.Add(s);
+                                // 延迟一个周期确保上传开始/完成
+                                Scheduler.AddOnce(() => tcs.SetResult(true));
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"[EzLocalTextureFactory] Error scheduling preload for {framePath}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+                        }
+                    }
+
+                    // 等待所有加载任务完成，然后清理 holder 并标记完成
+                    Task.WhenAll(loadTasks).ContinueWith(_ =>
+                    {
+                        Schedule(() =>
+                        {
+                            holder.RemoveAll(d => true, true);
+                            RemoveInternal(holder, true);
+                            loadTcs.TrySetResult(true);
+                        });
+                    }, TaskScheduler.Default);
+                });
+
+                // 等待主线程上的加载流程完成
+                await loadTcs.Task.ConfigureAwait(false);
 
                 preloadCompleted = true;
-                Logger.Log($"[EzLocalTextureFactory] Preload completed for {preload_components.Length} components", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                Logger.Log($"[EzLocalTextureFactory] Preload completed for {allFramePaths.Count} frames", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
             }
             catch (Exception ex)
             {
@@ -49,71 +131,6 @@ namespace osu.Game.EzOsuGame
             {
                 isPreloading = false;
             }
-        }
-
-        private void preloadComponent(string component, string noteSetName)
-        {
-            try
-            {
-                // 构建纹理路径
-                string path = $"note/{noteSetName}/{component}";
-
-                // 预加载动画帧（000.png, 001.png, ...）
-                for (int i = 0; i < max_frames_to_load; i++)
-                {
-                    string frameFile = $"{path}/{i:D3}.png";
-                    var texture = textureStore.Get(frameFile);
-
-                    if (texture == null)
-                        break; // 没有更多帧了
-
-                    // 触发纹理加载（不保存，只让 TextureStore 缓存）
-                    Logger.Log($"[EzLocalTextureFactory] Preloaded: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                }
-
-                // 额外预加载带颜色的变体（如果需要）
-                if (component.StartsWith("white", StringComparison.Ordinal))
-                {
-                    string blueComponent = component.Replace("white", "blue");
-                    string greenComponent = component.Replace("white", "green");
-
-                    preloadColorVariant(blueComponent, noteSetName);
-                    preloadColorVariant(greenComponent, noteSetName);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Failed to preload {component}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-            }
-        }
-
-        private void preloadColorVariant(string component, string noteSetName)
-        {
-            try
-            {
-                string path = $"note/{noteSetName}/{component}";
-
-                for (int i = 0; i < max_frames_to_load; i++)
-                {
-                    string frameFile = $"{path}/{i:D3}.png";
-                    var texture = textureStore.Get(frameFile);
-
-                    if (texture == null)
-                        break;
-
-                    Logger.Log($"[EzLocalTextureFactory] Preloaded color variant: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[EzLocalTextureFactory] Failed to preload color variant {component}: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-            }
-        }
-
-        private void resetPreloadState()
-        {
-            preloadCompleted = false;
-            isPreloading = false;
         }
 
         #endregion
