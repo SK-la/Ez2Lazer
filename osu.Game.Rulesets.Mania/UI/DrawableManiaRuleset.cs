@@ -15,7 +15,6 @@ using osu.Framework.Input.Events;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
-using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Database;
@@ -73,6 +72,8 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Bindable<bool> touchOverlay = new Bindable<bool>();
 
         private static EzManiaScrollingStyle scrollingStyleStatic = EzManiaScrollingStyle.ScrollTimeStyleFixed;
+
+        public double TargetTimeRange { get; protected set; }
 
         // Stores the current speed adjustment active in gameplay.
         private readonly Track speedAdjustmentTrack = new TrackVirtual(0);
@@ -141,8 +142,10 @@ namespace osu.Game.Rulesets.Mania.UI
                 if (!AllowScrollSpeedAdjustment)
                     return;
 
-                TimeRange.Value = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value);
+                TargetTimeRange = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value);
             });
+
+            TimeRange.Value = TargetTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
             scrollingStyle = Config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle);
             scrollingStyleStatic = scrollingStyle.Value;
@@ -151,8 +154,6 @@ namespace osu.Game.Rulesets.Mania.UI
                 scrollingStyleStatic = style.NewValue;
                 updateTimeRange();
             });
-
-            TimeRange.Value = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
             mobileLayout.BindValueChanged(_ => updateMobileLayout(), true);
@@ -277,6 +278,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override void AdjustScrollSpeed(int amount) => configScrollSpeed.Value += amount;
 
+        protected override void Update()
+        {
+            base.Update();
+            updateTimeRange();
+        }
+
         private ScheduledDelegate? pendingSkinChange;
         private float hitPosition;
 
@@ -330,6 +337,8 @@ namespace osu.Game.Rulesets.Mania.UI
                     scale = lengthToHitPosition / 768;
                     break;
             }
+
+            TimeRange.Value = TargetTimeRange * speedAdjustmentTrack.AggregateTempo.Value * speedAdjustmentTrack.AggregateFrequency.Value * scale;
         }
 
         /// <summary>
