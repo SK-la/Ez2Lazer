@@ -116,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        public bool ModifyHitWindows { get; private set; }
+        public static bool HasReset { get; private set; }
 
         /// <summary>
         /// 用于静态Mod覆写，设置后切换自定义判定区间
@@ -152,7 +152,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public ManiaHitWindows()
         {
-            setHitMode();
             updateWindows();
         }
 
@@ -170,10 +169,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                 case HitResult.Poor:
                     return AllowPoorEnabled;
-
-                default:
-                    return false;
             }
+
+            return false;
         }
 
         public override void SetDifficulty(double difficulty)
@@ -184,8 +182,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void modifyManiaHitRange(double[] difficultyRangeArray)
         {
-            ModifyHitWindows = true;
-
             PerfectRange = difficultyRangeArray[0];
             GreatRange = difficultyRangeArray[1];
             GoodRange = difficultyRangeArray[2];
@@ -193,39 +189,23 @@ namespace osu.Game.Rulesets.Mania.Scoring
             MehRange = difficultyRangeArray[4];
             MissRange = difficultyRangeArray[5];
             PoorRange = difficultyRangeArray[6] == 0 ? MissRange : difficultyRangeArray[6];
-            updateWindows();
-        }
-
-        public void ModifyManiaHitRange(ManiaModifyHitRange range)
-        {
-            ModifyHitWindows = true;
-
-            PerfectRange = range.Perfect;
-            GreatRange = range.Great;
-            GoodRange = range.Good;
-            OkRange = range.Ok;
-            MehRange = range.Meh;
-            MissRange = range.Miss;
-            PoorRange = range.Poor == 0 ? MissRange : range.Poor;
-            updateWindows();
         }
 
         public void ResetRange()
         {
-            ModifyHitWindows = false;
-            setHitMode();
+            HasReset = true;
             updateWindows();
         }
 
         private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper();
 
-        private void setHitMode()
+        private bool setHitMode()
         {
             EzEnumHitMode hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
 
             if (hitMode == EzEnumHitMode.Lazer)
             {
-                return;
+                return false;
             }
 
             switch (hitMode)
@@ -248,11 +228,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     modifyManiaHitRange(custom_helper.GetHitWindowsMelody());
                     break;
             }
+
+            return true;
         }
 
         private void updateWindows()
         {
-            if (ModifyHitWindows)
+            if (setHitMode() && !HasReset)
             {
                 perfect = PerfectRange;
                 great = GreatRange;
@@ -261,8 +243,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 meh = MehRange;
                 miss = MissRange;
                 pool = PoorRange;
+                return;
             }
-            else if (ClassicModActive && !ScoreV2Active)
+
+            if (ClassicModActive && !ScoreV2Active)
             {
                 if (IsConvert)
                 {
@@ -303,13 +287,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
             {
                 return result switch
                 {
+                    HitResult.Poor => mo.Poor,
                     HitResult.Perfect => mo.Perfect,
                     HitResult.Great => mo.Great,
                     HitResult.Good => mo.Good,
                     HitResult.Ok => mo.Ok,
                     HitResult.Meh => mo.Meh,
                     HitResult.Miss => mo.Miss,
-                    HitResult.Poor => mo.Poor == 0 ? mo.Miss : mo.Poor,
                     _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
                 };
             }

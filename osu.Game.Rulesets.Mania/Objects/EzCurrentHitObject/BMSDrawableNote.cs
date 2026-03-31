@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
                     return;
 
-                DispatchNewResult();
+                DispatchNewResult(HitResult.Poor);
                 return;
             }
 
@@ -100,7 +100,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
                     return;
 
-                DispatchNewResult();
+                DispatchNewResult(HitResult.Poor);
                 return;
             }
 
@@ -158,7 +158,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
                     return;
 
-                DispatchNewResult();
+                DispatchNewResult(HitResult.Poor);
                 return;
             }
 

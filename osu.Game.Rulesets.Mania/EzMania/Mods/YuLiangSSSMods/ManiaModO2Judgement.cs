@@ -72,14 +72,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             O2HitModeExtension.PillActivated = PillMode.Value;
             O2HitModeExtension.PILL_COUNT.Value = 0;
             HitWindows.BPM = bpm;
-            HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
-                O2HitModeExtension.BASE_COOL / bpm,
-                O2HitModeExtension.BASE_COOL / bpm,
-                O2HitModeExtension.BASE_GOOD / bpm,
-                O2HitModeExtension.BASE_GOOD / bpm,
-                O2HitModeExtension.BASE_BAD / bpm,
-                O2HitModeExtension.BASE_BAD / bpm
-            ));
+            // HitWindows.ModifyManiaHitRange(new ManiaModifyHitRange(
+            //     O2HitModeExtension.BASE_COOL / bpm,
+            //     O2HitModeExtension.BASE_COOL / bpm,
+            //     O2HitModeExtension.BASE_GOOD / bpm,
+            //     O2HitModeExtension.BASE_GOOD / bpm,
+            //     O2HitModeExtension.BASE_BAD / bpm,
+            //     O2HitModeExtension.BASE_BAD / bpm
+            // ));
         }
 
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
