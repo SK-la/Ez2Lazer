@@ -67,15 +67,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected new ManiaRulesetConfigManager Config => (ManiaRulesetConfigManager)base.Config;
 
-        private static EzManiaScrollingStyle scrollingStyleStatic = EzManiaScrollingStyle.ScrollTimeStyleFixed;
         private readonly Bindable<ManiaScrollingDirection> configDirection = new Bindable<ManiaScrollingDirection>();
         private readonly BindableDouble configScrollSpeed = new BindableDouble();
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
         private readonly Bindable<bool> touchOverlay = new Bindable<bool>();
 
-        public double TargetTimeRange { get; protected set; }
-
-        private double currentTimeRange;
+        private static EzManiaScrollingStyle scrollingStyleStatic = EzManiaScrollingStyle.ScrollTimeStyleFixed;
 
         // Stores the current speed adjustment active in gameplay.
         private readonly Track speedAdjustmentTrack = new TrackVirtual(0);
@@ -144,7 +141,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 if (!AllowScrollSpeedAdjustment)
                     return;
 
-                TargetTimeRange = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value);
+                TimeRange.Value = ComputeScrollTime(speed.NewValue, configBaseMs.Value, configTimePerSpeed.Value);
             });
 
             scrollingStyle = Config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle);
@@ -155,7 +152,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 updateTimeRange();
             });
 
-            TimeRange.Value = TargetTimeRange = currentTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
+            TimeRange.Value = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
             mobileLayout.BindValueChanged(_ => updateMobileLayout(), true);
@@ -221,6 +218,8 @@ namespace osu.Game.Rulesets.Mania.UI
             }
         }
 
+        #region LAlt 2档变速
+
         private const Key accelerated_scroll_speed_modifier_key = Key.LAlt;
         private const int accelerated_scroll_speed_adjustment_amount = 5;
 
@@ -274,13 +273,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
         protected override int GetScrollSpeedAdjustmentAmount(KeyBindingPressEvent<GlobalAction> e) => e.CurrentState.Keyboard.Keys.IsPressed(Key.LAlt) ? 5 : 1;
 
-        protected override void AdjustScrollSpeed(int amount) => configScrollSpeed.Value += amount;
+        #endregion
 
-        protected override void Update()
-        {
-            base.Update();
-            updateTimeRange();
-        }
+        protected override void AdjustScrollSpeed(int amount) => configScrollSpeed.Value += amount;
 
         private ScheduledDelegate? pendingSkinChange;
         private float hitPosition;
@@ -335,10 +330,6 @@ namespace osu.Game.Rulesets.Mania.UI
                     scale = lengthToHitPosition / 768;
                     break;
             }
-
-            // we're intentionally using the game host's update clock here to decouple the time range tween from the gameplay clock (which can be arbitrarily paused, or even rewinding)
-            currentTimeRange = Interpolation.DampContinuously(currentTimeRange, TargetTimeRange, 50, gameHost.UpdateThread.Clock.ElapsedFrameTime);
-            TimeRange.Value = currentTimeRange * speedAdjustmentTrack.AggregateTempo.Value * speedAdjustmentTrack.AggregateFrequency.Value * scale;
         }
 
         /// <summary>
