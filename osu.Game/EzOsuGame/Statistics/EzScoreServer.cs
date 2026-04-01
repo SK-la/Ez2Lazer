@@ -2,268 +2,532 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using osu.Framework.Allocation;
+using osu.Framework.Audio;
+using osu.Framework.Bindables;
+using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets;
-using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Replays;
+using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
-using osu.Game.Utils;
-using osu.Game.Replays.Legacy;
-using osu.Game.Rulesets.Objects.Types;
-using osuTK;
+using osu.Game.Screens;
+using osu.Game.Screens.Play;
+using osu.Game.Screens.Play.Leaderboards;
+using osu.Game.Screens.Ranking;
+using osu.Game.Users;
 
 namespace osu.Game.EzOsuGame.Statistics
 {
     /// <summary>
-    /// 简单的命中事件生成器：仅使用谱面顶层 HitObject（不包含嵌套的 ticks / tail / hold 等）
-    /// 来匹配回放帧并生成 <see cref="HitEvent"/> 列表。
-    /// 目的：不对 slider ticks、spinner、hold 等嵌套对象做任何特殊处理或判定逻辑。
+    /// 通过隐藏的真实 replay 判定链生成命中事件。
     /// </summary>
     public static partial class EzScoreServer
     {
-        /// <summary>
-        /// 从给定分数与可玩谱面中，基于顶层 HitObject 与回放帧匹配，生成命中事件列表。
-        /// 不会访问或包含任何 <see cref="HitObject.NestedHitObjects"/> 中的对象。
-        /// </summary>
-        public static List<HitEvent>? TryGenerate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
+        private const double default_analysis_playback_rate = 40;
+
+        private static readonly ConcurrentDictionary<string, IReadOnlyList<HitEvent>> cached_hit_events = new ConcurrentDictionary<string, IReadOnlyList<HitEvent>>();
+
+        private static readonly IAnalysisPlayerStrategy[] analysis_strategies =
+        {
+            new CatchAnalysisPlayerStrategy(),
+            new DefaultAnalysisPlayerStrategy(),
+        };
+
+        private static bool tryGetCached(ScoreInfo scoreInfo, out IReadOnlyList<HitEvent> hitEvents)
+        {
+            hitEvents = Array.Empty<HitEvent>();
+
+            string? key = getCacheKey(scoreInfo);
+            if (string.IsNullOrEmpty(key))
+                return false;
+
+            return cached_hit_events.TryGetValue(key, out hitEvents!);
+        }
+
+        public static void Invalidate(ScoreInfo? scoreInfo)
+        {
+            if (scoreInfo == null)
+                return;
+
+            string? key = getCacheKey(scoreInfo);
+            if (string.IsNullOrEmpty(key))
+                return;
+
+            cached_hit_events.TryRemove(key, out _);
+        }
+
+        private static void storeCached(ScoreInfo scoreInfo, IReadOnlyList<HitEvent> hitEvents)
+        {
+            if (hitEvents.Count == 0)
+                return;
+
+            string? key = getCacheKey(scoreInfo);
+            if (string.IsNullOrEmpty(key))
+                return;
+
+            cached_hit_events[key] = cloneHitEvents(hitEvents);
+        }
+
+        private static string? getCacheKey(ScoreInfo scoreInfo)
+        {
+            if (!string.IsNullOrEmpty(scoreInfo.Hash))
+                return $"hash:{scoreInfo.Hash}";
+
+            if (scoreInfo.ID != Guid.Empty)
+                return $"id:{scoreInfo.ID}";
+
+            if (scoreInfo.OnlineID > 0)
+                return $"online:{scoreInfo.OnlineID}";
+
+            if (scoreInfo.LegacyOnlineID > 0)
+                return $"legacy:{scoreInfo.LegacyOnlineID}";
+
+            return null;
+        }
+
+        private static List<HitEvent> cloneHitEvents(IReadOnlyList<HitEvent> hitEvents) => new List<HitEvent>(hitEvents);
+
+        public static int GetRecommendedAnalysisTimeoutMs(Score score, IBeatmap playableBeatmap)
         {
             ArgumentNullException.ThrowIfNull(score);
             ArgumentNullException.ThrowIfNull(playableBeatmap);
 
-            var replay = score.Replay;
-            if (replay == null || replay.Frames.Count == 0)
-                return null;
-
-            // 使用按时间排序的帧列表（不做类型假定，也不读取位置）
-            var frames = replay.Frames.OrderBy(f => f.Time).ToList();
-            if (frames.Count == 0)
-                return null;
-
-            // 尝试使用分数中的 ruleset ID 反射并创建对应规则集实例，使用其 BeatmapConverter 对谱面进行转换。
-            // 转换成功时优先使用转换后对象的 HitWindows 来进行判定（以保证与真实模式判定一致）。
-            // 若转换失败或不可用，则回退到直接对顶层对象调用 ApplyDefaults 的行为。
-            List<HitObject>? convertedObjects = null;
-
-            try
-            {
-                var rulesetInfo = score.ScoreInfo?.Ruleset;
-
-                if (rulesetInfo != null && rulesetInfo.Available)
-                {
-                    try
-                    {
-                        var rulesetInstance = rulesetInfo.CreateInstance();
-                        var converter = rulesetInstance.CreateBeatmapConverter(playableBeatmap);
-
-                        if (converter.CanConvert())
-                        {
-                            var convertedBeatmap = converter.Convert(cancellationToken);
-                            convertedObjects = convertedBeatmap.HitObjects.OrderBy(h => h.StartTime).ToList();
-                        }
-                    }
-                    catch
-                    {
-                        // 若无法加载/实例化规则集或转换失败，默默回退到原生行为（不抛出）
-                    }
-                }
-            }
-            catch
-            {
-                // 守住所有反射/创建异常，确保不会影响主流程
-            }
-
-            // 仅收集顶层判定对象（不包含 nestedHitObjects）
-            // 不主动依赖 HitObject.HitWindows 属性，判定时优先尝试使用规则集转换后对象的 HitWindows
-            var targets = playableBeatmap.HitObjects
-                                         .Where(h => h.Judgement.MaxResult != HitResult.IgnoreHit)
-                                         .OrderBy(h => h.StartTime)
-                                         .ToList();
-
-            if (targets.Count == 0)
-                return null;
-
-            var hitEvents = new List<HitEvent>(targets.Count);
-            HitObject? lastHitObject = targets.FirstOrDefault();
-            double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
-
-            foreach (var target in targets)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                double targetTime = target.GetEndTime();
-
-                var closest = findClosestFrame(frames, targetTime);
-
-                if (closest == null)
-                {
-                    // 没有匹配到任何帧 -> 视为 Miss
-                    hitEvents.Add(new HitEvent(0.0, gameplayRate, HitResult.Miss, target, lastHitObject, null));
-                    lastHitObject = target;
-                    continue;
-                }
-
-                // 优先尝试在回放帧中查找实际的按键按下帧（录制器会在按键事件触发时写入），
-                // 以避免仅依赖固定帧率采样（例如 60fps）带来的时间量化（≈±8ms）问题。
-                var pressFrame = findClosestPressFrame(frames, targetTime, 500);
-                if (pressFrame != null)
-                    closest = pressFrame;
-
-                // 使用所选帧的时间差作为 TimeOffset（单位：毫秒）
-                double timeOffset = closest.Time - targetTime;
-
-                // 优先尝试从规则集转换后的对象中获取 HitWindows（以保证判定与模式一致）
-                HitWindows? hitWindows = null;
-
-                if (convertedObjects != null && convertedObjects.Count > 0)
-                {
-                    const double time_epsilon = 0.001; // ms
-
-                    // 以 StartTime 为主键进行匹配（转换器通常保留事件时间）。
-                    var candidates = convertedObjects.Where(c => Math.Abs(c.StartTime - target.StartTime) < time_epsilon).ToList();
-
-                    // 若未找到严格匹配，尝试按最接近时间的单个对象作为候选（阈值较宽松，避免极端错误匹配）。
-                    if (candidates.Count == 0)
-                    {
-                        var nearest = convertedObjects.OrderBy(c => Math.Abs(c.StartTime - target.StartTime)).FirstOrDefault();
-                        if (nearest != null && Math.Abs(nearest.StartTime - target.StartTime) <= 5) // 5ms 容忍度
-                            candidates.Add(nearest);
-                    }
-
-                    foreach (var c in candidates)
-                    {
-                        c.ApplyDefaults(playableBeatmap.ControlPointInfo, playableBeatmap.Difficulty, cancellationToken);
-
-                        if (c.HitWindows != null)
-                        {
-                            hitWindows = c.HitWindows;
-                            break;
-                        }
-                    }
-                }
-
-                // 未能通过转换对象获取到 HitWindows，则回退到对原对象调用 ApplyDefaults
-                if (hitWindows == null)
-                {
-                    target.ApplyDefaults(playableBeatmap.ControlPointInfo, playableBeatmap.Difficulty, cancellationToken);
-                    hitWindows = target.HitWindows;
-                }
-
-                var result = hitWindows.ResultFor(timeOffset);
-
-                // 优先使用 HitObject 的 IHas 接口获取坐标（避免反射）
-                Vector2? position = null;
-
-                if (target is IHasPosition hp)
-                    position = hp.Position;
-                else if (target is IHasXPosition hx)
-                {
-                    float x = hx.X;
-                    float y = target is IHasYPosition hy ? hy.Y : 0f;
-                    position = new Vector2(x, y);
-                }
-
-                // 若 HitObject 无坐标，再尝试从已知回放帧类型读取（显式类型判断，避免反射）
-                if (position == null)
-                {
-                    if (closest is LegacyReplayFrame legacy)
-                        position = legacy.Position;
-                }
-
-                hitEvents.Add(new HitEvent(timeOffset, gameplayRate, result, target, lastHitObject, position));
-                lastHitObject = target;
-            }
-
-            return hitEvents.Count > 0 ? hitEvents : null;
+            return getStrategy(score.ScoreInfo.Ruleset).GetTimeoutMs(score, playableBeatmap);
         }
 
-        private static ReplayFrame? findClosestFrame(IList<ReplayFrame> frames, double targetTime)
+        private static IAnalysisPlayerStrategy getStrategy(RulesetInfo? rulesetInfo)
+            => analysis_strategies.FirstOrDefault(strategy => strategy.AppliesTo(rulesetInfo)) ?? analysis_strategies[^1];
+
+        /// <summary>
+        /// 一个隐藏的分析宿主，用来在结果页里驱动真实 replay 判定。
+        /// </summary>
+        public partial class AnalysisHost : CompositeDrawable
         {
-            if (frames.Count == 0)
-                return null;
+            private readonly BackgroundScreenStack backgroundScreenStack;
+            private readonly ScreenStack screenStack;
 
-            int left = 0, right = frames.Count - 1;
-            ReplayFrame? closest = null;
-            double minDiff = double.MaxValue;
+            private AnalysisPlayer? currentPlayer;
+            private TaskCompletionSource<List<HitEvent>?>? currentTask;
+            private CancellationTokenRegistration cancellationRegistration;
+            private long requestId;
 
-            while (left <= right)
+            public override bool HandlePositionalInput => false;
+
+            public override bool HandleNonPositionalInput => false;
+
+            public override bool PropagatePositionalInputSubTree => false;
+
+            public override bool PropagateNonPositionalInputSubTree => false;
+
+            public AnalysisHost()
             {
-                int mid = (left + right) / 2;
-                var frame = frames[mid];
-                double diff = Math.Abs(frame.Time - targetTime);
+                RelativeSizeAxes = Axes.Both;
+                AlwaysPresent = true;
+                Alpha = 0;
 
-                if (diff < minDiff)
+                InternalChildren = new Drawable[]
                 {
-                    minDiff = diff;
-                    closest = frame;
+                    backgroundScreenStack = new BackgroundScreenStack
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        AlwaysPresent = true,
+                        Alpha = 0,
+                    },
+                    screenStack = new ScreenStack
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        AlwaysPresent = true,
+                        Alpha = 0,
+                    }
+                };
+            }
+
+            protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+            {
+                var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+                dependencies.CacheAs(backgroundScreenStack);
+                return dependencies;
+            }
+
+            public Task<List<HitEvent>?> GenerateAsync(Score score, CancellationToken cancellationToken = default)
+            {
+                ArgumentNullException.ThrowIfNull(score);
+
+                if (score.Replay == null || score.Replay.Frames.Count == 0)
+                    return Task.FromResult<List<HitEvent>?>(null);
+
+                if (tryGetCached(score.ScoreInfo, out var cached))
+                    return Task.FromResult<List<HitEvent>?>(cloneHitEvents(cached));
+
+                if (cancellationToken.IsCancellationRequested)
+                    return Task.FromCanceled<List<HitEvent>?>(cancellationToken);
+
+                var completionSource = new TaskCompletionSource<List<HitEvent>?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                long analysisId = Interlocked.Increment(ref requestId);
+
+                Schedule(() => startAnalysis(analysisId, score.DeepClone(), completionSource));
+
+                if (cancellationToken.CanBeCanceled)
+                {
+                    cancellationRegistration = cancellationToken.Register(() => Schedule(() => cancelAnalysis(analysisId, completionSource, cancellationToken)));
                 }
 
-                if (frame.Time < targetTime)
-                    left = mid + 1;
-                else
-                    right = mid - 1;
+                return completionSource.Task;
             }
 
-            if (left < frames.Count)
+            public void CancelPendingAnalysis()
             {
-                var lf = frames[left];
-                if (Math.Abs(lf.Time - targetTime) < minDiff)
-                    closest = lf;
+                long cancellationId = Interlocked.Increment(ref requestId);
+
+                Schedule(() =>
+                {
+                    if (cancellationId != requestId)
+                        return;
+
+                    cancelActiveAnalysis(setTaskCancelled: true);
+                });
             }
 
-            if (right >= 0)
+            private void startAnalysis(long analysisId, Score score, TaskCompletionSource<List<HitEvent>?> completionSource)
             {
-                var rf = frames[right];
-                if (Math.Abs(rf.Time - targetTime) < minDiff)
-                    closest = rf;
+                if (completionSource.Task.IsCompleted || analysisId != requestId)
+                    return;
+
+                if (LoadState < LoadState.Ready || screenStack.LoadState < LoadState.Ready)
+                {
+                    Schedule(() => startAnalysis(analysisId, score, completionSource));
+                    return;
+                }
+
+                cancelActiveAnalysis(setTaskCancelled: false);
+
+                currentTask = completionSource;
+                currentPlayer = new AnalysisPlayer(score);
+                currentPlayer.AnalysisCompleted += hitEvents => finishAnalysis(analysisId, completionSource, score.ScoreInfo, hitEvents);
+                screenStack.Push(currentPlayer);
             }
 
-            return closest;
+            private void finishAnalysis(long analysisId, TaskCompletionSource<List<HitEvent>?> completionSource, ScoreInfo scoreInfo, List<HitEvent>? hitEvents)
+            {
+                if (analysisId != requestId || completionSource.Task.IsCompleted)
+                    return;
+
+                cancellationRegistration.Dispose();
+                currentTask = null;
+                currentPlayer = null;
+
+                if (hitEvents != null && hitEvents.Count > 0)
+                    storeCached(scoreInfo, hitEvents);
+
+                completionSource.TrySetResult(hitEvents != null && hitEvents.Count > 0 ? cloneHitEvents(hitEvents) : null);
+            }
+
+            private void cancelAnalysis(long analysisId, TaskCompletionSource<List<HitEvent>?> completionSource, CancellationToken cancellationToken)
+            {
+                if (analysisId != requestId || completionSource.Task.IsCompleted)
+                    return;
+
+                cancelActiveAnalysis(setTaskCancelled: false);
+                completionSource.TrySetCanceled(cancellationToken);
+            }
+
+            private void cancelActiveAnalysis(bool setTaskCancelled)
+            {
+                cancellationRegistration.Dispose();
+
+                if (currentPlayer != null)
+                {
+                    currentPlayer.CancelAnalysis();
+                    currentPlayer = null;
+                }
+
+                if (setTaskCancelled)
+                    currentTask?.TrySetCanceled();
+
+                currentTask = null;
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                if (isDisposing)
+                    cancelActiveAnalysis(setTaskCancelled: true);
+
+                base.Dispose(isDisposing);
+            }
         }
 
-        private static ReplayFrame? findClosestPressFrame(IList<ReplayFrame> frames, double targetTime, double window = 500)
+        /// <summary>
+        /// 负责按规则集选择分析运行策略。
+        /// 这里只允许覆写“如何运行真实 replay 判定链”，不允许覆写判定逻辑本身。
+        /// </summary>
+        private interface IAnalysisPlayerStrategy
         {
-            if (frames.Count == 0)
-                return null;
+            bool AppliesTo(RulesetInfo? rulesetInfo);
 
-            ReplayFrame? best = null;
-            double bestDiff = double.MaxValue;
+            double GetPlaybackRate(Score score);
 
-            for (int i = 0; i < frames.Count; i++)
+            int GetTimeoutMs(Score score, IBeatmap playableBeatmap);
+
+            bool AllowFailure(AnalysisPlayer player);
+
+            double GetCompletionTime(AnalysisPlayer player);
+
+            bool ShouldComplete(AnalysisPlayer player);
+        }
+
+        private class DefaultAnalysisPlayerStrategy : IAnalysisPlayerStrategy
+        {
+            private const double timeout_buffer_ms = 3000;
+            private const double min_timeout_ms = 5000;
+            private const double max_timeout_ms = 30000;
+            private const double completion_safety_time = 100;
+
+            public virtual bool AppliesTo(RulesetInfo? rulesetInfo) => true;
+
+            public virtual double GetPlaybackRate(Score score) => default_analysis_playback_rate;
+
+            public virtual int GetTimeoutMs(Score score, IBeatmap playableBeatmap)
             {
-                if (frames[i] is not LegacyReplayFrame curr)
-                    continue;
+                double playbackRate = Math.Max(1, GetPlaybackRate(score));
+                double estimatedRuntime = Math.Max(0, playableBeatmap.GetLastObjectTime()) / playbackRate;
 
-                bool isPress = false;
-
-                if (i == 0)
-                {
-                    // 若首帧即为按下状态，则视为一次按下事件（保守处理）
-                    if (curr.MouseLeft)
-                        isPress = true;
-                }
-                else if (frames[i - 1] is LegacyReplayFrame prev)
-                {
-                    // 检测从未按下到按下的上升沿
-                    if (curr.MouseLeft && !prev.MouseLeft)
-                        isPress = true;
-                }
-
-                if (!isPress)
-                    continue;
-
-                double diff = Math.Abs(curr.Time - targetTime);
-                if (diff <= window && diff < bestDiff)
-                {
-                    bestDiff = diff;
-                    best = curr;
-                }
+                return (int)Math.Clamp(estimatedRuntime + timeout_buffer_ms, min_timeout_ms, max_timeout_ms);
             }
 
-            return best;
+            public virtual bool AllowFailure(AnalysisPlayer player) => false;
+
+            public virtual double GetCompletionTime(AnalysisPlayer player)
+            {
+                double lastObjectTime = player.GameplayState.Beatmap.GetLastObjectTime();
+                double missWindow = player.FirstMissWindow;
+                double replayTailTime = player.LastReplayFrameTime ?? lastObjectTime;
+
+                return Math.Max(lastObjectTime + missWindow, replayTailTime) + completion_safety_time;
+            }
+
+            public virtual bool ShouldComplete(AnalysisPlayer player)
+            {
+                if (player.IsScoreProcessorCompleted)
+                    return true;
+
+                if (!player.HasReplayLoaded)
+                    return false;
+
+                if (player.IsWaitingOnReplayFrames)
+                    return false;
+
+                if (player.CurrentGameplayTime < player.AnalysisCompletionTime)
+                    return false;
+
+                return true;
+            }
+        }
+
+        private sealed class CatchAnalysisPlayerStrategy : DefaultAnalysisPlayerStrategy
+        {
+            private const string catch_ruleset_short_name = "fruits";
+            private const double safe_catch_analysis_playback_rate = 5;
+
+            public override bool AppliesTo(RulesetInfo? rulesetInfo) => rulesetInfo?.ShortName == catch_ruleset_short_name;
+
+            public override double GetPlaybackRate(Score score) => safe_catch_analysis_playback_rate;
+
+            public override bool ShouldComplete(AnalysisPlayer player)
+            {
+                if (player.IsScoreProcessorCompleted)
+                    return true;
+
+                if (!player.HasReplayLoaded)
+                    return false;
+
+                return player.CurrentGameplayTime >= player.AnalysisCompletionTime;
+            }
+        }
+
+        /// <summary>
+        /// 一个最小化的隐藏 Player，只负责跑真实 replay 判定并导出 HitEvents。
+        /// </summary>
+        private sealed partial class AnalysisPlayer : Player
+        {
+            [Cached(typeof(IGameplayLeaderboardProvider))]
+            private readonly EmptyGameplayLeaderboardProvider leaderboardProvider = new EmptyGameplayLeaderboardProvider();
+
+            private readonly Score score;
+            private readonly IAnalysisPlayerStrategy strategy;
+            private readonly BindableDouble analysisPlaybackRate;
+            private readonly BindableDouble analysisMutedVolume = new BindableDouble(0);
+            private bool analysisFinished;
+
+            public event Action<List<HitEvent>?>? AnalysisCompleted;
+
+            protected override UserActivity? InitialActivity => null;
+
+            public override bool HideOverlaysOnEnter => false;
+
+            public override bool HideMenuCursorOnNonMouseInput => false;
+
+            public double? LastReplayFrameTime { get; private set; }
+
+            public double AnalysisCompletionTime { get; private set; } = double.PositiveInfinity;
+
+            public double CurrentGameplayTime => GameplayClockContainer?.CurrentTime ?? double.NaN;
+
+            public bool HasReplayLoaded => DrawableRuleset?.HasReplayLoaded.Value == true;
+
+            public bool IsWaitingOnReplayFrames => DrawableRuleset != null && (DrawableRuleset.FrameStableClock.WaitingOnFrames.Value || DrawableRuleset.FrameStableClock.IsCatchingUp.Value);
+
+            public bool IsScoreProcessorCompleted => ScoreProcessor.HasCompleted.Value;
+
+            public double FirstMissWindow => DrawableRuleset?.FirstAvailableHitWindows?.WindowFor(HitResult.Miss) ?? 0;
+
+            public AnalysisPlayer(Score score)
+                : base(new PlayerConfiguration
+                {
+                    AllowPause = false,
+                    ShowResults = false,
+                    AllowRestart = false,
+                    AllowUserInteraction = false,
+                    AllowSkipping = false,
+                    AutomaticallySkipIntro = false,
+                    ShowLeaderboard = false,
+                })
+            {
+                this.score = score;
+                strategy = getStrategy(score.ScoreInfo.Ruleset);
+                analysisPlaybackRate = new BindableDouble(strategy.GetPlaybackRate(score));
+                AlwaysPresent = true;
+                Alpha = 0;
+            }
+
+            protected override Drawable CreateOverlayComponents() => new Container();
+
+            public override void OnEntering(ScreenTransitionEvent e)
+            {
+                if (!LoadedBeatmapSuccessfully)
+                    return;
+
+                applyAnalysisAudioAdjustments();
+                ValidForResume = false;
+
+                base.OnEntering(e);
+            }
+
+            public override bool OnExiting(ScreenExitEvent e)
+            {
+                clearAnalysisAdjustments();
+
+                return false;
+            }
+
+            protected override bool CheckModsAllowFailure() => strategy.AllowFailure(this);
+
+            protected override Score CreateScore(IBeatmap beatmap) => score;
+
+            protected override ResultsScreen CreateResults(ScoreInfo scoreInfo) => new SoloResultsScreen(scoreInfo);
+
+            protected override void PrepareReplay()
+            {
+                score.ScoreInfo.HitEvents.Clear();
+                DrawableRuleset?.SetReplayScore(score);
+                LastReplayFrameTime = score.Replay?.Frames.LastOrDefault()?.Time;
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                if (!LoadedBeatmapSuccessfully)
+                {
+                    completeAnalysis(null);
+                    return;
+                }
+
+                AnalysisCompletionTime = strategy.GetCompletionTime(this);
+
+                ScoreProcessor.HasCompleted.BindValueChanged(completed =>
+                {
+                    if (completed.NewValue)
+                        completeAnalysis();
+                });
+            }
+
+            protected override void Update()
+            {
+                base.Update();
+
+                if (analysisFinished || !LoadedBeatmapSuccessfully)
+                    return;
+
+                if (strategy.ShouldComplete(this))
+                    completeAnalysis();
+            }
+
+            protected override void StartGameplay()
+            {
+                // 保留真实 beatmap track 作为 gameplay 时钟来源，只通过变速与静音调整驱动隐藏分析。
+                GameplayClockContainer.AdjustmentsFromMods.AddAdjustment(AdjustableProperty.Frequency, analysisPlaybackRate);
+
+                base.StartGameplay();
+            }
+
+            protected override void ConcludeFailedScore(Score score)
+            {
+                base.ConcludeFailedScore(score);
+                completeAnalysis();
+            }
+
+            public void CancelAnalysis()
+            {
+                if (analysisFinished)
+                    return;
+
+                analysisFinished = true;
+                clearAnalysisAdjustments();
+                ValidForPush = false;
+                ValidForResume = false;
+
+                if (this.IsCurrentScreen())
+                    this.Exit();
+            }
+
+            private void completeAnalysis(List<HitEvent>? hitEvents = null)
+            {
+                if (analysisFinished)
+                    return;
+
+                analysisFinished = true;
+                clearAnalysisAdjustments();
+
+                if (hitEvents == null && LoadedBeatmapSuccessfully && ScoreProcessor.HitEvents.Count > 0)
+                    hitEvents = cloneHitEvents(ScoreProcessor.HitEvents);
+
+                AnalysisCompleted?.Invoke(hitEvents);
+
+                if (this.IsCurrentScreen())
+                    this.Exit();
+            }
+
+            private void applyAnalysisAudioAdjustments()
+            {
+                GameplayClockContainer.AdjustmentsFromMods.AddAdjustment(AdjustableProperty.Volume, analysisMutedVolume);
+                DrawableRuleset?.Audio.AddAdjustment(AdjustableProperty.Volume, analysisMutedVolume);
+            }
+
+            private void clearAnalysisAdjustments()
+            {
+                GameplayClockContainer?.AdjustmentsFromMods.RemoveAdjustment(AdjustableProperty.Frequency, analysisPlaybackRate);
+                GameplayClockContainer?.AdjustmentsFromMods.RemoveAdjustment(AdjustableProperty.Volume, analysisMutedVolume);
+                DrawableRuleset?.Audio.RemoveAdjustment(AdjustableProperty.Volume, analysisMutedVolume);
+            }
         }
     }
 }

@@ -68,6 +68,7 @@ namespace osu.Game.Screens.Ranking
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
+        private Bindable<double> offsetPlusManiaBindable = null!;
 
         private bool skipExitTransition;
 
@@ -249,6 +250,7 @@ namespace osu.Game.Screens.Ranking
 
             // 底部增加按钮
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            offsetPlusManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             buttons.Add(new HitModeButton(hitModeBindable));
 
             // Add settings button (placeholder)
@@ -279,7 +281,7 @@ namespace osu.Game.Screens.Ranking
                         // 不使用相对大小，使用固定宽度以避免与父容器 AutoSize 冲突
                         RelativeSizeAxes = Axes.None,
                         Width = 220,
-                        Current = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania)
+                        Current = offsetPlusManiaBindable
                     }
                 }
             });
@@ -289,18 +291,24 @@ namespace osu.Game.Screens.Ranking
         {
             base.LoadComplete();
 
-            hitModeBindable.BindValueChanged(v =>
-            {
-                Score?.HitEvents.Clear();
-
-                // TODO: 此处应重新加载分数中的 List<HitEvent>
-
-                StatisticsPanel.Score.TriggerChange();
-            });
+            hitModeBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
+            offsetPlusManiaBindable.BindValueChanged(_ => invalidateDisplayedAnalysis());
 
             StatisticsPanel.State.BindValueChanged(onStatisticsStateChanged, true);
 
             fetchScores(null);
+        }
+
+        private void invalidateDisplayedAnalysis()
+        {
+            ScoreInfo? displayedScore = SelectedScore.Value;
+
+            if (displayedScore == null)
+                return;
+
+            displayedScore.HitEvents.Clear();
+            EzScoreServer.Invalidate(displayedScore);
+            StatisticsPanel.Score.TriggerChange();
         }
 
         protected override void Update()

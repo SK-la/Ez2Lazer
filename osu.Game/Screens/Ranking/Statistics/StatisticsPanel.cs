@@ -62,6 +62,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
         private readonly Container content;
         private readonly LoadingSpinner spinner;
+        private readonly EzScoreServer.AnalysisHost analysisHost;
 
         private bool wasOpened;
         private Sample? popInSample;
@@ -83,7 +84,8 @@ namespace osu.Game.Screens.Ranking.Statistics
                 Children = new Drawable[]
                 {
                     content = new Container { RelativeSizeAxes = Axes.Both },
-                    spinner = new LoadingSpinner()
+                    spinner = new LoadingSpinner(),
+                    analysisHost = new EzScoreServer.AnalysisHost(),
                 }
             };
         }
@@ -101,6 +103,7 @@ namespace osu.Game.Screens.Ranking.Statistics
         {
             loadCancellation?.Cancel();
             loadCancellation = null;
+            analysisHost.CancelPendingAnalysis();
 
             foreach (var child in content)
                 child.FadeOut(150).Expire();
@@ -137,7 +140,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
                         // try
                         // {
-                        //     generatedHitEvents = EzScoreServer.TryGenerate(databasedScore, playable, loadCancellation.Token);
+                        //     generatedHitEvents = analysisHost.GenerateAsync(databasedScore, loadCancellation.Token).GetResultSafely();
                         // }
                         // catch
                         // {

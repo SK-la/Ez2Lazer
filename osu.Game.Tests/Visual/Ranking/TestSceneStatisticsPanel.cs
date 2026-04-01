@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using NUnit.Framework;
@@ -20,26 +21,36 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
+using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.IO.Archives;
 using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays;
+using osu.Game.Replays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Replays;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Game.Rulesets.Osu.Objects;
+using osu.Game.Rulesets.Osu.Replays;
+using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Ranking.Statistics.User;
+using osu.Game.Scoring.Legacy;
 using osu.Game.Tests.Resources;
 using osu.Game.Users;
 using osuTK;
@@ -92,6 +103,48 @@ namespace osu.Game.Tests.Visual.Ranking
         public void TestScoreWithoutStatistics()
         {
             loadPanel(TestResources.CreateTestScoreInfo());
+        }
+
+        [Test]
+        public void TestHitEventsAreGeneratedIntoDisplayedScore()
+        {
+            ScoreInfo score = null!;
+
+            AddStep("import replay-backed score", () => score = createReplayBackedScore());
+            AddAssert("score starts without hit events", () => score.HitEvents, () => Is.Empty);
+
+            loadPanel(score);
+
+            AddUntilStep("score hit events generated", () => score.HitEvents.Count > 0);
+        }
+
+        [Test]
+        public void TestOsuBridgeGeneratesExpectedReplayPositions()
+        {
+            List<HitEvent> generatedHitEvents = null;
+
+            AddStep("generate osu bridge hit events", () => generatedHitEvents = generateOsuBridgeHitEvents());
+            AddAssert("osu bridge returned hit events", () => generatedHitEvents is { Count: 2 });
+            AddAssert("first hit offset matches replay", () => generatedHitEvents![0].TimeOffset == 0);
+            AddAssert("second hit offset matches replay", () => Math.Abs(generatedHitEvents![1].TimeOffset - 12) < 0.01);
+            AddAssert("all osu events carry hit positions", () => generatedHitEvents!.All(e => e.Position != null));
+            AddAssert("first osu event has no previous object", () => generatedHitEvents![0].LastHitObject == null);
+            AddAssert("second osu event links previous object", () => ReferenceEquals(generatedHitEvents![1].LastHitObject, generatedHitEvents[0].HitObject));
+        }
+
+        [Test]
+        public void TestManiaBridgeRespectsConfiguredHitMode()
+        {
+            List<HitEvent> lazerHitEvents = null;
+            List<HitEvent> bmsHitEvents = null;
+
+            AddStep("generate lazer mania hit events", () => lazerHitEvents = generateManiaBridgeHitEvents(EzEnumHitMode.Lazer, 1300));
+            AddStep("generate bms mania hit events", () => bmsHitEvents = generateManiaBridgeHitEvents(EzEnumHitMode.IIDX_HD, 1300));
+            AddAssert("lazer mania bridge returned hit events", () => lazerHitEvents is { Count: 1 });
+            AddAssert("bms mania bridge returned hit events", () => bmsHitEvents is { Count: 1 });
+            AddAssert("lazer late hit is miss", () => lazerHitEvents![0].Result == HitResult.Miss);
+            AddAssert("bms late hit is poor", () => bmsHitEvents![0].Result == HitResult.Poor);
+            AddAssert("bms preserves raw late offset", () => Math.Abs(bmsHitEvents![0].TimeOffset - 300) < 0.01);
         }
 
         [Test]
@@ -391,6 +444,179 @@ namespace osu.Game.Tests.Visual.Ranking
             };
         });
 
+        private ScoreInfo createReplayBackedScore()
+        {
+            const long replay_score_online_id = 91234567;
+
+            beatmapManager.Import(TestResources.GetQuickTestBeatmapForImport()).WaitSafely();
+            scoreManager.Delete(s => s.OnlineID == replay_score_online_id, true);
+
+            var beatmapInfo = beatmapManager.GetAllUsableBeatmapSets()
+                                            .SelectMany(s => s.Beatmaps)
+                                            .First(b => b.Ruleset.ShortName == new OsuRuleset().RulesetInfo.ShortName);
+
+            var playableBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo).GetPlayableBeatmap(beatmapInfo.Ruleset);
+
+            var scoreInfo = TestResources.CreateTestScoreInfo(new OsuRuleset().RulesetInfo);
+            scoreInfo.BeatmapInfo = beatmapInfo;
+            scoreInfo.BeatmapHash = beatmapInfo.Hash;
+            scoreInfo.Ruleset = beatmapInfo.Ruleset;
+            scoreInfo.User = API.LocalUser.Value;
+            scoreInfo.OnlineID = replay_score_online_id;
+            scoreInfo.HitEvents = new List<HitEvent>();
+
+            ScoreInfo importedScore;
+
+            using (var stream = new MemoryStream())
+            {
+                new LegacyScoreEncoder(new Score
+                {
+                    ScoreInfo = scoreInfo,
+                    Replay = new Replay
+                    {
+                        Frames = createReplayFrames(playableBeatmap),
+                    }
+                }, playableBeatmap).Encode(stream, leaveOpen: true);
+
+                importedScore = scoreManager.Import(scoreInfo, new MemoryArchiveReader(stream.ToArray()))!.Value.Detach();
+            }
+
+            Assert.That(importedScore, Is.Not.Null);
+            Assert.That(importedScore.HitEvents, Is.Empty);
+
+            return importedScore;
+        }
+
+        private static List<ReplayFrame> createReplayFrames(IBeatmap playableBeatmap)
+        {
+            var hitCircles = playableBeatmap.HitObjects.OfType<HitCircle>().Take(3).ToList();
+
+            Assert.That(hitCircles, Has.Count.GreaterThan(0));
+
+            var frames = new List<ReplayFrame>
+            {
+                new OsuReplayFrame(0, hitCircles[0].Position)
+            };
+
+            foreach (var hitCircle in hitCircles)
+            {
+                frames.Add(new OsuReplayFrame(Math.Max(0, hitCircle.StartTime - 20), hitCircle.Position));
+                frames.Add(new OsuReplayFrame(hitCircle.StartTime, hitCircle.Position, OsuAction.LeftButton));
+                frames.Add(new OsuReplayFrame(hitCircle.StartTime + 20, hitCircle.Position));
+            }
+
+            return frames.OrderBy(f => f.Time).ToList();
+        }
+
+        private static List<HitEvent> generateOsuBridgeHitEvents()
+        {
+            var ruleset = new OsuRuleset();
+            var beatmap = new Beatmap<HitObject>
+            {
+                BeatmapInfo = new BeatmapInfo(ruleset.RulesetInfo, new BeatmapDifficulty
+                {
+                    OverallDifficulty = 5,
+                    CircleSize = 4,
+                }, new BeatmapMetadata())
+            };
+
+            beatmap.HitObjects.Add(new HitCircle
+            {
+                StartTime = 1000,
+                Position = new Vector2(64, 64),
+            });
+            beatmap.HitObjects.Add(new HitCircle
+            {
+                StartTime = 1500,
+                Position = new Vector2(196, 196),
+            });
+
+            applyDefaults(beatmap);
+
+            var score = new Score
+            {
+                ScoreInfo =
+                {
+                    Ruleset = ruleset.RulesetInfo,
+                    BeatmapInfo = beatmap.BeatmapInfo,
+                },
+                Replay = new Replay
+                {
+                    Frames = new List<ReplayFrame>
+                    {
+                        new OsuReplayFrame(0, new Vector2(-100, -100)),
+                        new OsuReplayFrame(980, new Vector2(64, 64)),
+                        new OsuReplayFrame(1000, new Vector2(64, 64), OsuAction.LeftButton),
+                        new OsuReplayFrame(1010, new Vector2(64, 64)),
+                        new OsuReplayFrame(1488, new Vector2(196, 196)),
+                        new OsuReplayFrame(1512, new Vector2(196, 196), OsuAction.RightButton),
+                        new OsuReplayFrame(1520, new Vector2(196, 196)),
+                    }
+                }
+            };
+
+            EzScoreReloadBridge.InitializeAllGenerators();
+            return EzScoreReloadBridge.TryGenerate(score, beatmap);
+        }
+
+        private static List<HitEvent> generateManiaBridgeHitEvents(EzEnumHitMode hitMode, double pressTime)
+        {
+            var ruleset = new ManiaRuleset();
+            EzEnumHitMode originalHitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+
+            try
+            {
+                GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHitMode, hitMode);
+
+                var beatmap = new Beatmap<HitObject>
+                {
+                    BeatmapInfo = new BeatmapInfo(ruleset.RulesetInfo, new BeatmapDifficulty
+                    {
+                        OverallDifficulty = 5,
+                    }, new BeatmapMetadata())
+                };
+
+                beatmap.HitObjects.Add(new Note
+                {
+                    StartTime = 1000,
+                    Column = 0,
+                });
+
+                applyDefaults(beatmap);
+
+                var score = new Score
+                {
+                    ScoreInfo =
+                    {
+                        Ruleset = ruleset.RulesetInfo,
+                        BeatmapInfo = beatmap.BeatmapInfo,
+                    },
+                    Replay = new Replay
+                    {
+                        Frames = new List<ReplayFrame>
+                        {
+                            new ManiaReplayFrame(0),
+                            new ManiaReplayFrame(pressTime, ManiaAction.Key1),
+                            new ManiaReplayFrame(pressTime + 20),
+                        }
+                    }
+                };
+
+                EzScoreReloadBridge.InitializeAllGenerators();
+                return EzScoreReloadBridge.TryGenerate(score, beatmap);
+            }
+            finally
+            {
+                GlobalConfigStore.EzConfig.SetValue(Ez2Setting.ManiaHitMode, originalHitMode);
+            }
+        }
+
+        private static void applyDefaults(IBeatmap beatmap)
+        {
+            foreach (var hitObject in beatmap.HitObjects)
+                hitObject.ApplyDefaults(beatmap.ControlPointInfo, beatmap.Difficulty);
+        }
+
         public static List<HitEvent> CreatePositionDistributedHitEvents()
         {
             var hitEvents = TestSceneHitEventTimingDistributionGraph.CreateDistributedHitEvents();
@@ -417,6 +643,25 @@ namespace osu.Game.Tests.Visual.Ranking
 
             if (rulesetStore.IsNotNull())
                 rulesetStore?.Dispose();
+        }
+
+        private class MemoryArchiveReader : ArchiveReader
+        {
+            private readonly byte[] data;
+
+            public MemoryArchiveReader(byte[] data)
+                : base("generated-replay.osr")
+            {
+                this.data = data;
+            }
+
+            public override Stream GetStream(string name) => new MemoryStream(data, writable: false);
+
+            public override IEnumerable<string> Filenames => ["generated-replay.osr"];
+
+            public override void Dispose()
+            {
+            }
         }
 
         private class TestRuleset : Ruleset

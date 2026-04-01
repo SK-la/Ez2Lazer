@@ -23,6 +23,18 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Statistics
     /// </summary>
     public sealed class OsuScoreHitEventGenerator : IScoreHitEventGenerator
     {
+        private readonly struct ReplayPressEvent
+        {
+            public readonly double Time;
+            public readonly Vector2 Position;
+
+            public ReplayPressEvent(double time, Vector2 position)
+            {
+                Time = time;
+                Position = position;
+            }
+        }
+
         /// <summary>
         /// 生成器的单例实例。
         /// </summary>
@@ -71,68 +83,78 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Statistics
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // 解析回放帧 - 使用 OfType 安全过滤
             var osuFrames = score.Replay.Frames.OfType<OsuReplayFrame>().OrderBy(f => f.Time).ToList();
 
             if (osuFrames.Count == 0)
                 return null;
 
-            // 收集判定目标对象
             var targets = collectJudgementTargets(playableBeatmap, cancellationToken);
 
             if (targets.Count == 0)
                 return null;
 
-            // 生成 HitEvent
-            var hitEvents = new List<HitEvent>();
-            var lastHitObject = targets.FirstOrDefault();
+            var replayPresses = collectPressEvents(osuFrames);
+            bool[] pressConsumed = new bool[replayPresses.Count];
+
+            var hitEvents = new List<HitEvent>(targets.Count);
+            HitObject? lastHitObject = null;
             double gameplayRate = ModUtils.CalculateRateWithMods(score.ScoreInfo.Mods);
+            int firstRelevantPressIndex = 0;
 
             foreach (var target in targets)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                try
+                if (target is not OsuHitObject osuTarget || target.HitWindows == null || ReferenceEquals(target.HitWindows, HitWindows.Empty))
+                    continue;
+
+                double targetTime = target.StartTime;
+                double missWindow = target.HitWindows.WindowFor(HitResult.Miss);
+
+                while (firstRelevantPressIndex < replayPresses.Count && replayPresses[firstRelevantPressIndex].Time < targetTime - missWindow)
+                    firstRelevantPressIndex++;
+
+                int matchedPressIndex = -1;
+
+                for (int i = firstRelevantPressIndex; i < replayPresses.Count; i++)
                 {
-                    // 计算目标对象的判定时间
-                    double targetTime = target.GetEndTime();
-                    if (target is HitCircle hitCircle)
-                        targetTime = hitCircle.StartTime;
-                    else if (target is Slider slider)
-                        targetTime = slider.StartTime;
-                    else if (target is Spinner spinner)
-                        targetTime = spinner.StartTime;
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                    // 查找最接近的帧
-                    OsuReplayFrame? closestFrame = findClosestFrame(osuFrames, targetTime);
-
-                    if (closestFrame == null)
-                    {
-                        // 没有找到对应的按键事件 -> Miss
-                        hitEvents.Add(new HitEvent(0.0, gameplayRate, HitResult.Miss, target, lastHitObject, null));
-                        lastHitObject = target;
+                    if (pressConsumed[i])
                         continue;
-                    }
 
-                    // 计算时间偏差
-                    double timeOffsetForJudgement = (closestFrame.Time - targetTime) / gameplayRate;
+                    ReplayPressEvent press = replayPresses[i];
 
-                    // 计算空间距离偏差
-                    Vector2 cursorPosition = closestFrame.Position;
-                    Vector2 targetPosition = (target as OsuHitObject)?.Position ?? Vector2.Zero;
-                    double spatialDistance = Vector2.Distance(cursorPosition, targetPosition);
+                    if (press.Time > targetTime + missWindow)
+                        break;
 
-                    // 根据时间判定结果（Osu 主要基于时间判定）
-                    HitResult result = evaluateHitResult(target, timeOffsetForJudgement, spatialDistance);
+                    if (Vector2.Distance(press.Position, osuTarget.StackedPosition) > osuTarget.Radius)
+                        continue;
 
-                    // 创建 HitEvent，包含位移信息
-                    hitEvents.Add(new HitEvent(timeOffsetForJudgement, gameplayRate, result, target, lastHitObject, null));
-                    lastHitObject = target;
+                    matchedPressIndex = i;
+                    break;
                 }
-                catch (Exception)
+
+                double timeOffsetForJudgement = 0;
+                HitResult result = HitResult.Miss;
+                Vector2? hitPosition = null;
+
+                if (matchedPressIndex >= 0)
                 {
-                    // 继续处理下一个对象
+                    pressConsumed[matchedPressIndex] = true;
+
+                    ReplayPressEvent press = replayPresses[matchedPressIndex];
+                    timeOffsetForJudgement = press.Time - targetTime;
+                    result = target.HitWindows.ResultFor(timeOffsetForJudgement);
+
+                    if (result == HitResult.None)
+                        result = HitResult.Miss;
+
+                    hitPosition = press.Position;
                 }
+
+                hitEvents.Add(new HitEvent(timeOffsetForJudgement, gameplayRate, result, target, lastHitObject, hitPosition));
+                lastHitObject = target;
             }
 
             return hitEvents.Count > 0 ? hitEvents : null;
@@ -184,101 +206,29 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Statistics
             }
         }
 
-        /// <summary>
-        /// 在回放帧中找到最接近目标时间的帧。
-        /// 使用二分查找以提高性能。
-        /// </summary>
-        private static OsuReplayFrame? findClosestFrame(List<OsuReplayFrame> frames, double targetTime)
+        private static List<ReplayPressEvent> collectPressEvents(List<OsuReplayFrame> frames)
         {
-            if (frames.Count == 0)
-                return null;
+            var presses = new List<ReplayPressEvent>();
+            var previousActions = new HashSet<OsuAction>();
 
-            // 二分查找最接近的帧
-            int left = 0, right = frames.Count - 1;
-            OsuReplayFrame? closest = null;
-            double minTimeDiff = double.MaxValue;
-
-            while (left <= right)
+            foreach (var frame in frames)
             {
-                int mid = (left + right) / 2;
-                var frame = frames[mid];
-                double timeDiff = Math.Abs(frame.Time - targetTime);
+                var currentActions = new HashSet<OsuAction>(frame.Actions.Where(isPressAction));
 
-                if (timeDiff < minTimeDiff)
+                foreach (var action in currentActions)
                 {
-                    minTimeDiff = timeDiff;
-                    closest = frame;
+                    if (previousActions.Contains(action))
+                        continue;
+
+                    presses.Add(new ReplayPressEvent(frame.Time, frame.Position));
                 }
 
-                if (frame.Time < targetTime)
-                    left = mid + 1;
-                else
-                    right = mid - 1;
+                previousActions = currentActions;
             }
 
-            // 检查前后帧，找到最接近的
-            if (left < frames.Count)
-            {
-                var leftFrame = frames[left];
-                if (Math.Abs(leftFrame.Time - targetTime) < minTimeDiff)
-                    closest = leftFrame;
-            }
-
-            if (right >= 0)
-            {
-                var rightFrame = frames[right];
-                if (Math.Abs(rightFrame.Time - targetTime) < minTimeDiff)
-                    closest = rightFrame;
-            }
-
-            return closest;
+            return presses;
         }
 
-        /// <summary>
-        /// 根据时间偏差和空间距离评估 Hit Result。
-        /// Osu 规则集主要基于时间判定，但也会考虑空间距离作为二级因素。
-        /// </summary>
-        private static HitResult evaluateHitResult(HitObject hitObject, double timeOffset, double spatialDistance)
-        {
-            var hitWindows = hitObject.HitWindows;
-
-            if (hitWindows == null)
-                return HitResult.Miss;
-
-            // Osu 判定主要基于时间偏差
-            // 从最严格到最宽松检查各个判定等级
-
-            if (hitWindows.IsHitResultAllowed(HitResult.Perfect))
-            {
-                if (Math.Abs(timeOffset) <= hitWindows.WindowFor(HitResult.Perfect))
-                    return HitResult.Perfect;
-            }
-
-            if (hitWindows.IsHitResultAllowed(HitResult.Great))
-            {
-                if (Math.Abs(timeOffset) <= hitWindows.WindowFor(HitResult.Great))
-                    return HitResult.Great;
-            }
-
-            if (hitWindows.IsHitResultAllowed(HitResult.Good))
-            {
-                if (Math.Abs(timeOffset) <= hitWindows.WindowFor(HitResult.Good))
-                    return HitResult.Good;
-            }
-
-            if (hitWindows.IsHitResultAllowed(HitResult.Ok))
-            {
-                if (Math.Abs(timeOffset) <= hitWindows.WindowFor(HitResult.Ok))
-                    return HitResult.Ok;
-            }
-
-            if (hitWindows.IsHitResultAllowed(HitResult.Meh))
-            {
-                if (Math.Abs(timeOffset) <= hitWindows.WindowFor(HitResult.Meh))
-                    return HitResult.Meh;
-            }
-
-            return HitResult.Miss;
-        }
+        private static bool isPressAction(OsuAction action) => action == OsuAction.LeftButton || action == OsuAction.RightButton;
     }
 }
