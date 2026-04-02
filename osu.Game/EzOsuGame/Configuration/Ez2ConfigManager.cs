@@ -77,6 +77,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.EzAnalysisRecEnabled, true);
             SetDefault(Ez2Setting.EzAnalysisSqliteEnabled, true);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
+            SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, true);
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, true);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
@@ -559,6 +560,7 @@ namespace osu.Game.EzOsuGame.Configuration
         InputAudioLatencyTracker,
         OffsetPlusMania,
         OffsetPlusNonMania,
+        HitObjectLifetimeUsesOwnTime,
 
         // 皮肤与舞台资源
         ColumnWidthStyle,

@@ -166,6 +166,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         private ScheduledDelegate autoplayDelegate;
         private IBindable<double> offsetBindable;
+        private IBindable<bool> hitObjectLifetimeUsesOwnTimeBindable = new BindableBool();
 
         /// <summary>
         /// Whether the initialization logic in <see cref="Playfield" /> has applied.
@@ -223,13 +224,18 @@ namespace osu.Game.Rulesets.Objects.Drawables
             CurrentSkin.SourceChanged += skinSourceChanged;
 
             // Choose the appropriate offset bindable once during load to avoid runtime reflection/namespace checks.
-            if (ezConfig != null && drawableRuleset != null)
+            if (ezConfig != null)
             {
-                int onlineId = drawableRuleset.Ruleset.RulesetInfo.OnlineID;
-                if (onlineId == 3) // Mania legacy ruleset id
-                    offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
-                else
-                    offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+                hitObjectLifetimeUsesOwnTimeBindable = ezConfig.GetBindable<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime);
+
+                if (drawableRuleset != null)
+                {
+                    int onlineId = drawableRuleset.Ruleset.RulesetInfo.OnlineID;
+                    if (onlineId == 3) // Mania legacy ruleset id
+                        offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+                    else
+                        offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+                }
             }
         }
 
@@ -519,6 +525,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             clearExistingStateTransforms();
 
             double initialTransformsTime = HitObject.StartTime - InitialLifetimeOffset;
+            double hitStateUpdateTime = HitStateUpdateTime;
 
             AnimationStartTime.Value = initialTransformsTime;
 
@@ -528,13 +535,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
             using (BeginAbsoluteSequence(StateUpdateTime))
                 UpdateStartTimeStateTransforms();
 
-            using (BeginAbsoluteSequence(HitStateUpdateTime))
+            using (BeginAbsoluteSequence(hitStateUpdateTime))
                 UpdateHitStateTransforms(newState);
 
             state.Value = newState;
 
             if (LifetimeEnd == double.MaxValue && (state.Value != ArmedState.Idle || HitObject.HitWindows == null))
-                LifetimeEnd = Math.Max(LatestTransformEndTime, HitStateUpdateTime + (Samples?.Length ?? 0));
+                LifetimeEnd = Math.Max(LatestTransformEndTime, hitStateUpdateTime + (Samples?.Length ?? 0));
 
             // apply any custom state overrides
             ApplyCustomUpdateState?.Invoke(this, newState);
@@ -731,10 +738,15 @@ namespace osu.Game.Rulesets.Objects.Drawables
         public double StateUpdateTime => HitObject.StartTime;
 
         /// <summary>
-        /// The time at which judgement dependent state transforms should be applied. This is equivalent of the (end) time of the object, in addition to any judgement offset.
-        /// This is used to offset calls to <see cref="UpdateHitStateTransforms"/>.
+        /// 控制命中后状态变换是否固定使用物件自身时间作为基准。
         /// </summary>
-        public double HitStateUpdateTime => Result?.TimeAbsolute ?? HitObject.GetEndTime();
+        protected virtual bool HitObjectLifetimeUsesOwnTime => hitObjectLifetimeUsesOwnTimeBindable.Value;
+
+        /// <summary>
+        /// 当前物件命中后状态变换所使用的时间基准。
+        /// 默认使用实际判定时间；启用 Ez 生命周期开关后改为使用物件自身结束时间。
+        /// </summary>
+        public double HitStateUpdateTime => HitObjectLifetimeUsesOwnTime ? HitObject.GetEndTime() : Result?.TimeAbsolute ?? HitObject.GetEndTime();
 
         /// <summary>
         /// Will be called at least once after this <see cref="DrawableHitObject"/> has become not alive.
@@ -871,7 +883,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 double interpDrift = 0, bassSource = 0, frameElapsed = Clock.ElapsedFrameTime;
 
                 if (drawableRuleset?.FrameStableClock is FrameStabilityContainer fsc
-                    && fsc.ParentGameplayClock is Screens.Play.GameplayClockContainer gcc)
+                    && fsc.ParentGameplayClock is GameplayClockContainer gcc)
                 {
                     interpDrift = gcc.InterpolatedDrift;
                     bassSource = gcc.BassSourceCurrentTime;

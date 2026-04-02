@@ -100,6 +100,14 @@ namespace osu.Game.EzOsuGame.Localization
             "Directly correct the offset value of input results without changing the timeline of audio and beatmap."
             + "\nCan be adjusted for all input delays. (Testing feature! Lock score upload)");
 
+        public static readonly EzLocalizationManager.EzLocalisableString HIT_OBJECT_LIFETIME_USES_OWN_TIME = new EzLocalizationManager.EzLocalisableString("以物件自身时间结束生命周期", "Use hit object's own time for lifetime");
+
+        public static readonly EzLocalizationManager.EzLocalisableString HIT_OBJECT_LIFETIME_USES_OWN_TIME_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "开启后，HitObject 的命中后状态变换与生命周期结束将以物件自身时间为基准，而不是以实际交互判定时间为基准。"
+            + "\nnote 会固定在判定线上消失，对所有模式生效。",
+            "When enabled, hit-state transforms and hit object lifetime end will use the hit object's own time instead of the actual judged interaction time."
+            + "\nNotes will disappear consistently at the judgement line. Applies to all game modes.");
+
         public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "(Mania) Hit Mode");
 
         public static readonly LocalisableString HIT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(

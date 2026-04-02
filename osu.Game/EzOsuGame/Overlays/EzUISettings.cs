@@ -55,7 +55,16 @@ namespace osu.Game.EzOsuGame.Overlays
                 })
                 {
                     Keywords = new[] { "storyboard", "video", "size", "auto", "scaling", "ui" }
-                }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.HIT_OBJECT_LIFETIME_USES_OWN_TIME,
+                    HintText = EzSettingsStrings.HIT_OBJECT_LIFETIME_USES_OWN_TIME_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime),
+                })
+                {
+                    Keywords = new[] { "ez", "timing", "lifetime", "hitobject" }
+                },
             });
         }
     }
