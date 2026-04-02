@@ -22,10 +22,10 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private static int modSnapshotFailCount;
 
-        public EzAnalysisLookupCache(BeatmapInfo beatmapInfo, IEnumerable<Mod>? mods)
+        public EzAnalysisLookupCache(BeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods)
         {
             BeatmapInfo = beatmapInfo;
-            Ruleset = BeatmapInfo.Ruleset;
+            Ruleset = (rulesetInfo as RulesetInfo) ?? BeatmapInfo.Ruleset;
             // 重要：mod 应用顺序对谱面转换很重要。
             OrderedMods = createModSnapshot(mods);
             // 重要：一些自定义 mods会在 ApplyToBeatmap 期间懒惰地分配随机种子

@@ -175,7 +175,7 @@ namespace osu.Game.Screens.Select
             if (!preferXxySrForDifficultyOperations)
                 return Task.FromResult(beatmap.StarRating);
 
-            if (maniaAnalysisCache.TryGetXxySr(beatmap, out double xxySr))
+            if (ezAnalysisCache.TryGetXxySr(beatmap, ruleset.Value, out double xxySr))
                 return Task.FromResult(xxySr);
 
             return Task.FromResult(beatmap.StarRating);
@@ -906,7 +906,7 @@ namespace osu.Game.Screens.Select
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
         [Resolved]
-        private EzAnalysisCache maniaAnalysisCache { get; set; } = null!;
+        private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
         /// <remarks>
         /// FOOTGUN WARNING: this being sorted on the realm side before detaching is IMPORTANT.

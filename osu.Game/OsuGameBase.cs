@@ -235,7 +235,7 @@ namespace osu.Game
         public readonly Bindable<Dictionary<ModType, IReadOnlyList<Mod>>> AvailableMods = new Bindable<Dictionary<ModType, IReadOnlyList<Mod>>>(new Dictionary<ModType, IReadOnlyList<Mod>>());
 
         private BeatmapDifficultyCache difficultyCache;
-        private EzAnalysisCache maniaAnalysisCache;
+        private EzAnalysisCache ezAnalysisCache;
         private IBeatmapUpdater beatmapUpdater;
 
         private UserLookupCache userCache;
@@ -375,15 +375,19 @@ namespace osu.Game
             dependencies.Cache(BeatmapManager = new BeatmapManager(Storage, realm, API, Audio, Resources, Host, defaultBeatmap, difficultyCache, performOnlineLookups: true));
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
-            dependencies.Cache(new EzAnalysisPersistentStore(Storage));
-            dependencies.Cache(maniaAnalysisCache = new EzAnalysisCache());
+            var ezAnalysisPersistentStore = new EzAnalysisPersistentStore(Storage);
+            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, Ez2ConfigManager);
+            ezAnalysisCache = new EzAnalysisCache(ezAnalysisDatabase, Ez2ConfigManager);
+            dependencies.Cache(ezAnalysisPersistentStore);
+            dependencies.Cache(ezAnalysisDatabase);
+            dependencies.Cache(ezAnalysisCache);
 
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
             dependencies.Cache(ScoreDownloader = new ScoreModelDownloader(ScoreManager, API));
 
             // Add after all the above cache operations as it depends on them.
             base.Content.Add(difficultyCache);
-            base.Content.Add(maniaAnalysisCache);
+            base.Content.Add(ezAnalysisCache);
 
             // TODO: OsuGame or OsuGameBase?
             dependencies.CacheAs(beatmapUpdater = CreateBeatmapUpdater());
@@ -682,7 +686,7 @@ namespace osu.Game
             }
         }
 
-        protected virtual IBeatmapUpdater CreateBeatmapUpdater() => new BeatmapUpdater(BeatmapManager, difficultyCache, API, Storage);
+        protected virtual IBeatmapUpdater CreateBeatmapUpdater() => new BeatmapUpdater(BeatmapManager, difficultyCache, ezAnalysisCache, API, Storage);
 
         protected override UserInputManager CreateUserInputManager() => new OsuUserInputManager();
 

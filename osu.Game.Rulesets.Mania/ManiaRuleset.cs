@@ -13,8 +13,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Mods;
-using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -26,6 +26,7 @@ using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
+using osu.Game.Rulesets.Mania.EzMania.Analysis;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
@@ -51,7 +52,7 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania
 {
-    public class ManiaRuleset : Ruleset, ILegacyRuleset
+    public class ManiaRuleset : Ruleset, ILegacyRuleset, IXxySrCalculator
     {
         /// <summary>
         /// The maximum number of supported keys in a single stage.
@@ -75,6 +76,21 @@ namespace osu.Game.Rulesets.Mania
         public override HitObjectComposer CreateHitObjectComposer() => new ManiaHitObjectComposer(this);
 
         public override IBeatmapVerifier CreateBeatmapVerifier() => new ManiaBeatmapVerifier();
+
+        public bool TryCalculateXxySr(IBeatmap beatmap, double clockRate, out double sr)
+        {
+            sr = 0;
+
+            int keyCount = beatmap is ManiaBeatmap maniaBeatmap && maniaBeatmap.TotalColumns > 0
+                ? maniaBeatmap.TotalColumns
+                : Math.Max(1, (int)Math.Round(beatmap.BeatmapInfo.Difficulty.CircleSize));
+
+            if (keyCount >= 11 && keyCount % 2 == 1)
+                return false;
+
+            sr = SRCalculator.CalculateSR(beatmap, clockRate);
+            return !double.IsNaN(sr) && !double.IsInfinity(sr);
+        }
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
         {

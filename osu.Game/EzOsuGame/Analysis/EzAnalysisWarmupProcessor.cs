@@ -21,8 +21,8 @@ using osu.Game.Screens.Play;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 启动阶段只做一次全量扫描，确定哪些 mania 谱面缺失/过期。
-    /// 运行阶段仅在当前选中谱面命中待补算集合时，执行一次低优先级重算。
+    /// 启动阶段只做一次全量扫描，确定哪些谱面缺失/过期的分析结果。
+    /// 运行阶段通过单后台 worker 仅处理最新选中谱面的低优先级重算。
     /// </summary>
     public partial class EzAnalysisWarmupProcessor : Component
     {
@@ -39,10 +39,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private RealmAccess realmAccess { get; set; } = null!;
 
         [Resolved]
-        private EzAnalysisCache maniaAnalysisCache { get; set; } = null!;
-
-        [Resolved]
-        private EzAnalysisPersistentStore persistentStore { get; set; } = null!;
+        private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -59,7 +56,6 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private IHighPerformanceSessionManager? highPerformanceSessionManager { get; set; }
 
-        private IBindable<bool> ezAnalysisRecomputeEnabled = new BindableBool(true);
         private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
@@ -67,6 +63,16 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly object pendingBeatmapLock = new object();
         private readonly HashSet<Guid> pendingBeatmapIds = new HashSet<Guid>();
         private readonly HashSet<Guid> inFlightBeatmapIds = new HashSet<Guid>();
+        private readonly SemaphoreSlim startupWarmupSignal = new SemaphoreSlim(0, 1);
+        private readonly SemaphoreSlim selectedBeatmapRecomputeSignal = new SemaphoreSlim(0, 1);
+        private readonly CancellationTokenSource startupWarmupCancellationSource = new CancellationTokenSource();
+        private readonly CancellationTokenSource selectedBeatmapRecomputeCancellationSource = new CancellationTokenSource();
+
+        private Task startupWarmupTask = Task.CompletedTask;
+        private Task selectedBeatmapRecomputeTask = Task.CompletedTask;
+        private Guid? queuedSelectedBeatmapId;
+        private bool startupWarmupSignalPending;
+        private bool selectedBeatmapRecomputeSignalPending;
 
         private volatile bool pendingScanCompleted;
 
@@ -74,8 +80,17 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             base.LoadComplete();
 
-            ezAnalysisRecomputeEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
             ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+
+            startupWarmupTask = Task.Factory.StartNew(() => processStartupWarmupQueue(startupWarmupCancellationSource.Token),
+                startupWarmupCancellationSource.Token,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
+
+            selectedBeatmapRecomputeTask = Task.Factory.StartNew(() => processSelectedBeatmapRecomputeQueue(selectedBeatmapRecomputeCancellationSource.Token),
+                selectedBeatmapRecomputeCancellationSource.Token,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
 
             currentBeatmap.BindValueChanged(beatmap => queueSelectedBeatmapRecomputeIfRequired(beatmap.NewValue), true);
 
@@ -83,14 +98,14 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 if (t.Exception?.InnerException is ObjectDisposedException)
                 {
-                    Logger.Log("Finished mania analysis startup scan aborted during shutdown", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
+                    Logger.Log("Finished analysis startup scan aborted during shutdown", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
                     return;
                 }
 
                 pendingScanCompleted = true;
                 Schedule(() => queueSelectedBeatmapRecomputeIfRequired(currentBeatmap.Value));
 
-                Logger.Log("Finished background mania analysis startup scan.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("Finished background analysis startup scan.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             });
         }
 
@@ -98,8 +113,9 @@ namespace osu.Game.EzOsuGame.Analysis
             ezAnalysisSqliteEnabled.Value
             && EzAnalysisPersistentStore.Enabled;
 
-        private bool isRuntimeSelectedBeatmapRecomputeEnabled() =>
-            ezAnalysisRecomputeEnabled.Value;
+        private bool isSelectedBeatmapWarmupEnabled() =>
+            ezAnalysisSqliteEnabled.Value
+            && EzAnalysisPersistentStore.Enabled;
 
         private void scanBeatmapsNeedingWarmup()
         {
@@ -112,7 +128,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!isStartupWarmupScanEnabled())
             {
                 Logger.Log(ezAnalysisSqliteEnabled.Value
-                        ? "Mania analysis persistence is disabled; skipping startup scan."
+                        ? "Ez analysis persistence is disabled; skipping startup scan."
                         : "Ez analysis sqlite cache is disabled; skipping startup scan.",
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
@@ -120,7 +136,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             List<(Guid id, string hash)> beatmaps = new List<(Guid id, string hash)>();
 
-            Logger.Log("Querying for mania beatmaps requiring analysis recompute...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+            Logger.Log("Querying for beatmaps requiring analysis recompute...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
             realmAccess.Run(r =>
             {
@@ -159,10 +175,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     totalWithSet++;
 
-                    if (!isMania)
-                        continue;
+                    if (isMania)
+                        maniaWithSet++;
 
-                    maniaWithSet++;
                     beatmaps.Add((b.ID, b.Hash));
                 }
 
@@ -179,13 +194,15 @@ namespace osu.Game.EzOsuGame.Analysis
             if (beatmaps.Count == 0)
                 return;
 
-            var needingRecompute = persistentStore.GetBeatmapsNeedingRecompute(beatmaps);
+            var needingRecompute = analysisDatabase.GetBeatmapsNeedingRecompute(beatmaps);
 
             if (needingRecompute.Count == 0)
             {
-                Logger.Log("No beatmaps require mania analysis recompute.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log("No beatmaps require analysis recompute.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
             }
+
+            bool shouldSignalStartupWarmup = false;
 
             lock (pendingBeatmapLock)
             {
@@ -193,9 +210,18 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 foreach (Guid id in needingRecompute)
                     pendingBeatmapIds.Add(id);
+
+                if (!startupWarmupSignalPending)
+                {
+                    startupWarmupSignalPending = true;
+                    shouldSignalStartupWarmup = true;
+                }
             }
 
-            Logger.Log($"Startup scan found {needingRecompute.Count} beatmaps requiring mania analysis recompute. Runtime recompute will only process the selected beatmap from this set.",
+            if (shouldSignalStartupWarmup)
+                startupWarmupSignal.Release();
+
+            Logger.Log($"Startup scan found {needingRecompute.Count} beatmaps requiring analysis recompute. Background sqlite warmup will process them.",
                 Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
             postWarmupSummaryNotification(needingRecompute.Count);
@@ -203,59 +229,150 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private void queueSelectedBeatmapRecomputeIfRequired(WorkingBeatmap? workingBeatmap)
         {
-            if (!pendingScanCompleted || !isRuntimeSelectedBeatmapRecomputeEnabled())
+            if (!pendingScanCompleted || !isSelectedBeatmapWarmupEnabled())
                 return;
 
             var beatmapInfo = workingBeatmap?.BeatmapInfo;
 
-            if (beatmapInfo == null || beatmapInfo.Ruleset.OnlineID != 3)
+            if (beatmapInfo == null)
                 return;
 
-            bool shouldQueue;
+            bool shouldSignal = false;
 
             lock (pendingBeatmapLock)
             {
-                shouldQueue = pendingBeatmapIds.Contains(beatmapInfo.ID) && inFlightBeatmapIds.Add(beatmapInfo.ID);
+                if (!pendingBeatmapIds.Contains(beatmapInfo.ID) || inFlightBeatmapIds.Contains(beatmapInfo.ID))
+                    return;
+
+                queuedSelectedBeatmapId = beatmapInfo.ID;
+
+                if (!selectedBeatmapRecomputeSignalPending)
+                {
+                    selectedBeatmapRecomputeSignalPending = true;
+                    shouldSignal = true;
+                }
             }
 
-            if (!shouldQueue)
-                return;
-
-            Task.Factory.StartNew(() => recomputeSelectedBeatmap(beatmapInfo), TaskCreationOptions.LongRunning);
+            if (shouldSignal)
+                selectedBeatmapRecomputeSignal.Release();
         }
 
-        private void recomputeSelectedBeatmap(BeatmapInfo beatmapInfo)
+        private void processStartupWarmupQueue(CancellationToken cancellationToken)
         {
             try
             {
-                if (!isRuntimeSelectedBeatmapRecomputeEnabled())
+                while (true)
+                {
+                    startupWarmupSignal.Wait(cancellationToken);
+
+                    lock (pendingBeatmapLock)
+                        startupWarmupSignalPending = false;
+
+                    while (isStartupWarmupScanEnabled() && tryBeginAnyPendingBeatmap(out Guid beatmapId))
+                        recomputePendingBeatmap(beatmapId, cancellationToken, "startup warmup");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        private void processSelectedBeatmapRecomputeQueue(CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (true)
+                {
+                    selectedBeatmapRecomputeSignal.Wait(cancellationToken);
+
+                    Guid? beatmapId = null;
+
+                    lock (pendingBeatmapLock)
+                    {
+                        selectedBeatmapRecomputeSignalPending = false;
+
+                        if (queuedSelectedBeatmapId is Guid queuedBeatmapId)
+                        {
+                            queuedSelectedBeatmapId = null;
+
+                            if (pendingBeatmapIds.Contains(queuedBeatmapId) && inFlightBeatmapIds.Add(queuedBeatmapId))
+                                beatmapId = queuedBeatmapId;
+                        }
+                    }
+
+                    if (beatmapId.HasValue)
+                        recomputePendingBeatmap(beatmapId.Value, cancellationToken, "selected-beatmap warmup");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        private void recomputePendingBeatmap(Guid beatmapId, CancellationToken cancellationToken, string source)
+        {
+            BeatmapInfo? beatmap = null;
+
+            try
+            {
+                if (!isSelectedBeatmapWarmupEnabled())
                     return;
 
-                sleepIfRequired();
+                sleepIfRequired(cancellationToken);
 
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(beatmapInfo.ID)?.Detach()) ?? beatmapInfo;
+                beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(beatmapId)?.Detach());
 
-                maniaAnalysisCache.WarmupPersistentOnlyAsync(beatmap, CancellationToken.None)
-                                  .GetAwaiter()
-                                  .GetResult();
+                if (beatmap == null)
+                {
+                    lock (pendingBeatmapLock)
+                        pendingBeatmapIds.Remove(beatmapId);
+
+                    return;
+                }
+
+                analysisDatabase.RecomputeStoredAnalysisAsync(beatmap, cancellationToken)
+                                .GetAwaiter()
+                                .GetResult();
 
                 lock (pendingBeatmapLock)
-                    pendingBeatmapIds.Remove(beatmapInfo.ID);
+                    pendingBeatmapIds.Remove(beatmapId);
 
                 ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
-                Logger.Log($"Completed selected-beatmap mania analysis recompute for {beatmapInfo}. Remaining pending={getPendingBeatmapCount()}.",
+                Logger.Log($"Completed {source} analysis recompute for {beatmap}. Remaining pending={getPendingBeatmapCount()}.",
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            }
+            catch (OperationCanceledException)
+            {
             }
             catch (Exception e)
             {
-                Logger.Log($"Selected-beatmap mania analysis recompute failed on {beatmapInfo}: {e}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                Logger.Log($"{source} analysis recompute failed on {beatmap?.BeatmapSet?.Metadata.Title}: {e}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             }
             finally
             {
                 lock (pendingBeatmapLock)
-                    inFlightBeatmapIds.Remove(beatmapInfo.ID);
+                    inFlightBeatmapIds.Remove(beatmapId);
             }
+        }
+
+        private bool tryBeginAnyPendingBeatmap(out Guid beatmapId)
+        {
+            lock (pendingBeatmapLock)
+            {
+                foreach (Guid pendingBeatmapId in pendingBeatmapIds)
+                {
+                    if (inFlightBeatmapIds.Contains(pendingBeatmapId))
+                        continue;
+
+                    inFlightBeatmapIds.Add(pendingBeatmapId);
+                    beatmapId = pendingBeatmapId;
+                    return true;
+                }
+            }
+
+            beatmapId = Guid.Empty;
+            return false;
         }
 
         private int getPendingBeatmapCount()
@@ -273,25 +390,64 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 try
                 {
+                    int remainingCount = getPendingBeatmapCount();
+
+                    if (remainingCount <= 0 || !isStartupWarmupScanEnabled())
+                        return;
+
                     notificationOverlay.Post(new SimpleNotification
                     {
-                        Text = $"Ez analysis scan found {totalCount} beatmaps needing recompute. Runtime recompute is limited to the selected beatmap only."
+                        Text = $"Ez analysis startup scan queued {totalCount} beatmaps for recompute. Background sqlite warmup is still processing {remainingCount} remaining result(s)."
                     });
                 }
                 catch (Exception e)
                 {
-                    Logger.Error(e, "Failed to post mania analysis recompute summary notification.");
+                    Logger.Error(e, "Failed to post analysis recompute summary notification.");
                 }
             });
         }
 
-        private void sleepIfRequired()
+        private void sleepIfRequired(CancellationToken cancellationToken)
         {
             while (localUserPlayInfo?.PlayingState.Value != LocalUserPlayingState.NotPlaying || highPerformanceSessionManager?.IsSessionActive == true)
             {
-                Logger.Log("Mania analysis recompute is sleeping due to active gameplay...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                Thread.Sleep(TimeToSleepDuringGameplay);
+                Logger.Log("Analysis recompute is sleeping due to active gameplay...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                cancellationToken.WaitHandle.WaitOne(TimeToSleepDuringGameplay);
+                cancellationToken.ThrowIfCancellationRequested();
             }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                startupWarmupCancellationSource.Cancel();
+                selectedBeatmapRecomputeCancellationSource.Cancel();
+
+                try
+                {
+                    startupWarmupTask.Wait(1000);
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    selectedBeatmapRecomputeTask.Wait(1000);
+                }
+                catch
+                {
+                }
+
+                startupWarmupCancellationSource.Dispose();
+                startupWarmupSignal.Dispose();
+                selectedBeatmapRecomputeCancellationSource.Dispose();
+                selectedBeatmapRecomputeSignal.Dispose();
+            }
+
+            base.Dispose(isDisposing);
         }
     }
 }

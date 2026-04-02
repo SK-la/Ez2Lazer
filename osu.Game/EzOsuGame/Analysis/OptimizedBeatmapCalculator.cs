@@ -249,7 +249,8 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// 一次性计算所有需要的数据，避免重复遍历
+        /// 一次性计算所有需要的数据，避免重复遍历。
+        /// 可通过 <paramref name="onlyKps"/> 跳过列统计，仅保留 KPS 相关结果。
         /// </summary>
         public static (
             double averageKps,
@@ -257,7 +258,7 @@ namespace osu.Game.EzOsuGame.Analysis
             List<double> kpsList,
             Dictionary<int, int> columnCounts,
             Dictionary<int, int> holdNoteCounts
-            ) GetAllDataOptimized(IBeatmap beatmap)
+            ) GetAllDataOptimized(IBeatmap beatmap, bool onlyKps = false)
         {
             var hitObjects = beatmap.HitObjects;
             if (hitObjects.Count == 0)
@@ -294,18 +295,21 @@ namespace osu.Game.EzOsuGame.Analysis
             // 同时处理KPS和列统计
             var hitObjectsArray = hitObjects as HitObject[] ?? hitObjects.ToArray();
 
-            // 预处理列统计
-            foreach (var obj in hitObjectsArray)
+            // 非 KPS-only 路径才需要列统计。
+            if (!onlyKps)
             {
-                if (obj is IHasColumn columnObj)
+                foreach (var obj in hitObjectsArray)
                 {
-                    // 统计所有note（包括普通note和长按note）
-                    columnCounts[columnObj.Column] = columnCounts.GetValueOrDefault(columnObj.Column) + 1;
-
-                    // 单独统计长按note
-                    if (obj is IHasDuration)
+                    if (obj is IHasColumn columnObj)
                     {
-                        holdNoteCounts[columnObj.Column] = holdNoteCounts.GetValueOrDefault(columnObj.Column) + 1;
+                        // 统计所有note（包括普通note和长按note）
+                        columnCounts[columnObj.Column] = columnCounts.GetValueOrDefault(columnObj.Column) + 1;
+
+                        // 单独统计长按note
+                        if (obj is IHasDuration)
+                        {
+                            holdNoteCounts[columnObj.Column] = holdNoteCounts.GetValueOrDefault(columnObj.Column) + 1;
+                        }
                     }
                 }
             }

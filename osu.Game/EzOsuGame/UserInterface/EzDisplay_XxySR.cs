@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// </summary>
     public partial class EzDisplayXxySR : CompositeDrawable, IHasCurrentValue<EzAnalysisResult>
     {
-        // private readonly bool animated;
+        private readonly bool animated;
         private readonly Box background;
         private readonly SpriteIcon srIcon;
         private readonly OsuSpriteText srText;
@@ -46,9 +46,6 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
-
-        [Resolved]
-        private OverlayColourProvider? colourProvider { get; set; }
 
         public EzDisplayXxySR(EzAnalysisResult ezAnalysisResult, bool animated = false)
         {
@@ -120,10 +117,10 @@ namespace osu.Game.EzOsuGame.UserInterface
                 //     this.TransformBindableTo(displayedStars, c.NewValue.XxySr, 100 + 80 * Math.Abs(c.NewValue.XxySr - c.OldValue.XxySr), Easing.OutQuint);
                 // else
                 //     displayedStars.Value = c.NewValue.XxySr;
-                updateDisplay(c.NewValue.EzManiaSummary.XxySr);
+                updateDisplay(c.NewValue.ManiaAttributes?.XxySr);
             }, true);
 
-            // displayedStars.Value = Current.Value.XxySr;
+            // displayedStars.Value = Current.Value.ManiaAttributes?.XxySr;
             //
             // displayedStars.BindValueChanged(s =>
             // {
@@ -140,12 +137,13 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             if (sr == null)
             {
-                srText.Text = "...";
-
-                // Placeholder state: keep the pill background subtle, but ensure icon/text remain visible.
-                background.Colour = colourProvider?.Background5 ?? Color4Extensions.FromHex("303d47");
-                srIcon.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
-                srText.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
+                // Hide();
+                srText.Text = "/";
+                //
+                // // Placeholder state: keep the pill background subtle, but ensure icon/text remain visible.
+                // background.Colour = colourProvider?.Background5 ?? Color4Extensions.FromHex("303d47");
+                // srIcon.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
+                // srText.Colour = colourProvider?.Content2 ?? Color4.White.Opacity(0.9f);
                 return;
             }
 
@@ -167,13 +165,8 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             background.Colour = colours.ForStarDifficulty(sr.Value);
 
-            srIcon.Colour = sr.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF
-                ? colours.Orange1
-                : colourProvider?.Background5 ?? Color4Extensions.FromHex("303d47");
-
-            srText.Colour = sr.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF
-                ? colours.Orange1
-                : colourProvider?.Background5 ?? Color4.Black.Opacity(0.75f);
+            srIcon.Colour = colours.ForStarDifficultyText(sr.Value);
+            srText.Colour = colours.ForStarDifficultyText(sr.Value);
         }
 
         protected override void Dispose(bool isDisposing)
