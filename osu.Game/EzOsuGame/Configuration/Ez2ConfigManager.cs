@@ -81,6 +81,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.StoryboardAutoVideoSize, true);
             SetDefault(Ez2Setting.KeySoundPreviewMode, KeySoundPreviewMode.Off);
+            SetDefault(Ez2Setting.BeatmapPreviewMode, EzBeatmapPreviewMode.Static);
             SetDefault(Ez2Setting.XxySRFilter, false);
             SetDefault(Ez2Setting.KpcDisplayMode, KpcDisplayMode.BarChart);
             SetDefault(Ez2Setting.EzSelectCsMode, string.Empty);
@@ -549,6 +550,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 界面功能
         KeySoundPreviewMode,
+        BeatmapPreviewMode,
         XxySRFilter,
         KpcDisplayMode,
         EzSelectCsMode,

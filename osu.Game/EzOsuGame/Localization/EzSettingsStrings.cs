@@ -59,21 +59,21 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析重算", "Enable Ez analysis recomputation");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_REC_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "重算开关。开启后允许活动面板进行实时分析计算并刷新显示；关闭后不进行重算。"
+            "开启后允许选歌界面进行实时分析并刷新显示，纳入Mod转换结果的分析。"
             + "\n注意：该开关不控制 SQLite 本地读取与预热（由下方 SQLite 开关单独控制）。",
-            "Recomputation switch. When enabled, active panels can run real-time analysis and refresh displayed values; when disabled, no recomputation is performed."
-            + "\nNote: This switch does not control SQLite local reads or warmup (handled independently by the SQLite switch below).");
+            "When enabled, allows real-time analysis and display refresh in the song selection screen, including analysis of Mod conversion results."
+            + "\nNote: This switch does not control SQLite local reading and warmup (which is controlled separately by the SQLite switch below).");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED =
             new EzLocalizationManager.EzLocalisableString("启用 Ez 分析本地数据（SQLite）", "Enable Ez analysis local data (SQLite)");
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "本地数据开关。独立控制 SQLite 本地读取/写入与启动预热。"
-            + "\n开启：面板可读取本地持久化分析数据，并在启动时执行预热。"
+            "启用独立控制的 SQLite 本地储存，启动时预热器。（No-Mod）"
+            + "\n开启：面板直读本地数据，在exe启动时执行预热列队分析加载（进入游戏中会暂停进度），但不会考虑Mod转换结果。"
             + "\n关闭：不读取 SQLite 本地数据，也不执行预热。",
-            "Local-data switch. Independently controls SQLite local read/write and startup warmup."
-            + "\nEnabled: Panels can read persisted local analysis data and startup warmup runs."
-            + "\nDisabled: No SQLite local reads and no warmup.");
+            "Enable independently controlled SQLite local storage and warmup on startup (No-Mod)"
+            + "\nWhen enabled: Panels read local data directly, and perform warmup queue analysis loading on exe startup (progress will pause when entering gameplay), but Mod conversion results will not be considered."
+            + "\nWhen disabled: Do not read SQLite local data, and do not perform warmup.");
 
 #region 机制类
 

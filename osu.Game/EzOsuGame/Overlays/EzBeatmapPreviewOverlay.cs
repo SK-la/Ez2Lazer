@@ -6,52 +6,77 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Skinning;
 using osu.Game.Rulesets.UI;
+using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.Select
+namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class BeatmapPreviewTabOverlay : CompositeDrawable
+    public partial class EzBeatmapPreviewOverlay : CompositeDrawable
     {
         private const float panel_left_margin = 12;
         private const float panel_width_ratio = 0.54f;
+        private const float panel_right_margin = 20;
         private const float default_panel_height = 340;
         private const float default_panel_min_width = 520;
         private const float min_panel_width = 360;
-        private const float max_panel_width = 1200;
+        private const float max_panel_width = 800;
         private const float min_panel_height = 180;
         private const float max_panel_height = 800;
         private const float bottom_controls_height = 56;
         private const float resize_handle_height = 10;
         private const float resize_handle_width = 10;
+        private const float preview_mode_button_width = 120;
+        private const float preview_mode_list_width = preview_mode_button_width;
+        private const float preview_mode_button_height = 30;
+        private const float preview_mode_button_spacing = 6;
 
         private const float dynamic_preview_duration = 10000;
         private const float dynamic_preview_repeat_delay = 500;
         private const int selection_load_debounce = 180;
 
         private static bool rememberedExpanded;
-        private static bool rememberedDynamicMode;
+
+        private static readonly EzBeatmapPreviewMode[] shared_preview_modes =
+        {
+            EzBeatmapPreviewMode.Dynamic,
+            EzBeatmapPreviewMode.Static,
+        };
+
+        private static readonly EzBeatmapPreviewMode[] mania_preview_modes =
+        {
+            EzBeatmapPreviewMode.Dynamic,
+            EzBeatmapPreviewMode.Static,
+            EzBeatmapPreviewMode.StaticFullMap,
+            EzBeatmapPreviewMode.StaticScroll,
+        };
 
         private readonly StopwatchClock previewClock = new StopwatchClock();
         private readonly FramedClock framedPreviewClock;
+        private readonly BindableBool expandedBindable = new BindableBool();
+        private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>(EzBeatmapPreviewMode.Static);
 
         private readonly Container panelContainer;
         private readonly Container stageViewport;
@@ -60,12 +85,18 @@ namespace osu.Game.Screens.Select
         private readonly OsuSpriteText progressText;
         private readonly OsuSpriteText stateText;
         private readonly OsuSpriteText loadTimeText;
+        private readonly FillFlowContainer previewModeButtonList;
+        private readonly Dictionary<EzBeatmapPreviewMode, PreviewModeButton> previewModeButtons = new Dictionary<EzBeatmapPreviewMode, PreviewModeButton>();
+        private readonly Box topResizeHandle;
+        private readonly Box rightResizeHandle;
 
         private bool expanded;
-        private bool dynamicMode;
         private bool heightResizeActive;
         private bool widthResizeActive;
+        private bool panelWidthManuallyAdjusted;
         private bool selectionDirty;
+        private float dragStartPanelWidth;
+        private float dragStartPanelHeight;
 
         private float panelWidth;
         private float panelHeight = default_panel_height;
@@ -88,9 +119,11 @@ namespace osu.Game.Screens.Select
 
         private CancellationTokenSource? previewLoadCancellation;
         private ScheduledDelegate? scheduledSelectionLoad;
+        private Drawable? currentPreviewRoot;
+        private Drawable? pendingPreviewRoot;
         private DrawableRuleset? drawableRuleset;
-        private IWorkingBeatmap? pendingWorkingBeatmap;
-        private RulesetInfo? pendingRuleset;
+        private IWorkingBeatmap? currentWorkingBeatmap;
+        private RulesetInfo? currentRuleset;
         private bool selectionLoadInProgress;
 
         private long selectionEventVersion;
@@ -99,7 +132,13 @@ namespace osu.Game.Screens.Select
         private int previewLoadedCount;
         private int previewReleasedCount;
 
-        public BeatmapPreviewTabOverlay()
+        private bool dynamicMode => previewMode.Value == EzBeatmapPreviewMode.Dynamic;
+
+        public IBindable<bool> ExpandedState => expandedBindable;
+
+        public Func<float>? DefaultPanelRightEdgeInScreenSpace { get; set; }
+
+        public EzBeatmapPreviewOverlay()
         {
             RelativeSizeAxes = Axes.Both;
             AlwaysPresent = true;
@@ -136,6 +175,17 @@ namespace osu.Game.Screens.Select
                                 Origin = Anchor.TopRight,
                                 Margin = new MarginPadding { Top = 8, Right = 8 }
                             },
+                            previewModeButtonList = new FillFlowContainer
+                            {
+                                Anchor = Anchor.TopLeft,
+                                Origin = Anchor.TopLeft,
+                                Depth = float.MinValue,
+                                Position = new Vector2(8, resize_handle_height + 8),
+                                Width = preview_mode_list_width,
+                                AutoSizeAxes = Axes.Y,
+                                Direction = FillDirection.Vertical,
+                                Spacing = new Vector2(0, preview_mode_button_spacing),
+                            },
                             new Container
                             {
                                 RelativeSizeAxes = Axes.Both,
@@ -143,7 +193,7 @@ namespace osu.Game.Screens.Select
                                 {
                                     Top = resize_handle_height,
                                     Bottom = bottom_controls_height,
-                                    Left = 8,
+                                    Left = preview_mode_list_width + 16,
                                     Right = 8
                                 },
                                 Children = new Drawable[]
@@ -184,7 +234,13 @@ namespace osu.Game.Screens.Select
                                 Height = bottom_controls_height,
                                 Anchor = Anchor.BottomLeft,
                                 Origin = Anchor.BottomLeft,
-                                Padding = new MarginPadding(10),
+                                Padding = new MarginPadding
+                                {
+                                    Top = 10,
+                                    Bottom = 10,
+                                    Left = preview_mode_list_width + 16,
+                                    Right = 10
+                                },
                                 Children = new Drawable[]
                                 {
                                     new Container
@@ -212,7 +268,7 @@ namespace osu.Game.Screens.Select
                                     }
                                 }
                             },
-                            new Box
+                            topResizeHandle = new Box
                             {
                                 RelativeSizeAxes = Axes.X,
                                 Height = resize_handle_height,
@@ -220,7 +276,7 @@ namespace osu.Game.Screens.Select
                                 Origin = Anchor.TopLeft,
                                 Colour = Color4.White.Opacity(0.22f)
                             },
-                            new Box
+                            rightResizeHandle = new Box
                             {
                                 RelativeSizeAxes = Axes.Y,
                                 Width = resize_handle_width,
@@ -233,8 +289,23 @@ namespace osu.Game.Screens.Select
                 }
             };
 
-            timeline.OnSeek = seekTo;
-            timeline.OnCommit = seekTo;
+            timeline.OnSeek = time => seekTo(time, dynamicMode);
+            timeline.OnCommit = time => seekTo(time, dynamicMode);
+
+            createPreviewModeButtons();
+            updatePreviewModeButtons();
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(Ez2ConfigManager ezConfig)
+        {
+            previewMode.BindTo(ezConfig.GetBindable<EzBeatmapPreviewMode>(Ez2Setting.BeatmapPreviewMode));
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            previewMode.BindValueChanged(_ => onPreviewModeChanged(), true);
         }
 
         public void Toggle()
@@ -251,6 +322,10 @@ namespace osu.Game.Screens.Select
                 return;
 
             expanded = true;
+            expandedBindable.Value = true;
+
+            if (drawableRuleset == null && currentWorkingBeatmap != null && currentRuleset != null)
+                selectionDirty = true;
 
             panelContainer.ClearTransforms();
             panelContainer.MoveTo(new Vector2(panel_left_margin, 14));
@@ -267,6 +342,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             expanded = false;
+            expandedBindable.Value = false;
             heightResizeActive = false;
             widthResizeActive = false;
             selectionLoadInProgress = false;
@@ -277,8 +353,8 @@ namespace osu.Game.Screens.Select
 
             // Clean up resources
             disposePreviewResources();
-            pendingWorkingBeatmap = null;
-            pendingRuleset = null;
+            selectionDirty = currentWorkingBeatmap != null && currentRuleset != null;
+            setStateText("预览未加载");
 
             panelContainer.ClearTransforms();
             panelContainer.FadeOut(160, Easing.OutQuint);
@@ -290,21 +366,33 @@ namespace osu.Game.Screens.Select
             if (workingBeatmap.BeatmapInfo == null)
                 return;
 
+            currentWorkingBeatmap = workingBeatmap;
+            currentRuleset = ruleset;
+            updatePreviewModeButtons();
+
             string beatmapHash = workingBeatmap.BeatmapInfo.Hash;
 
             bool unchanged = currentRulesetOnlineId == ruleset.OnlineID
                              && currentBeatmapHash == beatmapHash;
 
             if (unchanged)
+            {
+                if (drawableRuleset == null)
+                {
+                    selectionDirty = true;
+
+                    if (expanded)
+                        scheduleSelectionLoad();
+                }
+
                 return;
+            }
 
             currentRulesetOnlineId = ruleset.OnlineID;
             currentBeatmapHash = beatmapHash;
             lastSelectionEventTime = Time.Current;
             selectionEventVersion++;
 
-            pendingWorkingBeatmap = workingBeatmap;
-            pendingRuleset = ruleset;
             selectionDirty = true;
 
             if (!expanded)
@@ -320,14 +408,14 @@ namespace osu.Game.Screens.Select
             cancelPendingLoad();
 
             disposePreviewResources();
-            pendingWorkingBeatmap = null;
-            pendingRuleset = null;
+            currentWorkingBeatmap = null;
+            currentRuleset = null;
             selectionDirty = false;
             currentRulesetOnlineId = -1;
             currentBeatmapHash = string.Empty;
+            updatePreviewModeButtons();
 
             rememberedExpanded = expanded;
-            rememberedDynamicMode = dynamicMode;
         }
 
         public void RestoreRememberedState()
@@ -337,7 +425,7 @@ namespace osu.Game.Screens.Select
             else
                 Collapse();
 
-            dynamicMode = rememberedDynamicMode;
+            updatePreviewModeButtons();
         }
 
         private void beginLoadPendingSelectionIfRequired()
@@ -375,7 +463,7 @@ namespace osu.Game.Screens.Select
             if (eventVersion != selectionEventVersion)
                 return;
 
-            if (pendingWorkingBeatmap == null || pendingRuleset == null || pendingWorkingBeatmap.BeatmapInfo == null)
+            if (currentWorkingBeatmap == null || currentRuleset == null || currentWorkingBeatmap.BeatmapInfo == null)
                 return;
 
             selectionLoadInProgress = true;
@@ -383,14 +471,14 @@ namespace osu.Game.Screens.Select
             selectionDirty = false;
             lastLoadTimeMs = 0;
 
-            setStateText("谱面预览加载中...");
+            setStateText("loading...");
 
             cancelPendingLoad();
             previewLoadCancellation = new CancellationTokenSource();
             var token = previewLoadCancellation.Token;
 
-            var workingBeatmap = pendingWorkingBeatmap;
-            var ruleset = pendingRuleset;
+            var workingBeatmap = currentWorkingBeatmap;
+            var ruleset = currentRuleset;
 
             double loadStartTime = lastSelectionEventTime > 0 ? lastSelectionEventTime : Time.Current;
 
@@ -425,7 +513,7 @@ namespace osu.Game.Screens.Select
                     if (task.IsFaulted)
                     {
                         if (eventVersion == selectionEventVersion)
-                            setStateText("预览加载失败");
+                            setStateText("load fail");
 
                         onSelectionLoadFinished();
                         return;
@@ -447,10 +535,6 @@ namespace osu.Game.Screens.Select
                     playbackStartTime = result.StartTime;
 
                     setupDrawableRulesetAsync(result.Version, result.WorkingBeatmap, result.RulesetInfo, result.PlayableBeatmap, token);
-
-                    // Clear pending references to avoid memory leak
-                    pendingWorkingBeatmap = null;
-                    pendingRuleset = null;
 
                     previewClock.Stop();
                     previewClock.Seek(playbackStartTime);
@@ -492,8 +576,11 @@ namespace osu.Game.Screens.Select
                 }
             }
 
-            if (panelWidth <= 0)
-                panelWidth = getDefaultPanelWidth();
+            panelWidth = panelWidthManuallyAdjusted
+                ? clampPanelWidth(panelWidth <= 0 ? getDefaultPanelWidth() : panelWidth)
+                : getDefaultPanelWidth();
+
+            panelHeight = clampPanelHeight(panelHeight);
 
             float targetPanelY = expanded ? 0 : 14;
 
@@ -573,19 +660,14 @@ namespace osu.Game.Screens.Select
             if (!expanded)
                 return false;
 
-            Vector2 local = ToLocalSpace(e.ScreenSpaceMousePosition);
-            float panelRight = panel_left_margin + panelWidth;
-            float panelTop = DrawHeight - panelHeight;
-            float panelBottom = DrawHeight;
-
-            bool inWidthHandle = local.X >= panelRight - resize_handle_width && local.X <= panelRight + resize_handle_width
-                                                                             && local.Y >= panelTop && local.Y <= panelBottom;
-
-            bool inHeightHandle = local.X >= panel_left_margin && local.X <= panelRight
-                                                               && local.Y >= panelTop - resize_handle_height && local.Y <= panelTop + resize_handle_height;
+            bool inWidthHandle = isWithinWidthResizeHandle(e.ScreenSpaceMousePosition);
+            bool inHeightHandle = isWithinHeightResizeHandle(e.ScreenSpaceMousePosition);
 
             if (!inWidthHandle && !inHeightHandle)
                 return base.OnDragStart(e);
+
+            dragStartPanelWidth = panelWidth <= 0 ? getDefaultPanelWidth() : panelWidth;
+            dragStartPanelHeight = panelHeight;
 
             if (inWidthHandle)
                 widthResizeActive = true;
@@ -596,26 +678,34 @@ namespace osu.Game.Screens.Select
             return true;
         }
 
+        protected override bool OnMouseDown(MouseDownEvent e)
+        {
+            if (!expanded)
+                return base.OnMouseDown(e);
+
+            if (base.OnMouseDown(e))
+                return true;
+
+            return isWithinPanel(e.ScreenSpaceMousePosition);
+        }
+
         protected override bool OnScroll(ScrollEvent e)
         {
             if (!expanded || drawableRuleset == null)
                 return base.OnScroll(e);
 
-            Vector2 local = ToLocalSpace(e.ScreenSpaceMousePosition);
-            float panelRight = panel_left_margin + panelWidth;
-            float panelTop = DrawHeight - panelHeight;
-            float panelBottom = DrawHeight;
+            var panelQuad = panelContainer.ScreenSpaceDrawQuad;
+            Vector2 mouse = e.ScreenSpaceMousePosition;
 
             // Check if scroll is within panel bounds
-            if (local.X < panel_left_margin || local.X > panelRight || local.Y < panelTop || local.Y > panelBottom)
+            if (mouse.X < panelQuad.TopLeft.X || mouse.X > panelQuad.TopRight.X || mouse.Y < panelQuad.TopLeft.Y || mouse.Y > panelQuad.BottomLeft.Y)
                 return base.OnScroll(e);
 
             // In dynamic mode: fast-forward 3 seconds per scroll, keep playback running
             if (dynamicMode)
             {
-                double newTime = previewClock.CurrentTime + e.ScrollDelta.Y * 3000;
-                previewClock.Seek(Math.Clamp(newTime, beatmapMinTime, beatmapMaxTime));
-                updateProgressDisplay(previewClock.CurrentTime);
+                double newTime = previewClock.CurrentTime - e.ScrollDelta.Y * 3000;
+                seekTo(Math.Clamp(newTime, beatmapMinTime, beatmapMaxTime), true);
                 return true;
             }
 
@@ -625,7 +715,7 @@ namespace osu.Game.Screens.Select
 
             double totalDuration = beatmapMaxTime - beatmapMinTime;
             double timePerScroll = totalDuration * 0.005;
-            double seekTime = previewClock.CurrentTime + e.ScrollDelta.Y * timePerScroll;
+            double seekTime = previewClock.CurrentTime - e.ScrollDelta.Y * timePerScroll;
 
             seekTo(Math.Clamp(seekTime, beatmapMinTime, beatmapMaxTime));
             return true;
@@ -634,16 +724,17 @@ namespace osu.Game.Screens.Select
         protected override void OnDrag(DragEvent e)
         {
             bool handled = false;
+            Vector2 localDelta = ToLocalSpace(e.ScreenSpaceMousePosition) - ToLocalSpace(e.ScreenSpaceMouseDownPosition);
 
             if (heightResizeActive)
             {
-                setPanelHeight(panelHeight - e.Delta.Y);
+                setPanelHeight(dragStartPanelHeight - localDelta.Y);
                 handled = true;
             }
 
             if (widthResizeActive)
             {
-                setPanelWidth(panelWidth + e.Delta.X);
+                setPanelWidth(dragStartPanelWidth + localDelta.X, true);
                 handled = true;
             }
 
@@ -665,7 +756,10 @@ namespace osu.Game.Screens.Select
             selectionLoadInProgress = false;
             cancelScheduledSelectionLoad();
             cancelPendingLoad();
-            drawableRuleset = null;
+            disposePreviewResources();
+            currentWorkingBeatmap = null;
+            currentRuleset = null;
+            previewMode.UnbindAll();
             base.Dispose(isDisposing);
         }
 
@@ -676,27 +770,15 @@ namespace osu.Game.Screens.Select
             previewLoadCancellation = null;
         }
 
-        public void TogglePreviewMode()
-        {
-            dynamicMode = !dynamicMode;
-
-            previewClock.Stop();
-
-            if (!dynamicMode)
-                return;
-
-            if (!expanded || drawableRuleset == null)
-                return;
-
-            previewClock.Seek(playbackStartTime);
-            nextDynamicLoopStartTime = Time.Current;
-            previewClock.Start();
-        }
-
         private void setupDrawableRulesetAsync(long eventVersion, IWorkingBeatmap workingBeatmap, RulesetInfo rulesetInfo, IBeatmap playableBeatmap, CancellationToken cancellationToken)
         {
-            // Clean up previous resources first
+            if (cancellationToken.IsCancellationRequested || eventVersion != selectionEventVersion || !expanded)
+                return;
+
             disposePreviewResources();
+
+            if (cancellationToken.IsCancellationRequested || eventVersion != selectionEventVersion || !expanded)
+                return;
 
             var ruleset = rulesetInfo.CreateInstance();
 
@@ -715,15 +797,31 @@ namespace osu.Game.Screens.Select
                 }
             };
 
+            pendingPreviewRoot = previewContainer;
+
+            cancellationToken.Register(() => Schedule(() =>
+            {
+                if (!ReferenceEquals(pendingPreviewRoot, previewContainer))
+                    return;
+
+                pendingPreviewRoot = null;
+                previewContainer.Dispose();
+            }));
+
             LoadComponentAsync(previewContainer, loaded =>
             {
+                if (ReferenceEquals(pendingPreviewRoot, loaded))
+                    pendingPreviewRoot = null;
+
                 if (cancellationToken.IsCancellationRequested || eventVersion != selectionEventVersion || !expanded)
                 {
                     loaded.Dispose();
                     return;
                 }
 
+                disposePreviewResources();
                 stageScaleContainer.Child = loaded;
+                currentPreviewRoot = loaded;
                 drawableRuleset = newDrawableRuleset;
 
                 previewLoadedCount++;
@@ -734,19 +832,29 @@ namespace osu.Game.Screens.Select
         private float getDefaultPanelWidth()
         {
             float preferred = DrawWidth * panel_width_ratio;
-            return Math.Clamp(preferred, default_panel_min_width, Math.Min(max_panel_width, DrawWidth - panel_left_margin - 20));
+
+            if (DefaultPanelRightEdgeInScreenSpace != null)
+            {
+                float targetRightEdge = ToLocalSpace(new Vector2(DefaultPanelRightEdgeInScreenSpace(), 0)).X;
+
+                if (!float.IsNaN(targetRightEdge) && !float.IsInfinity(targetRightEdge))
+                    preferred = targetRightEdge - panel_left_margin;
+            }
+
+            return clampPanelWidth(preferred);
         }
 
-        private void setPanelWidth(float width)
+        private void setPanelWidth(float width, bool adjustedByUser = false)
         {
-            float maxWidth = Math.Min(max_panel_width, DrawWidth - panel_left_margin - 20);
-            panelWidth = Math.Clamp(width, min_panel_width, Math.Max(min_panel_width, maxWidth));
+            panelWidth = clampPanelWidth(width);
+
+            if (adjustedByUser)
+                panelWidthManuallyAdjusted = true;
         }
 
         private void setPanelHeight(float height)
         {
-            float maxHeight = Math.Min(max_panel_height, DrawHeight - 30);
-            panelHeight = Math.Clamp(height, min_panel_height, Math.Max(min_panel_height, maxHeight));
+            panelHeight = clampPanelHeight(height);
         }
 
         private void setStateText(string text)
@@ -755,13 +863,27 @@ namespace osu.Game.Screens.Select
             stateText.FadeTo(string.IsNullOrEmpty(text) ? 0 : 1, 120, Easing.OutQuint);
         }
 
-        private void seekTo(double time)
+        private void seekTo(double time, bool preserveDynamicPlayback = false)
         {
-            dynamicMode = false;
-            nextDynamicLoopStartTime = 0;
-            previewClock.Stop();
-            previewClock.Seek(time);
-            updateProgressDisplay(time);
+            double clamped = beatmapMaxTime <= beatmapMinTime
+                ? Math.Max(0, time)
+                : Math.Clamp(time, beatmapMinTime, beatmapMaxTime);
+
+            if (preserveDynamicPlayback && dynamicMode && drawableRuleset != null)
+            {
+                playbackStartTime = clamped;
+                nextDynamicLoopStartTime = 0;
+                previewClock.Seek(clamped);
+                previewClock.Start();
+            }
+            else
+            {
+                nextDynamicLoopStartTime = 0;
+                previewClock.Stop();
+                previewClock.Seek(clamped);
+            }
+
+            updateProgressDisplay(clamped);
         }
 
         private void updateProgressDisplay(double time)
@@ -771,6 +893,7 @@ namespace osu.Game.Screens.Select
                 timeline.EndTime = 1;
                 timeline.CurrentTime = 0;
                 progressText.Text = "00:00.000";
+                lastProgressDisplayTime = 0;
                 return;
             }
 
@@ -778,19 +901,42 @@ namespace osu.Game.Screens.Select
             timeline.EndTime = beatmapMaxTime;
             timeline.CurrentTime = clamped;
             progressText.Text = formatTime(clamped);
+            lastProgressDisplayTime = clamped;
         }
 
         private void disposePreviewResources()
         {
-            if (drawableRuleset != null)
+            if (currentPreviewRoot != null)
             {
                 previewReleasedCount++;
                 logPreviewLoadReleaseStats("released");
             }
 
             stageScaleContainer.Clear(true);
+            currentPreviewRoot = null;
             drawableRuleset = null;
         }
+
+        private float clampPanelWidth(float width)
+        {
+            float maxWidth = Math.Min(max_panel_width, DrawWidth - panel_left_margin - panel_right_margin);
+            return Math.Clamp(width, min_panel_width, Math.Max(min_panel_width, maxWidth));
+        }
+
+        private float clampPanelHeight(float height)
+        {
+            float maxHeight = Math.Min(max_panel_height, DrawHeight - 30);
+            return Math.Clamp(height, min_panel_height, Math.Max(min_panel_height, maxHeight));
+        }
+
+        private bool isWithinPanel(Vector2 screenSpacePosition)
+            => panelContainer.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
+
+        private bool isWithinWidthResizeHandle(Vector2 screenSpacePosition)
+            => rightResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
+
+        private bool isWithinHeightResizeHandle(Vector2 screenSpacePosition)
+            => topResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
 
         private void logPreviewLoadReleaseStats(string action)
         {
@@ -852,6 +998,74 @@ namespace osu.Game.Screens.Select
             return $"{span.Minutes:00}:{span.Seconds:00}.{span.Milliseconds:000}";
         }
 
+        private void createPreviewModeButtons()
+        {
+            foreach (EzBeatmapPreviewMode mode in mania_preview_modes)
+            {
+                previewModeButtons[mode] = new PreviewModeButton
+                {
+                    Width = preview_mode_button_width,
+                    Height = preview_mode_button_height,
+                    Text = mode.GetLocalisableDescription(),
+                    Action = () => setPreviewMode(mode)
+                };
+            }
+        }
+
+        private void setPreviewMode(EzBeatmapPreviewMode mode)
+        {
+            if (previewMode.Value == mode)
+                return;
+
+            previewMode.Value = mode;
+        }
+
+        private void onPreviewModeChanged()
+        {
+            updatePreviewModeButtons();
+
+            nextDynamicLoopStartTime = 0;
+            previewClock.Stop();
+
+            if (!dynamicMode || !expanded || drawableRuleset == null)
+            {
+                updateProgressDisplay(previewClock.CurrentTime);
+                return;
+            }
+
+            playbackStartTime = Math.Clamp(previewClock.CurrentTime, beatmapMinTime, beatmapMaxTime);
+            previewClock.Seek(playbackStartTime);
+            previewClock.Start();
+            updateProgressDisplay(playbackStartTime);
+        }
+
+        private void updatePreviewModeButtons()
+        {
+            previewModeButtonList.Clear(false);
+
+            foreach (EzBeatmapPreviewMode mode in getAvailablePreviewModes())
+                previewModeButtonList.Add(previewModeButtons[mode]);
+
+            EzBeatmapPreviewMode highlightedMode = getHighlightedPreviewMode();
+
+            foreach (var pair in previewModeButtons)
+                pair.Value.Selected = pair.Key == highlightedMode;
+        }
+
+        private IReadOnlyList<EzBeatmapPreviewMode> getAvailablePreviewModes() => isManiaRuleset(currentRuleset) ? mania_preview_modes : shared_preview_modes;
+
+        private EzBeatmapPreviewMode getHighlightedPreviewMode()
+        {
+            IReadOnlyList<EzBeatmapPreviewMode> availableModes = getAvailablePreviewModes();
+
+            if (availableModes.Contains(previewMode.Value))
+                return previewMode.Value;
+
+            return dynamicMode ? EzBeatmapPreviewMode.Dynamic : EzBeatmapPreviewMode.Static;
+        }
+
+        private static bool isManiaRuleset(RulesetInfo? ruleset) => string.Equals(ruleset?.ShortName, "mania", StringComparison.OrdinalIgnoreCase);
+
         private readonly record struct LoadedPreviewData(
             long Version,
             IWorkingBeatmap WorkingBeatmap,
@@ -868,6 +1082,61 @@ namespace osu.Game.Screens.Select
             public override bool HandleNonPositionalInput => false;
 
             public override bool PropagateNonPositionalInputSubTree => false;
+        }
+
+        private partial class PreviewModeButton : OsuButton
+        {
+            private Color4 textColour = Color4.White;
+            private bool selected;
+
+            public bool Selected
+            {
+                set
+                {
+                    if (selected == value)
+                        return;
+
+                    selected = value;
+                    updateVisualState();
+                }
+            }
+
+            public Color4 TextColour
+            {
+                set
+                {
+                    textColour = value;
+                    SpriteText.FadeColour(textColour, 120, Easing.OutQuint);
+                }
+            }
+
+            public PreviewModeButton()
+            {
+                Size = new Vector2(108, 28);
+                Content.CornerRadius = 6;
+            }
+
+            protected override float HoverLayerFinalAlpha => 0.06f;
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                SpriteText.Colour = textColour;
+                updateVisualState();
+            }
+
+            private void updateVisualState()
+            {
+                BackgroundColour = selected ? Color4.CornflowerBlue.Opacity(0.85f) : Color4.Black.Opacity(0.5f);
+                TextColour = selected ? Color4.White : Color4.White.Opacity(0.9f);
+            }
+
+            protected override SpriteText CreateText() => new OsuSpriteText
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Font = OsuFont.Default.With(size: 12, weight: FontWeight.SemiBold)
+            };
         }
     }
 }

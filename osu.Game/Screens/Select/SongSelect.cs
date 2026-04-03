@@ -129,7 +129,7 @@ namespace osu.Game.Screens.Select
         private SkinnableContainer skinnableContent = null!;
 
         private GridContainer mainGridContainer = null!;
-        private BeatmapPreviewTabOverlay beatmapPreviewTabOverlay = null!;
+        private EzBeatmapPreviewOverlay ezBeatmapPreviewOverlay = null!;
 
         private NoResultsPlaceholder noResultsPlaceholder = null!;
 
@@ -305,10 +305,11 @@ namespace osu.Game.Screens.Select
                                         },
                                     }
                                 },
-                                beatmapPreviewTabOverlay = new BeatmapPreviewTabOverlay
+                                ezBeatmapPreviewOverlay = new EzBeatmapPreviewOverlay
                                 {
                                     RelativeSizeAxes = Axes.Both,
                                     Depth = float.MinValue,
+                                    DefaultPanelRightEdgeInScreenSpace = () => titleWedge.ScreenSpaceDrawQuad.AABBFloat.Right,
                                 },
                                 ezPreviewManager = new EzPreviewTrackManager()
                             }
@@ -390,11 +391,16 @@ namespace osu.Game.Screens.Select
             {
                 Hotkey = GlobalAction.ToggleBeatmapOptions,
             },
-            new FooterButtonEzUtils(
+            new FooterButtonEzExport(
                 carousel.GetFilteredBeatmaps,
-                () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo,
-                () => beatmapPreviewTabOverlay.Toggle(),
-                () => beatmapPreviewTabOverlay.TogglePreviewMode())
+                () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo),
+            new FooterButtonEzPreView(
+                () =>
+                {
+                    ezBeatmapPreviewOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value);
+                    ezBeatmapPreviewOverlay.Toggle();
+                },
+                ezBeatmapPreviewOverlay.ExpandedState)
         };
 
         protected override void LoadComplete()
@@ -779,7 +785,7 @@ namespace osu.Game.Screens.Select
 
             Beatmap.BindValueChanged(updateVariousState, true);
 
-            beatmapPreviewTabOverlay.RestoreRememberedState();
+            ezBeatmapPreviewOverlay.RestoreRememberedState();
         }
 
         private void updateVariousState(ValueChangedEvent<WorkingBeatmap> e)
@@ -794,7 +800,7 @@ namespace osu.Game.Screens.Select
             updateWedgeVisibility();
             fetchOnlineInfo(force: ReferenceEquals(e.OldValue, e.NewValue));
 
-            beatmapPreviewTabOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value);
+            ezBeatmapPreviewOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value);
         }
 
         private void onLeavingScreen()
@@ -804,7 +810,7 @@ namespace osu.Game.Screens.Select
             if (manageCollectionsDialog?.FilteredBeatmapsProvider == getFilteredBeatmaps)
                 manageCollectionsDialog.FilteredBeatmapsProvider = null;
 
-            beatmapPreviewTabOverlay.SuspendForScreenExit();
+            ezBeatmapPreviewOverlay.SuspendForScreenExit();
 
             Beatmap.ValueChanged -= updateVariousState;
 

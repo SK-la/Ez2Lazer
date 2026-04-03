@@ -35,12 +35,10 @@ using osuTK.Input;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class FooterButtonEzUtils : ScreenFooterButton, IHasPopover
+    public partial class FooterButtonEzExport : ScreenFooterButton, IHasPopover
     {
         private readonly Func<IReadOnlyList<BeatmapInfo>> getFilteredBeatmaps;
         private readonly Func<BeatmapInfo?> getSelectedBeatmap;
-        private readonly Action toggleBeatmapPreview;
-        private readonly Action toggleBeatmapPreviewMode;
 
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
@@ -51,36 +49,32 @@ namespace osu.Game.EzOsuGame.Overlays
         [Resolved]
         private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
-        public FooterButtonEzUtils(Func<IReadOnlyList<BeatmapInfo>> getFilteredBeatmaps, Func<BeatmapInfo?> getSelectedBeatmap, Action toggleBeatmapPreview, Action toggleBeatmapPreviewMode)
+        public FooterButtonEzExport(Func<IReadOnlyList<BeatmapInfo>> getFilteredBeatmaps, Func<BeatmapInfo?> getSelectedBeatmap)
             : base(null)
         {
             this.getFilteredBeatmaps = getFilteredBeatmaps;
             this.getSelectedBeatmap = getSelectedBeatmap;
-            this.toggleBeatmapPreview = toggleBeatmapPreview;
-            this.toggleBeatmapPreviewMode = toggleBeatmapPreviewMode;
         }
 
         [BackgroundDependencyLoader]
         private void load(OsuColour colour)
         {
-            Text = FooterButtonEzUtilsStrings.BUTTON_TEXT;
+            Text = FooterButtonEzExportStrings.EXPORT_BUTTON_TEXT;
             Icon = FontAwesome.Solid.Toolbox;
             AccentColour = colour.Orange1;
             Action = this.ShowPopover;
         }
 
-        public Popover GetPopover() => new EzUtilsPopover(this, getFilteredBeatmaps, getSelectedBeatmap, toggleBeatmapPreview, toggleBeatmapPreviewMode, ruleset.Value, mods.Value)
+        public Popover GetPopover() => new EzExportPopover(this, getFilteredBeatmaps, getSelectedBeatmap, ruleset.Value, mods.Value)
         {
             ColourProvider = colourProvider,
         };
 
-        private partial class EzUtilsPopover : OsuPopover
+        private partial class EzExportPopover : OsuPopover
         {
-            private readonly FooterButtonEzUtils footerButton;
+            private readonly FooterButtonEzExport footerButton;
             private readonly Func<IReadOnlyList<BeatmapInfo>> getFilteredBeatmaps;
             private readonly Func<BeatmapInfo?> getSelectedBeatmap;
-            private readonly Action toggleBeatmapPreview;
-            private readonly Action toggleBeatmapPreviewMode;
             private readonly RulesetInfo ruleset;
             private readonly IReadOnlyList<Mod> mods;
 
@@ -100,20 +94,16 @@ namespace osu.Game.EzOsuGame.Overlays
 
             public required OverlayColourProvider ColourProvider { get; init; }
 
-            public EzUtilsPopover(FooterButtonEzUtils footerButton,
-                                  Func<IReadOnlyList<BeatmapInfo>> getFilteredBeatmaps,
-                                  Func<BeatmapInfo?> getSelectedBeatmap,
-                                  Action toggleBeatmapPreview,
-                                  Action toggleBeatmapPreviewMode,
-                                  RulesetInfo ruleset,
-                                  IReadOnlyList<Mod> mods)
+            public EzExportPopover(FooterButtonEzExport footerButton,
+                                   Func<IReadOnlyList<BeatmapInfo>> getFilteredBeatmaps,
+                                   Func<BeatmapInfo?> getSelectedBeatmap,
+                                   RulesetInfo ruleset,
+                                   IReadOnlyList<Mod> mods)
                 : base(false)
             {
                 this.footerButton = footerButton;
                 this.getFilteredBeatmaps = getFilteredBeatmaps;
                 this.getSelectedBeatmap = getSelectedBeatmap;
-                this.toggleBeatmapPreview = toggleBeatmapPreview;
-                this.toggleBeatmapPreviewMode = toggleBeatmapPreviewMode;
                 this.ruleset = ruleset;
                 this.mods = mods;
 
@@ -122,7 +112,7 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             [BackgroundDependencyLoader]
-            private void load(OsuColour colours)
+            private void load()
             {
                 Content.Padding = new MarginPadding(5);
 
@@ -145,15 +135,12 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 BeatmapInfo? selectedBeatmap = getSelectedBeatmap();
 
-                addHeader(FooterButtonEzUtilsStrings.FILTERED_RESULTS_HEADER, $"{getFilteredBeatmaps().Count} {FooterButtonEzUtilsStrings.BEATMAPS_UNIT}");
-                addButton(FooterButtonEzUtilsStrings.EXPORT_FILTERED_BEATMAPS_TO_ZIP, FontAwesome.Solid.Download, () => Task.Run(() => exportFiltered(filteredExporter)));
-                addButton(FooterButtonEzUtilsStrings.EXPORT_FILTERED_BEATMAPS_CONVERTED_TO_ZIP, FontAwesome.Solid.Download, () => Task.Run(() => exportFilteredConverted(filteredExporter)));
+                addHeader(FooterButtonEzExportStrings.FILTERED_RESULTS_HEADER, $"{getFilteredBeatmaps().Count} {FooterButtonEzExportStrings.BEATMAPS_UNIT}");
+                addButton(FooterButtonEzExportStrings.EXPORT_FILTERED_BEATMAPS_TO_ZIP, FontAwesome.Solid.Download, () => Task.Run(() => exportFiltered(filteredExporter)));
+                addButton(FooterButtonEzExportStrings.EXPORT_FILTERED_BEATMAPS_CONVERTED_TO_ZIP, FontAwesome.Solid.Download, () => Task.Run(() => exportFilteredConverted(filteredExporter)));
 
                 if (selectedBeatmap == null)
-                {
-                    addPreviewToggleButton();
                     return;
-                }
 
                 buttonFlow.Add(new Container
                 {
@@ -161,18 +148,16 @@ namespace osu.Game.EzOsuGame.Overlays
                     Height = 10,
                 });
 
-                addHeader(FooterButtonEzUtilsStrings.SELECTED_BEATMAP_HEADER, selectedBeatmap.DifficultyName);
-                addButton(FooterButtonEzUtilsStrings.EXPORT_SELECTED_BEATMAP_AS_OSU, FontAwesome.Solid.Download,
+                addHeader(FooterButtonEzExportStrings.SELECTED_BEATMAP_HEADER, selectedBeatmap.DifficultyName);
+                addButton(FooterButtonEzExportStrings.EXPORT_SELECTED_BEATMAP_AS_OSU, FontAwesome.Solid.Download,
                     () => Task.Run(() => selectedExporter.ExportBeatmapAsOsu(selectedBeatmap, ruleset, mods)));
 
                 if (selectedBeatmap.BeatmapSet != null)
                 {
-                    addHeader(FooterButtonEzUtilsStrings.SELECTED_SET_HEADER, selectedBeatmap.BeatmapSet.ToString());
-                    addButton(FooterButtonEzUtilsStrings.EXPORT_SELECTED_BEATMAP_SET_AS_OSZ, FontAwesome.Solid.Download,
+                    addHeader(FooterButtonEzExportStrings.SELECTED_SET_HEADER, selectedBeatmap.BeatmapSet.ToString());
+                    addButton(FooterButtonEzExportStrings.EXPORT_SELECTED_BEATMAP_SET_AS_OSZ, FontAwesome.Solid.Download,
                         () => Task.Run(() => selectedExporter.ExportBeatmapSetAsOsz(selectedBeatmap, ruleset, mods)));
                 }
-
-                addPreviewToggleButton();
             }
 
             protected override void LoadComplete()
@@ -227,18 +212,6 @@ namespace osu.Game.EzOsuGame.Overlays
                 }
 
                 buttonFlow.Add(textFlow);
-            }
-
-            private void addPreviewToggleButton()
-            {
-                buttonFlow.Add(new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    Height = 10,
-                });
-
-                addButton(FooterButtonEzUtilsStrings.TOGGLE_BEATMAP_PREVIEW, FontAwesome.Solid.Eye, toggleBeatmapPreview, ColourProvider.Light1);
-                addButton(FooterButtonEzUtilsStrings.TOGGLE_BEATMAP_PREVIEW_MODE, FontAwesome.Solid.PlayCircle, toggleBeatmapPreviewMode, ColourProvider.Light1);
             }
 
             private void addButton(LocalisableString text, IconUsage? icon, Action? action, Color4? colour = null)
@@ -316,9 +289,9 @@ namespace osu.Game.EzOsuGame.Overlays
             }
         }
 
-        private static class FooterButtonEzUtilsStrings
+        private static class FooterButtonEzExportStrings
         {
-            internal static readonly EzLocalizationManager.EzLocalisableString BUTTON_TEXT = new EzLocalizationManager.EzLocalisableString("Ez 工具", "Ez Utils");
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON_TEXT = new EzLocalizationManager.EzLocalisableString("Ez 导出", "Ez Export");
 
             internal static readonly EzLocalizationManager.EzLocalisableString FILTERED_RESULTS_HEADER = new EzLocalizationManager.EzLocalisableString("筛选结果", "Filtered Results");
             internal static readonly EzLocalizationManager.EzLocalisableString BEATMAPS_UNIT = new EzLocalizationManager.EzLocalisableString("张谱面", "beatmaps");
@@ -331,8 +304,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
             internal static readonly EzLocalizationManager.EzLocalisableString SELECTED_SET_HEADER = new EzLocalizationManager.EzLocalisableString("选中谱包", "Selected Set");
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_SELECTED_BEATMAP_SET_AS_OSZ = new EzLocalizationManager.EzLocalisableString("导出选中谱包为 .osz", "Export selected BeatmapSet as .osz");
-            internal static readonly EzLocalizationManager.EzLocalisableString TOGGLE_BEATMAP_PREVIEW = new EzLocalizationManager.EzLocalisableString("切换谱面预览标签页", "Toggle Beatmap Preview Tab");
-            internal static readonly EzLocalizationManager.EzLocalisableString TOGGLE_BEATMAP_PREVIEW_MODE = new EzLocalizationManager.EzLocalisableString("切换预览模式（静态/动态）", "Toggle Preview Mode (Static/Dynamic)");
         }
     }
 }
