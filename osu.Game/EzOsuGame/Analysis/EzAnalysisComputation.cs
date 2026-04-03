@@ -20,53 +20,45 @@ namespace osu.Game.EzOsuGame.Analysis
     {
         public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
-            try
+            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+
+            bool onlyKps = lookup.Ruleset.OnlineID != 3;
+            IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(analysisBeatmap, onlyKps: onlyKps);
+
+            // 将速率调整 mod 应用到分析结果，保持与实际游玩时长一致。
+            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+
+            if (!Precision.AlmostEquals(rate, 1.0))
             {
-                PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+                averageKps *= rate;
+                maxKps *= rate;
 
-                bool onlyKps = lookup.Ruleset.OnlineID != 3;
-                IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var (averageKps, maxKps, kpsList, columnCounts, holdNoteCounts) = OptimizedBeatmapCalculator.GetAllDataOptimized(analysisBeatmap, onlyKps: onlyKps);
-
-                // 将速率调整 mod 应用到分析结果，保持与实际游玩时长一致。
-                double rate = getRateAdjustMultiplier(lookup.OrderedMods);
-
-                if (!Precision.AlmostEquals(rate, 1.0))
-                {
-                    averageKps *= rate;
-                    maxKps *= rate;
-
-                    for (int i = 0; i < kpsList.Count; i++)
-                        kpsList[i] *= rate;
-                }
-
-                double? xxySr = null;
-
-                bool shouldCalculateXxy = !onlyKps && lookup.Ruleset.OnlineID == 3;
-
-                if (shouldCalculateXxy && analysisBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(lookup.Ruleset, analysisBeatmap, rate, out double sr) && !double.IsNaN(sr)
-                    && !double.IsInfinity(sr))
-                    xxySr = sr;
-
-                cancellationToken.ThrowIfCancellationRequested();
-
-                kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
-
-                var commonAttributes = EzCommonAnalysisAttributes.Create(averageKps, maxKps, kpsList);
-                EzRulesetAnalysisAttributes? rulesetAttributes = onlyKps
-                    ? null
-                    : EzManiaAnalysisAttributes.Create(columnCounts, holdNoteCounts, xxySr);
-
-                return new EzAnalysisResult(commonAttributes, rulesetAttributes);
+                for (int i = 0; i < kpsList.Count; i++)
+                    kpsList[i] *= rate;
             }
-            finally
-            {
-                // 主动释放 manager 内的 working beatmap 缓存，避免选歌批量计算后长期驻留。
-                ((IWorkingBeatmapCache)beatmapManager).Invalidate(lookup.BeatmapInfo);
-            }
+
+            double? xxySr = null;
+
+            bool shouldCalculateXxy = !onlyKps && lookup.Ruleset.OnlineID == 3;
+
+            if (shouldCalculateXxy && analysisBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(lookup.Ruleset, analysisBeatmap, rate, out double sr) && !double.IsNaN(sr)
+                && !double.IsInfinity(sr))
+                xxySr = sr;
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
+
+            var commonAttributes = EzCommonAnalysisAttributes.Create(averageKps, maxKps, kpsList);
+            EzRulesetAnalysisAttributes? rulesetAttributes = onlyKps
+                ? null
+                : EzManiaAnalysisAttributes.Create(columnCounts, holdNoteCounts, xxySr);
+
+            return new EzAnalysisResult(commonAttributes, rulesetAttributes);
         }
 
         private static double getRateAdjustMultiplier(Mod[] mods)
