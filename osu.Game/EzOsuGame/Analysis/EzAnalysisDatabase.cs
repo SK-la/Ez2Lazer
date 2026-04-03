@@ -27,6 +27,7 @@ namespace osu.Game.EzOsuGame.Analysis
     public class EzAnalysisDatabase
     {
         private static int computeFailCount;
+        private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
 
         private readonly EzAnalysisPersistentStore persistentStore;
         private readonly BeatmapManager beatmapManager;
@@ -65,6 +66,19 @@ namespace osu.Game.EzOsuGame.Analysis
 
             xxySr = storedXxySr;
             return true;
+        }
+
+        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return empty_xxy_sr_values;
+
+            var eligibleBeatmaps = beatmaps.Where(b => CanUseStoredAnalysis(b, rulesetInfo, mods: null)).ToList();
+
+            if (eligibleBeatmaps.Count == 0)
+                return empty_xxy_sr_values;
+
+            return persistentStore.GetStoredXxySrValues(eligibleBeatmaps);
         }
 
         public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps)

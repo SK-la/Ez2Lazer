@@ -58,6 +58,8 @@ namespace osu.Game.Screens.Select
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
         private Bindable<bool> xxySrFilterSetting = null!;
         private Bindable<bool> ezAnalysisSqliteEnabled = null!;
+        private readonly AsyncLocal<Dictionary<BeatmapInfo, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<BeatmapInfo, double>?>();
+        private static readonly IReadOnlyDictionary<BeatmapInfo, double> empty_operation_difficulties = new Dictionary<BeatmapInfo, double>();
 
         private readonly LoadingLayer loading;
 
@@ -126,8 +128,8 @@ namespace osu.Game.Screens.Select
 
             Filters = new ICarouselFilter[]
             {
-                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultyForOperationsAsync),
-                new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultyForOperationsAsync),
+                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync),
+                new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
                     GetCriteria = () => Criteria!,
@@ -135,7 +137,7 @@ namespace osu.Game.Screens.Select
                     GetLocalUserTopRanks = GetBeatmapInfoGuidToTopRankMapping,
                     GetFavouriteBeatmapSets = GetFavouriteBeatmapSets,
                     ShouldUseXxySrForDifficultyOperations = () => preferXxySrForDifficultyOperations,
-                    GetDifficultyForOperationsAsync = getDifficultyForOperationsAsync,
+                    GetDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync,
                 }
             };
 
@@ -170,15 +172,26 @@ namespace osu.Game.Screens.Select
 
         private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && xxySrFilterSetting.Value && ruleset.Value.OnlineID == 3;
 
-        private Task<double> getDifficultyForOperationsAsync(BeatmapInfo beatmap, CancellationToken cancellationToken)
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
             if (!preferXxySrForDifficultyOperations)
-                return Task.FromResult(beatmap.StarRating);
+                return Task.FromResult(empty_operation_difficulties);
 
-            if (ezAnalysisCache.TryGetXxySr(beatmap, ruleset.Value, out double xxySr))
-                return Task.FromResult(xxySr);
+            var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<BeatmapInfo, double>();
+            var uncachedBeatmaps = beatmaps.Distinct().Where(b => !cachedDifficulties.ContainsKey(b)).ToList();
 
-            return Task.FromResult(beatmap.StarRating);
+            if (uncachedBeatmaps.Count > 0)
+            {
+                var storedXxySrValues = ezAnalysisCache.GetStoredXxySrValues(uncachedBeatmaps, ruleset.Value);
+
+                foreach (var beatmap in uncachedBeatmaps)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    cachedDifficulties[beatmap] = storedXxySrValues.TryGetValue(beatmap.ID, out double xxySr) ? xxySr : beatmap.StarRating;
+                }
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(cachedDifficulties);
         }
 
         protected override void LoadComplete()

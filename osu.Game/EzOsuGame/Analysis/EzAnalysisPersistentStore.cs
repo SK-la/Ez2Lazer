@@ -66,6 +66,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private readonly Storage storage;
         private readonly object initLock = new object();
+        private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
 
         private bool initialised;
         private string dbPath = string.Empty;
@@ -338,6 +339,103 @@ LIMIT 1;
             {
                 Logger.Error(e, "EzManiaAnalysisPersistentStore TryGet failed.", Ez2ConfigManager.LOGGER_NAME);
                 return false;
+            }
+        }
+
+        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps)
+        {
+            if (!Enabled)
+                return empty_xxy_sr_values;
+
+            try
+            {
+                Initialise();
+
+                var beatmapList = beatmaps.Distinct().ToList();
+
+                if (beatmapList.Count == 0)
+                    return empty_xxy_sr_values;
+
+                var beatmapsById = beatmapList.ToDictionary(b => b.ID);
+                var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
+                var idsNeedingDatabaseLookup = new List<Guid>(beatmapList.Count);
+
+                foreach (var beatmap in beatmapList)
+                {
+                    if (pendingWrites.TryGetValue(beatmap.ID, out var pending)
+                        && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    {
+                        if (pending.Analysis.ManiaAttributes?.XxySr is double pendingXxySr)
+                            resolvedValues[beatmap.ID] = pendingXxySr;
+
+                        continue;
+                    }
+
+                    idsNeedingDatabaseLookup.Add(beatmap.ID);
+                }
+
+                if (idsNeedingDatabaseLookup.Count == 0)
+                    return resolvedValues;
+
+                using var connection = openConnection();
+
+                for (int offset = 0; offset < idsNeedingDatabaseLookup.Count; offset += 800)
+                {
+                    using var cmd = connection.CreateCommand();
+
+                    int batchCount = Math.Min(800, idsNeedingDatabaseLookup.Count - offset);
+                    var parameterNames = new List<string>(batchCount);
+
+                    for (int i = 0; i < batchCount; i++)
+                    {
+                        string parameterName = $"$id{i}";
+                        parameterNames.Add(parameterName);
+                        cmd.Parameters.AddWithValue(parameterName, idsNeedingDatabaseLookup[offset + i].ToString());
+                    }
+
+                    cmd.CommandText = $@"
+SELECT beatmap_id, beatmap_hash, beatmap_md5, analysis_version, xxy_sr
+FROM mania_analysis
+WHERE beatmap_id IN ({string.Join(", ", parameterNames)})
+  AND xxy_sr IS NOT NULL;
+";
+
+                    using var reader = cmd.ExecuteReader();
+
+                    while (reader.Read())
+                    {
+                        if (!Guid.TryParse(reader.GetString(0), out var beatmapId))
+                            continue;
+
+                        if (!beatmapsById.TryGetValue(beatmapId, out var beatmap))
+                            continue;
+
+                        string storedHash = reader.GetString(1);
+                        string storedMd5 = reader.GetString(2);
+                        int storedVersion = reader.GetInt32(3);
+
+                        if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
+                            continue;
+
+                        if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                            continue;
+
+                        if (storedVersion > ANALYSIS_VERSION)
+                            continue;
+
+                        if (storedVersion != ANALYSIS_VERSION && !canUpgradeInPlace(storedVersion))
+                            continue;
+
+                        resolvedValues[beatmapId] = reader.GetDouble(4);
+                    }
+                }
+
+                return resolvedValues;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetStoredXxySrValues failed.", Ez2ConfigManager.LOGGER_NAME);
+                return empty_xxy_sr_values;
             }
         }
 

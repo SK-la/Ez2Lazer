@@ -173,6 +173,9 @@ namespace osu.Game.EzOsuGame.Analysis
         public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
             => analysisDatabase.TryGetXxySr(beatmapInfo, rulesetInfo, out xxySr);
 
+        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
+            => analysisDatabase.GetStoredXxySrValues(beatmaps, rulesetInfo);
+
         protected virtual Task<EzAnalysisResult?> GetDynamicAnalysisAsync(BeatmapInfo beatmapInfo, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods,
                                                                           CancellationToken cancellationToken = default, int computationDelay = 0)
             => GetAsync(new EzAnalysisLookupCache(beatmapInfo, rulesetInfo, mods), cancellationToken, computationDelay);

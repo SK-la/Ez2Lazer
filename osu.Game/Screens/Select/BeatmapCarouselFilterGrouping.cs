@@ -47,7 +47,7 @@ namespace osu.Game.Screens.Select
         public required Func<FilterCriteria, IReadOnlyDictionary<Guid, ScoreRank>> GetLocalUserTopRanks { get; init; }
         public required Func<HashSet<int>> GetFavouriteBeatmapSets { get; init; }
         public required Func<bool> ShouldUseXxySrForDifficultyOperations { get; init; }
-        public required Func<BeatmapInfo, CancellationToken, Task<double>> GetDifficultyForOperationsAsync { get; init; }
+        public required Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> GetDifficultiesForOperationsAsync { get; init; }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
         {
@@ -62,7 +62,7 @@ namespace osu.Game.Screens.Select
                 var newItems = new List<CarouselItem>();
                 var itemList = (List<CarouselItem>)items;
 
-                Dictionary<BeatmapInfo, double>? operationDifficulties = null;
+                IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
 
                 // xxy_SR is only required when difficulty is the active grouping key.
                 // For 0/1 item, grouping key does not affect output.
@@ -73,11 +73,9 @@ namespace osu.Game.Screens.Select
                 if (useXxyDifficulty)
                 {
                     var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
-                    var difficultyTasks = uniqueBeatmaps.ToDictionary(b => b, b => GetDifficultyForOperationsAsync(b, cancellationToken));
-
-                    Task.WhenAll(difficultyTasks.Values).Wait(cancellationToken);
-
-                    operationDifficulties = difficultyTasks.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.GetResultSafely());
+                    operationDifficulties = GetDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken)
+                                            .GetAwaiter()
+                                            .GetResult();
                 }
 
                 BeatmapSetsGroupedTogether = ShouldGroupBeatmapsTogether(criteria);

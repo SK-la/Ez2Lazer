@@ -174,7 +174,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             var sorter = new BeatmapCarouselFilterSorting(
                 () => new FilterCriteria { Sort = sort },
                 () => false,
-                (beatmap, _) => Task.FromResult(beatmap.StarRating));
+                (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.ToDictionary(b => b, b => b.StarRating)));
             var carouselItems = await sorter.Run(beatmapSets.SelectMany(s => s.Beatmaps.Select(b => new CarouselItem(b))), CancellationToken.None);
             return carouselItems.Select(ci => ci.Model).OfType<BeatmapInfo>();
         }

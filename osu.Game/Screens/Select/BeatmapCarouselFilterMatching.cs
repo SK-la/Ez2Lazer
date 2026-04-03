@@ -17,16 +17,16 @@ namespace osu.Game.Screens.Select
     {
         private readonly Func<FilterCriteria> getCriteria;
         private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
-        private readonly Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync;
+        private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
 
         public int BeatmapItemsCount { get; private set; }
 
         public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
-                                             Func<BeatmapInfo, CancellationToken, Task<double>> getDifficultyForOperationsAsync)
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync)
         {
             this.getCriteria = getCriteria;
             this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
-            this.getDifficultyForOperationsAsync = getDifficultyForOperationsAsync;
+            this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
         }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ namespace osu.Game.Screens.Select
             bool useXxyDifficulty = shouldUseXxySrForDifficultyOperations();
             bool requiresDifficultyForFiltering = useXxyDifficulty && (criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter);
 
-            Dictionary<BeatmapInfo, double>? operationDifficulties = null;
+            IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
 
             if (requiresDifficultyForFiltering)
             {
@@ -48,11 +48,7 @@ namespace osu.Game.Screens.Select
                                              .Distinct()
                                              .ToList();
 
-                var difficultyTasks = uniqueBeatmaps.ToDictionary(b => b, b => getDifficultyForOperationsAsync(b, cancellationToken));
-
-                await Task.WhenAll(difficultyTasks.Values).ConfigureAwait(false);
-
-                operationDifficulties = difficultyTasks.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.GetResultSafely());
+                operationDifficulties = await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
             }
 
             foreach (var item in itemList)
