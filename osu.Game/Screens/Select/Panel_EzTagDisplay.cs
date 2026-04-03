@@ -1,6 +1,9 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -15,7 +18,8 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
-using osu.Game.Storyboards;
+using osu.Game.Beatmaps.Legacy;
+using osu.Game.Extensions;
 using osuTK;
 
 namespace osu.Game.Screens.Select
@@ -27,6 +31,9 @@ namespace osu.Game.Screens.Select
     {
         private const int max_visible_tags = 10;
         private const float tag_corner_radius = 3;
+
+        private static readonly Dictionary<Guid, CachedTagInfo> tag_info_cache = new Dictionary<Guid, CachedTagInfo>();
+        private static readonly object tag_info_cache_lock = new object();
 
         private readonly FillFlowContainer tagFlow;
 
@@ -44,7 +51,6 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        private Storyboard? storyboard;
         private bool tagDisplayEnabled => true;
 
         [Resolved]
@@ -71,12 +77,10 @@ namespace osu.Game.Screens.Select
         {
             if (!tagDisplayEnabled)
             {
-                storyboard = null;
                 tagFlow.Clear();
                 return;
             }
 
-            storyboard = beatmap != null ? beatmaps.GetWorkingBeatmap(beatmap).Storyboard : null;
             updateTags();
         }
 
@@ -84,19 +88,15 @@ namespace osu.Game.Screens.Select
         {
             tagFlow.Clear();
 
-            if (beatmap?.BeatmapSet == null || storyboard == null)
+            if (beatmap?.BeatmapSet == null)
                 return;
 
-            bool hasVideo = storyboard.GetLayer("Video").Elements.Any(e => e is StoryboardVideo);
+            var tagInfo = getTagInfo(beatmap);
 
-            if (hasVideo)
+            if (tagInfo.HasVideo)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo));
 
-            bool hasStoryboard = storyboard.Layers
-                                           .SelectMany(l => l.Elements)
-                                           .Any(e => e is StoryboardSprite && e is not StoryboardVideo);
-
-            if (hasStoryboard)
+            if (tagInfo.HasStoryboard)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard));
 
             // 添加用户标签（不受图标数量影响）
@@ -120,12 +120,137 @@ namespace osu.Game.Screens.Select
         protected override void Dispose(bool isDisposing)
         {
             if (isDisposing)
-            {
                 beatmap = null;
-                storyboard = null;
-            }
 
             base.Dispose(isDisposing);
+        }
+
+        private CachedTagInfo getTagInfo(BeatmapInfo beatmapInfo)
+        {
+            lock (tag_info_cache_lock)
+            {
+                if (tag_info_cache.TryGetValue(beatmapInfo.ID, out var cachedTagInfo) && cachedTagInfo.BeatmapHash == beatmapInfo.Hash)
+                    return cachedTagInfo;
+            }
+
+            var detectedTagInfo = detectTagInfo(beatmapInfo);
+
+            lock (tag_info_cache_lock)
+                tag_info_cache[beatmapInfo.ID] = detectedTagInfo;
+
+            return detectedTagInfo;
+        }
+
+        private CachedTagInfo detectTagInfo(BeatmapInfo beatmapInfo)
+        {
+            var beatmapSet = beatmapInfo.BeatmapSet;
+
+            if (beatmapSet == null || string.IsNullOrEmpty(beatmapInfo.Path))
+                return new CachedTagInfo(beatmapInfo.Hash, false, false);
+
+            string? beatmapFilePath = beatmapSet.GetPathForFile(beatmapInfo.Path);
+
+            if (string.IsNullOrEmpty(beatmapFilePath))
+                return new CachedTagInfo(beatmapInfo.Hash, false, false);
+
+            bool hasVideo = false;
+            bool hasStoryboard = false;
+
+            try
+            {
+                var workingBeatmap = beatmaps.GetWorkingBeatmap(beatmapInfo);
+
+                scanEventFile(workingBeatmap.GetStream(beatmapFilePath), ref hasVideo, ref hasStoryboard);
+
+                if (!hasVideo || !hasStoryboard)
+                {
+                    string? storyboardFilePath = beatmapSet.GetPathForFile(getMainStoryboardFilename(beatmapInfo.Metadata));
+
+                    if (!string.IsNullOrEmpty(storyboardFilePath))
+                        scanEventFile(workingBeatmap.GetStream(storyboardFilePath), ref hasVideo, ref hasStoryboard);
+                }
+            }
+            catch
+            {
+            }
+
+            return new CachedTagInfo(beatmapInfo.Hash, hasVideo, hasStoryboard);
+        }
+
+        private static void scanEventFile(Stream stream, ref bool hasVideo, ref bool hasStoryboard)
+        {
+            if (stream == null)
+                return;
+
+            using (stream)
+            using (var reader = new StreamReader(stream))
+            {
+                bool inEventsSection = false;
+
+                while (reader.ReadLine() is string line)
+                {
+                    string trimmed = line.Trim();
+
+                    if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal))
+                        continue;
+
+                    if (trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal))
+                    {
+                        if (inEventsSection)
+                            break;
+
+                        inEventsSection = trimmed.Equals("[Events]", StringComparison.OrdinalIgnoreCase);
+                        continue;
+                    }
+
+                    if (!inEventsSection)
+                        continue;
+
+                    int commentIndex = trimmed.IndexOf("//", StringComparison.Ordinal);
+
+                    if (commentIndex >= 0)
+                        trimmed = trimmed[..commentIndex].TrimEnd();
+
+                    if (trimmed.Length == 0)
+                        continue;
+
+                    string eventType = trimmed.Split(',')[0].Trim();
+
+                    if (!hasVideo && matchesEventType(eventType, LegacyEventType.Video, "Video"))
+                        hasVideo = true;
+
+                    if (!hasStoryboard && (matchesEventType(eventType, LegacyEventType.Sprite, "Sprite") || matchesEventType(eventType, LegacyEventType.Animation, "Animation")))
+                        hasStoryboard = true;
+
+                    if (hasVideo && hasStoryboard)
+                        break;
+                }
+            }
+        }
+
+        private static string getMainStoryboardFilename(IBeatmapMetadataInfo metadata)
+        {
+            string baseFilename = (metadata.Artist.Length > 0 ? metadata.Artist + @" - " + metadata.Title : Path.GetFileNameWithoutExtension(metadata.AudioFile))
+                                  + (metadata.Author.Username.Length > 0 ? @" (" + metadata.Author.Username + @")" : string.Empty)
+                                  + @".osb";
+            return baseFilename.GetValidFilename();
+        }
+
+        private static bool matchesEventType(string value, LegacyEventType eventType, string eventName)
+            => value.Equals(eventName, StringComparison.OrdinalIgnoreCase) || value == ((int)eventType).ToString();
+
+        private readonly struct CachedTagInfo
+        {
+            public readonly string BeatmapHash;
+            public readonly bool HasVideo;
+            public readonly bool HasStoryboard;
+
+            public CachedTagInfo(string beatmapHash, bool hasVideo, bool hasStoryboard)
+            {
+                BeatmapHash = beatmapHash;
+                HasVideo = hasVideo;
+                HasStoryboard = hasStoryboard;
+            }
         }
 
         private partial class IconTag : CompositeDrawable, IHasTooltip
