@@ -76,7 +76,7 @@ namespace osu.Game.Screens.Select
                     if (!activeBranchDifficulties.TryGetValue(beatmap, out double branchDifficulty))
                         continue;
 
-                    if (requiresDifficultyForFiltering && !checkDifficultyCriteriaMatch(criteria, branchDifficulty))
+                    if (!CheckCriteriaMatch(beatmap, criteria, branchDifficulty))
                         continue;
 
                     countMatching++;

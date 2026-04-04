@@ -38,6 +38,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public readonly record struct XxySrBranchDescriptor(string DatabasePath, string RelativePath, XxySrBranchMetadata Metadata);
 
+        public readonly record struct SourceCollectionSnapshot(
+            Guid CollectionId,
+            string Name,
+            long LastModifiedUnixMilliseconds,
+            IReadOnlyList<string> BeatmapMd5Hashes);
+
         public readonly record struct XxySrBranchMetadata(
             int RulesetOnlineId,
             string RulesetShortName,
@@ -46,7 +52,12 @@ namespace osu.Game.EzOsuGame.Analysis
             int BeatmapCount,
             long CreatedAtUnixMilliseconds,
             string DisplayName,
-            string ModsJson = "");
+            string ModsJson = "",
+            bool HiddenApplied = false,
+            Guid SourceCollectionId = default,
+            string SourceCollectionName = "",
+            long SourceCollectionLastModifiedUnixMilliseconds = 0,
+            int SourceCollectionBeatmapCount = 0);
 
         /// <summary>
         /// 持久化总开关（默认关闭）：未来考虑是否允许用户通过配置关闭此功能以避免额外的磁盘读写。
@@ -164,6 +175,8 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON mania_analysis(analysis
 ";
                         cmd.ExecuteNonQuery();
                     }
+
+                    ensureCollectionHideTables(connection);
 
                     // 从旧版本平滑升级：如果缺少列则补齐（SQLite 不支持 IF NOT EXISTS 语法的 ADD COLUMN）。
                     if (!hasColumn(connection, "mania_analysis", "kps_list_json"))
@@ -780,18 +793,19 @@ LIMIT 1;
             string safeRulesetName = string.IsNullOrWhiteSpace(rulesetShortName) ? "ruleset" : rulesetShortName.Trim();
             string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
 
-            return storage.GetFullPath(Path.Combine(XXY_SR_BRANCH_DATABASE_DIRECTORY, $"xxySR_{safeRulesetName}_{timestamp}.sqlite"), true);
+            return storage.GetFullPath(Path.Combine(XXY_SR_BRANCH_DATABASE_DIRECTORY, $"songs_{safeRulesetName}_{timestamp}.sqlite"), true);
         }
 
         public string CreateXxySrBranchDatabasePath(XxySrBranchMetadata metadata)
         {
+            string safeCollectionName = createSafeBranchDisplayName(string.IsNullOrWhiteSpace(metadata.SourceCollectionName) ? "collection" : metadata.SourceCollectionName);
             string safeModsDisplay = createSafeBranchModsDisplay(metadata.ModsDisplay);
             string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
 
-            return storage.GetFullPath(Path.Combine(XXY_SR_BRANCH_DATABASE_DIRECTORY, $"xxySR_{metadata.BeatmapCount}diff_{safeModsDisplay}_{timestamp}.sqlite"), true);
+            return storage.GetFullPath(Path.Combine(XXY_SR_BRANCH_DATABASE_DIRECTORY, $"songs_{safeCollectionName}_{safeModsDisplay}_{timestamp}.sqlite"), true);
         }
 
-        public void StoreXxySrBranch(string databasePath, XxySrBranchMetadata metadata, IEnumerable<XxySrBranchRow> rows)
+        public void StoreXxySrBranch(string databasePath, XxySrBranchMetadata metadata, IEnumerable<XxySrBranchRow> rows, SourceCollectionSnapshot? sourceCollection = null)
         {
             if (!Enabled)
                 return;
@@ -827,9 +841,20 @@ CREATE TABLE IF NOT EXISTS xxy_sr_branch (
     beatmap_md5 TEXT NOT NULL,
     xxy_sr REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS hidden_preexisting_beatmap (
+    beatmap_id TEXT PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS source_collection_beatmap (
+    beatmap_md5 TEXT PRIMARY KEY
+);
 ";
                 cmd.ExecuteNonQuery();
             }
+
+            long sourceCollectionLastModified = sourceCollection?.LastModifiedUnixMilliseconds ?? metadata.SourceCollectionLastModifiedUnixMilliseconds;
+            int sourceCollectionBeatmapCount = sourceCollection?.BeatmapMd5Hashes.Count ?? metadata.SourceCollectionBeatmapCount;
 
             setMeta(connection, "kind", xxy_sr_branch_kind);
             setMeta(connection, "schema_version", xxy_sr_branch_schema_version.ToString(CultureInfo.InvariantCulture));
@@ -842,8 +867,42 @@ CREATE TABLE IF NOT EXISTS xxy_sr_branch (
             setMeta(connection, "created_at", metadata.CreatedAtUnixMilliseconds.ToString(CultureInfo.InvariantCulture));
             setMeta(connection, "display_name", metadata.DisplayName);
             setMeta(connection, "mods_json", metadata.ModsJson);
+            setMeta(connection, "hidden_applied", metadata.HiddenApplied ? "1" : "0");
+            setMeta(connection, "source_collection_id", metadata.SourceCollectionId == Guid.Empty ? string.Empty : metadata.SourceCollectionId.ToString());
+            setMeta(connection, "source_collection_name", metadata.SourceCollectionName);
+            setMeta(connection, "source_collection_last_modified", sourceCollectionLastModified.ToString(CultureInfo.InvariantCulture));
+            setMeta(connection, "source_collection_beatmap_count", sourceCollectionBeatmapCount.ToString(CultureInfo.InvariantCulture));
 
             using var transaction = connection.BeginTransaction();
+
+            using (var deleteSourceCollection = connection.CreateCommand())
+            {
+                deleteSourceCollection.Transaction = transaction;
+                deleteSourceCollection.CommandText = "DELETE FROM source_collection_beatmap;";
+                deleteSourceCollection.ExecuteNonQuery();
+            }
+
+            if (sourceCollection is SourceCollectionSnapshot sourceCollectionSnapshot)
+            {
+                using var insertSourceCollection = connection.CreateCommand();
+                insertSourceCollection.Transaction = transaction;
+                insertSourceCollection.CommandText = @"
+INSERT INTO source_collection_beatmap(beatmap_md5)
+VALUES($md5)
+ON CONFLICT(beatmap_md5) DO NOTHING;
+";
+
+                var sourceCollectionMd5Param = insertSourceCollection.CreateParameter();
+                sourceCollectionMd5Param.ParameterName = "$md5";
+                insertSourceCollection.Parameters.Add(sourceCollectionMd5Param);
+
+                foreach (string beatmapMd5 in sourceCollectionSnapshot.BeatmapMd5Hashes.Where(hash => !string.IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    sourceCollectionMd5Param.Value = beatmapMd5;
+                    insertSourceCollection.ExecuteNonQuery();
+                }
+            }
+
             using var insert = connection.CreateCommand();
             insert.Transaction = transaction;
             insert.CommandText = @"
@@ -953,7 +1012,7 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
                         if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                             continue;
 
-                        resolvedValues[beatmapId] = reader.GetDouble(3);
+                        resolvedValues[beatmapId] = reader.IsDBNull(3) ? 0 : reader.GetDouble(3);
                     }
                 }
 
@@ -963,6 +1022,70 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
             {
                 Logger.Error(e, "EzManiaAnalysisPersistentStore GetXxySrBranchValues failed.", Ez2ConfigManager.LOGGER_NAME);
                 return empty_xxy_sr_values;
+            }
+        }
+
+        public IReadOnlySet<string> GetXxySrBranchCollectionBeatmapMd5Hashes(string databasePath)
+        {
+            var beatmapMd5Hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return beatmapMd5Hashes;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidXxySrBranchConnection(connection))
+                    return beatmapMd5Hashes;
+
+                try
+                {
+                    using var collectionCommand = connection.CreateCommand();
+                    collectionCommand.CommandText = @"
+SELECT beatmap_md5
+FROM source_collection_beatmap;
+";
+
+                    using var collectionReader = collectionCommand.ExecuteReader();
+
+                    while (collectionReader.Read())
+                    {
+                        string beatmapMd5 = collectionReader.GetString(0);
+
+                        if (!string.IsNullOrWhiteSpace(beatmapMd5))
+                            beatmapMd5Hashes.Add(beatmapMd5);
+                    }
+                }
+                catch (SqliteException)
+                {
+                }
+
+                if (beatmapMd5Hashes.Count > 0)
+                    return beatmapMd5Hashes;
+
+                using var branchCommand = connection.CreateCommand();
+                branchCommand.CommandText = @"
+SELECT beatmap_md5
+FROM xxy_sr_branch;
+";
+
+                using var branchReader = branchCommand.ExecuteReader();
+
+                while (branchReader.Read())
+                {
+                    string beatmapMd5 = branchReader.GetString(0);
+
+                    if (!string.IsNullOrWhiteSpace(beatmapMd5))
+                        beatmapMd5Hashes.Add(beatmapMd5);
+                }
+
+                return beatmapMd5Hashes;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetXxySrBranchCollectionBeatmapMd5Hashes failed.", Ez2ConfigManager.LOGGER_NAME);
+                return beatmapMd5Hashes;
             }
         }
 
@@ -994,38 +1117,309 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
                    .ToList();
         }
 
-        public bool TryRenameXxySrBranch(string databasePath, string newDisplayName, out XxySrBranchDescriptor descriptor)
+        public bool TrySetXxySrBranchHideState(string databasePath, bool hiddenApplied, IEnumerable<Guid> preexistingHiddenBeatmapIds)
         {
-            descriptor = default;
-
-            if (!Enabled || string.IsNullOrWhiteSpace(newDisplayName))
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
-
-            if (!TryGetXxySrBranchDescriptor(databasePath, out var existingDescriptor))
-                return false;
-
-            string trimmedDisplayName = newDisplayName.Trim();
-            string sourcePath = Path.GetFullPath(existingDescriptor.DatabasePath);
-            string targetPath = createRenamedBranchPath(sourcePath, trimmedDisplayName);
 
             try
             {
-                if (!string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
+                using var connection = openConnection(databasePath);
+
+                if (!isValidXxySrBranchConnection(connection))
+                    return false;
+
+                ensureXxySrBranchStateTables(connection);
+
+                using var transaction = connection.BeginTransaction();
+
+                setMeta(connection, "hidden_applied", hiddenApplied ? "1" : "0");
+
+                using (var delete = connection.CreateCommand())
                 {
-                    Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
-                    File.Move(sourcePath, targetPath);
+                    delete.Transaction = transaction;
+                    delete.CommandText = "DELETE FROM hidden_preexisting_beatmap;";
+                    delete.ExecuteNonQuery();
                 }
 
-                using (var connection = openConnection(targetPath))
-                    setMeta(connection, "display_name", trimmedDisplayName);
+                using var insert = connection.CreateCommand();
+                insert.Transaction = transaction;
+                insert.CommandText = @"
+INSERT INTO hidden_preexisting_beatmap(beatmap_id)
+VALUES($id)
+ON CONFLICT(beatmap_id) DO NOTHING;
+";
 
-                descriptor = createXxySrBranchDescriptor(targetPath, existingDescriptor.Metadata with { DisplayName = trimmedDisplayName });
+                var idParam = insert.CreateParameter();
+                idParam.ParameterName = "$id";
+                insert.Parameters.Add(idParam);
+
+                foreach (Guid beatmapId in preexistingHiddenBeatmapIds.Distinct())
+                {
+                    idParam.Value = beatmapId.ToString();
+                    insert.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
                 return true;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore TryRenameXxySrBranch failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TrySetXxySrBranchHideState failed.", Ez2ConfigManager.LOGGER_NAME);
                 return false;
+            }
+        }
+
+        public bool TrySetCollectionHideState(Guid collectionId, bool hiddenApplied, IEnumerable<Guid> preexistingHiddenBeatmapIds, IEnumerable<string> beatmapMd5Hashes)
+        {
+            if (!Enabled || collectionId == Guid.Empty)
+                return false;
+
+            try
+            {
+                Initialise();
+
+                using var connection = openConnection();
+                ensureCollectionHideTables(connection);
+
+                using var transaction = connection.BeginTransaction();
+
+                using (var upsertState = connection.CreateCommand())
+                {
+                    upsertState.Transaction = transaction;
+                    upsertState.CommandText = @"
+INSERT INTO collection_hidden_state(collection_id, hidden_applied)
+VALUES($collection_id, $hidden_applied)
+ON CONFLICT(collection_id) DO UPDATE SET
+    hidden_applied = excluded.hidden_applied;
+";
+                    upsertState.Parameters.AddWithValue("$collection_id", collectionId.ToString());
+                    upsertState.Parameters.AddWithValue("$hidden_applied", hiddenApplied ? 1 : 0);
+                    upsertState.ExecuteNonQuery();
+                }
+
+                using (var deletePreexisting = connection.CreateCommand())
+                {
+                    deletePreexisting.Transaction = transaction;
+                    deletePreexisting.CommandText = "DELETE FROM collection_hidden_preexisting_beatmap WHERE collection_id = $collection_id;";
+                    deletePreexisting.Parameters.AddWithValue("$collection_id", collectionId.ToString());
+                    deletePreexisting.ExecuteNonQuery();
+                }
+
+                using (var deleteMd5 = connection.CreateCommand())
+                {
+                    deleteMd5.Transaction = transaction;
+                    deleteMd5.CommandText = "DELETE FROM collection_hidden_beatmap_md5 WHERE collection_id = $collection_id;";
+                    deleteMd5.Parameters.AddWithValue("$collection_id", collectionId.ToString());
+                    deleteMd5.ExecuteNonQuery();
+                }
+
+                using (var insertPreexisting = connection.CreateCommand())
+                {
+                    insertPreexisting.Transaction = transaction;
+                    insertPreexisting.CommandText = @"
+INSERT INTO collection_hidden_preexisting_beatmap(collection_id, beatmap_id)
+VALUES($collection_id, $beatmap_id)
+ON CONFLICT(collection_id, beatmap_id) DO NOTHING;
+";
+
+                    insertPreexisting.Parameters.AddWithValue("$collection_id", collectionId.ToString());
+                    var beatmapIdParam = insertPreexisting.CreateParameter();
+                    beatmapIdParam.ParameterName = "$beatmap_id";
+                    insertPreexisting.Parameters.Add(beatmapIdParam);
+
+                    foreach (Guid beatmapId in preexistingHiddenBeatmapIds.Distinct())
+                    {
+                        beatmapIdParam.Value = beatmapId.ToString();
+                        insertPreexisting.ExecuteNonQuery();
+                    }
+                }
+
+                using (var insertMd5 = connection.CreateCommand())
+                {
+                    insertMd5.Transaction = transaction;
+                    insertMd5.CommandText = @"
+INSERT INTO collection_hidden_beatmap_md5(collection_id, beatmap_md5)
+VALUES($collection_id, $beatmap_md5)
+ON CONFLICT(collection_id, beatmap_md5) DO NOTHING;
+";
+
+                    insertMd5.Parameters.AddWithValue("$collection_id", collectionId.ToString());
+                    var beatmapMd5Param = insertMd5.CreateParameter();
+                    beatmapMd5Param.ParameterName = "$beatmap_md5";
+                    insertMd5.Parameters.Add(beatmapMd5Param);
+
+                    foreach (string beatmapMd5 in beatmapMd5Hashes.Where(hash => !string.IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
+                    {
+                        beatmapMd5Param.Value = beatmapMd5;
+                        insertMd5.ExecuteNonQuery();
+                    }
+                }
+
+                transaction.Commit();
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TrySetCollectionHideState failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        public IReadOnlySet<Guid> GetHiddenCollectionIds()
+        {
+            var collectionIds = new HashSet<Guid>();
+
+            if (!Enabled)
+                return collectionIds;
+
+            try
+            {
+                Initialise();
+
+                using var connection = openConnection();
+                ensureCollectionHideTables(connection);
+
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT collection_id
+FROM collection_hidden_state
+WHERE hidden_applied = 1;
+";
+
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (Guid.TryParse(reader.GetString(0), out Guid collectionId))
+                        collectionIds.Add(collectionId);
+                }
+
+                return collectionIds;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetHiddenCollectionIds failed.", Ez2ConfigManager.LOGGER_NAME);
+                return collectionIds;
+            }
+        }
+
+        public IReadOnlySet<Guid> GetCollectionPreexistingHiddenBeatmapIds(Guid collectionId)
+        {
+            var beatmapIds = new HashSet<Guid>();
+
+            if (!Enabled || collectionId == Guid.Empty)
+                return beatmapIds;
+
+            try
+            {
+                Initialise();
+
+                using var connection = openConnection();
+                ensureCollectionHideTables(connection);
+
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT beatmap_id
+FROM collection_hidden_preexisting_beatmap
+WHERE collection_id = $collection_id;
+";
+                cmd.Parameters.AddWithValue("$collection_id", collectionId.ToString());
+
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (Guid.TryParse(reader.GetString(0), out Guid beatmapId))
+                        beatmapIds.Add(beatmapId);
+                }
+
+                return beatmapIds;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetCollectionPreexistingHiddenBeatmapIds failed.", Ez2ConfigManager.LOGGER_NAME);
+                return beatmapIds;
+            }
+        }
+
+        public IReadOnlySet<string> GetHiddenCollectionBeatmapMd5Hashes(Guid collectionId)
+        {
+            var beatmapMd5Hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (!Enabled || collectionId == Guid.Empty)
+                return beatmapMd5Hashes;
+
+            try
+            {
+                Initialise();
+
+                using var connection = openConnection();
+                ensureCollectionHideTables(connection);
+
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT beatmap_md5
+FROM collection_hidden_beatmap_md5
+WHERE collection_id = $collection_id;
+";
+                cmd.Parameters.AddWithValue("$collection_id", collectionId.ToString());
+
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    string beatmapMd5 = reader.GetString(0);
+
+                    if (!string.IsNullOrWhiteSpace(beatmapMd5))
+                        beatmapMd5Hashes.Add(beatmapMd5);
+                }
+
+                return beatmapMd5Hashes;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetHiddenCollectionBeatmapMd5Hashes failed.", Ez2ConfigManager.LOGGER_NAME);
+                return beatmapMd5Hashes;
+            }
+        }
+
+        public IReadOnlySet<Guid> GetXxySrBranchPreexistingHiddenBeatmapIds(string databasePath)
+        {
+            var beatmapIds = new HashSet<Guid>();
+
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return beatmapIds;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidXxySrBranchConnection(connection))
+                    return beatmapIds;
+
+                ensureXxySrBranchStateTables(connection);
+
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT beatmap_id
+FROM hidden_preexisting_beatmap;
+";
+
+                using var reader = cmd.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    if (Guid.TryParse(reader.GetString(0), out Guid beatmapId))
+                        beatmapIds.Add(beatmapId);
+                }
+
+                return beatmapIds;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetXxySrBranchPreexistingHiddenBeatmapIds failed.", Ez2ConfigManager.LOGGER_NAME);
+                return beatmapIds;
             }
         }
 
@@ -1148,6 +1542,11 @@ LIMIT 1;
             string? createdAtText = tryGetMeta(connection, "created_at");
             string? displayName = tryGetMeta(connection, "display_name");
             string? modsJson = tryGetMeta(connection, "mods_json");
+            string? hiddenAppliedText = tryGetMeta(connection, "hidden_applied");
+            string? sourceCollectionIdText = tryGetMeta(connection, "source_collection_id");
+            string? sourceCollectionName = tryGetMeta(connection, "source_collection_name");
+            string? sourceCollectionLastModifiedText = tryGetMeta(connection, "source_collection_last_modified");
+            string? sourceCollectionBeatmapCountText = tryGetMeta(connection, "source_collection_beatmap_count");
 
             if (!int.TryParse(rulesetOnlineIdText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int rulesetOnlineId))
                 return false;
@@ -1161,8 +1560,19 @@ LIMIT 1;
             rulesetShortName ??= "ruleset";
             modsFingerprint ??= string.Empty;
             modsDisplay ??= "NoMod";
-            displayName ??= $"{rulesetShortName} | {modsDisplay} | {beatmapCount:#,0}";
+            sourceCollectionName ??= string.Empty;
+            displayName ??= string.IsNullOrWhiteSpace(sourceCollectionName)
+                ? $"songs | {modsDisplay}"
+                : $"{sourceCollectionName} | {modsDisplay}";
             modsJson ??= string.Empty;
+            bool hiddenApplied = string.Equals(hiddenAppliedText, "1", StringComparison.Ordinal);
+            Guid sourceCollectionId = Guid.TryParse(sourceCollectionIdText, out Guid parsedSourceCollectionId) ? parsedSourceCollectionId : Guid.Empty;
+            long sourceCollectionLastModifiedUnixMilliseconds = long.TryParse(sourceCollectionLastModifiedText, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsedSourceCollectionLastModified)
+                ? parsedSourceCollectionLastModified
+                : 0;
+            int sourceCollectionBeatmapCount = int.TryParse(sourceCollectionBeatmapCountText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedSourceCollectionBeatmapCount)
+                ? parsedSourceCollectionBeatmapCount
+                : 0;
 
             metadata = new XxySrBranchMetadata(
                 rulesetOnlineId,
@@ -1172,8 +1582,48 @@ LIMIT 1;
                 beatmapCount,
                 createdAtUnixMilliseconds,
                 displayName,
-                modsJson);
+                modsJson,
+                hiddenApplied,
+                sourceCollectionId,
+                sourceCollectionName,
+                sourceCollectionLastModifiedUnixMilliseconds,
+                sourceCollectionBeatmapCount);
             return true;
+        }
+
+        private static void ensureXxySrBranchStateTables(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+CREATE TABLE IF NOT EXISTS hidden_preexisting_beatmap (
+    beatmap_id TEXT PRIMARY KEY
+);
+";
+            cmd.ExecuteNonQuery();
+        }
+
+        private static void ensureCollectionHideTables(SqliteConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+CREATE TABLE IF NOT EXISTS collection_hidden_state (
+    collection_id TEXT PRIMARY KEY,
+    hidden_applied INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS collection_hidden_preexisting_beatmap (
+    collection_id TEXT NOT NULL,
+    beatmap_id TEXT NOT NULL,
+    PRIMARY KEY(collection_id, beatmap_id)
+);
+
+CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
+    collection_id TEXT NOT NULL,
+    beatmap_md5 TEXT NOT NULL,
+    PRIMARY KEY(collection_id, beatmap_md5)
+);
+";
+            cmd.ExecuteNonQuery();
         }
 
         private bool isCurrentXxySrBranchPath(string databasePath)
@@ -1196,24 +1646,6 @@ LIMIT 1;
             string relativePath = Path.GetRelativePath(rootPath, fullPath).Replace('\\', '/');
 
             return new XxySrBranchDescriptor(fullPath, relativePath, metadata);
-        }
-
-        private static string createRenamedBranchPath(string sourcePath, string displayName)
-        {
-            string directory = Path.GetDirectoryName(sourcePath) ?? string.Empty;
-            string safeFileName = createSafeBranchDisplayName(displayName);
-            string candidatePath = Path.Combine(directory, $"{safeFileName}.sqlite");
-
-            if (string.Equals(candidatePath, sourcePath, StringComparison.OrdinalIgnoreCase) || !File.Exists(candidatePath))
-                return candidatePath;
-
-            for (int suffix = 2;; suffix++)
-            {
-                candidatePath = Path.Combine(directory, $"{safeFileName}_{suffix}.sqlite");
-
-                if (string.Equals(candidatePath, sourcePath, StringComparison.OrdinalIgnoreCase) || !File.Exists(candidatePath))
-                    return candidatePath;
-            }
         }
 
         private static string createSafeBranchModsDisplay(string? value)
@@ -1248,7 +1680,7 @@ LIMIT 1;
             string trimmed = value.Trim();
 
             if (string.IsNullOrEmpty(trimmed))
-                return "xxySR_branch";
+                return "songs_branch";
 
             char[] invalidChars = Path.GetInvalidFileNameChars();
             var builder = new StringBuilder(trimmed.Length);
@@ -1262,7 +1694,7 @@ LIMIT 1;
             }
 
             string result = builder.ToString().Trim().TrimEnd('.');
-            return string.IsNullOrEmpty(result) ? "xxySR_branch" : result;
+            return string.IsNullOrEmpty(result) ? "songs_branch" : result;
         }
 
         private static bool canUpgradeInPlace(int storedVersion) => storedVersion >= min_inplace_upgrade_version && storedVersion <= ANALYSIS_VERSION;

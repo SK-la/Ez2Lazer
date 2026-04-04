@@ -176,8 +176,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public IBindable<string?> ActiveXxySrBranchDisplayName => analysisDatabase.ActiveXxySrBranchDisplayName;
 
-        public IBindable<string?> ActiveXxySrBranchPath => analysisDatabase.ActiveXxySrBranchPath;
-
         public IBindable<int> ActiveXxySrBranchVersion => analysisDatabase.ActiveXxySrBranchVersion;
 
         public bool HasActiveXxySrBranch => analysisDatabase.HasActiveXxySrBranch;
@@ -194,24 +192,38 @@ namespace osu.Game.EzOsuGame.Analysis
         public bool IsActiveXxySrBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
             => analysisDatabase.IsActiveXxySrBranchFor(rulesetInfo, mods);
 
+        public bool IsXxySrBranchActive(string databasePath)
+            => analysisDatabase.IsXxySrBranchActive(databasePath);
+
         public void DeactivateXxySrBranch()
             => analysisDatabase.DeactivateXxySrBranch();
 
         public bool TryActivateXxySrBranch(string databasePath, out LocalisableString message)
             => analysisDatabase.TryActivateXxySrBranch(databasePath, out message);
 
-        public bool TryRenameXxySrBranch(string databasePath, string newDisplayName, out LocalisableString message, out EzAnalysisPersistentStore.XxySrBranchDescriptor renamedBranch)
-            => analysisDatabase.TryRenameXxySrBranch(databasePath, newDisplayName, out message, out renamedBranch);
+        public bool TryToggleXxySrBranchActivation(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryToggleXxySrBranchActivation(databasePath, out message);
 
         public bool TryDeleteXxySrBranch(string databasePath, out LocalisableString message)
             => analysisDatabase.TryDeleteXxySrBranch(databasePath, out message);
 
+        public bool TryToggleXxySrBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+            => analysisDatabase.TryToggleXxySrBranchHidden(databasePath, out message, out nonHideableBeatmapSets);
+
+        public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
+                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+            => analysisDatabase.TryToggleCollectionHidden(collectionId, collectionName, beatmapMd5Hashes, out message, out nonHideableBeatmapSets);
+
+        public IReadOnlySet<Guid> GetHiddenCollectionIds()
+            => analysisDatabase.GetHiddenCollectionIds();
+
         public IReadOnlyList<EzAnalysisPersistentStore.XxySrBranchDescriptor> GetAvailableXxySrBranches(IRulesetInfo? rulesetInfo = null, IReadOnlyList<Mod>? mods = null, int maxCount = 0)
             => analysisDatabase.GetAvailableXxySrBranches(rulesetInfo, mods, maxCount);
 
-        public Task<EzAnalysisDatabase.XxySrBranchBuildResult> CreateAndActivateXxySrBranchAsync(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods,
+        public Task<EzAnalysisDatabase.XxySrBranchBuildResult> CreateAndActivateXxySrBranchAsync(IEnumerable<BeatmapInfo> beatmaps, EzAnalysisPersistentStore.SourceCollectionSnapshot? sourceCollection,
+                                                                                                 IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods,
                                                                                                  Action<int, int>? progress = null, CancellationToken cancellationToken = default)
-            => analysisDatabase.CreateAndActivateXxySrBranchAsync(beatmaps, rulesetInfo, mods, progress, cancellationToken);
+            => analysisDatabase.CreateAndActivateXxySrBranchAsync(beatmaps, sourceCollection, rulesetInfo, mods, progress, cancellationToken);
 
         protected virtual Task<EzAnalysisResult?> GetDynamicAnalysisAsync(BeatmapInfo beatmapInfo, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods,
                                                                           CancellationToken cancellationToken = default, int computationDelay = 0)

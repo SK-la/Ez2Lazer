@@ -1221,7 +1221,7 @@ namespace osu.Game
             // overlay elements
             loadComponentSingleFile(FirstRunOverlay = new FirstRunSetupOverlay(), footerBasedOverlayContent.Add, true);
             loadComponentSingleFile(new ManageCollectionsDialog(), overlayContent.Add, true);
-            loadComponentSingleFile(new EzManageXxySrBranchesDialog(), overlayContent.Add, true);
+            loadComponentSingleFile(new EzManageSongsBranchesDialog(), overlayContent.Add, true);
             loadComponentSingleFile(beatmapListing = new BeatmapListingOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(dashboard = new DashboardOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(news = new NewsOverlay(), overlayContent.Add, true);
