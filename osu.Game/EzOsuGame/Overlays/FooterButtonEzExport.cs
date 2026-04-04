@@ -453,10 +453,10 @@ namespace osu.Game.EzOsuGame.Overlays
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_FILTERED_BEATMAPS_CONVERTED_TO_ZIP = new EzLocalizationManager.EzLocalisableString("导出筛选 Mods 转谱到 .zip", "Convert Beatmaps with active mods to .zip");
 
             internal static readonly EzLocalizationManager.EzLocalisableString SELECTED_BEATMAP_HEADER = new EzLocalizationManager.EzLocalisableString("选中谱面", "Selected Beatmap");
-            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_SELECTED_BEATMAP_AS_OSU = new EzLocalizationManager.EzLocalisableString("导出选中谱面为 .osu", "Export selected Beatmap as .osu");
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_SELECTED_BEATMAP_AS_OSU = new EzLocalizationManager.EzLocalisableString("导出 Mods 转谱为 .osu", "Export selected beatmap converted with active mods as .osu");
 
             internal static readonly EzLocalizationManager.EzLocalisableString SELECTED_SET_HEADER = new EzLocalizationManager.EzLocalisableString("选中谱包", "Selected Set");
-            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_SELECTED_BEATMAP_SET_AS_OSZ = new EzLocalizationManager.EzLocalisableString("导出选中谱包为 .osz", "Export selected BeatmapSet as .osz");
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_SELECTED_BEATMAP_SET_AS_OSZ = new EzLocalizationManager.EzLocalisableString("导出 Mods 转谱为 .osz", "Export selected beatmap set converted with active mods as .osz");
         }
     }
 }

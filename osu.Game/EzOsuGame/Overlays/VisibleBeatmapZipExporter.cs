@@ -151,6 +151,7 @@ namespace osu.Game.EzOsuGame.Overlays
             using var writer = new ZipWriter(outputStream, zipWriterOptions);
 
             int totalFiles = beatmapSets.Sum(e => e.FileCount);
+            int processedFiles = 0;
             int exportedFiles = 0;
 
             foreach (var beatmapSet in beatmapSets)
@@ -163,13 +164,15 @@ namespace osu.Game.EzOsuGame.Overlays
 
                     using var stream = getFileContents(file, convertedBeatmaps, convertWithMods, ruleset, mods);
 
+                    processedFiles++;
+                    notification.Progress = totalFiles > 0 ? (float)processedFiles / totalFiles : 1;
+
                     if (stream == null)
                         continue;
 
                     writer.Write($"{rootDirectory}/{beatmapSet.DirectoryName}/{file.Filename}".Replace('\\', '/'), stream);
 
                     exportedFiles++;
-                    notification.Progress = totalFiles > 0 ? (float)exportedFiles / totalFiles : 1;
                 }
             }
 
