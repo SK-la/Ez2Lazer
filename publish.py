@@ -5,17 +5,39 @@ import argparse
 import shutil
 import zipfile
 import hashlib
+import platform
 from datetime import datetime
 
 
-def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str) -> int:
-    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir]
+def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str, os_id: str = None) -> int:
+    # Map simple os identifier to RID when possible (pass via -r)
+    def _rid_for(os_id: str) -> str | None:
+        if not os_id:
+            return None
+        low = str(os_id).lower()
+        machine = platform.machine().lower()
+        arch = 'x64'
+        if 'arm' in machine or 'aarch' in machine:
+            arch = 'arm64'
+        if low in ('osx', 'macos', 'darwin'):
+            return f'osx-{arch}'
+        if low in ('linux',):
+            return f'linux-{arch}'
+        if low in ('win', 'windows'):
+            return f'win-{arch}'
+        # allow full RID passthrough
+        return os_id
+
+    rid = _rid_for(os_id)
+    cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "true"]
+    if rid:
+        cmd.extend(["-r", rid])
     print("Running:", " ".join(cmd))
     res = subprocess.run(cmd, cwd=working_dir)
     return res.returncode
 
 
-def run_cleanup(script_path: str, target_dir: str) -> int:
+def run_cleanup(script_path: str, target_dir: str, platform: str = None) -> int:
     # If an external script is provided and exists, run it. Otherwise use internal cleaner.
     if script_path and os.path.exists(script_path):
         print(f"Running external cleanup script: {script_path}")
@@ -23,7 +45,7 @@ def run_cleanup(script_path: str, target_dir: str) -> int:
         return res.returncode
     else:
         print("External cleanup script not found, using internal cleanup logic")
-        return clean_publish_folder(target_dir)
+        return clean_publish_folder(target_dir, platform)
 
 
 def clean_publish_folder(release_dir=None, platform=None):
@@ -169,6 +191,10 @@ def main():
     # Note: no local-only root option to keep publish.py CI-friendly
     parser.add_argument('--zip-only', action='store_true', help='Only create zip files locally and do not attempt any remote operations')
     parser.add_argument('--no-zip', action='store_true', help='Do not create zip files')
+    parser.add_argument('--release-only', action='store_true', default=True, help='Only publish the release package and skip debug output')
+    parser.add_argument('--appimage', action='store_true', help='Build AppImage for linux from release output')
+    parser.add_argument('--os', default=None, help='OS identifier forwarded to dotnet publish')
+    parser.add_argument('--platform', default=None, help='Platform to include in package name')
     parser.add_argument('--tag', default=None, help='Optional tag to include in asset name')
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
     parser.add_argument('--deps-pattern', default='*.dll', help='Glob pattern for dependency files to copy')
@@ -181,6 +207,21 @@ def main():
     parser.add_argument('--resources-path', default=None, help='Local path to resources to include in package')
     args = parser.parse_args()
 
+    # Interactive prompt when script run with no arguments (help is handled by argparse)
+    if len(sys.argv) == 1:
+        print("No arguments provided. Enter target platform (windows/linux/macos).")
+        print("Press Enter to use this host platform. This will perform a Release-only build.")
+        try:
+            user_in = input("Platform: ").strip()
+        except EOFError:
+            user_in = ''
+        if user_in:
+            args.platform = user_in
+        else:
+            args.platform = None
+        # interactive invocation should default to release-only
+        args.release_only = True
+
     # Enforce that a tag is provided to avoid any implicit fallback tag generation
     if not args.tag:
         # default to today's date tag if not provided when running locally
@@ -190,12 +231,63 @@ def main():
 
     tag_suffix = f"_{args.tag}"
 
-    # fixed folder names
-    # If running in zip-only (local) mode, place artifacts under the user-specified local root
-    base_out = args.outroot
+    # determine host platform canonical name
+    host_raw = platform.system().lower()
+    if host_raw.startswith('win'):
+        host_platform = 'windows'
+    elif host_raw.startswith('darwin'):
+        host_platform = 'macos'
+    else:
+        host_platform = 'linux' if 'linux' in host_raw else host_raw
 
-    release_dir = os.path.join(base_out, 'Ez2Lazer_release_x64')
-    debug_dir = os.path.join(base_out, 'Ez2Lazer_debug_x64')
+    # infer platform: priority CLI --platform, --os, then script filename, otherwise host
+    explicit = False
+    if args.platform:
+        target_platform = args.platform
+        explicit = True
+    elif args.os:
+        target_platform = args.os
+        explicit = True
+    else:
+        # When invoked with command-line arguments, ignore filename shortcut
+        # (wrapper behavior). Only apply filename-based default when no args.
+        if len(sys.argv) > 1:
+            target_platform = host_platform
+        else:
+            name = os.path.basename(__file__).lower()
+            if 'linux' in name:
+                target_platform = 'linux'
+            elif 'mac' in name or 'osx' in name or 'darwin' in name:
+                target_platform = 'macos'
+            elif 'win' in name:
+                target_platform = 'windows'
+            else:
+                target_platform = host_platform
+
+    # If platform was inferred from filename and doesn't match host, skip to avoid accidental runs
+    if not explicit and target_platform != host_platform:
+        print(f"Inferred platform '{target_platform}' from filename but current host is '{host_platform}'; skipping publish to avoid accidental cross-platform build.")
+        sys.exit(0)
+
+    # fixed folder names
+    # Place all outputs under <outroot>/artifacts for a unified layout across platforms
+    base_out = args.outroot
+    artifacts_dir = os.path.join(base_out, 'artifacts')
+    try:
+        os.makedirs(artifacts_dir, exist_ok=True)
+    except PermissionError:
+        fallback = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'artifacts')
+        print(f"Permission denied creating {artifacts_dir}, falling back to {fallback}")
+        os.makedirs(fallback, exist_ok=True)
+        artifacts_dir = fallback
+
+    # determine architecture for naming (x64 vs arm64)
+    machine = platform.machine().lower()
+    arch_name = 'arm64' if ('arm' in machine or 'aarch' in machine) else 'x64'
+
+    # Use the target platform (not host) for artifact folder and asset naming
+    release_dir = os.path.join(artifacts_dir, f'Ez2Lazer_release_{target_platform}_{arch_name}')
+    debug_dir = os.path.join(artifacts_dir, f'Ez2Lazer_debug_{target_platform}_{arch_name}')
 
     # remove existing folders to ensure deterministic output
     for d in (release_dir, debug_dir):
@@ -205,37 +297,26 @@ def main():
 
     # publish
     print('Publishing Release...')
-    rc = run_publish(args.project, args.workdir, 'Release', release_dir)
+    rc = run_publish(args.project, args.workdir, 'Release', release_dir, target_platform)
     if rc != 0:
         print('Release publish failed with code', rc)
     else:
         print('Release publish succeeded')
-        # optional cleanup
-        run_cleanup(args.cleanup_release, release_dir)
+        # optional cleanup (pass target platform so we don't remove required runtimes)
+        run_cleanup(args.cleanup_release, release_dir, target_platform)
 
-    print('Publishing Debug...')
-    rc2 = run_publish(args.project, args.workdir, 'Debug', debug_dir)
-    if rc2 != 0:
-        print('Debug publish failed with code', rc2)
-    else:
-        print('Debug publish succeeded')
-        run_cleanup(args.cleanup_debug, debug_dir)
-
-    # create zips with fixed base name + tag
-    artifacts_dir = os.path.join(base_out, 'artifacts')
-    # Try to create artifacts dir; if permission denied (e.g. running from system32),
-    # fall back to a safe location next to this script.
-    try:
-        os.makedirs(artifacts_dir, exist_ok=True)
-    except PermissionError:
-        fallback = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'artifacts')
-        print(f"Permission denied creating {artifacts_dir}, falling back to {fallback}")
-        os.makedirs(fallback, exist_ok=True)
-        artifacts_dir = fallback
+    if not args.release_only:
+        print('Publishing Debug...')
+        rc2 = run_publish(args.project, args.workdir, 'Debug', debug_dir, target_platform)
+        if rc2 != 0:
+            print('Debug publish failed with code', rc2)
+        else:
+            print('Debug publish succeeded')
+            run_cleanup(args.cleanup_debug, debug_dir, target_platform)
 
     # Use asset names that match workflow-normalized names when tag present
-    release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_x64{tag_suffix}.zip")
-    debug_zip = os.path.join(artifacts_dir, f"Ez2Lazer_debug_x64{tag_suffix}.zip")
+    release_zip = os.path.join(artifacts_dir, f"Ez2Lazer_release_{target_platform}_{arch_name}{tag_suffix}.zip")
+    debug_zip = os.path.join(artifacts_dir, f"Ez2Lazer_debug_{target_platform}_{arch_name}{tag_suffix}.zip")
 
     if not args.no_zip:
         if os.path.exists(release_dir):
@@ -344,12 +425,191 @@ def main():
                         shutil.rmtree(d)
                     except Exception:
                         pass
-            print('Zipping release ->', release_zip)
-            zip_folder(release_dir, release_zip)
+            # For macOS, create a minimal .app bundle containing the published files,
+            # then zip the .app so Releases contain a mac-friendly bundle.
+            if str(target_platform).lower().startswith('mac') or 'osx' in str(target_platform).lower():
+                try:
+                    print('Building .app bundle from release output')
+                    app_name = 'Ez2Lazer'
+                    app_bundle = os.path.join(artifacts_dir, f'{app_name}.app')
+                    # Clean existing
+                    shutil.rmtree(app_bundle, ignore_errors=True)
+                    contents = os.path.join(app_bundle, 'Contents')
+                    macos_dir = os.path.join(contents, 'MacOS')
+                    resources_dir = os.path.join(contents, 'Resources')
+                    app_resources = os.path.join(resources_dir, 'app')
+                    os.makedirs(macos_dir, exist_ok=True)
+                    os.makedirs(app_resources, exist_ok=True)
+
+                    # copy published files into Resources/app
+                    for item in os.listdir(release_dir):
+                        s = os.path.join(release_dir, item)
+                        d = os.path.join(app_resources, item)
+                        if os.path.isdir(s):
+                            shutil.copytree(s, d, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(s, d)
+
+                    # attempt to find executable inside the published files
+                    exe_candidate = None
+                    # 1) find an executable file
+                    for f in os.listdir(app_resources):
+                        fp = os.path.join(app_resources, f)
+                        if os.path.isfile(fp) and os.access(fp, os.X_OK):
+                            exe_candidate = f
+                            break
+                    # 2) fallback: match project name
+                    if not exe_candidate:
+                        proj_base = os.path.splitext(os.path.basename(args.project))[0]
+                        for f in os.listdir(app_resources):
+                            if f.lower().startswith(proj_base.lower()):
+                                exe_candidate = f
+                                break
+                    # 3) final fallback: pick first file with no extension
+                    if not exe_candidate:
+                        for f in os.listdir(app_resources):
+                            if os.path.isfile(os.path.join(app_resources, f)) and '.' not in f:
+                                exe_candidate = f
+                                break
+
+                    if not exe_candidate:
+                        # leave as-is: use a launcher that runs the managed DLL via dotnet if necessary
+                        launcher_exec = os.path.join(macos_dir, app_name)
+                        with open(launcher_exec, 'w', encoding='utf-8') as f:
+                            f.write('#!/bin/sh\n')
+                            f.write('HERE="$(dirname "$(dirname "$(readlink -f "$0"))")"\n')
+                            f.write('exec "${HERE}/Resources/app/osu.Desktop" "$@"\n')
+                        try:
+                            os.chmod(launcher_exec, 0o755)
+                        except Exception:
+                            pass
+                        bundle_executable_name = app_name
+                    else:
+                        # create launcher that execs the discovered executable
+                        launcher_exec = os.path.join(macos_dir, app_name)
+                        with open(launcher_exec, 'w', encoding='utf-8') as f:
+                            f.write('#!/bin/sh\n')
+                            f.write('HERE="$(dirname "$(dirname "$(readlink -f "$0"))")"\n')
+                            f.write('exec "${HERE}/Resources/app/%s" "$@"\n' % exe_candidate)
+                        try:
+                            os.chmod(launcher_exec, 0o755)
+                        except Exception:
+                            pass
+                        bundle_executable_name = app_name
+
+                    # minimal Info.plist
+                    info_path = os.path.join(contents, 'Info.plist')
+                    plist = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">\n<dict>\n  <key>CFBundleName</key>\n  <string>{app_name}</string>\n  <key>CFBundleExecutable</key>\n  <string>{bundle_executable_name}</string>\n  <key>CFBundleIdentifier</key>\n  <string>com.example.ez2lazer</string>\n  <key>CFBundleVersion</key>\n  <string>{args.tag}</string>\n  <key>CFBundlePackageType</key>\n  <string>APPL</string>\n</dict>\n</plist>"""
+                    with open(info_path, 'w', encoding='utf-8') as f:
+                        f.write(plist)
+
+                    # zip the .app bundle
+                    print('Zipping .app ->', release_zip)
+                    zip_folder(app_bundle, release_zip)
+                except Exception as e:
+                    print('Failed to build .app bundle:', e)
+                    print('Falling back to zipping release folder')
+                    print('Zipping release ->', release_zip)
+                    zip_folder(release_dir, release_zip)
+            else:
+                print('Zipping release ->', release_zip)
+                zip_folder(release_dir, release_zip)
+            # Optionally build AppImage (Linux)
+            if args.appimage and (str(target_platform).lower().startswith('linux') or 'linux' in str(target_platform).lower()):
+                try:
+                    print('Building AppImage from', release_dir)
+                    appdir = os.path.join(base_out, 'AppDir')
+                    shutil.rmtree(appdir, ignore_errors=True)
+                    os.makedirs(os.path.join(appdir, 'usr', 'bin'), exist_ok=True)
+                    os.makedirs(os.path.join(appdir, 'usr', 'share', 'applications'), exist_ok=True)
+                    os.makedirs(os.path.join(appdir, 'usr', 'share', 'icons', 'hicolor', '256x256', 'apps'), exist_ok=True)
+
+                    # copy published files into AppDir/usr/bin
+                    for item in os.listdir(release_dir):
+                        s = os.path.join(release_dir, item)
+                        d = os.path.join(appdir, 'usr', 'bin', item)
+                        if os.path.isdir(s):
+                            shutil.copytree(s, d, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(s, d)
+
+                    # AppRun
+                    apprun_path = os.path.join(appdir, 'AppRun')
+                    with open(apprun_path, 'w', encoding='utf-8') as f:
+                        f.write('#!/bin/sh\n')
+                        f.write('HERE="$(dirname "$(readlink -f "$0")")"\n')
+                        f.write('exec "$HERE"/usr/bin/osu.Desktop "$@"\n')
+                    try:
+                        os.chmod(apprun_path, 0o755)
+                    except Exception:
+                        pass
+
+                    # desktop file
+                    desktop_path = os.path.join(appdir, 'usr', 'share', 'applications', 'ez2lazer.desktop')
+                    with open(desktop_path, 'w', encoding='utf-8') as f:
+                        f.write('[Desktop Entry]\n')
+                        f.write('Type=Application\n')
+                        f.write('Name=Ez2Lazer\n')
+                        f.write('Exec=osu.Desktop %u\n')
+                        f.write('Icon=ez2lazer\n')
+                        f.write('Categories=Game;\n')
+                        f.write('Terminal=false\n')
+
+                    # copy icon if available
+                    icon_src = None
+                    if args.resources_path and os.path.exists(os.path.join(args.resources_path, 'Icons', 'ez2lazer-256.png')):
+                        icon_src = os.path.join(args.resources_path, 'Icons', 'ez2lazer-256.png')
+                    else:
+                        candidate = os.path.join(os.path.dirname(__file__), 'resources', 'Icons', 'ez2lazer-256.png')
+                        if os.path.exists(candidate):
+                            icon_src = candidate
+                    if icon_src:
+                        shutil.copy2(icon_src, os.path.join(appdir, 'usr', 'share', 'icons', 'hicolor', '256x256', 'apps', 'ez2lazer.png'))
+
+                    # download appimagetool
+                    import urllib.request
+                    tool = os.path.join(base_out, 'appimagetool-x86_64.AppImage')
+                    uri = 'https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage'
+                    try:
+                        print('Downloading appimagetool...')
+                        urllib.request.urlretrieve(uri, tool)
+                    except Exception:
+                        print('urllib failed, trying curl...')
+                        rc = subprocess.run(['curl', '-L', uri, '-o', tool])
+                        if rc.returncode != 0:
+                            print('Failed to download appimagetool')
+                            raise
+                    try:
+                        os.chmod(tool, 0o755)
+                    except Exception:
+                        pass
+
+                    # run appimagetool
+                    rc_tool = subprocess.run([tool, appdir], cwd=base_out)
+                    if rc_tool.returncode != 0:
+                        print('appimagetool failed', rc_tool.returncode)
+                    else:
+                        # find generated AppImage
+                        import glob
+                        matches = glob.glob(os.path.join(base_out, '*.AppImage'))
+                        if matches:
+                            matches.sort(key=os.path.getmtime, reverse=True)
+                            gen = matches[0]
+                            artifacts_dir = os.path.join(base_out, 'artifacts')
+                            os.makedirs(artifacts_dir, exist_ok=True)
+                            dest = os.path.join(artifacts_dir, f'Ez2Lazer_release_linux_{arch_name}.AppImage')
+                            shutil.copy2(gen, dest)
+                            print('Created AppImage at', dest)
+                        else:
+                            print('No AppImage generated')
+                except Exception as e:
+                    print('AppImage build failed:', e)
         else:
             print('Release folder missing, skipping zip')
 
-        if os.path.exists(debug_dir):
+        if not args.release_only and os.path.exists(debug_dir):
             # for debug, repeat similar deps copy if deps_source is local
             if args.deps_source == 'local' and args.deps_path and os.path.exists(args.deps_path):
                 import glob
