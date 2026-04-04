@@ -19,7 +19,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
@@ -45,8 +44,8 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
-            // [Resolved]
-            // private Ez2ConfigManager ezConfig { get; set; } = null!;
+            [Resolved]
+            private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
             private ModSettingChangeTracker? settingChangeTracker;
 
@@ -64,9 +63,6 @@ namespace osu.Game.Screens.Select
             private DifficultyStatisticsDisplay countStatisticsDisplay = null!;
             private DifficultyStatisticsDisplay difficultyStatisticsDisplay = null!;
             private EzKpcDisplay ezKpcDisplay = null!;
-
-            // 无性能问题，所以不使用开关绑定，始终开启
-            // private IBindable<bool> ezAnalysisCacheEnabled = new BindableBool(true);
 
             private CancellationTokenSource? cancellationSource;
 
@@ -232,9 +228,6 @@ namespace osu.Game.Screens.Select
             {
                 base.LoadComplete();
 
-                // ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
-                // ezAnalysisCacheEnabled.BindValueChanged(_ => Scheduler.AddOnce(updateDisplay), true);
-
                 // it is not uncommon for the beatmap and the ruleset to change in conjunction during a single update frame.
                 // in that process, it is possible for the global bindable triad (beatmap / ruleset / mods) to briefly be partially invalid in combination (e.g. mods invalid for given ruleset).
                 // `updateDisplay()` will initiate a difficulty calculation, and if it is allowed to run in that invalid intermediate state, it will loudly fail.
@@ -265,6 +258,7 @@ namespace osu.Game.Screens.Select
             private void updateDisplay()
             {
                 cancellationSource?.Cancel();
+                cancellationSource?.Dispose();
                 cancellationSource = new CancellationTokenSource();
 
                 if (beatmap.IsDefault)
@@ -280,8 +274,7 @@ namespace osu.Game.Screens.Select
                     mapperText.Text = beatmap.Value.Metadata.Author.Username;
                 }
 
-                starRatingDisplay.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token,
-                    SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+                starRatingDisplay.Current = (Bindable<StarDifficulty>)difficultyCache.GetBindableDifficulty(beatmap.Value.BeatmapInfo, cancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
 
                 updateCountStatistics(cancellationSource.Token);
                 updateDifficultyStatistics();
@@ -296,19 +289,45 @@ namespace osu.Game.Screens.Select
                     return;
                 }
 
+                var selectedBeatmap = beatmap.Value;
+                var selectedRuleset = ruleset.Value;
+                var selectedMods = mods.Value.ToArray();
+
                 Task.Run(() =>
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    bool hasMods = selectedMods.Length > 0;
+                    EzManiaSummary storedManiaSummary = EzManiaSummary.EMPTY;
+                    bool canUseStoredManiaSummary = false;
+
+                    if (!hasMods
+                        && selectedRuleset != null
+                        && selectedRuleset.OnlineID == 3
+                        && analysisDatabase.TryGetStoredAnalysis(selectedBeatmap.BeatmapInfo, selectedRuleset, out var storedAnalysis)
+                        && storedAnalysis.EzManiaSummary.HasData)
+                    {
+                        canUseStoredManiaSummary = true;
+                        storedManiaSummary = storedAnalysis.EzManiaSummary;
+                    }
+
                     // This can take time as it is a synchronous task.
                     // TODO: We're calling `GetPlayableBeatmap` multiple times every map load at song select.
-                    var playableBeatmap = beatmap.Value.GetPlayableBeatmap(ruleset.Value);
+                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset, selectedMods, cancellationToken);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (playableBeatmap == null)
+                        return;
+
                     var statistics = playableBeatmap.GetStatistics()
                                                     .Select(s => new StatisticDifficulty.Data(s.Name, s.BarDisplayLength ?? 0, s.BarDisplayLength ?? 0, 1, s.Content))
                                                     .ToList();
 
                     // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
-                    if (ruleset.Value != null && ruleset.Value.OnlineID == 3)
+                    if (selectedRuleset != null && selectedRuleset.OnlineID == 3)
                     {
-                        var maniaSummary = OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
+                        var maniaSummary = canUseStoredManiaSummary ? storedManiaSummary : OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
                         Schedule(() =>
                         {
                             if (cancellationToken.IsCancellationRequested)
@@ -334,6 +353,21 @@ namespace osu.Game.Screens.Select
                 }, cancellationToken);
             }
 
+            protected override void Dispose(bool isDisposing)
+            {
+                if (isDisposing)
+                {
+                    cancellationSource?.Cancel();
+                    cancellationSource?.Dispose();
+                    cancellationSource = null;
+
+                    settingChangeTracker?.Dispose();
+                    settingChangeTracker = null;
+                }
+
+                base.Dispose(isDisposing);
+            }
+
             private void updateDifficultyStatistics() => Scheduler.AddOnce(() =>
             {
                 if (beatmap.IsDefault || ruleset.Value == null)
@@ -355,9 +389,7 @@ namespace osu.Game.Screens.Select
                 difficultyText.MaxWidth = Math.Max(nameLine.DrawWidth - mappedByText.DrawWidth - mapperText.DrawWidth - 20, 0);
 
                 // Use difficulty colour until it gets too dark to be visible against dark backgrounds.
-                Color4 col = starRatingDisplay.DisplayedStars.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF
-                    ? starRatingDisplay.DisplayedDifficultyTextColour
-                    : starRatingDisplay.DisplayedDifficultyColour;
+                Color4 col = starRatingDisplay.DisplayedStars.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF ? starRatingDisplay.DisplayedDifficultyTextColour : starRatingDisplay.DisplayedDifficultyColour;
 
                 difficultyText.Colour = col;
                 mappedByText.Colour = Colour4.WhiteSmoke;

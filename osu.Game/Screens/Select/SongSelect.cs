@@ -174,6 +174,7 @@ namespace osu.Game.Screens.Select
         private Bindable<bool> showConvertedBeatmaps = null!;
         private Bindable<KeySoundPreviewMode> keySoundPreview = null!;
         private EzPreviewTrackManager ezPreviewManager = null!;
+        private ModSettingChangeTracker? previewOverlayModSettingTracker;
 
         private IDisposable? modSelectOverlayRegistration;
 
@@ -397,7 +398,7 @@ namespace osu.Game.Screens.Select
             new FooterButtonEzPreView(
                 () =>
                 {
-                    ezBeatmapPreviewOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value);
+                    updateBeatmapPreviewSelection();
                     ezBeatmapPreviewOverlay.Toggle();
                 },
                 ezBeatmapPreviewOverlay.ExpandedState)
@@ -784,6 +785,8 @@ namespace osu.Game.Screens.Select
             }
 
             Beatmap.BindValueChanged(updateVariousState, true);
+            Ruleset.BindValueChanged(updateBeatmapPreviewSelection, true);
+            Mods.BindValueChanged(updatePreviewSelectionFromModsChange, true);
 
             ezBeatmapPreviewOverlay.RestoreRememberedState();
         }
@@ -800,7 +803,32 @@ namespace osu.Game.Screens.Select
             updateWedgeVisibility();
             fetchOnlineInfo(force: ReferenceEquals(e.OldValue, e.NewValue));
 
-            ezBeatmapPreviewOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value);
+            updateBeatmapPreviewSelection();
+        }
+
+        private void updateBeatmapPreviewSelection(ValueChangedEvent<RulesetInfo> _)
+            => updateBeatmapPreviewSelection();
+
+        private void updatePreviewSelectionFromModsChange(ValueChangedEvent<IReadOnlyList<Mod>> e)
+        {
+            previewOverlayModSettingTracker?.Dispose();
+            previewOverlayModSettingTracker = null;
+
+            if (e.NewValue.Any())
+            {
+                previewOverlayModSettingTracker = new ModSettingChangeTracker(e.NewValue);
+                previewOverlayModSettingTracker.SettingChanged += _ => Scheduler.AddOnce(() => updateBeatmapPreviewSelection(forceReload: true));
+            }
+
+            updateBeatmapPreviewSelection();
+        }
+
+        private void updateBeatmapPreviewSelection(bool forceReload = false)
+        {
+            if (!this.IsCurrentScreen())
+                return;
+
+            ezBeatmapPreviewOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value, Mods.Value, forceReload);
         }
 
         private void onLeavingScreen()
@@ -813,6 +841,11 @@ namespace osu.Game.Screens.Select
             ezBeatmapPreviewOverlay.SuspendForScreenExit();
 
             Beatmap.ValueChanged -= updateVariousState;
+            Ruleset.ValueChanged -= updateBeatmapPreviewSelection;
+            Mods.ValueChanged -= updatePreviewSelectionFromModsChange;
+
+            previewOverlayModSettingTracker?.Dispose();
+            previewOverlayModSettingTracker = null;
 
             modSelectOverlay.SelectedMods.UnbindFrom(Mods);
             modSelectOverlay.Beatmap.UnbindFrom(Beatmap);

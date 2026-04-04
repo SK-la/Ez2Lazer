@@ -21,7 +21,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
@@ -70,12 +69,6 @@ namespace osu.Game.Screens.Select
         private Statistic bpmStatistic = null!;
         private EzDisplayKpsGraph kpsGraph = null!;
 
-        // 无性能问题，所以不使用开关绑定，始终开启
-        // private IBindable<bool> ezAnalysisCacheEnabled = new BindableBool(true);
-
-        // [Resolved]
-        // private Ez2ConfigManager ezConfig { get; set; } = null!;
-
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
@@ -84,6 +77,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
         private FillFlowContainer statisticsFlow = null!;
 
@@ -203,13 +199,6 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            // ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
-            // ezAnalysisCacheEnabled.BindValueChanged(_ =>
-            // {
-            //     updateAnalysisDisplay();
-            //     updateLengthAndBpmStatistics();
-            // }, true);
-
             working.BindValueChanged(_ => updateDisplay());
             ruleset.BindValueChanged(_ => updateDisplay());
             onlineLookupResult.BindValueChanged(_ => updateDisplay());
@@ -217,8 +206,12 @@ namespace osu.Game.Screens.Select
             mods.BindValueChanged(m =>
             {
                 settingChangeTracker?.Dispose();
+                settingChangeTracker = null;
 
                 updateLengthAndBpmStatistics();
+
+                if (!m.NewValue.Any())
+                    return;
 
                 settingChangeTracker = new ModSettingChangeTracker(m.NewValue);
                 settingChangeTracker.SettingChanged += _ => updateLengthAndBpmStatistics();
@@ -229,17 +222,6 @@ namespace osu.Game.Screens.Select
             statisticsFlow.AutoSizeDuration = 100;
             statisticsFlow.AutoSizeEasing = Easing.OutQuint;
         }
-
-        // private void updateAnalysisDisplay()
-        // {
-        //     if (ezAnalysisCacheEnabled.Value)
-        //         kpsGraph.Show();
-        //     else
-        //     {
-        //         kpsGraph.SetPoints(Array.Empty<double>());
-        //         kpsGraph.Hide();
-        //     }
-        // }
 
         protected override void PopIn()
         {
@@ -289,6 +271,7 @@ namespace osu.Game.Screens.Select
         private void updateLengthAndBpmStatistics()
         {
             lengthBpmCancellationSource?.Cancel();
+            lengthBpmCancellationSource?.Dispose();
             lengthBpmCancellationSource = new CancellationTokenSource();
 
             var token = lengthBpmCancellationSource.Token;
@@ -298,8 +281,10 @@ namespace osu.Game.Screens.Select
                 var beatmapInfo = working.Value.BeatmapInfo;
                 // This can take time as it is a synchronous task.
                 var beatmap = working.Value.Beatmap;
+                var selectedRuleset = ruleset.Value;
+                var selectedMods = mods.Value;
 
-                double rate = ModUtils.CalculateRateWithMods(mods.Value);
+                double rate = ModUtils.CalculateRateWithMods(selectedMods);
 
                 int bpmMax = FormatUtils.RoundBPM(beatmap.ControlPointInfo.BPMMaximum, rate);
                 int bpmMin = FormatUtils.RoundBPM(beatmap.ControlPointInfo.BPMMinimum, rate);
@@ -307,6 +292,20 @@ namespace osu.Game.Screens.Select
 
                 double drainLength = Math.Round(beatmap.CalculateDrainLength() / rate);
                 double hitLength = Math.Round(beatmapInfo.Length / rate);
+
+                IReadOnlyList<double> kpsList;
+
+                if (selectedMods.Count == 0
+                    && analysisDatabase.TryGetStoredAnalysis(beatmapInfo, selectedRuleset, out var storedAnalysis)
+                    && storedAnalysis.CommonAttributes?.KpsList is { Count: > 0 } storedKpsList)
+                {
+                    kpsList = storedKpsList;
+                }
+                else
+                {
+                    var (_, _, computedKpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
+                    kpsList = computedKpsList;
+                }
 
                 Schedule(() =>
                 {
@@ -320,16 +319,7 @@ namespace osu.Game.Screens.Select
                         ? $"{bpmMin}"
                         : LocalisableString.Interpolate($"{bpmMin}-{bpmMax} ({SongSelectStrings.MostlyBPM(mostCommonBPM)})");
 
-                    // if (ezAnalysisCacheEnabled.Value)
-                    // {
-                    // 计算并展示 KPS 折线（非阻塞，粗略采样）
-                    var (_, _, kpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(working.Value.Beatmap, buckets: 64);
                     kpsGraph.SetPoints(kpsList);
-                    // }
-                    // else
-                    // {
-                    //     kpsGraph.SetPoints(Array.Empty<double>());
-                    // }
 
                     // 由于 bpmStatistic.Text 变化会触发布局动画（100ms），需要延迟更新 KPS 图表尺寸以确保获取正确的宽度
                     Scheduler.Add(updateKPSGraphSize);
@@ -396,6 +386,13 @@ namespace osu.Game.Screens.Select
 
         protected override void Dispose(bool isDisposing)
         {
+            settingChangeTracker?.Dispose();
+
+            lengthBpmCancellationSource?.Cancel();
+            lengthBpmCancellationSource?.Dispose();
+            lengthBpmCancellationSource = null;
+
+            onlineDisplayCancellationSource?.Cancel();
             onlineDisplayCancellationSource?.Dispose();
             onlineDisplayCancellationSource = null;
             base.Dispose(isDisposing);

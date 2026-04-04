@@ -26,6 +26,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
@@ -124,6 +125,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private DrawableRuleset? drawableRuleset;
         private IWorkingBeatmap? currentWorkingBeatmap;
         private RulesetInfo? currentRuleset;
+        private IReadOnlyList<Mod> currentMods = Array.Empty<Mod>();
         private bool selectionLoadInProgress;
 
         private long selectionEventVersion;
@@ -361,19 +363,21 @@ namespace osu.Game.EzOsuGame.Overlays
             panelContainer.MoveToY(14, 160, Easing.OutQuint);
         }
 
-        public void UpdateSelection(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset)
+        public void UpdateSelection(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, bool forceReload = false)
         {
             if (workingBeatmap.BeatmapInfo == null)
                 return;
 
+            string beatmapHash = workingBeatmap.BeatmapInfo.Hash;
+            bool unchanged = !forceReload
+                             && currentRulesetOnlineId == ruleset.OnlineID
+                             && currentBeatmapHash == beatmapHash
+                             && currentMods.SequenceEqual(mods);
+
             currentWorkingBeatmap = workingBeatmap;
             currentRuleset = ruleset;
+            currentMods = mods.ToArray();
             updatePreviewModeButtons();
-
-            string beatmapHash = workingBeatmap.BeatmapInfo.Hash;
-
-            bool unchanged = currentRulesetOnlineId == ruleset.OnlineID
-                             && currentBeatmapHash == beatmapHash;
 
             if (unchanged)
             {
@@ -410,6 +414,7 @@ namespace osu.Game.EzOsuGame.Overlays
             disposePreviewResources();
             currentWorkingBeatmap = null;
             currentRuleset = null;
+            currentMods = Array.Empty<Mod>();
             selectionDirty = false;
             currentRulesetOnlineId = -1;
             currentBeatmapHash = string.Empty;
@@ -479,16 +484,20 @@ namespace osu.Game.EzOsuGame.Overlays
 
             var workingBeatmap = currentWorkingBeatmap;
             var ruleset = currentRuleset;
+            var mods = currentMods;
 
             double loadStartTime = lastSelectionEventTime > 0 ? lastSelectionEventTime : Time.Current;
 
-            Task.Run(() =>
+            Task.Run<LoadedPreviewData?>(() =>
             {
                 token.ThrowIfCancellationRequested();
 
-                var playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset);
+                var playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset, mods, token);
 
                 token.ThrowIfCancellationRequested();
+
+                if (playableBeatmap == null)
+                    return null;
 
                 var objects = playableBeatmap.HitObjects;
 
@@ -521,7 +530,13 @@ namespace osu.Game.EzOsuGame.Overlays
 
                     var result = task.GetResultSafely();
 
-                    if (result.Version != selectionEventVersion)
+                    if (result == null)
+                    {
+                        onSelectionLoadFinished();
+                        return;
+                    }
+
+                    if (result.Value.Version != selectionEventVersion)
                     {
                         onSelectionLoadFinished();
                         return;
@@ -530,11 +545,11 @@ namespace osu.Game.EzOsuGame.Overlays
                     lastLoadTimeMs = Time.Current - loadStartTime;
                     lastDisplayedLoadTimeMs = -1;
 
-                    beatmapMinTime = result.MinTime;
-                    beatmapMaxTime = Math.Max(result.MaxTime, beatmapMinTime + 1);
-                    playbackStartTime = result.StartTime;
+                    beatmapMinTime = result.Value.MinTime;
+                    beatmapMaxTime = Math.Max(result.Value.MaxTime, beatmapMinTime + 1);
+                    playbackStartTime = result.Value.StartTime;
 
-                    setupDrawableRulesetAsync(result.Version, result.WorkingBeatmap, result.RulesetInfo, result.PlayableBeatmap, token);
+                    setupDrawableRulesetAsync(result.Value.Version, result.Value.WorkingBeatmap, result.Value.RulesetInfo, result.Value.PlayableBeatmap, token);
 
                     previewClock.Stop();
                     previewClock.Seek(playbackStartTime);
