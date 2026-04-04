@@ -38,6 +38,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -1220,6 +1221,7 @@ namespace osu.Game
             // overlay elements
             loadComponentSingleFile(FirstRunOverlay = new FirstRunSetupOverlay(), footerBasedOverlayContent.Add, true);
             loadComponentSingleFile(new ManageCollectionsDialog(), overlayContent.Add, true);
+            loadComponentSingleFile(new EzManageXxySrBranchesDialog(), overlayContent.Add, true);
             loadComponentSingleFile(beatmapListing = new BeatmapListingOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(dashboard = new DashboardOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(news = new NewsOverlay(), overlayContent.Add, true);

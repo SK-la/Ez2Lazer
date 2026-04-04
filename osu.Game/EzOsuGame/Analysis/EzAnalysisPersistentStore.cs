@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,12 +34,30 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public class EzAnalysisPersistentStore
     {
+        public readonly record struct XxySrBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr);
+
+        public readonly record struct XxySrBranchDescriptor(string DatabasePath, string RelativePath, XxySrBranchMetadata Metadata);
+
+        public readonly record struct XxySrBranchMetadata(
+            int RulesetOnlineId,
+            string RulesetShortName,
+            string ModsFingerprint,
+            string ModsDisplay,
+            int BeatmapCount,
+            long CreatedAtUnixMilliseconds,
+            string DisplayName);
+
         /// <summary>
         /// 持久化总开关（默认关闭）：未来考虑是否允许用户通过配置关闭此功能以避免额外的磁盘读写。
         /// </summary>
         public static bool Enabled = true;
 
         public static readonly string DATABASE_FILENAME = $@"mania-analysis_v{ANALYSIS_VERSION}.sqlite";
+
+        public const string XXY_SR_BRANCH_DATABASE_DIRECTORY = "EzData";
+        private const string legacy_xxy_sr_branch_database_directory = "analysis-branches";
+        private const string xxy_sr_branch_kind = "xxy_sr_branch";
+        private const int xxy_sr_branch_schema_version = 1;
 
         // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
         // 注意：此版本号与 osu! 官方服务器端的版本号无关，仅用于本地持久化存储的失效控制。
@@ -756,15 +775,323 @@ LIMIT 1;
             }
         }
 
+        public string CreateXxySrBranchDatabasePath(string rulesetShortName)
+        {
+            string safeRulesetName = string.IsNullOrWhiteSpace(rulesetShortName) ? "ruleset" : rulesetShortName.Trim();
+            string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+
+            return storage.GetFullPath(Path.Combine(XXY_SR_BRANCH_DATABASE_DIRECTORY, $"xxySR_{safeRulesetName}_{timestamp}.sqlite"), true);
+        }
+
+        public string CreateXxySrBranchDatabasePath(XxySrBranchMetadata metadata)
+        {
+            string safeModsDisplay = createSafeBranchModsDisplay(metadata.ModsDisplay);
+            string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+
+            return storage.GetFullPath(Path.Combine(XXY_SR_BRANCH_DATABASE_DIRECTORY, $"xxySR_{metadata.BeatmapCount}diff_{safeModsDisplay}_{timestamp}.sqlite"), true);
+        }
+
+        public void StoreXxySrBranch(string databasePath, XxySrBranchMetadata metadata, IEnumerable<XxySrBranchRow> rows)
+        {
+            if (!Enabled)
+                return;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+
+            if (File.Exists(databasePath))
+                File.Delete(databasePath);
+
+            using var connection = openConnection(databasePath);
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+PRAGMA temp_store=MEMORY;
+";
+                cmd.ExecuteNonQuery();
+            }
+
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = @"
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS xxy_sr_branch (
+    beatmap_id TEXT PRIMARY KEY,
+    beatmap_hash TEXT NOT NULL,
+    beatmap_md5 TEXT NOT NULL,
+    xxy_sr REAL NOT NULL
+);
+";
+                cmd.ExecuteNonQuery();
+            }
+
+            setMeta(connection, "kind", xxy_sr_branch_kind);
+            setMeta(connection, "schema_version", xxy_sr_branch_schema_version.ToString(CultureInfo.InvariantCulture));
+            setMeta(connection, "analysis_version", ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+            setMeta(connection, "ruleset_online_id", metadata.RulesetOnlineId.ToString(CultureInfo.InvariantCulture));
+            setMeta(connection, "ruleset_short_name", metadata.RulesetShortName);
+            setMeta(connection, "mods_fingerprint", metadata.ModsFingerprint);
+            setMeta(connection, "mods_display", metadata.ModsDisplay);
+            setMeta(connection, "beatmap_count", metadata.BeatmapCount.ToString(CultureInfo.InvariantCulture));
+            setMeta(connection, "created_at", metadata.CreatedAtUnixMilliseconds.ToString(CultureInfo.InvariantCulture));
+            setMeta(connection, "display_name", metadata.DisplayName);
+
+            using var transaction = connection.BeginTransaction();
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = @"
+INSERT INTO xxy_sr_branch(
+    beatmap_id,
+    beatmap_hash,
+    beatmap_md5,
+    xxy_sr
+)
+VALUES(
+    $id,
+    $hash,
+    $md5,
+    $xxy_sr
+)
+ON CONFLICT(beatmap_id) DO UPDATE SET
+    beatmap_hash = excluded.beatmap_hash,
+    beatmap_md5 = excluded.beatmap_md5,
+    xxy_sr = excluded.xxy_sr;
+";
+
+            var idParam = insert.CreateParameter();
+            idParam.ParameterName = "$id";
+            insert.Parameters.Add(idParam);
+
+            var hashParam = insert.CreateParameter();
+            hashParam.ParameterName = "$hash";
+            insert.Parameters.Add(hashParam);
+
+            var md5Param = insert.CreateParameter();
+            md5Param.ParameterName = "$md5";
+            insert.Parameters.Add(md5Param);
+
+            var xxySrParam = insert.CreateParameter();
+            xxySrParam.ParameterName = "$xxy_sr";
+            insert.Parameters.Add(xxySrParam);
+
+            foreach (var row in rows)
+            {
+                idParam.Value = row.BeatmapId.ToString();
+                hashParam.Value = row.BeatmapHash;
+                md5Param.Value = row.BeatmapMd5;
+                xxySrParam.Value = row.XxySr;
+                insert.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+        }
+
+        public IReadOnlyDictionary<Guid, double> GetXxySrBranchValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
+        {
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return empty_xxy_sr_values;
+
+            try
+            {
+                var beatmapList = beatmaps.Distinct().ToList();
+
+                if (beatmapList.Count == 0)
+                    return empty_xxy_sr_values;
+
+                using var connection = openConnection(databasePath);
+
+                if (!isValidXxySrBranchConnection(connection))
+                    return empty_xxy_sr_values;
+
+                var beatmapsById = beatmapList.ToDictionary(b => b.ID);
+                var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
+                var idsToQuery = beatmapList.Select(b => b.ID).ToList();
+
+                for (int offset = 0; offset < idsToQuery.Count; offset += 800)
+                {
+                    using var cmd = connection.CreateCommand();
+
+                    int batchCount = Math.Min(800, idsToQuery.Count - offset);
+                    var parameterNames = new List<string>(batchCount);
+
+                    for (int i = 0; i < batchCount; i++)
+                    {
+                        string parameterName = $"$id{i}";
+                        parameterNames.Add(parameterName);
+                        cmd.Parameters.AddWithValue(parameterName, idsToQuery[offset + i].ToString());
+                    }
+
+                    cmd.CommandText = $@"
+SELECT beatmap_id, beatmap_hash, beatmap_md5, xxy_sr
+FROM xxy_sr_branch
+WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
+";
+
+                    using var reader = cmd.ExecuteReader();
+
+                    while (reader.Read())
+                    {
+                        if (!Guid.TryParse(reader.GetString(0), out var beatmapId))
+                            continue;
+
+                        if (!beatmapsById.TryGetValue(beatmapId, out var beatmap))
+                            continue;
+
+                        string storedHash = reader.GetString(1);
+                        string storedMd5 = reader.GetString(2);
+
+                        if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
+                            continue;
+
+                        if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                            continue;
+
+                        resolvedValues[beatmapId] = reader.GetDouble(3);
+                    }
+                }
+
+                return resolvedValues;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetXxySrBranchValues failed.", Ez2ConfigManager.LOGGER_NAME);
+                return empty_xxy_sr_values;
+            }
+        }
+
+        public IReadOnlyList<XxySrBranchDescriptor> GetAvailableXxySrBranches()
+        {
+            if (!Enabled)
+                return Array.Empty<XxySrBranchDescriptor>();
+
+            var descriptors = new List<XxySrBranchDescriptor>();
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string directory in enumerateBranchDirectories())
+            {
+                if (!storage.ExistsDirectory(directory))
+                    continue;
+
+                foreach (string relativePath in storage.GetFiles(directory, "*.sqlite"))
+                {
+                    string absolutePath = storage.GetFullPath(relativePath);
+
+                    if (!seenPaths.Add(absolutePath))
+                        continue;
+
+                    if (TryGetXxySrBranchDescriptor(absolutePath, out var descriptor))
+                        descriptors.Add(descriptor);
+                }
+            }
+
+            return descriptors
+                   .OrderByDescending(d => d.Metadata.CreatedAtUnixMilliseconds)
+                   .ThenByDescending(d => d.RelativePath, StringComparer.Ordinal)
+                   .ToList();
+        }
+
+        public bool TryRenameXxySrBranch(string databasePath, string newDisplayName, out XxySrBranchDescriptor descriptor)
+        {
+            descriptor = default;
+
+            if (!Enabled || string.IsNullOrWhiteSpace(newDisplayName))
+                return false;
+
+            if (!TryGetXxySrBranchDescriptor(databasePath, out var existingDescriptor))
+                return false;
+
+            string trimmedDisplayName = newDisplayName.Trim();
+            string sourcePath = Path.GetFullPath(existingDescriptor.DatabasePath);
+            string targetPath = createRenamedBranchPath(sourcePath, trimmedDisplayName);
+
+            try
+            {
+                if (!string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+                    File.Move(sourcePath, targetPath);
+                }
+
+                using (var connection = openConnection(targetPath))
+                    setMeta(connection, "display_name", trimmedDisplayName);
+
+                descriptor = createXxySrBranchDescriptor(targetPath, existingDescriptor.Metadata with { DisplayName = trimmedDisplayName });
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryRenameXxySrBranch failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        public bool DeleteXxySrBranch(string databasePath)
+        {
+            if (!Enabled || string.IsNullOrEmpty(databasePath))
+                return false;
+
+            try
+            {
+                string fullPath = Path.GetFullPath(databasePath);
+
+                if (!File.Exists(fullPath))
+                    return false;
+
+                File.Delete(fullPath);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore DeleteXxySrBranch failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
+        public bool TryGetXxySrBranchDescriptor(string databasePath, out XxySrBranchDescriptor descriptor)
+        {
+            descriptor = default;
+
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return false;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidXxySrBranchConnection(connection))
+                    return false;
+
+                if (!tryReadXxySrBranchMetadata(connection, out var metadata))
+                    return false;
+
+                descriptor = createXxySrBranchDescriptor(databasePath, metadata);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGetXxySrBranchDescriptor failed.", Ez2ConfigManager.LOGGER_NAME);
+                return false;
+            }
+        }
+
         private SqliteConnection openConnection()
+            => openConnection(dbPath);
+
+        private static SqliteConnection openConnection(string databasePath)
         {
             // 这里每次操作打开一个连接，避免跨线程复用连接导致的问题。
-            var connection = new SqliteConnection($"Data Source={dbPath};Cache=Shared;Mode=ReadWriteCreate");
+            var connection = new SqliteConnection($"Data Source={databasePath};Cache=Shared;Mode=ReadWriteCreate");
             connection.Open();
             return connection;
         }
 
-        private void setMeta(SqliteConnection connection, string key, string value)
+        private static void setMeta(SqliteConnection connection, string key, string value)
         {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
@@ -775,6 +1102,158 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value;
             cmd.Parameters.AddWithValue("$k", key);
             cmd.Parameters.AddWithValue("$v", value);
             cmd.ExecuteNonQuery();
+        }
+
+        private static string? tryGetMeta(SqliteConnection connection, string key)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = @"
+SELECT value
+FROM meta
+WHERE key = $key
+LIMIT 1;
+";
+            cmd.Parameters.AddWithValue("$key", key);
+            return cmd.ExecuteScalar() as string;
+        }
+
+        private static bool isValidXxySrBranchConnection(SqliteConnection connection)
+        {
+            string? kind = tryGetMeta(connection, "kind");
+            string? schemaVersionText = tryGetMeta(connection, "schema_version");
+            string? analysisVersionText = tryGetMeta(connection, "analysis_version");
+
+            if (!string.Equals(kind, xxy_sr_branch_kind, StringComparison.Ordinal))
+                return false;
+
+            if (!int.TryParse(schemaVersionText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int schemaVersion) || schemaVersion != xxy_sr_branch_schema_version)
+                return false;
+
+            if (!int.TryParse(analysisVersionText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int analysisVersion) || analysisVersion != ANALYSIS_VERSION)
+                return false;
+
+            return true;
+        }
+
+        private static bool tryReadXxySrBranchMetadata(SqliteConnection connection, out XxySrBranchMetadata metadata)
+        {
+            metadata = default;
+
+            string? rulesetOnlineIdText = tryGetMeta(connection, "ruleset_online_id");
+            string? rulesetShortName = tryGetMeta(connection, "ruleset_short_name");
+            string? modsFingerprint = tryGetMeta(connection, "mods_fingerprint");
+            string? modsDisplay = tryGetMeta(connection, "mods_display");
+            string? beatmapCountText = tryGetMeta(connection, "beatmap_count");
+            string? createdAtText = tryGetMeta(connection, "created_at");
+            string? displayName = tryGetMeta(connection, "display_name");
+
+            if (!int.TryParse(rulesetOnlineIdText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int rulesetOnlineId))
+                return false;
+
+            if (!int.TryParse(beatmapCountText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int beatmapCount))
+                beatmapCount = 0;
+
+            if (!long.TryParse(createdAtText, NumberStyles.Integer, CultureInfo.InvariantCulture, out long createdAtUnixMilliseconds))
+                createdAtUnixMilliseconds = 0;
+
+            rulesetShortName ??= "ruleset";
+            modsFingerprint ??= string.Empty;
+            modsDisplay ??= "NoMod";
+            displayName ??= $"{rulesetShortName} | {modsDisplay} | {beatmapCount:#,0}";
+
+            metadata = new XxySrBranchMetadata(
+                rulesetOnlineId,
+                rulesetShortName,
+                modsFingerprint,
+                modsDisplay,
+                beatmapCount,
+                createdAtUnixMilliseconds,
+                displayName);
+            return true;
+        }
+
+        private static IEnumerable<string> enumerateBranchDirectories()
+        {
+            yield return XXY_SR_BRANCH_DATABASE_DIRECTORY;
+
+            if (!string.Equals(legacy_xxy_sr_branch_database_directory, XXY_SR_BRANCH_DATABASE_DIRECTORY, StringComparison.OrdinalIgnoreCase))
+                yield return legacy_xxy_sr_branch_database_directory;
+        }
+
+        private XxySrBranchDescriptor createXxySrBranchDescriptor(string databasePath, XxySrBranchMetadata metadata)
+        {
+            string fullPath = Path.GetFullPath(databasePath);
+            string rootPath = storage.GetFullPath(string.Empty, true);
+            string relativePath = Path.GetRelativePath(rootPath, fullPath).Replace('\\', '/');
+
+            return new XxySrBranchDescriptor(fullPath, relativePath, metadata);
+        }
+
+        private static string createRenamedBranchPath(string sourcePath, string displayName)
+        {
+            string directory = Path.GetDirectoryName(sourcePath) ?? string.Empty;
+            string safeFileName = createSafeBranchDisplayName(displayName);
+            string candidatePath = Path.Combine(directory, $"{safeFileName}.sqlite");
+
+            if (string.Equals(candidatePath, sourcePath, StringComparison.OrdinalIgnoreCase) || !File.Exists(candidatePath))
+                return candidatePath;
+
+            for (int suffix = 2;; suffix++)
+            {
+                candidatePath = Path.Combine(directory, $"{safeFileName}_{suffix}.sqlite");
+
+                if (string.Equals(candidatePath, sourcePath, StringComparison.OrdinalIgnoreCase) || !File.Exists(candidatePath))
+                    return candidatePath;
+            }
+        }
+
+        private static string createSafeBranchModsDisplay(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return "NoMod";
+
+            var builder = new StringBuilder(value.Length);
+
+            foreach (char c in value)
+            {
+                if (char.IsLetterOrDigit(c))
+                {
+                    builder.Append(c);
+                }
+                else if (c == '+')
+                {
+                    builder.Append('+');
+                }
+            }
+
+            string result = builder.ToString().Trim('+');
+
+            while (result.Contains("++", StringComparison.Ordinal))
+                result = result.Replace("++", "+", StringComparison.Ordinal);
+
+            return string.IsNullOrEmpty(result) ? "NoMod" : result;
+        }
+
+        private static string createSafeBranchDisplayName(string value)
+        {
+            string trimmed = value.Trim();
+
+            if (string.IsNullOrEmpty(trimmed))
+                return "xxySR_branch";
+
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            var builder = new StringBuilder(trimmed.Length);
+
+            foreach (char c in trimmed)
+            {
+                if (Array.IndexOf(invalidChars, c) >= 0)
+                    continue;
+
+                builder.Append(c);
+            }
+
+            string result = builder.ToString().Trim().TrimEnd('.');
+            return string.IsNullOrEmpty(result) ? "xxySR_branch" : result;
         }
 
         private static bool canUpgradeInPlace(int storedVersion) => storedVersion >= min_inplace_upgrade_version && storedVersion <= ANALYSIS_VERSION;

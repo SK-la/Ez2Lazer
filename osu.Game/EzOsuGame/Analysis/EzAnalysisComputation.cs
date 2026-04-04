@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -18,6 +17,30 @@ namespace osu.Game.EzOsuGame.Analysis
 {
     internal static class EzAnalysisComputation
     {
+        public static bool TryComputeXxySr(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double xxySr)
+        {
+            xxySr = 0;
+
+            if (lookup.Ruleset.OnlineID != 3)
+                return false;
+
+            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+            IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (analysisBeatmap.HitObjects.Count == 0)
+                return false;
+
+            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+
+            if (!XxySrCalculatorBridge.TryCalculate(lookup.Ruleset, analysisBeatmap, rate, out double sr) || double.IsNaN(sr) || double.IsInfinity(sr))
+                return false;
+
+            xxySr = sr;
+            return true;
+        }
+
         public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
         {
             PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));

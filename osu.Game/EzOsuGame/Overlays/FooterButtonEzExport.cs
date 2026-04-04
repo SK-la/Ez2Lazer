@@ -18,6 +18,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Graphics;
@@ -26,6 +27,7 @@ using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Footer;
@@ -89,6 +91,12 @@ namespace osu.Game.EzOsuGame.Overlays
             [Resolved]
             private RealmAccess realm { get; set; } = null!;
 
+            [Resolved]
+            private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
+
+            [Resolved(CanBeNull = true)]
+            private EzManageXxySrBranchesDialog? manageXxySrBranchesDialog { get; set; }
+
             [Resolved(canBeNull: true)]
             private INotificationOverlay? notifications { get; set; }
 
@@ -134,6 +142,13 @@ namespace osu.Game.EzOsuGame.Overlays
                 };
 
                 BeatmapInfo? selectedBeatmap = getSelectedBeatmap();
+                string xxySrBranchContext = getXxySrBranchContext();
+
+                addHeader(FooterButtonEzExportStrings.XXY_SR_BRANCH_HEADER, xxySrBranchContext);
+                addButton(FooterButtonEzExportStrings.MANAGE_XXY_SR_BRANCHES, FontAwesome.Solid.List, openXxySrBranchManager);
+                addButton(FooterButtonEzExportStrings.GENERATE_XXY_SR_BRANCH, FontAwesome.Solid.Database, () => Task.Run(generateAndActivateXxySrBranchAsync));
+                addButton(FooterButtonEzExportStrings.ENABLE_XXY_SR_BRANCH, FontAwesome.Solid.Play, openXxySrBranchManagerForActivation);
+                addButton(FooterButtonEzExportStrings.DEACTIVATE_XXY_SR_BRANCH, FontAwesome.Solid.PowerOff, deactivateXxySrBranch, ColourProvider.Content2);
 
                 addHeader(FooterButtonEzExportStrings.FILTERED_RESULTS_HEADER, $"{getFilteredBeatmaps().Count} {FooterButtonEzExportStrings.BEATMAPS_UNIT}");
                 addButton(FooterButtonEzExportStrings.EXPORT_FILTERED_BEATMAPS_TO_ZIP, FontAwesome.Solid.Download, () => Task.Run(() => exportFiltered(filteredExporter)));
@@ -189,6 +204,125 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 exporter.ExportConverted(exportName, filteredBeatmaps, ruleset, mods);
             }
+
+            private async Task generateAndActivateXxySrBranchAsync()
+            {
+                var filteredBeatmaps = getFilteredBeatmaps();
+
+                if (filteredBeatmaps.Count == 0)
+                {
+                    postNotification(new SimpleErrorNotification
+                    {
+                        Text = FooterButtonEzExportStrings.XXY_SR_BRANCH_EMPTY_FILTER_RESULT
+                    });
+                    return;
+                }
+
+                var notification = new ProgressNotification
+                {
+                    State = ProgressNotificationState.Active,
+                    Text = LocalisableString.Format(FooterButtonEzExportStrings.GENERATING_XXY_SR_BRANCH, filteredBeatmaps.Count)
+                };
+
+                postNotification(notification);
+
+                try
+                {
+                    var result = await ezAnalysisCache.CreateAndActivateXxySrBranchAsync(filteredBeatmaps, ruleset, mods,
+                        progress: (processed, total) => notification.Progress = total <= 0 ? 0 : (float)processed / total).ConfigureAwait(false);
+
+                    if (!result.Success)
+                    {
+                        notification.State = ProgressNotificationState.Cancelled;
+                        postNotification(new SimpleErrorNotification
+                        {
+                            Text = result.Message
+                        });
+                        return;
+                    }
+
+                    notification.CompletionText = LocalisableString.Format(
+                        FooterButtonEzExportStrings.XXY_SR_BRANCH_ACTIVATED,
+                        result.DisplayName ?? string.Empty,
+                        result.StoredBeatmapCount,
+                        result.RequestedBeatmapCount);
+
+                    if (!string.IsNullOrEmpty(result.DatabasePath))
+                        notification.CompletionClickAction = () => storage.PresentFileExternally(result.DatabasePath);
+
+                    notification.State = ProgressNotificationState.Completed;
+                }
+                catch (Exception)
+                {
+                    notification.State = ProgressNotificationState.Cancelled;
+                    postNotification(new SimpleErrorNotification
+                    {
+                        Text = FooterButtonEzExportStrings.GENERATE_XXY_SR_BRANCH_FAILED
+                    });
+                }
+            }
+
+            private void deactivateXxySrBranch()
+            {
+                if (!ezAnalysisCache.HasActiveXxySrBranch)
+                {
+                    postNotification(new SimpleNotification
+                    {
+                        Text = FooterButtonEzExportStrings.XXY_SR_BRANCH_ALREADY_INACTIVE
+                    });
+                    return;
+                }
+
+                ezAnalysisCache.DeactivateXxySrBranch();
+                postNotification(new SimpleNotification
+                {
+                    Text = FooterButtonEzExportStrings.DEACTIVATED_XXY_SR_BRANCH
+                });
+            }
+
+            private void openXxySrBranchManager()
+            {
+                if (manageXxySrBranchesDialog == null)
+                {
+                    postNotification(new SimpleErrorNotification
+                    {
+                        Text = FooterButtonEzExportStrings.XXY_SR_BRANCH_MANAGER_UNAVAILABLE
+                    });
+                    return;
+                }
+
+                manageXxySrBranchesDialog.ShowManager();
+            }
+
+            private void openXxySrBranchManagerForActivation()
+            {
+                if (manageXxySrBranchesDialog == null)
+                {
+                    postNotification(new SimpleErrorNotification
+                    {
+                        Text = FooterButtonEzExportStrings.XXY_SR_BRANCH_MANAGER_UNAVAILABLE
+                    });
+                    return;
+                }
+
+                manageXxySrBranchesDialog.ShowForActivation();
+            }
+
+            private string getXxySrBranchContext()
+            {
+                if (!ezAnalysisCache.HasActiveXxySrBranch)
+                    return FooterButtonEzExportStrings.XXY_SR_BRANCH_INACTIVE;
+
+                string context = ezAnalysisCache.ActiveXxySrBranchDisplayName.Value ?? FooterButtonEzExportStrings.XXY_SR_BRANCH_ACTIVE;
+
+                if (!ezAnalysisCache.IsActiveXxySrBranchFor(ruleset, mods))
+                    context += $"\n{FooterButtonEzExportStrings.XXY_SR_BRANCH_RULESET_MODS_MISMATCH}";
+
+                return context;
+            }
+
+            private void postNotification(Notification notification)
+                => footerButton.Schedule(() => notifications?.Post(notification));
 
             private void addHeader(LocalisableString text, string? context = null)
             {
@@ -292,6 +426,22 @@ namespace osu.Game.EzOsuGame.Overlays
         private static class FooterButtonEzExportStrings
         {
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON_TEXT = new EzLocalizationManager.EzLocalisableString("Ez 导出", "Ez Export");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_HEADER = new EzLocalizationManager.EzLocalisableString("xxySR 分支库", "xxySR Branch SQLite");
+            internal static readonly EzLocalizationManager.EzLocalisableString MANAGE_XXY_SR_BRANCHES = new EzLocalizationManager.EzLocalisableString("管理分支库", "Manage Branch SQLite Files");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("生成分支库", "Generate Branch SQLite");
+            internal static readonly EzLocalizationManager.EzLocalisableString ENABLE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("启用分支库", "Enable Branch SQLite");
+            internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("停用当前 xxySR 分支库", "Deactivate Current xxySR Branch");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_EMPTY_FILTER_RESULT = new EzLocalizationManager.EzLocalisableString("当前筛选结果为空，未生成 xxySR 分支库。", "The current filtered result is empty. No xxySR branch sqlite was generated.");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATING_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("正在生成 xxySR 分支库（{0} 张谱面）...", "Generating xxySR branch sqlite ({0} beatmaps)...");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_ACTIVATED = new EzLocalizationManager.EzLocalisableString("xxySR 分支库已启用：{0}（写入 {1}/{2} 张谱面）。", "xxySR branch sqlite activated: {0} ({1}/{2} beatmaps stored).");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_XXY_SR_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("生成 xxySR 分支库失败。", "Failed to generate xxySR branch sqlite.");
+            internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATED_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("已停用当前 xxySR 分支库。", "The current xxySR branch sqlite has been deactivated.");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_ALREADY_INACTIVE = new EzLocalizationManager.EzLocalisableString("当前没有已启用的 xxySR 分支库。", "There is no active xxySR branch sqlite.");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_MANAGER_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("分支库管理器当前不可用。", "The branch sqlite manager is currently unavailable.");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_INACTIVE = new EzLocalizationManager.EzLocalisableString("当前未启用", "Currently inactive");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_ACTIVE = new EzLocalizationManager.EzLocalisableString("当前已启用", "Currently active");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_RULESET_MODS_MISMATCH = new EzLocalizationManager.EzLocalisableString("当前 ruleset / mods 未命中该分支", "Current ruleset / mods do not match this branch");
 
             internal static readonly EzLocalizationManager.EzLocalisableString FILTERED_RESULTS_HEADER = new EzLocalizationManager.EzLocalisableString("筛选结果", "Filtered Results");
             internal static readonly EzLocalizationManager.EzLocalisableString BEATMAPS_UNIT = new EzLocalizationManager.EzLocalisableString("张谱面", "beatmaps");

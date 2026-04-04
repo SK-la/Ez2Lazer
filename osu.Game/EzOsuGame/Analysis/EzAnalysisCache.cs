@@ -11,6 +11,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Lists;
 using osu.Framework.Logging;
+using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -173,8 +174,38 @@ namespace osu.Game.EzOsuGame.Analysis
         public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
             => analysisDatabase.TryGetXxySr(beatmapInfo, rulesetInfo, out xxySr);
 
-        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
-            => analysisDatabase.GetStoredXxySrValues(beatmaps, rulesetInfo);
+        public IBindable<string?> ActiveXxySrBranchDisplayName => analysisDatabase.ActiveXxySrBranchDisplayName;
+
+        public IBindable<string?> ActiveXxySrBranchPath => analysisDatabase.ActiveXxySrBranchPath;
+
+        public IBindable<int> ActiveXxySrBranchVersion => analysisDatabase.ActiveXxySrBranchVersion;
+
+        public bool HasActiveXxySrBranch => analysisDatabase.HasActiveXxySrBranch;
+
+        public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+            => analysisDatabase.GetStoredXxySrValues(beatmaps, rulesetInfo, mods);
+
+        public bool IsActiveXxySrBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
+            => analysisDatabase.IsActiveXxySrBranchFor(rulesetInfo, mods);
+
+        public void DeactivateXxySrBranch()
+            => analysisDatabase.DeactivateXxySrBranch();
+
+        public bool TryActivateXxySrBranch(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryActivateXxySrBranch(databasePath, out message);
+
+        public bool TryRenameXxySrBranch(string databasePath, string newDisplayName, out LocalisableString message, out EzAnalysisPersistentStore.XxySrBranchDescriptor renamedBranch)
+            => analysisDatabase.TryRenameXxySrBranch(databasePath, newDisplayName, out message, out renamedBranch);
+
+        public bool TryDeleteXxySrBranch(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryDeleteXxySrBranch(databasePath, out message);
+
+        public IReadOnlyList<EzAnalysisPersistentStore.XxySrBranchDescriptor> GetAvailableXxySrBranches(IRulesetInfo? rulesetInfo = null, IReadOnlyList<Mod>? mods = null, int maxCount = 0)
+            => analysisDatabase.GetAvailableXxySrBranches(rulesetInfo, mods, maxCount);
+
+        public Task<EzAnalysisDatabase.XxySrBranchBuildResult> CreateAndActivateXxySrBranchAsync(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods,
+                                                                                                 Action<int, int>? progress = null, CancellationToken cancellationToken = default)
+            => analysisDatabase.CreateAndActivateXxySrBranchAsync(beatmaps, rulesetInfo, mods, progress, cancellationToken);
 
         protected virtual Task<EzAnalysisResult?> GetDynamicAnalysisAsync(BeatmapInfo beatmapInfo, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods,
                                                                           CancellationToken cancellationToken = default, int computationDelay = 0)

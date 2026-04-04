@@ -58,6 +58,7 @@ namespace osu.Game.Screens.Select
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
         private Bindable<bool> xxySrFilterSetting = null!;
         private Bindable<bool> ezAnalysisSqliteEnabled = null!;
+        private IBindable<int> activeXxySrBranchVersion = null!;
         private readonly AsyncLocal<Dictionary<BeatmapInfo, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<BeatmapInfo, double>?>();
         private static readonly IReadOnlyDictionary<BeatmapInfo, double> empty_operation_difficulties = new Dictionary<BeatmapInfo, double>();
 
@@ -182,7 +183,7 @@ namespace osu.Game.Screens.Select
 
             if (uncachedBeatmaps.Count > 0)
             {
-                var storedXxySrValues = ezAnalysisCache.GetStoredXxySrValues(uncachedBeatmaps, ruleset.Value);
+                var storedXxySrValues = ezAnalysisCache.GetStoredXxySrValues(uncachedBeatmaps, ruleset.Value, Criteria?.Mods);
 
                 foreach (var beatmap in uncachedBeatmaps)
                 {
@@ -198,6 +199,18 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
             detachedBeatmaps.BindCollectionChanged(beatmapSetsChanged, true);
+
+            activeXxySrBranchVersion = ezAnalysisCache.ActiveXxySrBranchVersion.GetBoundCopy();
+            activeXxySrBranchVersion.BindValueChanged(_ =>
+            {
+                Schedule(() =>
+                {
+                    operationDifficultyCache.Value = null;
+
+                    if (Criteria != null)
+                        Filter(Criteria, true);
+                });
+            }, false);
         }
 
         #region Beatmap source hookup
@@ -860,6 +873,7 @@ namespace osu.Game.Screens.Select
         {
             bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
 
+            operationDifficultyCache.Value = null;
             Criteria = criteria;
 
             loadingDebounce ??= Scheduler.AddDelayed(() =>

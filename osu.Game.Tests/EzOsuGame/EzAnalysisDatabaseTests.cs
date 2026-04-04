@@ -22,7 +22,7 @@ using osu.Game.Tests.Resources;
 namespace osu.Game.Tests.EzOsuGame
 {
     [TestFixture]
-    public class EzAnalysisCacheTests : RealmTest
+    public partial class EzAnalysisCacheTests : RealmTest
     {
         private bool previousPersistentStoreEnabled;
 
@@ -82,7 +82,7 @@ namespace osu.Game.Tests.EzOsuGame
 
                 Assert.That(cache.GetDynamicAnalysisCalls, Is.EqualTo(1));
                 Assert.That(analysis.HasValue, Is.True);
-                assertAnalysis(analysis.Value, runtimeAnalysis);
+                assertAnalysis(analysis!.Value, runtimeAnalysis);
             });
         }
 
@@ -104,7 +104,7 @@ namespace osu.Game.Tests.EzOsuGame
 
                 Assert.That(cache.GetDynamicAnalysisCalls, Is.EqualTo(1));
                 Assert.That(analysis.HasValue, Is.True);
-                assertAnalysis(analysis.Value, runtimeAnalysis);
+                assertAnalysis(analysis!.Value, runtimeAnalysis);
             });
         }
 
@@ -142,7 +142,7 @@ namespace osu.Game.Tests.EzOsuGame
 
                 var cache = new TestEzAnalysisCache(persistentStore, config)
                 {
-                    DynamicResult = default,
+                    DynamicResult = null,
                 };
 
                 var bindable = cache.GetBindableAnalysis(beatmap);
@@ -220,7 +220,72 @@ namespace osu.Game.Tests.EzOsuGame
 
                 Assert.That(cache.GetDynamicAnalysisCalls, Is.EqualTo(1));
                 Assert.That(analysis.HasValue, Is.True);
-                assertAnalysis(analysis.Value, storedAnalysis);
+                assertAnalysis(analysis!.Value, storedAnalysis);
+            });
+        }
+
+        [Test]
+        public void TestMatchingXxySrBranchOverridesBaselineValue()
+        {
+            RunTestWithRealm((_, storage) =>
+            {
+                var beatmap = createBeatmap();
+                var baselineAnalysis = createAnalysis(3.2, 6.4, 9.6);
+                var mods = new Mod[] { new TestMod() };
+
+                var persistentStore = new EzAnalysisPersistentStore(storage);
+                persistentStore.StoreIfDifferent(beatmap, baselineAnalysis);
+
+                var database = createDatabase(persistentStore, storage);
+                storeBranch(persistentStore, beatmap, mods, 15.7, out string databasePath);
+                database.ActivateXxySrBranch(databasePath, beatmap.Ruleset, mods, 1, "branch");
+
+                var values = database.GetStoredXxySrValues(new[] { beatmap }, beatmap.Ruleset, mods);
+
+                Assert.That(values.TryGetValue(beatmap.ID, out double xxySr), Is.True);
+                Assert.That(xxySr, Is.EqualTo(15.7).Within(0.0001));
+            });
+        }
+
+        [Test]
+        public void TestMismatchedXxySrBranchFallsBackToBaseline()
+        {
+            RunTestWithRealm((_, storage) =>
+            {
+                var beatmap = createBeatmap();
+                var baselineAnalysis = createAnalysis(3.2, 6.4, 9.6);
+                var activeBranchMods = new Mod[] { new TestMod() };
+
+                var persistentStore = new EzAnalysisPersistentStore(storage);
+                persistentStore.StoreIfDifferent(beatmap, baselineAnalysis);
+
+                var database = createDatabase(persistentStore, storage);
+                storeBranch(persistentStore, beatmap, activeBranchMods, 15.7, out string databasePath);
+                database.ActivateXxySrBranch(databasePath, beatmap.Ruleset, activeBranchMods, 1, "branch");
+
+                var values = database.GetStoredXxySrValues(new[] { beatmap }, beatmap.Ruleset, mods: null);
+
+                Assert.That(values.TryGetValue(beatmap.ID, out double xxySr), Is.True);
+                Assert.That(xxySr, Is.EqualTo(9.6).Within(0.0001));
+            });
+        }
+
+        [Test]
+        public void TestXxySrBranchSkipsHashMismatch()
+        {
+            RunTestWithRealm((_, storage) =>
+            {
+                var beatmap = createBeatmap();
+                var mods = new Mod[] { new TestMod() };
+
+                var persistentStore = new EzAnalysisPersistentStore(storage);
+                var database = createDatabase(persistentStore, storage);
+                storeBranch(persistentStore, beatmap, mods, 15.7, out string databasePath, storedHash: "mismatch-hash");
+                database.ActivateXxySrBranch(databasePath, beatmap.Ruleset, mods, 1, "branch");
+
+                var values = database.GetStoredXxySrValues(new[] { beatmap }, beatmap.Ruleset, mods);
+
+                Assert.That(values.ContainsKey(beatmap.ID), Is.False);
             });
         }
 
@@ -230,6 +295,32 @@ namespace osu.Game.Tests.EzOsuGame
             config.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled).Value = runtimeEnabled;
             config.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled).Value = sqliteEnabled;
             return config;
+        }
+
+        private static EzAnalysisDatabase createDatabase(EzAnalysisPersistentStore persistentStore, OsuStorage storage)
+            => new EzAnalysisDatabase(persistentStore, null!, createConfig(storage, runtimeEnabled: false, sqliteEnabled: true));
+
+        private static void storeBranch(EzAnalysisPersistentStore persistentStore, BeatmapInfo beatmap, IReadOnlyList<Mod>? mods, double xxySr, out string databasePath, string? storedHash = null)
+        {
+            databasePath = persistentStore.CreateXxySrBranchDatabasePath(beatmap.Ruleset.ShortName);
+            persistentStore.StoreXxySrBranch(
+                databasePath,
+                new EzAnalysisPersistentStore.XxySrBranchMetadata(
+                    beatmap.Ruleset.OnlineID,
+                    beatmap.Ruleset.ShortName,
+                    mods == null || mods.Count == 0 ? string.Empty : string.Join(',', mods.Select(m => m.Acronym)),
+                    mods == null || mods.Count == 0 ? "NoMod" : string.Join(',', mods.Select(m => m.Acronym)),
+                    1,
+                    0,
+                    "branch"),
+                new[]
+                {
+                    new EzAnalysisPersistentStore.XxySrBranchRow(
+                        beatmap.ID,
+                        storedHash ?? beatmap.Hash,
+                        beatmap.MD5Hash,
+                        xxySr)
+                });
         }
 
         private static BeatmapInfo createBeatmap(RulesetInfo? rulesetInfo = null)
@@ -261,7 +352,7 @@ namespace osu.Game.Tests.EzOsuGame
             Assert.That(actual.ManiaAttributes.HoldNoteCounts, Is.EquivalentTo(expected.ManiaAttributes.HoldNoteCounts));
         }
 
-        private class TestEzAnalysisCache : EzAnalysisCache
+        private partial class TestEzAnalysisCache : EzAnalysisCache
         {
             public EzAnalysisResult? DynamicResult { get; set; }
 
@@ -275,7 +366,7 @@ namespace osu.Game.Tests.EzOsuGame
             protected override Task<EzAnalysisResult?> GetDynamicAnalysisAsync(BeatmapInfo beatmapInfo, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods, CancellationToken cancellationToken = default, int computationDelay = 0)
             {
                 GetDynamicAnalysisCalls++;
-                return Task.FromResult<EzAnalysisResult?>(DynamicResult);
+                return Task.FromResult(DynamicResult);
             }
         }
 
