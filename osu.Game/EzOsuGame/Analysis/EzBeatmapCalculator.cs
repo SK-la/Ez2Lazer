@@ -75,7 +75,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// 用于选歌面板：避免重复遍历 HitObjects / 重复计算 KPS。
         /// keyCount 从 columnCounts 推断。
         /// </summary>
-        public static string GetScratchFromPrecomputed(Dictionary<int, int>? columnCounts, double maxKps, List<double>? kpsList)
+        public static string GetScratchFromPrecomputed(Dictionary<int, int>? columnCounts, double maxKps, IReadOnlyList<double>? kpsList)
         {
             if (columnCounts == null || columnCounts.Count == 0)
                 return "[?K] ";

@@ -21,9 +21,9 @@ namespace osu.Game.EzOsuGame.Analysis
         public double MaxKps { get; set; }
 
         [JsonProperty("kps_list", Order = -3)]
-        public List<double> KpsList { get; set; } = new List<double>();
+        public IReadOnlyList<double> KpsList { get; set; } = Array.Empty<double>();
 
-        public static EzCommonAnalysisAttributes Create(double averageKps, double maxKps, List<double> kpsList)
+        public static EzCommonAnalysisAttributes Create(double averageKps, double maxKps, IReadOnlyList<double> kpsList)
             => new EzCommonAnalysisAttributes
             {
                 AverageKps = averageKps,
@@ -102,7 +102,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         public EzAnalysisResult(double averageKps, double maxKps)
-            : this(EzCommonAnalysisAttributes.Create(averageKps, maxKps, new List<double>()))
+            : this(EzCommonAnalysisAttributes.Create(averageKps, maxKps, Array.Empty<double>()))
         {
         }
 
@@ -110,7 +110,10 @@ namespace osu.Game.EzOsuGame.Analysis
         public EzManiaAnalysisAttributes? ManiaAttributes => RulesetAttributes as EzManiaAnalysisAttributes;
 
         [JsonIgnore]
-        public KpsSummary KpsSummary => new KpsSummary(AverageKps, MaxKps, CommonAttributes?.KpsList ?? new List<double>());
+        public IReadOnlyList<double> KpsList => CommonAttributes?.KpsList ?? Array.Empty<double>();
+
+        [JsonIgnore]
+        public KpsSummary KpsSummary => new KpsSummary(AverageKps, MaxKps, KpsList);
 
         [JsonIgnore]
         public EzManiaSummary EzManiaSummary => ManiaAttributes?.Summary ?? EzManiaSummary.EMPTY;
@@ -123,9 +126,9 @@ namespace osu.Game.EzOsuGame.Analysis
     {
         public readonly double AvgKPS;
         public readonly double MaxKPS;
-        public readonly List<double> KpsList;
+        public readonly IReadOnlyList<double> KpsList;
 
-        public KpsSummary(double avgKPS, double maxKps, List<double> kpsList)
+        public KpsSummary(double avgKPS, double maxKps, IReadOnlyList<double> kpsList)
         {
             AvgKPS = avgKPS;
             MaxKPS = maxKps;

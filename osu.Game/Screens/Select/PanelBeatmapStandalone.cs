@@ -376,10 +376,9 @@ namespace osu.Game.Screens.Select
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
         {
-            var commonAttributes = ezAnalysisResult.CommonAttributes;
             double avgKPS = ezAnalysisResult.AverageKps;
             double maxKps = ezAnalysisResult.MaxKps;
-            var kpsList = commonAttributes?.KpsList ?? new List<double>();
+            IReadOnlyList<double> kpsList = ezAnalysisResult.KpsList;
             ezKpsDisplay.SetKps(avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 

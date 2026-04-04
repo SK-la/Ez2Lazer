@@ -580,7 +580,7 @@ LIMIT 1;
             if (!stored.AverageKps.Equals(computed.AverageKps) || !stored.MaxKps.Equals(computed.MaxKps))
                 return true;
 
-            if (!(storedCommonAttributes?.KpsList ?? new List<double>()).SequenceEqual(computedCommonAttributes?.KpsList ?? new List<double>()))
+            if (!(storedCommonAttributes?.KpsList ?? Array.Empty<double>()).SequenceEqual(computedCommonAttributes?.KpsList ?? Array.Empty<double>()))
                 return true;
 
             var storedColumnCounts = storedManiaAttributes?.ColumnCounts ?? new Dictionary<int, int>();
@@ -953,7 +953,7 @@ WHERE beatmap_id = $id;
             var commonAttributes = analysis.CommonAttributes;
             var maniaAttributes = analysis.ManiaAttributes;
 
-            string kpsListJson = JsonSerializer.Serialize(commonAttributes?.KpsList ?? new List<double>());
+            string kpsListJson = JsonSerializer.Serialize(commonAttributes?.KpsList ?? Array.Empty<double>());
             string columnCountsJson = JsonSerializer.Serialize(maniaAttributes?.ColumnCounts ?? new Dictionary<int, int>());
             string holdNoteCountsJson = JsonSerializer.Serialize(maniaAttributes?.HoldNoteCounts ?? new Dictionary<int, int>());
 
