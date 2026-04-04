@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -17,9 +18,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly EzHoldNoteHittingLayer hittingLayer = new EzHoldNoteHittingLayer();
 
         private TextureAnimation? animation;
-        private Container container = null!;
 
-        private readonly IBindable<bool> enabledColor = new Bindable<bool>();
         private IBindable<double> tailAlpha = null!;
         private IBindable<double> tailMaskHeight = null!;
 
@@ -40,7 +39,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 drawableObject.HitObjectApplied += hitObjectApplied;
             }
 
-            enabledColor.BindTo(ezSkinInfo.ColorSettingsEnabled);
             tailAlpha = ezSkinInfo.HoldTailAlpha;
             tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
 
@@ -83,25 +81,25 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 animation = Factory.CreateAnimation($"{ColorPrefix}note");
             }
 
-            container = new Container
+            if (MainContainer != null)
             {
-                RelativeSizeAxes = Axes.X,
-                Anchor = Anchor.TopCentre,
-                Origin = Anchor.TopCentre,
-                Masking = true,
-                Child = new Container
+                MainContainer.Child = new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     Anchor = Anchor.TopCentre,
                     Origin = Anchor.TopCentre,
-                    Child = animation,
-                }
-            };
+                    Masking = true,
+                    Child = new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Anchor = Anchor.TopCentre,
+                        Origin = Anchor.TopCentre,
+                        Child = animation,
+                    }
+                };
+            }
 
-            if (enabledColor.Value)
-                container.Colour = NoteColor;
-
-            AddInternal(container);
+            UpdateColor();
         }
 
         private void hitObjectApplied(DrawableHitObject drawableHitObject)

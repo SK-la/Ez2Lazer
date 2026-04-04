@@ -62,7 +62,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 }
             }
 
-            Schedule(UpdateDrawable);
+            UpdateDrawable();
+            UpdateColor();
         }
 
         protected override void UpdateDrawable()

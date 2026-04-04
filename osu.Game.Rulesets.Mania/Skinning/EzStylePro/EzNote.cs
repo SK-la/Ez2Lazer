@@ -34,6 +34,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 MainContainer.Clear();
                 MainContainer.Child = animation;
             }
+
+            UpdateColor();
         }
 
         protected override void UpdateDrawable()

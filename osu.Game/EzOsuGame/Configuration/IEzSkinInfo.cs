@@ -5,11 +5,9 @@ using osu.Framework.Bindables;
 
 namespace osu.Game.EzOsuGame.Configuration
 {
+    // string类不建议在此绑定
     public interface IEzSkinInfo
     {
-        IBindable<string> NoteSetName { get; }
-        IBindable<string> StageName { get; }
-
         IBindable<double> ColumnWidth { get; }
         IBindable<double> SpecialFactor { get; }
 
@@ -78,9 +76,6 @@ namespace osu.Game.EzOsuGame.Configuration
         {
             BindTo(config);
         }
-
-        IBindable<string> IEzSkinInfo.NoteSetName => NoteSetNameBindable;
-        IBindable<string> IEzSkinInfo.StageName => StageNameBindable;
 
         IBindable<double> IEzSkinInfo.ColumnWidth => ColumnWidthBindable;
         IBindable<double> IEzSkinInfo.SpecialFactor => SpecialFactorBindable;

@@ -125,7 +125,7 @@ namespace osu.Game.Rulesets.Mania.UI
             cachedNoSpecial = null;
 
             EzNoteSizeBindable = ezFactory.GetNoteSize(cachedKeyMode, Index, cachedNoSpecial);
-            EzNoteColourBindable = ezConfig.GetColumnColorBindable(stageDefinition.Columns, Index);
+            EzNoteColourBindable = ezConfig.GetColumnColorBindable(cachedKeyMode, Index);
             EzNoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
 
             SkinnableDrawable keyArea;

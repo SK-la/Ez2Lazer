@@ -196,6 +196,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             resetLayoutCache();
             // 立即刷新 + 下一帧刷新，确保 HoldNote 布局稳定
             Schedule(UpdateDrawable);
+
+            UpdateColor();
         }
 
         protected override void UpdateDrawable()

@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -10,13 +9,11 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning.Legacy;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens.Play;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -30,14 +27,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly Container sprite;
         private TextureAnimation? upSprite;
         private TextureAnimation? downSprite;
-        protected virtual bool IsKeyPress => true;
-        protected virtual bool UseColorization => true;
 
-        [Resolved]
-        private IBeatmap beatmap { get; set; } = null!;
+        // protected virtual bool IsKeyPress => true;
+        // protected virtual bool UseColorization => true;
 
-        [Resolved]
-        private IGameplayClock gameplayClock { get; set; } = null!;
+        // [Resolved]
+        // private IBeatmap beatmap { get; set; } = null!;
+        //
+        // [Resolved]
+        // private IGameplayClock gameplayClock { get; set; } = null!;
 
         [Resolved]
         private Column column { get; set; } = null!;
@@ -51,8 +49,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        private double bpm;
-        private double beatInterval;
+        // private double bpm;
+        // private double beatInterval;
         private int keyMode;
         private int columnIndex;
 
@@ -79,8 +77,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
             noteSizeBindable = column.EzNoteSizeBindable;
 
-            bpm = beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
-            beatInterval = 60000 / bpm * 64;
+            // bpm = beatmap.Beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
+            // beatInterval = 60000 / bpm * 64;
 
             bool isFreeSize = EzProHelper.FREE_SIZE_STAGES.Contains(stageNameBindable.Value);
 
@@ -93,7 +91,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
             else
             {
-                column.TopLevelContainer.Add(sprite);
+                column.TopLevelContainer.Add(CreateProxy());
             }
 
             loadAnimation();

@@ -94,6 +94,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 MainContainer.Clear();
                 MainContainer.Children = [bodyContainer, topContainer];
             }
+
+            UpdateColor();
         }
 
         protected override void UpdateDrawable()

@@ -29,9 +29,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected Column Column { get; private set; } = null!;
 
         [Resolved]
-        protected StageDefinition StageDefinition { get; private set; } = null!;
-
-        [Resolved]
         protected Ez2ConfigManager EzSkinConfig { get; private set; } = null!;
 
         [Resolved]
@@ -43,15 +40,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected int KeyMode;
         protected int ColumnIndex;
-
-        private Colour4 lastNoteColor = Colour4.White;
-        private bool lastNoteColorCached;
+        protected EzColumnType KeyType;
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
+        private void load(StageDefinition stageDefinition, IEzSkinInfo ezSkinInfo)
         {
-            KeyMode = StageDefinition.Columns;
+            KeyMode = stageDefinition.Columns;
             ColumnIndex = Column.Index;
+            KeyType = EzSkinConfig.GetColumnTypeFast(KeyMode, ColumnIndex);
 
             if (ShowSeparators) createSeparators();
 
@@ -63,16 +59,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             };
             AddInternal(MainContainer); //允许多个子元素
 
-            NoteSetBindable.BindTo(ezSkinInfo.NoteSetName);
-            EnabledColor.BindTo(ezSkinInfo.ColorSettingsEnabled);
+            NoteSetBindable.BindTo(Column.EzNoteSetNameBindable);
             NoteSize.BindTo(Column.EzNoteSizeBindable);
-            NoteSize.BindValueChanged(_ => OnNoteSizeChanged());
+            EnabledColor.BindTo(ezSkinInfo.ColorSettingsEnabled);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            // Use a per-column watcher to avoid creating an event handler delegate per-note.
+
+            NoteSize.BindValueChanged(_ => OnNoteSizeChanged());
+
+            // 使用每列共享的 ColumnWatcher 来监听列级事件，避免每个 Note 都单独订阅导致的高额开销
             ColumnWatcher.GetOrCreate(Column).Add(this);
 
             Scheduler.AddOnce(OnNoteSetChanged);
@@ -119,14 +117,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // 或者，不着色时，使用新的开关拓展，在Middle中进一步单独管理着色
             if (MainContainer != null && UseColorization)
             {
-                Colour4 targetColor = NoteColor;
-
-                if (!lastNoteColorCached || lastNoteColor != targetColor)
-                {
-                    MainContainer.Colour = targetColor;
-                    lastNoteColor = targetColor;
-                    lastNoteColorCached = true;
-                }
+                // 颜色订阅是列级的，不需要额外防护
+                MainContainer.Colour = NoteColor;
             }
         }
 
@@ -138,20 +130,19 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             MainContainer?.Clear();
             // 纹理切换后会通过 EzLocalTextureFactory.scheduleTextureRefresh() 自动触发 OnNoteSizeChanged
             // 这里只需要更新纹理即可
-            Scheduler.AddOnce(UpdateTexture);
-            Scheduler.AddOnce(UpdateDrawable);
+            UpdateTexture();
+            UpdateDrawable();
         }
 
         private void OnNoteSizeChanged()
         {
-            Scheduler.AddOnce(UpdateDrawable);
+            UpdateDrawable();
             OnColourChanged();
         }
 
         private void OnColourChanged()
         {
-            lastNoteColorCached = false;
-            Scheduler.AddOnce(UpdateColor);
+            UpdateColor();
         }
 
         protected virtual Colour4 NoteColor
@@ -161,7 +152,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 if (!EnabledColor.Value || !UseColorization)
                     return Colour4.White;
 
-                return Column.EzNoteColourBindable?.Value ?? Colour4.White;
+                return Column.EzNoteColourBindable.Value;
             }
         }
 
@@ -171,9 +162,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             {
                 if (EnabledColor.Value || !UseColorization) return "white";
 
-                EzColumnType keyType = EzSkinConfig.GetColumnTypeFast(KeyMode, ColumnIndex);
-
-                return keyType switch
+                return KeyType switch
                 {
                     EzColumnType.A => "white",
                     EzColumnType.B => "blue",

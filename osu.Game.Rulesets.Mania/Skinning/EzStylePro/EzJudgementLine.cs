@@ -14,8 +14,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzJudgementLine : CompositeDrawable
     {
-        private readonly IBindable<double> hitPositonBindable = new BindableDouble();
-        private readonly IBindable<string> noteSetName = new Bindable<string>();
+        private IBindable<double> hitPositonBindable = new BindableDouble();
+        private IBindable<string> noteSetName = new Bindable<string>();
 
         private Container sprite = null!;
         private TextureAnimation? container;
@@ -24,10 +24,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private EzLocalTextureFactory factory { get; set; } = null!;
 
         [Resolved]
-        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
+        private void load()
         {
             RelativeSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
@@ -41,14 +41,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     FillMode = FillMode.Fill,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Y = -ezSkinConfig.DefaultHitPosition,
+                    Y = -ezConfig.DefaultHitPosition,
                 }
             };
 
-            noteSetName.BindTo(ezSkinInfo.NoteSetName);
+            noteSetName = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             noteSetName.BindValueChanged(_ => OnDrawableChanged(), true);
 
-            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
+            hitPositonBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
             hitPositonBindable.BindValueChanged(_ => updateSizes(), true);
         }
 
@@ -64,11 +64,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void updateSizes()
         {
-            float actualPanelWidth = DrawWidth; //ezSkinConfig.GetTotalWidth(cs);
+            float actualPanelWidth = DrawWidth; //ezConfig.GetTotalWidth(cs);
             float scale = actualPanelWidth / 412.0f;
 
             sprite.Scale = new Vector2(scale);
-            sprite.Y = 384f + ezSkinConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
+            sprite.Y = 384f + ezConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
         }
 
         protected override void Dispose(bool isDisposing)
