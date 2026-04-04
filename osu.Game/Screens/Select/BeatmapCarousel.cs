@@ -129,7 +129,7 @@ namespace osu.Game.Screens.Select
 
             Filters = new ICarouselFilter[]
             {
-                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync),
+                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, () => useActiveXxySrBranchAsBeatmapSource, getDifficultiesForOperationsAsync, getActiveBranchDifficultiesAsync),
                 new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
@@ -171,15 +171,49 @@ namespace osu.Game.Screens.Select
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
         }
 
-        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && xxySrFilterSetting.Value && ruleset.Value.OnlineID == 3;
+        private bool useActiveXxySrBranchAsBeatmapSource => ezAnalysisCache.HasActiveXxySrBranchFor(ruleset.Value);
+
+        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && (xxySrFilterSetting.Value || useActiveXxySrBranchAsBeatmapSource);
+
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getActiveBranchDifficultiesAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        {
+            if (!useActiveXxySrBranchAsBeatmapSource)
+                return Task.FromResult(empty_operation_difficulties);
+
+            var beatmapList = beatmaps.Distinct().ToList();
+
+            if (beatmapList.Count == 0)
+                return Task.FromResult(empty_operation_difficulties);
+
+            var storedXxySrValues = ezAnalysisCache.GetActiveXxySrBranchValues(beatmapList, ruleset.Value);
+            var resolvedValues = new Dictionary<BeatmapInfo, double>(storedXxySrValues.Count);
+
+            foreach (var beatmap in beatmapList)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (storedXxySrValues.TryGetValue(beatmap.ID, out double xxySr))
+                    resolvedValues[beatmap] = xxySr;
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
+        }
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
             if (!preferXxySrForDifficultyOperations)
                 return Task.FromResult(empty_operation_difficulties);
 
+            var beatmapList = beatmaps.Distinct().ToList();
+
+            if (beatmapList.Count == 0)
+                return Task.FromResult(empty_operation_difficulties);
+
+            if (useActiveXxySrBranchAsBeatmapSource)
+                return getStrictActiveBranchDifficultiesAsync(beatmapList, cancellationToken);
+
             var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<BeatmapInfo, double>();
-            var uncachedBeatmaps = beatmaps.Distinct().Where(b => !cachedDifficulties.ContainsKey(b)).ToList();
+            var uncachedBeatmaps = beatmapList.Where(b => !cachedDifficulties.ContainsKey(b)).ToList();
 
             if (uncachedBeatmaps.Count > 0)
             {
@@ -193,6 +227,37 @@ namespace osu.Game.Screens.Select
             }
 
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(cachedDifficulties);
+        }
+
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getStrictActiveBranchDifficultiesAsync(IReadOnlyList<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        {
+            var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<BeatmapInfo, double>();
+            var uncachedBeatmaps = beatmaps.Where(b => !cachedDifficulties.ContainsKey(b)).ToList();
+
+            if (uncachedBeatmaps.Count > 0)
+            {
+                var storedXxySrValues = ezAnalysisCache.GetActiveXxySrBranchValues(uncachedBeatmaps, ruleset.Value);
+
+                foreach (var beatmap in uncachedBeatmaps)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (storedXxySrValues.TryGetValue(beatmap.ID, out double xxySr))
+                        cachedDifficulties[beatmap] = xxySr;
+                }
+            }
+
+            var resolvedValues = new Dictionary<BeatmapInfo, double>(beatmaps.Count);
+
+            foreach (var beatmap in beatmaps)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (cachedDifficulties.TryGetValue(beatmap, out double xxySr))
+                    resolvedValues[beatmap] = xxySr;
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
         }
 
         protected override void LoadComplete()

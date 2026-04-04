@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Framework.Localisation;
@@ -16,6 +17,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
@@ -98,6 +100,19 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public bool HasActiveXxySrBranch => !string.IsNullOrEmpty(activeXxySrBranchPath);
 
+        public bool HasActiveXxySrBranchFor(IRulesetInfo? rulesetInfo)
+            => rulesetInfo?.OnlineID == 3
+               && !string.IsNullOrEmpty(activeXxySrBranchPath)
+               && activeXxySrBranchRulesetOnlineId == rulesetInfo.OnlineID;
+
+        public IReadOnlyDictionary<Guid, double> GetActiveXxySrBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled || !HasActiveXxySrBranchFor(rulesetInfo) || activeXxySrBranchPath == null)
+                return empty_xxy_sr_values;
+
+            return persistentStore.GetXxySrBranchValues(activeXxySrBranchPath, beatmaps);
+        }
+
         public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
@@ -110,7 +125,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
 
-            if (IsActiveXxySrBranchFor(rulesetInfo, mods) && activeXxySrBranchPath != null)
+            if (HasActiveXxySrBranchFor(rulesetInfo) && activeXxySrBranchPath != null)
             {
                 foreach (var kvp in persistentStore.GetXxySrBranchValues(activeXxySrBranchPath, beatmapList))
                     resolvedValues[kvp.Key] = kvp.Value;
@@ -144,7 +159,8 @@ namespace osu.Game.EzOsuGame.Analysis
                 createModsDisplay(mods),
                 beatmapCount,
                 DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                displayName ?? createBranchDisplayName(rulesetInfo, mods, beatmapCount)));
+                displayName ?? createBranchDisplayName(rulesetInfo, mods, beatmapCount),
+                createModsJson(mods)));
         }
 
         public void DeactivateXxySrBranch()
@@ -185,7 +201,8 @@ namespace osu.Game.EzOsuGame.Analysis
                     modsDisplay,
                     beatmapList.Count,
                     DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    displayName);
+                    displayName,
+                    createModsJson(mods));
                 string databasePath = persistentStore.CreateXxySrBranchDatabasePath(metadata);
                 var rows = new List<EzAnalysisPersistentStore.XxySrBranchRow>(beatmapList.Count);
 
@@ -443,6 +460,12 @@ namespace osu.Game.EzOsuGame.Analysis
             return relevantMods.Count == 0 ? "NoMod" : string.Join('+', relevantMods.Select(m => m.Acronym));
         }
 
+        private static string createModsJson(IReadOnlyList<Mod>? mods)
+        {
+            var apiMods = (mods ?? Array.Empty<Mod>()).Select(mod => new APIMod(mod)).ToArray();
+            return JsonConvert.SerializeObject(apiMods);
+        }
+
         private static string createModsProfileFingerprint(IEnumerable<Mod>? mods)
         {
             var relevantMods = getXxySrRelevantMods(mods).ToList();
@@ -459,7 +482,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 foreach (var setting in mod.SettingsBindables)
                 {
                     builder.Append('|');
-                    builder.Append(JsonSerializer.Serialize(setting.GetUnderlyingSettingValue()));
+                    builder.Append(System.Text.Json.JsonSerializer.Serialize(setting.GetUnderlyingSettingValue()));
                 }
 
                 builder.Append(';');

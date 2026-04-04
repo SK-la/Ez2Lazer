@@ -315,8 +315,10 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 string context = ezAnalysisCache.ActiveXxySrBranchDisplayName.Value ?? FooterButtonEzExportStrings.XXY_SR_BRANCH_ACTIVE;
 
-                if (!ezAnalysisCache.IsActiveXxySrBranchFor(ruleset, mods))
-                    context += $"\n{FooterButtonEzExportStrings.XXY_SR_BRANCH_RULESET_MODS_MISMATCH}";
+                if (!ezAnalysisCache.HasActiveXxySrBranchFor(ruleset))
+                    context += $"\n{FooterButtonEzExportStrings.XXY_SR_BRANCH_RULESET_MISMATCH}";
+                else if (!ezAnalysisCache.IsActiveXxySrBranchFor(ruleset, mods))
+                    context += $"\n{FooterButtonEzExportStrings.XXY_SR_BRANCH_MODS_OUT_OF_SYNC}";
 
                 return context;
             }
@@ -431,7 +433,7 @@ namespace osu.Game.EzOsuGame.Overlays
             internal static readonly EzLocalizationManager.EzLocalisableString MANAGE_XXY_SR_BRANCHES = new EzLocalizationManager.EzLocalisableString("管理分支库", "Manage Branch SQLite Files");
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("生成分支库", "Generate Branch SQLite");
             internal static readonly EzLocalizationManager.EzLocalisableString ENABLE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("启用分支库", "Enable Branch SQLite");
-            internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("停用当前 xxySR 分支库", "Deactivate Current xxySR Branch");
+            internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("停用分支库", "Deactivate Branch SQLite");
             internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_EMPTY_FILTER_RESULT = new EzLocalizationManager.EzLocalisableString("当前筛选结果为空，未生成 xxySR 分支库。", "The current filtered result is empty. No xxySR branch sqlite was generated.");
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATING_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("正在生成 xxySR 分支库（{0} 张谱面）...", "Generating xxySR branch sqlite ({0} beatmaps)...");
             internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_ACTIVATED = new EzLocalizationManager.EzLocalisableString("xxySR 分支库已启用：{0}（写入 {1}/{2} 张谱面）。", "xxySR branch sqlite activated: {0} ({1}/{2} beatmaps stored).");
@@ -441,7 +443,8 @@ namespace osu.Game.EzOsuGame.Overlays
             internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_MANAGER_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("分支库管理器当前不可用。", "The branch sqlite manager is currently unavailable.");
             internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_INACTIVE = new EzLocalizationManager.EzLocalisableString("当前未启用", "Currently inactive");
             internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_ACTIVE = new EzLocalizationManager.EzLocalisableString("当前已启用", "Currently active");
-            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_RULESET_MODS_MISMATCH = new EzLocalizationManager.EzLocalisableString("当前 ruleset / mods 未命中该分支", "Current ruleset / mods do not match this branch");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_RULESET_MISMATCH = new EzLocalizationManager.EzLocalisableString("当前 ruleset 与分支库不一致", "Current ruleset does not match this branch");
+            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_MODS_OUT_OF_SYNC = new EzLocalizationManager.EzLocalisableString("当前 mods 已偏离建库时状态，但列表仍按分支库显示", "Current mods differ from the branch build state, but the list is still driven by the branch sqlite");
 
             internal static readonly EzLocalizationManager.EzLocalisableString FILTERED_RESULTS_HEADER = new EzLocalizationManager.EzLocalisableString("筛选结果", "Filtered Results");
             internal static readonly EzLocalizationManager.EzLocalisableString BEATMAPS_UNIT = new EzLocalizationManager.EzLocalisableString("张谱面", "beatmaps");

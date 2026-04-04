@@ -1,31 +1,36 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 using osu.Framework.Allocation;
-using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
+using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Extensions;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Online.API;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Utils;
 using osuTK;
 using osuTK.Graphics;
 
@@ -397,7 +402,6 @@ namespace osu.Game.EzOsuGame.Overlays
                         IsSelected = string.Equals(branch.DatabasePath, selectedDatabasePath, StringComparison.OrdinalIgnoreCase),
                         IsActive = string.Equals(branch.DatabasePath, activePath, StringComparison.OrdinalIgnoreCase),
                         SelectAction = selectBranch,
-                        ActivateAction = _ => activateBranch(branch.DatabasePath),
                         RenameAction = renameBranch,
                     });
                 }
@@ -437,6 +441,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void activateBranch(string databasePath)
         {
+            var selectedBranch = displayedBranches.FirstOrDefault(branch => string.Equals(branch.DatabasePath, databasePath, StringComparison.OrdinalIgnoreCase));
+
             if (!ezAnalysisCache.TryActivateXxySrBranch(databasePath, out LocalisableString message))
             {
                 postNotification(new SimpleErrorNotification
@@ -445,6 +451,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 });
                 return;
             }
+
+            tryApplyBranchMods(selectedBranch.Metadata);
 
             postNotification(new SimpleNotification
             {
@@ -455,6 +463,105 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (activationEntryRequested)
                 Hide();
+        }
+
+        private void tryApplyBranchMods(EzAnalysisPersistentStore.XxySrBranchMetadata metadata)
+        {
+            if (metadata.RulesetOnlineId != ruleset.Value.OnlineID)
+                return;
+
+            if (string.IsNullOrWhiteSpace(metadata.ModsJson))
+                return;
+
+            if (mods is not Bindable<IReadOnlyList<Mod>> writableMods)
+            {
+                Logger.Log($"启用分支库“{metadata.DisplayName}”时，当前 mods 绑定不可写，已跳过套用建库时 mods。",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return;
+            }
+
+            try
+            {
+                var apiMods = JsonConvert.DeserializeObject<IEnumerable<APIMod>>(metadata.ModsJson)?.ToArray();
+
+                if (apiMods == null)
+                    return;
+
+                var rulesetInstance = ruleset.Value.CreateInstance();
+                var restoredMods = new List<Mod>();
+                var ignoredMods = new List<string>();
+                var ignoredSettings = new List<string>();
+
+                foreach (var apiMod in apiMods)
+                {
+                    Mod? restoredMod = rulesetInstance.CreateModFromAcronym(apiMod.Acronym);
+
+                    if (restoredMod == null)
+                    {
+                        ignoredMods.Add(apiMod.Acronym);
+                        continue;
+                    }
+
+                    HashSet<string> availableSettings = restoredMod.GetSettingsSourceProperties()
+                                                                   .Select(tuple => tuple.Item2.Name.ToSnakeCase())
+                                                                   .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (string settingKey in apiMod.Settings.Keys)
+                    {
+                        if (!availableSettings.Contains(settingKey))
+                            ignoredSettings.Add($"{apiMod.Acronym}.{settingKey}");
+                    }
+
+                    foreach (var (_, property) in restoredMod.GetSettingsSourceProperties())
+                    {
+                        string settingKey = property.Name.ToSnakeCase();
+
+                        if (!apiMod.Settings.TryGetValue(settingKey, out object? settingValue))
+                            continue;
+
+                        try
+                        {
+                            restoredMod.CopyAdjustedSetting((IBindable)property.GetValue(restoredMod)!, settingValue);
+                        }
+                        catch
+                        {
+                            ignoredSettings.Add($"{apiMod.Acronym}.{settingKey}");
+                        }
+                    }
+
+                    restoredMods.Add(restoredMod);
+                }
+
+                if (!ModUtils.CheckCompatibleSet(restoredMods, out var invalidMods))
+                {
+                    ignoredMods.AddRange(invalidMods.Select(mod => mod.Acronym));
+                    restoredMods = restoredMods.Where(mod => !invalidMods.Contains(mod)).ToList();
+                }
+
+                writableMods.Value = restoredMods.ToArray();
+                logIgnoredBranchMods(metadata.DisplayName, ignoredMods, ignoredSettings);
+            }
+            catch
+            {
+            }
+        }
+
+        private void logIgnoredBranchMods(string branchDisplayName, IEnumerable<string> ignoredMods, IEnumerable<string> ignoredSettings)
+        {
+            string[] ignoredModList = ignoredMods.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            string[] ignoredSettingList = ignoredSettings.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+            if (ignoredModList.Length > 0)
+            {
+                Logger.Log($"启用分支库“{branchDisplayName}”时，以下 mods 无法套用，已忽略: {string.Join(", ", ignoredModList)}",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+            }
+
+            if (ignoredSettingList.Length > 0)
+            {
+                Logger.Log($"启用分支库“{branchDisplayName}”时，以下 mod 设置无法套用，已忽略: {string.Join(", ", ignoredSettingList)}",
+                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+            }
         }
 
         private void renameBranch(EzAnalysisPersistentStore.XxySrBranchDescriptor branch, string newDisplayName)
@@ -571,8 +678,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
             public Action<EzAnalysisPersistentStore.XxySrBranchDescriptor>? SelectAction { get; init; }
 
-            public Action<EzAnalysisPersistentStore.XxySrBranchDescriptor>? ActivateAction { get; init; }
-
             public Action<EzAnalysisPersistentStore.XxySrBranchDescriptor, string>? RenameAction { get; init; }
 
             public BranchListItem(EzAnalysisPersistentStore.XxySrBranchDescriptor branch)
@@ -621,6 +726,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                     RelativeSizeAxes = Axes.X,
                                     Height = 36,
                                     CommitOnFocusLost = true,
+                                    SelectAllOnFocus = true,
                                     Text = branch.Metadata.DisplayName,
                                     FocusedAction = () => SelectAction?.Invoke(branch),
                                 },
@@ -660,12 +766,6 @@ namespace osu.Game.EzOsuGame.Overlays
             protected override bool OnClick(ClickEvent e)
             {
                 SelectAction?.Invoke(branch);
-                return true;
-            }
-
-            protected override bool OnDoubleClick(DoubleClickEvent e)
-            {
-                ActivateAction?.Invoke(branch);
                 return true;
             }
 
@@ -730,8 +830,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private static class EzManageXxySrBranchesDialogStrings
         {
             internal static readonly EzLocalizationManager.EzLocalisableString TITLE = new EzLocalizationManager.EzLocalisableString("xxySR 分支库管理", "xxySR Branch Manager");
-            internal static readonly EzLocalizationManager.EzLocalisableString MANAGER_SUBTITLE = new EzLocalizationManager.EzLocalisableString("滚动列表中选中后可重命名、删除，双击可直接启用。", "Select in the list to rename or delete. Double-click to activate.");
-            internal static readonly EzLocalizationManager.EzLocalisableString ACTIVATION_SUBTITLE = new EzLocalizationManager.EzLocalisableString("选择要启用的分支库，双击列表也可直接启用。", "Choose a branch sqlite to activate. Double-clicking an item also activates it.");
+            internal static readonly EzLocalizationManager.EzLocalisableString MANAGER_SUBTITLE = new EzLocalizationManager.EzLocalisableString("选中分支库后，点击深色名称框可直接重命名；下方可启用、打开目录或删除。", "Select a branch, click the dark name box to rename it directly, then use the buttons below to activate, open the directory, or delete it.");
+            internal static readonly EzLocalizationManager.EzLocalisableString ACTIVATION_SUBTITLE = new EzLocalizationManager.EzLocalisableString("先选中要启用的分支库；点击深色名称框可直接重命名，启用请使用下方按钮。", "Select the branch to activate first. Click the dark name box to rename it directly, then use the button below to activate it.");
             internal static readonly EzLocalizationManager.EzLocalisableString ACTIVATE_SELECTED_BRANCH = new EzLocalizationManager.EzLocalisableString("启用选中分支库", "Activate Selected Branch");
             internal static readonly EzLocalizationManager.EzLocalisableString OPEN_BRANCH_DIRECTORY = new EzLocalizationManager.EzLocalisableString("打开分支库目录", "Open Branch Directory");
             internal static readonly EzLocalizationManager.EzLocalisableString DELETE_SELECTED_BRANCH = new EzLocalizationManager.EzLocalisableString("删除选中分支库", "Delete Selected Branch");

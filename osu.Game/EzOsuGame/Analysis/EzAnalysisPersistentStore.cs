@@ -45,7 +45,8 @@ namespace osu.Game.EzOsuGame.Analysis
             string ModsDisplay,
             int BeatmapCount,
             long CreatedAtUnixMilliseconds,
-            string DisplayName);
+            string DisplayName,
+            string ModsJson = "");
 
         /// <summary>
         /// 持久化总开关（默认关闭）：未来考虑是否允许用户通过配置关闭此功能以避免额外的磁盘读写。
@@ -55,7 +56,6 @@ namespace osu.Game.EzOsuGame.Analysis
         public static readonly string DATABASE_FILENAME = $@"mania-analysis_v{ANALYSIS_VERSION}.sqlite";
 
         public const string XXY_SR_BRANCH_DATABASE_DIRECTORY = "EzData";
-        private const string legacy_xxy_sr_branch_database_directory = "analysis-branches";
         private const string xxy_sr_branch_kind = "xxy_sr_branch";
         private const int xxy_sr_branch_schema_version = 1;
 
@@ -841,6 +841,7 @@ CREATE TABLE IF NOT EXISTS xxy_sr_branch (
             setMeta(connection, "beatmap_count", metadata.BeatmapCount.ToString(CultureInfo.InvariantCulture));
             setMeta(connection, "created_at", metadata.CreatedAtUnixMilliseconds.ToString(CultureInfo.InvariantCulture));
             setMeta(connection, "display_name", metadata.DisplayName);
+            setMeta(connection, "mods_json", metadata.ModsJson);
 
             using var transaction = connection.BeginTransaction();
             using var insert = connection.CreateCommand();
@@ -973,12 +974,9 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
             var descriptors = new List<XxySrBranchDescriptor>();
             var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (string directory in enumerateBranchDirectories())
+            if (storage.ExistsDirectory(XXY_SR_BRANCH_DATABASE_DIRECTORY))
             {
-                if (!storage.ExistsDirectory(directory))
-                    continue;
-
-                foreach (string relativePath in storage.GetFiles(directory, "*.sqlite"))
+                foreach (string relativePath in storage.GetFiles(XXY_SR_BRANCH_DATABASE_DIRECTORY, "*.sqlite"))
                 {
                     string absolutePath = storage.GetFullPath(relativePath);
 
@@ -1058,6 +1056,9 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
             descriptor = default;
 
             if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return false;
+
+            if (!isCurrentXxySrBranchPath(databasePath))
                 return false;
 
             try
@@ -1146,6 +1147,7 @@ LIMIT 1;
             string? beatmapCountText = tryGetMeta(connection, "beatmap_count");
             string? createdAtText = tryGetMeta(connection, "created_at");
             string? displayName = tryGetMeta(connection, "display_name");
+            string? modsJson = tryGetMeta(connection, "mods_json");
 
             if (!int.TryParse(rulesetOnlineIdText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int rulesetOnlineId))
                 return false;
@@ -1160,6 +1162,7 @@ LIMIT 1;
             modsFingerprint ??= string.Empty;
             modsDisplay ??= "NoMod";
             displayName ??= $"{rulesetShortName} | {modsDisplay} | {beatmapCount:#,0}";
+            modsJson ??= string.Empty;
 
             metadata = new XxySrBranchMetadata(
                 rulesetOnlineId,
@@ -1168,16 +1171,22 @@ LIMIT 1;
                 modsDisplay,
                 beatmapCount,
                 createdAtUnixMilliseconds,
-                displayName);
+                displayName,
+                modsJson);
             return true;
         }
 
-        private static IEnumerable<string> enumerateBranchDirectories()
+        private bool isCurrentXxySrBranchPath(string databasePath)
         {
-            yield return XXY_SR_BRANCH_DATABASE_DIRECTORY;
+            string fullPath = Path.GetFullPath(databasePath);
+            string branchRoot = storage.GetFullPath(XXY_SR_BRANCH_DATABASE_DIRECTORY, true);
+            string relativePath = Path.GetRelativePath(branchRoot, fullPath);
 
-            if (!string.Equals(legacy_xxy_sr_branch_database_directory, XXY_SR_BRANCH_DATABASE_DIRECTORY, StringComparison.OrdinalIgnoreCase))
-                yield return legacy_xxy_sr_branch_database_directory;
+            if (string.IsNullOrEmpty(relativePath))
+                return false;
+
+            return !relativePath.StartsWith("..", StringComparison.Ordinal)
+                   && !Path.IsPathRooted(relativePath);
         }
 
         private XxySrBranchDescriptor createXxySrBranchDescriptor(string databasePath, XxySrBranchMetadata metadata)

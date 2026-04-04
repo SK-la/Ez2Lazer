@@ -182,6 +182,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public bool HasActiveXxySrBranch => analysisDatabase.HasActiveXxySrBranch;
 
+        public bool HasActiveXxySrBranchFor(IRulesetInfo? rulesetInfo)
+            => analysisDatabase.HasActiveXxySrBranchFor(rulesetInfo);
+
+        public IReadOnlyDictionary<Guid, double> GetActiveXxySrBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
+            => analysisDatabase.GetActiveXxySrBranchValues(beatmaps, rulesetInfo);
+
         public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetStoredXxySrValues(beatmaps, rulesetInfo, mods);
 

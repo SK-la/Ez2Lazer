@@ -17,16 +17,22 @@ namespace osu.Game.Screens.Select
     {
         private readonly Func<FilterCriteria> getCriteria;
         private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
+        private readonly Func<bool> shouldUseActiveXxySrBranchAsBeatmapSource;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
+        private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync;
 
         public int BeatmapItemsCount { get; private set; }
 
         public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
-                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync)
+                                             Func<bool> shouldUseActiveXxySrBranchAsBeatmapSource,
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync)
         {
             this.getCriteria = getCriteria;
             this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
+            this.shouldUseActiveXxySrBranchAsBeatmapSource = shouldUseActiveXxySrBranchAsBeatmapSource;
             this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
+            this.getActiveBranchDifficultiesAsync = getActiveBranchDifficultiesAsync;
         }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
@@ -36,18 +42,23 @@ namespace osu.Game.Screens.Select
             int countMatching = 0;
             var matchedItems = new List<CarouselItem>();
 
+            bool useActiveBranchBeatmapSource = shouldUseActiveXxySrBranchAsBeatmapSource();
             bool useXxyDifficulty = shouldUseXxySrForDifficultyOperations();
             bool requiresDifficultyForFiltering = useXxyDifficulty && (criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter);
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
+            IReadOnlyDictionary<BeatmapInfo, double>? activeBranchDifficulties = null;
+
+            var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model)
+                                         .Where(b => !b.Hidden)
+                                         .Distinct()
+                                         .ToList();
+
+            if (useActiveBranchBeatmapSource)
+                activeBranchDifficulties = await getActiveBranchDifficultiesAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
 
             if (requiresDifficultyForFiltering)
             {
-                var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model)
-                                             .Where(b => !b.Hidden)
-                                             .Distinct()
-                                             .ToList();
-
                 operationDifficulties = await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
             }
 
@@ -59,6 +70,19 @@ namespace osu.Game.Screens.Select
 
                 if (beatmap.Hidden)
                     continue;
+
+                if (activeBranchDifficulties != null)
+                {
+                    if (!activeBranchDifficulties.TryGetValue(beatmap, out double branchDifficulty))
+                        continue;
+
+                    if (requiresDifficultyForFiltering && !checkDifficultyCriteriaMatch(criteria, branchDifficulty))
+                        continue;
+
+                    countMatching++;
+                    matchedItems.Add(item);
+                    continue;
+                }
 
                 double starDifficultyForFilter = beatmap.StarRating;
 
@@ -74,6 +98,17 @@ namespace osu.Game.Screens.Select
 
             BeatmapItemsCount = countMatching;
             return matchedItems;
+        }
+
+        private static bool checkDifficultyCriteriaMatch(FilterCriteria criteria, double starDifficultyForFilter)
+        {
+            if (criteria.StarDifficulty.HasFilter && !criteria.StarDifficulty.IsInRange(starDifficultyForFilter.FloorToDecimalDigits(2)))
+                return false;
+
+            if (criteria.UserStarDifficulty.HasFilter && !criteria.UserStarDifficulty.IsInRange(starDifficultyForFilter))
+                return false;
+
+            return true;
         }
 
         public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter)
