@@ -35,17 +35,26 @@ namespace osu.Game.EzOsuGame
         private readonly LargeTextureStore stageTextureStore;
         private readonly TextureStore textureStore;
 
-        private readonly Bindable<string> noteSetName;
-        private readonly Bindable<string> stageName;
-        private readonly Bindable<double> columnWidth;
-        private readonly Bindable<double> specialFactor;
-        private readonly Bindable<double> noteHeightScaleToWidth;
+        private readonly IBindable<string> noteSetName;
+        private readonly IBindable<string> stageName;
+
+        private readonly BindableDouble columnWidth = new BindableDouble();
+        private readonly BindableDouble specialFactor = new BindableDouble();
+        private readonly BindableDouble noteHeightScaleToWidth = new BindableDouble();
+
         private readonly IBindable<bool> colorSettingsEnabled;
-        private readonly Bindable<Colour4> columnTypeA;
-        private readonly Bindable<Colour4> columnTypeB;
-        private readonly Bindable<Colour4> columnTypeS;
-        private readonly Bindable<Colour4> columnTypeE;
-        private readonly Bindable<Colour4> columnTypeP;
+        private readonly IBindable<Colour4> columnTypeA;
+        private readonly IBindable<Colour4> columnTypeB;
+        private readonly IBindable<Colour4> columnTypeS;
+        private readonly IBindable<Colour4> columnTypeE;
+        private readonly IBindable<Colour4> columnTypeP;
+        private readonly IBindable<string>[] columnTypeLists;
+        private readonly Dictionary<NoteSizeCacheKey, Bindable<Vector2>> noteSizeBindables = new Dictionary<NoteSizeCacheKey, Bindable<Vector2>>();
+
+        private readonly Action<int, int, EzColumnType>? onColumnTypeChangedHandler;
+
+        public IBindable<string> NoteSetNameBindable { get; }
+        public IBindable<bool> ColorSettingsEnabledBindable { get; }
 
         private readonly struct NoteSizeCacheKey : IEquatable<NoteSizeCacheKey>
         {
@@ -91,41 +100,69 @@ namespace osu.Game.EzOsuGame
             stageTextureStore = new LargeTextureStore(renderer, limitedLoader);
             stageTextureStore.AddTextureSource(baseTextureLoaderStore);
 
-            columnWidth = ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
-            specialFactor = ezConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
-            noteHeightScaleToWidth = ezConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
-
             noteSetName = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             stageName = ezConfig.GetBindable<string>(Ez2Setting.StageName);
+            NoteSetNameBindable = noteSetName;
+
+            ezConfig.BindWith(Ez2Setting.ColumnWidth, columnWidth);
+            ezConfig.BindWith(Ez2Setting.SpecialFactor, specialFactor);
+            ezConfig.BindWith(Ez2Setting.NoteHeightScaleToWidth, noteHeightScaleToWidth);
+            // columnWidth = ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
+            // specialFactor = ezConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
+            // noteHeightScaleToWidth = ezConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
 
             // 绑定颜色设置，用于通知颜色变化
             colorSettingsEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            ColorSettingsEnabledBindable = colorSettingsEnabled;
             columnTypeA = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
             columnTypeB = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
             columnTypeS = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
             columnTypeE = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
             columnTypeP = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
+            columnTypeLists = new IBindable<string>[]
+            {
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf4K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf5K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf6K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf7K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf8K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf9K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf10K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf12K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf14K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf16K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf18K),
+            };
 
             initializeDrawableEvents();
             initializeSizeEvents();
             initializeColourEvents();
+
+            onColumnTypeChangedHandler = onColumnTypeChanged;
+            ezConfig.ColumnTypeChanged += onColumnTypeChangedHandler;
         }
 
         #region 事件发布
 
-        private void scheduleTextureRefresh()
-        {
-            // 使用 Scheduler.AddOnce 而不是 Schedule，确保即使时钟暂停也能执行
-            Scheduler.AddOnce(() =>
-            {
-                // 强制重新计算比例并刷新尺寸
-                GetRatio(forceRecalculate: true);
-                OnNoteSizeChanged?.Invoke();
-            });
-        }
-
         public event Action? OnNoteSizeChanged;
         public event Action? OnNoteColourChanged;
+
+        private void scheduleTextureRefresh()
+        {
+            // 纹理名或轨道尺寸相关设置变化时，立即重算尺寸，避免 note 先用旧尺寸渲染一帧。
+            GetRatio(forceRecalculate: true);
+            refreshNoteSizeBindables();
+            OnNoteSizeChanged?.Invoke();
+        }
+
+        private void onColumnTypeChanged(int keyMode, int columnIndex, EzColumnType type)
+        {
+            foreach (var pair in noteSizeBindables)
+            {
+                if (pair.Key.KeyMode == keyMode && pair.Key.ColumnIndex == columnIndex)
+                    updateNoteSizeBindable(pair.Key, pair.Value);
+            }
+        }
 
         private void initializeDrawableEvents()
         {
@@ -138,35 +175,19 @@ namespace osu.Game.EzOsuGame
             columnWidth.BindValueChanged(_ => scheduleTextureRefresh());
             specialFactor.BindValueChanged(_ => scheduleTextureRefresh());
             noteHeightScaleToWidth.BindValueChanged(_ => scheduleTextureRefresh(), true);
-
-            columnWidth.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-            specialFactor.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-            noteHeightScaleToWidth.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-
-            var columnWidthStyleBindable = ezConfig.GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle);
-            var holdTailMaskHeightBindable = ezConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight);
-
-            columnWidthStyleBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
-            holdTailMaskHeightBindable.BindValueChanged(_ => OnNoteSizeChanged?.Invoke());
         }
 
         private void initializeColourEvents()
         {
-            var holdTailAlphaBindable = ezConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha);
-            var customColour = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
-            var colorABindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
-            var colorBBindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
-            var colorSBindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
-            var colorEBindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
-            var colorPBindable = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
+            colorSettingsEnabled.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeA.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeB.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeS.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeE.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeP.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
 
-            holdTailAlphaBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            customColour.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorABindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorBBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorSBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorEBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
-            colorPBindable.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            foreach (var columnTypeList in columnTypeLists)
+                columnTypeList.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
         }
 
         #endregion
@@ -203,11 +224,17 @@ namespace osu.Game.EzOsuGame
             return ratio;
         }
 
-        public Bindable<Vector2> GetNoteSize(int keyMode, int columnIndex, bool? noSpecial = null)
+        public Bindable<Vector2> GetNoteSizeBindable(int keyMode, int columnIndex, bool noSpecial = false)
         {
-            // 当 Note/Column销毁时，Bindable会被 GC自动回收，避免内存泄漏
-            var cacheKey = new NoteSizeCacheKey(keyMode, columnIndex, noSpecial == true);
-            return new Bindable<Vector2>(calculateNoteSize(cacheKey));
+            var cacheKey = new NoteSizeCacheKey(keyMode, columnIndex, noSpecial);
+
+            if (!noteSizeBindables.TryGetValue(cacheKey, out var bindable))
+            {
+                bindable = new Bindable<Vector2>(calculateNoteSize(cacheKey));
+                noteSizeBindables[cacheKey] = bindable;
+            }
+
+            return bindable;
         }
 
         private Vector2 calculateNoteSize(NoteSizeCacheKey cacheKey)
@@ -217,6 +244,26 @@ namespace osu.Game.EzOsuGame
             float x = (float)(columnWidth.Value * (isSpecialColumn ? specialFactor.Value : 1.0));
             float y = (float)noteHeightScaleToWidth.Value * ratio * x;
             return new Vector2(x, y);
+        }
+
+        private void refreshNoteSizeBindables()
+        {
+            foreach (var pair in noteSizeBindables)
+                updateNoteSizeBindable(pair.Key, pair.Value);
+        }
+
+        private void updateNoteSizeBindable(NoteSizeCacheKey cacheKey)
+        {
+            if (noteSizeBindables.TryGetValue(cacheKey, out var bindable))
+                updateNoteSizeBindable(cacheKey, bindable);
+        }
+
+        private void updateNoteSizeBindable(NoteSizeCacheKey cacheKey, Bindable<Vector2> bindable)
+        {
+            Vector2 newSize = calculateNoteSize(cacheKey);
+
+            if (bindable.Value != newSize)
+                bindable.Value = newSize;
         }
 
         private string getComponentPath(string noteName, string component)
@@ -465,6 +512,9 @@ namespace osu.Game.EzOsuGame
         {
             if (isDisposing)
             {
+                if (onColumnTypeChangedHandler != null)
+                    ezConfig.ColumnTypeChanged -= onColumnTypeChangedHandler;
+
                 noteSetName.UnbindAll();
                 stageName.UnbindAll();
                 columnWidth.UnbindAll();

@@ -192,10 +192,8 @@ namespace osu.Game.EzOsuGame.Screens
 
         private BindableColour4 createColorBindable(Ez2Setting setting)
         {
-            var configBindable = ezSkinConfig.GetBindable<Colour4>(setting);
-            var result = new BindableColour4(configBindable.Value);
-
-            result.BindTo(configBindable);
+            var result = new BindableColour4();
+            ezSkinConfig.BindWith(setting, result);
 
             return result;
         }
@@ -330,8 +328,8 @@ namespace osu.Game.EzOsuGame.Screens
         {
             if (isDisposing)
             {
-                colorSettingsEnabled?.UnbindAll();
-                columnTypeListSelectBindable?.UnbindAll();
+                colorSettingsEnabled.UnbindAll();
+                columnTypeListSelectBindable.UnbindAll();
 
                 foreach (var bindable in colorBindables.Values)
                     bindable.UnbindAll();

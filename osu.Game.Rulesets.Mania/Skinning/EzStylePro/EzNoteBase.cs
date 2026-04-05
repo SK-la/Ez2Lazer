@@ -10,9 +10,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Rulesets.UI;
 using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
@@ -29,26 +27,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected Column Column { get; private set; } = null!;
 
         [Resolved]
-        protected Ez2ConfigManager EzSkinConfig { get; private set; } = null!;
-
-        [Resolved]
         protected EzLocalTextureFactory Factory { get; private set; } = null!;
 
-        protected readonly IBindable<string> NoteSetBindable = new Bindable<string>();
-        protected readonly IBindable<bool> EnabledColor = new Bindable<bool>();
-        protected readonly IBindable<Vector2> NoteSize = new Bindable<Vector2>();
-
-        protected int KeyMode;
-        protected int ColumnIndex;
-        protected EzColumnType KeyType;
+        protected IBindable<string> NoteSetNameBindable = null!;
+        protected IBindable<bool> EnabledColorBindable = null!;
+        protected IBindable<Vector2> NoteSizeBindable = null!;
+        protected IBindable<EzColumnType> NoteTypeBindable = null!;
+        protected IBindable<Colour4> NoteColourBindable = null!;
+        private Action<ValueChangedEvent<Colour4>>? noteColourChangedHandler;
 
         [BackgroundDependencyLoader]
-        private void load(StageDefinition stageDefinition, IEzSkinInfo ezSkinInfo)
+        private void load()
         {
-            KeyMode = stageDefinition.Columns;
-            ColumnIndex = Column.Index;
-            KeyType = EzSkinConfig.GetColumnTypeFast(KeyMode, ColumnIndex);
-
             if (ShowSeparators) createSeparators();
 
             MainContainer = new Container
@@ -59,19 +49,23 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             };
             AddInternal(MainContainer); //允许多个子元素
 
-            NoteSetBindable.BindTo(Column.EzNoteSetNameBindable);
-            NoteSize.BindTo(Column.EzNoteSizeBindable);
-            EnabledColor.BindTo(ezSkinInfo.ColorSettingsEnabled);
+            NoteSetNameBindable = Factory.NoteSetNameBindable;
+            EnabledColorBindable = Factory.ColorSettingsEnabledBindable;
+            NoteTypeBindable = Column.EzNoteTypeBindable;
+            NoteSizeBindable = Column.EzNoteSizeBindable;
+            NoteColourBindable = Column.EzNoteColourBindable;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            NoteSize.BindValueChanged(_ => OnNoteSizeChanged());
-
-            // 使用每列共享的 ColumnWatcher 来监听列级事件，避免每个 Note 都单独订阅导致的高额开销
             ColumnWatcher.GetOrCreate(Column).Add(this);
+
+            noteColourChangedHandler = _ => UpdateColor();
+            NoteColourBindable.ValueChanged += noteColourChangedHandler;
+
+            UpdateColor();
 
             Scheduler.AddOnce(OnNoteSetChanged);
         }
@@ -124,7 +118,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnNoteSetChanged()
         {
-            if (string.IsNullOrEmpty(NoteSetBindable.Value))
+            if (string.IsNullOrEmpty(NoteSetNameBindable.Value))
                 return;
 
             MainContainer?.Clear();
@@ -137,7 +131,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void OnNoteSizeChanged()
         {
             UpdateDrawable();
-            OnColourChanged();
+            UpdateColor();
         }
 
         private void OnColourChanged()
@@ -149,10 +143,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (!EnabledColor.Value || !UseColorization)
+                if (!EnabledColorBindable.Value || !UseColorization)
                     return Colour4.White;
 
-                return Column.EzNoteColourBindable.Value;
+                return NoteColourBindable.Value;
             }
         }
 
@@ -160,9 +154,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (EnabledColor.Value || !UseColorization) return "white";
+                if (EnabledColorBindable.Value || !UseColorization) return "white";
 
-                return KeyType switch
+                return NoteTypeBindable.Value switch
                 {
                     EzColumnType.A => "white",
                     EzColumnType.B => "blue",
@@ -179,6 +173,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (isDisposing)
             {
                 ColumnWatcher.Remove(Column, this);
+
+                if (noteColourChangedHandler != null)
+                {
+                    NoteColourBindable.ValueChanged -= noteColourChangedHandler;
+                    noteColourChangedHandler = null;
+                }
             }
 
             base.Dispose(isDisposing);
@@ -227,13 +227,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         continue;
                     }
 
-                    // If the note is no longer part of a Playfield (e.g. returned to a pool), treat it as removed.
-                    if (target.FindClosestParent<Playfield>() == null)
-                    {
-                        notes.RemoveAt(i);
-                        continue;
-                    }
-
                     target.ForwardOnNoteSetChanged();
                 }
             }
@@ -250,12 +243,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         continue;
                     }
 
-                    if (target.FindClosestParent<Playfield>() == null)
-                    {
-                        notes.RemoveAt(i);
-                        continue;
-                    }
-
                     target.ForwardOnColourChanged();
                 }
             }
@@ -267,12 +254,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                     var wr = notes[i];
 
                     if (!wr.TryGetTarget(out var target))
-                    {
-                        notes.RemoveAt(i);
-                        continue;
-                    }
-
-                    if (target.FindClosestParent<Playfield>() == null)
                     {
                         notes.RemoveAt(i);
                         continue;

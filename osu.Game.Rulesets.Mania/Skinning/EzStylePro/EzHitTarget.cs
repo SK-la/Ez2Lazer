@@ -50,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }, true);
 
             hitTargetAlpha.BindTo(ezSkinInfo.HitTargetAlpha);
-            hitTargetAlpha.BindValueChanged(_ => Alpha = (float)hitTargetAlpha.Value, true);
+            hitTargetAlpha.BindValueChanged(v => Alpha = (float)v.NewValue, true);
 
             requiresUpdate = true;
         }

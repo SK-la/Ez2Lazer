@@ -60,7 +60,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateDrawable()
         {
-            float moveY = NoteSize.Value.Y / 2;
+            float moveY = NoteSizeBindable.Value.Y / 2;
             // baseYPosition = LegacyManiaSkinConfiguration.DEFAULT_HIT_POSITION - (float)hitPosition.Value - moveY;
             Position = new Vector2(0, -moveY);
         }

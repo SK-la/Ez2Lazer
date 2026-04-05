@@ -77,6 +77,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Bindable<double> columnWidthBindable = new Bindable<double>();
         private readonly Bindable<double> specialFactorBindable = new Bindable<double>();
         private readonly Bindable<ColumnWidthStyle> ezColumnWidthStyle = new Bindable<ColumnWidthStyle>();
+        private Action<int, int, EzColumnType>? onColumnTypeChangedHandler;
 
         [BackgroundDependencyLoader]
         private void load(ManiaRulesetConfigManager? rulesetConfig)
@@ -89,6 +90,9 @@ namespace osu.Game.Rulesets.Mania.UI
             ezColumnWidthStyle.BindValueChanged(v => invalidateLayout());
             columnWidthBindable.BindValueChanged(v => invalidateLayout());
             specialFactorBindable.BindValueChanged(v => invalidateLayout());
+
+            onColumnTypeChangedHandler = onColumnTypeChanged;
+            ezSkinConfig.ColumnTypeChanged += onColumnTypeChangedHandler;
 
             mobileLayout.BindValueChanged(_ => invalidateLayout());
             skin.SourceChanged += invalidateLayout;
@@ -159,6 +163,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 {
                     columns[i].Width = 0;
                     columns[i].Margin = new MarginPadding { Left = 0, Right = 0 };
+
                     continue;
                 }
 
@@ -167,9 +172,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 switch (ezColumnWidthStyle.Value)
                 {
-                    case ColumnWidthStyle.EzStyleProOnly:
-                        var skinInfo = skinManager.CurrentSkinInfo.Value;
-                        if (skinInfo.Value.Name.Contains("Ez Style Pro"))
+                    case ColumnWidthStyle.EzSkinOnly:
+                        var skinInfoType = skinManager.CurrentSkinInfo.Value.GetType();
+                        if (skinInfoType == typeof(EzStyleProSkin) || skinInfoType == typeof(Ez2Skin) || skinInfoType == typeof(SbISkin))
                             width = ezWidth;
                         break;
 
@@ -193,8 +198,17 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.Dispose(isDisposing);
 
+            if (onColumnTypeChangedHandler != null)
+                ezSkinConfig.ColumnTypeChanged -= onColumnTypeChangedHandler;
+
             if (skin.IsNotNull())
                 skin.SourceChanged -= invalidateLayout;
+        }
+
+        private void onColumnTypeChanged(int keyMode, int columnIndex, EzColumnType type)
+        {
+            if (keyMode == stageDefinition.Columns)
+                invalidateLayout();
         }
     }
 }

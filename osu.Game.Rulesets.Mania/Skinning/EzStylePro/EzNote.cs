@@ -40,7 +40,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateDrawable()
         {
-            float v = NoteSize.Value.Y;
+            float v = NoteSizeBindable.Value.Y;
             Height = v;
         }
     }

@@ -100,20 +100,21 @@ namespace osu.Game.Rulesets.Mania.UI
         //
         // public IEzSkinInfo EzSkinInfo => ezSkinInfo;
 
-        public Bindable<Colour4> EzNoteColourBindable = new Bindable<Colour4>(Color4.White);
+        public Bindable<Colour4> EzNoteColourBindable = null!;
         public Bindable<Vector2> EzNoteSizeBindable = null!;
-        public Bindable<string> EzNoteSetNameBindable = null!;
+        public Bindable<EzColumnType> EzNoteTypeBindable = null!;
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
 
         private KeySoundPreviewMode keySoundPreviewMode;
 
-        // 存储对本地事件的引用，以便在 Dispose 中正确取消订阅
+        private Action<ValueChangedEvent<string>>? onNoteSetNameChangedHandler;
+        private Action<ValueChangedEvent<bool>>? onColorSettingsEnabledChangedHandler;
+        private Action<int, int, EzColumnType>? onColumnTypeChangedHandler;
         private Action? onNoteSizeChangedHandler;
         private Action? onNoteColourChangedHandler;
 
         // 缓存计算参数，避免闭包捕获
-        private int cachedKeyMode;
-        private bool? cachedNoSpecial;
+        public int KeyMode;
 
         [BackgroundDependencyLoader]
         private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, StageDefinition stageDefinition)
@@ -121,12 +122,11 @@ namespace osu.Game.Rulesets.Mania.UI
             keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
 
             // 缓存计算参数，避免每次创建闭包
-            cachedKeyMode = stageDefinition.Columns;
-            cachedNoSpecial = null;
+            KeyMode = stageDefinition.Columns;
 
-            EzNoteSizeBindable = ezFactory.GetNoteSize(cachedKeyMode, Index, cachedNoSpecial);
-            EzNoteColourBindable = ezConfig.GetColumnColorBindable(cachedKeyMode, Index);
-            EzNoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+            EzNoteTypeBindable = ezConfig.GetColumnTypeBindable(KeyMode, Index);
+            EzNoteSizeBindable = ezFactory.GetNoteSizeBindable(KeyMode, Index);
+            EzNoteColourBindable = ezConfig.GetColumnColorBindable(KeyMode, Index);
 
             SkinnableDrawable keyArea;
 
@@ -188,20 +188,27 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
             NewResult += OnNewResult;
 
-            // 使用缓存的参数创建 Action，避免闭包捕获和重复计算
-            onNoteSizeChangedHandler = () =>
+            onNoteSetNameChangedHandler = _ => NoteSetChanged?.Invoke();
+            ezFactory.NoteSetNameBindable.ValueChanged += onNoteSetNameChangedHandler;
+
+            onColorSettingsEnabledChangedHandler = _ =>
             {
-                EzNoteSizeBindable.Value = ezFactory.GetNoteSize(cachedKeyMode, Index, cachedNoSpecial).Value;
+                NoteSetChanged?.Invoke();
             };
+            ezFactory.ColorSettingsEnabledBindable.ValueChanged += onColorSettingsEnabledChangedHandler;
+
+            onColumnTypeChangedHandler = (keyMode, columnIndex, _) =>
+            {
+                if (keyMode == KeyMode && columnIndex == Index)
+                    NoteSetChanged?.Invoke();
+            };
+            ezConfig.ColumnTypeChanged += onColumnTypeChangedHandler;
+
+            onNoteSizeChangedHandler = () => NoteSizeChanged?.Invoke();
+            ezFactory.OnNoteSizeChanged += onNoteSizeChangedHandler;
 
             onNoteColourChangedHandler = () => NoteColourChanged?.Invoke();
-
-            ezFactory.OnNoteSizeChanged += onNoteSizeChangedHandler;
             ezFactory.OnNoteColourChanged += onNoteColourChangedHandler;
-
-            EzNoteSetNameBindable.BindValueChanged(_ => NoteSetChanged?.Invoke());
-            EzNoteSizeBindable.BindValueChanged(_ => NoteSizeChanged?.Invoke());
-            EzNoteColourBindable.BindValueChanged(_ => NoteColourChanged?.Invoke());
         }
 
         protected override void Dispose(bool isDisposing)
@@ -209,19 +216,20 @@ namespace osu.Game.Rulesets.Mania.UI
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
 
-            // 解除对 EzLocalTextureFactory 事件的订阅
-            if (ezFactory.IsNotNull())
-            {
-                if (onNoteColourChangedHandler != null)
-                    ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
+            if (onNoteSetNameChangedHandler != null)
+                ezFactory.NoteSetNameBindable.ValueChanged -= onNoteSetNameChangedHandler;
 
-                if (onNoteSizeChangedHandler != null)
-                    ezFactory.OnNoteSizeChanged -= onNoteSizeChangedHandler;
-            }
+            if (onColorSettingsEnabledChangedHandler != null)
+                ezFactory.ColorSettingsEnabledBindable.ValueChanged -= onColorSettingsEnabledChangedHandler;
 
-            NoteSetChanged = null;
-            NoteSizeChanged = null;
-            NoteColourChanged = null;
+            if (onColumnTypeChangedHandler != null)
+                ezConfig.ColumnTypeChanged -= onColumnTypeChangedHandler;
+
+            if (onNoteSizeChangedHandler != null)
+                ezFactory.OnNoteSizeChanged -= onNoteSizeChangedHandler;
+
+            if (onNoteColourChangedHandler != null)
+                ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
 
             base.Dispose(isDisposing);
 

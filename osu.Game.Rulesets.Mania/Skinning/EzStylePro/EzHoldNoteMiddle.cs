@@ -88,8 +88,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 Child = hittingLayer
             };
 
-            if (isHitting != null)
-                ((IBindable<bool>)hittingLayer.IsHitting).BindTo(isHitting);
+            ((IBindable<bool>)hittingLayer.IsHitting).BindTo(isHitting);
         }
 
         private void onIsHittingChanged(ValueChangedEvent<bool> isHitting)
@@ -202,7 +201,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateDrawable()
         {
-            tailHeight = NoteSize.Value.Y * 0.5f;
+            tailHeight = NoteSizeBindable.Value.Y * 0.5f;
 
             // 当设置为负值时，隐藏 topContainer；非负值时显示
             if (topContainer != null)

@@ -99,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateDrawable()
         {
-            float v = -(float)HitPosition.Value - NoteSize.Value.Y / 2;
+            float v = -(float)HitPosition.Value - NoteSizeBindable.Value.Y / 2;
             Position = new Vector2(0, v);
         }
 

@@ -35,7 +35,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private Bindable<double> hitPosition = null!;
         private Color4 brightColour;
         private Color4 dimColour;
-
         private bool hasSeparator;
 
         [Resolved]
@@ -44,13 +43,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [Resolved]
         private StageDefinition stageDefinition { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
         public EzColumnBackground()
         {
             RelativeSizeAxes = Axes.Both;
         }
 
         [BackgroundDependencyLoader]
-        private void load(Ez2ConfigManager ezConfig, TextureStore textures)
+        private void load(TextureStore textures)
         {
             // 计算 drawSeparator 结果（基于不变的列数和列索引）
             hasSeparator = stageDefinition.HasSeparator(column.Index);
@@ -95,7 +97,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             Scheduler.AddOnce(updateSeparator);
 
-            colourBindable = column.EzNoteColourBindable.GetBoundCopy();
+            colourBindable = column.EzNoteColourBindable;
             colourBindable.BindValueChanged(v =>
             {
                 var baseColour = v.NewValue;

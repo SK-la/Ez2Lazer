@@ -100,7 +100,7 @@ namespace osu.Game.EzOsuGame.Screens
         {
             colorBox.Colour = newColor;
             label.Colour = getContrastColor(newColor);
-            label.ShadowColour = getContrastColor(newColor).Opacity(0.3f);
+            refreshStateAppearance();
         }
 
         private void updateVisualState()
@@ -122,6 +122,14 @@ namespace osu.Game.EzOsuGame.Screens
                 background.FadeColour(Color4.White.Opacity(0.2f), 200, Easing.OutQuint); // 恢复默认
             }
 
+            refreshStateAppearance();
+
+            this.ScaleTo(1.0f, 200, Easing.OutQuint); // 保持原始大小
+            content.Scale = Vector2.One;
+        }
+
+        private void refreshStateAppearance()
+        {
             if (selected)
             {
                 EdgeEffect = new EdgeEffectParameters
@@ -170,9 +178,6 @@ namespace osu.Game.EzOsuGame.Screens
 
                 this.MoveToY(0, 200, Easing.OutQuint);
             }
-
-            this.ScaleTo(1.0f, 200, Easing.OutQuint); // 保持原始大小
-            content.Scale = Vector2.One;
         }
 
         //对比色

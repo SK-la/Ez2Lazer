@@ -13,7 +13,6 @@ using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Online;
-using osu.Game.Screens.Select;
 
 namespace osu.Game.EzOsuGame.Configuration
 {
@@ -58,6 +57,12 @@ namespace osu.Game.EzOsuGame.Configuration
             nameof(EzColumnType.E),
             nameof(EzColumnType.P),
         };
+
+        private readonly Dictionary<EzColumnType, Bindable<Colour4>> columnColorBindables = new Dictionary<EzColumnType, Bindable<Colour4>>();
+        private readonly Dictionary<(int keyMode, int columnIndex), ColumnBindings> columnBindings = new Dictionary<(int keyMode, int columnIndex), ColumnBindings>();
+        private readonly object columnBindingsLock = new object();
+
+        public event Action<int, int, EzColumnType>? ColumnTypeChanged;
 
         public Ez2ConfigManager(Storage storage)
             : base(storage)
@@ -108,7 +113,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.StageName, "Celeste_Lumiere");
             SetDefault(Ez2Setting.StagePanelEnabled, true);
 
-            SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzStyleProOnly);
+            SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzSkinOnly);
             SetDefault(Ez2Setting.ColumnWidth, 75, 5, 400.0, 1.0);
             SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
 
@@ -219,37 +224,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public void SetColumnType(int keyMode, int columnIndex, EzColumnType colorType)
         {
-            try
-            {
-                var setting = getColumnTypeListSetting(keyMode);
-                KeyModeColumnData current = getOrBuildKeyModeColumnData(keyMode);
-                byte newValue = (byte)colorType;
-
-                if (columnIndex < current.Length && current.Types[columnIndex] == newValue)
-                    return;
-
-                int targetLength = Math.Max(current.Length, Math.Max(keyMode, columnIndex + 1));
-                byte[] updatedTypes;
-
-                if (targetLength == current.Length)
-                {
-                    updatedTypes = (byte[])current.Types.Clone();
-                }
-                else
-                {
-                    updatedTypes = new byte[targetLength];
-                    Array.Copy(current.Types, updatedTypes, current.Length);
-
-                    for (int i = current.Length; i < targetLength; i++)
-                        updatedTypes[i] = getDefaultColumnTypeByte(keyMode, i);
-                }
-
-                updatedTypes[columnIndex] = newValue;
-                applyColumnTypesAndPersist(keyMode, setting, updatedTypes);
-            }
-            catch (NotSupportedException)
-            {
-            }
+            setColumnTypeInternal(keyMode, columnIndex, colorType, syncBindable: true);
         }
 
         private static Ez2Setting getColumnTypeListSetting(int keyMode)
@@ -301,6 +276,12 @@ namespace osu.Game.EzOsuGame.Configuration
         }
 
         [UsedImplicitly]
+        public Colour4 GetColumnColorByType(EzColumnType colorType)
+        {
+            return Get<Colour4>(getColorSetting(colorType));
+        }
+
+        [UsedImplicitly]
         public Colour4 GetColumnColor(int keyMode, int columnIndex)
         {
             EzColumnType colorType = GetColumnType(keyMode, columnIndex);
@@ -308,30 +289,37 @@ namespace osu.Game.EzOsuGame.Configuration
         }
 
         [UsedImplicitly]
+        public Bindable<EzColumnType> GetColumnTypeBindable(int keyMode, int columnIndex)
+        {
+            lock (columnBindingsLock)
+                return getOrCreateColumnBindings(keyMode, columnIndex).TypeBindable;
+        }
+
+        [UsedImplicitly]
+        public Bindable<bool> GetSpecialColumnBindable(int keyMode, int columnIndex)
+        {
+            lock (columnBindingsLock)
+                return getOrCreateColumnBindings(keyMode, columnIndex).SpecialBindable;
+        }
+
+        [UsedImplicitly]
+        public Bindable<Colour4> GetColumnColorBindableByType(EzColumnType colorType)
+        {
+            lock (columnBindingsLock)
+                return getOrCreateColumnColorBindableByType(colorType);
+        }
+
+        [UsedImplicitly]
         public Bindable<Colour4> GetColumnColorBindable(int keyMode, int columnIndex)
         {
-            EzColumnType colorType = GetColumnType(keyMode, columnIndex);
-            var colorSetting = getColorSetting(colorType);
-            return GetBindable<Colour4>(colorSetting).GetBoundCopy();
+            lock (columnBindingsLock)
+                return getOrCreateColumnBindings(keyMode, columnIndex).ColourBindable;
         }
 
         [UsedImplicitly]
         public bool IsSpecialColumn(int keyMode, int columnIndex)
         {
             return GetColumnType(keyMode, columnIndex) == EzColumnType.S;
-        }
-
-        // Fast accessors for hot paths: read runtime data only and avoid parsing/allocations.
-        // These do NOT attempt to read settings from disk — they only consult already-built runtime data.
-        public EzColumnType GetColumnTypeFast(int keyMode, int columnIndex)
-        {
-            if (runtime_column_data.TryGetValue(keyMode, out var data))
-            {
-                if (columnIndex < data.Length)
-                    return (EzColumnType)data.Types[columnIndex];
-            }
-
-            return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
         }
 
         public bool IsSpecialColumnFast(int keyMode, int columnIndex)
@@ -366,6 +354,19 @@ namespace osu.Game.EzOsuGame.Configuration
                 result[i] = data.Types[i] == (byte)EzColumnType.S;
 
             return result;
+        }
+
+        // Fast accessors for hot paths: read runtime data only and avoid parsing/allocations.
+        // These do NOT attempt to read settings from disk — they only consult already-built runtime data.
+        public EzColumnType GetColumnTypeFast(int keyMode, int columnIndex)
+        {
+            if (runtime_column_data.TryGetValue(keyMode, out var data))
+            {
+                if (columnIndex < data.Length)
+                    return (EzColumnType)data.Types[columnIndex];
+            }
+
+            return EzColumnTypeManager.GetColumnType(keyMode, columnIndex);
         }
 
         public EzColumnType GetColumnType(int keyMode, int columnIndex)
@@ -475,6 +476,171 @@ namespace osu.Game.EzOsuGame.Configuration
             string serialized = serializeColumnTypes(updatedTypes);
             if (!string.Equals(Get<string>(setting), serialized, StringComparison.Ordinal))
                 SetValue(setting, serialized);
+        }
+
+        private void setColumnTypeInternal(int keyMode, int columnIndex, EzColumnType colorType, bool syncBindable)
+        {
+            try
+            {
+                var setting = getColumnTypeListSetting(keyMode);
+                KeyModeColumnData current = getOrBuildKeyModeColumnData(keyMode);
+                byte newValue = (byte)colorType;
+
+                ColumnBindings? bindings;
+
+                lock (columnBindingsLock)
+                {
+                    columnBindings.TryGetValue((keyMode, columnIndex), out bindings);
+                }
+
+                if (columnIndex < current.Length && current.Types[columnIndex] == newValue)
+                {
+                    if (bindings != null)
+                    {
+                        if (syncBindable)
+                            bindings.SyncFromOwner(colorType);
+                        else
+                            bindings.SyncDerivedFromType(colorType);
+                    }
+
+                    ColumnTypeChanged?.Invoke(keyMode, columnIndex, colorType);
+
+                    return;
+                }
+
+                int targetLength = Math.Max(current.Length, Math.Max(keyMode, columnIndex + 1));
+                byte[] updatedTypes;
+
+                if (targetLength == current.Length)
+                {
+                    updatedTypes = (byte[])current.Types.Clone();
+                }
+                else
+                {
+                    updatedTypes = new byte[targetLength];
+                    Array.Copy(current.Types, updatedTypes, current.Length);
+
+                    for (int i = current.Length; i < targetLength; i++)
+                        updatedTypes[i] = getDefaultColumnTypeByte(keyMode, i);
+                }
+
+                updatedTypes[columnIndex] = newValue;
+                applyColumnTypesAndPersist(keyMode, setting, updatedTypes);
+
+                if (bindings != null)
+                {
+                    if (syncBindable)
+                        bindings.SyncFromOwner(colorType);
+                    else
+                        bindings.SyncDerivedFromType(colorType);
+                }
+
+                ColumnTypeChanged?.Invoke(keyMode, columnIndex, colorType);
+            }
+            catch (NotSupportedException)
+            {
+            }
+        }
+
+        private ColumnBindings getOrCreateColumnBindings(int keyMode, int columnIndex)
+        {
+            var key = (keyMode, columnIndex);
+
+            if (!columnBindings.TryGetValue(key, out var bindings))
+            {
+                bindings = new ColumnBindings(this, keyMode, columnIndex);
+                columnBindings[key] = bindings;
+            }
+
+            return bindings;
+        }
+
+        private Bindable<Colour4> getOrCreateColumnColorBindableByType(EzColumnType colorType)
+        {
+            if (!columnColorBindables.TryGetValue(colorType, out var bindable))
+            {
+                var colorSetting = getColorSetting(colorType);
+                bindable = GetBindable<Colour4>(colorSetting);
+                columnColorBindables[colorType] = bindable;
+            }
+
+            return bindable;
+        }
+
+        private sealed class ColumnBindings
+        {
+            private readonly Ez2ConfigManager owner;
+            private readonly int keyMode;
+            private readonly int columnIndex;
+            private bool applyingFromOwner;
+            private Bindable<Colour4>? currentColourSource;
+
+            public Bindable<EzColumnType> TypeBindable { get; }
+            public Bindable<bool> SpecialBindable { get; }
+            public Bindable<Colour4> ColourBindable { get; }
+
+            public ColumnBindings(Ez2ConfigManager owner, int keyMode, int columnIndex)
+            {
+                this.owner = owner;
+                this.keyMode = keyMode;
+                this.columnIndex = columnIndex;
+
+                TypeBindable = new Bindable<EzColumnType>(owner.GetColumnTypeFast(keyMode, columnIndex));
+                SpecialBindable = new Bindable<bool>(TypeBindable.Value == EzColumnType.S);
+                ColourBindable = new Bindable<Colour4>();
+
+                TypeBindable.BindValueChanged(onTypeChanged);
+                syncDerived(TypeBindable.Value);
+            }
+
+            private void onTypeChanged(ValueChangedEvent<EzColumnType> e)
+            {
+                if (applyingFromOwner)
+                    return;
+
+                owner.setColumnTypeInternal(keyMode, columnIndex, e.NewValue, syncBindable: false);
+            }
+
+            public void SyncFromOwner(EzColumnType type)
+            {
+                applyingFromOwner = true;
+
+                try
+                {
+                    if (TypeBindable.Value != type)
+                        TypeBindable.Value = type;
+                }
+                finally
+                {
+                    applyingFromOwner = false;
+                }
+
+                syncDerived(type);
+            }
+
+            public void SyncDerivedFromType(EzColumnType type) => syncDerived(type);
+
+            private void syncDerived(EzColumnType type)
+            {
+                bool isSpecial = type == EzColumnType.S;
+
+                if (SpecialBindable.Value != isSpecial)
+                    SpecialBindable.Value = isSpecial;
+
+                var colourSource = owner.getOrCreateColumnColorBindableByType(type);
+
+                if (currentColourSource == null)
+                {
+                    currentColourSource = colourSource;
+                    ColourBindable.BindTo(colourSource);
+                }
+                else if (!ReferenceEquals(currentColourSource, colourSource))
+                {
+                    ColourBindable.UnbindFrom(currentColourSource);
+                    currentColourSource = colourSource;
+                    ColourBindable.BindTo(colourSource);
+                }
+            }
         }
 
         private static bool areTypesEqual(byte[] left, byte[] right)

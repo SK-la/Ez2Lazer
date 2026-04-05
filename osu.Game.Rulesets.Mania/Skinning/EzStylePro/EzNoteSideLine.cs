@@ -14,21 +14,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzNoteSideLine : CompositeDrawable
     {
-        private readonly IBindable<double> noteTrackLineHeight = new BindableDouble();
+        private IBindable<double> noteTrackLineHeight = null!;
 
         private Drawable separator = null!;
-
-        private static Texture? sharedTexture;
+        private Sprite? sprite;
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo, TextureStore textures)
+        private void load(TextureStore textures, Ez2ConfigManager ezConfig)
         {
             AlwaysPresent = true;
 
             // 使用共享纹理避免重复加载
-            sharedTexture ??= textures.Get("EzResources/note/NoteSideLine.png");
+            var texture = textures.Get("EzResources/note/NoteSideLine.png");
 
-            var texture = sharedTexture;
+            sprite = new Sprite
+            {
+                RelativeSizeAxes = Axes.Y,
+                Width = 10,
+                Scale = new Vector2(1f, 1),
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Texture = texture,
+            };
 
             InternalChild = new Container
             {
@@ -43,26 +50,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                         // Blending = BlendingParameters.Additive,
-                        Child = new Sprite
-                        {
-                            RelativeSizeAxes = Axes.Y,
-                            Width = 10,
-                            Scale = new Vector2(1f, 1),
-                            Anchor = Anchor.Centre,
-                            Origin = Anchor.Centre,
-                            Texture = texture,
-                        },
+                        Child = sprite,
                     }
                 }
             };
 
-            noteTrackLineHeight.BindTo(ezSkinInfo.NoteTrackLineHeight);
-            noteTrackLineHeight.BindValueChanged(_ => UpdateTrackLineHeight(), true);
+            noteTrackLineHeight = ezConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight);
+            noteTrackLineHeight.BindValueChanged(UpdateTrackLineHeight, true);
         }
 
-        public void UpdateTrackLineHeight()
+        public void UpdateTrackLineHeight(ValueChangedEvent<double> v)
         {
-            separator.Height = (float)noteTrackLineHeight.Value;
+            separator.Height = (float)v.NewValue;
         }
 
         // public void UpdateGlowEffect(Colour4 color)

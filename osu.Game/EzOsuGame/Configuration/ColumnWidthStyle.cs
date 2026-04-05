@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.Configuration
     public enum ColumnWidthStyle
     {
         [LocalisableDescription(typeof(ColumnWidthStyleStrings), nameof(ColumnWidthStyleStrings.EZ_STYLE_PRO_ONLY))]
-        EzStyleProOnly = 0,
+        EzSkinOnly = 0,
 
         [LocalisableDescription(typeof(ColumnWidthStyleStrings), nameof(ColumnWidthStyleStrings.GLOBAL_WIDTH))]
         GlobalWidth = 1,
@@ -20,7 +20,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
     public static class ColumnWidthStyleStrings
     {
-        public static readonly LocalisableString EZ_STYLE_PRO_ONLY = new EzLocalizationManager.EzLocalisableString("Ez Pro 皮肤专用", "EzStylePro Skin Only");
+        public static readonly LocalisableString EZ_STYLE_PRO_ONLY = new EzLocalizationManager.EzLocalisableString("Ez 内置皮肤专用", "Ez Skin Only");
         public static readonly LocalisableString GLOBAL_WIDTH = new EzLocalizationManager.EzLocalisableString("全局宽度", "Global Width");
         public static readonly LocalisableString GLOBAL_TOTAL_WIDTH = new EzLocalizationManager.EzLocalisableString("全局总宽度", "Global Total Width");
     }

@@ -56,7 +56,14 @@ namespace osu.Game.EzOsuGame.Edit
         public override void OnEntering(ScreenTransitionEvent e)
         {
             base.OnEntering(e);
+            Schedule(populateSettings);
             this.FadeInFromZero(200, Easing.OutQuint);
+        }
+
+        public override void OnResuming(ScreenTransitionEvent e)
+        {
+            base.OnResuming(e);
+            Schedule(populateSettings);
         }
 
         public override bool OnExiting(ScreenExitEvent e)
@@ -136,16 +143,6 @@ namespace osu.Game.EzOsuGame.Edit
                     }
                 }
             };
-
-            // PopulateSettings is invoked from LoadComplete to ensure dependencies are available.
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            // Ensure dependencies are available before initialising.
-            Schedule(populateSettings);
         }
 
         public void PopulateSettings() => populateSettings();
@@ -253,7 +250,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void initializeLeftPlayback()
         {
-            var currentSkin = skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager);
+            var currentSkin = getEditorSkin();
 
             if (provider != null)
             {
@@ -287,11 +284,13 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void initializeCenterDisplay()
         {
+            var currentSkin = getEditorSkin();
+
             if (provider != null)
             {
                 centerNoteDisplayContainer!.Children = new Drawable[]
                 {
-                    provider.CreateStaticPart(skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager))
+                    provider.CreateStaticPart(currentSkin)
                 };
             }
             else
@@ -311,10 +310,12 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void initializeRightSettings()
         {
+            var currentSkin = getEditorSkin();
+
             if (provider != null)
             {
                 // Provider may provide a full parameters UI; prefer that when available.
-                settingsScrollContainer!.Child = provider.CreateParametersPart(skinManager.CurrentSkin.Value as EzStyleProSkin ?? new EzStyleProSkin(skinManager));
+                settingsScrollContainer!.Child = provider.CreateParametersPart(currentSkin);
             }
             else
             {
@@ -350,6 +351,15 @@ namespace osu.Game.EzOsuGame.Edit
             // TODO: 将设置应用到当前皮肤
             // 目前只是刷新中间显示
             initializeCenterDisplay();
+        }
+
+        private ISkin getEditorSkin()
+        {
+            var currentSkin = skinManager.CurrentSkin.Value;
+
+            return currentSkin is EzStyleProSkin or Ez2Skin or SbISkin
+                ? currentSkin
+                : new EzStyleProSkin(skinManager);
         }
 
         private void showExitDialog()

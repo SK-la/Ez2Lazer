@@ -211,14 +211,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                 };
             }
 
-            protected override void LoadComplete()
-            {
-                base.LoadComplete();
-
-                columnDependency.EzNoteSizeBindable.Value = new Vector2(preview_column_width, preview_column_width);
-                columnDependency.EzNoteColourBindable.Value = Colour4.White;
-            }
-
             protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
             {
                 var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));

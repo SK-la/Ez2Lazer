@@ -1,96 +1,133 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using JetBrains.Annotations;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 
 namespace osu.Game.EzOsuGame.Configuration
 {
-    // string类不建议在此绑定
     public interface IEzSkinInfo
     {
-        IBindable<double> ColumnWidth { get; }
-        IBindable<double> SpecialFactor { get; }
+        Bindable<string> NoteSetName { get; }
+        Bindable<double> ColumnWidth { get; }
+        Bindable<double> SpecialFactor { get; }
 
-        IBindable<double> HitPosition { get; }
+        Bindable<double> HitPosition { get; }
 
-        IBindable<double> NoteHeightScaleToWidth { get; }
-        IBindable<double> NoteTrackLineHeight { get; }
+        Bindable<double> NoteHeightScaleToWidth { get; }
+        Bindable<double> NoteTrackLineHeight { get; }
 
-        IBindable<double> HitTargetFloatFixed { get; }
-        IBindable<double> HitTargetAlpha { get; }
+        Bindable<double> HitTargetFloatFixed { get; }
+        Bindable<double> HitTargetAlpha { get; }
 
-        IBindable<double> HoldTailAlpha { get; }
-        IBindable<double> HoldTailMaskHeight { get; }
+        Bindable<double> HoldTailAlpha { get; }
+        Bindable<double> HoldTailMaskHeight { get; }
 
-        IBindable<bool> ColorSettingsEnabled { get; }
+        Bindable<bool> ColorSettingsEnabled { get; }
     }
+
+    // public class EzProNoteInfo : IEzSkinInfo
+    // {
+    //     public IBindable<double> ColumnWidth { get; } = new Bindable<double>();
+    //     public IBindable<double> SpecialFactor { get; }  = new Bindable<double>();
+    //     public IBindable<double> NoteHeightScaleToWidth { get; }   = new Bindable<double>();
+    //
+    //     public IBindable<double> HitPosition { get; }   = new Bindable<double>();
+    //
+    //     public IBindable<double> NoteTrackLineHeight { get; } = new Bindable<double>();
+    //
+    //     public IBindable<double> HitTargetFloatFixed { get; } = new Bindable<double>();
+    //     public IBindable<double> HitTargetAlpha { get; } = new Bindable<double>();
+    //
+    //     public IBindable<double> HoldTailAlpha { get; } = new Bindable<double>();
+    //     public IBindable<double> HoldTailMaskHeight { get; } = new Bindable<double>();
+    //
+    //     public IBindable<bool> ColorSettingsEnabled { get; } = new Bindable<bool>();
+    // }
 
     public class EzSkinInfo : IEzSkinInfo
     {
-        public readonly Bindable<string> NoteSetNameBindable = new Bindable<string>();
-        public readonly Bindable<string> StageNameBindable = new Bindable<string>();
+        public Bindable<string> NoteSetName { get; } = new Bindable<string>();
+        public Bindable<double> ColumnWidth { get; } = new Bindable<double>();
+        public Bindable<double> SpecialFactor { get; }  = new Bindable<double>();
+        public Bindable<double> NoteHeightScaleToWidth { get; } = new Bindable<double>();
 
-        public readonly Bindable<double> ColumnWidthBindable = new Bindable<double>();
-        public readonly Bindable<double> SpecialFactorBindable = new Bindable<double>();
+        public Bindable<double> HitPosition { get; } = new Bindable<double>();
 
-        public readonly Bindable<double> HitPositionBindable = new Bindable<double>();
+        public Bindable<double> NoteTrackLineHeight { get; } = new Bindable<double>();
 
-        public readonly Bindable<double> NoteHeightScaleToWidthBindable = new Bindable<double>();
-        public readonly Bindable<double> NoteTrackLineHeightBindable = new Bindable<double>();
+        public Bindable<double> HitTargetFloatFixed { get; } = new Bindable<double>();
+        public Bindable<double> HitTargetAlpha { get; } = new Bindable<double>();
 
-        public readonly Bindable<double> HitTargetFloatFixedBindable = new Bindable<double>();
-        public readonly Bindable<double> HitTargetAlphaBindable = new Bindable<double>();
+        public Bindable<double> HoldTailAlpha { get; } = new Bindable<double>();
+        public Bindable<double> HoldTailMaskHeight { get; } = new Bindable<double>();
 
-        public readonly Bindable<double> HoldTailAlphaBindable = new Bindable<double>();
-        public readonly Bindable<double> HoldTailMaskHeightBindable = new Bindable<double>();
+        public Bindable<bool> ColorSettingsEnabled { get; } = new Bindable<bool>();
 
-        public readonly Bindable<bool> ColorSettingsEnabledBindable = new Bindable<bool>();
-
-        public void BindTo(Ez2ConfigManager config)
+        public void BindWith(Ez2ConfigManager ezConfig)
         {
-            NoteSetNameBindable.BindTo(config.GetBindable<string>(Ez2Setting.NoteSetName));
-            StageNameBindable.BindTo(config.GetBindable<string>(Ez2Setting.StageName));
-
-            ColumnWidthBindable.BindTo(config.GetBindable<double>(Ez2Setting.ColumnWidth));
-            SpecialFactorBindable.BindTo(config.GetBindable<double>(Ez2Setting.SpecialFactor));
-
-            HitPositionBindable.BindTo(config.GetBindable<double>(Ez2Setting.HitPosition));
-
-            NoteHeightScaleToWidthBindable.BindTo(config.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth));
-            NoteTrackLineHeightBindable.BindTo(config.GetBindable<double>(Ez2Setting.NoteTrackLineHeight));
-
-            HitTargetFloatFixedBindable.BindTo(config.GetBindable<double>(Ez2Setting.HitTargetFloatFixed));
-            HitTargetAlphaBindable.BindTo(config.GetBindable<double>(Ez2Setting.HitTargetAlpha));
-
-            HoldTailAlphaBindable.BindTo(config.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha));
-            HoldTailMaskHeightBindable.BindTo(config.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight));
-
-            ColorSettingsEnabledBindable.BindTo(config.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled));
+            ezConfig.BindWith(Ez2Setting.NoteSetName, NoteSetName);
+            ezConfig.BindWith(Ez2Setting.ColumnWidth, ColumnWidth);
+            ezConfig.BindWith(Ez2Setting.SpecialFactor, SpecialFactor);
+            ezConfig.BindWith(Ez2Setting.NoteHeightScaleToWidth, NoteHeightScaleToWidth);
+            ezConfig.BindWith(Ez2Setting.HitPosition, HitPosition);
+            ezConfig.BindWith(Ez2Setting.NoteTrackLineHeight, NoteTrackLineHeight);
+            ezConfig.BindWith(Ez2Setting.HitTargetFloatFixed, HitTargetFloatFixed);
+            ezConfig.BindWith(Ez2Setting.HitTargetAlpha, HitTargetAlpha);
+            ezConfig.BindWith(Ez2Setting.ManiaHoldTailAlpha, HoldTailAlpha);
+            ezConfig.BindWith(Ez2Setting.ManiaHoldTailMaskGradientHeight, HoldTailMaskHeight);
+            ezConfig.BindWith(Ez2Setting.ColorSettingsEnabled, ColorSettingsEnabled);
         }
 
+        [UsedImplicitly]
         public EzSkinInfo()
         {
         }
 
         public EzSkinInfo(Ez2ConfigManager config)
         {
-            BindTo(config);
+            BindWith(config);
         }
+    }
 
-        IBindable<double> IEzSkinInfo.ColumnWidth => ColumnWidthBindable;
-        IBindable<double> IEzSkinInfo.SpecialFactor => SpecialFactorBindable;
+    public class EzSkinColour
+    {
+        public event Action? OnNoteColourChanged;
 
-        IBindable<double> IEzSkinInfo.HitPosition => HitPositionBindable;
+        public EzSkinColour(Ez2ConfigManager ezConfig)
+        {
+            var colorSettingsEnabled1 = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            var columnTypeA = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
+            var columnTypeB = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
+            var columnTypeS = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
+            var columnTypeE = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
+            var columnTypeP = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
+            var columnTypeLists = new IBindable<string>[]
+            {
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf4K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf5K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf6K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf7K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf8K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf9K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf10K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf12K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf14K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf16K),
+                ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf18K),
+            };
 
-        IBindable<double> IEzSkinInfo.NoteHeightScaleToWidth => NoteHeightScaleToWidthBindable;
-        IBindable<double> IEzSkinInfo.NoteTrackLineHeight => NoteTrackLineHeightBindable;
+            colorSettingsEnabled1.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeA.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeB.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeS.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeE.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            columnTypeP.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
 
-        IBindable<double> IEzSkinInfo.HitTargetFloatFixed => HitTargetFloatFixedBindable;
-        IBindable<double> IEzSkinInfo.HitTargetAlpha => HitTargetAlphaBindable;
-
-        IBindable<double> IEzSkinInfo.HoldTailAlpha => HoldTailAlphaBindable;
-        IBindable<double> IEzSkinInfo.HoldTailMaskHeight => HoldTailMaskHeightBindable;
-
-        IBindable<bool> IEzSkinInfo.ColorSettingsEnabled => ColorSettingsEnabledBindable;
+            foreach (var columnTypeList in columnTypeLists)
+                columnTypeList.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+        }
     }
 }
