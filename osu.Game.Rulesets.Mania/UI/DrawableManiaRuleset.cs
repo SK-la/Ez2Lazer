@@ -81,23 +81,18 @@ namespace osu.Game.Rulesets.Mania.UI
         private ISkinSource currentSkin = null!;
 
         [Resolved]
-        private GameHost gameHost { get; set; } = null!;
-
-        [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
-        private Bindable<double> hitPositonBindable = new Bindable<double>();
-        private Bindable<bool> globalHitPosition = new Bindable<bool>();
-        private Bindable<bool> barLinesBindable = new Bindable<bool>();
-        private Bindable<EzEnumHitMode> hitMode = new Bindable<EzEnumHitMode>();
-
-        //自定义判定系统
-        private Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
+        private readonly Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
+        private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
+        private readonly BindableDouble hitPositonBindable = new BindableDouble();
+        private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
+        private readonly Bindable<bool> barLinesBindable = new Bindable<bool>();
 
         public DrawableManiaRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)
@@ -147,13 +142,12 @@ namespace osu.Game.Rulesets.Mania.UI
 
             TimeRange.Value = TargetTimeRange = ComputeScrollTime(configScrollSpeed.Value, configBaseMs.Value, configTimePerSpeed.Value);
 
-            scrollingStyle = Config.GetBindable<EzManiaScrollingStyle>(ManiaRulesetSetting.ScrollStyle);
-            scrollingStyleStatic = scrollingStyle.Value;
+            Config.BindWith(ManiaRulesetSetting.ScrollStyle, scrollingStyle);
             scrollingStyle.BindValueChanged(style =>
             {
                 scrollingStyleStatic = style.NewValue;
                 updateTimeRange();
-            });
+            }, true);
 
             Config.BindWith(ManiaRulesetSetting.MobileLayout, mobileLayout);
             mobileLayout.BindValueChanged(_ => updateMobileLayout(), true);
@@ -161,19 +155,22 @@ namespace osu.Game.Rulesets.Mania.UI
             Config.BindWith(ManiaRulesetSetting.TouchOverlay, touchOverlay);
             touchOverlay.BindValueChanged(_ => updateMobileLayout(), true);
 
-            hitPositonBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            // hitPositonBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            ezConfig.BindWith(Ez2Setting.HitPosition, hitPositonBindable);
             hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
-            globalHitPosition = ezConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition);
+
+            ezConfig.BindWith(Ez2Setting.GlobalHitPosition, globalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
-            barLinesBindable = ezConfig.GetBindable<bool>(Ez2Setting.ManiaBarLinesBool);
-            hitMode = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+
+            ezConfig.BindWith(Ez2Setting.ManiaBarLinesBool, barLinesBindable);
+            ezConfig.BindWith(Ez2Setting.ManiaHitMode, hitModeBindable);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            hitMode.BindValueChanged(h =>
+            hitModeBindable.BindValueChanged(h =>
             {
                 O2HitModeExtension.PILL_COUNT.Value = 0;
 
@@ -193,14 +190,17 @@ namespace osu.Game.Rulesets.Mania.UI
             }, true);
 
             // 立即触发并在主线程等待预加载完成，尽量在进入游戏前确保纹理上传完毕以避免首局卡顿。
-            try
+            if (currentSkin.GetType() == typeof(EzStyleProSkin))
             {
-                var factory = Dependencies.Get<EzLocalTextureFactory>();
-                _ = factory.PreloadGameTextures();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+                try
+                {
+                    var factory = Dependencies.Get<EzLocalTextureFactory>();
+                    _ = factory.PreloadGameTextures();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
+                }
             }
         }
 
