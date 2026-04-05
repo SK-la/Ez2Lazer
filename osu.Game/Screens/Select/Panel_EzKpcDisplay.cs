@@ -15,6 +15,7 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osuTK;
 using osuTK.Graphics;
 
@@ -22,7 +23,7 @@ namespace osu.Game.Screens.Select
 {
     public partial class EzKpcDisplay : CompositeDrawable, IHasCurrentValue<EzManiaSummary>
     {
-        public Bindable<KpcDisplayMode> KpcDisplayModeBindable { get; } = new Bindable<KpcDisplayMode>(KpcDisplayMode.BarChart);
+        public Bindable<EzEnumChartDisplay> KpcDisplayModeBindable { get; } = new Bindable<EzEnumChartDisplay>(EzEnumChartDisplay.BarChart);
 
         private readonly BindableWithCurrent<EzManiaSummary> current = new BindableWithCurrent<EzManiaSummary>();
 
@@ -99,7 +100,7 @@ namespace osu.Game.Screens.Select
             Current.BindValueChanged(_ => refresh());
         }
 
-        private void buildForMode(KpcDisplayMode mode)
+        private void buildForMode(EzEnumChartDisplay mode)
         {
             modePlaceholder?.Clear();
             columnNotesContainer = null;
@@ -110,7 +111,7 @@ namespace osu.Game.Screens.Select
 
             switch (mode)
             {
-                case KpcDisplayMode.Numbers:
+                case EzEnumChartDisplay.Numbers:
                 {
                     columnNotesContainer = new FillFlowContainer
                     {
@@ -155,7 +156,7 @@ namespace osu.Game.Screens.Select
 
                     break;
 
-                case KpcDisplayMode.BarChart:
+                case EzEnumChartDisplay.BarChart:
                 {
                     columnNotesContainer = new FillFlowContainer
                     {
@@ -273,11 +274,11 @@ namespace osu.Game.Screens.Select
         {
             switch (KpcDisplayModeBindable.Value)
             {
-                case KpcDisplayMode.Numbers:
+                case EzEnumChartDisplay.Numbers:
                     updateNumbersDisplay(columnNoteCounts, holdNoteCounts, columns);
                     break;
 
-                case KpcDisplayMode.BarChart:
+                case EzEnumChartDisplay.BarChart:
                     updateBarChartDisplay(columnNoteCounts, holdNoteCounts, columns);
                     break;
             }
@@ -344,11 +345,11 @@ namespace osu.Game.Screens.Select
         {
             switch (KpcDisplayModeBindable.Value)
             {
-                case KpcDisplayMode.Numbers:
+                case EzEnumChartDisplay.Numbers:
                     updateNumbersDisplay(columnNoteCounts, holdNoteCounts);
                     break;
 
-                case KpcDisplayMode.BarChart:
+                case EzEnumChartDisplay.BarChart:
                     updateBarChartDisplay(columnNoteCounts, holdNoteCounts);
                     break;
             }
@@ -364,7 +365,7 @@ namespace osu.Game.Screens.Select
             {
                 switch (KpcDisplayModeBindable.Value)
                 {
-                    case KpcDisplayMode.Numbers:
+                    case EzEnumChartDisplay.Numbers:
                         numberEntries.EnsureCapacity(columns);
 
                         for (int i = currentColumnCount; i < columns; i++)
@@ -376,7 +377,7 @@ namespace osu.Game.Screens.Select
 
                         break;
 
-                    case KpcDisplayMode.BarChart:
+                    case EzEnumChartDisplay.BarChart:
                         barEntries.EnsureCapacity(columns);
 
                         for (int i = currentColumnCount; i < columns; i++)
@@ -393,7 +394,7 @@ namespace osu.Game.Screens.Select
             {
                 switch (KpcDisplayModeBindable.Value)
                 {
-                    case KpcDisplayMode.Numbers:
+                    case EzEnumChartDisplay.Numbers:
                         if (numberEntries.Count > columns)
                         {
                             for (int i = numberEntries.Count - 1; i >= columns; i--)
@@ -406,7 +407,7 @@ namespace osu.Game.Screens.Select
 
                         break;
 
-                    case KpcDisplayMode.BarChart:
+                    case EzEnumChartDisplay.BarChart:
                         if (barEntries.Count > columns)
                         {
                             for (int i = barEntries.Count - 1; i >= columns; i--)
@@ -722,32 +723,16 @@ namespace osu.Game.Screens.Select
 
         #endregion
 
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                KpcDisplayModeBindable.UnbindAll();
-                Current.UnbindAll();
-                releaseState();
-            }
-
-            base.Dispose(isDisposing);
-        }
-    }
-
-    /// <summary>
-    /// 显示模式枚举
-    /// </summary>
-    public enum KpcDisplayMode
-    {
-        /// <summary>
-        /// 数字（默认，最高性能）
-        /// </summary>
-        Numbers,
-
-        /// <summary>
-        /// 柱状图
-        /// </summary>
-        BarChart
+        // protected override void Dispose(bool isDisposing)
+        // {
+        //     if (isDisposing)
+        //     {
+        //         KpcDisplayModeBindable.UnbindAll();
+        //         Current.UnbindAll();
+        //         releaseState();
+        //     }
+        //
+        //     base.Dispose(isDisposing);
+        // }
     }
 }

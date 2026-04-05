@@ -194,7 +194,7 @@ namespace osu.Game.Screens.Select
                     if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal))
                         continue;
 
-                    if (trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal))
+                    if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
                     {
                         if (inEventsSection)
                             break;

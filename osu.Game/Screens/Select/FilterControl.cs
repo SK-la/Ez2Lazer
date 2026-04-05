@@ -57,7 +57,7 @@ namespace osu.Game.Screens.Select
         private EzKeyModeSelector csSelector = null!;
         private ShearedKSPreviewButton ksPreviewButton = null!;
         private ShearedToggleButton xxySrFilterButton = null!;
-        private ShearedDropdown<KpcDisplayMode> kpcDropdown = null!;
+        private ShearedDropdown<EzEnumChartDisplay> kpcDropdown = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
@@ -230,10 +230,10 @@ namespace osu.Game.Screens.Select
                                             {
                                                 RelativeSizeAxes = Axes.X,
                                             },
-                                            kpcDropdown = new ShearedDropdown<KpcDisplayMode>("KPC")
+                                            kpcDropdown = new ShearedDropdown<EzEnumChartDisplay>("KPC")
                                             {
                                                 RelativeSizeAxes = Axes.X,
-                                                Items = Enum.GetValues<KpcDisplayMode>(),
+                                                Items = Enum.GetValues<EzEnumChartDisplay>(),
                                             },
                                         }
                                     }
