@@ -15,8 +15,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets;
-using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens;
@@ -407,8 +405,6 @@ namespace osu.Game.EzOsuGame.Statistics
                 AlwaysPresent = true;
                 Alpha = 0;
             }
-
-            protected override Drawable CreateOverlayComponents() => new Container();
 
             public override void OnEntering(ScreenTransitionEvent e)
             {

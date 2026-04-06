@@ -19,7 +19,7 @@
             "request": "launch",
             "program": "dotnet",
             "args": [
-                "${workspaceRoot}/osu.Desktop/bin/Debug/net8.0/osu!.dll",
+                "${workspaceRoot}/osu.Desktop/bin/Debug/net8.0/Ez2osu!.dll",
                 "--debug-client-id=1"
             ],
             "cwd": "${workspaceRoot}",
@@ -81,7 +81,7 @@
             "request": "launch",
             "program": "dotnet",
             "args": [
-                "${workspaceRoot}/osu.Desktop/bin/Release/net8.0/osu!.dll",
+                "${workspaceRoot}/osu.Desktop/bin/Release/net8.0/Ez2osu!.dll",
                 "--tournament"
             ],
             "cwd": "${workspaceRoot}",
