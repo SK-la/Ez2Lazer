@@ -19,7 +19,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 {
-    public class ManiaModLNTransformer : ManiaModLN, IApplicableAfterBeatmapConversion
+    public class ManiaModLNTransformer : ManiaModLNBase, IApplicableAfterBeatmapConversion
     {
         public override string Name => "LN Transformer";
 

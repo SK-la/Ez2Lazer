@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 {
-    public class ManiaModLNSimplify : Mod, IApplicableAfterBeatmapConversion
+    public class ManiaModLNSimplify : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder
     {
         public override string Name => "LN Simplify";
 
@@ -69,6 +69,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         [SettingSource(typeof(LNSimplifyStrings), nameof(LNSimplifyStrings.SHORTEST_LN_LABEL), nameof(LNSimplifyStrings.SHORTEST_LN_DESCRIPTION))]
         public BindableBool Len { get; set; } = new BindableBool(true);
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(50)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         //[SettingSource("Allowable ms", "Minimum ms.")]
         //public BindableInt Allowable { get; set; } = new BindableInt(10)

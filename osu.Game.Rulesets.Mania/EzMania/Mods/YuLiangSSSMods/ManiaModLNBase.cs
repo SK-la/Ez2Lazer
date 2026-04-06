@@ -12,7 +12,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 {
-    public class ManiaModLN : Mod, IHasSeed
+    public class ManiaModLNBase : Mod, IHasSeed, IEzApplyOrder
     {
         public override string Name => "LN";
 
@@ -85,6 +85,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(50)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {

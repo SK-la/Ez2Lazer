@@ -18,7 +18,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 {
-    public class ManiaModLNDoubleDistribution : Mod, IApplicableAfterBeatmapConversion, IHasSeed
+    public class ManiaModLNDoubleDistribution : Mod, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder
     {
         public override string Name => "LN Double Distribution";
 
@@ -172,6 +172,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
         public Bindable<int?> Seed { get; } = new Bindable<int?>();
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.APPLY_ORDER_LABEL), nameof(EzCommonModStrings.APPLY_ORDER_DESCRIPTION))]
+        public BindableNumber<int> ApplyOrderIndex { get; } = new BindableInt(50)
+        {
+            MinValue = 0,
+            MaxValue = 100
+        };
+
+        public int ApplyOrder => ApplyOrderIndex.Value;
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {

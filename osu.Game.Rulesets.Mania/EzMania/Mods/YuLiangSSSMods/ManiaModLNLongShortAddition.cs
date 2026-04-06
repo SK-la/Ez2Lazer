@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 {
-    public class ManiaModLNLongShortAddition : ManiaModLN, IApplicableAfterBeatmapConversion
+    public class ManiaModLNLongShortAddition : ManiaModLNBase, IApplicableAfterBeatmapConversion
     {
         public override string Name => "LN Long & Short";
 
