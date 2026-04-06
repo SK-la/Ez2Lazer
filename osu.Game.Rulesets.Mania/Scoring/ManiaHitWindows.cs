@@ -116,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        public static bool HasReset { get; private set; }
+        public bool HasReset { get; private set; }
 
         /// <summary>
         /// 用于静态Mod覆写，设置后切换自定义判定区间
