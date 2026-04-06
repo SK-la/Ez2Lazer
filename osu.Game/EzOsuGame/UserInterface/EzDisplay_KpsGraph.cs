@@ -21,6 +21,10 @@ using osuTK;
 
 namespace osu.Game.EzOsuGame.UserInterface
 {
+    /// <summary>
+    /// KPS折线图
+    /// </summary>
+    /// 支持可选的尾部补零与热力颜色渲染，默认关闭。
     public partial class EzDisplayKpsGraph : CompositeDrawable
     {
         private const float line_thickness = 1.5f;
@@ -37,6 +41,10 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         private int valuesCount;
         private bool hasData;
+        private bool lastExtendToBaseline;
+        private bool lastHeatmapEnabled;
+        private double lastSourceLengthMs;
+        private double lastBaselineLengthMs;
 
         /// <summary>
         /// 是否启用悬浮显示当前横坐标的 KPS 值（仅在外部显式开启时创建相关容器）。
@@ -111,7 +119,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             hoverCreated = true;
         }
 
-        public void SetPoints(IReadOnlyList<double> source)
+        public void SetPoints(IReadOnlyList<double> source, double sourceLengthMs = 0, double baselineLengthMs = 0, bool extendToBaseline = false, bool heatmapEnabled = false)
         {
             if (source == null)
                 return;
@@ -132,22 +140,41 @@ namespace osu.Game.EzOsuGame.UserInterface
                 // maskingContainer.ClearTransforms();
                 // maskingContainer.Width = 1;
                 graphDrawable.Clear();
+                lastExtendToBaseline = extendToBaseline;
+                lastHeatmapEnabled = heatmapEnabled;
+                lastSourceLengthMs = sourceLengthMs;
+                lastBaselineLengthMs = baselineLengthMs;
                 return;
             }
 
-            int sampledCount = Math.Min(count, max_display_points);
+            int effectiveCount = count;
+
+            if (extendToBaseline && sourceLengthMs > 0 && baselineLengthMs > sourceLengthMs)
+            {
+                double expandedCount = Math.Ceiling(count * baselineLengthMs / sourceLengthMs);
+
+                if (expandedCount > int.MaxValue)
+                    effectiveCount = int.MaxValue;
+                else
+                    effectiveCount = Math.Max(count, (int)expandedCount);
+            }
+
+            int sampledCount = Math.Min(effectiveCount, max_display_points);
 
             if (values == null || values.Length < sampledCount)
                 values = new float[sampledCount];
 
             float max = float.MinValue;
             float min = float.MaxValue;
-            bool same = hasData && valuesCount == sampledCount;
+            bool same = hasData && valuesCount == sampledCount && lastExtendToBaseline == extendToBaseline && lastHeatmapEnabled == heatmapEnabled;
+
+            if (same && extendToBaseline)
+                same = lastSourceLengthMs == sourceLengthMs && lastBaselineLengthMs == baselineLengthMs;
 
             for (int i = 0; i < sampledCount; i++)
             {
-                int sourceIndex = getSourceIndex(i, sampledCount, count);
-                float v = (float)source[sourceIndex];
+                int sourceIndex = getSourceIndex(i, sampledCount, effectiveCount);
+                float v = sourceIndex < count ? (float)source[sourceIndex] : 0;
 
                 if (same && values[i] != v)
                     same = false;
@@ -165,11 +192,15 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             hasData = true;
             valuesCount = sampledCount;
+            lastExtendToBaseline = extendToBaseline;
+            lastHeatmapEnabled = heatmapEnabled;
+            lastSourceLengthMs = sourceLengthMs;
+            lastBaselineLengthMs = baselineLengthMs;
 
             if (same)
                 return;
 
-            graphDrawable.SetValues(values, valuesCount, ActualMinValue, ActualMaxValue, line_thickness);
+            graphDrawable.SetValues(values, valuesCount, ActualMinValue, ActualMaxValue, line_thickness, heatmapEnabled);
 
             // // 直接显示完整图表，避免从左到右的展开动画。
             // maskingContainer.ClearTransforms();
@@ -257,6 +288,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             private float minValue;
             private float maxValue;
             private float thickness;
+            private bool heatmapEnabled;
             private long version;
 
             private Texture texture = null!;
@@ -269,7 +301,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 shader = shaders.Load(VertexShaderDescriptor.TEXTURE_2, FragmentShaderDescriptor.TEXTURE);
             }
 
-            public void SetValues(float[] source, int count, float minValue, float maxValue, float thickness)
+            public void SetValues(float[] source, int count, float minValue, float maxValue, float thickness, bool heatmapEnabled)
             {
                 points.Clear();
 
@@ -279,6 +311,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 this.minValue = minValue;
                 this.maxValue = maxValue;
                 this.thickness = thickness;
+                this.heatmapEnabled = heatmapEnabled;
                 version++;
 
                 Invalidate(Invalidation.DrawNode);
@@ -305,6 +338,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 private float minValue;
                 private float maxValue;
                 private float thickness;
+                private bool heatmapEnabled;
                 private long version = -1;
 
                 private IVertexBatch<TexturedVertex2D> quadBatch;
@@ -326,6 +360,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     minValue = Source.minValue;
                     maxValue = Source.maxValue;
                     thickness = Source.thickness;
+                    heatmapEnabled = Source.heatmapEnabled;
 
                     if (version == Source.version)
                         return;
@@ -363,6 +398,8 @@ namespace osu.Game.EzOsuGame.UserInterface
                     {
                         Vector2 start = new Vector2(i / (float)denominator * drawSize.X, getYPosition(points[i]) * drawSize.Y);
                         Vector2 end = new Vector2((i + 1) / (float)denominator * drawSize.X, getYPosition(points[i + 1]) * drawSize.Y);
+                        Colour4 startColour = heatmapEnabled ? getHeatColour(points[i]) : Colour4.CornflowerBlue;
+                        Colour4 endColour = heatmapEnabled ? getHeatColour(points[i + 1]) : Colour4.CornflowerBlue;
 
                         Vector2 direction = end - start;
                         float length = direction.Length;
@@ -385,7 +422,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                             TexturePosition = textureRect.TopLeft,
                             TextureRect = textureRectangle,
                             BlendRange = blendRange,
-                            Colour = Colour4.CornflowerBlue
+                            Colour = startColour
                         });
                         add(new TexturedVertex2D(renderer)
                         {
@@ -393,7 +430,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                             TexturePosition = textureRect.TopRight,
                             TextureRect = textureRectangle,
                             BlendRange = blendRange,
-                            Colour = Colour4.CornflowerBlue
+                            Colour = endColour
                         });
                         add(new TexturedVertex2D(renderer)
                         {
@@ -401,7 +438,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                             TexturePosition = textureRect.BottomRight,
                             TextureRect = textureRectangle,
                             BlendRange = blendRange,
-                            Colour = Colour4.CornflowerBlue
+                            Colour = endColour
                         });
                         add(new TexturedVertex2D(renderer)
                         {
@@ -409,7 +446,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                             TexturePosition = textureRect.BottomLeft,
                             TextureRect = textureRectangle,
                             BlendRange = blendRange,
-                            Colour = Colour4.CornflowerBlue
+                            Colour = startColour
                         });
                     }
 
@@ -424,6 +461,15 @@ namespace osu.Game.EzOsuGame.UserInterface
                         return value > 1 ? 0 : 1;
 
                     return (maxValue - value) / (maxValue - minValue);
+                }
+
+                private Colour4 getHeatColour(float value)
+                {
+                    if (value <= 0 || maxValue <= 0)
+                        return Colour4.White;
+
+                    float t = Math.Clamp(value / maxValue, 0, 1);
+                    return new Colour4(1f, 1f - t, 1f - t, 1f);
                 }
 
                 protected override void Dispose(bool isDisposing)

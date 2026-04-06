@@ -292,6 +292,7 @@ namespace osu.Game.Screens.Select
 
                 double drainLength = Math.Round(beatmap.CalculateDrainLength() / rate);
                 double hitLength = Math.Round(beatmapInfo.Length / rate);
+                double audioLength = working.Value.TrackLoaded ? Math.Round(working.Value.Track.Length / rate) : hitLength;
 
                 IReadOnlyList<double> kpsList;
 
@@ -319,7 +320,7 @@ namespace osu.Game.Screens.Select
                         ? $"{bpmMin}"
                         : LocalisableString.Interpolate($"{bpmMin}-{bpmMax} ({SongSelectStrings.MostlyBPM(mostCommonBPM)})");
 
-                    kpsGraph.SetPoints(kpsList);
+                    kpsGraph.SetPoints(kpsList, sourceLengthMs: drainLength, baselineLengthMs: Math.Max(drainLength, audioLength), extendToBaseline: true, heatmapEnabled: true);
 
                     // 由于 bpmStatistic.Text 变化会触发布局动画（100ms），需要延迟更新 KPS 图表尺寸以确保获取正确的宽度
                     Scheduler.Add(updateKPSGraphSize);
