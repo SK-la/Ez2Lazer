@@ -191,10 +191,7 @@ namespace osu.Game.Rulesets.Mania.UI
             onNoteSetNameChangedHandler = _ => NoteSetChanged?.Invoke();
             ezFactory.NoteSetNameBindable.ValueChanged += onNoteSetNameChangedHandler;
 
-            onColorSettingsEnabledChangedHandler = _ =>
-            {
-                NoteSetChanged?.Invoke();
-            };
+            onColorSettingsEnabledChangedHandler = _ => NoteSetChanged?.Invoke();
             ezFactory.ColorSettingsEnabledBindable.ValueChanged += onColorSettingsEnabledChangedHandler;
 
             onColumnTypeChangedHandler = (keyMode, columnIndex, _) =>

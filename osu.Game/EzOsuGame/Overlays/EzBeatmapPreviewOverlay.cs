@@ -12,7 +12,6 @@ using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
@@ -20,7 +19,7 @@ using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
@@ -123,6 +122,10 @@ namespace osu.Game.EzOsuGame.Overlays
         private Drawable? currentPreviewRoot;
         private Drawable? pendingPreviewRoot;
         private DrawableRuleset? drawableRuleset;
+
+        [Resolved]
+        private EzAnalysisCache? ezAnalysisCache { get; set; }
+
         private IWorkingBeatmap? currentWorkingBeatmap;
         private RulesetInfo? currentRuleset;
         private IReadOnlyList<Mod> currentMods = Array.Empty<Mod>();
@@ -506,7 +509,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
                 double minTime = objects.First().StartTime;
                 double maxTime = objects.Max(o => o.GetEndTime());
-                double startTime = computeDefaultStartTime(playableBeatmap, ruleset, minTime);
+                double startTime = computeDefaultStartTime(workingBeatmap, ruleset, mods, playableBeatmap, minTime, token);
 
                 return new LoadedPreviewData(eventVersion, workingBeatmap, ruleset, playableBeatmap, startTime, minTime, maxTime);
             }, token).ContinueWith(task =>
@@ -768,14 +771,18 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override void Dispose(bool isDisposing)
         {
-            selectionLoadInProgress = false;
-            cancelScheduledSelectionLoad();
-            cancelPendingLoad();
-            disposePreviewResources();
-            currentWorkingBeatmap = null;
-            currentRuleset = null;
-            previewMode.UnbindAll();
             base.Dispose(isDisposing);
+
+            if (isDisposing)
+            {
+                selectionLoadInProgress = false;
+                cancelScheduledSelectionLoad();
+                cancelPendingLoad();
+                disposePreviewResources();
+                currentWorkingBeatmap = null;
+                currentRuleset = null;
+                previewMode.UnbindAll();
+            }
         }
 
         private void cancelPendingLoad()
@@ -789,8 +796,6 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             if (cancellationToken.IsCancellationRequested || eventVersion != selectionEventVersion || !expanded)
                 return;
-
-            disposePreviewResources();
 
             if (cancellationToken.IsCancellationRequested || eventVersion != selectionEventVersion || !expanded)
                 return;
@@ -834,10 +839,17 @@ namespace osu.Game.EzOsuGame.Overlays
                     return;
                 }
 
-                disposePreviewResources();
+                var previousPreviewRoot = currentPreviewRoot;
+
                 stageScaleContainer.Child = loaded;
                 currentPreviewRoot = loaded;
                 drawableRuleset = newDrawableRuleset;
+
+                if (previousPreviewRoot != null)
+                {
+                    previewReleasedCount++;
+                    logPreviewLoadReleaseStats("released");
+                }
 
                 previewLoadedCount++;
                 logPreviewLoadReleaseStats("loaded");
@@ -927,7 +939,14 @@ namespace osu.Game.EzOsuGame.Overlays
                 logPreviewLoadReleaseStats("released");
             }
 
-            stageScaleContainer.Clear(true);
+            if (stageScaleContainer.Count > 0)
+            {
+                if (!IsLoaded)
+                    stageScaleContainer.Clear(true);
+                else
+                    Schedule(() => stageScaleContainer.Clear(true));
+            }
+
             currentPreviewRoot = null;
             drawableRuleset = null;
         }
@@ -959,52 +978,91 @@ namespace osu.Game.EzOsuGame.Overlays
             Logger.Log($"[BeatmapPreview] action={action}, loaded={previewLoadedCount}, released={previewReleasedCount}, active={activePreviewCount}, expanded={expanded}", LoggingTarget.Runtime, LogLevel.Debug);
         }
 
-        private static double computeDefaultStartTime(IBeatmap beatmap, RulesetInfo ruleset, double fallback)
+        private double computeDefaultStartTime(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, IBeatmap playableBeatmap, double fallback,
+                                               CancellationToken cancellationToken)
         {
-            var objects = beatmap.HitObjects;
+            var kpsData = getPreviewKpsData(workingBeatmap, ruleset, mods, playableBeatmap, cancellationToken);
 
-            if (objects.Count == 0)
-                return 0;
+            if (kpsData.Values.Count == 0)
+                return fallback;
 
-            double anchorTime;
-
-            if (string.Equals(ruleset.ShortName, "mania", StringComparison.OrdinalIgnoreCase))
-                anchorTime = getMaxKpsAnchor(objects);
-            else
-                anchorTime = getKiaiAnchor(beatmap.ControlPointInfo, objects[0].StartTime);
-
+            double anchorTime = getPreviewKpsAnchorTime(playableBeatmap, kpsData);
             return Math.Max(fallback, anchorTime - 1000);
         }
 
-        private static double getKiaiAnchor(ControlPointInfo controlPoints, double fallback)
+        private PreviewKpsData getPreviewKpsData(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, IBeatmap playableBeatmap,
+                                                 CancellationToken cancellationToken)
         {
-            var firstKiai = controlPoints.EffectPoints.FirstOrDefault(p => p.KiaiMode);
-            return firstKiai?.Time ?? fallback;
-        }
-
-        private static double getMaxKpsAnchor(IReadOnlyList<HitObject> objects)
-        {
-            int left = 0;
-            int bestCount = 0;
-            double bestTime = objects[0].StartTime;
-
-            for (int right = 0; right < objects.Count; right++)
+            if (ezAnalysisCache != null && workingBeatmap.BeatmapInfo != null)
             {
-                double rightTime = objects[right].StartTime;
-
-                while (left <= right && objects[left].StartTime < rightTime - 1000)
-                    left++;
-
-                int count = right - left + 1;
-
-                if (count > bestCount)
+                try
                 {
-                    bestCount = count;
-                    bestTime = rightTime;
+                    var analysis = ezAnalysisCache.GetAnalysisAsync(workingBeatmap.BeatmapInfo, ruleset, mods, cancellationToken).GetAwaiter().GetResult();
+
+                    if (analysis?.KpsList is { Count: > 0 } storedKpsList)
+                        return new PreviewKpsData(storedKpsList, PreviewKpsSource.Analysis);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // 回退到本地快速计算。
                 }
             }
 
-            return bestTime;
+            var (_, _, coarseKpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(playableBeatmap, buckets: 64);
+            return new PreviewKpsData(coarseKpsList, PreviewKpsSource.Coarse);
+        }
+
+        private static double getPreviewKpsAnchorTime(IBeatmap beatmap, PreviewKpsData kpsData)
+        {
+            if (kpsData.Values.Count == 0 || beatmap.HitObjects.Count == 0)
+                return 0;
+
+            int maxIndex = 0;
+            double maxValue = kpsData.Values[0];
+
+            for (int i = 1; i < kpsData.Values.Count; i++)
+            {
+                if (kpsData.Values[i] > maxValue)
+                {
+                    maxValue = kpsData.Values[i];
+                    maxIndex = i;
+                }
+            }
+
+            double songStart = beatmap.HitObjects[0].StartTime;
+            double songEnd = beatmap.HitObjects[^1].StartTime;
+
+            if (kpsData.Source == PreviewKpsSource.Analysis)
+            {
+                double bpm = beatmap.BeatmapInfo.BPM;
+                double interval = 240000.0 / bpm;
+                double estimatedIntervals = (songEnd / interval) + 1;
+
+                if (estimatedIntervals > OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS)
+                {
+                    int lastIndex = (int)estimatedIntervals - 1;
+                    int sampledIndex = (int)((long)maxIndex * lastIndex / (OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS - 1));
+                    return sampledIndex * interval;
+                }
+
+                return maxIndex * interval;
+            }
+
+            double duration = Math.Max(1, songEnd - songStart);
+            double bucketDuration = duration / kpsData.Values.Count;
+            return songStart + (maxIndex + 1) * bucketDuration;
+        }
+
+        private readonly record struct PreviewKpsData(IReadOnlyList<double> Values, PreviewKpsSource Source);
+
+        private enum PreviewKpsSource
+        {
+            Analysis,
+            Coarse,
         }
 
         private static string formatTime(double time)
@@ -1079,7 +1137,7 @@ namespace osu.Game.EzOsuGame.Overlays
             return dynamicMode ? EzBeatmapPreviewMode.Dynamic : EzBeatmapPreviewMode.Static;
         }
 
-        private static bool isManiaRuleset(RulesetInfo? ruleset) => string.Equals(ruleset?.ShortName, "mania", StringComparison.OrdinalIgnoreCase);
+        private static bool isManiaRuleset(RulesetInfo? ruleset) => ruleset?.OnlineID == 3;
 
         private readonly record struct LoadedPreviewData(
             long Version,

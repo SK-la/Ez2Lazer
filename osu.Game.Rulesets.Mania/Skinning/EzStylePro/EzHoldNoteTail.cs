@@ -72,7 +72,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateTexture()
         {
-            ClearInternal();
+            MainContainer?.Clear();
             animation = Factory.CreateAnimation(ComponentName);
 
             if (animation.FrameCount == 0)

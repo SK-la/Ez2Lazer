@@ -91,7 +91,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
             else
             {
-                column.TopLevelContainer.Add(CreateProxy());
+                column.TopLevelContainer.Add(sprite);
             }
 
             loadAnimation();
