@@ -70,23 +70,6 @@ namespace osu.Game.EzOsuGame.HUD
         }
     }
 
-    public enum EzComEffectType
-    {
-        [LocalisableDescription(typeof(EzComEffectTypeStrings), nameof(EzComEffectTypeStrings.SCALE))]
-        Scale,
-
-        [LocalisableDescription(typeof(EzComEffectTypeStrings), nameof(EzComEffectTypeStrings.BOUNCE))]
-        Bounce,
-
-        None
-    }
-
-    public static class EzComEffectTypeStrings
-    {
-        public static readonly LocalisableString SCALE = new EzLocalizationManager.EzLocalisableString("缩放动效", "Scale");
-        public static readonly LocalisableString BOUNCE = new EzLocalizationManager.EzLocalisableString("跳跃动效", "Bounce");
-    }
-
     //TODO: 枚举维护不方便，修改后要清理重构，考虑改为读取配置文件，或自动搜索子文件夹生成列表
     //这里使用枚举，加载的是Resource.dll中的资源
     //注释用来备份，不要删除

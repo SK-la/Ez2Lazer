@@ -5,6 +5,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
