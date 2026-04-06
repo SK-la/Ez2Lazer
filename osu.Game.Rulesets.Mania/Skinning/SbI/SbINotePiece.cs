@@ -17,8 +17,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     public partial class SbINotePiece : EzNoteBase
     {
-        public IBindable<double> NoteAccentRatio = new Bindable<double>(1f);
-        public Bindable<double> NoteHeight = new Bindable<double>(8);
         public Bindable<double> CornerRadiusBindable = new Bindable<double>();
 
         private readonly IBindable<Colour4> columnColour = new Bindable<Colour4>();
@@ -78,8 +76,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             columnColour.BindTo(Column.EzNoteColourBindable);
             columnColour.BindValueChanged(onAccentChanged, true);
-
-            NoteAccentRatio = ezSkinInfo.NoteHeightScaleToWidth;
             UpdateDrawable();
         }
 
@@ -93,13 +89,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
         protected override void UpdateDrawable()
         {
-            float fixedA = NoteAccentRatio.Value > 5
-                ? (float)NoteAccentRatio.Value * 1.5f
-                : NoteAccentRatio.Value > 2
-                    ? (float)NoteAccentRatio.Value * 1.5f
-                    : (float)NoteAccentRatio.Value;
-
-            Height = (float)NoteHeight.Value * fixedA;
+            Height = NoteSizeBindable.Value.Y;
         }
 
         private void onAccentChanged(ValueChangedEvent<Colour4> accent)

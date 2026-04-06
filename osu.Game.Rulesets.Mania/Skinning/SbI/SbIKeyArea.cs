@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Screens.Play;
@@ -22,6 +23,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         private Container directionContainer = null!;
         private Drawable background = null!;
 
+        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
+        private readonly IBindable<double> hitPosition = new BindableDouble();
         private IBindable<Colour4> columnColour = null!;
 
         [Resolved]
@@ -33,7 +36,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         }
 
         [BackgroundDependencyLoader]
-        private void load()
+        private void load(IScrollingInfo scrollingInfo, IEzSkinInfo ezSkinInfo)
         {
             InternalChild = directionContainer = new Container
             {
@@ -56,6 +59,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 }
             };
 
+            direction.BindTo(scrollingInfo.Direction);
+            direction.BindValueChanged(onDirectionChanged, true);
+
+            hitPosition.BindTo(ezSkinInfo.HitPosition);
+            hitPosition.BindValueChanged(_ => updateHitPosition(), true);
+
             columnColour = column.EzNoteColourBindable;
             columnColour.BindValueChanged(colour =>
                 {
@@ -65,6 +74,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 true);
 
             column.TopLevelContainer.Add(CreateProxy());
+        }
+
+        private void updateHitPosition()
+        {
+            directionContainer.Height = (float)hitPosition.Value;
         }
 
         protected KeyCounter CreateCounter(InputTrigger trigger) => new ArgonKeyCounter(trigger);

@@ -105,7 +105,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     hitErrorMeter.LabelStyle.Value = BarHitErrorMeter.LabelStyles.None;
                                 }
 
-                                var fsd = container.OfType<YuComFastSlowDisplay>().FirstOrDefault();
+                                _ = container.OfType<YuComFastSlowDisplay>().FirstOrDefault();
                             })
                             {
                                 new EzComHitTiming(),
@@ -180,7 +180,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
 
                     case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>());
+                        return SkinUtils.As<TValue>(new Bindable<float>((float)hitPosition.Value));
 
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:
                         return SkinUtils.As<TValue>(new Bindable<float>());
