@@ -348,4 +348,6 @@ FodyWeavers.xsd
 # MacOS literally shits anywhere lmao
 *.DS_Store
 
-.github/workflows
+#.github/workflows
+
+/osu.Game.Rulesets.BMS/

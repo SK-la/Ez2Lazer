@@ -163,37 +163,30 @@ jobs:
           # outroot should be the working directory; publish-linux.py will append /artifacts
           $outroot = $workdir
           $create_zip = '${{ github.event.inputs.create_zip }}'
+          $pack_appimage = '${{ github.event.inputs.pack_appimage }}'
+          $resourcesPath = "${{ github.workspace }}\osu-resources\osu.Game.Resources\Resources"
+
           if ($create_zip -eq 'true') {
-            python ./publish-linux.py --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "${{ github.workspace }}\osu-resources\osu.Game.Resources\Resources" --tag "$tag"
+            if ($pack_appimage -eq 'true') {
+              Write-Output 'create_zip=true and pack_appimage=true -> running publish-linux.py with --appimage'
+              python ./publish-linux.py --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --appimage
+            } else {
+              Write-Output 'create_zip=true and pack_appimage!=true -> running publish-linux.py without --appimage'
+              python ./publish-linux.py --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag"
+            }
           } else {
-            Write-Output 'create_zip is false -> running publish-linux.py with --no-zip to avoid creating zip files'
-            python ./publish-linux.py --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "${{ github.workspace }}\osu-resources\osu.Game.Resources\Resources" --tag "$tag" --no-zip
+            if ($pack_appimage -eq 'true') {
+              Write-Output 'create_zip=false and pack_appimage=true -> running publish-linux.py with --no-zip and --appimage'
+              python ./publish-linux.py --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --no-zip --appimage
+            } else {
+              Write-Output 'create_zip=false and pack_appimage!=true -> running publish-linux.py with --no-zip'
+              python ./publish-linux.py --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --no-zip
+            }
           }
 
-      - name: Debug publish environment (list files + --help)
-        working-directory: osu
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          Write-Output "PWD: $(Get-Location)"
-          Write-Output "Listing osu/ (first 200 entries)"
-          Get-ChildItem -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 200 | ForEach-Object { Write-Output $_.FullName }
-          Write-Output "Python version:"
-          python --version || Write-Output 'python --version failed'
-          Write-Output "Dotnet info:"
-          dotnet --info || Write-Output 'dotnet --info failed'
-          Write-Output "Show the first 200 lines of publish-linux.py"
-          Get-Content publish-linux.py -TotalCount 200 -ErrorAction SilentlyContinue || Write-Output 'cat publish-linux.py failed'
-          Write-Output "Running publish-linux.py --help"
-          python ./publish-linux.py --help || Write-Output 'publish-linux.py --help failed'
+      # Removed verbose debug step to reduce log noise; keep publish and artifact detection steps
 
-      - name: List artifacts directories for diagnostics
-        shell: pwsh
-        run: |
-          Write-Output 'Listing $GITHUB_WORKSPACE/artifacts:'
-          if (Test-Path "$env:GITHUB_WORKSPACE\artifacts") { Get-ChildItem -Path "$env:GITHUB_WORKSPACE\artifacts" -Recurse -Force | Select-Object FullName, Length | ForEach-Object { Write-Output "$($_.FullName) - $($_.Length)" } } else { Write-Output 'No root artifacts dir' }
-          Write-Output 'Listing $GITHUB_WORKSPACE/osu/artifacts:'
-          if (Test-Path "$env:GITHUB_WORKSPACE\osu\artifacts") { Get-ChildItem -Path "$env:GITHUB_WORKSPACE\osu\artifacts" -Recurse -Force | Select-Object FullName, Length | ForEach-Object { Write-Output "$($_.FullName) - $($_.Length)" } } else { Write-Output 'No osu artifacts dir' }
+      # Removed artifact-directory listing to keep logs concise
 
       - name: Find produced zip artifact
         if: ${{ github.event.inputs.create_zip == 'true' }}
@@ -266,7 +259,7 @@ jobs:
       - name: Check remote tag existence and create if missing
         shell: pwsh
         run: |
-          $tag = '${{ env.RELEASE_TAG }}'
+          $tag = $env:RELEASE_TAG
           Write-Output "Checking remote for tag $tag..."
           $found = git ls-remote --tags https://github.com/${{ github.repository }}.git refs/tags/$tag | Select-String -Pattern $tag
           if ($found) { Write-Output "Tag $tag exists remotely"; exit 0 }
@@ -288,8 +281,8 @@ jobs:
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: ${{ env.RELEASE_TAG }}
+          tag_name: ${{ github.event.inputs.tag }}
+          name: ${{ github.event.inputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

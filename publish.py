@@ -33,7 +33,20 @@ def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str
     if rid:
         cmd.extend(["-r", rid])
     print("Running:", " ".join(cmd))
-    res = subprocess.run(cmd, cwd=working_dir)
+    # Capture output for diagnostics in CI, but only print on failure to avoid excessive logs
+    res = subprocess.run(cmd, cwd=working_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if res.returncode != 0:
+        try:
+            out = res.stdout.decode('utf-8', errors='replace')
+            err = res.stderr.decode('utf-8', errors='replace')
+            print('dotnet publish failed (stdout):')
+            print(out)
+            print('dotnet publish failed (stderr):')
+            print(err)
+        except Exception:
+            print('dotnet publish failed but output decoding failed')
+    else:
+        print('dotnet publish succeeded')
     return res.returncode
 
 
@@ -178,6 +191,38 @@ def zip_folder(src_dir: str, zip_path: str):
         print(f"Created zip but failed to compute diagnostics: {e}")
 
 
+def _dir_has_files(path: str) -> bool:
+    for _, _, files in os.walk(path):
+        if files:
+            return True
+    return False
+
+
+def _find_best_publish_candidate(search_root: str):
+    # Look for likely publish outputs under bin/Release
+    candidates = []
+    for root, dirs, files in os.walk(search_root):
+        # speed: only consider paths containing bin and Release
+        lower = root.lower()
+        if 'bin' in lower and 'release' in lower and files:
+            candidates.append(root)
+    if not candidates:
+        return None
+
+    def _size(p):
+        total = 0
+        for rt, ds, fs in os.walk(p):
+            for f in fs:
+                try:
+                    total += os.path.getsize(os.path.join(rt, f))
+                except Exception:
+                    pass
+        return total
+
+    candidates.sort(key=_size, reverse=True)
+    return candidates[0]
+
+
 def main():
     parser = argparse.ArgumentParser(description="Publish and package Ez2Lazer builds.")
     # Prefer the GITHUB_WORKSPACE env when present (CI), otherwise use the script directory
@@ -304,6 +349,7 @@ def main():
         print('Release publish succeeded')
         # optional cleanup (pass target platform so we don't remove required runtimes)
         run_cleanup(args.cleanup_release, release_dir, target_platform)
+        # cleanup done; removed verbose release_dir listing to reduce log noise
 
     if not args.release_only:
         print('Publishing Debug...')
@@ -511,8 +557,25 @@ def main():
                 except Exception as e:
                     print('Failed to build .app bundle:', e)
                     print('Falling back to zipping release folder')
-                    print('Zipping release ->', release_zip)
-                    zip_folder(release_dir, release_zip)
+                    # If release_dir missing or empty, try to find publish outputs elsewhere and copy them
+                    if not os.path.exists(release_dir) or not _dir_has_files(release_dir):
+                        print('Release folder missing or empty, attempting to find publish outputs...')
+                        candidate = _find_best_publish_candidate(args.workdir)
+                        if candidate:
+                            try:
+                                print('Found candidate publish output:', candidate)
+                                shutil.copytree(candidate, release_dir, dirs_exist_ok=True)
+                                print('Copied publish output to', release_dir)
+                            except Exception as e:
+                                print('Failed to copy candidate publish output:', e)
+                        else:
+                            print('No publish candidate found; skipping zip')
+
+                    if os.path.exists(release_dir) and _dir_has_files(release_dir):
+                        print('Zipping release ->', release_zip)
+                        zip_folder(release_dir, release_zip)
+                    else:
+                        print('Release folder still missing or empty after fallback; skipping zip')
             else:
                 print('Zipping release ->', release_zip)
                 zip_folder(release_dir, release_zip)
@@ -587,13 +650,29 @@ def main():
                         pass
 
                     # run appimagetool
-                    rc_tool = subprocess.run([tool, appdir], cwd=base_out)
+                    # Run appimagetool and capture output for diagnostics
+                    rc_tool = subprocess.run([tool, appdir], cwd=base_out, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if rc_tool.returncode != 0:
+                        try:
+                            out = rc_tool.stdout.decode('utf-8', errors='replace')
+                            err = rc_tool.stderr.decode('utf-8', errors='replace')
+                            print('appimagetool failed (stdout):')
+                            print(out)
+                            print('appimagetool failed (stderr):')
+                            print(err)
+                        except Exception:
+                            print('appimagetool failed but output decoding failed')
                         print('appimagetool failed', rc_tool.returncode)
                     else:
                         # find generated AppImage
                         import glob
                         matches = glob.glob(os.path.join(base_out, '*.AppImage'))
+                        # Exclude the downloaded appimagetool itself from results
+                        try:
+                            tool_name = os.path.basename(tool)
+                            matches = [m for m in matches if os.path.basename(m) != tool_name]
+                        except Exception:
+                            pass
                         if matches:
                             matches.sort(key=os.path.getmtime, reverse=True)
                             gen = matches[0]
@@ -603,7 +682,13 @@ def main():
                             shutil.copy2(gen, dest)
                             print('Created AppImage at', dest)
                         else:
-                            print('No AppImage generated')
+                            print('No AppImage generated (only appimagetool found or generation failed)')
+                        # cleanup downloaded tool so CI doesn't mistake it for the generated AppImage
+                        try:
+                            if os.path.exists(tool):
+                                os.remove(tool)
+                        except Exception:
+                            pass
                 except Exception as e:
                     print('AppImage build failed:', e)
         else:
