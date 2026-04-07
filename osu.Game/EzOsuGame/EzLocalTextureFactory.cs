@@ -35,26 +35,24 @@ namespace osu.Game.EzOsuGame
         private readonly LargeTextureStore stageTextureStore;
         private readonly TextureStore textureStore;
 
-        private readonly IBindable<string> noteSetName;
-        private readonly IBindable<string> stageName;
-
         private readonly BindableDouble columnWidth = new BindableDouble();
         private readonly BindableDouble specialFactor = new BindableDouble();
         private readonly BindableDouble noteHeightScaleToWidth = new BindableDouble();
 
-        private readonly IBindable<bool> colorSettingsEnabled;
-        private readonly IBindable<Colour4> columnTypeA;
-        private readonly IBindable<Colour4> columnTypeB;
-        private readonly IBindable<Colour4> columnTypeS;
-        private readonly IBindable<Colour4> columnTypeE;
-        private readonly IBindable<Colour4> columnTypeP;
+        private readonly Bindable<string> stageName = new Bindable<string>();
+        private readonly Bindable<string> noteSetName = new Bindable<string>();
+
+        private readonly BindableBool colorSettingsEnabled = new BindableBool();
+        private readonly Bindable<Colour4> columnTypeA = new Bindable<Colour4>();
+        private readonly Bindable<Colour4> columnTypeB = new Bindable<Colour4>();
+        private readonly Bindable<Colour4> columnTypeS = new Bindable<Colour4>();
+        private readonly Bindable<Colour4> columnTypeE = new Bindable<Colour4>();
+        private readonly Bindable<Colour4> columnTypeP = new Bindable<Colour4>();
+
         private readonly IBindable<string>[] columnTypeLists;
         private readonly Dictionary<NoteSizeCacheKey, Bindable<Vector2>> noteSizeBindables = new Dictionary<NoteSizeCacheKey, Bindable<Vector2>>();
 
         private readonly Action<int, int, EzColumnType>? onColumnTypeChangedHandler;
-
-        public IBindable<string> NoteSetNameBindable { get; }
-        public IBindable<bool> ColorSettingsEnabledBindable { get; }
 
         private readonly struct NoteSizeCacheKey : IEquatable<NoteSizeCacheKey>
         {
@@ -100,25 +98,20 @@ namespace osu.Game.EzOsuGame
             stageTextureStore = new LargeTextureStore(renderer, limitedLoader);
             stageTextureStore.AddTextureSource(baseTextureLoaderStore);
 
-            noteSetName = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
-            stageName = ezConfig.GetBindable<string>(Ez2Setting.StageName);
-            NoteSetNameBindable = noteSetName;
+            ezConfig.BindWith(Ez2Setting.NoteSetName, noteSetName);
+            ezConfig.BindWith(Ez2Setting.StageName, stageName);
 
             ezConfig.BindWith(Ez2Setting.ColumnWidth, columnWidth);
             ezConfig.BindWith(Ez2Setting.SpecialFactor, specialFactor);
             ezConfig.BindWith(Ez2Setting.NoteHeightScaleToWidth, noteHeightScaleToWidth);
-            // columnWidth = ezConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
-            // specialFactor = ezConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
-            // noteHeightScaleToWidth = ezConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth);
 
-            // 绑定颜色设置，用于通知颜色变化
-            colorSettingsEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
-            ColorSettingsEnabledBindable = colorSettingsEnabled;
-            columnTypeA = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
-            columnTypeB = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
-            columnTypeS = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
-            columnTypeE = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeE);
-            columnTypeP = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeP);
+            ezConfig.BindWith(Ez2Setting.ColorSettingsEnabled, colorSettingsEnabled);
+            ezConfig.BindWith(Ez2Setting.ColumnTypeA, columnTypeA);
+            ezConfig.BindWith(Ez2Setting.ColumnTypeB, columnTypeB);
+            ezConfig.BindWith(Ez2Setting.ColumnTypeS, columnTypeS);
+            ezConfig.BindWith(Ez2Setting.ColumnTypeE, columnTypeE);
+            ezConfig.BindWith(Ez2Setting.ColumnTypeP, columnTypeP);
+
             columnTypeLists = new IBindable<string>[]
             {
                 ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf4K),
@@ -144,6 +137,7 @@ namespace osu.Game.EzOsuGame
 
         #region 事件发布
 
+        public event Action? OnNoteDrawableChanged;
         public event Action? OnNoteSizeChanged;
         public event Action? OnNoteColourChanged;
 
@@ -166,8 +160,11 @@ namespace osu.Game.EzOsuGame
 
         private void initializeDrawableEvents()
         {
-            noteSetName.BindValueChanged(_ => scheduleTextureRefresh());
-            stageName.BindValueChanged(_ => scheduleTextureRefresh());
+            noteSetName.BindValueChanged(_ =>
+            {
+                scheduleTextureRefresh();
+                OnNoteDrawableChanged?.Invoke();
+            });
         }
 
         private void initializeSizeEvents()
@@ -332,16 +329,16 @@ namespace osu.Game.EzOsuGame
                 FillMode = FillMode.Fill;
 
             // 直接加载纹理帧，不缓存
-            var frames = loadNotesFrames(component, noteSetName.Value);
+            var frames = loadNotesFrames(component);
             animation.AddFrames(frames);
 
             return animation;
         }
 
-        private List<Texture> loadNotesFrames(string component, string noteSetName)
+        private List<Texture> loadNotesFrames(string component)
         {
+            string basePath = $"note/{noteSetName.Value}/{component}";
             var frames = new List<Texture>();
-            string basePath = $"note/{noteSetName}/{component}";
 
             if (component != "JudgementLine")
             {
@@ -366,7 +363,7 @@ namespace osu.Game.EzOsuGame
                 frames.Add(texture);
             }
 
-            return new List<Texture>(frames);
+            return frames;
         }
 
         #endregion
@@ -526,6 +523,9 @@ namespace osu.Game.EzOsuGame
                 columnTypeS.UnbindAll();
                 columnTypeE.UnbindAll();
                 columnTypeP.UnbindAll();
+
+                foreach (var columnTypeList in columnTypeLists)
+                    columnTypeList.UnbindAll();
 
                 // 清理纹理加载器
                 lock (loaderStoreCache)

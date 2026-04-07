@@ -296,9 +296,9 @@ namespace osu.Game.EzOsuGame.Screens
         {
             if (isDisposing)
             {
-                nameOfNote?.UnbindAll();
-                nameOfStage?.UnbindAll();
-                nameOfGameTheme?.UnbindAll();
+                nameOfNote.UnbindAll();
+                nameOfStage.UnbindAll();
+                nameOfGameTheme.UnbindAll();
 
                 refreshSkinButton.Action = null;
 

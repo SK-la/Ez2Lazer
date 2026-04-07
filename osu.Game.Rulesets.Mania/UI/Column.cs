@@ -100,6 +100,8 @@ namespace osu.Game.Rulesets.Mania.UI
         //
         // public IEzSkinInfo EzSkinInfo => ezSkinInfo;
 
+        public Bindable<string> NoteSetNameBindable = null!;
+        public Bindable<bool> ColorSettingsEnabledBindable = null!;
         public Bindable<Colour4> EzNoteColourBindable = null!;
         public Bindable<Vector2> EzNoteSizeBindable = null!;
         public Bindable<EzColumnType> EzNoteTypeBindable = null!;
@@ -107,9 +109,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private KeySoundPreviewMode keySoundPreviewMode;
 
-        private Action<ValueChangedEvent<string>>? onNoteSetNameChangedHandler;
-        private Action<ValueChangedEvent<bool>>? onColorSettingsEnabledChangedHandler;
         private Action<int, int, EzColumnType>? onColumnTypeChangedHandler;
+        private Action? onNoteDrawableChangedHandler;
         private Action? onNoteSizeChangedHandler;
         private Action? onNoteColourChangedHandler;
 
@@ -119,14 +120,12 @@ namespace osu.Game.Rulesets.Mania.UI
         [BackgroundDependencyLoader]
         private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, StageDefinition stageDefinition)
         {
-            keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
-
-            // 缓存计算参数，避免每次创建闭包
             KeyMode = stageDefinition.Columns;
-
             EzNoteTypeBindable = ezConfig.GetColumnTypeBindable(KeyMode, Index);
             EzNoteSizeBindable = ezFactory.GetNoteSizeBindable(KeyMode, Index);
             EzNoteColourBindable = ezConfig.GetColumnColorBindable(KeyMode, Index);
+            NoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+            ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
 
             SkinnableDrawable keyArea;
 
@@ -159,11 +158,12 @@ namespace osu.Game.Rulesets.Mania.UI
             BackgroundContainer.Add(background);
             TopLevelContainer.Add(HitObjectArea.Explosions.CreateProxy());
 
-            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            hitModeBindable.BindValueChanged(mode => configurePools(mode.NewValue), true);
-
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
+
+            keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            hitModeBindable.BindValueChanged(configurePools, true);
         }
 
         private void onSourceChanged()
@@ -188,11 +188,8 @@ namespace osu.Game.Rulesets.Mania.UI
             base.LoadComplete();
             NewResult += OnNewResult;
 
-            onNoteSetNameChangedHandler = _ => NoteSetChanged?.Invoke();
-            ezFactory.NoteSetNameBindable.ValueChanged += onNoteSetNameChangedHandler;
-
-            onColorSettingsEnabledChangedHandler = _ => NoteSetChanged?.Invoke();
-            ezFactory.ColorSettingsEnabledBindable.ValueChanged += onColorSettingsEnabledChangedHandler;
+            onNoteDrawableChangedHandler = () => NoteSetChanged?.Invoke();
+            ezFactory.OnNoteDrawableChanged += onNoteDrawableChangedHandler;
 
             onColumnTypeChangedHandler = (keyMode, columnIndex, _) =>
             {
@@ -213,11 +210,8 @@ namespace osu.Game.Rulesets.Mania.UI
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
 
-            if (onNoteSetNameChangedHandler != null)
-                ezFactory.NoteSetNameBindable.ValueChanged -= onNoteSetNameChangedHandler;
-
-            if (onColorSettingsEnabledChangedHandler != null)
-                ezFactory.ColorSettingsEnabledBindable.ValueChanged -= onColorSettingsEnabledChangedHandler;
+            if (onNoteDrawableChangedHandler != null)
+                ezFactory.OnNoteDrawableChanged -= onNoteDrawableChangedHandler;
 
             if (onColumnTypeChangedHandler != null)
                 ezConfig.ColumnTypeChanged -= onColumnTypeChangedHandler;
@@ -288,9 +282,9 @@ namespace osu.Game.Rulesets.Mania.UI
             return DrawRectangle.Inflate(spacingInflation).Contains(ToLocalSpace(screenSpacePos));
         }
 
-        private void configurePools(EzEnumHitMode hitMode)
+        private void configurePools(ValueChangedEvent<EzEnumHitMode> v)
         {
-            switch (hitMode)
+            switch (v.NewValue)
             {
                 case EzEnumHitMode.EZ2AC:
                     RegisterPool<Note, Ez2AcDrawableNote>(10, 50);

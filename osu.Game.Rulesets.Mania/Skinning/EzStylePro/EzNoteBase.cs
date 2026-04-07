@@ -49,8 +49,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             };
             AddInternal(MainContainer); //允许多个子元素
 
-            NoteSetNameBindable = Factory.NoteSetNameBindable;
-            EnabledColorBindable = Factory.ColorSettingsEnabledBindable;
+            NoteSetNameBindable = Column.NoteSetNameBindable;
+            EnabledColorBindable = Column.ColorSettingsEnabledBindable;
             NoteTypeBindable = Column.EzNoteTypeBindable;
             NoteSizeBindable = Column.EzNoteSizeBindable;
             NoteColourBindable = Column.EzNoteColourBindable;
@@ -118,6 +118,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private void OnNoteSetChanged()
         {
+            if (!IsLoaded)
+                return;
+
             if (string.IsNullOrEmpty(NoteSetNameBindable.Value))
                 return;
 

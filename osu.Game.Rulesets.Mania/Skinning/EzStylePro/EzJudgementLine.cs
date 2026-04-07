@@ -14,8 +14,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzJudgementLine : CompositeDrawable
     {
-        private IBindable<double> hitPositonBindable = new BindableDouble();
-        private IBindable<string> noteSetName = new Bindable<string>();
+        private Bindable<double> hitPositonBindable = null!;
+        private Bindable<string> noteSetName = null!;
 
         private Container sprite = null!;
         private TextureAnimation? container;

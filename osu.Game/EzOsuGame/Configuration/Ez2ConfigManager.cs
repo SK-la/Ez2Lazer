@@ -560,7 +560,8 @@ namespace osu.Game.EzOsuGame.Configuration
             if (!columnColorBindables.TryGetValue(colorType, out var bindable))
             {
                 var colorSetting = getColorSetting(colorType);
-                bindable = GetBindable<Colour4>(colorSetting);
+                bindable = new Bindable<Colour4>();
+                BindWith(colorSetting, bindable);
                 columnColorBindables[colorType] = bindable;
             }
 
