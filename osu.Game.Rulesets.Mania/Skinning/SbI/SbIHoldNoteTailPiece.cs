@@ -5,82 +5,38 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     public partial class SbIHoldNoteTailPiece : SbINotePiece
     {
+        private readonly SbIHoldNoteHittingLayer hittingLayer = new SbIHoldNoteHittingLayer();
+
         private IBindable<double> tailAlpha = null!;
+        private IBindable<double> tailMaskHeight = null!;
 
-        // [Resolved]
-        // private DrawableHitObject? drawableObject { get; set; }
-
-        // private SbIHoldNoteHittingLayer hittingLayer { get; set; }
+        [Resolved]
+        private DrawableHitObject? drawableObject { get; set; }
 
         public SbIHoldNoteTailPiece()
         {
-            RelativeSizeAxes = Axes.X;
-            Height = 8;
-            Alpha = 0;
+            // Height = 8;
+            Rotation = 180;
         }
 
         [BackgroundDependencyLoader(true)]
         private void load(IEzSkinInfo ezSkinInfo)
         {
-            if (MainContainer != null)
-            {
-                MainContainer.Rotation = 180;
-            }
-
-            // if (drawableObject != null)
-            // {
-            //     drawableObject.HitObjectApplied += hitObjectApplied;
-            // }
-
             tailAlpha = ezSkinInfo.HoldTailAlpha;
-            tailAlpha.BindValueChanged(alpha =>
+            tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
+
+            // 当设置为负值时显示 tail，非负值时隐藏
+            tailMaskHeight.BindValueChanged(maskHeight =>
             {
-                Alpha = (float)alpha.NewValue;
+                Alpha = maskHeight.NewValue < 0 ? (float)tailAlpha.Value : 0f;
             }, true);
         }
-
-        // protected override void LoadComplete()
-        // {
-        //     base.LoadComplete();
-        //
-        //     tailAlpha = Column.EzSkinInfo.HoldTailAlpha;
-        //     tailAlpha.BindValueChanged(alpha =>
-        //     {
-        //         Alpha = (float)alpha.NewValue;
-        //     }, true);
-        // }
-
-        // private void hitObjectApplied(DrawableHitObject drawableHitObject)
-        // {
-        //     var holdNoteTail = (DrawableHoldNoteTail)drawableHitObject;
-        //
-        //     hittingLayer.Recycle();
-        //
-        //     hittingLayer.AccentColour.UnbindBindings();
-        //     hittingLayer.AccentColour.BindTo(holdNoteTail.HoldNote.AccentColour);
-        //
-        //     hittingLayer.IsHitting.UnbindBindings();
-        //     ((IBindable<bool>)hittingLayer.IsHitting).BindTo(holdNoteTail.HoldNote.IsHitting);
-        // }
-
-        // protected override void Update()
-        // {
-        //     base.Update();
-        //     Height = DrawWidth / DrawWidth;
-        // }
-
-        // protected override void Dispose(bool isDisposing)
-        // {
-        //     base.Dispose(isDisposing);
-        //
-        //     if (drawableObject != null)
-        //         drawableObject.HitObjectApplied -= hitObjectApplied;
-        // }
     }
 }

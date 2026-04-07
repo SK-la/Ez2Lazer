@@ -14,10 +14,10 @@ using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
 using osu.Game.Skinning;
@@ -126,7 +126,7 @@ namespace osu.Game.EzOsuGame.Screens
                     {
                         LabelText = EzSkinStrings.GLOBAL_HIT_POSITION,
                         TooltipText = EzSkinStrings.GLOBAL_HIT_POSITION_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.GlobalHitPosition),
+                        Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.HitPositionGlobalEnable),
                     },
                     new SettingsSlider<double>
                     {
@@ -155,6 +155,19 @@ namespace osu.Game.EzOsuGame.Screens
                         TooltipText = EzSkinStrings.NOTE_HEIGHT_SCALE_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth),
                         KeyboardStep = 0.1f,
+                    },
+                    new SettingsSlider<double>
+                    {
+                        LabelText = EzSkinStrings.NOTE_CORNER_RADIUS,
+                        TooltipText = EzSkinStrings.NOTE_CORNER_RADIUS_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteCornerRadius),
+                        KeyboardStep = 1.0f,
+                    },
+                    new SettingsCheckbox
+                    {
+                        LabelText = EzSkinStrings.MANIA_LN_GRADIENT_ENABLE,
+                        TooltipText = EzSkinStrings.MANIA_LN_GRADIENT_ENABLE_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.ManiaLNGradientEnable),
                     },
                     new SettingsSlider<double>
                     {

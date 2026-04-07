@@ -17,6 +17,7 @@ namespace osu.Game.EzOsuGame.Configuration
         Bindable<double> HitPosition { get; }
 
         Bindable<double> NoteHeightScaleToWidth { get; }
+        Bindable<double> NoteCornerRadius { get; }
         Bindable<double> NoteTrackLineHeight { get; }
 
         Bindable<double> HitTargetFloatFixed { get; }
@@ -53,6 +54,7 @@ namespace osu.Game.EzOsuGame.Configuration
         public Bindable<double> ColumnWidth { get; } = new Bindable<double>();
         public Bindable<double> SpecialFactor { get; }  = new Bindable<double>();
         public Bindable<double> NoteHeightScaleToWidth { get; } = new Bindable<double>();
+        public Bindable<double> NoteCornerRadius { get; } = new Bindable<double>();
 
         public Bindable<double> HitPosition { get; } = new Bindable<double>();
 
@@ -72,6 +74,7 @@ namespace osu.Game.EzOsuGame.Configuration
             ezConfig.BindWith(Ez2Setting.ColumnWidth, ColumnWidth);
             ezConfig.BindWith(Ez2Setting.SpecialFactor, SpecialFactor);
             ezConfig.BindWith(Ez2Setting.NoteHeightScaleToWidth, NoteHeightScaleToWidth);
+            ezConfig.BindWith(Ez2Setting.NoteCornerRadius, NoteCornerRadius);
             ezConfig.BindWith(Ez2Setting.HitPosition, HitPosition);
             ezConfig.BindWith(Ez2Setting.NoteTrackLineHeight, NoteTrackLineHeight);
             ezConfig.BindWith(Ez2Setting.HitTargetFloatFixed, HitTargetFloatFixed);

@@ -3,24 +3,21 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
     public partial class SbIColumnBackground : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
+        private Bindable<double> hitPosition = null!;
 
         private Color4 brightColour;
         private Color4 dimColour;
@@ -32,8 +29,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [Resolved]
         private Column column { get; set; } = null!;
 
-        // private Bindable<Color4> accentColour = null!;
-        private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        // private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
 
         public SbIColumnBackground()
         {
@@ -43,7 +42,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo, ISkinSource skin, StageDefinition stageDefinition)
+        private void load()
         {
             InternalChildren = new Drawable[]
             {
@@ -57,60 +56,38 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 backgroundOverlay = new Box
                 {
                     Name = "Background Gradient Overlay",
-                    RelativeSizeAxes = Axes.Both,
-                    Height = 0.1f,
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    RelativeSizeAxes = Axes.X,
+                    Height = 20,
                     Blending = BlendingParameters.Additive,
                     Alpha = 0,
                     Colour = Color4.White,
                 },
             };
 
-            overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
-            // accentColour.BindValueChanged(colour =>
-            // {
-            //     var newColour = colour.NewValue.Darken(3);
-            //
-            //     if (newColour.A != 0)
-            //     {
-            //         newColour = newColour.Opacity(1f);
-            //     }
-            //
-            //     background.Colour = newColour;
-            //     // background.Colour = colour.NewValue.Darken(3);
-            //     // brightColour = colour.NewValue.Opacity(0.6f);
-            //     // dimColour = colour.NewValue.Opacity(0);
-            // }, true);
-
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
+            hitPosition = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            hitPosition.BindValueChanged(_ => updateDrawable(), true);
+            // overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
         }
 
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
+        private void updateDrawable()
         {
-            if (direction.NewValue == ScrollingDirection.Up)
-            {
-                backgroundOverlay.Anchor = backgroundOverlay.Origin = Anchor.TopLeft;
-            }
-            else
-            {
-                backgroundOverlay.Anchor = backgroundOverlay.Origin = Anchor.BottomLeft;
-            }
+            float bottomHeight = (float)hitPosition.Value;
+            backgroundOverlay.Height = bottomHeight;
         }
 
         public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
             if (e.Action == column.Action.Value)
             {
-                var c = column.EzNoteColourBindable.Value;
-                var noteColour = new Color4(c.R, c.G, c.B, c.A);
+                var noteColour = column.EzNoteColourBindable.Value;
                 brightColour = noteColour.Opacity(1f);
                 dimColour = noteColour.Opacity(0);
 
-                backgroundOverlay.Colour = direction.Value == ScrollingDirection.Up
-                    ? ColourInfo.GradientVertical(brightColour, dimColour)
-                    : ColourInfo.GradientVertical(dimColour, brightColour);
+                backgroundOverlay.Colour = ColourInfo.GradientVertical(brightColour, dimColour);
 
-                overlayHeight.Value = 0.1f;
+                // overlayHeight.Value = 0.1f;
 
                 backgroundOverlay.FadeTo(1, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
             }

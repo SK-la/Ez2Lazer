@@ -3,112 +3,64 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens.Play;
-using osu.Game.Screens.Play.HUD;
-using osuTK;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    public partial class SbIKeyArea : SbINotePiece
+    public partial class SbIKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private Container directionContainer = null!;
-        private Drawable background = null!;
+        private readonly IBindable<double> hitPositonBindable = new Bindable<double>();
 
-        private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
-        private readonly IBindable<double> hitPosition = new BindableDouble();
-        private IBindable<Colour4> columnColour = null!;
+        private readonly Box line;
 
         [Resolved]
         private Column column { get; set; } = null!;
 
         public SbIKeyArea()
         {
-            RelativeSizeAxes = Axes.Both;
+            RelativeSizeAxes = Axes.X;
+
+            InternalChild = line = new Box
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 1f,
+                Colour = Color4.Black,
+            };
         }
 
         [BackgroundDependencyLoader]
-        private void load(IScrollingInfo scrollingInfo, IEzSkinInfo ezSkinInfo)
+        private void load(IEzSkinInfo ezSkinInfo)
         {
-            InternalChild = directionContainer = new Container
-            {
-                RelativeSizeAxes = Axes.X,
-                // Height = Stage.HIT_TARGET_POSITION + SbINotePiece.CORNER_RADIUS * 2,
-                Children = new Drawable[]
-                {
-                    new Container
-                    {
-                        Masking = true,
-                        RelativeSizeAxes = Axes.Both,
-                        CornerRadius = (float)CornerRadiusBindable.Value,
-                        Child = background = new Box
-                        {
-                            Name = "Key gradient",
-                            Alpha = 0,
-                            RelativeSizeAxes = Axes.Both,
-                        },
-                    },
-                }
-            };
+            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
+            hitPositonBindable.BindValueChanged(_ => OnConfigChanged(), true);
 
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
-
-            hitPosition.BindTo(ezSkinInfo.HitPosition);
-            hitPosition.BindValueChanged(_ => updateHitPosition(), true);
-
-            columnColour = column.EzNoteColourBindable;
-            columnColour.BindValueChanged(colour =>
-                {
-                    var c = colour.NewValue;
-                    background.Colour = new Color4(c.R, c.G, c.B, c.A).Darken(0.2f);
-                },
-                true);
-
-            column.TopLevelContainer.Add(CreateProxy());
+            // column.TopLevelContainer.Add(CreateProxy());
         }
 
-        private void updateHitPosition()
+        private void OnConfigChanged()
         {
-            directionContainer.Height = (float)hitPosition.Value;
+            Y = (float)hitPositonBindable.Value;
         }
 
-        protected KeyCounter CreateCounter(InputTrigger trigger) => new ArgonKeyCounter(trigger);
-
-        private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
+        public bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
         {
-            switch (direction.NewValue)
-            {
-                case ScrollingDirection.Up:
-                    directionContainer.Scale = new Vector2(1, -1);
-                    directionContainer.Anchor = Anchor.TopCentre;
-                    directionContainer.Origin = Anchor.BottomCentre;
-                    break;
-
-                case ScrollingDirection.Down:
-                    directionContainer.Scale = new Vector2(1, 1);
-                    directionContainer.Anchor = Anchor.BottomCentre;
-                    directionContainer.Origin = Anchor.BottomCentre;
-                    break;
-            }
+            return false;
         }
 
         public void OnReleased(KeyBindingReleaseEvent<ManiaAction> e)
         {
             if (e.Action != column.Action.Value) return;
 
-            const double lighting_fade_out_duration = 800;
-            background.FadeTo(0f, 50, Easing.OutQuint)
-                      .Then()
-                      .FadeOut(lighting_fade_out_duration, Easing.OutQuint);
+            line.FadeTo(0f, 50, Easing.OutQuint)
+                .Then()
+                .FadeOut(800, Easing.OutQuint);
         }
     }
 }

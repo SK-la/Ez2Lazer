@@ -52,15 +52,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
         private void onDirectionChanged() => Y = direction.Value == ScrollingDirection.Up ? -judgement_y_position : judgement_y_position;
 
-        protected override SpriteText CreateJudgementText() =>
-            new OsuSpriteText
-            {
-                Anchor = Anchor.Centre,
-                Origin = Anchor.Centre,
-                Blending = BlendingParameters.Additive,
-                Spacing = new Vector2(10, 0),
-                Font = OsuFont.Default.With(size: 28, weight: FontWeight.Regular),
-            };
+        protected override SpriteText CreateJudgementText() => new OsuSpriteText
+        {
+            Anchor = Anchor.Centre,
+            Origin = Anchor.Centre,
+            Blending = BlendingParameters.Additive,
+            Spacing = new Vector2(10, 0),
+            Font = OsuFont.Default.With(size: 28, weight: FontWeight.Regular),
+        };
 
         public virtual void PlayAnimation()
         {

@@ -7,7 +7,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Scoring;
@@ -139,7 +138,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                             return new SbINotePiece();
 
                         case ManiaSkinComponents.HoldNoteHead:
-                            return new SbIHoldNoteHeadPiece();
+                            return Drawable.Empty();
 
                         case ManiaSkinComponents.HoldNoteTail:
                             return new SbIHoldNoteTailPiece();
@@ -147,14 +146,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         case ManiaSkinComponents.HoldNoteBody:
                             return new SbIHoldBodyPiece();
 
-                        // case ManiaSkinComponents.HitTarget:
-                        //     return new SbIHitTarget();
-
                         case ManiaSkinComponents.KeyArea:
-                            return new SbIKeyArea();
+                            return Drawable.Empty();
 
-                        // case ManiaSkinComponents.HitExplosion:
-                        // return new SbIHitExplosion();
+                        case ManiaSkinComponents.HitExplosion:
+                            return Drawable.Empty();
+
+                        case ManiaSkinComponents.HitTarget:
+                            return new SbIHitTarget();
                     }
 
                     break;

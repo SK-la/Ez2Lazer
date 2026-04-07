@@ -159,7 +159,7 @@ namespace osu.Game.Rulesets.Mania.UI
             ezConfig.BindWith(Ez2Setting.HitPosition, hitPositonBindable);
             hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
 
-            ezConfig.BindWith(Ez2Setting.GlobalHitPosition, globalHitPosition);
+            ezConfig.BindWith(Ez2Setting.HitPositionGlobalEnable, globalHitPosition);
             globalHitPosition.BindValueChanged(_ => skinChanged(), true);
 
             ezConfig.BindWith(Ez2Setting.ManiaBarLinesBool, barLinesBindable);

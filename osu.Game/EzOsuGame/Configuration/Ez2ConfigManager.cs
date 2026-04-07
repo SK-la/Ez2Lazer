@@ -117,11 +117,12 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ColumnWidth, 75, 5, 400.0, 1.0);
             SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
 
-            SetDefault(Ez2Setting.GlobalHitPosition, false);
+            SetDefault(Ez2Setting.HitPositionGlobalEnable, false);
             SetDefault(Ez2Setting.HitPosition, DefaultHitPosition, 0, 500, 1.0);
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
             SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 10, 0.1);
+            SetDefault(Ez2Setting.NoteCornerRadius, 5, 0.0, 80, 0.5);
             SetDefault(Ez2Setting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             #endregion
@@ -733,7 +734,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         // 皮肤与舞台资源
         ColumnWidthStyle,
-        GlobalHitPosition,
+        HitPositionGlobalEnable, // 未来要考虑，是否统一成，整套系统套用在传统皮肤上，变成切换设置
         GlobalTextureName,
         GameThemeName,
 
@@ -744,20 +745,24 @@ namespace osu.Game.EzOsuGame.Configuration
         ColumnWidth,
         SpecialFactor,
         HitPosition,
-        HitTargetFloatFixed,
-        HitTargetAlpha,
-        NoteHeightScaleToWidth,
-        NoteTrackLineHeight,
 
         // Mania 专属行为
         ManiaHitMode,
         ManiaHealthMode,
         BmsPoorHitResultEnable,
+
+        HitTargetFloatFixed,
+        HitTargetAlpha,
+        NoteHeightScaleToWidth,
+        NoteTrackLineHeight,
+
         ManiaBarLinesBool,
         ManiaPseudo3DRotation,
+
         ManiaHoldTailAlpha,
-        ManiaHoldTailMaskGradientHeight,
-        ManiaLNGradientEnable,
+        ManiaHoldTailMaskGradientHeight, // 投皮面尾
+        ManiaLNGradientEnable, // 还没做UI和应用，投皮开关
+        NoteCornerRadius, // 还没做UI
 
         // 列着色与配色系统
         ColorSettingsEnabled,
