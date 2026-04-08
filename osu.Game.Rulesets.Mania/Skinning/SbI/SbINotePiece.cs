@@ -32,6 +32,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [BackgroundDependencyLoader(true)]
         private void load(IEzSkinInfo ezSkinInfo)
         {
+            CornerRadiusBindable.BindTo(ezSkinInfo.NoteCornerRadius);
+            CornerRadiusBindable.BindValueChanged(_ => UpdateDrawable());
+        }
+
+        protected override void UpdateTexture()
+        {
             if (MainContainer != null)
             {
                 MainContainer.Child = box = new Box
@@ -41,8 +47,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 };
             }
 
-            CornerRadiusBindable.BindTo(ezSkinInfo.NoteCornerRadius);
-            CornerRadiusBindable.BindValueChanged(_ => UpdateDrawable(), true);
+            UpdateDrawable();
         }
 
         protected override void UpdateDrawable()

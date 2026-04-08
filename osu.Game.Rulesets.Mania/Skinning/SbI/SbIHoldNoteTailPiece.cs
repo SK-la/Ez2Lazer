@@ -17,8 +17,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     {
         private bool lnGradientEnable;
 
-        private IBindable<double>? tailAlphaBindable;
-        private IBindable<double>? tailMaskHeightBindable;
+        private readonly IBindable<double> tailAlphaBindable = new Bindable<double>();
+        private readonly IBindable<double> tailMaskHeightBindable = new Bindable<double>();
 
         public SbIHoldNoteTailPiece()
         {
@@ -38,22 +38,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             Alpha = 1;
 
-            tailAlphaBindable = ezSkinInfo.HoldTailAlpha;
-            tailMaskHeightBindable = ezSkinInfo.HoldTailMaskHeight;
+            tailAlphaBindable.BindTo(ezSkinInfo.HoldTailAlpha);
+            tailMaskHeightBindable.BindTo(ezSkinInfo.HoldTailMaskHeight);
 
-            tailAlphaBindable.BindValueChanged(_ => refreshTailAppearance());
-            tailMaskHeightBindable.BindValueChanged(_ => refreshTailAppearance(), true);
+            tailAlphaBindable.BindValueChanged(_ => UpdateDrawable());
+            tailMaskHeightBindable.BindValueChanged(_ => UpdateDrawable(), true);
         }
 
-        private void refreshTailAppearance()
+        protected override void UpdateDrawable()
         {
-            applyTailMaskLayout();
-            UpdateColor();
-        }
-
-        private void applyTailMaskLayout()
-        {
-            if (lnGradientEnable || MainContainer == null || tailMaskHeightBindable == null)
+            if (lnGradientEnable || MainContainer == null)
                 return;
 
             // 与 SbIHoldBodyPiece 中 topContainer 的 Y 规则一致
@@ -67,7 +61,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             if (lnGradientEnable)
                 return;
 
-            if (MainContainer != null && tailAlphaBindable != null)
+            if (MainContainer != null)
             {
                 MainContainer.Colour = ColourInfo.GradientVertical(
                     NoteColor.Opacity((float)tailAlphaBindable.Value),
