@@ -19,6 +19,9 @@ namespace osu.Desktop.Updater
 {
     public partial class VelopackUpdateManager : UpdateManager
     {
+        // Force this build to use the Ez2Lazer release stream (fixed to SK-la/Ez2Lazer updates).
+        public override Game.Configuration.ReleaseStream? FixedReleaseStream => Game.Configuration.ReleaseStream.Ez2Lazer;
+
         [Resolved]
         private INotificationOverlay notificationOverlay { get; set; } = null!;
 
@@ -55,7 +58,33 @@ namespace osu.Desktop.Updater
 
             try
             {
-                IUpdateSource updateSource = new GithubSource(@"https://github.com/ppy/osu", null, ReleaseStream.Value == Game.Configuration.ReleaseStream.Tachyon);
+                // Allow overriding the GitHub update source via environment variables:
+                // - OSU_UPDATE_REPO can be set to "owner/repo" or a full URL
+                // - OSU_UPDATE_REPO_URL can be set to a full URL and takes precedence
+                string? repoEnv = Environment.GetEnvironmentVariable("OSU_UPDATE_REPO");
+                string? repoUrlEnv = Environment.GetEnvironmentVariable("OSU_UPDATE_REPO_URL");
+
+                string updateSourceUrl;
+                if (!string.IsNullOrEmpty(repoUrlEnv))
+                {
+                    updateSourceUrl = repoUrlEnv;
+                }
+                else if (!string.IsNullOrEmpty(repoEnv))
+                {
+                    if (repoEnv.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || repoEnv.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                        updateSourceUrl = repoEnv;
+                    else
+                        updateSourceUrl = $"https://github.com/{repoEnv}";
+                }
+                else
+                {
+                    // Default to the forked Ez2Lazer repository for update distribution.
+                    updateSourceUrl = "https://github.com/SK-la/Ez2Lazer";
+                }
+
+                log($"Using update source: {updateSourceUrl}");
+
+                IUpdateSource updateSource = new GithubSource(updateSourceUrl, null, ReleaseStream.Value == Game.Configuration.ReleaseStream.Tachyon);
                 Velopack.UpdateManager updateManager = new Velopack.UpdateManager(updateSource, new UpdateOptions
                 {
                     AllowVersionDowngrade = true
