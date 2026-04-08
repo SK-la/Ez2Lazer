@@ -15,6 +15,12 @@ Ez2Lazer is a heavily customized branch based on osu! lazer, focused on Mania/BM
 - 资源包 / Resource pack: [EzResources (OneDrive)](https://la1225-my.sharepoint.com/:f:/g/personal/la_la1225_onmicrosoft_com/EiosAbw_1C9ErYCNRD1PQvkBaYvhflOkt8G9ZKHNYuppLg?e=DWY1kn)
 - 运行时要求 / Runtime: [.NET 8.0 Runtime](https://dotnet.microsoft.com/download)
 
+**自动更新（推荐）** / **Auto-update (recommended)**  
+- Windows：下载 Release 中的 `ez2lazer-Setup.exe` 安装；之后可在游戏内接收增量更新。  
+- Windows: use `ez2lazer-Setup.exe` from Releases for install; in-game updates will download deltas afterward.  
+- 仍可使用 zip 手动解压，但 zip 安装无法使用增量更新，需改用安装包一次。  
+- Zip archives remain available for manual installs, but they cannot receive delta updates until you switch to the installer once.
+
 > 未安装 EzResources 时，Ez Pro Skin 和 Ez HUD 组件会缺失贴图。  
 > Without EzResources, Ez Pro Skin and Ez HUD widgets will miss textures.
 
@@ -67,12 +73,15 @@ git clone https://github.com/SK-la/osu-resources
 建议把三个仓库放在同一级目录后再构建。  
 It is recommended to place all three repositories side by side before building.
 
+自编译版本不会显示游戏内更新选项，也不会从 SK-la/Ez2Lazer Releases 拉取更新。  
+Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer Releases for updates.
+
 ## Release Notes Automation
 
 Use the helper script to generate a categorized draft from commit range:
 
 ```powershell
-pwsh ./GenerateReleaseNotes.ps1 -FromRef "2026-5-1" -ToRef "2026-5-6" -Output "../release-2026-5-6.md" -Title "Release 2026-5-6"
+pwsh ./GenerateReleaseNotes.ps1 -FromRef "2026.5.1" -ToRef "2026.5.6" -Output "../release-2026.5.6.md" -Title "Release 2026.5.6"
 ```
 
 Then polish the draft and publish it on GitHub Releases.

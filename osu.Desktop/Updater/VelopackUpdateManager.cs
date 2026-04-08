@@ -19,6 +19,9 @@ namespace osu.Desktop.Updater
 {
     public partial class VelopackUpdateManager : UpdateManager
     {
+        // Force this build to use the Ez2Lazer release stream (fixed to SK-la/Ez2Lazer updates).
+        public override Game.Configuration.ReleaseStream? FixedReleaseStream => Game.Configuration.ReleaseStream.Ez2Lazer;
+
         [Resolved]
         private INotificationOverlay notificationOverlay { get; set; } = null!;
 
@@ -55,7 +58,9 @@ namespace osu.Desktop.Updater
 
             try
             {
-                IUpdateSource updateSource = new GithubSource(@"https://github.com/ppy/osu", null, ReleaseStream.Value == Game.Configuration.ReleaseStream.Tachyon);
+                // Third parameter is includePrerelease (GitHub pre-release assets), not the release stream.
+                // Ez2Lazer uses SK-la/Ez2Lazer stable releases only.
+                IUpdateSource updateSource = new GithubSource(@"https://github.com/SK-la/Ez2Lazer", null, false);
                 Velopack.UpdateManager updateManager = new Velopack.UpdateManager(updateSource, new UpdateOptions
                 {
                     AllowVersionDowngrade = true

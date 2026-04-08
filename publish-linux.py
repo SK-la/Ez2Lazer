@@ -262,7 +262,7 @@ def main():
     if not args.tag:
         # default to today's date tag if not provided when running locally
         today = datetime.utcnow()
-        args.tag = f"{today.year}-{today.month}-{today.day}"
+        args.tag = f"{today.year}.{today.month}.{today.day:02d}"
         print(f"No --tag provided; defaulting to {args.tag}")
 
     tag_suffix = f"_{args.tag}"

@@ -55,7 +55,7 @@ jobs:
           }
 
           $mainBranch = '${{ github.event.inputs.branch }}'
-          if ([string]::IsNullOrWhiteSpace($mainBranch)) { $mainBranch = 'master' }
+          if ([string]::IsNullOrWhiteSpace($mainBranch)) { $mainBranch = '${{ github.ref_name }}' }
 
           $frameworkBranch = '${{ github.event.inputs.framework_branch }}'
           if ([string]::IsNullOrWhiteSpace($frameworkBranch)) { $frameworkBranch = 'master' }
@@ -148,6 +148,7 @@ jobs:
           GITHUB_WORKSPACE: ${{ github.workspace }}
           PYTHONUTF8: '1'
           PYTHONIOENCODING: 'utf-8'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = '${{ needs.prepare.outputs.release_tag }}'
           if ([string]::IsNullOrWhiteSpace($tag)) {
@@ -163,110 +164,97 @@ jobs:
           $platform = '${{ matrix.platform }}'
           $arch = '${{ matrix.arch }}'
 
+          $publishArgs = @(
+            (Join-Path (Get-Location) 'publish.py'),
+            '--project', $project,
+            '--workdir', $workdir,
+            '--outroot', $outroot,
+            '--deps-source', 'none',
+            '--resources-path', $resourcesPath,
+            '--tag', $tag,
+            '--platform', $platform,
+            '--arch', $arch,
+            '--official-build',
+            '--release-only'
+          )
           if ($platform -eq 'linux') {
-            python (Join-Path (Get-Location) 'publish.py') --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --platform "$platform" --os "linux" --release-only
-          } elseif ($platform -eq 'macos') {
-            # arm64 workflow proved this path is more stable for mac runner differences.
-            python (Join-Path (Get-Location) 'publish.py') --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --platform "$platform" --release-only
-          } else {
-            python (Join-Path (Get-Location) 'publish.py') --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --platform "$platform" --release-only
+            $publishArgs += @('--os', 'linux')
           }
+          python @publishArgs
 
-      # Debug steps removed: keep artifact normalization and minimal checks only
-
-      # AppImage is built by publish-linux.py when --appimage is passed for linux
-
-      - name: Normalize artifact name
+      - name: Collect release artifacts
         id: prepare_asset
         shell: pwsh
         run: |
           $ws = $env:GITHUB_WORKSPACE
-          $artifactsDir = Join-Path $ws 'artifacts'
-          if (-not (Test-Path $artifactsDir)) { New-Item -ItemType Directory -Path $artifactsDir | Out-Null }
+          $osuArtifacts = Join-Path $ws 'osu\artifacts'
+          $uploadDir = Join-Path $ws 'upload-artifacts'
+          if (Test-Path $uploadDir) { Remove-Item -Recurse -Force $uploadDir }
+          New-Item -ItemType Directory -Path $uploadDir | Out-Null
+
           $platform = '${{ matrix.platform }}'
           $arch = '${{ matrix.arch }}'
 
           if ($platform -eq 'linux') {
-            # Try AppImage first, then fall back to linux zip patterns (some runners cannot build AppImage due to missing FUSE)
             if ($arch -eq 'arm64') {
-              $patterns = @('*.AppImage','Ez2Lazer_release_linux_arm64*.zip','Ez2Lazer_release_linux*.zip')
+              $zipPatterns = @('Ez2Lazer_release_linux_arm64*.zip')
+              $zipDest = 'Ez2Lazer_release_linux_arm64.zip'
             } else {
-              $patterns = @('*.AppImage','Ez2Lazer_release_linux_x64*.zip','Ez2Lazer_release_linux*.zip')
+              $zipPatterns = @('Ez2Lazer_release_linux_x64*.zip')
+              $zipDest = 'Ez2Lazer_release_linux_x64.zip'
             }
-            $found = $null
-            foreach ($p in $patterns) {
-              $found = Get-ChildItem -Path $ws -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
-              if ($found) { break }
-              $found = Get-ChildItem -Path (Join-Path $ws 'osu\artifacts') -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
-              if ($found) { break }
-            }
-            if (-not $found) { Write-Error 'linux asset not found'; exit 1 }
-            $ext = [IO.Path]::GetExtension($found.Name).ToLower()
-            if ($ext -eq '.appimage') {
-              if ($arch -eq 'arm64') { $destName = 'Ez2Lazer_release_linux_arm64.AppImage' } else { $destName = 'Ez2Lazer_release_linux_x64.AppImage' }
-            } else {
-              if ($arch -eq 'arm64') { $destName = 'Ez2Lazer_release_linux_arm64.zip' } else { $destName = 'Ez2Lazer_release_linux_x64.zip' }
-            }
-            $dest = Join-Path $artifactsDir $destName
-            Copy-Item -Path $found.FullName -Destination $dest -Force
-            Write-Output "asset_path=$dest" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } elseif ($platform -eq 'macos') {
             if ($arch -eq 'arm64') {
-              $patterns = @('Ez2Lazer_release_macos_arm64*.zip','Ez2Lazer_release_macos*.zip','Ez2Lazer_release_osx*.zip')
+              $zipPatterns = @('Ez2Lazer_release_macos_arm64*.zip')
+              $zipDest = 'Ez2Lazer_release_macos_arm64.zip'
             } else {
-              $patterns = @('Ez2Lazer_release_macos_x64*.zip','Ez2Lazer_release_macos*.zip','Ez2Lazer_release_osx*.zip')
+              $zipPatterns = @('Ez2Lazer_release_macos_x64*.zip')
+              $zipDest = 'Ez2Lazer_release_macos_x64.zip'
             }
-            $found = $null
-            foreach ($p in $patterns) {
-              $found = Get-ChildItem -Path $ws -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
-              if ($found) { break }
-              $found = Get-ChildItem -Path (Join-Path $ws 'osu\artifacts') -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
-              if ($found) { break }
-            }
-            if (-not $found) { Write-Error 'zip asset not found for mac patterns'; exit 1 }
-            if ($arch -eq 'arm64') {
-              $dest = Join-Path $artifactsDir 'Ez2Lazer_release_macos_arm64.zip'
-            } else {
-              $dest = Join-Path $artifactsDir 'Ez2Lazer_release_macos_x64.zip'
-            }
-            Copy-Item -Path $found.FullName -Destination $dest -Force
-            Write-Output "asset_path=$dest" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } else {
-            # windows
             if ($arch -eq 'arm64') {
-              $patterns = @('Ez2Lazer_release_windows_arm64*.zip','Ez2Lazer_release_arm64*.zip','Ez2Lazer_release_windows*.zip')
+              $zipPatterns = @('Ez2Lazer_release_windows_arm64*.zip')
+              $zipDest = 'Ez2Lazer_release_windows_arm64.zip'
             } else {
-              $patterns = @('Ez2Lazer_release_windows_x64*.zip','Ez2Lazer_release_x64*.zip','Ez2Lazer_release_windows*.zip')
+              $zipPatterns = @('Ez2Lazer_release_x64*.zip', 'Ez2Lazer_release_windows_x64*.zip')
+              $zipDest = 'Ez2Lazer_release_x64.zip'
             }
-            $found = $null
-            foreach ($p in $patterns) {
-              $found = Get-ChildItem -Path $ws -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
-              if ($found) { break }
-              $found = Get-ChildItem -Path (Join-Path $ws 'osu\artifacts') -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
-              if ($found) { break }
-            }
-            if (-not $found) { Write-Error 'zip asset not found for windows patterns'; exit 1 }
-            if ($arch -eq 'arm64') {
-              $dest = Join-Path $artifactsDir 'Ez2Lazer_release_windows_arm64.zip'
-            } else {
-              $dest = Join-Path $artifactsDir 'Ez2Lazer_release_x64.zip'
-            }
-            Copy-Item -Path $found.FullName -Destination $dest -Force
-            Write-Output "asset_path=$dest" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           }
 
-      # Size check removed per user request
+          $zipFound = $null
+          foreach ($p in $zipPatterns) {
+            $zipFound = Get-ChildItem -Path $osuArtifacts -Filter $p -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
+            if ($zipFound) { break }
+          }
+          if (-not $zipFound) { Write-Error "zip asset not found in $osuArtifacts"; exit 1 }
+          Copy-Item -Path $zipFound.FullName -Destination (Join-Path $uploadDir $zipDest) -Force
+
+          $velopackPatterns = @('ez2lazer-*.nupkg', 'RELEASES', 'releases*.json', 'assets*.json', 'ez2lazer-*-Setup.exe', 'ez2lazer-*-Portable.zip')
+          foreach ($pattern in $velopackPatterns) {
+            Get-ChildItem -Path $osuArtifacts -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+              Copy-Item -Path $_.FullName -Destination (Join-Path $uploadDir $_.Name) -Force
+            }
+          }
+
+          $velopackCount = (Get-ChildItem -Path $uploadDir -Filter 'ez2lazer-*.nupkg' -ErrorAction SilentlyContinue).Count
+          if ($velopackCount -eq 0) {
+            Write-Warning 'No Velopack nupkg assets found; zip-only release artifact will be uploaded'
+          }
+
+          Write-Output "asset_dir=$uploadDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ format('release-{0}-{1}', matrix.platform, matrix.arch) }}
-          path: ${{ steps.prepare_asset.outputs.asset_path }}
+          path: ${{ steps.prepare_asset.outputs.asset_dir }}
 
   release:
     needs: [prepare, build]
     if: ${{ github.event.inputs.no_publish != '1' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout main repo into osu/
         uses: actions/checkout@v4

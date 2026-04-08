@@ -10,6 +10,9 @@ namespace osu.Game.Configuration
         Lazer,
 
         [Description("Tachyon (Unstable)")]
-        Tachyon
+        Tachyon,
+
+        [Description("Ez2Lazer (SK-la)")]
+        Ez2Lazer,
     }
 }

@@ -108,18 +108,23 @@ namespace osu.Desktop
 
         public static bool IsPackageManaged => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OSU_EXTERNAL_UPDATE_PROVIDER"));
 
+        public static bool IsOfficialEz2Build => RuntimeInfo.EntryAssembly?.GetCustomAttribute<OfficialBuildAttribute>() != null;
+
         protected override UpdateManager CreateUpdateManager()
         {
+            if (IsPackageManaged)
+                return new NoActionUpdateManager();
+
+            if (!IsOfficialEz2Build)
+                return new UpdateManager();
+
             // If this is the first time we've run the game, ie it is being installed,
-            // reset the user's release stream to "lazer".
+            // reset the user's release stream to the Ez2Lazer update channel.
             //
             // This ensures that if a user is trying to recover from a failed startup on an unstable release stream,
             // the game doesn't immediately try and update them back to the release stream after starting up.
             if (IsFirstRun)
-                LocalConfig.SetValue(OsuSetting.ReleaseStream, ReleaseStream.Lazer);
-
-            if (IsPackageManaged)
-                return new NoActionUpdateManager();
+                LocalConfig.SetValue(OsuSetting.ReleaseStream, ReleaseStream.Ez2Lazer);
 
             return new VelopackUpdateManager();
         }

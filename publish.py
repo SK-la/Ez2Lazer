@@ -8,23 +8,44 @@ import hashlib
 import platform
 from datetime import datetime
 
+VELOPACK_TOOL_VERSION = '0.0.1298'
+VELOPACK_PACK_ID = 'ez2lazer'
+VELOPACK_GITHUB_REPO_URL = 'https://github.com/SK-la/Ez2Lazer'
 
-def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str, os_id: str = None) -> int:
+
+def format_date_tag(dt: datetime | None = None) -> str:
+    dt = dt or datetime.utcnow()
+    return f'{dt.year}.{dt.month}.{dt.day:02d}'
+
+
+def resolve_arch(arch: str | None = None) -> str:
+    if arch in ('x64', 'arm64'):
+        return arch
+    machine = platform.machine().lower()
+    return 'arm64' if 'arm' in machine or 'aarch' in machine else 'x64'
+
+
+def run_publish(
+    project_csproj: str,
+    working_dir: str,
+    config: str,
+    out_dir: str,
+    os_id: str | None = None,
+    arch: str | None = None,
+    msbuild_properties: dict | None = None,
+) -> int:
     # Map simple os identifier to RID when possible (pass via -r)
     def _rid_for(os_id: str) -> str | None:
         if not os_id:
             return None
         low = str(os_id).lower()
-        machine = platform.machine().lower()
-        arch = 'x64'
-        if 'arm' in machine or 'aarch' in machine:
-            arch = 'arm64'
+        resolved_arch = resolve_arch(arch)
         if low in ('osx', 'macos', 'darwin'):
-            return f'osx-{arch}'
+            return f'osx-{resolved_arch}'
         if low in ('linux',):
-            return f'linux-{arch}'
+            return f'linux-{resolved_arch}'
         if low in ('win', 'windows'):
-            return f'win-{arch}'
+            return f'win-{resolved_arch}'
         # allow full RID passthrough
         return os_id
 
@@ -32,6 +53,9 @@ def run_publish(project_csproj: str, working_dir: str, config: str, out_dir: str
     cmd = ["dotnet", "publish", project_csproj, "-c", config, "-o", out_dir, "--self-contained", "true"]
     if rid:
         cmd.extend(["-r", rid])
+    if msbuild_properties:
+        for key, value in msbuild_properties.items():
+            cmd.append(f'-p:{key}={value}')
     print("Running:", " ".join(cmd))
     # Capture output for diagnostics in CI, but only print on failure to avoid excessive logs
     res = subprocess.run(cmd, cwd=working_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -292,6 +316,95 @@ def _build_macos_launcher_script(executable_name: str | None) -> str:
     return '\n'.join(lines) + '\n'
 
 
+def velopack_pack(
+    release_dir: str,
+    pack_version: str,
+    target_platform: str,
+    arch_name: str,
+    artifacts_dir: str,
+    workdir: str,
+    project_csproj: str,
+) -> int:
+    if not os.path.isdir(release_dir):
+        print(f'Velopack: release directory missing ({release_dir}), skipping')
+        return 1
+
+    runtime_by_platform = {
+        'windows': f'win-{arch_name}',
+        'linux': f'linux-{arch_name}',
+        'macos': f'osx-{arch_name}',
+    }
+    runtime = runtime_by_platform.get(target_platform)
+    if runtime is None:
+        print(f'Velopack: unsupported platform {target_platform}')
+        return 1
+
+    main_exe = 'Ez2osu!.exe' if target_platform == 'windows' else 'Ez2osu!'
+    vpk_tool_dir = os.path.join(workdir, '.vpk-tools')
+    os.makedirs(vpk_tool_dir, exist_ok=True)
+    vpk_exe = os.path.join(vpk_tool_dir, 'vpk.exe' if os.name == 'nt' else 'vpk')
+
+    install_cmd = [
+        'dotnet', 'tool', 'install', 'vpk',
+        f'--version', VELOPACK_TOOL_VERSION,
+        '--tool-path', vpk_tool_dir,
+    ]
+    print('Running:', ' '.join(install_cmd))
+    subprocess.run(install_cmd, check=False)
+
+    if not os.path.isfile(vpk_exe):
+        print(f'Velopack: vpk CLI not found at {vpk_exe}')
+        return 1
+
+    vpk_out = os.path.join(artifacts_dir, f'velopack_{target_platform}_{arch_name}')
+    os.makedirs(vpk_out, exist_ok=True)
+
+    download_cmd = [
+        vpk_exe, 'download', 'github',
+        '--repoUrl', VELOPACK_GITHUB_REPO_URL,
+        '--outputDir', vpk_out,
+    ]
+    github_token = os.environ.get('GITHUB_TOKEN')
+    if github_token:
+        download_cmd.extend(['--token', github_token])
+
+    print('Running:', ' '.join(download_cmd))
+    download_res = subprocess.run(download_cmd, cwd=workdir)
+    if download_res.returncode != 0:
+        print('Velopack: download previous release failed (continuing for first release)')
+
+    icon_path = os.path.join(os.path.dirname(project_csproj), 'lazer.ico')
+    pack_cmd = [
+        vpk_exe, 'pack',
+        '--packId', VELOPACK_PACK_ID,
+        '--packVersion', pack_version,
+        '--packDir', release_dir,
+        '--mainExe', main_exe,
+        '--packTitle', 'Ez2Lazer',
+        '--outputDir', vpk_out,
+        '--runtime', runtime,
+    ]
+    if os.path.isfile(icon_path):
+        pack_cmd.extend(['--icon', icon_path])
+
+    print('Running:', ' '.join(pack_cmd))
+    pack_res = subprocess.run(pack_cmd, cwd=workdir)
+    if pack_res.returncode != 0:
+        print('Velopack: pack failed with code', pack_res.returncode)
+        return pack_res.returncode
+
+    # Flatten Velopack outputs into artifacts_dir for CI collection.
+    import glob
+    for pattern in ('*.nupkg', 'RELEASES', 'releases*.json', '*-Setup.exe', '*-Portable.zip', 'assets*.json'):
+        for src in glob.glob(os.path.join(vpk_out, '**', pattern), recursive=True):
+            dest = os.path.join(artifacts_dir, os.path.basename(src))
+            shutil.copy2(src, dest)
+            print('Velopack: copied', dest)
+
+    print('Velopack: pack succeeded')
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Publish and package Ez2Lazer builds.")
     # Prefer the GITHUB_WORKSPACE env when present (CI), otherwise use the script directory
@@ -309,7 +422,12 @@ def main():
     parser.add_argument('--appimage', action='store_true', help='Build AppImage for linux from release output')
     parser.add_argument('--os', default=None, help='OS identifier forwarded to dotnet publish')
     parser.add_argument('--platform', default=None, help='Platform to include in package name')
-    parser.add_argument('--tag', default=None, help='Optional tag to include in asset name')
+    parser.add_argument('--tag', default=None, help='Release tag (YYYY.M.DD) for asset names and versioning')
+    parser.add_argument('--arch', default=None, choices=['x64', 'arm64'], help='Target CPU architecture for publish and Velopack')
+    parser.add_argument('--official-build', action='store_true', help='Mark build as official Ez2Lazer release (enables versioning + Velopack)')
+    parser.add_argument('--release-version', default=None, help='MSBuild ReleaseVersion (YYYY.M.DD); defaults to --tag')
+    parser.add_argument('--pack-version', default=None, help='Velopack pack version; defaults to {tag}-ez2lazer')
+    parser.add_argument('--no-velopack', action='store_true', help='Skip Velopack packaging even for official builds')
     parser.add_argument('--deps-path', default=None, help='Path to folder containing dependency DLLs to include')
     parser.add_argument('--deps-pattern', default='*.dll', help='Glob pattern for dependency files to copy')
     parser.add_argument('--deps-source', choices=['local','github','none'], default='local', help='Where to get dependency DLLs')
@@ -338,12 +456,22 @@ def main():
 
     # Enforce that a tag is provided to avoid any implicit fallback tag generation
     if not args.tag:
-        # default to today's date tag if not provided when running locally
-        today = datetime.utcnow()
-        args.tag = f"{today.year}-{today.month}-{today.day}"
+        args.tag = format_date_tag()
         print(f"No --tag provided; defaulting to {args.tag}")
 
     tag_suffix = f"_{args.tag}"
+    arch_name = resolve_arch(args.arch)
+
+    msbuild_properties = None
+    if args.official_build:
+        release_version = args.release_version or args.tag
+        msbuild_properties = {
+            'OfficialEz2Build': 'true',
+            'ReleaseVersion': release_version,
+        }
+        print(f'Official build: ReleaseVersion={release_version}')
+
+    pack_version = args.pack_version or f'{args.tag}-ez2lazer'
 
     # determine host platform canonical name
     host_raw = platform.system().lower()
@@ -395,10 +523,6 @@ def main():
         os.makedirs(fallback, exist_ok=True)
         artifacts_dir = fallback
 
-    # determine architecture for naming (x64 vs arm64)
-    machine = platform.machine().lower()
-    arch_name = 'arm64' if ('arm' in machine or 'aarch' in machine) else 'x64'
-
     # Use the target platform (not host) for artifact folder and asset naming
     release_dir = os.path.join(artifacts_dir, f'Ez2Lazer_release_{target_platform}_{arch_name}')
     debug_dir = os.path.join(artifacts_dir, f'Ez2Lazer_debug_{target_platform}_{arch_name}')
@@ -411,7 +535,7 @@ def main():
 
     # publish
     print('Publishing Release...')
-    rc = run_publish(args.project, args.workdir, 'Release', release_dir, target_platform)
+    rc = run_publish(args.project, args.workdir, 'Release', release_dir, target_platform, arch=arch_name, msbuild_properties=msbuild_properties)
     if rc != 0:
         print('Release publish failed with code', rc)
     else:
@@ -841,6 +965,20 @@ def main():
             zip_folder(debug_dir, debug_zip)
         else:
             print('Debug folder missing, skipping zip')
+
+    if args.official_build and not args.no_velopack and os.path.exists(release_dir):
+        velopack_rc = velopack_pack(
+            release_dir,
+            pack_version,
+            target_platform,
+            arch_name,
+            artifacts_dir,
+            args.workdir,
+            args.project,
+        )
+        if velopack_rc != 0:
+            print('Velopack packaging failed')
+            sys.exit(velopack_rc)
 
     print('Done.')
 
