@@ -131,6 +131,8 @@ namespace osu.Game.EzOsuGame.Overlays
         private IReadOnlyList<Mod> currentMods = Array.Empty<Mod>();
         private bool selectionLoadInProgress;
 
+        private IBeatmap? injectedPlayableBeatmap;
+
         private long selectionEventVersion;
         private int currentRulesetOnlineId = -1;
         private string currentBeatmapHash = string.Empty;
@@ -408,6 +410,16 @@ namespace osu.Game.EzOsuGame.Overlays
             scheduleSelectionLoad();
         }
 
+        /// <summary>
+        /// Update selection with a precomputed playable beatmap. The overlay will prefer using
+        /// <paramref name="playableBeatmap"/> when loading the preview to avoid doing conversion on the overlay side.
+        /// </summary>
+        public void UpdateSelection(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, IBeatmap? playableBeatmap, bool forceReload = false)
+        {
+            injectedPlayableBeatmap = playableBeatmap;
+            UpdateSelection(workingBeatmap, ruleset, mods, forceReload);
+        }
+
         public void SuspendForScreenExit()
         {
             selectionLoadInProgress = false;
@@ -495,7 +507,19 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 token.ThrowIfCancellationRequested();
 
-                var playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset, mods, token);
+                // Prefer an externally-injected playable beatmap if available to avoid performing
+                // conversion (which may be thread-affine) on the overlay side.
+                IBeatmap? playableBeatmap = injectedPlayableBeatmap;
+
+                if (playableBeatmap != null)
+                {
+                    // Clear the injection so it isn't reused accidentally.
+                    injectedPlayableBeatmap = null;
+                }
+                else
+                {
+                    playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset, mods, token);
+                }
 
                 token.ThrowIfCancellationRequested();
 
@@ -975,7 +999,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private void logPreviewLoadReleaseStats(string action)
         {
             int activePreviewCount = previewLoadedCount - previewReleasedCount;
-            Logger.Log($"[BeatmapPreview] action={action}, loaded={previewLoadedCount}, released={previewReleasedCount}, active={activePreviewCount}, expanded={expanded}", LoggingTarget.Runtime, LogLevel.Debug);
+            Logger.Log($"[BeatmapPreview] action={action}, loaded={previewLoadedCount}, released={previewReleasedCount}, active={activePreviewCount}, expanded={expanded}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
 
         private double computeDefaultStartTime(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, IBeatmap playableBeatmap, double fallback,

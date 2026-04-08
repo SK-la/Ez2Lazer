@@ -176,6 +176,8 @@ namespace osu.Game.Screens.Select
         private EzPreviewTrackManager ezPreviewManager = null!;
         private ModSettingChangeTracker? previewOverlayModSettingTracker;
 
+        private CancellationTokenSource? previewPlayableCancellation;
+
         private IDisposable? modSelectOverlayRegistration;
 
         [BackgroundDependencyLoader]
@@ -398,8 +400,9 @@ namespace osu.Game.Screens.Select
             new FooterButtonEzPreView(
                 () =>
                 {
-                    updateBeatmapPreviewSelection();
+                    // Toggle first so UpdateSelection can decide whether to prepare a playable.
                     ezBeatmapPreviewOverlay.Toggle();
+                    updateBeatmapPreviewSelection();
                 },
                 ezBeatmapPreviewOverlay.ExpandedState)
         };
@@ -828,7 +831,55 @@ namespace osu.Game.Screens.Select
             if (!this.IsCurrentScreen())
                 return;
 
-            ezBeatmapPreviewOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value, Mods.Value, forceReload);
+            // If overlay is not expanded, do a simple update without preparing a playable.
+            if (!ezBeatmapPreviewOverlay.ExpandedState.Value)
+            {
+                ezBeatmapPreviewOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value, Mods.Value, forceReload);
+                return;
+            }
+
+            // Cancel any previous preparation work.
+            previewPlayableCancellation?.Cancel();
+            previewPlayableCancellation?.Dispose();
+            previewPlayableCancellation = new CancellationTokenSource();
+            var token = previewPlayableCancellation.Token;
+
+            var workingBeatmap = Beatmap.Value;
+            var ruleset = Ruleset.Value;
+            var mods = Mods.Value;
+
+            // Try to prepare playable on a background thread. If that fails due to thread-affinity, fall back to main-thread conversion.
+            Task.Run(() =>
+            {
+                try
+                {
+                    var playable = workingBeatmap.GetPlayableBeatmap(ruleset, mods, token);
+                    if (token.IsCancellationRequested) return;
+
+                    Schedule(() => ezBeatmapPreviewOverlay.UpdateSelection(workingBeatmap, ruleset, mods, playable, forceReload));
+                }
+                catch (OperationCanceledException)
+                {
+                    // ignore
+                }
+                catch
+                {
+                    // fallback to main thread
+                    Schedule(() =>
+                    {
+                        try
+                        {
+                            var playableMain = workingBeatmap.GetPlayableBeatmap(ruleset, mods);
+                            ezBeatmapPreviewOverlay.UpdateSelection(workingBeatmap, ruleset, mods, playableMain, forceReload);
+                        }
+                        catch
+                        {
+                            // as last resort, update without a playable.
+                            ezBeatmapPreviewOverlay.UpdateSelection(workingBeatmap, ruleset, mods, forceReload);
+                        }
+                    });
+                }
+            }, token);
         }
 
         private void onLeavingScreen()
