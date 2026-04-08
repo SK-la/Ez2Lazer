@@ -58,33 +58,7 @@ namespace osu.Desktop.Updater
 
             try
             {
-                // Allow overriding the GitHub update source via environment variables:
-                // - OSU_UPDATE_REPO can be set to "owner/repo" or a full URL
-                // - OSU_UPDATE_REPO_URL can be set to a full URL and takes precedence
-                string? repoEnv = Environment.GetEnvironmentVariable("OSU_UPDATE_REPO");
-                string? repoUrlEnv = Environment.GetEnvironmentVariable("OSU_UPDATE_REPO_URL");
-
-                string updateSourceUrl;
-                if (!string.IsNullOrEmpty(repoUrlEnv))
-                {
-                    updateSourceUrl = repoUrlEnv;
-                }
-                else if (!string.IsNullOrEmpty(repoEnv))
-                {
-                    if (repoEnv.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || repoEnv.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-                        updateSourceUrl = repoEnv;
-                    else
-                        updateSourceUrl = $"https://github.com/{repoEnv}";
-                }
-                else
-                {
-                    // Default to the forked Ez2Lazer repository for update distribution.
-                    updateSourceUrl = "https://github.com/SK-la/Ez2Lazer";
-                }
-
-                log($"Using update source: {updateSourceUrl}");
-
-                IUpdateSource updateSource = new GithubSource(updateSourceUrl, null, ReleaseStream.Value == Game.Configuration.ReleaseStream.Tachyon);
+                IUpdateSource updateSource = new GithubSource(@"https://github.com/SK-la/Ez2Lazer", null, ReleaseStream.Value == Game.Configuration.ReleaseStream.Ez2Lazer);
                 Velopack.UpdateManager updateManager = new Velopack.UpdateManager(updateSource, new UpdateOptions
                 {
                     AllowVersionDowngrade = true
