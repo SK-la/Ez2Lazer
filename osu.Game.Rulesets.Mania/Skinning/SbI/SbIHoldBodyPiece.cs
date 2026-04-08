@@ -10,27 +10,23 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Skinning.Default;
-using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
+using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    public partial class SbIHoldBodyPiece : EzNoteBase, IHoldNoteBody
+    public partial class SbIHoldBodyPiece : FastNoteBase, IHoldNoteBody
     {
-        protected override bool UseColorization => true;
-        protected readonly IBindable<double> CornerRadiusBindable = new Bindable<double>();
-
         private IBindable<double> tailAlpha = null!;
         private IBindable<double> tailMaskHeight = null!;
 
         private Container? topContainer;
         private Container? bodyContainer;
-        private Container? bodyInnerContainer;
 
         private float tailHeight;
         private float cachedTailMaskHeight = float.NaN;
         private float lastBodyContainerHeight = float.NaN;
         private float lastTopContainerY = float.NaN;
-        private bool advancedMode;
+        private bool lnGradient;
 
         public SbIHoldBodyPiece()
         {
@@ -40,11 +36,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [BackgroundDependencyLoader(true)]
         private void load(IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
         {
-            advancedMode = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
-            CornerRadiusBindable.BindTo(ezSkinInfo.NoteCornerRadius);
-            RelativeSizeAxes = Axes.Both;
+            lnGradient = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
 
-            if (advancedMode)
+            if (lnGradient)
             {
                 tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
                 tailAlpha = ezSkinInfo.HoldTailAlpha;
@@ -53,49 +47,39 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     cachedTailMaskHeight = (float)e.NewValue;
                     UpdateDrawable();
                 }, true);
-                tailAlpha.BindValueChanged(_ => UpdateDrawable());
+                tailAlpha.BindValueChanged(_ => UpdateColor(), true);
             }
-
-            UpdateTexture();
-
-            CornerRadiusBindable.BindValueChanged(_ => UpdateDrawable(), true);
         }
 
-        protected override void UpdateTexture()
+        protected override void UpdateLoad()
         {
-            if (!advancedMode)
+            if (!lnGradient)
             {
-                if (MainContainer != null)
+                MainContainer.Clear();
+                MainContainer.RelativeSizeAxes = Axes.X;
+                MainContainer.Anchor = Anchor.TopCentre;
+                MainContainer.Origin = Anchor.TopCentre;
+                MainContainer.Child = new Box
                 {
-                    MainContainer.Child = new Box
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                    };
-                }
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Color4.White,
+                };
 
-                bodyInnerContainer = null;
-
+                topContainer = null;
+                bodyContainer = null;
+                resetLayoutCache();
                 return;
             }
-
-            topContainer?.Expire();
-            bodyContainer?.Expire();
 
             topContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
                 Anchor = Anchor.TopCentre,
                 Origin = Anchor.TopCentre,
-                Masking = true,
-                Child = new Container
+                Child = new Box
                 {
-                    RelativeSizeAxes = Axes.X,
-                    Anchor = Anchor.TopCentre,
-                    Origin = Anchor.TopCentre,
-                    Child = new Box
-                    {
-                        RelativeSizeAxes = Axes.X,
-                    }
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Color4.White,
                 }
             };
 
@@ -104,74 +88,61 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 RelativeSizeAxes = Axes.X,
                 Anchor = Anchor.BottomCentre,
                 Origin = Anchor.BottomCentre,
-                Masking = true,
-                Child = bodyInnerContainer = new Container
+                Child = new Box
                 {
-                    RelativeSizeAxes = Axes.X,
-                    Child = new Box
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                    }
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Color4.White,
                 }
             };
 
-            if (MainContainer != null)
-            {
-                MainContainer.Clear();
-                MainContainer.Children = [bodyContainer, topContainer];
-            }
+            MainContainer.Clear();
+            MainContainer.Children = [bodyContainer, topContainer];
 
             resetLayoutCache();
-            // 立即刷新 + 下一帧刷新，确保 HoldNote 布局稳定
             Schedule(UpdateDrawable);
-
-            UpdateColor();
         }
 
         protected override void UpdateDrawable()
         {
-            if (advancedMode)
+            if (DrawWidth <= 1)
             {
-                tailHeight = NoteSizeBindable.Value.Y * 0.5f;
-
-                // 当设置为负值时，隐藏 topContainer；非负值时显示
-                if (topContainer != null)
-                {
-                    topContainer.Alpha = tailMaskHeight.Value >= 0 ? 1 : 0;
-                    topContainer.CornerRadius = (float)CornerRadiusBindable.Value;
-                }
-
-                if (topContainer?.Child is Container topInner)
-                {
-                    topContainer.Height = tailHeight;
-                    topInner.Height = tailHeight * 2;
-                    topContainer.Y = tailMaskHeight.Value > 0
-                        ? (float)tailMaskHeight.Value
-                        : 0;
-                }
-
-                if (bodyInnerContainer != null)
-                {
-                    bodyInnerContainer.Height = tailHeight * 2;
-                    bodyInnerContainer.Y = -tailHeight;
-                }
-            }
-            else
-            {
-                Masking = CornerRadiusBindable.Value > 0;
-                CornerRadius = (float)CornerRadiusBindable.Value;
+                Schedule(UpdateDrawable);
+                return;
             }
 
-            float noteHeight = NoteSizeBindable.Value.Y;
-            Y = noteHeight;
-            UpdateColor();
+            float radius = (float)CornerRadiusBindable.Value;
+
+            Masking = true;
+            CornerRadius = radius;
+
+            Y = UnitHeight;
+
+            if (!lnGradient)
+            {
+                MainContainer.Height = DrawHeight + UnitHeight;
+                return;
+            }
+
+            tailHeight = UnitHeight;
+            float topHeight = Math.Max(tailHeight - cachedTailMaskHeight, 0);
+            float topY = tailHeight - topHeight;
+
+            if (topContainer != null)
+            {
+                topContainer.Alpha = cachedTailMaskHeight >= 0 ? 1 : 0;
+                topContainer.Height = topHeight;
+                topContainer.Y = topY;
+            }
+
+            if (bodyContainer != null)
+                bodyContainer.Height = Math.Max(DrawHeight - tailHeight, 0);
         }
 
         protected override void UpdateColor()
         {
-            if (!advancedMode)
+            if (!lnGradient)
             {
-                base.UpdateColor();
+                MainContainer.Colour = NoteColor;
                 return;
             }
 
@@ -190,10 +161,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             base.Update();
 
-            if (!advancedMode || MainContainer?.Children.Count == 0)
+            if (!lnGradient || MainContainer.Children.Count == 0 || tailHeight <= 0)
                 return;
 
-            float targetTopY = cachedTailMaskHeight > 0 ? cachedTailMaskHeight : 0;
+            float maskHeight = float.IsNaN(cachedTailMaskHeight) ? 0 : cachedTailMaskHeight;
+            float targetTopHeight = Math.Max(tailHeight - maskHeight, 0);
+            float targetTopY = tailHeight - targetTopHeight;
 
             if (topContainer != null && layoutChanged(lastTopContainerY, targetTopY))
             {
@@ -203,9 +176,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             float drawHeightMinusHalf = DrawHeight - tailHeight;
             float middleHeight = Math.Max(drawHeightMinusHalf, tailHeight);
-            float targetBodyHeight = cachedTailMaskHeight >= 0
-                ? middleHeight - cachedTailMaskHeight + 1
-                : middleHeight + MathF.Abs(cachedTailMaskHeight) + 2;
+            float targetBodyHeight = maskHeight >= 0
+                ? middleHeight - maskHeight + 1
+                : middleHeight + MathF.Abs(maskHeight) + 2;
+            targetBodyHeight = Math.Max(targetBodyHeight, 0);
 
             if (bodyContainer != null && layoutChanged(lastBodyContainerHeight, targetBodyHeight))
             {

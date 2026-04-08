@@ -122,7 +122,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.HitTargetFloatFixed, 6, 0, 10, 0.1);
             SetDefault(Ez2Setting.HitTargetAlpha, 0.6, 0, 1, 0.01);
             SetDefault(Ez2Setting.NoteHeightScaleToWidth, 1, 0.1, 10, 0.1);
-            SetDefault(Ez2Setting.NoteCornerRadius, 5, 0.0, 80, 0.5);
+            SetDefault(Ez2Setting.NoteCornerRadius, 5, 0.0, 80, 1);
             SetDefault(Ez2Setting.NoteTrackLineHeight, 300, 0, 1000, 5.0);
 
             #endregion
@@ -784,8 +784,8 @@ namespace osu.Game.EzOsuGame.Configuration
 
         ManiaHoldTailAlpha,
         ManiaHoldTailMaskGradientHeight, // 投皮面尾
-        ManiaLNGradientEnable, // 还没做UI和应用，投皮开关
-        NoteCornerRadius, // 还没做UI
+        ManiaLNGradientEnable,
+        NoteCornerRadius,
 
         // 列着色与配色系统
         ColorSettingsEnabled,

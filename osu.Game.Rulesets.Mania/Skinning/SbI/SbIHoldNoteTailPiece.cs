@@ -1,8 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Game.EzOsuGame.Configuration;
 
@@ -15,22 +17,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     /// </summary>
     public partial class SbIHoldNoteTailPiece : SbINotePiece
     {
-        private bool lnGradientEnable;
-
         private readonly IBindable<double> tailAlphaBindable = new Bindable<double>();
         private readonly IBindable<double> tailMaskHeightBindable = new Bindable<double>();
 
-        public SbIHoldNoteTailPiece()
-        {
-            Rotation = 180;
-        }
+        private bool gradient;
 
         [BackgroundDependencyLoader(true)]
         private void load(IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
         {
-            lnGradientEnable = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
+            gradient = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
 
-            if (lnGradientEnable)
+            if (gradient)
             {
                 Alpha = 0;
                 return;
@@ -38,38 +35,32 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             Alpha = 1;
 
-            tailAlphaBindable.BindTo(ezSkinInfo.HoldTailAlpha);
             tailMaskHeightBindable.BindTo(ezSkinInfo.HoldTailMaskHeight);
+            tailAlphaBindable.BindTo(ezSkinInfo.HoldTailAlpha);
 
-            tailAlphaBindable.BindValueChanged(_ => UpdateDrawable());
             tailMaskHeightBindable.BindValueChanged(_ => UpdateDrawable(), true);
+            tailAlphaBindable.BindValueChanged(_ => UpdateColor(), true);
         }
 
         protected override void UpdateDrawable()
         {
-            if (lnGradientEnable || MainContainer == null)
+            base.UpdateDrawable();
+
+            if (gradient)
                 return;
 
-            // 与 SbIHoldBodyPiece 中 topContainer 的 Y 规则一致
-            MainContainer.Y = tailMaskHeightBindable.Value > 0
-                ? (float)tailMaskHeightBindable.Value
-                : 0;
+            float visibleHeight = UnitHeight - (float)tailMaskHeightBindable.Value;
+            Height = visibleHeight;
         }
 
         protected override void UpdateColor()
         {
-            if (lnGradientEnable)
+            if (gradient)
                 return;
 
-            if (MainContainer != null)
-            {
-                MainContainer.Colour = ColourInfo.GradientVertical(
-                    NoteColor.Opacity((float)tailAlphaBindable.Value),
-                    NoteColor);
-                return;
-            }
-
-            base.UpdateColor();
+            MainContainer.Colour = ColourInfo.GradientVertical(
+                NoteColor.Opacity((float)tailAlphaBindable.Value),
+                NoteColor);
         }
     }
 }

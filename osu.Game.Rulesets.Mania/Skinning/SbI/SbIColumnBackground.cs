@@ -23,16 +23,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         private Color4 dimColour;
 
         private Box backgroundOverlay = null!;
-        // private Box background = null!;
-        // private Box? separator;
 
         [Resolved]
         private Column column { get; set; } = null!;
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
-
-        // private readonly Bindable<float> overlayHeight = new Bindable<float>(0f);
 
         public SbIColumnBackground()
         {
@@ -51,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     Name = "Background",
                     RelativeSizeAxes = Axes.Both,
                     Colour = Color4.Black,
-                    Alpha = 1,
+                    Alpha = 0.8f,
                 },
                 backgroundOverlay = new Box
                 {
@@ -68,7 +64,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
 
             hitPosition = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
             hitPosition.BindValueChanged(_ => updateDrawable(), true);
-            // overlayHeight.BindValueChanged(height => backgroundOverlay.Height = height.NewValue, true);
         }
 
         private void updateDrawable()
@@ -82,14 +77,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             if (e.Action == column.Action.Value)
             {
                 var noteColour = column.EzNoteColourBindable.Value;
-                brightColour = noteColour.Opacity(1f);
+                brightColour = noteColour.Opacity(0.6f);
                 dimColour = noteColour.Opacity(0);
 
                 backgroundOverlay.Colour = ColourInfo.GradientVertical(brightColour, dimColour);
 
-                // overlayHeight.Value = 0.1f;
-
-                backgroundOverlay.FadeTo(1, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
+                backgroundOverlay.FadeTo(0.8f, 50, Easing.OutQuint).Then().FadeTo(0.5f, 250, Easing.OutQuint);
             }
 
             return false;
