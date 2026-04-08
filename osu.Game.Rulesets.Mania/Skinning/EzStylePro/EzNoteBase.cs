@@ -2,8 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -15,7 +13,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public abstract partial class EzNoteBase : CompositeDrawable
+    public abstract partial class EzNoteBase : CompositeDrawable, IColumnNote
     {
         protected virtual bool UseColorization => false;
         protected virtual bool ShowSeparators => false;
@@ -187,168 +185,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             base.Dispose(isDisposing);
         }
 
-        // Forwarders used by ColumnWatcher when broadcasting per-column changes to instances.
-        internal void ForwardOnNoteSetChanged() => OnNoteSetChanged();
-        internal void ForwardOnNoteSizeChanged() => OnNoteSizeChanged();
-        internal void ForwardOnColourChanged() => OnColourChanged();
-
-        private class ColumnWatcher
-        {
-            private readonly Column column;
-            private readonly List<WeakReference<EzNoteBase>> notes = new List<WeakReference<EzNoteBase>>();
-
-            public ColumnWatcher(Column column)
-            {
-                this.column = column;
-                column.NoteSetChanged += watcherNoteSetChanged;
-                column.NoteColourChanged += watcherNoteColourChanged;
-                column.NoteSizeChanged += watcherNoteSizeChanged;
-            }
-
-            public void Add(EzNoteBase note)
-            {
-                // store weak reference to avoid preventing note GC if removed elsewhere
-                notes.Add(new WeakReference<EzNoteBase>(note));
-            }
-
-            public void Remove(EzNoteBase note)
-            {
-                notes.RemoveAll(wr => !wr.TryGetTarget(out var target) || ReferenceEquals(target, note));
-            }
-
-            private void watcherNoteSetChanged()
-            {
-                // iterate backwards and remove dead weak references in-place to avoid
-                // allocating a large temporary array when the column has many notes.
-                for (int i = notes.Count - 1; i >= 0; i--)
-                {
-                    var wr = notes[i];
-
-                    if (!wr.TryGetTarget(out var target))
-                    {
-                        notes.RemoveAt(i);
-                        continue;
-                    }
-
-                    target.ForwardOnNoteSetChanged();
-                }
-            }
-
-            private void watcherNoteColourChanged()
-            {
-                for (int i = notes.Count - 1; i >= 0; i--)
-                {
-                    var wr = notes[i];
-
-                    if (!wr.TryGetTarget(out var target))
-                    {
-                        notes.RemoveAt(i);
-                        continue;
-                    }
-
-                    target.ForwardOnColourChanged();
-                }
-            }
-
-            private void watcherNoteSizeChanged()
-            {
-                for (int i = notes.Count - 1; i >= 0; i--)
-                {
-                    var wr = notes[i];
-
-                    if (!wr.TryGetTarget(out var target))
-                    {
-                        notes.RemoveAt(i);
-                        continue;
-                    }
-
-                    target.ForwardOnNoteSizeChanged();
-                }
-            }
-
-            public void Unsubscribe()
-            {
-                column.NoteSetChanged -= watcherNoteSetChanged;
-                column.NoteColourChanged -= watcherNoteColourChanged;
-                column.NoteSizeChanged -= watcherNoteSizeChanged;
-            }
-
-            public bool IsEmpty => notes.All(wr => !wr.TryGetTarget(out _));
-
-            private static readonly Dictionary<WeakReference<Column>, ColumnWatcher> watchers = new Dictionary<WeakReference<Column>, ColumnWatcher>();
-            private static readonly object watcher_lock = new object();
-
-            public static ColumnWatcher GetOrCreate(Column c)
-            {
-                lock (watcher_lock)
-                {
-                    // Clean up dead references first
-                    cleanupDeadReferences();
-
-                    // Try to find existing watcher for this column
-                    ColumnWatcher? w = null;
-
-                    foreach (var kvp in watchers)
-                    {
-                        if (kvp.Key.TryGetTarget(out var target) && ReferenceEquals(target, c))
-                        {
-                            w = kvp.Value;
-                            break;
-                        }
-                    }
-
-                    if (w == null)
-                    {
-                        w = new ColumnWatcher(c);
-                        var weakRef = new WeakReference<Column>(c);
-                        watchers[weakRef] = w;
-                    }
-
-                    return w;
-                }
-            }
-
-            public static void Remove(Column c, EzNoteBase note)
-            {
-                lock (watcher_lock)
-                {
-                    ColumnWatcher? w = null;
-                    WeakReference<Column>? keyToRemove = null;
-
-                    foreach (var kvp in watchers)
-                    {
-                        if (kvp.Key.TryGetTarget(out var target) && ReferenceEquals(target, c))
-                        {
-                            w = kvp.Value;
-                            keyToRemove = kvp.Key;
-                            break;
-                        }
-                    }
-
-                    if (w == null)
-                        return;
-
-                    w.Remove(note);
-
-                    if (w.IsEmpty)
-                    {
-                        w.Unsubscribe();
-                        if (keyToRemove != null)
-                            watchers.Remove(keyToRemove);
-                    }
-                }
-            }
-
-            private static void cleanupDeadReferences()
-            {
-                // Remove entries where the Column has been garbage collected
-                var keysToRemove = watchers.Keys.Where(k => !k.TryGetTarget(out _)).ToList();
-
-                foreach (var key in keysToRemove)
-                {
-                    watchers.Remove(key);
-                }
-            }
-        }
+        void IColumnNote.ForwardOnNoteSetChanged() => OnNoteSetChanged();
+        void IColumnNote.ForwardOnNoteSizeChanged() => OnNoteSizeChanged();
+        void IColumnNote.ForwardOnColourChanged() => OnColourChanged();
     }
 }

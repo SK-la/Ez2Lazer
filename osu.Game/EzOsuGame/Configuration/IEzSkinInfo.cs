@@ -10,7 +10,6 @@ namespace osu.Game.EzOsuGame.Configuration
 {
     public interface IEzSkinInfo
     {
-        Bindable<string> NoteSetName { get; }
         Bindable<double> ColumnWidth { get; }
         Bindable<double> SpecialFactor { get; }
 
@@ -25,8 +24,6 @@ namespace osu.Game.EzOsuGame.Configuration
 
         Bindable<double> HoldTailAlpha { get; }
         Bindable<double> HoldTailMaskHeight { get; }
-
-        Bindable<bool> ColorSettingsEnabled { get; }
     }
 
     // public class EzProNoteInfo : IEzSkinInfo
@@ -50,7 +47,6 @@ namespace osu.Game.EzOsuGame.Configuration
 
     public class EzSkinInfo : IEzSkinInfo
     {
-        public Bindable<string> NoteSetName { get; } = new Bindable<string>();
         public Bindable<double> ColumnWidth { get; } = new Bindable<double>();
         public Bindable<double> SpecialFactor { get; }  = new Bindable<double>();
         public Bindable<double> NoteHeightScaleToWidth { get; } = new Bindable<double>();
@@ -66,11 +62,8 @@ namespace osu.Game.EzOsuGame.Configuration
         public Bindable<double> HoldTailAlpha { get; } = new Bindable<double>();
         public Bindable<double> HoldTailMaskHeight { get; } = new Bindable<double>();
 
-        public Bindable<bool> ColorSettingsEnabled { get; } = new Bindable<bool>();
-
         public void BindWith(Ez2ConfigManager ezConfig)
         {
-            ezConfig.BindWith(Ez2Setting.NoteSetName, NoteSetName);
             ezConfig.BindWith(Ez2Setting.ColumnWidth, ColumnWidth);
             ezConfig.BindWith(Ez2Setting.SpecialFactor, SpecialFactor);
             ezConfig.BindWith(Ez2Setting.NoteHeightScaleToWidth, NoteHeightScaleToWidth);
@@ -81,7 +74,6 @@ namespace osu.Game.EzOsuGame.Configuration
             ezConfig.BindWith(Ez2Setting.HitTargetAlpha, HitTargetAlpha);
             ezConfig.BindWith(Ez2Setting.ManiaHoldTailAlpha, HoldTailAlpha);
             ezConfig.BindWith(Ez2Setting.ManiaHoldTailMaskGradientHeight, HoldTailMaskHeight);
-            ezConfig.BindWith(Ez2Setting.ColorSettingsEnabled, ColorSettingsEnabled);
         }
 
         [UsedImplicitly]
@@ -101,7 +93,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public EzSkinColour(Ez2ConfigManager ezConfig)
         {
-            var colorSettingsEnabled1 = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+            var colorSettingsEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             var columnTypeA = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeA);
             var columnTypeB = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
             var columnTypeS = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeS);
@@ -122,7 +114,7 @@ namespace osu.Game.EzOsuGame.Configuration
                 ezConfig.GetBindable<string>(Ez2Setting.ColumnTypeOf18K),
             };
 
-            colorSettingsEnabled1.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
+            colorSettingsEnabled.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
             columnTypeA.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
             columnTypeB.BindValueChanged(_ => OnNoteColourChanged?.Invoke());
             columnTypeS.BindValueChanged(_ => OnNoteColourChanged?.Invoke());

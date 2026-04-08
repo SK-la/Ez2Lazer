@@ -42,7 +42,7 @@ namespace osu.Game.EzOsuGame
         private readonly Bindable<string> stageName = new Bindable<string>();
         private readonly Bindable<string> noteSetName = new Bindable<string>();
 
-        private readonly BindableBool colorSettingsEnabled = new BindableBool();
+        private readonly BindableBool colorSettingsEnabled = new BindableBool(true);
         private readonly Bindable<Colour4> columnTypeA = new Bindable<Colour4>();
         private readonly Bindable<Colour4> columnTypeB = new Bindable<Colour4>();
         private readonly Bindable<Colour4> columnTypeS = new Bindable<Colour4>();
