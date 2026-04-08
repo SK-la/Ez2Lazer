@@ -17,28 +17,22 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
+    /// <summary>
+    /// 本皮肤原则上应专注极致性能。
+    /// </summary>
     public class ManiaSbISkinTransformer : SkinTransformer
     {
         private readonly ManiaBeatmap beatmap;
         private readonly Ez2ConfigManager ezSkinConfig;
-        private readonly IBindable<double> columnWidthBindable;
-        private readonly IBindable<double> specialFactorBindable;
-        private readonly IBindable<double> hitPosition;
+        private readonly float hitPosition;
 
         public ManiaSbISkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            // if (GlobalConfigStore.EzConfig == null)
-            // {
-            //     Logger.Log("!GlobalConfigStore.EzConfig SbISkin", LoggingTarget.Runtime, LogLevel.Important);
-            // }
-
             ezSkinConfig = GlobalConfigStore.EzConfig;
-            columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
-            specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
-            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            hitPosition = (float)ezSkinConfig.Get<double>(Ez2Setting.HitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -119,23 +113,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 case SkinComponentLookup<HitResult>:
                     // if (Skin is SbISkin && resultComponent.Component >= HitResult.Great)
                     //     return Drawable.Empty();
-                    // return new EzComJudgementTexture(resultComponent.Component);
                     // return new SbIJudgementPiece(resultComponent.Component);
                     return Drawable.Empty();
 
                 case ManiaSkinComponentLookup maniaComponent:
                     switch (maniaComponent.Component)
                     {
-                        // case ManiaSkinComponents.StageBackground:
-                        //     return new SbIStageBackground();
-
                         case ManiaSkinComponents.ColumnBackground:
-                            // if (Skin is SbISkin && resultComponent.Component >= HitResult.Perfect)
-                            //     return Drawable.Empty();
                             return new SbIColumnBackground();
 
-                        case ManiaSkinComponents.Note:
-                            return new SbINotePiece();
+                        case ManiaSkinComponents.KeyArea:
+                            return Drawable.Empty();
 
                         case ManiaSkinComponents.HoldNoteHead:
                             return Drawable.Empty();
@@ -146,14 +134,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         case ManiaSkinComponents.HoldNoteBody:
                             return new SbIHoldBodyPiece();
 
-                        case ManiaSkinComponents.KeyArea:
-                            return Drawable.Empty();
+                        case ManiaSkinComponents.Note:
+                            return new SbINotePiece();
+
+                        case ManiaSkinComponents.HitTarget:
+                            return new SbIHitTarget();
 
                         case ManiaSkinComponents.HitExplosion:
                             return Drawable.Empty();
 
-                        case ManiaSkinComponents.HitTarget:
-                            return new SbIHitTarget();
+                        case ManiaSkinComponents.StageBackground:
+                            //return new SbIStageBackground();
+                            return Drawable.Empty();
                     }
 
                     break;
@@ -162,16 +154,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
             return base.GetDrawableComponent(lookup);
         }
 
-        private float columnWidth;
-
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {
             if (lookup is ManiaSkinConfigurationLookup maniaLookup)
             {
+                int keyMode = beatmap.TotalColumns;
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
-                var stage = beatmap.GetStageForColumnIndex(columnIndex);
-                bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(stage.Columns, columnIndex);
-                columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
+                float columnWidth = ezSkinConfig.GetColumnWidth(keyMode, columnIndex);
 
                 switch (maniaLookup.Lookup)
                 {
@@ -179,7 +168,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
 
                     case LegacyManiaSkinConfigurationLookups.HitPosition:
-                        return SkinUtils.As<TValue>(new Bindable<float>((float)hitPosition.Value));
+                        return SkinUtils.As<TValue>(new Bindable<float>(hitPosition));
 
                     case LegacyManiaSkinConfigurationLookups.BarLineHeight:
                         return SkinUtils.As<TValue>(new Bindable<float>());

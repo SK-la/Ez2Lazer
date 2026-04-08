@@ -32,12 +32,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         [BackgroundDependencyLoader(true)]
         private void load(IEzSkinInfo ezSkinInfo)
         {
-            CornerRadiusBindable.BindTo(ezSkinInfo.NoteCornerRadius);
-            CornerRadiusBindable.BindValueChanged(_ => UpdateDrawable(), true);
-        }
-
-        protected override void UpdateDrawable()
-        {
             if (MainContainer != null)
             {
                 MainContainer.Child = box = new Box
@@ -47,6 +41,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                 };
             }
 
+            CornerRadiusBindable.BindTo(ezSkinInfo.NoteCornerRadius);
+            CornerRadiusBindable.BindValueChanged(_ => UpdateDrawable(), true);
+        }
+
+        protected override void UpdateDrawable()
+        {
             // 确保父 drawable 有合适的高度，否则启用 Masking 时子元素会被裁剪不可见。
             // 这里将自身高度与 note 尺寸同步，并设置主体 box 的高度。
             float noteHeight = NoteSizeBindable.Value.Y;

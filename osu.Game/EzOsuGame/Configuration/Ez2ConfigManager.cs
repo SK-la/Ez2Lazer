@@ -145,7 +145,7 @@ namespace osu.Game.EzOsuGame.Configuration
             foreach (int keyMode in commonKeyModes)
             {
                 GetColumnTypes(keyMode);
-                GetSpecialColumnsBools(keyMode);
+                GetSpecialColumnsBoolList(keyMode);
             }
 
             #endregion
@@ -240,18 +240,41 @@ namespace osu.Game.EzOsuGame.Configuration
 
         #region 公共方法
 
+        /// <summary>
+        /// 获取列宽
+        /// </summary>
+        /// <param name="keyMode">总key数</param>
+        /// <param name="index">第N列的列号，从0开始。如果留空，则直接返回面板的总列宽</param>
+        /// <param name="isEzSpaceMixMode">可选项。供Space Mix的13k模式专用，忽略最后一列宽度。</param>
+        /// <returns></returns>
         [UsedImplicitly]
-        public float GetTotalWidth(int keyMode)
+        public float GetColumnWidth(int keyMode, int? index = null, bool isEzSpaceMixMode = false)
         {
             // Hot path: read runtime compact data once and operate on locals only.
             double baseWidth = Get<double>(Ez2Setting.ColumnWidth);
             double specialFactor = Get<double>(Ez2Setting.SpecialFactor);
 
-            int forMode = keyMode == 14 ? keyMode - 1 : keyMode;
+            int forMode = isEzSpaceMixMode && keyMode == 14
+                ? keyMode - 1
+                : keyMode;
 
             var data = getOrBuildKeyModeColumnData(keyMode);
             byte[] types = data.Types;
             ulong mask = data.SpecialMask;
+
+            if (index != null)
+            {
+                int i = index.Value;
+
+                if (i < types.Length)
+                {
+                    bool isSpecial = i < 64
+                        ? ((mask >> i) & 1UL) != 0UL
+                        : types[i] == (byte)EzColumnType.S;
+
+                    return (float)(baseWidth * (isSpecial ? specialFactor : 1.0));
+                }
+            }
 
             // Use double accumulator for precision then cast once.
             double total = 0.0;
@@ -341,7 +364,7 @@ namespace osu.Game.EzOsuGame.Configuration
             return EzColumnTypeManager.GetColumnType(keyMode, columnIndex) == EzColumnType.S;
         }
 
-        public bool[] GetSpecialColumnsBools(int keyMode)
+        public bool[] GetSpecialColumnsBoolList(int keyMode)
         {
             KeyModeColumnData data = getOrBuildKeyModeColumnData(keyMode);
 

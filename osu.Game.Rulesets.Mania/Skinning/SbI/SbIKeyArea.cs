@@ -58,7 +58,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             if (e.Action != column.Action.Value) return;
 
-            line.FadeTo(0f, 50, Easing.OutQuint)
+            line.FadeTo(0.8f, 50, Easing.OutQuint)
                 .Then()
                 .FadeOut(800, Easing.OutQuint);
         }
