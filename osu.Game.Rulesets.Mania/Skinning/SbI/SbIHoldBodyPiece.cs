@@ -14,7 +14,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    public partial class SbIHoldBodyPiece : FastNoteBase, IHoldNoteBody
+    internal partial class SbIHoldBodyPiece : FastNoteBase, IHoldNoteBody
     {
         private IBindable<double> tailAlpha = null!;
         private IBindable<double> tailMaskHeight = null!;

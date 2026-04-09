@@ -1,10 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Game.EzOsuGame.Configuration;
 
@@ -15,7 +13,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
     /// 关闭时：常规 body + 独立 tail；tail 使用与 body 顶部段相同的 <see cref="IEzSkinInfo.HoldTailMaskHeight"/> / <see cref="IEzSkinInfo.HoldTailAlpha"/>（高度修正与纵向渐变）。
     /// LN 渐变开关仅在加载时读取；tail 的高度修正与透明度在常规模式下仍随皮肤绑定更新。
     /// </summary>
-    public partial class SbIHoldNoteTailPiece : SbINotePiece
+    internal partial class SbIHoldNoteTailPiece : SbINotePiece
     {
         private readonly IBindable<double> tailAlphaBindable = new Bindable<double>();
         private readonly IBindable<double> tailMaskHeightBindable = new Bindable<double>();

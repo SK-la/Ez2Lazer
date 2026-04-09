@@ -10,7 +10,7 @@ using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    public abstract partial class FastNoteBase : CompositeDrawable, IColumnNote
+    internal abstract partial class FastNoteBase : CompositeDrawable, IColumnNote
     {
         protected virtual bool UseColorization => true;
 

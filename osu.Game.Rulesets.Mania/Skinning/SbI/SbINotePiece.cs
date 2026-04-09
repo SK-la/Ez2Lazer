@@ -6,7 +6,7 @@ using osu.Framework.Graphics.Shapes;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
-    public partial class SbINotePiece : FastNoteBase
+    internal partial class SbINotePiece : FastNoteBase
     {
         public SbINotePiece()
         {
