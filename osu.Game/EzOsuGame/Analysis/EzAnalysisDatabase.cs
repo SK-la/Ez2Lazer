@@ -201,7 +201,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public Task<SongsBranchBuildResult> CreateAndActivateSongsBranchAsync(
             IEnumerable<BeatmapInfo> beatmaps, EzAnalysisPersistentStore.SourceCollectionSnapshot? sourceCollection, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods,
-            Action<int, int>? progress = null, CancellationToken cancellationToken = default)
+            bool activateAfterCreate = true, Action<int, int>? progress = null, CancellationToken cancellationToken = default)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.FromResult(new SongsBranchBuildResult(false, SongsBranchStrings.SQLITE_DISABLED, null, null, 0, 0));
@@ -287,9 +287,14 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection);
                 deleteBranchesForSourceCollection(resolvedSourceCollectionId, databasePath);
-                activateSongsBranch(databasePath, metadata);
 
-                return new SongsBranchBuildResult(true, SongsBranchStrings.GENERATED_AND_ACTIVATED, databasePath, displayName, beatmapList.Count, rows.Count);
+                if (activateAfterCreate)
+                {
+                    activateSongsBranch(databasePath, metadata);
+                    return new SongsBranchBuildResult(true, SongsBranchStrings.GENERATED_AND_ACTIVATED, databasePath, displayName, beatmapList.Count, rows.Count);
+                }
+
+                return new SongsBranchBuildResult(true, SongsBranchStrings.GENERATED_ONLY, databasePath, displayName, beatmapList.Count, rows.Count);
             }, cancellationToken);
         }
 
@@ -978,6 +983,7 @@ namespace osu.Game.EzOsuGame.Analysis
             internal static readonly EzLocalizationManager.EzLocalisableString EMPTY_FILTER_RESULT = new EzLocalizationManager.EzLocalisableString("当前筛选结果为空，未生成分支库。", "The current filtered result is empty. No branch sqlite was generated.");
             internal static readonly EzLocalizationManager.EzLocalisableString NO_WRITABLE_RESULTS = new EzLocalizationManager.EzLocalisableString("当前收藏夹里没有可写入分支曲库的 mania 谱面。", "The selected collection does not contain any mania beatmaps that can be written into the branch library.");
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATED_AND_ACTIVATED = new EzLocalizationManager.EzLocalisableString("分支曲库已生成并启用。", "The branch library has been generated and activated.");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATED_ONLY = new EzLocalizationManager.EzLocalisableString("分支曲库已生成。", "The branch library has been generated.");
             internal static readonly EzLocalizationManager.EzLocalisableString INVALID_BRANCH = new EzLocalizationManager.EzLocalisableString("所选分支曲库无效。", "The selected branch library is invalid.");
             internal static readonly EzLocalizationManager.EzLocalisableString INVALID_COLLECTION = new EzLocalizationManager.EzLocalisableString("所选收藏夹无效。", "The selected collection is invalid.");
             internal static readonly EzLocalizationManager.EzLocalisableString ALREADY_ACTIVE_BRANCH = new EzLocalizationManager.EzLocalisableString("分支曲库已在启用列表中：{0}", "Branch library is already active: {0}");

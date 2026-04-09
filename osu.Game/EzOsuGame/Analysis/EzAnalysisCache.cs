@@ -221,9 +221,9 @@ namespace osu.Game.EzOsuGame.Analysis
             => analysisDatabase.GetAvailableSongsBranches(rulesetInfo, mods, maxCount);
 
         public Task<EzAnalysisDatabase.SongsBranchBuildResult> CreateAndActivateSongsBranchAsync(IEnumerable<BeatmapInfo> beatmaps, EzAnalysisPersistentStore.SourceCollectionSnapshot? sourceCollection,
-                                                                                                 IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods,
+                                                                                                 IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods, bool activateAfterCreate = true,
                                                                                                  Action<int, int>? progress = null, CancellationToken cancellationToken = default)
-            => analysisDatabase.CreateAndActivateSongsBranchAsync(beatmaps, sourceCollection, rulesetInfo, mods, progress, cancellationToken);
+            => analysisDatabase.CreateAndActivateSongsBranchAsync(beatmaps, sourceCollection, rulesetInfo, mods, activateAfterCreate, progress, cancellationToken);
 
         protected virtual Task<EzAnalysisResult?> GetDynamicAnalysisAsync(BeatmapInfo beatmapInfo, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods,
                                                                           CancellationToken cancellationToken = default, int computationDelay = 0)

@@ -54,6 +54,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private IDisposable? collectionSubscription;
         private bool activationEntryRequested;
         private string? selectedEntryKey;
+        private int generationQueueCounter;
         private readonly HashSet<Guid> pendingCollectionHideOperations = new HashSet<Guid>();
         private readonly HashSet<Guid> pendingCollectionDeleteOperations = new HashSet<Guid>();
 
@@ -343,10 +344,10 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             base.LoadComplete();
 
-            searchTextBox.Current.BindValueChanged(_ => refreshBranches());
-            ruleset.BindValueChanged(_ => refreshBranches());
-            mods.BindValueChanged(_ => refreshBranches());
-            ezAnalysisCache.ActiveSongsBranchVersion.BindValueChanged(_ => refreshBranches());
+            searchTextBox.Current.BindValueChanged(_ => Schedule(refreshBranches));
+            ruleset.BindValueChanged(_ => Schedule(refreshBranches));
+            mods.BindValueChanged(_ => Schedule(refreshBranches));
+            ezAnalysisCache.ActiveSongsBranchVersion.BindValueChanged(_ => Schedule(refreshBranches));
             collectionSubscription = realm.RegisterForNotifications(r => r.All<BeatmapCollection>().OrderBy(c => c.Name), (_, __) => Schedule(refreshBranches));
         }
 
@@ -557,10 +558,12 @@ namespace osu.Game.EzOsuGame.Overlays
                 return;
             }
 
+            int queueId = ++generationQueueCounter;
+
             var notification = new ProgressNotification
             {
                 State = ProgressNotificationState.Active,
-                Text = LocalisableString.Format(EzManageSongsBranchesDialogStrings.GENERATING_BRANCH_FROM_VISIBLE, filteredBeatmaps.Count)
+                Text = withGenerationQueueTag(queueId, LocalisableString.Format(EzManageSongsBranchesDialogStrings.GENERATING_BRANCH_FROM_VISIBLE, filteredBeatmaps.Count))
             };
 
             postNotification(notification);
@@ -568,7 +571,8 @@ namespace osu.Game.EzOsuGame.Overlays
             try
             {
                 var result = await ezAnalysisCache.CreateAndActivateSongsBranchAsync(filteredBeatmaps, null,
-                    ruleset.Value, mods.Value, progress: (processed, total) => notification.Progress = total <= 0 ? 0 : (float)processed / total).ConfigureAwait(false);
+                    ruleset.Value, mods.Value, activateAfterCreate: false,
+                    progress: (processed, total) => notification.Progress = total <= 0 ? 0 : (float)processed / total).ConfigureAwait(false);
 
                 Schedule(() =>
                 {
@@ -577,16 +581,17 @@ namespace osu.Game.EzOsuGame.Overlays
                         notification.State = ProgressNotificationState.Cancelled;
                         notifications?.Post(new SimpleErrorNotification
                         {
-                            Text = result.Message,
+                            Text = withGenerationQueueTag(queueId, result.Message),
                         });
                         refreshBranches();
                         return;
                     }
 
-                    notification.CompletionText = LocalisableString.Format(EzManageSongsBranchesDialogStrings.BRANCH_GENERATED_AND_ACTIVATED,
-                        result.DisplayName ?? EzManageSongsBranchesDialogStrings.VISIBLE_GENERATED_SOURCE_NAME,
-                        result.StoredBeatmapCount,
-                        result.RequestedBeatmapCount);
+                    notification.CompletionText = withGenerationQueueTag(queueId,
+                        LocalisableString.Format(EzManageSongsBranchesDialogStrings.BRANCH_GENERATED,
+                            result.DisplayName ?? EzManageSongsBranchesDialogStrings.VISIBLE_GENERATED_SOURCE_NAME,
+                            result.StoredBeatmapCount,
+                            result.RequestedBeatmapCount));
 
                     if (!string.IsNullOrEmpty(result.DatabasePath))
                         notification.CompletionClickAction = () => storage.PresentFileExternally(result.DatabasePath);
@@ -602,7 +607,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     notification.State = ProgressNotificationState.Cancelled;
                     notifications?.Post(new SimpleErrorNotification
                     {
-                        Text = EzManageSongsBranchesDialogStrings.GENERATE_BRANCH_FAILED,
+                        Text = withGenerationQueueTag(queueId, EzManageSongsBranchesDialogStrings.GENERATE_BRANCH_FAILED),
                     });
                 });
             }
@@ -641,10 +646,13 @@ namespace osu.Game.EzOsuGame.Overlays
                 return;
             }
 
+            int queueId = ++generationQueueCounter;
+
             var notification = new ProgressNotification
             {
                 State = ProgressNotificationState.Active,
-                Text = LocalisableString.Format(EzManageSongsBranchesDialogStrings.GENERATING_BRANCH_FROM_COLLECTION, selectedEntry.SourceCollectionName, collectionBeatmaps.Count)
+                Text = withGenerationQueueTag(queueId,
+                    LocalisableString.Format(EzManageSongsBranchesDialogStrings.GENERATING_BRANCH_FROM_COLLECTION, selectedEntry.SourceCollectionName, collectionBeatmaps.Count))
             };
 
             postNotification(notification);
@@ -652,7 +660,8 @@ namespace osu.Game.EzOsuGame.Overlays
             try
             {
                 var result = await ezAnalysisCache.CreateAndActivateSongsBranchAsync(collectionBeatmaps, sourceCollection,
-                    ruleset.Value, mods.Value, progress: (processed, total) => notification.Progress = total <= 0 ? 0 : (float)processed / total).ConfigureAwait(false);
+                    ruleset.Value, mods.Value, activateAfterCreate: false,
+                    progress: (processed, total) => notification.Progress = total <= 0 ? 0 : (float)processed / total).ConfigureAwait(false);
 
                 Schedule(() =>
                 {
@@ -661,17 +670,18 @@ namespace osu.Game.EzOsuGame.Overlays
                         notification.State = ProgressNotificationState.Cancelled;
                         notifications?.Post(new SimpleErrorNotification
                         {
-                            Text = result.Message,
+                            Text = withGenerationQueueTag(queueId, result.Message),
                         });
                         refreshBranches();
                         return;
                     }
 
                     selectedEntryKey = createCollectionSelectionKey(selectedEntry.SourceCollectionId.Value);
-                    notification.CompletionText = LocalisableString.Format(EzManageSongsBranchesDialogStrings.BRANCH_GENERATED_AND_ACTIVATED,
-                        result.DisplayName ?? selectedEntry.SourceCollectionName,
-                        result.StoredBeatmapCount,
-                        result.RequestedBeatmapCount);
+                    notification.CompletionText = withGenerationQueueTag(queueId,
+                        LocalisableString.Format(EzManageSongsBranchesDialogStrings.BRANCH_GENERATED,
+                            result.DisplayName ?? selectedEntry.SourceCollectionName,
+                            result.StoredBeatmapCount,
+                            result.RequestedBeatmapCount));
 
                     if (!string.IsNullOrEmpty(result.DatabasePath))
                         notification.CompletionClickAction = () => storage.PresentFileExternally(result.DatabasePath);
@@ -687,7 +697,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     notification.State = ProgressNotificationState.Cancelled;
                     notifications?.Post(new SimpleErrorNotification
                     {
-                        Text = EzManageSongsBranchesDialogStrings.GENERATE_BRANCH_FAILED,
+                        Text = withGenerationQueueTag(queueId, EzManageSongsBranchesDialogStrings.GENERATE_BRANCH_FAILED),
                     });
                 });
             }
@@ -1234,6 +1244,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private static string createBranchSelectionKey(string databasePath) => $"branch:{Path.GetFullPath(databasePath)}";
 
+        private static LocalisableString withGenerationQueueTag(int queueId, LocalisableString message)
+            => LocalisableString.Interpolate($"[队列#{queueId}] {message}");
+
         private IReadOnlyList<BeatmapInfo> getFilteredBeatmaps()
             => filteredBeatmapsProvider?.Invoke() ?? carousel?.GetFilteredBeatmaps() ?? Array.Empty<BeatmapInfo>();
 
@@ -1343,8 +1356,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             internal static readonly EzLocalizationManager.EzLocalisableString VISIBLE_GENERATED_SOURCE_NAME = new EzLocalizationManager.EzLocalisableString("筛选结果", "Filtered results");
 
-            internal static readonly EzLocalizationManager.EzLocalisableString BRANCH_GENERATED_AND_ACTIVATED = new EzLocalizationManager.EzLocalisableString("分支曲库已生成并启用：{0}（写入 {1}/{2} 张谱面）。",
-                "Branch library generated and activated: {0} ({1}/{2} beatmaps stored).");
+            internal static readonly EzLocalizationManager.EzLocalisableString BRANCH_GENERATED = new EzLocalizationManager.EzLocalisableString("分支曲库已生成：{0}（写入 {1}/{2} 张谱面）。",
+                "Branch library generated: {0} ({1}/{2} beatmaps stored).");
 
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("生成分支曲库失败。",
                 "Failed to generate the branch library.");
