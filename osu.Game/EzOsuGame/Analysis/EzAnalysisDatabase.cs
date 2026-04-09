@@ -35,20 +35,20 @@ namespace osu.Game.EzOsuGame.Analysis
     public class EzAnalysisDatabase
     {
         private static int computeFailCount;
-        private static int xxySrBranchComputeFailCount;
+        private static int songsBranchComputeFailCount;
         private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
 
         private readonly EzAnalysisPersistentStore persistentStore;
         private readonly BeatmapManager beatmapManager;
         private readonly IBindable<bool> sqliteAnalysisEnabled;
-        private readonly Bindable<string?> activeXxySrBranchDisplayName = new Bindable<string?>();
-        private readonly Bindable<int> activeXxySrBranchVersion = new Bindable<int>();
-        private readonly object activeXxySrBranchStateLock = new object();
-        private readonly List<ActiveXxySrBranchState> activeXxySrBranches = new List<ActiveXxySrBranchState>();
+        private readonly Bindable<string?> activeSongsBranchDisplayName = new Bindable<string?>();
+        private readonly Bindable<int> activeSongsBranchVersion = new Bindable<int>();
+        private readonly object activeSongsBranchStateLock = new object();
+        private readonly List<ActiveSongsBranchState> activeSongsBranches = new List<ActiveSongsBranchState>();
 
-        private readonly record struct ActiveXxySrBranchState(string DatabasePath, string DisplayName, int RulesetOnlineId, string ModsFingerprint);
+        private readonly record struct ActiveSongsBranchState(string DatabasePath, string DisplayName, int RulesetOnlineId, string ModsFingerprint);
 
-        public readonly record struct XxySrBranchBuildResult(
+        public readonly record struct SongsBranchBuildResult(
             bool Success,
             LocalisableString Message,
             string? DatabasePath,
@@ -91,33 +91,33 @@ namespace osu.Game.EzOsuGame.Analysis
             return true;
         }
 
-        public IBindable<string?> ActiveXxySrBranchDisplayName => activeXxySrBranchDisplayName;
+        public IBindable<string?> ActiveSongsBranchDisplayName => activeSongsBranchDisplayName;
 
-        public IBindable<int> ActiveXxySrBranchVersion => activeXxySrBranchVersion;
+        public IBindable<int> ActiveSongsBranchVersion => activeSongsBranchVersion;
 
-        public bool HasActiveXxySrBranch
+        public bool HasActiveSongsBranch
         {
             get
             {
-                lock (activeXxySrBranchStateLock)
-                    return activeXxySrBranches.Count > 0;
+                lock (activeSongsBranchStateLock)
+                    return activeSongsBranches.Count > 0;
             }
         }
 
-        public bool HasActiveXxySrBranchFor(IRulesetInfo? rulesetInfo)
+        public bool HasActiveSongsBranchFor(IRulesetInfo? rulesetInfo)
         {
             int? rulesetOnlineId = rulesetInfo?.OnlineID;
 
             if (!rulesetOnlineId.HasValue)
                 return false;
 
-            lock (activeXxySrBranchStateLock)
-                return activeXxySrBranches.Any(branch => branch.RulesetOnlineId == rulesetOnlineId.Value);
+            lock (activeSongsBranchStateLock)
+                return activeSongsBranches.Any(branch => branch.RulesetOnlineId == rulesetOnlineId.Value);
         }
 
-        public IReadOnlyDictionary<Guid, double> GetActiveXxySrBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
+        public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
         {
-            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled || !HasActiveXxySrBranchFor(rulesetInfo))
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled || !HasActiveSongsBranchFor(rulesetInfo))
                 return empty_xxy_sr_values;
 
             return getResolvedActiveBranchValues(beatmaps, rulesetInfo);
@@ -135,7 +135,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
 
-            if (HasActiveXxySrBranchFor(rulesetInfo))
+            if (HasActiveSongsBranchFor(rulesetInfo))
             {
                 foreach (var kvp in getResolvedActiveBranchValues(beatmapList, rulesetInfo))
                     resolvedValues[kvp.Key] = kvp.Value;
@@ -152,7 +152,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
         }
 
-        public bool IsActiveXxySrBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
+        public bool IsActiveSongsBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
         {
             int? rulesetOnlineId = rulesetInfo?.OnlineID;
 
@@ -161,24 +161,24 @@ namespace osu.Game.EzOsuGame.Analysis
 
             string modsFingerprint = createModsProfileFingerprint(mods);
 
-            lock (activeXxySrBranchStateLock)
+            lock (activeSongsBranchStateLock)
             {
-                return activeXxySrBranches.Any(branch => branch.RulesetOnlineId == rulesetOnlineId.Value
+                return activeSongsBranches.Any(branch => branch.RulesetOnlineId == rulesetOnlineId.Value
                                                          && string.Equals(branch.ModsFingerprint, modsFingerprint, StringComparison.Ordinal));
             }
         }
 
-        public bool IsXxySrBranchActive(string databasePath)
+        public bool IsSongsBranchActive(string databasePath)
         {
             string fullPath = Path.GetFullPath(databasePath);
 
-            lock (activeXxySrBranchStateLock)
-                return activeXxySrBranches.Any(branch => string.Equals(branch.DatabasePath, fullPath, StringComparison.OrdinalIgnoreCase));
+            lock (activeSongsBranchStateLock)
+                return activeSongsBranches.Any(branch => string.Equals(branch.DatabasePath, fullPath, StringComparison.OrdinalIgnoreCase));
         }
 
-        public void ActivateXxySrBranch(string databasePath, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods, int beatmapCount = 0, string? displayName = null)
+        public void ActivateSongsBranch(string databasePath, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods, int beatmapCount = 0, string? displayName = null)
         {
-            activateXxySrBranch(databasePath, new EzAnalysisPersistentStore.XxySrBranchMetadata(
+            activateSongsBranch(databasePath, new EzAnalysisPersistentStore.SongsBranchMetadata(
                 rulesetInfo?.OnlineID ?? 0,
                 rulesetInfo?.ShortName ?? "ruleset",
                 createModsProfileFingerprint(mods),
@@ -189,37 +189,37 @@ namespace osu.Game.EzOsuGame.Analysis
                 createModsJson(mods)));
         }
 
-        public void DeactivateXxySrBranch()
+        public void DeactivateSongsBranch()
         {
-            lock (activeXxySrBranchStateLock)
+            lock (activeSongsBranchStateLock)
             {
-                activeXxySrBranches.Clear();
+                activeSongsBranches.Clear();
                 updateActiveBranchBindablesLocked();
-                activeXxySrBranchVersion.Value++;
+                activeSongsBranchVersion.Value++;
             }
         }
 
-        public Task<XxySrBranchBuildResult> CreateAndActivateXxySrBranchAsync(
+        public Task<SongsBranchBuildResult> CreateAndActivateSongsBranchAsync(
             IEnumerable<BeatmapInfo> beatmaps, EzAnalysisPersistentStore.SourceCollectionSnapshot? sourceCollection, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods,
             Action<int, int>? progress = null, CancellationToken cancellationToken = default)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
-                return Task.FromResult(new XxySrBranchBuildResult(false, XxySrBranchStrings.SQLITE_DISABLED, null, null, 0, 0));
+                return Task.FromResult(new SongsBranchBuildResult(false, SongsBranchStrings.SQLITE_DISABLED, null, null, 0, 0));
 
             if (rulesetInfo is not RulesetInfo localRulesetInfo || localRulesetInfo.OnlineID != 3)
-                return Task.FromResult(new XxySrBranchBuildResult(false, XxySrBranchStrings.MANIA_ONLY, null, null, 0, 0));
+                return Task.FromResult(new SongsBranchBuildResult(false, SongsBranchStrings.MANIA_ONLY, null, null, 0, 0));
 
             var requestedBeatmaps = beatmaps.Distinct().ToList();
 
             if (requestedBeatmaps.Count == 0)
-                return Task.FromResult(new XxySrBranchBuildResult(false, XxySrBranchStrings.EMPTY_FILTER_RESULT, null, null, 0, 0));
+                return Task.FromResult(new SongsBranchBuildResult(false, SongsBranchStrings.EMPTY_FILTER_RESULT, null, null, 0, 0));
 
             return Task.Run(() =>
             {
                 var beatmapList = requestedBeatmaps.Where(beatmap => beatmap.Ruleset.OnlineID == localRulesetInfo.OnlineID).ToList();
 
                 if (beatmapList.Count == 0)
-                    return new XxySrBranchBuildResult(false, XxySrBranchStrings.NO_WRITABLE_RESULTS, null, null, requestedBeatmaps.Count, 0);
+                    return new SongsBranchBuildResult(false, SongsBranchStrings.NO_WRITABLE_RESULTS, null, null, requestedBeatmaps.Count, 0);
 
                 string modsFingerprint = createModsProfileFingerprint(mods);
                 string modsDisplay = createModsDisplay(mods);
@@ -227,7 +227,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 string resolvedSourceCollectionName = sourceCollection?.Name.Trim() ?? string.Empty;
                 string displayName = createBranchDisplayName(resolvedSourceCollectionName, mods);
                 long lastProgressReportAt = Environment.TickCount64;
-                var metadata = new EzAnalysisPersistentStore.XxySrBranchMetadata(
+                var metadata = new EzAnalysisPersistentStore.SongsBranchMetadata(
                     localRulesetInfo.OnlineID,
                     localRulesetInfo.ShortName,
                     modsFingerprint,
@@ -240,8 +240,8 @@ namespace osu.Game.EzOsuGame.Analysis
                     SourceCollectionName: resolvedSourceCollectionName,
                     SourceCollectionLastModifiedUnixMilliseconds: sourceCollection?.LastModifiedUnixMilliseconds ?? 0,
                     SourceCollectionBeatmapCount: sourceCollection?.BeatmapMd5Hashes.Count ?? beatmapList.Count);
-                string databasePath = persistentStore.CreateXxySrBranchDatabasePath(metadata);
-                var rows = new List<EzAnalysisPersistentStore.XxySrBranchRow>(beatmapList.Count);
+                string databasePath = persistentStore.CreateSongsBranchDatabasePath(metadata);
+                var rows = new List<EzAnalysisPersistentStore.SongsBranchRow>(beatmapList.Count);
 
                 for (int i = 0; i < beatmapList.Count; i++)
                 {
@@ -266,15 +266,15 @@ namespace osu.Game.EzOsuGame.Analysis
                     }
                     catch (Exception ex)
                     {
-                        if (Interlocked.Increment(ref xxySrBranchComputeFailCount) <= 10)
+                        if (Interlocked.Increment(ref songsBranchComputeFailCount) <= 10)
                         {
                             Logger.Error(ex,
-                                $"[EzAnalysisDatabase] CreateAndActivateXxySrBranchAsync failed. beatmapId={beatmap.ID} diff=\"{beatmap.DifficultyName}\" ruleset={localRulesetInfo.ShortName} mods={modsDisplay}",
+                                $"[EzAnalysisDatabase] CreateAndActivateSongsBranchAsync failed. beatmapId={beatmap.ID} diff=\"{beatmap.DifficultyName}\" ruleset={localRulesetInfo.ShortName} mods={modsDisplay}",
                                 Ez2ConfigManager.LOGGER_NAME);
                         }
                     }
 
-                    rows.Add(new EzAnalysisPersistentStore.XxySrBranchRow(beatmap.ID, beatmap.Hash, beatmap.MD5Hash, xxySr));
+                    rows.Add(new EzAnalysisPersistentStore.SongsBranchRow(beatmap.ID, beatmap.Hash, beatmap.MD5Hash, xxySr));
 
                     long now = Environment.TickCount64;
 
@@ -285,17 +285,17 @@ namespace osu.Game.EzOsuGame.Analysis
                     }
                 }
 
-                persistentStore.StoreXxySrBranch(databasePath, metadata, rows, sourceCollection);
+                persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection);
                 deleteBranchesForSourceCollection(resolvedSourceCollectionId, databasePath);
-                activateXxySrBranch(databasePath, metadata);
+                activateSongsBranch(databasePath, metadata);
 
-                return new XxySrBranchBuildResult(true, XxySrBranchStrings.GENERATED_AND_ACTIVATED, databasePath, displayName, beatmapList.Count, rows.Count);
+                return new SongsBranchBuildResult(true, SongsBranchStrings.GENERATED_AND_ACTIVATED, databasePath, displayName, beatmapList.Count, rows.Count);
             }, cancellationToken);
         }
 
-        public IReadOnlyList<EzAnalysisPersistentStore.XxySrBranchDescriptor> GetAvailableXxySrBranches(IRulesetInfo? rulesetInfo = null, IReadOnlyList<Mod>? mods = null, int maxCount = 0)
+        public IReadOnlyList<EzAnalysisPersistentStore.SongsBranchDescriptor> GetAvailableSongsBranches(IRulesetInfo? rulesetInfo = null, IReadOnlyList<Mod>? mods = null, int maxCount = 0)
         {
-            var branches = persistentStore.GetAvailableXxySrBranches();
+            var branches = persistentStore.GetAvailableSongsBranches();
 
             if (branches.Count == 0)
                 return branches;
@@ -315,95 +315,98 @@ namespace osu.Game.EzOsuGame.Analysis
             return ordered;
         }
 
-        public bool TryActivateXxySrBranch(string databasePath, out LocalisableString message)
+        public bool TryActivateSongsBranch(string databasePath, out LocalisableString message)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
             {
-                message = XxySrBranchStrings.SQLITE_DISABLED;
+                message = SongsBranchStrings.SQLITE_DISABLED;
                 return false;
             }
 
-            if (!persistentStore.TryGetXxySrBranchDescriptor(databasePath, out var branch))
+            if (!persistentStore.TryGetSongsBranchDescriptor(databasePath, out var branch))
             {
-                message = XxySrBranchStrings.INVALID_BRANCH;
+                message = SongsBranchStrings.INVALID_BRANCH;
                 return false;
             }
 
-            if (IsXxySrBranchActive(branch.DatabasePath))
+            if (IsSongsBranchActive(branch.DatabasePath))
             {
-                message = LocalisableString.Format(XxySrBranchStrings.ALREADY_ACTIVE_BRANCH, branch.Metadata.DisplayName);
+                message = LocalisableString.Format(SongsBranchStrings.ALREADY_ACTIVE_BRANCH, branch.Metadata.DisplayName);
                 return true;
             }
 
-            activateXxySrBranch(branch.DatabasePath, branch.Metadata);
-            message = LocalisableString.Format(XxySrBranchStrings.ACTIVATED_BRANCH, branch.Metadata.DisplayName);
+            activateSongsBranch(branch.DatabasePath, branch.Metadata);
+            message = LocalisableString.Format(SongsBranchStrings.ACTIVATED_BRANCH, branch.Metadata.DisplayName);
             return true;
         }
 
-        public bool TryToggleXxySrBranchActivation(string databasePath, out LocalisableString message)
+        public bool TryToggleSongsBranchActivation(string databasePath, out LocalisableString message)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
             {
-                message = XxySrBranchStrings.SQLITE_DISABLED;
+                message = SongsBranchStrings.SQLITE_DISABLED;
                 return false;
             }
 
-            if (!persistentStore.TryGetXxySrBranchDescriptor(databasePath, out var branch))
+            if (!persistentStore.TryGetSongsBranchDescriptor(databasePath, out var branch))
             {
-                message = XxySrBranchStrings.INVALID_BRANCH;
+                message = SongsBranchStrings.INVALID_BRANCH;
                 return false;
             }
 
-            if (removeActiveXxySrBranch(branch.DatabasePath))
+            if (removeActiveSongsBranch(branch.DatabasePath))
             {
-                message = LocalisableString.Format(XxySrBranchStrings.DEACTIVATED_BRANCH, branch.Metadata.DisplayName);
+                message = LocalisableString.Format(SongsBranchStrings.DEACTIVATED_BRANCH, branch.Metadata.DisplayName);
                 return true;
             }
 
-            activateXxySrBranch(branch.DatabasePath, branch.Metadata);
-            message = LocalisableString.Format(XxySrBranchStrings.ACTIVATED_BRANCH, branch.Metadata.DisplayName);
+            activateSongsBranch(branch.DatabasePath, branch.Metadata);
+            message = LocalisableString.Format(SongsBranchStrings.ACTIVATED_BRANCH, branch.Metadata.DisplayName);
             return true;
         }
 
-        public bool TryDeleteXxySrBranch(string databasePath, out LocalisableString message)
+        public bool TryDeleteSongsBranch(string databasePath, out LocalisableString message)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
             {
-                message = XxySrBranchStrings.SQLITE_DISABLED;
+                message = SongsBranchStrings.SQLITE_DISABLED;
                 return false;
             }
 
-            if (!persistentStore.TryGetXxySrBranchDescriptor(databasePath, out var branch))
+            if (!persistentStore.TryGetSongsBranchDescriptor(databasePath, out var branch))
             {
-                message = XxySrBranchStrings.INVALID_BRANCH;
+                message = SongsBranchStrings.INVALID_BRANCH;
                 return false;
             }
 
-            if (!persistentStore.DeleteXxySrBranch(branch.DatabasePath))
+            bool wasActive = removeActiveSongsBranch(branch.DatabasePath);
+
+            if (!persistentStore.DeleteSongsBranch(branch.DatabasePath))
             {
-                message = XxySrBranchStrings.DELETE_BRANCH_FAILED;
+                if (wasActive)
+                    activateSongsBranch(branch.DatabasePath, branch.Metadata);
+
+                message = SongsBranchStrings.DELETE_BRANCH_FAILED;
                 return false;
             }
 
-            removeActiveXxySrBranch(branch.DatabasePath);
-
-            message = LocalisableString.Format(XxySrBranchStrings.DELETED_BRANCH, branch.Metadata.DisplayName);
+            message = LocalisableString.Format(SongsBranchStrings.DELETED_BRANCH, branch.Metadata.DisplayName);
             return true;
         }
 
-        public bool TryToggleXxySrBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+        public bool TryToggleSongsBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
         {
             nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
 
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
             {
-                message = XxySrBranchStrings.SQLITE_DISABLED;
+                message = SongsBranchStrings.SQLITE_DISABLED;
                 return false;
             }
 
-            if (!persistentStore.TryGetXxySrBranchDescriptor(databasePath, out var branch))
+            if (!persistentStore.TryGetSongsBranchDescriptor(databasePath, out var branch))
             {
-                message = XxySrBranchStrings.INVALID_BRANCH;
+                message = SongsBranchStrings.INVALID_BRANCH;
                 return false;
             }
 
@@ -413,7 +416,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (branchBeatmaps.Count == 0)
             {
-                message = LocalisableString.Format(XxySrBranchStrings.BRANCH_HIDE_NO_LOCAL_BEATMAPS, branch.Metadata.DisplayName);
+                message = LocalisableString.Format(SongsBranchStrings.BRANCH_HIDE_NO_LOCAL_BEATMAPS, branch.Metadata.DisplayName);
                 return false;
             }
 
@@ -430,13 +433,13 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
             {
-                message = XxySrBranchStrings.SQLITE_DISABLED;
+                message = SongsBranchStrings.SQLITE_DISABLED;
                 return false;
             }
 
             if (collectionId == Guid.Empty)
             {
-                message = XxySrBranchStrings.INVALID_COLLECTION;
+                message = SongsBranchStrings.INVALID_COLLECTION;
                 return false;
             }
 
@@ -557,11 +560,11 @@ namespace osu.Game.EzOsuGame.Analysis
             if (beatmapList.Count == 0)
                 return empty_xxy_sr_values;
 
-            List<ActiveXxySrBranchState> activeBranches;
+            List<ActiveSongsBranchState> activeBranches;
 
-            lock (activeXxySrBranchStateLock)
+            lock (activeSongsBranchStateLock)
             {
-                activeBranches = activeXxySrBranches
+                activeBranches = activeSongsBranches
                                  .Where(branch => branch.RulesetOnlineId == rulesetOnlineId.Value)
                                  .ToList();
             }
@@ -571,10 +574,10 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
 
-            foreach (ActiveXxySrBranchState activeBranch in activeBranches)
+            foreach (ActiveSongsBranchState activeBranch in activeBranches)
             {
-                IReadOnlyDictionary<Guid, double> branchValues = persistentStore.GetXxySrBranchValues(activeBranch.DatabasePath, beatmapList);
-                IReadOnlySet<string> branchBeatmapMd5Hashes = persistentStore.GetXxySrBranchCollectionBeatmapMd5Hashes(activeBranch.DatabasePath);
+                IReadOnlyDictionary<Guid, double> branchValues = persistentStore.GetSongsBranchValues(activeBranch.DatabasePath, beatmapList);
+                IReadOnlySet<string> branchBeatmapMd5Hashes = persistentStore.GetSongsBranchCollectionBeatmapMd5Hashes(activeBranch.DatabasePath);
 
                 foreach (BeatmapInfo beatmap in beatmapList)
                 {
@@ -597,7 +600,7 @@ namespace osu.Game.EzOsuGame.Analysis
             return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
         }
 
-        private bool tryApplyBranchHiddenState(EzAnalysisPersistentStore.XxySrBranchDescriptor branch, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5,
+        private bool tryApplyBranchHiddenState(EzAnalysisPersistentStore.SongsBranchDescriptor branch, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5,
                                                IReadOnlyList<BeatmapInfo> branchBeatmaps, out LocalisableString message,
                                                out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
         {
@@ -631,21 +634,21 @@ namespace osu.Game.EzOsuGame.Analysis
 
             nonHideableBeatmapSets = nonHideableBeatmapSetList;
 
-            if (!persistentStore.TrySetXxySrBranchHideState(branch.DatabasePath, true, preexistingHiddenBeatmapIds))
+            if (!persistentStore.TrySetSongsBranchHideState(branch.DatabasePath, true, preexistingHiddenBeatmapIds))
             {
                 nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
-                message = XxySrBranchStrings.HIDE_BRANCH_FAILED;
+                message = SongsBranchStrings.HIDE_BRANCH_FAILED;
                 return false;
             }
 
             message = skippedCount > 0
-                ? LocalisableString.Format(XxySrBranchStrings.HIDDEN_BRANCH_WITH_SKIPS, branch.Metadata.DisplayName, hiddenCount, skippedCount)
-                : LocalisableString.Format(XxySrBranchStrings.HIDDEN_BRANCH, branch.Metadata.DisplayName, hiddenCount);
+                ? LocalisableString.Format(SongsBranchStrings.HIDDEN_BRANCH_WITH_SKIPS, branch.Metadata.DisplayName, hiddenCount, skippedCount)
+                : LocalisableString.Format(SongsBranchStrings.HIDDEN_BRANCH, branch.Metadata.DisplayName, hiddenCount);
 
             return true;
         }
 
-        private bool tryRestoreBranchHiddenState(EzAnalysisPersistentStore.XxySrBranchDescriptor branch, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5,
+        private bool tryRestoreBranchHiddenState(EzAnalysisPersistentStore.SongsBranchDescriptor branch, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5,
                                                  IReadOnlyList<BeatmapInfo> branchBeatmaps, out LocalisableString message)
         {
             HashSet<Guid> keepHiddenBeatmapIds = getHiddenBeatmapIdsFromOtherSources(localBeatmapsByMd5, excludedBranchDatabasePath: branch.DatabasePath);
@@ -664,14 +667,14 @@ namespace osu.Game.EzOsuGame.Analysis
                 restoredCount++;
             }
 
-            if (!persistentStore.TrySetXxySrBranchHideState(branch.DatabasePath, false,
-                    persistentStore.GetXxySrBranchPreexistingHiddenBeatmapIds(branch.DatabasePath)))
+            if (!persistentStore.TrySetSongsBranchHideState(branch.DatabasePath, false,
+                    persistentStore.GetSongsBranchPreexistingHiddenBeatmapIds(branch.DatabasePath)))
             {
-                message = XxySrBranchStrings.RESTORE_BRANCH_HIDE_FAILED;
+                message = SongsBranchStrings.RESTORE_BRANCH_HIDE_FAILED;
                 return false;
             }
 
-            message = LocalisableString.Format(XxySrBranchStrings.RESTORED_BRANCH_HIDDEN, branch.Metadata.DisplayName, restoredCount);
+            message = LocalisableString.Format(SongsBranchStrings.RESTORED_BRANCH_HIDDEN, branch.Metadata.DisplayName, restoredCount);
             return true;
         }
 
@@ -712,13 +715,13 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!persistentStore.TrySetCollectionHideState(collectionId, true, preexistingHiddenBeatmapIds, beatmapMd5Hashes))
             {
                 nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
-                message = XxySrBranchStrings.HIDE_COLLECTION_FAILED;
+                message = SongsBranchStrings.HIDE_COLLECTION_FAILED;
                 return false;
             }
 
             message = skippedCount > 0
-                ? LocalisableString.Format(XxySrBranchStrings.HIDDEN_COLLECTION_WITH_SKIPS, collectionName, hiddenCount, skippedCount)
-                : LocalisableString.Format(XxySrBranchStrings.HIDDEN_COLLECTION, collectionName, hiddenCount);
+                ? LocalisableString.Format(SongsBranchStrings.HIDDEN_COLLECTION_WITH_SKIPS, collectionName, hiddenCount, skippedCount)
+                : LocalisableString.Format(SongsBranchStrings.HIDDEN_COLLECTION, collectionName, hiddenCount);
 
             return true;
         }
@@ -744,11 +747,11 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (!persistentStore.TrySetCollectionHideState(collectionId, false, persistentStore.GetCollectionPreexistingHiddenBeatmapIds(collectionId), Array.Empty<string>()))
             {
-                message = XxySrBranchStrings.RESTORE_COLLECTION_HIDE_FAILED;
+                message = SongsBranchStrings.RESTORE_COLLECTION_HIDE_FAILED;
                 return false;
             }
 
-            message = LocalisableString.Format(XxySrBranchStrings.RESTORED_COLLECTION_HIDDEN, collectionName, restoredCount);
+            message = LocalisableString.Format(SongsBranchStrings.RESTORED_COLLECTION_HIDDEN, collectionName, restoredCount);
             return true;
         }
 
@@ -776,7 +779,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         private List<BeatmapInfo> getLocalBeatmapsForBranchCollection(string databasePath, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5)
         {
-            IReadOnlySet<string> beatmapMd5Hashes = persistentStore.GetXxySrBranchCollectionBeatmapMd5Hashes(databasePath);
+            IReadOnlySet<string> beatmapMd5Hashes = persistentStore.GetSongsBranchCollectionBeatmapMd5Hashes(databasePath);
             return getLocalBeatmapsForCollection(beatmapMd5Hashes, localBeatmapsByMd5);
         }
 
@@ -801,7 +804,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             var hiddenBeatmapIds = new HashSet<Guid>();
 
-            foreach (var branch in persistentStore.GetAvailableXxySrBranches())
+            foreach (var branch in persistentStore.GetAvailableSongsBranches())
             {
                 if (!branch.Metadata.HiddenApplied || string.Equals(branch.DatabasePath, excludedBranchDatabasePath, StringComparison.OrdinalIgnoreCase))
                     continue;
@@ -826,9 +829,9 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             var hiddenBeatmapIds = new HashSet<Guid>();
 
-            foreach (var branch in persistentStore.GetAvailableXxySrBranches())
+            foreach (var branch in persistentStore.GetAvailableSongsBranches())
             {
-                foreach (Guid beatmapId in persistentStore.GetXxySrBranchPreexistingHiddenBeatmapIds(branch.DatabasePath))
+                foreach (Guid beatmapId in persistentStore.GetSongsBranchPreexistingHiddenBeatmapIds(branch.DatabasePath))
                     hiddenBeatmapIds.Add(beatmapId);
             }
 
@@ -841,52 +844,52 @@ namespace osu.Game.EzOsuGame.Analysis
             return hiddenBeatmapIds;
         }
 
-        private void activateXxySrBranch(string databasePath, EzAnalysisPersistentStore.XxySrBranchMetadata metadata)
+        private void activateSongsBranch(string databasePath, EzAnalysisPersistentStore.SongsBranchMetadata metadata)
         {
             string fullPath = Path.GetFullPath(databasePath);
 
-            lock (activeXxySrBranchStateLock)
+            lock (activeSongsBranchStateLock)
             {
-                activeXxySrBranches.RemoveAll(branch => string.Equals(branch.DatabasePath, fullPath, StringComparison.OrdinalIgnoreCase));
-                activeXxySrBranches.Add(new ActiveXxySrBranchState(fullPath, metadata.DisplayName, metadata.RulesetOnlineId, metadata.ModsFingerprint));
+                activeSongsBranches.RemoveAll(branch => string.Equals(branch.DatabasePath, fullPath, StringComparison.OrdinalIgnoreCase));
+                activeSongsBranches.Add(new ActiveSongsBranchState(fullPath, metadata.DisplayName, metadata.RulesetOnlineId, metadata.ModsFingerprint));
 
                 updateActiveBranchBindablesLocked();
-                activeXxySrBranchVersion.Value++;
+                activeSongsBranchVersion.Value++;
             }
         }
 
-        private bool isActiveXxySrBranch(string databasePath)
-            => IsXxySrBranchActive(databasePath);
+        private bool isActiveSongsBranch(string databasePath)
+            => IsSongsBranchActive(databasePath);
 
-        private bool removeActiveXxySrBranch(string databasePath)
+        private bool removeActiveSongsBranch(string databasePath)
         {
             string fullPath = Path.GetFullPath(databasePath);
 
-            lock (activeXxySrBranchStateLock)
+            lock (activeSongsBranchStateLock)
             {
-                int removedCount = activeXxySrBranches.RemoveAll(branch => string.Equals(branch.DatabasePath, fullPath, StringComparison.OrdinalIgnoreCase));
+                int removedCount = activeSongsBranches.RemoveAll(branch => string.Equals(branch.DatabasePath, fullPath, StringComparison.OrdinalIgnoreCase));
 
                 if (removedCount <= 0)
                     return false;
 
                 updateActiveBranchBindablesLocked();
-                activeXxySrBranchVersion.Value++;
+                activeSongsBranchVersion.Value++;
                 return true;
             }
         }
 
         private void updateActiveBranchBindablesLocked()
         {
-            if (activeXxySrBranches.Count == 0)
+            if (activeSongsBranches.Count == 0)
             {
-                activeXxySrBranchDisplayName.Value = null;
+                activeSongsBranchDisplayName.Value = null;
                 return;
             }
 
-            ActiveXxySrBranchState lastActiveBranch = activeXxySrBranches[^1];
-            activeXxySrBranchDisplayName.Value = activeXxySrBranches.Count == 1
+            ActiveSongsBranchState lastActiveBranch = activeSongsBranches[^1];
+            activeSongsBranchDisplayName.Value = activeSongsBranches.Count == 1
                 ? lastActiveBranch.DisplayName
-                : $"{lastActiveBranch.DisplayName} +{activeXxySrBranches.Count - 1}";
+                : $"{lastActiveBranch.DisplayName} +{activeSongsBranches.Count - 1}";
         }
 
         private void deleteBranchesForSourceCollection(Guid sourceCollectionId, string keepDatabasePath)
@@ -894,14 +897,19 @@ namespace osu.Game.EzOsuGame.Analysis
             if (sourceCollectionId == Guid.Empty)
                 return;
 
-            foreach (var existingBranch in persistentStore.GetAvailableXxySrBranches())
+            foreach (var existingBranch in persistentStore.GetAvailableSongsBranches())
             {
                 if (existingBranch.Metadata.SourceCollectionId != sourceCollectionId
                     || string.Equals(existingBranch.DatabasePath, keepDatabasePath, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                if (persistentStore.DeleteXxySrBranch(existingBranch.DatabasePath))
-                    removeActiveXxySrBranch(existingBranch.DatabasePath);
+                bool wasActive = removeActiveSongsBranch(existingBranch.DatabasePath);
+
+                if (persistentStore.DeleteSongsBranch(existingBranch.DatabasePath))
+                    continue;
+
+                if (wasActive)
+                    activateSongsBranch(existingBranch.DatabasePath, existingBranch.Metadata);
             }
         }
 
@@ -963,7 +971,7 @@ namespace osu.Game.EzOsuGame.Analysis
                       or IApplicableToHitObject
                       or IApplicableToBeatmap;
 
-        private static class XxySrBranchStrings
+        private static class SongsBranchStrings
         {
             internal static readonly EzLocalizationManager.EzLocalisableString SQLITE_DISABLED = new EzLocalizationManager.EzLocalisableString("Ez analysis sqlite 未启用。", "Ez analysis sqlite is disabled.");
             internal static readonly EzLocalizationManager.EzLocalisableString MANIA_ONLY = new EzLocalizationManager.EzLocalisableString("当前仅支持在 mania 下生成分支曲库。", "Generating branch libraries is currently only supported under mania.");

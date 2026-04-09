@@ -95,7 +95,7 @@ namespace osu.Game.EzOsuGame.Overlays
             private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
             [Resolved(CanBeNull = true)]
-            private EzManageSongsBranchesDialog? manageXxySrBranchesDialog { get; set; }
+            private EzManageSongsBranchesDialog? manageSongsBranchesDialog { get; set; }
 
             [Resolved(canBeNull: true)]
             private INotificationOverlay? notifications { get; set; }
@@ -142,12 +142,12 @@ namespace osu.Game.EzOsuGame.Overlays
                 };
 
                 BeatmapInfo? selectedBeatmap = getSelectedBeatmap();
-                string xxySrBranchContext = getXxySrBranchContext();
+                string songsBranchContext = getSongsBranchContext();
 
-                addHeader(FooterButtonEzExportStrings.XXY_SR_BRANCH_HEADER, xxySrBranchContext);
-                addButton(FooterButtonEzExportStrings.MANAGE_XXY_SR_BRANCHES, FontAwesome.Solid.List, openXxySrBranchManager);
-                addButton(FooterButtonEzExportStrings.ENABLE_XXY_SR_BRANCH, FontAwesome.Solid.Play, openXxySrBranchManagerForActivation);
-                addButton(FooterButtonEzExportStrings.DEACTIVATE_XXY_SR_BRANCH, FontAwesome.Solid.PowerOff, deactivateXxySrBranch, ColourProvider.Content2);
+                addHeader(FooterButtonEzExportStrings.SONGS_BRANCH_HEADER, songsBranchContext);
+                addButton(FooterButtonEzExportStrings.MANAGE_SONGS_BRANCHES, FontAwesome.Solid.List, openSongsBranchManager);
+                addButton(FooterButtonEzExportStrings.ENABLE_SONGS_BRANCH, FontAwesome.Solid.Play, openSongsBranchManagerForActivation);
+                addButton(FooterButtonEzExportStrings.DEACTIVATE_SONGS_BRANCH, FontAwesome.Solid.PowerOff, deactivateSongsBranch, ColourProvider.Content2);
 
                 addHeader(FooterButtonEzExportStrings.FILTERED_RESULTS_HEADER, $"{getFilteredBeatmaps().Count} {FooterButtonEzExportStrings.BEATMAPS_UNIT}");
                 addButton(FooterButtonEzExportStrings.EXPORT_FILTERED_BEATMAPS_TO_ZIP, FontAwesome.Solid.Download, () => Task.Run(() => exportFilteredAuto(filteredExporter)));
@@ -201,63 +201,65 @@ namespace osu.Game.EzOsuGame.Overlays
                 }
             }
 
-            private void deactivateXxySrBranch()
+            private void deactivateSongsBranch()
             {
-                if (!ezAnalysisCache.HasActiveXxySrBranch)
+                if (!ezAnalysisCache.HasActiveSongsBranch)
                 {
                     postNotification(new SimpleNotification
                     {
-                        Text = FooterButtonEzExportStrings.XXY_SR_BRANCH_ALREADY_INACTIVE
+                        Text = FooterButtonEzExportStrings.SONGS_BRANCH_ALREADY_INACTIVE
                     });
                     return;
                 }
 
-                ezAnalysisCache.DeactivateXxySrBranch();
+                ezAnalysisCache.DeactivateSongsBranch();
                 postNotification(new SimpleNotification
                 {
-                    Text = FooterButtonEzExportStrings.DEACTIVATED_XXY_SR_BRANCH
+                    Text = FooterButtonEzExportStrings.DEACTIVATED_SONGS_BRANCH
                 });
             }
 
-            private void openXxySrBranchManager()
+            private void openSongsBranchManager()
             {
-                if (manageXxySrBranchesDialog == null)
+                if (manageSongsBranchesDialog == null)
                 {
                     postNotification(new SimpleErrorNotification
                     {
-                        Text = FooterButtonEzExportStrings.XXY_SR_BRANCH_MANAGER_UNAVAILABLE
+                        Text = FooterButtonEzExportStrings.SONGS_BRANCH_MANAGER_UNAVAILABLE
                     });
                     return;
                 }
 
-                manageXxySrBranchesDialog.ShowManager();
+                manageSongsBranchesDialog.SetFilteredBeatmapsProvider(getFilteredBeatmaps);
+                manageSongsBranchesDialog.ShowManager();
             }
 
-            private void openXxySrBranchManagerForActivation()
+            private void openSongsBranchManagerForActivation()
             {
-                if (manageXxySrBranchesDialog == null)
+                if (manageSongsBranchesDialog == null)
                 {
                     postNotification(new SimpleErrorNotification
                     {
-                        Text = FooterButtonEzExportStrings.XXY_SR_BRANCH_MANAGER_UNAVAILABLE
+                        Text = FooterButtonEzExportStrings.SONGS_BRANCH_MANAGER_UNAVAILABLE
                     });
                     return;
                 }
 
-                manageXxySrBranchesDialog.ShowForActivation();
+                manageSongsBranchesDialog.SetFilteredBeatmapsProvider(getFilteredBeatmaps);
+                manageSongsBranchesDialog.ShowForActivation();
             }
 
-            private string getXxySrBranchContext()
+            private string getSongsBranchContext()
             {
-                if (!ezAnalysisCache.HasActiveXxySrBranch)
-                    return FooterButtonEzExportStrings.XXY_SR_BRANCH_INACTIVE;
+                if (!ezAnalysisCache.HasActiveSongsBranch)
+                    return FooterButtonEzExportStrings.SONGS_BRANCH_INACTIVE;
 
-                string context = ezAnalysisCache.ActiveXxySrBranchDisplayName.Value ?? FooterButtonEzExportStrings.XXY_SR_BRANCH_ACTIVE;
+                string context = ezAnalysisCache.ActiveSongsBranchDisplayName.Value ?? FooterButtonEzExportStrings.SONGS_BRANCH_ACTIVE;
 
-                if (!ezAnalysisCache.HasActiveXxySrBranchFor(ruleset))
-                    context += $"\n{FooterButtonEzExportStrings.XXY_SR_BRANCH_RULESET_MISMATCH}";
-                else if (!ezAnalysisCache.IsActiveXxySrBranchFor(ruleset, mods))
-                    context += $"\n{FooterButtonEzExportStrings.XXY_SR_BRANCH_MODS_OUT_OF_SYNC}";
+                if (!ezAnalysisCache.HasActiveSongsBranchFor(ruleset))
+                    context += $"\n{FooterButtonEzExportStrings.SONGS_BRANCH_RULESET_MISMATCH}";
+                else if (!ezAnalysisCache.IsActiveSongsBranchFor(ruleset, mods))
+                    context += $"\n{FooterButtonEzExportStrings.SONGS_BRANCH_MODS_OUT_OF_SYNC}";
 
                 return context;
             }
@@ -368,17 +370,17 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON_TEXT = new EzLocalizationManager.EzLocalisableString("Ez 导出", "Ez Export");
 
-            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_HEADER = new EzLocalizationManager.EzLocalisableString("分支曲库", "Branch Library");
-            internal static readonly EzLocalizationManager.EzLocalisableString MANAGE_XXY_SR_BRANCHES = new EzLocalizationManager.EzLocalisableString("管理分支曲库", "Manage Branch Libraries");
-            internal static readonly EzLocalizationManager.EzLocalisableString ENABLE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("启用分支曲库", "Enable Branch Library");
-            internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATE_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("停用分支曲库", "Deactivate Branch Library");
-            internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATED_XXY_SR_BRANCH = new EzLocalizationManager.EzLocalisableString("已停用当前分支曲库。", "The current branch library has been deactivated.");
-            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_ALREADY_INACTIVE = new EzLocalizationManager.EzLocalisableString("当前没有已启用的分支曲库。", "There is no active branch library.");
-            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_MANAGER_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("分支曲库管理器当前不可用。", "The branch library manager is currently unavailable.");
-            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_INACTIVE = new EzLocalizationManager.EzLocalisableString("当前未启用", "Currently inactive");
-            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_ACTIVE = new EzLocalizationManager.EzLocalisableString("当前已启用", "Currently active");
-            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_RULESET_MISMATCH = new EzLocalizationManager.EzLocalisableString("当前 ruleset 与分支库不一致", "Current ruleset does not match this branch");
-            internal static readonly EzLocalizationManager.EzLocalisableString XXY_SR_BRANCH_MODS_OUT_OF_SYNC = new EzLocalizationManager.EzLocalisableString("当前 mods 已偏离建库时状态，但列表仍按分支曲库显示", "Current mods differ from the branch build state, but the list is still driven by the branch library");
+            internal static readonly EzLocalizationManager.EzLocalisableString SONGS_BRANCH_HEADER = new EzLocalizationManager.EzLocalisableString("分支曲库", "Branch Library");
+            internal static readonly EzLocalizationManager.EzLocalisableString MANAGE_SONGS_BRANCHES = new EzLocalizationManager.EzLocalisableString("管理分支曲库", "Manage Branch Libraries");
+            internal static readonly EzLocalizationManager.EzLocalisableString ENABLE_SONGS_BRANCH = new EzLocalizationManager.EzLocalisableString("启用分支曲库", "Enable Branch Library");
+            internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATE_SONGS_BRANCH = new EzLocalizationManager.EzLocalisableString("停用分支曲库", "Deactivate Branch Library");
+            internal static readonly EzLocalizationManager.EzLocalisableString DEACTIVATED_SONGS_BRANCH = new EzLocalizationManager.EzLocalisableString("已停用当前分支曲库。", "The current branch library has been deactivated.");
+            internal static readonly EzLocalizationManager.EzLocalisableString SONGS_BRANCH_ALREADY_INACTIVE = new EzLocalizationManager.EzLocalisableString("当前没有已启用的分支曲库。", "There is no active branch library.");
+            internal static readonly EzLocalizationManager.EzLocalisableString SONGS_BRANCH_MANAGER_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString("分支曲库管理器当前不可用。", "The branch library manager is currently unavailable.");
+            internal static readonly EzLocalizationManager.EzLocalisableString SONGS_BRANCH_INACTIVE = new EzLocalizationManager.EzLocalisableString("当前未启用", "Currently inactive");
+            internal static readonly EzLocalizationManager.EzLocalisableString SONGS_BRANCH_ACTIVE = new EzLocalizationManager.EzLocalisableString("当前已启用", "Currently active");
+            internal static readonly EzLocalizationManager.EzLocalisableString SONGS_BRANCH_RULESET_MISMATCH = new EzLocalizationManager.EzLocalisableString("当前 ruleset 与分支库不一致", "Current ruleset does not match this branch");
+            internal static readonly EzLocalizationManager.EzLocalisableString SONGS_BRANCH_MODS_OUT_OF_SYNC = new EzLocalizationManager.EzLocalisableString("当前 mods 已偏离建库时状态，但列表仍按分支曲库显示", "Current mods differ from the branch build state, but the list is still driven by the branch library");
 
             internal static readonly EzLocalizationManager.EzLocalisableString FILTERED_RESULTS_HEADER = new EzLocalizationManager.EzLocalisableString("筛选结果", "Filtered Results");
             internal static readonly EzLocalizationManager.EzLocalisableString BEATMAPS_UNIT = new EzLocalizationManager.EzLocalisableString("张谱面", "beatmaps");

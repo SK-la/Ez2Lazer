@@ -174,41 +174,41 @@ namespace osu.Game.EzOsuGame.Analysis
         public bool TryGetXxySr(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, out double xxySr)
             => analysisDatabase.TryGetXxySr(beatmapInfo, rulesetInfo, out xxySr);
 
-        public IBindable<string?> ActiveXxySrBranchDisplayName => analysisDatabase.ActiveXxySrBranchDisplayName;
+        public IBindable<string?> ActiveSongsBranchDisplayName => analysisDatabase.ActiveSongsBranchDisplayName;
 
-        public IBindable<int> ActiveXxySrBranchVersion => analysisDatabase.ActiveXxySrBranchVersion;
+        public IBindable<int> ActiveSongsBranchVersion => analysisDatabase.ActiveSongsBranchVersion;
 
-        public bool HasActiveXxySrBranch => analysisDatabase.HasActiveXxySrBranch;
+        public bool HasActiveSongsBranch => analysisDatabase.HasActiveSongsBranch;
 
-        public bool HasActiveXxySrBranchFor(IRulesetInfo? rulesetInfo)
-            => analysisDatabase.HasActiveXxySrBranchFor(rulesetInfo);
+        public bool HasActiveSongsBranchFor(IRulesetInfo? rulesetInfo)
+            => analysisDatabase.HasActiveSongsBranchFor(rulesetInfo);
 
-        public IReadOnlyDictionary<Guid, double> GetActiveXxySrBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
-            => analysisDatabase.GetActiveXxySrBranchValues(beatmaps, rulesetInfo);
+        public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
+            => analysisDatabase.GetActiveSongsBranchValues(beatmaps, rulesetInfo);
 
         public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetStoredXxySrValues(beatmaps, rulesetInfo, mods);
 
-        public bool IsActiveXxySrBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
-            => analysisDatabase.IsActiveXxySrBranchFor(rulesetInfo, mods);
+        public bool IsActiveSongsBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
+            => analysisDatabase.IsActiveSongsBranchFor(rulesetInfo, mods);
 
-        public bool IsXxySrBranchActive(string databasePath)
-            => analysisDatabase.IsXxySrBranchActive(databasePath);
+        public bool IsSongsBranchActive(string databasePath)
+            => analysisDatabase.IsSongsBranchActive(databasePath);
 
-        public void DeactivateXxySrBranch()
-            => analysisDatabase.DeactivateXxySrBranch();
+        public void DeactivateSongsBranch()
+            => analysisDatabase.DeactivateSongsBranch();
 
-        public bool TryActivateXxySrBranch(string databasePath, out LocalisableString message)
-            => analysisDatabase.TryActivateXxySrBranch(databasePath, out message);
+        public bool TryActivateSongsBranch(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryActivateSongsBranch(databasePath, out message);
 
-        public bool TryToggleXxySrBranchActivation(string databasePath, out LocalisableString message)
-            => analysisDatabase.TryToggleXxySrBranchActivation(databasePath, out message);
+        public bool TryToggleSongsBranchActivation(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryToggleSongsBranchActivation(databasePath, out message);
 
-        public bool TryDeleteXxySrBranch(string databasePath, out LocalisableString message)
-            => analysisDatabase.TryDeleteXxySrBranch(databasePath, out message);
+        public bool TryDeleteSongsBranch(string databasePath, out LocalisableString message)
+            => analysisDatabase.TryDeleteSongsBranch(databasePath, out message);
 
-        public bool TryToggleXxySrBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
-            => analysisDatabase.TryToggleXxySrBranchHidden(databasePath, out message, out nonHideableBeatmapSets);
+        public bool TryToggleSongsBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+            => analysisDatabase.TryToggleSongsBranchHidden(databasePath, out message, out nonHideableBeatmapSets);
 
         public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
                                               out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
@@ -217,13 +217,13 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlySet<Guid> GetHiddenCollectionIds()
             => analysisDatabase.GetHiddenCollectionIds();
 
-        public IReadOnlyList<EzAnalysisPersistentStore.XxySrBranchDescriptor> GetAvailableXxySrBranches(IRulesetInfo? rulesetInfo = null, IReadOnlyList<Mod>? mods = null, int maxCount = 0)
-            => analysisDatabase.GetAvailableXxySrBranches(rulesetInfo, mods, maxCount);
+        public IReadOnlyList<EzAnalysisPersistentStore.SongsBranchDescriptor> GetAvailableSongsBranches(IRulesetInfo? rulesetInfo = null, IReadOnlyList<Mod>? mods = null, int maxCount = 0)
+            => analysisDatabase.GetAvailableSongsBranches(rulesetInfo, mods, maxCount);
 
-        public Task<EzAnalysisDatabase.XxySrBranchBuildResult> CreateAndActivateXxySrBranchAsync(IEnumerable<BeatmapInfo> beatmaps, EzAnalysisPersistentStore.SourceCollectionSnapshot? sourceCollection,
+        public Task<EzAnalysisDatabase.SongsBranchBuildResult> CreateAndActivateSongsBranchAsync(IEnumerable<BeatmapInfo> beatmaps, EzAnalysisPersistentStore.SourceCollectionSnapshot? sourceCollection,
                                                                                                  IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods,
                                                                                                  Action<int, int>? progress = null, CancellationToken cancellationToken = default)
-            => analysisDatabase.CreateAndActivateXxySrBranchAsync(beatmaps, sourceCollection, rulesetInfo, mods, progress, cancellationToken);
+            => analysisDatabase.CreateAndActivateSongsBranchAsync(beatmaps, sourceCollection, rulesetInfo, mods, progress, cancellationToken);
 
         protected virtual Task<EzAnalysisResult?> GetDynamicAnalysisAsync(BeatmapInfo beatmapInfo, RulesetInfo rulesetInfo, IEnumerable<Mod>? mods,
                                                                           CancellationToken cancellationToken = default, int computationDelay = 0)

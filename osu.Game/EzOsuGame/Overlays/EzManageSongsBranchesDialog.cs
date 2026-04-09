@@ -62,6 +62,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private TruncatingSpriteText selectedBranchText = null!;
         private FillFlowContainer listFlow = null!;
         private RoundedButton generateButton = null!;
+        private Func<IReadOnlyList<BeatmapInfo>>? filteredBeatmapsProvider;
 
         private IReadOnlyList<BranchManagerEntry> displayedEntries = Array.Empty<BranchManagerEntry>();
 
@@ -118,6 +119,14 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             Show();
+        }
+
+        public void SetFilteredBeatmapsProvider(Func<IReadOnlyList<BeatmapInfo>> provider)
+        {
+            filteredBeatmapsProvider = provider;
+
+            if (IsLoaded)
+                updateSelectedBranchState();
         }
 
         public void ShowForActivation()
@@ -291,7 +300,6 @@ namespace osu.Game.EzOsuGame.Overlays
                                                     new Dimension(),
                                                     new Dimension(),
                                                     new Dimension(),
-                                                    new Dimension(),
                                                 },
                                                 Content = new[]
                                                 {
@@ -301,8 +309,15 @@ namespace osu.Game.EzOsuGame.Overlays
                                                         {
                                                             RelativeSizeAxes = Axes.X,
                                                             Height = 48,
-                                                            Text = EzManageSongsBranchesDialogStrings.GENERATE_SELECTED_BRANCH,
+                                                            Text = EzManageSongsBranchesDialogStrings.GENERATE_FILTER_BRANCH,
                                                             Action = generateVisibleBranch,
+                                                        },
+                                                        new RoundedButton
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            Height = 48,
+                                                            Text = EzManageSongsBranchesDialogStrings.GENERATE_COLLECTION_BRANCH,
+                                                            Action = generateSelectedBranch,
                                                         },
                                                         new RoundedButton
                                                         {
@@ -331,7 +346,7 @@ namespace osu.Game.EzOsuGame.Overlays
             searchTextBox.Current.BindValueChanged(_ => refreshBranches());
             ruleset.BindValueChanged(_ => refreshBranches());
             mods.BindValueChanged(_ => refreshBranches());
-            ezAnalysisCache.ActiveXxySrBranchVersion.BindValueChanged(_ => refreshBranches());
+            ezAnalysisCache.ActiveSongsBranchVersion.BindValueChanged(_ => refreshBranches());
             collectionSubscription = realm.RegisterForNotifications(r => r.All<BeatmapCollection>().OrderBy(c => c.Name), (_, __) => Schedule(refreshBranches));
         }
 
@@ -393,7 +408,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (displayedEntries.All(entry => !string.Equals(entry.SelectionKey, selectedEntryKey, StringComparison.Ordinal)))
             {
-                string? activeEntryKey = displayedEntries.FirstOrDefault(entry => entry.HasBranch && entry.BranchDatabasePath != null && ezAnalysisCache.IsXxySrBranchActive(entry.BranchDatabasePath))
+                string? activeEntryKey = displayedEntries.FirstOrDefault(entry => entry.HasBranch && entry.BranchDatabasePath != null && ezAnalysisCache.IsSongsBranchActive(entry.BranchDatabasePath))
                                                          .SelectionKey;
                 selectedEntryKey = activeEntryKey ?? displayedEntries.FirstOrDefault().SelectionKey;
             }
@@ -427,7 +442,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         listFlow.Add(new EzBranchListItem(entry)
                         {
                             IsSelected = string.Equals(entry.SelectionKey, selectedEntryKey, StringComparison.Ordinal),
-                            IsActive = entry.BranchDatabasePath != null && ezAnalysisCache.IsXxySrBranchActive(entry.BranchDatabasePath),
+                            IsActive = entry.BranchDatabasePath != null && ezAnalysisCache.IsSongsBranchActive(entry.BranchDatabasePath),
                             SelectAction = selectEntry,
                             ToggleActivationAction = toggleBranchActivation,
                             DeleteBranchAction = confirmDeleteBranch,
@@ -460,7 +475,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private IReadOnlyList<BranchManagerEntry> getAvailableEntries()
         {
-            IReadOnlyList<EzAnalysisPersistentStore.XxySrBranchDescriptor> branches = ezAnalysisCache.GetAvailableXxySrBranches(ruleset.Value, mods.Value);
+            IReadOnlyList<EzAnalysisPersistentStore.SongsBranchDescriptor> branches = ezAnalysisCache.GetAvailableSongsBranches(ruleset.Value, mods.Value);
             List<CollectionSnapshot> collections = realm.Run(r => r.All<BeatmapCollection>()
                                                                    .OrderBy(c => c.Name)
                                                                    .AsEnumerable()
@@ -531,7 +546,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private async Task generateVisibleBranchAsync()
         {
-            var filteredBeatmaps = carousel?.GetFilteredBeatmaps() ?? Array.Empty<BeatmapInfo>();
+            var filteredBeatmaps = getFilteredBeatmaps();
 
             if (filteredBeatmaps.Count == 0)
             {
@@ -552,7 +567,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             try
             {
-                var result = await ezAnalysisCache.CreateAndActivateXxySrBranchAsync(filteredBeatmaps, null,
+                var result = await ezAnalysisCache.CreateAndActivateSongsBranchAsync(filteredBeatmaps, null,
                     ruleset.Value, mods.Value, progress: (processed, total) => notification.Progress = total <= 0 ? 0 : (float)processed / total).ConfigureAwait(false);
 
                 Schedule(() =>
@@ -636,7 +651,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             try
             {
-                var result = await ezAnalysisCache.CreateAndActivateXxySrBranchAsync(collectionBeatmaps, sourceCollection,
+                var result = await ezAnalysisCache.CreateAndActivateSongsBranchAsync(collectionBeatmaps, sourceCollection,
                     ruleset.Value, mods.Value, progress: (processed, total) => notification.Progress = total <= 0 ? 0 : (float)processed / total).ConfigureAwait(false);
 
                 Schedule(() =>
@@ -725,11 +740,11 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void activateBranch(string databasePath)
         {
-            EzAnalysisPersistentStore.XxySrBranchDescriptor selectedBranch = displayedEntries.Where(entry => entry.HasBranch).Select(entry => entry.BranchValue)
+            EzAnalysisPersistentStore.SongsBranchDescriptor selectedBranch = displayedEntries.Where(entry => entry.HasBranch).Select(entry => entry.BranchValue)
                                                                                              .FirstOrDefault(branch => string.Equals(branch.DatabasePath, databasePath,
                                                                                                  StringComparison.OrdinalIgnoreCase));
 
-            if (!ezAnalysisCache.TryActivateXxySrBranch(databasePath, out LocalisableString message))
+            if (!ezAnalysisCache.TryActivateSongsBranch(databasePath, out LocalisableString message))
             {
                 postNotification(new SimpleErrorNotification
                 {
@@ -752,7 +767,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 Hide();
         }
 
-        private void tryApplyBranchMods(EzAnalysisPersistentStore.XxySrBranchMetadata metadata)
+        private void tryApplyBranchMods(EzAnalysisPersistentStore.SongsBranchMetadata metadata)
         {
             if (metadata.RulesetOnlineId != ruleset.Value.OnlineID)
                 return;
@@ -856,7 +871,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!entry.HasBranch || entry.BranchDatabasePath == null)
                 return;
 
-            if (!ezAnalysisCache.TryToggleXxySrBranchHidden(entry.BranchDatabasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets))
+            if (!ezAnalysisCache.TryToggleSongsBranchHidden(entry.BranchDatabasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets))
             {
                 postNotification(new SimpleErrorNotification
                 {
@@ -894,7 +909,22 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void toggleCollectionHidden(BranchManagerEntry entry) => _ = toggleCollectionHiddenAsync(entry);
 
-        private void deleteCollectionLocalBeatmaps(BranchManagerEntry entry) => _ = deleteCollectionLocalBeatmapsAsync(entry);
+        private void deleteCollectionLocalBeatmaps(BranchManagerEntry entry)
+        {
+            if (entry.SourceCollectionId == null)
+                return;
+
+            if (dialogOverlay == null)
+            {
+                postNotification(new SimpleErrorNotification
+                {
+                    Text = EzManageSongsBranchesDialogStrings.COLLECTION_DELETE_CONFIRMATION_UNAVAILABLE,
+                });
+                return;
+            }
+
+            dialogOverlay.Push(new DeleteCollectionLocalBeatmapsDialog(entry.SourceCollectionName, () => _ = deleteCollectionLocalBeatmapsAsync(entry)));
+        }
 
         private async Task deleteCollectionLocalBeatmapsAsync(BranchManagerEntry entry)
         {
@@ -962,7 +992,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     }
 
                     notification.State = ProgressNotificationState.Completed;
-                    notification.CompletionText = deleteResult.message;
+                    notification.CompletionText = LocalisableString.Interpolate($"{deleteResult.message}\n{EzManageSongsBranchesDialogStrings.COLLECTION_DELETE_RESTORE_HINT}");
                     selectedEntryKey = entry.SelectionKey;
                     refreshBranches();
                 });
@@ -1076,7 +1106,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!entry.HasBranch || entry.BranchDatabasePath == null)
                 return;
 
-            if (!ezAnalysisCache.TryToggleXxySrBranchActivation(entry.BranchDatabasePath, out LocalisableString message))
+            if (!ezAnalysisCache.TryToggleSongsBranchActivation(entry.BranchDatabasePath, out LocalisableString message))
             {
                 postNotification(new SimpleErrorNotification
                 {
@@ -1148,7 +1178,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void deleteBranch(string databasePath)
         {
-            if (!ezAnalysisCache.TryDeleteXxySrBranch(databasePath, out LocalisableString message))
+            if (!ezAnalysisCache.TryDeleteSongsBranch(databasePath, out LocalisableString message))
             {
                 postNotification(new SimpleErrorNotification
                 {
@@ -1174,7 +1204,7 @@ namespace osu.Game.EzOsuGame.Overlays
             refreshBranches();
         }
 
-        private void openBranchDirectory() => storage.GetStorageForDirectory(EzAnalysisPersistentStore.XXY_SR_BRANCH_DATABASE_DIRECTORY).PresentExternally();
+        private void openBranchDirectory() => storage.GetStorageForDirectory(EzAnalysisPersistentStore.SONGS_BRANCH_DATABASE_DIRECTORY).PresentExternally();
 
         private BranchManagerEntry? getSelectedEntry()
         {
@@ -1191,7 +1221,7 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             BranchManagerEntry? selectedEntry = getSelectedEntry();
 
-            bool hasVisible = carousel != null && carousel.GetFilteredBeatmaps().Count > 0;
+            bool hasVisible = getFilteredBeatmaps().Count > 0;
             generateButton.Enabled.Value = hasVisible;
 
             if (selectedEntry is BranchManagerEntry entry)
@@ -1204,6 +1234,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private static string createBranchSelectionKey(string databasePath) => $"branch:{Path.GetFullPath(databasePath)}";
 
+        private IReadOnlyList<BeatmapInfo> getFilteredBeatmaps()
+            => filteredBeatmapsProvider?.Invoke() ?? carousel?.GetFilteredBeatmaps() ?? Array.Empty<BeatmapInfo>();
+
         private void postNotification(Notification notification) => Schedule(() => notifications?.Post(notification));
 
         private readonly record struct CollectionSnapshot(Guid ID, string Name, int BeatmapCount);
@@ -1213,6 +1246,15 @@ namespace osu.Game.EzOsuGame.Overlays
             public DeleteBranchDialog(string displayName, Action deleteAction)
             {
                 BodyText = LocalisableString.Format(EzManageSongsBranchesDialogStrings.DELETE_BRANCH_CONFIRMATION, displayName);
+                DangerousAction = deleteAction;
+            }
+        }
+
+        private partial class DeleteCollectionLocalBeatmapsDialog : DeletionDialog
+        {
+            public DeleteCollectionLocalBeatmapsDialog(string collectionName, Action deleteAction)
+            {
+                BodyText = LocalisableString.Format(EzManageSongsBranchesDialogStrings.DELETE_COLLECTION_LOCAL_BEATMAPS_CONFIRMATION, collectionName);
                 DangerousAction = deleteAction;
             }
         }
@@ -1237,7 +1279,8 @@ namespace osu.Game.EzOsuGame.Overlays
             internal static readonly EzLocalizationManager.EzLocalisableString ACTIVATION_SUBTITLE = new EzLocalizationManager.EzLocalisableString("分支曲库右侧可逐个启用/停用与删除，可叠加启用多个分支；收藏夹右侧可按来源收藏夹切换隐藏。",
                 "Use the right-side controls on branch entries to activate/deactivate or delete each branch (multiple can be active). Use the right-side controls on collection entries to toggle hide by source collection.");
 
-            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_SELECTED_BRANCH = new EzLocalizationManager.EzLocalisableString("生成分支曲库", "Generate Branch Library");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_FILTER_BRANCH = new EzLocalizationManager.EzLocalisableString("生成过滤分支库", "Generate Filter Branch Library");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_COLLECTION_BRANCH = new EzLocalizationManager.EzLocalisableString("生成收藏夹分支库", "Generate Collection Branch Library");
             internal static readonly EzLocalizationManager.EzLocalisableString OPEN_BRANCH_DIRECTORY = new EzLocalizationManager.EzLocalisableString("打开分支库目录", "Open Branch Directory");
 
             internal static readonly EzLocalizationManager.EzLocalisableString NO_ITEMS_AVAILABLE = new EzLocalizationManager.EzLocalisableString("当前没有收藏夹或分支曲库。",
@@ -1273,6 +1316,18 @@ namespace osu.Game.EzOsuGame.Overlays
 
             internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_FAILED = new EzLocalizationManager.EzLocalisableString("删除收藏夹命中的本地谱面失败。",
                 "Failed to delete local beatmaps matched by the collection.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString DELETE_COLLECTION_LOCAL_BEATMAPS_CONFIRMATION = new EzLocalizationManager.EzLocalisableString(
+                "危险操作：将删除收藏夹“{0}”命中的本地谱面（不修改收藏夹记录）。可在设置-维护中通过“恢复所有最近删除的谱面”撤销。",
+                "Dangerous operation: this deletes local beatmaps matched by collection \"{0}\" (collection entries remain). You can undo this in Settings > Maintenance via \"Restore all recently deleted beatmaps\".");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_CONFIRMATION_UNAVAILABLE = new EzLocalizationManager.EzLocalisableString(
+                "危险操作需要确认，当前无法显示确认对话框，已取消执行。",
+                "This dangerous operation requires confirmation, but the confirmation dialog is currently unavailable. The operation was cancelled.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_RESTORE_HINT = new EzLocalizationManager.EzLocalisableString(
+                "可在设置-维护中使用“恢复所有最近删除的谱面”撤销。",
+                "You can undo this in Settings > Maintenance via \"Restore all recently deleted beatmaps\".");
 
             internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_HAS_NO_LOCAL_BEATMAPS = new EzLocalizationManager.EzLocalisableString("选中的收藏夹当前没有可写入分支曲库的本地谱面。",
                 "The selected collection does not currently contain local beatmaps that can be written into a branch library.");

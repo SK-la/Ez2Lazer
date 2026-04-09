@@ -225,7 +225,7 @@ namespace osu.Game.Tests.EzOsuGame
         }
 
         [Test]
-        public void TestMatchingXxySrBranchOverridesBaselineValue()
+        public void TestMatchingSongsBranchOverridesBaselineValue()
         {
             RunTestWithRealm((_, storage) =>
             {
@@ -238,7 +238,7 @@ namespace osu.Game.Tests.EzOsuGame
 
                 var database = createDatabase(persistentStore, storage);
                 storeBranch(persistentStore, beatmap, mods, 15.7, out string databasePath);
-                database.ActivateXxySrBranch(databasePath, beatmap.Ruleset, mods, 1, "branch");
+                database.ActivateSongsBranch(databasePath, beatmap.Ruleset, mods, 1, "branch");
 
                 var values = database.GetStoredXxySrValues(new[] { beatmap }, beatmap.Ruleset, mods);
 
@@ -248,7 +248,7 @@ namespace osu.Game.Tests.EzOsuGame
         }
 
         [Test]
-        public void TestMismatchedXxySrBranchFallsBackToBaseline()
+        public void TestMismatchedSongsBranchFallsBackToBaseline()
         {
             RunTestWithRealm((_, storage) =>
             {
@@ -261,7 +261,7 @@ namespace osu.Game.Tests.EzOsuGame
 
                 var database = createDatabase(persistentStore, storage);
                 storeBranch(persistentStore, beatmap, activeBranchMods, 15.7, out string databasePath);
-                database.ActivateXxySrBranch(databasePath, beatmap.Ruleset, activeBranchMods, 1, "branch");
+                database.ActivateSongsBranch(databasePath, beatmap.Ruleset, activeBranchMods, 1, "branch");
 
                 var values = database.GetStoredXxySrValues(new[] { beatmap }, beatmap.Ruleset, mods: null);
 
@@ -271,7 +271,7 @@ namespace osu.Game.Tests.EzOsuGame
         }
 
         [Test]
-        public void TestXxySrBranchSkipsHashMismatch()
+        public void TestSongsBranchSkipsHashMismatch()
         {
             RunTestWithRealm((_, storage) =>
             {
@@ -281,7 +281,7 @@ namespace osu.Game.Tests.EzOsuGame
                 var persistentStore = new EzAnalysisPersistentStore(storage);
                 var database = createDatabase(persistentStore, storage);
                 storeBranch(persistentStore, beatmap, mods, 15.7, out string databasePath, storedHash: "mismatch-hash");
-                database.ActivateXxySrBranch(databasePath, beatmap.Ruleset, mods, 1, "branch");
+                database.ActivateSongsBranch(databasePath, beatmap.Ruleset, mods, 1, "branch");
 
                 var values = database.GetStoredXxySrValues(new[] { beatmap }, beatmap.Ruleset, mods);
 
@@ -302,10 +302,10 @@ namespace osu.Game.Tests.EzOsuGame
 
         private static void storeBranch(EzAnalysisPersistentStore persistentStore, BeatmapInfo beatmap, IReadOnlyList<Mod>? mods, double xxySr, out string databasePath, string? storedHash = null)
         {
-            databasePath = persistentStore.CreateXxySrBranchDatabasePath(beatmap.Ruleset.ShortName);
-            persistentStore.StoreXxySrBranch(
+            databasePath = persistentStore.CreateSongsBranchDatabasePath(beatmap.Ruleset.ShortName);
+            persistentStore.StoreSongsBranch(
                 databasePath,
-                new EzAnalysisPersistentStore.XxySrBranchMetadata(
+                new EzAnalysisPersistentStore.SongsBranchMetadata(
                     beatmap.Ruleset.OnlineID,
                     beatmap.Ruleset.ShortName,
                     mods == null || mods.Count == 0 ? string.Empty : string.Join(',', mods.Select(m => m.Acronym)),
@@ -315,7 +315,7 @@ namespace osu.Game.Tests.EzOsuGame
                     "branch"),
                 new[]
                 {
-                    new EzAnalysisPersistentStore.XxySrBranchRow(
+                    new EzAnalysisPersistentStore.SongsBranchRow(
                         beatmap.ID,
                         storedHash ?? beatmap.Hash,
                         beatmap.MD5Hash,

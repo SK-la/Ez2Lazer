@@ -35,7 +35,7 @@ namespace osu.Game.EzOsuGame.Overlays
         Guid? SourceCollectionId,
         string SourceCollectionName,
         int SourceCollectionBeatmapCount,
-        EzAnalysisPersistentStore.XxySrBranchDescriptor? Branch,
+        EzAnalysisPersistentStore.SongsBranchDescriptor? Branch,
         bool CollectionHiddenApplied)
     {
         public bool HasBranch => Branch.HasValue;
@@ -52,7 +52,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         public bool HiddenApplied => IsCollectionRow && CollectionHiddenApplied;
 
-        public EzAnalysisPersistentStore.XxySrBranchDescriptor BranchValue => Branch!.Value;
+        public EzAnalysisPersistentStore.SongsBranchDescriptor BranchValue => Branch!.Value;
     }
 
     public partial class EzBranchListItem : OsuClickableContainer

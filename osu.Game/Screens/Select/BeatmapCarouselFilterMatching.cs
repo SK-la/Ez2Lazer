@@ -17,20 +17,20 @@ namespace osu.Game.Screens.Select
     {
         private readonly Func<FilterCriteria> getCriteria;
         private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
-        private readonly Func<bool> shouldUseActiveXxySrBranchAsBeatmapSource;
+        private readonly Func<bool> shouldUseActiveSongsBranchAsBeatmapSource;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync;
 
         public int BeatmapItemsCount { get; private set; }
 
         public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
-                                             Func<bool> shouldUseActiveXxySrBranchAsBeatmapSource,
+                                             Func<bool> shouldUseActiveSongsBranchAsBeatmapSource,
                                              Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
                                              Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync)
         {
             this.getCriteria = getCriteria;
             this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
-            this.shouldUseActiveXxySrBranchAsBeatmapSource = shouldUseActiveXxySrBranchAsBeatmapSource;
+            this.shouldUseActiveSongsBranchAsBeatmapSource = shouldUseActiveSongsBranchAsBeatmapSource;
             this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
             this.getActiveBranchDifficultiesAsync = getActiveBranchDifficultiesAsync;
         }
@@ -42,7 +42,7 @@ namespace osu.Game.Screens.Select
             int countMatching = 0;
             var matchedItems = new List<CarouselItem>();
 
-            bool useActiveBranchBeatmapSource = shouldUseActiveXxySrBranchAsBeatmapSource();
+            bool useActiveBranchBeatmapSource = shouldUseActiveSongsBranchAsBeatmapSource();
             bool useXxyDifficulty = shouldUseXxySrForDifficultyOperations();
             bool requiresDifficultyForFiltering = useXxyDifficulty && (criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter);
 

@@ -34,9 +34,9 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public class EzAnalysisPersistentStore
     {
-        public readonly record struct XxySrBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr);
+        public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr);
 
-        public readonly record struct XxySrBranchDescriptor(string DatabasePath, string RelativePath, XxySrBranchMetadata Metadata);
+        public readonly record struct SongsBranchDescriptor(string DatabasePath, string RelativePath, SongsBranchMetadata Metadata);
 
         public readonly record struct SourceCollectionSnapshot(
             Guid CollectionId,
@@ -44,7 +44,7 @@ namespace osu.Game.EzOsuGame.Analysis
             long LastModifiedUnixMilliseconds,
             IReadOnlyList<string> BeatmapMd5Hashes);
 
-        public readonly record struct XxySrBranchMetadata(
+        public readonly record struct SongsBranchMetadata(
             int RulesetOnlineId,
             string RulesetShortName,
             string ModsFingerprint,
@@ -66,7 +66,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public static readonly string DATABASE_FILENAME = $@"mania-analysis_v{ANALYSIS_VERSION}.sqlite";
 
-        public const string XXY_SR_BRANCH_DATABASE_DIRECTORY = "EzData";
+        public const string SONGS_BRANCH_DATABASE_DIRECTORY = "EzData";
         private const string xxy_sr_branch_kind = "xxy_sr_branch";
         private const int xxy_sr_branch_schema_version = 1;
 
@@ -788,24 +788,24 @@ LIMIT 1;
             }
         }
 
-        public string CreateXxySrBranchDatabasePath(string rulesetShortName)
+        public string CreateSongsBranchDatabasePath(string rulesetShortName)
         {
             string safeRulesetName = string.IsNullOrWhiteSpace(rulesetShortName) ? "ruleset" : rulesetShortName.Trim();
             string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
 
-            return storage.GetFullPath(Path.Combine(XXY_SR_BRANCH_DATABASE_DIRECTORY, $"songs_{safeRulesetName}_{timestamp}.sqlite"), true);
+            return storage.GetFullPath(Path.Combine(SONGS_BRANCH_DATABASE_DIRECTORY, $"songs_{safeRulesetName}_{timestamp}.sqlite"), true);
         }
 
-        public string CreateXxySrBranchDatabasePath(XxySrBranchMetadata metadata)
+        public string CreateSongsBranchDatabasePath(SongsBranchMetadata metadata)
         {
             string safeCollectionName = createSafeBranchDisplayName(string.IsNullOrWhiteSpace(metadata.SourceCollectionName) ? "collection" : metadata.SourceCollectionName);
             string safeModsDisplay = createSafeBranchModsDisplay(metadata.ModsDisplay);
             string timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
 
-            return storage.GetFullPath(Path.Combine(XXY_SR_BRANCH_DATABASE_DIRECTORY, $"songs_{safeCollectionName}_{safeModsDisplay}_{timestamp}.sqlite"), true);
+            return storage.GetFullPath(Path.Combine(SONGS_BRANCH_DATABASE_DIRECTORY, $"songs_{safeCollectionName}_{safeModsDisplay}_{timestamp}.sqlite"), true);
         }
 
-        public void StoreXxySrBranch(string databasePath, XxySrBranchMetadata metadata, IEnumerable<XxySrBranchRow> rows, SourceCollectionSnapshot? sourceCollection = null)
+        public void StoreSongsBranch(string databasePath, SongsBranchMetadata metadata, IEnumerable<SongsBranchRow> rows, SourceCollectionSnapshot? sourceCollection = null)
         {
             if (!Enabled)
                 return;
@@ -952,7 +952,7 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
             transaction.Commit();
         }
 
-        public IReadOnlyDictionary<Guid, double> GetXxySrBranchValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
+        public IReadOnlyDictionary<Guid, double> GetSongsBranchValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
         {
             if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return empty_xxy_sr_values;
@@ -966,7 +966,7 @@ ON CONFLICT(beatmap_id) DO UPDATE SET
 
                 using var connection = openConnection(databasePath);
 
-                if (!isValidXxySrBranchConnection(connection))
+                if (!isValidSongsBranchConnection(connection))
                     return empty_xxy_sr_values;
 
                 var beatmapsById = beatmapList.ToDictionary(b => b.ID);
@@ -1020,12 +1020,12 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore GetXxySrBranchValues failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetSongsBranchValues failed.", Ez2ConfigManager.LOGGER_NAME);
                 return empty_xxy_sr_values;
             }
         }
 
-        public IReadOnlySet<string> GetXxySrBranchCollectionBeatmapMd5Hashes(string databasePath)
+        public IReadOnlySet<string> GetSongsBranchCollectionBeatmapMd5Hashes(string databasePath)
         {
             var beatmapMd5Hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1036,7 +1036,7 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
             {
                 using var connection = openConnection(databasePath);
 
-                if (!isValidXxySrBranchConnection(connection))
+                if (!isValidSongsBranchConnection(connection))
                     return beatmapMd5Hashes;
 
                 try
@@ -1084,29 +1084,29 @@ FROM xxy_sr_branch;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore GetXxySrBranchCollectionBeatmapMd5Hashes failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetSongsBranchCollectionBeatmapMd5Hashes failed.", Ez2ConfigManager.LOGGER_NAME);
                 return beatmapMd5Hashes;
             }
         }
 
-        public IReadOnlyList<XxySrBranchDescriptor> GetAvailableXxySrBranches()
+        public IReadOnlyList<SongsBranchDescriptor> GetAvailableSongsBranches()
         {
             if (!Enabled)
-                return Array.Empty<XxySrBranchDescriptor>();
+                return Array.Empty<SongsBranchDescriptor>();
 
-            var descriptors = new List<XxySrBranchDescriptor>();
+            var descriptors = new List<SongsBranchDescriptor>();
             var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            if (storage.ExistsDirectory(XXY_SR_BRANCH_DATABASE_DIRECTORY))
+            if (storage.ExistsDirectory(SONGS_BRANCH_DATABASE_DIRECTORY))
             {
-                foreach (string relativePath in storage.GetFiles(XXY_SR_BRANCH_DATABASE_DIRECTORY, "*.sqlite"))
+                foreach (string relativePath in storage.GetFiles(SONGS_BRANCH_DATABASE_DIRECTORY, "*.sqlite"))
                 {
                     string absolutePath = storage.GetFullPath(relativePath);
 
                     if (!seenPaths.Add(absolutePath))
                         continue;
 
-                    if (TryGetXxySrBranchDescriptor(absolutePath, out var descriptor))
+                    if (TryGetSongsBranchDescriptor(absolutePath, out var descriptor))
                         descriptors.Add(descriptor);
                 }
             }
@@ -1117,7 +1117,7 @@ FROM xxy_sr_branch;
                    .ToList();
         }
 
-        public bool TrySetXxySrBranchHideState(string databasePath, bool hiddenApplied, IEnumerable<Guid> preexistingHiddenBeatmapIds)
+        public bool TrySetSongsBranchHideState(string databasePath, bool hiddenApplied, IEnumerable<Guid> preexistingHiddenBeatmapIds)
         {
             if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
@@ -1126,10 +1126,10 @@ FROM xxy_sr_branch;
             {
                 using var connection = openConnection(databasePath);
 
-                if (!isValidXxySrBranchConnection(connection))
+                if (!isValidSongsBranchConnection(connection))
                     return false;
 
-                ensureXxySrBranchStateTables(connection);
+                ensureSongsBranchStateTables(connection);
 
                 using var transaction = connection.BeginTransaction();
 
@@ -1165,7 +1165,7 @@ ON CONFLICT(beatmap_id) DO NOTHING;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore TrySetXxySrBranchHideState failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TrySetSongsBranchHideState failed.", Ez2ConfigManager.LOGGER_NAME);
                 return false;
             }
         }
@@ -1384,7 +1384,7 @@ WHERE collection_id = $collection_id;
             }
         }
 
-        public IReadOnlySet<Guid> GetXxySrBranchPreexistingHiddenBeatmapIds(string databasePath)
+        public IReadOnlySet<Guid> GetSongsBranchPreexistingHiddenBeatmapIds(string databasePath)
         {
             var beatmapIds = new HashSet<Guid>();
 
@@ -1395,10 +1395,10 @@ WHERE collection_id = $collection_id;
             {
                 using var connection = openConnection(databasePath);
 
-                if (!isValidXxySrBranchConnection(connection))
+                if (!isValidSongsBranchConnection(connection))
                     return beatmapIds;
 
-                ensureXxySrBranchStateTables(connection);
+                ensureSongsBranchStateTables(connection);
 
                 using var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
@@ -1418,12 +1418,12 @@ FROM hidden_preexisting_beatmap;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore GetXxySrBranchPreexistingHiddenBeatmapIds failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetSongsBranchPreexistingHiddenBeatmapIds failed.", Ez2ConfigManager.LOGGER_NAME);
                 return beatmapIds;
             }
         }
 
-        public bool DeleteXxySrBranch(string databasePath)
+        public bool DeleteSongsBranch(string databasePath)
         {
             if (!Enabled || string.IsNullOrEmpty(databasePath))
                 return false;
@@ -1435,42 +1435,43 @@ FROM hidden_preexisting_beatmap;
                 if (!File.Exists(fullPath))
                     return false;
 
+                SqliteConnection.ClearAllPools();
                 File.Delete(fullPath);
                 return true;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore DeleteXxySrBranch failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore DeleteSongsBranch failed.", Ez2ConfigManager.LOGGER_NAME);
                 return false;
             }
         }
 
-        public bool TryGetXxySrBranchDescriptor(string databasePath, out XxySrBranchDescriptor descriptor)
+        public bool TryGetSongsBranchDescriptor(string databasePath, out SongsBranchDescriptor descriptor)
         {
             descriptor = default;
 
             if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
                 return false;
 
-            if (!isCurrentXxySrBranchPath(databasePath))
+            if (!isCurrentSongsBranchPath(databasePath))
                 return false;
 
             try
             {
                 using var connection = openConnection(databasePath);
 
-                if (!isValidXxySrBranchConnection(connection))
+                if (!isValidSongsBranchConnection(connection))
                     return false;
 
-                if (!tryReadXxySrBranchMetadata(connection, out var metadata))
+                if (!tryReadSongsBranchMetadata(connection, out var metadata))
                     return false;
 
-                descriptor = createXxySrBranchDescriptor(databasePath, metadata);
+                descriptor = createSongsBranchDescriptor(databasePath, metadata);
                 return true;
             }
             catch (Exception e)
             {
-                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGetXxySrBranchDescriptor failed.", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Error(e, "EzManiaAnalysisPersistentStore TryGetSongsBranchDescriptor failed.", Ez2ConfigManager.LOGGER_NAME);
                 return false;
             }
         }
@@ -1512,7 +1513,7 @@ LIMIT 1;
             return cmd.ExecuteScalar() as string;
         }
 
-        private static bool isValidXxySrBranchConnection(SqliteConnection connection)
+        private static bool isValidSongsBranchConnection(SqliteConnection connection)
         {
             string? kind = tryGetMeta(connection, "kind");
             string? schemaVersionText = tryGetMeta(connection, "schema_version");
@@ -1530,7 +1531,7 @@ LIMIT 1;
             return true;
         }
 
-        private static bool tryReadXxySrBranchMetadata(SqliteConnection connection, out XxySrBranchMetadata metadata)
+        private static bool tryReadSongsBranchMetadata(SqliteConnection connection, out SongsBranchMetadata metadata)
         {
             metadata = default;
 
@@ -1574,7 +1575,7 @@ LIMIT 1;
                 ? parsedSourceCollectionBeatmapCount
                 : 0;
 
-            metadata = new XxySrBranchMetadata(
+            metadata = new SongsBranchMetadata(
                 rulesetOnlineId,
                 rulesetShortName,
                 modsFingerprint,
@@ -1591,7 +1592,7 @@ LIMIT 1;
             return true;
         }
 
-        private static void ensureXxySrBranchStateTables(SqliteConnection connection)
+        private static void ensureSongsBranchStateTables(SqliteConnection connection)
         {
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
@@ -1626,10 +1627,10 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
             cmd.ExecuteNonQuery();
         }
 
-        private bool isCurrentXxySrBranchPath(string databasePath)
+        private bool isCurrentSongsBranchPath(string databasePath)
         {
             string fullPath = Path.GetFullPath(databasePath);
-            string branchRoot = storage.GetFullPath(XXY_SR_BRANCH_DATABASE_DIRECTORY, true);
+            string branchRoot = storage.GetFullPath(SONGS_BRANCH_DATABASE_DIRECTORY, true);
             string relativePath = Path.GetRelativePath(branchRoot, fullPath);
 
             if (string.IsNullOrEmpty(relativePath))
@@ -1639,13 +1640,13 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
                    && !Path.IsPathRooted(relativePath);
         }
 
-        private XxySrBranchDescriptor createXxySrBranchDescriptor(string databasePath, XxySrBranchMetadata metadata)
+        private SongsBranchDescriptor createSongsBranchDescriptor(string databasePath, SongsBranchMetadata metadata)
         {
             string fullPath = Path.GetFullPath(databasePath);
             string rootPath = storage.GetFullPath(string.Empty, true);
             string relativePath = Path.GetRelativePath(rootPath, fullPath).Replace('\\', '/');
 
-            return new XxySrBranchDescriptor(fullPath, relativePath, metadata);
+            return new SongsBranchDescriptor(fullPath, relativePath, metadata);
         }
 
         private static string createSafeBranchModsDisplay(string? value)

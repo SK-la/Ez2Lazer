@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -58,7 +58,7 @@ namespace osu.Game.Screens.Select
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
         private Bindable<bool> xxySrFilterSetting = null!;
         private Bindable<bool> ezAnalysisSqliteEnabled = null!;
-        private IBindable<int> activeXxySrBranchVersion = null!;
+        private IBindable<int> activeSongsBranchVersion = null!;
         private readonly AsyncLocal<Dictionary<BeatmapInfo, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<BeatmapInfo, double>?>();
         private static readonly IReadOnlyDictionary<BeatmapInfo, double> empty_operation_difficulties = new Dictionary<BeatmapInfo, double>();
 
@@ -129,7 +129,7 @@ namespace osu.Game.Screens.Select
 
             Filters = new ICarouselFilter[]
             {
-                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, () => useActiveXxySrBranchAsBeatmapSource, getDifficultiesForOperationsAsync, getActiveBranchDifficultiesAsync),
+                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, () => useActiveSongsBranchAsBeatmapSource, getDifficultiesForOperationsAsync, getActiveBranchDifficultiesAsync),
                 new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
@@ -171,13 +171,13 @@ namespace osu.Game.Screens.Select
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
         }
 
-        private bool useActiveXxySrBranchAsBeatmapSource => ezAnalysisCache.HasActiveXxySrBranchFor(ruleset.Value);
+        private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.HasActiveSongsBranchFor(ruleset.Value);
 
-        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && (xxySrFilterSetting.Value || useActiveXxySrBranchAsBeatmapSource);
+        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && (xxySrFilterSetting.Value || useActiveSongsBranchAsBeatmapSource);
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getActiveBranchDifficultiesAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
-            if (!useActiveXxySrBranchAsBeatmapSource)
+            if (!useActiveSongsBranchAsBeatmapSource)
                 return Task.FromResult(empty_operation_difficulties);
 
             var beatmapList = beatmaps.Distinct().ToList();
@@ -185,7 +185,7 @@ namespace osu.Game.Screens.Select
             if (beatmapList.Count == 0)
                 return Task.FromResult(empty_operation_difficulties);
 
-            var storedXxySrValues = ezAnalysisCache.GetActiveXxySrBranchValues(beatmapList, ruleset.Value);
+            var storedXxySrValues = ezAnalysisCache.GetActiveSongsBranchValues(beatmapList, ruleset.Value);
             var resolvedValues = new Dictionary<BeatmapInfo, double>(storedXxySrValues.Count);
 
             foreach (var beatmap in beatmapList)
@@ -209,7 +209,7 @@ namespace osu.Game.Screens.Select
             if (beatmapList.Count == 0)
                 return Task.FromResult(empty_operation_difficulties);
 
-            if (useActiveXxySrBranchAsBeatmapSource)
+            if (useActiveSongsBranchAsBeatmapSource)
                 return getStrictActiveBranchDifficultiesAsync(beatmapList, cancellationToken);
 
             var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<BeatmapInfo, double>();
@@ -236,7 +236,7 @@ namespace osu.Game.Screens.Select
 
             if (uncachedBeatmaps.Count > 0)
             {
-                var storedXxySrValues = ezAnalysisCache.GetActiveXxySrBranchValues(uncachedBeatmaps, ruleset.Value);
+                var storedXxySrValues = ezAnalysisCache.GetActiveSongsBranchValues(uncachedBeatmaps, ruleset.Value);
 
                 foreach (var beatmap in uncachedBeatmaps)
                 {
@@ -265,8 +265,8 @@ namespace osu.Game.Screens.Select
             base.LoadComplete();
             detachedBeatmaps.BindCollectionChanged(beatmapSetsChanged, true);
 
-            activeXxySrBranchVersion = ezAnalysisCache.ActiveXxySrBranchVersion.GetBoundCopy();
-            activeXxySrBranchVersion.BindValueChanged(_ =>
+            activeSongsBranchVersion = ezAnalysisCache.ActiveSongsBranchVersion.GetBoundCopy();
+            activeSongsBranchVersion.BindValueChanged(_ =>
             {
                 Schedule(() =>
                 {
