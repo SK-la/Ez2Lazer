@@ -35,10 +35,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private EzHoldNoteHittingLayer? hittingLayer;
 
         private float tailHeight;
-
         private float lastBodyContainerHeight = float.NaN;
         private float lastBodyScaleY = float.NaN;
         private float lastTopContainerY = float.NaN;
+        private float cachedTailMaskHeight = float.NaN;
+
+        // private bool lnGradient;
 
         public EzHoldNoteMiddle()
         {
@@ -46,10 +48,22 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(DrawableHitObject drawableObject, IEzSkinInfo ezSkinInfo)
+        private void load(DrawableHitObject drawableObject, IEzSkinInfo ezSkinInfo, Ez2ConfigManager ezConfig)
         {
-            tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
-            tailAlpha = ezSkinInfo.HoldTailAlpha;
+            // lnGradient = ezConfig.Get<bool>(Ez2Setting.ManiaLNGradientEnable);
+
+            // 以后改完Tail再恢复判断
+            // if (lnGradient)
+            {
+                tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
+                tailAlpha = ezSkinInfo.HoldTailAlpha;
+                tailMaskHeight.BindValueChanged(e =>
+                {
+                    cachedTailMaskHeight = (float)e.NewValue;
+                    UpdateDrawable();
+                }, true);
+                tailAlpha.BindValueChanged(_ => UpdateColor(), true);
+            }
 
             holdNote = (DrawableHoldNote)drawableObject;
 
@@ -205,15 +219,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
             // 当设置为负值时，隐藏 topContainer；非负值时显示
             if (topContainer != null)
-                topContainer.Alpha = tailMaskHeight.Value >= 0 ? 1 : 0;
+                topContainer.Alpha = cachedTailMaskHeight >= 0 ? 1 : 0;
 
             if (topContainer?.Child is Container topInner)
             {
                 topContainer.Height = tailHeight;
                 topInner.Height = tailHeight * 2;
-                topContainer.Y = tailMaskHeight.Value > 0
-                    ? (float)tailMaskHeight.Value
-                    : 0;
+                topContainer.Y = cachedTailMaskHeight;
             }
 
             if (bodyInnerContainer != null)
