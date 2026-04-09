@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
+using osu.Framework.Threading;
 using osu.Game.Rulesets.Scoring;
 using osuTK;
 
@@ -19,6 +20,7 @@ namespace osu.Game.Skinning
         public Bindable<int> Current { get; } = new BindableInt { MinValue = 0 };
 
         private uint scheduledPopOutCurrentId;
+        private ScheduledDelegate? scheduledPopOutDelegate;
 
         private const double big_pop_out_duration = 300;
 
@@ -215,7 +217,9 @@ namespace osu.Game.Skinning
 
             uint newTaskId = scheduledPopOutCurrentId;
 
-            Scheduler.AddDelayed(delegate
+            // Cancel any previously scheduled pop-out to avoid piling up pending tasks
+            scheduledPopOutDelegate?.Cancel();
+            scheduledPopOutDelegate = Scheduler.AddDelayed(() =>
             {
                 scheduledPopOutSmall(newTaskId);
             }, big_pop_out_duration - 140);
@@ -273,6 +277,12 @@ namespace osu.Game.Skinning
         {
             double difference = currentValue > newValue ? currentValue - newValue : newValue - currentValue;
             return difference * rolling_duration;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            scheduledPopOutDelegate?.Cancel();
+            base.Dispose(isDisposing);
         }
     }
 }
