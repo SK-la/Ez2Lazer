@@ -196,7 +196,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             var needingRecompute = analysisDatabase.GetBeatmapsNeedingRecompute(beatmaps);
 
-            if (needingRecompute.Count == 0)
+            if (needingRecompute.Count <= 1)
             {
                 Logger.Log("No beatmaps require analysis recompute.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
