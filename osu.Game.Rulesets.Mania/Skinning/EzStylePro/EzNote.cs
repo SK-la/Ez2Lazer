@@ -7,10 +7,12 @@ using osu.Framework.Graphics.Animations;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzNote : EzNoteBase
+    internal partial class EzNote : EzNoteBase
     {
         protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;
+
+        private TextureAnimation? animation;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -21,27 +23,27 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateTexture()
         {
-            var animation = Factory.CreateAnimation($"{ColorPrefix}note");
+            animation = Factory.CreateAnimation(ColorPrefix + "note");
 
-            if (animation is TextureAnimation textureAnimation && textureAnimation.FrameCount == 0)
+            if (animation.FrameCount == 0)
             {
-                animation.Dispose();
+                animation = null;
                 return;
             }
 
-            if (MainContainer != null)
-            {
-                MainContainer.Clear();
-                MainContainer.Child = animation;
-            }
-
-            UpdateColor();
+            MainContainer.Child = animation;
         }
 
         protected override void UpdateDrawable()
         {
-            float v = NoteSizeBindable.Value.Y;
-            Height = v;
+            Height = NoteHeight;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            animation = null;
         }
     }
 }

@@ -8,6 +8,9 @@ using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Skinning
 {
+    /// <summary>
+    /// 列级更新广播接口，使用<see cref="ColumnWatcher"/>
+    /// </summary>
     internal interface IColumnNote
     {
         void ForwardOnNoteSetChanged();
@@ -15,6 +18,12 @@ namespace osu.Game.Rulesets.Mania.Skinning
         void ForwardOnColourChanged();
     }
 
+    /// <summary>
+    /// <code>
+    /// ColumnWatcher.GetOrCreate(Column).Add(this); // 创建订阅
+    /// ColumnWatcher.Remove(Column, this); // 释放
+    /// </code>
+    /// </summary>
     internal class ColumnWatcher
     {
         private readonly Column column;

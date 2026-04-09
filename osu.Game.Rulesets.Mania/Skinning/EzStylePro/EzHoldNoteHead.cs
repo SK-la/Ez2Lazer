@@ -8,10 +8,12 @@ using osu.Framework.Graphics.Containers;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzHoldNoteHead : EzNoteBase
+    internal partial class EzHoldNoteHead : EzNoteBase
     {
         protected override bool UseColorization => true;
         protected override bool ShowSeparators => true;
+
+        private TextureAnimation? animation;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -22,60 +24,54 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateTexture()
         {
-            string newComponentName = $"{ColorPrefix}longnote/head";
+            animation = Factory.CreateAnimation(HeadName);
 
-            var animation = Factory.CreateAnimation(newComponentName);
-
-            if (animation is TextureAnimation textureAnimation && textureAnimation.FrameCount == 0)
+            if (animation.FrameCount == 0)
             {
                 animation.Dispose();
-                animation = Factory.CreateAnimation($"{ColorPrefix}note");
+                animation = Factory.CreateAnimation(NoteName);
 
-                if (animation is TextureAnimation newTexture && newTexture.FrameCount == 0)
+                if (animation.FrameCount == 0)
                 {
                     animation.Dispose();
                     return;
                 }
 
-                if (MainContainer != null)
+                MainContainer.Anchor = Anchor.BottomCentre;
+                MainContainer.Origin = Anchor.BottomCentre;
+                MainContainer.RelativeSizeAxes = Axes.X;
+                MainContainer.Masking = true;
+                MainContainer.Child = new Container
                 {
-                    MainContainer.Clear();
-                    MainContainer.RelativeSizeAxes = Axes.X;
-                    MainContainer.Anchor = Anchor.BottomCentre;
-                    MainContainer.Origin = Anchor.BottomCentre;
-                    MainContainer.Masking = true;
-                    MainContainer.Child = new Container
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        Anchor = Anchor.BottomCentre,
-                        Origin = Anchor.BottomCentre,
-                        Child = animation,
-                    };
-                }
+                    Anchor = Anchor.BottomCentre,
+                    Origin = Anchor.BottomCentre,
+                    RelativeSizeAxes = Axes.X,
+                    Masking = true,
+                    Child = animation,
+                };
             }
             else
             {
-                if (MainContainer != null)
-                {
-                    MainContainer.Clear();
-                    MainContainer.Child = animation;
-                }
+                MainContainer.Child = animation;
             }
-
-            UpdateDrawable();
-            UpdateColor();
         }
 
         protected override void UpdateDrawable()
         {
-            float v = NoteSizeBindable.Value.Y;
-            Height = v;
+            Height = NoteHeight;
 
-            if (MainContainer?.Children.Count > 0 && MainContainer.Child is Container c)
+            if (MainContainer.Child is Container c)
             {
-                MainContainer.Height = v / 2;
-                c.Height = v;
+                MainContainer.Height = NoteHeight / 2;
+                c.Height = NoteHeight;
             }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            animation = null;
         }
     }
 }

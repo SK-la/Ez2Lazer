@@ -46,7 +46,7 @@ namespace osu.Game.EzOsuGame
 
                         for (int i = 0; i < max_frames_to_load; i++)
                         {
-                            string frameFile = $"{path}/{i:D3}.png";
+                            string frameFile = $"{path}/{i:D3}";
                             var texture = textureStore.Get(frameFile);
 
                             if (texture == null)

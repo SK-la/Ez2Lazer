@@ -344,7 +344,7 @@ namespace osu.Game.EzOsuGame
             {
                 for (int i = 0; i < max_frames_to_load; i++)
                 {
-                    string frameFile = $"{basePath}/{i:D3}.png";
+                    string frameFile = $"{basePath}/{i:D3}";
                     var texture = textureStore.Get(frameFile);
 
                     if (texture == null) break;
@@ -356,11 +356,15 @@ namespace osu.Game.EzOsuGame
             }
             else
             {
-                string frameFile = $"{basePath}.png";
-                Logger.Log($"[EzLocalTextureFactory] Loading JudgementLine Frame: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                string frameFile = $"{basePath}";
                 var texture = textureStore.Get(frameFile);
 
-                frames.Add(texture);
+                if (texture != null)
+                {
+                    Logger.Log($"[EzLocalTextureFactory] Loading JudgementLine Frame: {frameFile}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                    frames.Add(texture);
+                }
             }
 
             return frames;

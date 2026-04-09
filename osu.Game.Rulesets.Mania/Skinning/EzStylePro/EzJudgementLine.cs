@@ -80,6 +80,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
 
             base.Dispose(isDisposing);
+
+            container = null;
         }
     }
 }

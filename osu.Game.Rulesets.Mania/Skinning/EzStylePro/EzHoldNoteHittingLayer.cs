@@ -11,7 +11,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
-    public partial class EzHoldNoteHittingLayer : EzNoteBase
+    internal partial class EzHoldNoteHittingLayer : EzNoteBase
     {
         private static readonly BlendingParameters additive_preserve_alpha = new BlendingParameters
         {
@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         };
 
         public readonly Bindable<bool> IsHitting = new Bindable<bool>();
-        public readonly IBindable<double> HitPosition = new BindableDouble();
+        public IBindable<double> HitPosition = null!;
 
         private TextureAnimation? animation;
 
@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         [BackgroundDependencyLoader]
         private void load(IEzSkinInfo ezSkinInfo)
         {
-            HitPosition.BindTo(ezSkinInfo.HitPosition);
+            HitPosition = ezSkinInfo.HitPosition;
             HitPosition.BindValueChanged(_ => UpdateDrawable());
         }
 
@@ -99,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void UpdateDrawable()
         {
-            float v = -(float)HitPosition.Value - NoteSizeBindable.Value.Y / 2;
+            float v = -(float)HitPosition.Value - NoteHeight / 2;
             Position = new Vector2(0, v);
         }
 
@@ -111,6 +111,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             }
 
             base.Dispose(isDisposing);
+
+            animation = null;
         }
     }
 }

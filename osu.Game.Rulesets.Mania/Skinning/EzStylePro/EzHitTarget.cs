@@ -8,6 +8,8 @@ using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Screens.Play;
+using osu.Framework.Platform;
+using osu.Framework.Timing;
 
 namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
@@ -28,6 +30,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private double beatInterval;
         private bool requiresUpdate;
 
+        private IFrameBasedClock? hostClock;
+
         public EzHitTarget()
         {
             RelativeSizeAxes = Axes.X;
@@ -36,10 +40,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         }
 
         [BackgroundDependencyLoader]
-        private void load(IEzSkinInfo ezSkinInfo)
+        private void load(IEzSkinInfo ezSkinInfo, GameHost host)
         {
             Anchor = Anchor.BottomCentre;
             Origin = Anchor.BottomCentre;
+
+            // 使用 host 的 update 线程时钟作为独立时间源，从而在暂停时仍能继续动画。
+            hostClock = host.UpdateThread.Clock;
 
             calculateBeatInterval();
 
@@ -76,7 +83,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             // 平滑正弦波效果
             if (beatInterval > 0)
             {
-                double progress = (gameplayClock.CurrentTime % beatInterval) / beatInterval;
+                // 优先使用主机时钟（不会被 gameplay pause 停止），若不可用再回退到 gameplayClock。
+                double time = hostClock?.CurrentTime ?? gameplayClock.CurrentTime;
+                double progress = (time % beatInterval) / beatInterval;
                 double smoothValue = 0.3 * Math.Sin(progress * 2 * Math.PI);
                 Y = (float)(smoothValue * hitTargetFloatFixed.Value);
             }

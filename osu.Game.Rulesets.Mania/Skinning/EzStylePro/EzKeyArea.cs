@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 {
     public partial class EzKeyArea : CompositeDrawable, IKeyBindingHandler<ManiaAction>
     {
-        private readonly IBindable<double> hitPositonBindable = new Bindable<double>();
+        private IBindable<double> hitPositonBindable = null!;
         private Bindable<Vector2> noteSizeBindable = null!;
         private Bindable<string> stageNameBindable = null!;
 
@@ -74,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             columnIndex = column.Index;
 
             stageNameBindable = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
-            hitPositonBindable.BindTo(ezSkinInfo.HitPosition);
+            hitPositonBindable = ezSkinInfo.HitPosition;
             noteSizeBindable = column.EzNoteSizeBindable;
 
             // bpm = beatmap.Beatmap.ControlPointInfo.TimingPointAt(gameplayClock.CurrentTime).BPM * gameplayClock.GetTrueGameplayRate();
@@ -110,7 +110,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                var type = ezSkinConfig.GetColumnTypeFast(keyMode, columnIndex);
+                var type = column.EzNoteTypeBindable.Value;
 
                 switch (type)
                 {
@@ -135,7 +135,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (keyMode == 14 && columnIndex == 13) return;
 
-            // ClearInternal();
             upSprite?.ClearFrames();
             downSprite?.ClearFrames();
 
