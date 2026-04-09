@@ -77,16 +77,18 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString LN_TAIL_ALPHA = new EzLocalizationManager.EzLocalisableString("Tail面尾透明度", "Mania Hold Tail Alpha");
 
-        public static readonly LocalisableString LN_TAIL_ALPHA_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Mania Tail面尾的透明度，当前只用于Ez Pro皮肤",
+        public static readonly LocalisableString LN_TAIL_ALPHA_TOOLTIP = new EzLocalizationManager.EzLocalisableString("Mania Tail面尾的透明度，当前只用于EzPro、SBI皮肤",
             "Modify the transparency of the Mania hold tail");
 
         public static readonly LocalisableString MANIA_LN_GRADIENT_ENABLE = new EzLocalizationManager.EzLocalisableString("LN 伪面尾开关", "LN Gradient Enable");
 
         public static readonly LocalisableString MANIA_LN_GRADIENT_ENABLE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "启用后，原Tail面尾隐藏，由Body面身的末端作为面尾。"
-            + "\n此举不会修改判定线实际位置，必须开启此开关后才能使用下方真投皮面尾。",
+            + "\n此举不会修改判定线实际位置，需要重载皮肤生效。"
+            + "\n必须开启此开关后才能使用下方真投皮面尾。",
             "When enabled, the original hold tail will be hidden, and the end of the hold body will serve as the tail. "
-            + "\nThis will not modify the actual position of the hit line, and the true opportunistic hold tail below can only be used after enabling this switch.");
+            + "This will not modify the actual position of the hit, and requires a skin reload to take effect. "
+            + "You must enable this switch to use the true opportunistic tail below.");
 
         public static readonly LocalisableString LN_TAIL_MASK_GRADIENT_HEIGHT = new EzLocalizationManager.EzLocalisableString("调整缩短面尾的距离(投)", "Adjust LN Tail Length (Opportunistic)");
 
@@ -94,12 +96,12 @@ namespace osu.Game.EzOsuGame.Localization
             "(投皮) 缩短面条中部实现, 不改变面尾形状",
             "(Opportunistic) Shorten the middle of the hold tail without changing its shape");
 
-        public static readonly LocalisableString NOTE_TRACK_LINE = new EzLocalizationManager.EzLocalisableString("Note辅助线", "Note Track Line");
+        public static readonly LocalisableString NOTE_TRACK_LINE = new EzLocalizationManager.EzLocalisableString("Note侧轨道线", "Note Track Line");
         public static readonly LocalisableString NOTE_TRACK_LINE_TOOLTIP = new EzLocalizationManager.EzLocalisableString("(Ez风格)note两侧辅助轨道线的高度", "(Ez Style)note side auxiliary track line height");
 
         public static readonly LocalisableString REFRESH_SAVE_SKIN = new EzLocalizationManager.EzLocalisableString("强制刷新&保存", "Force Refresh & Save Skin");
 
-        public static readonly LocalisableString REFRESH_SAVE_SKIN_TOOLTIP = new EzLocalizationManager.EzLocalisableString("没遇到问题不要点，调整用按钮",
+        public static readonly LocalisableString REFRESH_SAVE_SKIN_TOOLTIP = new EzLocalizationManager.EzLocalisableString("没遇到问题不需要点，测试用按钮，触发皮肤重载。",
             "If you haven't encountered any issues, don't click this. Use it for adjustments.");
 
         public static readonly LocalisableString SWITCH_TO_ABSOLUTE = new EzLocalizationManager.EzLocalisableString("强制刷新, 并切换至 绝对位置 (不稳定) ", "Refresh, Switch to Absolute(Unstable)");
