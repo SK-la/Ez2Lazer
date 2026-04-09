@@ -74,7 +74,7 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved(canBeNull: true)]
         private IBackdropCaptureSourceProvider? backdropCaptureSourceProvider { get; set; }
 
-        private Bindable<double> osuConfigDim = null!;
+        // private Bindable<double> osuConfigDim = null!;
         private Bindable<double> columnDim = null!;
         private Bindable<double> columnBlur = null!;
         private bool blurEnabledByConfig;
@@ -114,19 +114,6 @@ namespace osu.Game.Rulesets.Mania.UI
                         MaxCapturesPerSecond = 300,
                     }
                     : null) ?? Empty(),
-#if DEBUG
-                // 调试用的边框，显示模糊区域
-                new Container
-                {
-                    RelativeSizeAxes = Axes.Both,
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Masking = true,
-                    BorderThickness = 2,
-                    BorderColour = ColourInfo.GradientVertical(Colour4.HotPink, Colour4.Cyan),
-                    Alpha = 1,
-                },
-#endif
                 dimBox = new Box
                 {
                     RelativeSizeAxes = Axes.Both,
@@ -230,12 +217,13 @@ namespace osu.Game.Rulesets.Mania.UI
             currentSkin.SourceChanged += onSkinChanged;
             onSkinChanged();
 
-            osuConfigDim = osuConfig.GetBindable<double>(OsuSetting.DimLevel);
+            // osuConfigDim = osuConfig.GetBindable<double>(OsuSetting.DimLevel);
 
             columnDim = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim);
             columnDim.BindValueChanged(v =>
             {
-                dimBox.Alpha = (float)Math.Max(v.NewValue, osuConfigDim.Value / 2);
+                // dimBox.Alpha = (float)Math.Max(v.NewValue, osuConfigDim.Value / 2);
+                dimBox.Alpha = (float)v.NewValue;
             }, true);
 
             columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);

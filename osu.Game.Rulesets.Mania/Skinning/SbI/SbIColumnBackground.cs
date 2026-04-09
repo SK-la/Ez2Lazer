@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                     Name = "Background",
                     RelativeSizeAxes = Axes.Both,
                     Colour = Color4.Black,
-                    Alpha = 0.8f,
+                    Alpha = 0.0f,
                 },
                 backgroundOverlay = new Box
                 {
