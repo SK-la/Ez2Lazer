@@ -1,3 +1,6 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -17,10 +20,10 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Extensions;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -33,6 +36,7 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Select;
 using osu.Game.Utils;
 using osuTK;
 
@@ -78,6 +82,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         [Resolved]
         private BeatmapManager beatmapManager { get; set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        private BeatmapCarousel? carousel { get; set; }
 
         [Resolved]
         private MusicController? musicController { get; set; }
@@ -295,7 +302,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                                             RelativeSizeAxes = Axes.X,
                                                             Height = 48,
                                                             Text = EzManageSongsBranchesDialogStrings.GENERATE_SELECTED_BRANCH,
-                                                            Action = generateSelectedBranch,
+                                                            Action = generateVisibleBranch,
                                                         },
                                                         new RoundedButton
                                                         {
@@ -386,7 +393,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             if (displayedEntries.All(entry => !string.Equals(entry.SelectionKey, selectedEntryKey, StringComparison.Ordinal)))
             {
-                string? activeEntryKey = displayedEntries.FirstOrDefault(entry => entry.HasBranch && entry.BranchDatabasePath != null && ezAnalysisCache.IsXxySrBranchActive(entry.BranchDatabasePath)).SelectionKey;
+                string? activeEntryKey = displayedEntries.FirstOrDefault(entry => entry.HasBranch && entry.BranchDatabasePath != null && ezAnalysisCache.IsXxySrBranchActive(entry.BranchDatabasePath))
+                                                         .SelectionKey;
                 selectedEntryKey = activeEntryKey ?? displayedEntries.FirstOrDefault().SelectionKey;
             }
 
@@ -518,6 +526,72 @@ namespace osu.Game.EzOsuGame.Overlays
         }
 
         private void generateSelectedBranch() => _ = generateSelectedBranchAsync();
+
+        private void generateVisibleBranch() => _ = generateVisibleBranchAsync();
+
+        private async Task generateVisibleBranchAsync()
+        {
+            var filteredBeatmaps = carousel?.GetFilteredBeatmaps() ?? Array.Empty<BeatmapInfo>();
+
+            if (filteredBeatmaps.Count == 0)
+            {
+                postNotification(new SimpleErrorNotification
+                {
+                    Text = EzManageSongsBranchesDialogStrings.VISIBLE_BRANCH_EMPTY_FILTER_RESULT,
+                });
+                return;
+            }
+
+            var notification = new ProgressNotification
+            {
+                State = ProgressNotificationState.Active,
+                Text = LocalisableString.Format(EzManageSongsBranchesDialogStrings.GENERATING_BRANCH_FROM_VISIBLE, filteredBeatmaps.Count)
+            };
+
+            postNotification(notification);
+
+            try
+            {
+                var result = await ezAnalysisCache.CreateAndActivateXxySrBranchAsync(filteredBeatmaps, null,
+                    ruleset.Value, mods.Value, progress: (processed, total) => notification.Progress = total <= 0 ? 0 : (float)processed / total).ConfigureAwait(false);
+
+                Schedule(() =>
+                {
+                    if (!result.Success)
+                    {
+                        notification.State = ProgressNotificationState.Cancelled;
+                        notifications?.Post(new SimpleErrorNotification
+                        {
+                            Text = result.Message,
+                        });
+                        refreshBranches();
+                        return;
+                    }
+
+                    notification.CompletionText = LocalisableString.Format(EzManageSongsBranchesDialogStrings.BRANCH_GENERATED_AND_ACTIVATED,
+                        result.DisplayName ?? EzManageSongsBranchesDialogStrings.VISIBLE_GENERATED_SOURCE_NAME,
+                        result.StoredBeatmapCount,
+                        result.RequestedBeatmapCount);
+
+                    if (!string.IsNullOrEmpty(result.DatabasePath))
+                        notification.CompletionClickAction = () => storage.PresentFileExternally(result.DatabasePath);
+
+                    notification.State = ProgressNotificationState.Completed;
+                    refreshBranches();
+                });
+            }
+            catch (Exception)
+            {
+                Schedule(() =>
+                {
+                    notification.State = ProgressNotificationState.Cancelled;
+                    notifications?.Post(new SimpleErrorNotification
+                    {
+                        Text = EzManageSongsBranchesDialogStrings.GENERATE_BRANCH_FAILED,
+                    });
+                });
+            }
+        }
 
         private async Task generateSelectedBranchAsync()
         {
@@ -651,7 +725,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void activateBranch(string databasePath)
         {
-            EzAnalysisPersistentStore.XxySrBranchDescriptor selectedBranch = displayedEntries.Where(entry => entry.HasBranch).Select(entry => entry.BranchValue).FirstOrDefault(branch => string.Equals(branch.DatabasePath, databasePath, StringComparison.OrdinalIgnoreCase));
+            EzAnalysisPersistentStore.XxySrBranchDescriptor selectedBranch = displayedEntries.Where(entry => entry.HasBranch).Select(entry => entry.BranchValue)
+                                                                                             .FirstOrDefault(branch => string.Equals(branch.DatabasePath, databasePath,
+                                                                                                 StringComparison.OrdinalIgnoreCase));
 
             if (!ezAnalysisCache.TryActivateXxySrBranch(databasePath, out LocalisableString message))
             {
@@ -1098,8 +1174,7 @@ namespace osu.Game.EzOsuGame.Overlays
             refreshBranches();
         }
 
-        private void openBranchDirectory()
-            => storage.GetStorageForDirectory(EzAnalysisPersistentStore.XXY_SR_BRANCH_DATABASE_DIRECTORY).PresentExternally();
+        private void openBranchDirectory() => storage.GetStorageForDirectory(EzAnalysisPersistentStore.XXY_SR_BRANCH_DATABASE_DIRECTORY).PresentExternally();
 
         private BranchManagerEntry? getSelectedEntry()
         {
@@ -1116,7 +1191,8 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             BranchManagerEntry? selectedEntry = getSelectedEntry();
 
-            generateButton.Enabled.Value = selectedEntry?.SourceCollectionId != null;
+            bool hasVisible = carousel != null && carousel.GetFilteredBeatmaps().Count > 0;
+            generateButton.Enabled.Value = hasVisible;
 
             if (selectedEntry is BranchManagerEntry entry)
                 selectedBranchText.Text = LocalisableString.Format(EzManageSongsBranchesDialogStrings.SELECTED_ITEM, entry.DisplayName);
@@ -1128,8 +1204,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private static string createBranchSelectionKey(string databasePath) => $"branch:{Path.GetFullPath(databasePath)}";
 
-        private void postNotification(Notification notification)
-            => Schedule(() => notifications?.Post(notification));
+        private void postNotification(Notification notification) => Schedule(() => notifications?.Post(notification));
 
         private readonly record struct CollectionSnapshot(Guid ID, string Name, int BeatmapCount);
 
@@ -1154,32 +1229,81 @@ namespace osu.Game.EzOsuGame.Overlays
         private static class EzManageSongsBranchesDialogStrings
         {
             internal static readonly EzLocalizationManager.EzLocalisableString TITLE = new EzLocalizationManager.EzLocalisableString("分支曲库管理", "Branch Library Manager");
-            internal static readonly EzLocalizationManager.EzLocalisableString MANAGER_SUBTITLE = new EzLocalizationManager.EzLocalisableString("上方显示已生成的分支曲库，下方显示全部收藏夹；分支曲库右侧可启用/停用和删除，收藏夹右侧可按来源收藏夹切换隐藏。", "Generated branch libraries are shown first, followed by all collections. Branch entries support activate/deactivate and delete on the right, while collection entries support hide toggle by source collection on the right.");
-            internal static readonly EzLocalizationManager.EzLocalisableString ACTIVATION_SUBTITLE = new EzLocalizationManager.EzLocalisableString("分支曲库右侧可逐个启用/停用与删除，可叠加启用多个分支；收藏夹右侧可按来源收藏夹切换隐藏。", "Use the right-side controls on branch entries to activate/deactivate or delete each branch (multiple can be active). Use the right-side controls on collection entries to toggle hide by source collection.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString MANAGER_SUBTITLE = new EzLocalizationManager.EzLocalisableString(
+                "上方显示已生成的分支曲库，下方显示全部收藏夹；分支曲库右侧可启用/停用和删除，收藏夹右侧可按来源收藏夹切换隐藏。",
+                "Generated branch libraries are shown first, followed by all collections. Branch entries support activate/deactivate and delete on the right, while collection entries support hide toggle by source collection on the right.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString ACTIVATION_SUBTITLE = new EzLocalizationManager.EzLocalisableString("分支曲库右侧可逐个启用/停用与删除，可叠加启用多个分支；收藏夹右侧可按来源收藏夹切换隐藏。",
+                "Use the right-side controls on branch entries to activate/deactivate or delete each branch (multiple can be active). Use the right-side controls on collection entries to toggle hide by source collection.");
+
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_SELECTED_BRANCH = new EzLocalizationManager.EzLocalisableString("生成分支曲库", "Generate Branch Library");
             internal static readonly EzLocalizationManager.EzLocalisableString OPEN_BRANCH_DIRECTORY = new EzLocalizationManager.EzLocalisableString("打开分支库目录", "Open Branch Directory");
-            internal static readonly EzLocalizationManager.EzLocalisableString NO_ITEMS_AVAILABLE = new EzLocalizationManager.EzLocalisableString("当前没有收藏夹或分支曲库。", "No collections or branch libraries are currently available.");
-            internal static readonly EzLocalizationManager.EzLocalisableString NO_ITEMS_MATCHING_SEARCH = new EzLocalizationManager.EzLocalisableString("没有匹配的收藏夹或分支曲库。", "No collections or branch libraries match the current search.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString NO_ITEMS_AVAILABLE = new EzLocalizationManager.EzLocalisableString("当前没有收藏夹或分支曲库。",
+                "No collections or branch libraries are currently available.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString NO_ITEMS_MATCHING_SEARCH = new EzLocalizationManager.EzLocalisableString("没有匹配的收藏夹或分支曲库。",
+                "No collections or branch libraries match the current search.");
+
             internal static readonly EzLocalizationManager.EzLocalisableString SELECT_COLLECTION_FIRST = new EzLocalizationManager.EzLocalisableString("请先选择一个收藏夹。", "Select a collection first.");
-            internal static readonly EzLocalizationManager.EzLocalisableString SELECT_GENERATED_BRANCH_FIRST = new EzLocalizationManager.EzLocalisableString("请先选择一个已生成的分支曲库。", "Select a generated branch library first.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString SELECT_GENERATED_BRANCH_FIRST =
+                new EzLocalizationManager.EzLocalisableString("请先选择一个已生成的分支曲库。", "Select a generated branch library first.");
+
             internal static readonly EzLocalizationManager.EzLocalisableString SELECTED_ITEM = new EzLocalizationManager.EzLocalisableString("已选中：{0}", "Selected: {0}");
             internal static readonly EzLocalizationManager.EzLocalisableString NO_ITEM_SELECTED = new EzLocalizationManager.EzLocalisableString("未选中项目", "No item selected");
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATED_SECTION = new EzLocalizationManager.EzLocalisableString("已生成分支曲库", "Generated Branch Libraries");
             internal static readonly EzLocalizationManager.EzLocalisableString UNGENERATED_SECTION = new EzLocalizationManager.EzLocalisableString("收藏夹列表", "Collections");
-            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_HIDE_RUNNING = new EzLocalizationManager.EzLocalisableString("正在后台切换收藏夹“{0}”的隐藏状态...", "Toggling hide for collection \"{0}\" in the background...");
-            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_HIDE_FAILED = new EzLocalizationManager.EzLocalisableString("切换收藏夹隐藏失败。", "Failed to toggle collection hide.");
-            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_RUNNING = new EzLocalizationManager.EzLocalisableString("正在后台删除收藏夹“{0}”命中的本地谱面...", "Deleting local beatmaps matched by collection \"{0}\" in the background...");
-            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_COMPLETED = new EzLocalizationManager.EzLocalisableString("已删除 {0:#,0} 张本地谱面；收藏夹记录完整保留（共 {1:#,0} 条）。", "Deleted {0:#,0} local beatmaps; collection records remain intact ({1:#,0} total entries).");
-            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_NO_LOCAL_BEATMAPS = new EzLocalizationManager.EzLocalisableString("本地没有命中可删除谱面；收藏夹记录完整保留（共 {0:#,0} 条）。", "No local beatmaps matched for deletion; collection records remain intact ({0:#,0} total entries).");
-            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_FAILED = new EzLocalizationManager.EzLocalisableString("删除收藏夹命中的本地谱面失败。", "Failed to delete local beatmaps matched by the collection.");
-            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_HAS_NO_LOCAL_BEATMAPS = new EzLocalizationManager.EzLocalisableString("选中的收藏夹当前没有可写入分支曲库的本地谱面。", "The selected collection does not currently contain local beatmaps that can be written into a branch library.");
-            internal static readonly EzLocalizationManager.EzLocalisableString GENERATING_BRANCH_FROM_COLLECTION = new EzLocalizationManager.EzLocalisableString("正在根据收藏夹“{0}”生成分支曲库（本地命中 {1} 张谱面）...", "Generating a branch library from collection \"{0}\" ({1} local beatmaps matched)...");
-            internal static readonly EzLocalizationManager.EzLocalisableString BRANCH_GENERATED_AND_ACTIVATED = new EzLocalizationManager.EzLocalisableString("分支曲库已生成并启用：{0}（写入 {1}/{2} 张谱面）。", "Branch library generated and activated: {0} ({1}/{2} beatmaps stored).");
-            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("生成分支曲库失败。", "Failed to generate the branch library.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_HIDE_RUNNING = new EzLocalizationManager.EzLocalisableString("正在后台切换收藏夹“{0}”的隐藏状态...",
+                "Toggling hide for collection \"{0}\" in the background...");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString
+                COLLECTION_HIDE_FAILED = new EzLocalizationManager.EzLocalisableString("切换收藏夹隐藏失败。", "Failed to toggle collection hide.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_RUNNING = new EzLocalizationManager.EzLocalisableString("正在后台删除收藏夹“{0}”命中的本地谱面...",
+                "Deleting local beatmaps matched by collection \"{0}\" in the background...");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_COMPLETED = new EzLocalizationManager.EzLocalisableString("已删除 {0:#,0} 张本地谱面；收藏夹记录完整保留（共 {1:#,0} 条）。",
+                "Deleted {0:#,0} local beatmaps; collection records remain intact ({1:#,0} total entries).");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_NO_LOCAL_BEATMAPS = new EzLocalizationManager.EzLocalisableString(
+                "本地没有命中可删除谱面；收藏夹记录完整保留（共 {0:#,0} 条）。", "No local beatmaps matched for deletion; collection records remain intact ({0:#,0} total entries).");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_DELETE_FAILED = new EzLocalizationManager.EzLocalisableString("删除收藏夹命中的本地谱面失败。",
+                "Failed to delete local beatmaps matched by the collection.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString COLLECTION_HAS_NO_LOCAL_BEATMAPS = new EzLocalizationManager.EzLocalisableString("选中的收藏夹当前没有可写入分支曲库的本地谱面。",
+                "The selected collection does not currently contain local beatmaps that can be written into a branch library.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATING_BRANCH_FROM_COLLECTION = new EzLocalizationManager.EzLocalisableString("正在根据收藏夹“{0}”生成分支曲库（本地命中 {1} 张谱面）...",
+                "Generating a branch library from collection \"{0}\" ({1} local beatmaps matched)...");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString VISIBLE_BRANCH_EMPTY_FILTER_RESULT = new EzLocalizationManager.EzLocalisableString("当前筛选/可见结果为空，未生成分支曲库。",
+                "The current filtered/visible result is empty. No branch library was generated.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATING_BRANCH_FROM_VISIBLE = new EzLocalizationManager.EzLocalisableString("正在根据当前可见谱面生成分支曲库（本地命中 {0} 张谱面）...",
+                "Generating a branch library from visible beatmaps ({0} local beatmaps matched)...");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString VISIBLE_GENERATED_SOURCE_NAME = new EzLocalizationManager.EzLocalisableString("筛选结果", "Filtered results");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString BRANCH_GENERATED_AND_ACTIVATED = new EzLocalizationManager.EzLocalisableString("分支曲库已生成并启用：{0}（写入 {1}/{2} 张谱面）。",
+                "Branch library generated and activated: {0} ({1}/{2} beatmaps stored).");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("生成分支曲库失败。",
+                "Failed to generate the branch library.");
+
             internal static readonly EzLocalizationManager.EzLocalisableString DELETE_BRANCH_CONFIRMATION = new EzLocalizationManager.EzLocalisableString("删除分支库：{0}", "Delete branch sqlite: {0}");
-            internal static readonly EzLocalizationManager.EzLocalisableString NON_HIDEABLE_BEATMAPSETS_FOUND = new EzLocalizationManager.EzLocalisableString("有 {0} 个谱包当前只剩最后一张可见 diff，无法继续隐藏。", "There are {0} beatmap sets with only one visible difficulty remaining, so they cannot be hidden further.");
-            internal static readonly EzLocalizationManager.EzLocalisableString DELETE_NON_HIDEABLE_BEATMAPSETS_CONFIRMATION = new EzLocalizationManager.EzLocalisableString("有 {0} 个谱包当前只剩最后一张可见 diff，无法隐藏。是否直接删除这些谱包？", "There are {0} beatmap sets with only one visible difficulty remaining, so they cannot be hidden. Delete those beatmap sets?");
-            internal static readonly EzLocalizationManager.EzLocalisableString DELETED_NON_HIDEABLE_BEATMAPSETS = new EzLocalizationManager.EzLocalisableString("已删除 {0} 个无法隐藏的谱包。", "Deleted {0} beatmap sets that could not be hidden.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString NON_HIDEABLE_BEATMAPSETS_FOUND = new EzLocalizationManager.EzLocalisableString("有 {0} 个谱包当前只剩最后一张可见 diff，无法继续隐藏。",
+                "There are {0} beatmap sets with only one visible difficulty remaining, so they cannot be hidden further.");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString DELETE_NON_HIDEABLE_BEATMAPSETS_CONFIRMATION = new EzLocalizationManager.EzLocalisableString(
+                "有 {0} 个谱包当前只剩最后一张可见 diff，无法隐藏。是否直接删除这些谱包？", "There are {0} beatmap sets with only one visible difficulty remaining, so they cannot be hidden. Delete those beatmap sets?");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString DELETED_NON_HIDEABLE_BEATMAPSETS =
+                new EzLocalizationManager.EzLocalisableString("已删除 {0} 个无法隐藏的谱包。", "Deleted {0} beatmap sets that could not be hidden.");
         }
     }
 }
