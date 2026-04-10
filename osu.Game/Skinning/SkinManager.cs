@@ -62,7 +62,7 @@ namespace osu.Game.Skinning
         private readonly IResourceStore<byte[]> userFiles;
 
         private Skin ezProSkin { get; }
-
+        private Skin sbiSkin { get; }
         private Skin argonSkin { get; }
 
         private Skin trianglesSkin { get; }
@@ -109,16 +109,36 @@ namespace osu.Game.Skinning
                 new ArgonProSkin(this),
                 new Ez2Skin(this),
                 ezProSkin = new EzStyleProSkin(this),
-                new SbISkin(this),
+                sbiSkin = new SbISkin(this),
             };
 
             // Ensure the default entries are present.
+            // 同时对部分内置皮肤（如 Ez/EzStylePro/SBI）做一次轻量同步，
+            // 在数据库中该条目为受保护（Protected）且未被用户变更时，
+            // 将代码中的 Name/InstantiationInfo 覆盖到 Realm 中以保持显示一致性。
             realm.Write(r =>
             {
                 foreach (var skin in defaultSkins)
                 {
-                    if (r.Find<SkinInfo>(skin.SkinInfo.ID) == null)
+                    var existing = r.Find<SkinInfo>(skin.SkinInfo.ID);
+
+                    if (existing == null)
+                    {
                         r.Add(skin.SkinInfo.Value);
+                        continue;
+                    }
+
+                    // 仅在条目仍为受保护（默认内置）时进行同步，避免覆盖用户修改的皮肤。
+                    if (!existing.Protected)
+                        continue;
+
+                    var codeInfo = skin.SkinInfo.Value;
+
+                    if (existing.Name != codeInfo.Name)
+                        existing.Name = codeInfo.Name;
+
+                    if (existing.InstantiationInfo != codeInfo.InstantiationInfo)
+                        existing.InstantiationInfo = codeInfo.InstantiationInfo;
                 }
             });
 
@@ -455,6 +475,13 @@ namespace osu.Game.Skinning
 
                 if (guid == SkinInfo.RETRO_SKIN)
                     skinInfo = retroSkin.SkinInfo;
+
+                // 此处为匹配皮肤换版的信息同步
+                if (guid == SkinInfo.EZ_STYLE_PRO_SKIN)
+                    skinInfo = ezProSkin.SkinInfo;
+
+                if (guid == SkinInfo.SBI_SKIN)
+                    skinInfo = sbiSkin.SkinInfo;
             }
 
             CurrentSkinInfo.Value = skinInfo ?? trianglesSkin.SkinInfo;
