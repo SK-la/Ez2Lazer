@@ -46,6 +46,12 @@ namespace osu.Game.EzOsuGame.Statistics
         private double minTime;
         private double timeRange;
 
+        // 用于绘制主图表的容器（位于左侧统计宽度 LeftMarginConst 的右侧）。
+        private Container graphContainer = null!;
+
+        // 左侧预留用于判定区间标签的容器。派生类可在 X = LeftMarginConst - labelAreaWidth 处创建并赋值给它以预留标签区域。
+        protected Container? LeftLabelContainer;
+
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
@@ -98,8 +104,8 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
-        /// Calculate V1 (Classic) accuracy. Subclasses should override CalculateV1ScoresManually instead of this method.
-        /// Sets V1Accuracy, V1Score, and V1Counts properties instead of returning values.
+        /// 计算 V1（Classic）准确率。子类应覆盖 CalculateV1ScoresManually 而不是此方法。
+        /// 将结果设置到 V1Accuracy、V1Score 和 V1Counts 属性，而不是通过返回值提供。
         /// </summary>
         protected virtual void CalculateV1Accuracy()
         {
@@ -133,11 +139,11 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
-        /// Recalculate the V1-style HitResult for a given <see cref="HitEvent"/>.
-        /// Subclasses may override to provide ruleset-specific V1 judgement logic (e.g. Mania's CustomHitWindowsHelper).
+        /// 为给定的 <see cref="HitEvent"/> 重新计算 V1 风格的 HitResult。
+        /// 子类可以覆写以提供规则集特定的 V1 判定逻辑（例如 Mania 的 CustomHitWindowsHelper）。
         /// </summary>
-        /// <param name="hitEvent">The hit event to recalculate for.</param>
-        /// <returns>The recalculated <see cref="HitResult"/> for V1 accuracy.</returns>
+        /// <param name="hitEvent">要重新计算的命中事件。</param>
+        /// <returns>用于 V1 准确率的重新计算后的 <see cref="HitResult"/>。</returns>
         protected virtual HitResult RecalculateV1Result(HitEvent hitEvent)
         {
             return HitWindows.ResultFor(hitEvent.TimeOffset);
@@ -149,8 +155,8 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
-        /// Calculate V2 accuracy. Subclasses can override to customize calculation.
-        /// Sets V2Accuracy, V2Score, and V2Counts properties instead of returning values.
+        /// 计算 V2 准确率。子类可覆写以定制计算逻辑。
+        /// 将结果设置到 V2Accuracy、V2Score 和 V2Counts 属性，而不是通过返回值提供。
         /// </summary>
         protected virtual void CalculateV2Accuracy()
         {
@@ -199,6 +205,20 @@ namespace osu.Game.EzOsuGame.Statistics
             CalculateV2Accuracy();
             UpdateText();
 
+            // 创建主图表专用容器，用于将绘图区域可靠地放在左侧固定宽度统计面板（LeftMarginConst）右侧。
+            graphContainer = new Container
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                Position = new Vector2(LeftMarginConst, 0),
+                Size = new Vector2(DrawWidth - LeftMarginConst - RightMarginConst, DrawHeight),
+                RelativeSizeAxes = Axes.None,
+                AutoSizeAxes = Axes.None,
+                Masking = false
+            };
+
+            AddInternal(graphContainer);
+
             foreach (HitResult result in Enum.GetValues(typeof(HitResult)).Cast<HitResult>().Where(r => r <= HitResult.Perfect && r >= HitResult.Meh))
             {
                 double boundary = UpdateBoundary(result);
@@ -216,26 +236,31 @@ namespace osu.Game.EzOsuGame.Statistics
         {
             var pointList = new List<(Vector2 pos, Color4 colour)>();
 
+            float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
+            float centerY = DrawHeight / 2f;
+
             foreach (var e in sortedHitEvents)
             {
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
                 float yPosition = (float)(e.TimeOffset + current_offset);
 
-                float x = (xPosition * (DrawWidth - LeftMarginConst - RightMarginConst)) - (DrawWidth / 2) + LeftMarginConst;
-                pointList.Add((new Vector2(x, yPosition), colours.ForHitResult(e.Result)));
+                float x = xPosition * availableWidth;
+                float y = centerY + yPosition;
+
+                pointList.Add((new Vector2(x, y), colours.ForHitResult(e.Result)));
             }
 
             if (pointList.Count > 0)
             {
                 var scorePoints = new GirdPoints
                 {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
+                    Anchor = Anchor.TopLeft,
+                    Origin = Anchor.TopLeft,
                 };
 
                 scorePoints.SetPoints(pointList);
-                AddInternal(scorePoints);
+                graphContainer.Add(scorePoints);
             }
         }
 
@@ -244,7 +269,7 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
-        /// Request the graph to recalculate and redraw. Safe to call from other threads (will schedule on update thread).
+        /// 请求图表重新计算并重绘。可安全从其他线程调用（会安排到更新线程）。
         /// </summary>
         protected void Refresh()
         {
@@ -261,6 +286,8 @@ namespace osu.Game.EzOsuGame.Statistics
             double currentHealth = 0.0;
             List<Vector2> healthPoints = new List<Vector2>();
 
+            float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
+
             foreach (var e in sortedHitEvents)
             {
                 var judgement = e.HitObject.CreateJudgement();
@@ -270,18 +297,18 @@ namespace osu.Game.EzOsuGame.Statistics
 
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
-                float x = (xPosition * (DrawWidth - LeftMarginConst - RightMarginConst)) - (DrawWidth / 2) + LeftMarginConst;
-                float y = (float)((1 - currentHealth) * DrawHeight - DrawHeight / 2);
+                float x = xPosition * availableWidth;
+                float y = (float)((1 - currentHealth) * DrawHeight);
 
                 healthPoints.Add(new Vector2(x, y));
             }
 
             if (healthPoints.Count > 1)
             {
-                AddInternal(new Path
+                graphContainer.Add(new Path
                 {
-                    Anchor = Anchor.CentreRight,
-                    Origin = Anchor.CentreRight,
+                    Anchor = Anchor.TopLeft,
+                    Origin = Anchor.TopLeft,
                     PathRadius = 1,
                     Colour = Color4.Red,
                     Alpha = 0.3f,
@@ -292,42 +319,59 @@ namespace osu.Game.EzOsuGame.Statistics
 
         private void drawBoundaryLine(double boundary, HitResult result)
         {
-            float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst + 20;
-            float relativeWidth = availableWidth / DrawWidth;
+            float centerY = DrawHeight / 2f;
 
-            AddInternal(new Box
+            // 背景中心线（表示 0 ms）
+            graphContainer.Add(new Box
             {
-                Anchor = Anchor.CentreRight,
-                Origin = Anchor.CentreRight,
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.CentreLeft,
                 RelativeSizeAxes = Axes.X,
                 Height = 1,
-                Width = relativeWidth,
+                Width = 1,
                 Alpha = 0.1f,
                 Colour = Color4.Gray,
+                Y = centerY
             });
 
-            AddInternal(new Box
+            // 有色判定边界线
+            graphContainer.Add(new Box
             {
-                Anchor = Anchor.CentreRight,
-                Origin = Anchor.CentreRight,
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.CentreLeft,
                 RelativeSizeAxes = Axes.X,
                 Height = 1,
-                Width = relativeWidth,
+                Width = 1,
                 Alpha = 0.1f,
                 Colour = colours.ForHitResult(result),
-                Y = (float)(boundary + current_offset),
+                Y = centerY + (float)(boundary + current_offset)
             });
 
-            AddInternal(new OsuSpriteText
+            // 在左侧标签区域绘制判定标签（优先使用 LeftLabelContainer）
+            var label = new OsuSpriteText
             {
                 Text = $"{boundary:+0.##;-0.##}",
-                Anchor = Anchor.CentreLeft,
-                Origin = Anchor.CentreRight,
                 Font = OsuFont.GetFont(size: 12),
                 Colour = Color4.White,
-                X = LeftMarginConst - 25,
-                Y = (float)(boundary + current_offset),
-            });
+                Y = centerY + (float)(boundary + current_offset),
+            };
+
+            if (LeftLabelContainer != null)
+            {
+                // 在预留标签区域右侧对齐，并使文字垂直中心与线中心对齐
+                label.Anchor = Anchor.TopRight;
+                label.Origin = Anchor.CentreRight;
+                label.X = -4;
+                LeftLabelContainer.Add(label);
+            }
+            else
+            {
+                // 没有预留标签区域则回退：在左侧统计区附近绘制，文字垂直居中对齐
+                label.Anchor = Anchor.TopLeft;
+                label.Origin = Anchor.CentreLeft;
+                label.X = LeftMarginConst - 25;
+                AddInternal(label);
+            }
         }
     }
 }
