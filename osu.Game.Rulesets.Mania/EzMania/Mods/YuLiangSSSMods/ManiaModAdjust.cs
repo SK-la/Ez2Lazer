@@ -116,33 +116,33 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                if (!ScoreMultiplierAdjust.IsDefault) yield return ("Score Multiplier", $"{ScoreMultiplierAdjust.Value:N3}");
+                if (!ScoreMultiplierAdjust.IsDefault) yield return (AdjustStrings.SCORE_MULTIPLIER_LABEL, $"{ScoreMultiplierAdjust.Value:N3}");
 
-                if (CustomHP.Value) yield return ("HP", $"{DrainRate.Value:N1}");
+                if (CustomHP.Value) yield return (AdjustStrings.HP_DRAIN_LABEL, $"{DrainRate.Value:N1}");
 
-                if (CustomOD.Value) yield return ("OD", $"{OverallDifficulty.Value:N1}");
+                if (CustomOD.Value) yield return (AdjustStrings.ADJUST_ACCURACY_LABEL, $"{OverallDifficulty.Value:N1}");
 
-                if (CustomRelease.Value) yield return ("Release Lenience", $"{ReleaseLenience.Value:N1}");
+                if (CustomRelease.Value) yield return (AdjustStrings.RELEASE_LENIENCE_LABEL, $"{ReleaseLenience.Value:N1}");
 
-                if (!SpeedChange.IsDefault) yield return ("Speed", $"{SpeedChange.Value:N3}");
+                if (!SpeedChange.IsDefault) yield return (EzCommonModStrings.SPEED_CHANGE_LABEL, $"{SpeedChange.Value:N3}");
 
-                if (AdjustPitch.Value) yield return ("Adjust Pitch", "On");
+                if (AdjustPitch.Value) yield return (EzCommonModStrings.ADJUST_PITCH_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (ConstantSpeed.Value) yield return ("Constant Speed", "On");
+                if (ConstantSpeed.Value) yield return (AdjustStrings.ADJUST_CONSTANT_SPEED_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (Mirror.Value) yield return ("Mirror", "On");
+                if (Mirror.Value) yield return (EzCommonModStrings.MIRROR_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (RandomMirror.Value) yield return ("Random Mirror", "On");
+                if (RandomMirror.Value) yield return (AdjustStrings.RANDOM_MIRROR_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (NoFail.Value) yield return ("No Fail", "On");
+                if (NoFail.Value) yield return (AdjustStrings.NO_FAIL_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (Restart.Value) yield return ("Restart", "On");
+                if (Restart.Value) yield return (AdjustStrings.RESTART_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (RandomSelect.Value) yield return ("Random", "On");
+                if (RandomSelect.Value) yield return (AdjustStrings.RANDOM_SELECT_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (TrueRandom.Value) yield return ("True Random", "On");
+                if (TrueRandom.Value) yield return (AdjustStrings.TRUE_RANDOM_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (Seed.Value is not null) yield return ("Seed", $"Seed {Seed.Value}");
+                if (Seed.Value is not null) yield return (EzCommonModStrings.SEED_LABEL, $"Seed {Seed.Value}");
 
                 if (CustomHitRange.Value)
                 {
@@ -156,12 +156,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
                 if (CustomProportionScore.Value)
                 {
-                    yield return ("Perfect", $"{Perfect.Value}");
-                    yield return ("Great", $"{Great.Value}");
-                    yield return ("Good", $"{Good.Value}");
-                    yield return ("Ok", $"{Ok.Value}");
-                    yield return ("Meh", $"{Meh.Value}");
-                    yield return ("Miss", $"{Miss.Value}");
+                    yield return (new EzLocalizationManager.EzLocalisableString("完美分值", "Perfect"), $"{Perfect.Value}");
+                    yield return (new EzLocalizationManager.EzLocalisableString("极佳分值", "Great"), $"{Great.Value}");
+                    yield return (new EzLocalizationManager.EzLocalisableString("良好分值", "Good"), $"{Good.Value}");
+                    yield return (new EzLocalizationManager.EzLocalisableString("一般分值", "Ok"), $"{Ok.Value}");
+                    yield return (new EzLocalizationManager.EzLocalisableString("凑数分值", "Meh"), $"{Meh.Value}");
+                    yield return (new EzLocalizationManager.EzLocalisableString("Miss 分值", "Miss"), $"{Miss.Value}");
                 }
             }
         }
@@ -578,7 +578,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public static class AdjustStrings
         {
-            public static readonly LocalisableString ADJUST_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("凉雨Mod一卡通", "Set your settings.");
+            public static readonly LocalisableString ADJUST_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("凉雨Mod一卡通", "LiangYu Mod — all-in-one mod pack (LiangYu Mod All-in-One)");
 
             public static readonly LocalisableString RANDOM_MIRROR_LABEL = new EzLocalizationManager.EzLocalisableString("随机镜像", "Random Mirror");
             public static readonly LocalisableString RANDOM_MIRROR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("随机决定是否镜像音符", "Random Mirror. Mirror or not mirror notes by random.");

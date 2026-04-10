@@ -71,24 +71,24 @@ namespace osu.Game.EzOsuGame.Screens
                 {
                     new SettingsSlider<double>
                     {
-                        LabelText = EzColumnStrings.MANIA_PSEUDO_3D_ROTATION,
-                        TooltipText = EzColumnStrings.MANIA_PSEUDO_3D_ROTATION_TOOLTIP,
+                        LabelText = EzColumnStrings.STAGE_DIAGONAL_LANE_ANGLE,
+                        TooltipText = EzColumnStrings.STAGE_DIAGONAL_LANE_ANGLE_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaPseudo3DRotation),
                         KeyboardStep = 1f,
                         DisplayAsPercentage = false
                     },
                     new SettingsSlider<double>
                     {
-                        LabelText = EzColumnStrings.STAGE_BACKGROUND_DIM,
-                        TooltipText = EzColumnStrings.STAGE_BACKGROUND_DIM_TOOLTIP,
+                        LabelText = EzColumnStrings.COLUMN_BACKGROUND_DIM,
+                        TooltipText = EzColumnStrings.COLUMN_BACKGROUND_DIM_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim),
                         KeyboardStep = 0.01f,
                         DisplayAsPercentage = true
                     },
                     new SettingsSlider<double>
                     {
-                        LabelText = EzColumnStrings.STAGE_BACKGROUND_BLUR,
-                        TooltipText = EzColumnStrings.STAGE_BACKGROUND_BLUR_TOOLTIP,
+                        LabelText = EzColumnStrings.COLUMN_BACKGROUND_BLUR,
+                        TooltipText = EzColumnStrings.COLUMN_BACKGROUND_BLUR_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur),
                         KeyboardStep = 0.01f,
                         DisplayAsPercentage = true

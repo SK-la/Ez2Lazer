@@ -47,8 +47,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Editor
                     },
                     new SettingsSlider<double>
                     {
-                        LabelText = EzSkinStrings.LN_TAIL_MASK_GRADIENT_HEIGHT,
-                        TooltipText = EzSkinStrings.LN_TAIL_MASK_GRADIENT_HEIGHT_TOOLTIP,
+                        LabelText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT,
+                        TooltipText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight),
                         KeyboardStep = 1.0f,
                     },

@@ -77,13 +77,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             get
             {
-                yield return ("Target Keys", $"{TargetKeys.Value}");
-                yield return ("Beat Speed", $"{BeatSpeed.Value}");
+                yield return (KrrN2NcStrings.KRR_N2N_TARGET_KEYS_LABEL, $"{TargetKeys.Value}");
+                yield return (KrrN2NcStrings.KRR_N2N_BEAT_SPEED_LABEL, $"{BeatSpeed.Value}");
 
                 if (Seed.Value is null)
-                    yield return ("Seed", "Null");
+                    yield return (EzCommonModStrings.SEED_LABEL, new EzLocalizationManager.EzLocalisableString("无", "Null"));
                 else
-                    yield return ("Seed", $"Seed {Seed.Value}");
+                    yield return (EzCommonModStrings.SEED_LABEL, $"Seed {Seed.Value}");
             }
         }
 

@@ -171,8 +171,8 @@ namespace osu.Game.EzOsuGame.Screens
                     },
                     new SettingsSlider<double>
                     {
-                        LabelText = EzSkinStrings.LN_TAIL_MASK_GRADIENT_HEIGHT,
-                        TooltipText = EzSkinStrings.LN_TAIL_MASK_GRADIENT_HEIGHT_TOOLTIP,
+                        LabelText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT,
+                        TooltipText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight),
                         KeyboardStep = 1.0f,
                     },
@@ -191,9 +191,9 @@ namespace osu.Game.EzOsuGame.Screens
                     },
                     refreshSkinButton = new SettingsButton
                     {
-                        Action = refreshSkin,
                         Text = EzSkinStrings.REFRESH_SAVE_SKIN,
-                        TooltipText = EzSkinStrings.REFRESH_SAVE_SKIN_TOOLTIP
+                        TooltipText = EzSkinStrings.REFRESH_SAVE_SKIN_TOOLTIP,
+                        Action = refreshSkin,
                     }
                 }
             };
@@ -205,8 +205,11 @@ namespace osu.Game.EzOsuGame.Screens
 
             nameOfNote.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.NoteSetName, e.NewValue));
             nameOfStage.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.StageName, e.NewValue));
-            nameOfGameTheme.BindValueChanged(e => ezSkinConfig.SetValue(Ez2Setting.GameThemeName, e.NewValue));
-            nameOfGameTheme.BindValueChanged(e => updateAllEzTextureNames(e.NewValue));
+            nameOfGameTheme.BindValueChanged(e =>
+            {
+                ezSkinConfig.SetValue(Ez2Setting.GameThemeName, e.NewValue);
+                updateAllEzTextureNames(e.NewValue);
+            });
         }
 
         #region Save按钮处理
@@ -307,19 +310,13 @@ namespace osu.Game.EzOsuGame.Screens
 
         protected override void Dispose(bool isDisposing)
         {
+            base.Dispose(isDisposing);
+
             if (isDisposing)
             {
-                nameOfNote.UnbindAll();
-                nameOfStage.UnbindAll();
-                nameOfGameTheme.UnbindAll();
-
-                refreshSkinButton.Action = null;
-
                 availableNoteSets.Clear();
                 availableStageSets.Clear();
             }
-
-            base.Dispose(isDisposing);
         }
     }
 }
