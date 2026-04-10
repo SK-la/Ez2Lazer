@@ -22,7 +22,6 @@ using osuTK.Graphics;
 
 namespace osu.Game.Skinning
 {
-    [Cached]
     public class EzStyleProSkin : Skin
     {
         public const int EZ_STYLE_PRO_SKIN_ID = 999;
@@ -30,7 +29,7 @@ namespace osu.Game.Skinning
         public static SkinInfo CreateInfo() => new SkinInfo
         {
             ID = Skinning.SkinInfo.EZ_STYLE_PRO_SKIN,
-            Name = "LA's \"Ez Style Pro\" Circle(2025)",
+            Name = "[Ez] \"Pro Style\" (2026)",
             Creator = "SK_la",
             Protected = true,
             InstantiationInfo = typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
@@ -55,24 +54,14 @@ namespace osu.Game.Skinning
 
         public override Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => Textures?.Get(componentName, wrapModeS, wrapModeT);
 
-        public override ISample? GetSample(ISampleInfo sampleInfo)
+        public override ISample GetSample(ISampleInfo sampleInfo)
         {
-            foreach (string lookup in sampleInfo.LookupNames)
-            {
-                var sample = Samples?.Get(lookup)
-                             ?? Resources.AudioManager?.Samples.Get(lookup.Replace(@"Gameplay/", @"Gameplay/Ez/"))
-                             ?? Resources.AudioManager?.Samples.Get(lookup);
-
-                if (sample != null)
-                    return sample;
-            }
-
-            return null;
+            string lookup = sampleInfo.LookupNames.FirstOrDefault() ?? "virtual";
+            return new SampleVirtual(lookup);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
         {
-            // Temporary until default skin has a valid hit lighting.
             if ((lookup as SkinnableSprite.SpriteComponentLookup)?.LookupName == @"lighting") return Drawable.Empty();
 
             switch (lookup)

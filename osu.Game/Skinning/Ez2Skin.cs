@@ -26,7 +26,7 @@ namespace osu.Game.Skinning
         public static SkinInfo CreateInfo() => new SkinInfo
         {
             ID = Skinning.SkinInfo.EZ2_SKIN,
-            Name = "LA's \"EzStyle\" Circle(2025)",
+            Name = "[Ez] \"Ez2Circle\" (2025)",
             Creator = "SK_la",
             Protected = true,
             InstantiationInfo = typeof(Ez2Skin).GetInvariantInstantiationInfo()
@@ -51,9 +51,10 @@ namespace osu.Game.Skinning
 
         public override Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => Textures?.Get(componentName, wrapModeS, wrapModeT);
 
-        public override ISample? GetSample(ISampleInfo sampleInfo)
+        public override ISample GetSample(ISampleInfo sampleInfo)
         {
-            return Resources.AudioManager?.Samples.Get("Gameplay/Ez/hit.wav");
+            string lookup = sampleInfo.LookupNames.FirstOrDefault() ?? "virtual";
+            return new SampleVirtual(lookup);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)

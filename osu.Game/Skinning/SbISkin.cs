@@ -25,7 +25,7 @@ namespace osu.Game.Skinning
         public static SkinInfo CreateInfo() => new SkinInfo
         {
             ID = Skinning.SkinInfo.SBI_SKIN,
-            Name = "LA's \"StrongBox \" for arisu(2025)",
+            Name = "[SBI] \"Strength Bond Intensity\" (2026)",
             Creator = "SK_la",
             Protected = true,
             InstantiationInfo = typeof(SbISkin).GetInvariantInstantiationInfo()
@@ -50,10 +50,12 @@ namespace osu.Game.Skinning
 
         public override Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => Textures?.Get(componentName, wrapModeS, wrapModeT);
 
-        public override ISample? GetSample(ISampleInfo sampleInfo)
+        public override ISample GetSample(ISampleInfo sampleInfo)
         {
-            var sample = Samples?.Get("Gameplay/Ez/nil.wav");
-            return sample;
+            // 返回一个“虚拟”样本（静音）以表明皮肤提供了该音效，阻止框架回退到内置音效。
+            // 使用首个 lookup 名称作为样本名（若无则使用 "virtual"）。
+            string lookup = sampleInfo.LookupNames.FirstOrDefault() ?? "virtual";
+            return new SampleVirtual(lookup);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
