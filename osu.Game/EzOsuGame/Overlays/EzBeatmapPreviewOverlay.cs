@@ -15,18 +15,14 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
-using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets;
-using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.UI;
 using osu.Game.Skinning;
 using osuTK;
@@ -40,7 +36,6 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float panel_width_ratio = 0.54f;
         private const float panel_right_margin = 20;
         private const float default_panel_height = 340;
-        private const float default_panel_min_width = 520;
         private const float min_panel_width = 360;
         private const float max_panel_width = 800;
         private const float min_panel_height = 180;
@@ -55,9 +50,9 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private const float dynamic_preview_duration = 10000;
         private const float dynamic_preview_repeat_delay = 500;
-        private const int selection_load_debounce = 180;
+        private const int change_debounce = 50;
 
-        private static bool rememberedExpanded;
+        // private static bool rememberedExpanded;
 
         private static readonly EzBeatmapPreviewMode[] shared_preview_modes =
         {
@@ -75,8 +70,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private readonly StopwatchClock previewClock = new StopwatchClock();
         private readonly FramedClock framedPreviewClock;
-        private readonly BindableBool expandedBindable = new BindableBool();
-        private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>(EzBeatmapPreviewMode.Static);
+        private readonly Bindable<EzBeatmapPreviewMode> previewMode = new Bindable<EzBeatmapPreviewMode>();
 
         private readonly Container panelContainer;
         private readonly Container stageViewport;
@@ -90,7 +84,6 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Box topResizeHandle;
         private readonly Box rightResizeHandle;
 
-        private bool expanded;
         private bool heightResizeActive;
         private bool widthResizeActive;
         private bool panelWidthManuallyAdjusted;
@@ -119,29 +112,28 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private CancellationTokenSource? previewLoadCancellation;
         private ScheduledDelegate? scheduledSelectionLoad;
-        private Drawable? currentPreviewRoot;
         private Drawable? pendingPreviewRoot;
         private DrawableRuleset? drawableRuleset;
 
-        [Resolved]
-        private EzAnalysisCache? ezAnalysisCache { get; set; }
+        [Resolved(CanBeNull = true)]
+        private ISkin? skin { get; set; }
 
-        private IWorkingBeatmap? currentWorkingBeatmap;
+        private IBeatmap? playableBeatmap;
         private RulesetInfo? currentRuleset;
-        private IReadOnlyList<Mod> currentMods = Array.Empty<Mod>();
+
         private bool selectionLoadInProgress;
-
-        private IBeatmap? injectedPlayableBeatmap;
-
         private long selectionEventVersion;
         private int currentRulesetOnlineId = -1;
         private string currentBeatmapHash = string.Empty;
-        private int previewLoadedCount;
-        private int previewReleasedCount;
+
+        // 指示在隐藏时是否应立即释放所有引用（默认 true：隐藏即释放）。
+        private bool releaseOnHide = true;
 
         private bool dynamicMode => previewMode.Value == EzBeatmapPreviewMode.Dynamic;
 
-        public IBindable<bool> ExpandedState => expandedBindable;
+        private bool expanded;
+
+        public readonly Bindable<bool> ExpandedState = new Bindable<bool>();
 
         public Func<float>? DefaultPanelRightEdgeInScreenSpace { get; set; }
 
@@ -175,7 +167,7 @@ namespace osu.Game.EzOsuGame.Overlays
                             },
                             loadTimeText = new OsuSpriteText
                             {
-                                Text = "加载: 0ms",
+                                Text = "Load Time: 0ms",
                                 Font = OsuFont.Default.With(size: 12, weight: FontWeight.SemiBold),
                                 Colour = Color4.CornflowerBlue,
                                 Anchor = Anchor.TopRight,
@@ -229,7 +221,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                                 Origin = Anchor.Centre,
                                                 Font = OsuFont.Default.With(size: 20, weight: FontWeight.SemiBold),
                                                 Colour = Color4.White,
-                                                Text = "预览未加载"
+                                                Text = "No Load"
                                             }
                                         }
                                     }
@@ -300,6 +292,8 @@ namespace osu.Game.EzOsuGame.Overlays
             timeline.OnCommit = time => seekTo(time, dynamicMode);
 
             createPreviewModeButtons();
+            // 初始化对外可观察的展开状态
+            ExpandedState.Value = expanded;
             updatePreviewModeButtons();
         }
 
@@ -318,20 +312,20 @@ namespace osu.Game.EzOsuGame.Overlays
         public void Toggle()
         {
             if (expanded)
-                Collapse();
+                collapse();
             else
-                Expand();
+                expand();
         }
 
-        public void Expand()
+        private void expand()
         {
             if (expanded)
                 return;
 
             expanded = true;
-            expandedBindable.Value = true;
+            ExpandedState.Value = true;
 
-            if (drawableRuleset == null && currentWorkingBeatmap != null && currentRuleset != null)
+            if (drawableRuleset == null && playableBeatmap != null && currentRuleset != null)
                 selectionDirty = true;
 
             panelContainer.ClearTransforms();
@@ -343,13 +337,13 @@ namespace osu.Game.EzOsuGame.Overlays
                 scheduleSelectionLoad();
         }
 
-        public void Collapse()
+        private void collapse()
         {
             if (!expanded)
                 return;
 
             expanded = false;
-            expandedBindable.Value = false;
+            ExpandedState.Value = false;
             heightResizeActive = false;
             widthResizeActive = false;
             selectionLoadInProgress = false;
@@ -357,42 +351,57 @@ namespace osu.Game.EzOsuGame.Overlays
             previewClock.Stop();
             cancelScheduledSelectionLoad();
             cancelPendingLoad();
-
-            // Clean up resources
             disposePreviewResources();
-            selectionDirty = currentWorkingBeatmap != null && currentRuleset != null;
-            setStateText("预览未加载");
+
+            if (releaseOnHide)
+            {
+                // 立即释放对谱面/规则集等的大对象引用，降低内存占用。
+                playableBeatmap = null;
+                currentRuleset = null;
+                currentRulesetOnlineId = -1;
+                currentBeatmapHash = string.Empty;
+                selectionDirty = false;
+            }
+            else
+            {
+                selectionDirty = playableBeatmap != null && currentRuleset != null;
+            }
+
+            setStateText("No Load");
 
             panelContainer.ClearTransforms();
             panelContainer.FadeOut(160, Easing.OutQuint);
             panelContainer.MoveToY(14, 160, Easing.OutQuint);
         }
 
-        public void UpdateSelection(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, bool forceReload = false)
+        /// <summary>
+        /// 更新数据
+        /// </summary>
+        /// <param name="playableBeatmap">传入mod转换结果</param>
+        /// <param name="ruleset">用于判断预览开始时间</param>
+        /// <param name="forceReload">强制刷新，附注mod设置变化时的判断</param>
+        public void UpdateSelection(IBeatmap? playableBeatmap, RulesetInfo ruleset, bool forceReload = false)
         {
-            if (workingBeatmap.BeatmapInfo == null)
+            if (playableBeatmap == null)
                 return;
 
-            string beatmapHash = workingBeatmap.BeatmapInfo.Hash;
-            bool unchanged = !forceReload
-                             && currentRulesetOnlineId == ruleset.OnlineID
-                             && currentBeatmapHash == beatmapHash
-                             && currentMods.SequenceEqual(mods);
+            this.playableBeatmap = playableBeatmap;
+            string beatmapHash = playableBeatmap.BeatmapInfo.Hash;
+            bool beatmapSame = currentRulesetOnlineId == ruleset.OnlineID && currentBeatmapHash == beatmapHash;
 
-            currentWorkingBeatmap = workingBeatmap;
+            bool unchanged = !forceReload && beatmapSame;
+
             currentRuleset = ruleset;
-            currentMods = mods.ToArray();
             updatePreviewModeButtons();
 
             if (unchanged)
             {
-                if (drawableRuleset == null)
-                {
-                    selectionDirty = true;
+                if (drawableRuleset != null) return;
 
-                    if (expanded)
-                        scheduleSelectionLoad();
-                }
+                selectionDirty = true;
+
+                if (expanded)
+                    scheduleSelectionLoad();
 
                 return;
             }
@@ -407,17 +416,17 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!expanded)
                 return;
 
-            scheduleSelectionLoad();
-        }
-
-        /// <summary>
-        /// Update selection with a precomputed playable beatmap. The overlay will prefer using
-        /// <paramref name="playableBeatmap"/> when loading the preview to avoid doing conversion on the overlay side.
-        /// </summary>
-        public void UpdateSelection(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, IBeatmap? playableBeatmap, bool forceReload = false)
-        {
-            injectedPlayableBeatmap = playableBeatmap;
-            UpdateSelection(workingBeatmap, ruleset, mods, forceReload);
+            // 对于切换谱面（beatmap 改变）立即取消当前加载并立刻加载；仅 mods 更改仍使用去抖。
+            if (!beatmapSame)
+            {
+                cancelScheduledSelectionLoad();
+                cancelPendingLoad();
+                loadPendingSelection(selectionEventVersion);
+            }
+            else
+            {
+                scheduleSelectionLoad();
+            }
         }
 
         public void SuspendForScreenExit()
@@ -427,37 +436,31 @@ namespace osu.Game.EzOsuGame.Overlays
             cancelPendingLoad();
 
             disposePreviewResources();
-            currentWorkingBeatmap = null;
+            // 立即释放所有引用，避免切换屏幕时占用内存。
+            playableBeatmap = null;
             currentRuleset = null;
-            currentMods = Array.Empty<Mod>();
             selectionDirty = false;
             currentRulesetOnlineId = -1;
             currentBeatmapHash = string.Empty;
             updatePreviewModeButtons();
 
-            rememberedExpanded = expanded;
+            // rememberedExpanded = expanded;
         }
 
-        public void RestoreRememberedState()
-        {
-            if (rememberedExpanded)
-                Expand();
-            else
-                Collapse();
-
-            updatePreviewModeButtons();
-        }
+        // public void RestoreRememberedState()
+        // {
+        //     if (rememberedExpanded)
+        //         expand();
+        //     else
+        //         collapse();
+        //
+        //     updatePreviewModeButtons();
+        // }
 
         private void beginLoadPendingSelectionIfRequired()
         {
             if (!expanded || selectionLoadInProgress || !selectionDirty)
                 return;
-
-            if (Time.Current - lastSelectionEventTime < selection_load_debounce)
-            {
-                scheduleSelectionLoad();
-                return;
-            }
 
             loadPendingSelection(selectionEventVersion);
         }
@@ -469,7 +472,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!expanded)
                 return;
 
-            scheduledSelectionLoad = Scheduler.AddDelayed(beginLoadPendingSelectionIfRequired, selection_load_debounce);
+            beginLoadPendingSelectionIfRequired();
         }
 
         private void cancelScheduledSelectionLoad()
@@ -483,7 +486,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (eventVersion != selectionEventVersion)
                 return;
 
-            if (currentWorkingBeatmap == null || currentRuleset == null || currentWorkingBeatmap.BeatmapInfo == null)
+            if (playableBeatmap == null || currentRuleset == null)
                 return;
 
             selectionLoadInProgress = true;
@@ -491,15 +494,19 @@ namespace osu.Game.EzOsuGame.Overlays
             selectionDirty = false;
             lastLoadTimeMs = 0;
 
-            setStateText("loading...");
+            // 立即释放旧的预览资源，防止在切换谱面时短暂显示旧画面或跳转。
+            disposePreviewResources();
+            previewClock.Stop();
+            updateProgressDisplay(0);
 
             cancelPendingLoad();
             previewLoadCancellation = new CancellationTokenSource();
             var token = previewLoadCancellation.Token;
 
-            var workingBeatmap = currentWorkingBeatmap;
             var ruleset = currentRuleset;
-            var mods = currentMods;
+
+            // local copy to avoid capturing mutable/large fields in the task closure
+            var localPlayable = playableBeatmap;
 
             double loadStartTime = lastSelectionEventTime > 0 ? lastSelectionEventTime : Time.Current;
 
@@ -507,35 +514,13 @@ namespace osu.Game.EzOsuGame.Overlays
             {
                 token.ThrowIfCancellationRequested();
 
-                // Prefer an externally-injected playable beatmap if available to avoid performing
-                // conversion (which may be thread-affine) on the overlay side.
-                IBeatmap? playableBeatmap = injectedPlayableBeatmap;
-
-                if (playableBeatmap != null)
-                {
-                    // Clear the injection so it isn't reused accidentally.
-                    injectedPlayableBeatmap = null;
-                }
-                else
-                {
-                    playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset, mods, token);
-                }
-
-                token.ThrowIfCancellationRequested();
-
-                if (playableBeatmap == null)
+                if (localPlayable == null)
                     return null;
 
-                var objects = playableBeatmap.HitObjects;
+                double maxTime = localPlayable.BeatmapInfo.Length;
+                double startTime = computeDefaultStartTime(localPlayable, ruleset!, 0);
 
-                if (objects.Count == 0)
-                    return new LoadedPreviewData(eventVersion, workingBeatmap, ruleset, playableBeatmap, 0, 0, 0);
-
-                double minTime = objects.First().StartTime;
-                double maxTime = objects.Max(o => o.GetEndTime());
-                double startTime = computeDefaultStartTime(workingBeatmap, ruleset, mods, playableBeatmap, minTime, token);
-
-                return new LoadedPreviewData(eventVersion, workingBeatmap, ruleset, playableBeatmap, startTime, minTime, maxTime);
+                return new LoadedPreviewData(eventVersion, localPlayable, ruleset!, startTime, 0, maxTime);
             }, token).ContinueWith(task =>
             {
                 Schedule(() =>
@@ -576,7 +561,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     beatmapMaxTime = Math.Max(result.Value.MaxTime, beatmapMinTime + 1);
                     playbackStartTime = result.Value.StartTime;
 
-                    setupDrawableRulesetAsync(result.Value.Version, result.Value.WorkingBeatmap, result.Value.RulesetInfo, result.Value.PlayableBeatmap, token);
+                    setupDrawableRulesetAsync(result.Value.Version, result.Value.PlayableBeatmap, result.Value.RulesetInfo, token);
 
                     previewClock.Stop();
                     previewClock.Seek(playbackStartTime);
@@ -600,7 +585,7 @@ namespace osu.Game.EzOsuGame.Overlays
             selectionLoadInProgress = false;
 
             if (selectionDirty)
-                scheduleSelectionLoad();
+                beginLoadPendingSelectionIfRequired();
         }
 
         protected override void Update()
@@ -803,7 +788,9 @@ namespace osu.Game.EzOsuGame.Overlays
                 cancelScheduledSelectionLoad();
                 cancelPendingLoad();
                 disposePreviewResources();
-                currentWorkingBeatmap = null;
+
+                // 清理所有引用
+                playableBeatmap = null;
                 currentRuleset = null;
                 previewMode.UnbindAll();
             }
@@ -816,7 +803,7 @@ namespace osu.Game.EzOsuGame.Overlays
             previewLoadCancellation = null;
         }
 
-        private void setupDrawableRulesetAsync(long eventVersion, IWorkingBeatmap workingBeatmap, RulesetInfo rulesetInfo, IBeatmap playableBeatmap, CancellationToken cancellationToken)
+        private void setupDrawableRulesetAsync(long eventVersion, IBeatmap playableBeatmap, RulesetInfo rulesetInfo, CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested || eventVersion != selectionEventVersion || !expanded)
                 return;
@@ -831,7 +818,7 @@ namespace osu.Game.EzOsuGame.Overlays
             newDrawableRuleset.FrameStablePlayback = false;
             newDrawableRuleset.Playfield.DisplayJudgements.Value = false;
 
-            var previewContainer = new RulesetSkinProvidingContainer(ruleset, playableBeatmap, workingBeatmap.Skin)
+            pendingPreviewRoot = new RulesetSkinProvidingContainer(ruleset, playableBeatmap, skin)
             {
                 RelativeSizeAxes = Axes.Both,
                 Child = new NonInteractivePreviewContainer
@@ -841,18 +828,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 }
             };
 
-            pendingPreviewRoot = previewContainer;
-
-            cancellationToken.Register(() => Schedule(() =>
-            {
-                if (!ReferenceEquals(pendingPreviewRoot, previewContainer))
-                    return;
-
-                pendingPreviewRoot = null;
-                previewContainer.Dispose();
-            }));
-
-            LoadComponentAsync(previewContainer, loaded =>
+            LoadComponentAsync(pendingPreviewRoot, loaded =>
             {
                 if (ReferenceEquals(pendingPreviewRoot, loaded))
                     pendingPreviewRoot = null;
@@ -863,20 +839,8 @@ namespace osu.Game.EzOsuGame.Overlays
                     return;
                 }
 
-                var previousPreviewRoot = currentPreviewRoot;
-
                 stageScaleContainer.Child = loaded;
-                currentPreviewRoot = loaded;
                 drawableRuleset = newDrawableRuleset;
-
-                if (previousPreviewRoot != null)
-                {
-                    previewReleasedCount++;
-                    logPreviewLoadReleaseStats("released");
-                }
-
-                previewLoadedCount++;
-                logPreviewLoadReleaseStats("loaded");
             }, cancellationToken);
         }
 
@@ -957,12 +921,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void disposePreviewResources()
         {
-            if (currentPreviewRoot != null)
-            {
-                previewReleasedCount++;
-                logPreviewLoadReleaseStats("released");
-            }
-
+            // First, clear the visual container (this disposes children on the update thread).
             if (stageScaleContainer.Count > 0)
             {
                 if (!IsLoaded)
@@ -971,7 +930,6 @@ namespace osu.Game.EzOsuGame.Overlays
                     Schedule(() => stageScaleContainer.Clear(true));
             }
 
-            currentPreviewRoot = null;
             drawableRuleset = null;
         }
 
@@ -996,97 +954,45 @@ namespace osu.Game.EzOsuGame.Overlays
         private bool isWithinHeightResizeHandle(Vector2 screenSpacePosition)
             => topResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
 
-        private void logPreviewLoadReleaseStats(string action)
+        private double computeDefaultStartTime(IBeatmap playableBeatmap, RulesetInfo ruleset, double fallback)
         {
-            int activePreviewCount = previewLoadedCount - previewReleasedCount;
-            Logger.Log($"[BeatmapPreview] action={action}, loaded={previewLoadedCount}, released={previewReleasedCount}, active={activePreviewCount}, expanded={expanded}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-        }
-
-        private double computeDefaultStartTime(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, IBeatmap playableBeatmap, double fallback,
-                                               CancellationToken cancellationToken)
-        {
-            var kpsData = getPreviewKpsData(workingBeatmap, ruleset, mods, playableBeatmap, cancellationToken);
-
-            if (kpsData.Values.Count == 0)
-                return fallback;
-
-            double anchorTime = getPreviewKpsAnchorTime(playableBeatmap, kpsData);
-            return Math.Max(fallback, anchorTime - 1000);
-        }
-
-        private PreviewKpsData getPreviewKpsData(IWorkingBeatmap workingBeatmap, RulesetInfo ruleset, IReadOnlyList<Mod> mods, IBeatmap playableBeatmap,
-                                                 CancellationToken cancellationToken)
-        {
-            if (ezAnalysisCache != null && workingBeatmap.BeatmapInfo != null)
+            // Mania 模式使用谱面 Metadata.PreviewTime 作为预览起点（无效时回退到 fallback）。
+            if (ruleset.OnlineID == 3)
             {
-                try
-                {
-                    var analysis = ezAnalysisCache.GetAnalysisAsync(workingBeatmap.BeatmapInfo, ruleset, mods, cancellationToken).GetAwaiter().GetResult();
+                int previewTime = playableBeatmap.Metadata.PreviewTime;
+                if (previewTime <= 0)
+                    return fallback;
 
-                    if (analysis?.KpsList is { Count: > 0 } storedKpsList)
-                        return new PreviewKpsData(storedKpsList, PreviewKpsSource.Analysis);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch
-                {
-                    // 回退到本地快速计算。
-                }
+                return previewTime;
             }
 
-            var (_, _, coarseKpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(playableBeatmap, buckets: 64);
-            return new PreviewKpsData(coarseKpsList, PreviewKpsSource.Coarse);
+            // 非 mania 模式：使用谱面 Kiai 起点作为预览时间，若无 Kiai 则使用第一个 HitObject 的起始时间，仍无则回退到 fallback。
+            double kiaiStart = getKiaiStartTime(playableBeatmap);
+            if (!double.IsNaN(kiaiStart))
+                return kiaiStart;
+
+            return fallback;
         }
 
-        private static double getPreviewKpsAnchorTime(IBeatmap beatmap, PreviewKpsData kpsData)
+        private static double getKiaiStartTime(IBeatmap beatmap)
         {
-            if (kpsData.Values.Count == 0 || beatmap.HitObjects.Count == 0)
-                return 0;
-
-            int maxIndex = 0;
-            double maxValue = kpsData.Values[0];
-
-            for (int i = 1; i < kpsData.Values.Count; i++)
+            try
             {
-                if (kpsData.Values[i] > maxValue)
+                var cp = beatmap.ControlPointInfo;
+
+                // EffectPoints typically ordered by time; find first with Kiai enabled.
+                foreach (var e in cp.EffectPoints)
                 {
-                    maxValue = kpsData.Values[i];
-                    maxIndex = i;
+                    if (e.KiaiMode)
+                        return e.Time;
                 }
             }
-
-            double songStart = beatmap.HitObjects[0].StartTime;
-            double songEnd = beatmap.HitObjects[^1].StartTime;
-
-            if (kpsData.Source == PreviewKpsSource.Analysis)
+            catch
             {
-                double bpm = beatmap.BeatmapInfo.BPM;
-                double interval = 240000.0 / bpm;
-                double estimatedIntervals = (songEnd / interval) + 1;
-
-                if (estimatedIntervals > OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS)
-                {
-                    int lastIndex = (int)estimatedIntervals - 1;
-                    int sampledIndex = (int)((long)maxIndex * lastIndex / (OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS - 1));
-                    return sampledIndex * interval;
-                }
-
-                return maxIndex * interval;
+                // If any API differs, fall back silently.
             }
 
-            double duration = Math.Max(1, songEnd - songStart);
-            double bucketDuration = duration / kpsData.Values.Count;
-            return songStart + (maxIndex + 1) * bucketDuration;
-        }
-
-        private readonly record struct PreviewKpsData(IReadOnlyList<double> Values, PreviewKpsSource Source);
-
-        private enum PreviewKpsSource
-        {
-            Analysis,
-            Coarse,
+            return double.NaN;
         }
 
         private static string formatTime(double time)
@@ -1165,9 +1071,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private readonly record struct LoadedPreviewData(
             long Version,
-            IWorkingBeatmap WorkingBeatmap,
-            RulesetInfo RulesetInfo,
             IBeatmap PlayableBeatmap,
+            RulesetInfo RulesetInfo,
             double StartTime,
             double MinTime,
             double MaxTime);

@@ -129,7 +129,6 @@ namespace osu.Game.Screens.Select
         private SkinnableContainer skinnableContent = null!;
 
         private GridContainer mainGridContainer = null!;
-        private EzBeatmapPreviewOverlay ezBeatmapPreviewOverlay = null!;
 
         private NoResultsPlaceholder noResultsPlaceholder = null!;
 
@@ -174,8 +173,9 @@ namespace osu.Game.Screens.Select
         private Bindable<bool> showConvertedBeatmaps = null!;
         private Bindable<KeySoundPreviewMode> keySoundPreview = null!;
         private EzPreviewTrackManager ezPreviewManager = null!;
-        private ModSettingChangeTracker? previewOverlayModSettingTracker;
 
+        private EzBeatmapPreviewOverlay ezBeatmapPreviewOverlay = null!;
+        private ModSettingChangeTracker? previewOverlayModSettingTracker;
         private CancellationTokenSource? previewPlayableCancellation;
 
         private IDisposable? modSelectOverlayRegistration;
@@ -400,7 +400,6 @@ namespace osu.Game.Screens.Select
             new FooterButtonEzPreView(
                 () =>
                 {
-                    // Toggle first so UpdateSelection can decide whether to prepare a playable.
                     ezBeatmapPreviewOverlay.Toggle();
                     updateBeatmapPreviewSelection();
                 },
@@ -723,7 +722,7 @@ namespace osu.Game.Screens.Select
             this.FadeIn(fade_duration, Easing.OutQuint);
             onArrivingAtScreen();
 
-            // Refetch required here to ensure selection is still valid after potential external changes (deletion, hiding, etc.)
+            // 保持原样
             ensureGlobalBeatmapValid(refetch: true);
 
             detailsArea.Refresh();
@@ -788,10 +787,10 @@ namespace osu.Game.Screens.Select
             }
 
             Beatmap.BindValueChanged(updateVariousState, true);
-            Ruleset.BindValueChanged(updateBeatmapPreviewSelection, true);
-            Mods.BindValueChanged(updatePreviewSelectionFromModsChange, true);
+            Ruleset.BindValueChanged(updateBeatmapPreviewSelection);
+            Mods.BindValueChanged(updatePreviewSelectionFromModsChange);
 
-            ezBeatmapPreviewOverlay.RestoreRememberedState();
+            // ezBeatmapPreviewOverlay.RestoreRememberedState();
         }
 
         private void updateVariousState(ValueChangedEvent<WorkingBeatmap> e)
@@ -831,14 +830,9 @@ namespace osu.Game.Screens.Select
             if (!this.IsCurrentScreen())
                 return;
 
-            // If overlay is not expanded, do a simple update without preparing a playable.
             if (!ezBeatmapPreviewOverlay.ExpandedState.Value)
-            {
-                ezBeatmapPreviewOverlay.UpdateSelection(Beatmap.Value, Ruleset.Value, Mods.Value, forceReload);
                 return;
-            }
 
-            // Cancel any previous preparation work.
             previewPlayableCancellation?.Cancel();
             previewPlayableCancellation?.Dispose();
             previewPlayableCancellation = new CancellationTokenSource();
@@ -846,38 +840,20 @@ namespace osu.Game.Screens.Select
 
             var workingBeatmap = Beatmap.Value;
             var ruleset = Ruleset.Value;
-            var mods = Mods.Value;
 
-            // Try to prepare playable on a background thread. If that fails due to thread-affinity, fall back to main-thread conversion.
             Task.Run(() =>
             {
                 try
                 {
-                    var playable = workingBeatmap.GetPlayableBeatmap(ruleset, mods, token);
                     if (token.IsCancellationRequested) return;
 
-                    Schedule(() => ezBeatmapPreviewOverlay.UpdateSelection(workingBeatmap, ruleset, mods, playable, forceReload));
+                    var playable = workingBeatmap.GetPlayableBeatmap(ruleset, Mods.Value, token);
+
+                    Schedule(() => ezBeatmapPreviewOverlay.UpdateSelection(playable, ruleset, forceReload));
                 }
                 catch (OperationCanceledException)
                 {
                     // ignore
-                }
-                catch
-                {
-                    // fallback to main thread
-                    Schedule(() =>
-                    {
-                        try
-                        {
-                            var playableMain = workingBeatmap.GetPlayableBeatmap(ruleset, mods);
-                            ezBeatmapPreviewOverlay.UpdateSelection(workingBeatmap, ruleset, mods, playableMain, forceReload);
-                        }
-                        catch
-                        {
-                            // as last resort, update without a playable.
-                            ezBeatmapPreviewOverlay.UpdateSelection(workingBeatmap, ruleset, mods, forceReload);
-                        }
-                    });
                 }
             }, token);
         }
@@ -886,7 +862,7 @@ namespace osu.Game.Screens.Select
         {
             restoreBackground();
 
-            if (manageCollectionsDialog?.FilteredBeatmapsProvider == getFilteredBeatmaps)
+            if (manageCollectionsDialog != null)
                 manageCollectionsDialog.FilteredBeatmapsProvider = null;
 
             ezBeatmapPreviewOverlay.SuspendForScreenExit();
