@@ -14,12 +14,14 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
+using osu.Framework.Logging;
+using osu.Framework.Threading;
+using osu.Game.Beatmaps.Legacy;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
-using osu.Game.Beatmaps.Legacy;
-using osu.Game.Extensions;
+using osu.Game.Storyboards;
 using osuTK;
 
 namespace osu.Game.Screens.Select
@@ -37,6 +39,32 @@ namespace osu.Game.Screens.Select
 
         private readonly FillFlowContainer tagFlow;
 
+        private ScheduledDelegate? scheduledTagUpdate;
+
+        private WorkingBeatmap? working;
+
+        public WorkingBeatmap? Working
+        {
+            get => working;
+            set
+            {
+                if (working == value)
+                    return;
+
+                working = value;
+
+                // 当外部传入 WorkingBeatmap 时触发订阅更新（尽量快速生效）
+                scheduledTagUpdate?.Cancel();
+                scheduledTagUpdate = Scheduler.AddDelayed(() =>
+                {
+                    if (!IsAlive) return;
+
+                    updateSubscription();
+                    scheduledTagUpdate = null;
+                }, 0);
+            }
+        }
+
         private BeatmapInfo? beatmap;
 
         public BeatmapInfo? Beatmap
@@ -44,14 +72,28 @@ namespace osu.Game.Screens.Select
             get => beatmap;
             set
             {
+                if (beatmap == null && value == null)
+                    return;
+
                 beatmap = value;
 
+                // 取消上一次的防抖计划（若有），并在短延迟后执行订阅更新以减少滚动时的开销
+                scheduledTagUpdate?.Cancel();
+                scheduledTagUpdate = null;
+
                 if (IsLoaded)
-                    updateSubscription();
+                {
+                    scheduledTagUpdate = Scheduler.AddDelayed(() =>
+                    {
+                        updateSubscription();
+                        scheduledTagUpdate = null;
+                    }, 50);
+                }
             }
         }
 
-        private bool tagDisplayEnabled => true;
+        // 直读故事版基本也不会有显著的内存问题。尽管AI在内存分析问题中，总是乱猜测说这样可能存在问题。
+        private bool useSbFallBack => true;
 
         [Resolved]
         private BeatmapManager beatmaps { get; set; } = null!;
@@ -75,11 +117,8 @@ namespace osu.Game.Screens.Select
 
         private void updateSubscription()
         {
-            if (!tagDisplayEnabled)
-            {
-                tagFlow.Clear();
+            if (beatmap == null && working == null)
                 return;
-            }
 
             updateTags();
         }
@@ -88,9 +127,13 @@ namespace osu.Game.Screens.Select
         {
             tagFlow.Clear();
 
-            if (beatmap?.BeatmapSet == null)
+            beatmap ??= working?.BeatmapInfo;
+
+            if (beatmap == null)
                 return;
 
+            // 先准备数据，统一全部释放，之后更新UI.
+            var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
             var tagInfo = getTagInfo(beatmap);
 
             if (tagInfo.HasVideo)
@@ -99,9 +142,6 @@ namespace osu.Game.Screens.Select
             if (tagInfo.HasStoryboard)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard));
 
-            // 添加用户标签（不受图标数量影响）
-            var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
-
             foreach (string tag in userTags)
             {
                 tagFlow.Add(new SimpleTag(tag)
@@ -109,22 +149,29 @@ namespace osu.Game.Screens.Select
                     Action = () => songSelect?.Search($@"tag=""{tag}""!"),
                 });
             }
-
-            // 如果没有任何标签，显示提示
-            // if (!tagFlow.Any())
-            // {
-            //     tagFlow.Add(new SimpleTag("No tags") { Alpha = 0.5f });
-            // }
         }
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-                beatmap = null;
-
             base.Dispose(isDisposing);
+
+            if (isDisposing)
+            {
+                // 取消防抖计划，避免延迟任务在组件已卸载时执行
+                scheduledTagUpdate?.Cancel();
+                scheduledTagUpdate = null;
+
+                beatmap = null;
+                working = null;
+
+                lock (tag_info_cache_lock)
+                {
+                    tag_info_cache.Clear();
+                }
+            }
         }
 
+        // TODO：故事版和背景识别不出来
         private CachedTagInfo getTagInfo(BeatmapInfo beatmapInfo)
         {
             lock (tag_info_cache_lock)
@@ -143,97 +190,93 @@ namespace osu.Game.Screens.Select
 
         private CachedTagInfo detectTagInfo(BeatmapInfo beatmapInfo)
         {
-            var beatmapSet = beatmapInfo.BeatmapSet;
-
-            if (beatmapSet == null || string.IsNullOrEmpty(beatmapInfo.Path))
-                return new CachedTagInfo(beatmapInfo.Hash, false, false);
-
-            string? beatmapFilePath = beatmapSet.GetPathForFile(beatmapInfo.Path);
-
-            if (string.IsNullOrEmpty(beatmapFilePath))
-                return new CachedTagInfo(beatmapInfo.Hash, false, false);
-
             bool hasVideo = false;
             bool hasStoryboard = false;
 
+            // 优先使用解析后轻量的数据：
+            // 1) `WorkingBeatmap.Beatmap.UnhandledEventLines`（内存负担最小）
+            // 2) `WorkingBeatmap.Storyboard`（作为回退）
             try
             {
-                var workingBeatmap = beatmaps.GetWorkingBeatmap(beatmapInfo);
+                // 强制 refetch 以提升在 detached 模型下拿到完整数据的概率。
+                working ??= beatmaps.GetWorkingBeatmap(beatmapInfo);
 
-                scanEventFile(workingBeatmap.GetStream(beatmapFilePath), ref hasVideo, ref hasStoryboard);
-
-                if (!hasVideo || !hasStoryboard)
+                // 先检查已解析的 beatmap 的 UnhandledEventLines（优先）
+                try
                 {
-                    string? storyboardFilePath = beatmapSet.GetPathForFile(getMainStoryboardFilename(beatmapInfo.Metadata));
+                    var bm = working?.Beatmap;
 
-                    if (!string.IsNullOrEmpty(storyboardFilePath))
-                        scanEventFile(workingBeatmap.GetStream(storyboardFilePath), ref hasVideo, ref hasStoryboard);
+                    if (bm?.UnhandledEventLines != null)
+                    {
+                        foreach (string raw in bm.UnhandledEventLines)
+                        {
+                            if (string.IsNullOrWhiteSpace(raw))
+                                continue;
+
+                            string trimmed = raw.Trim();
+
+                            if (trimmed.StartsWith("//", StringComparison.Ordinal))
+                                continue;
+
+                            int commentIndex = trimmed.IndexOf("//", StringComparison.Ordinal);
+                            if (commentIndex >= 0)
+                                trimmed = trimmed[..commentIndex].TrimEnd();
+
+                            if (trimmed.Length == 0)
+                                continue;
+
+                            string eventType = trimmed.Split(',')[0].Trim();
+
+                            if (!hasVideo && matchesEventType(eventType, LegacyEventType.Video, "Video"))
+                                hasVideo = true;
+
+                            if (!hasStoryboard && (matchesEventType(eventType, LegacyEventType.Sprite, "Sprite") || matchesEventType(eventType, LegacyEventType.Animation, "Animation")))
+                                hasStoryboard = true;
+
+                            if (hasVideo && hasStoryboard)
+                                break;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, $"Beatmap UnhandledEventLines check failed for beatmap {beatmapInfo}");
+                }
+
+                // 若仍未确定，则回退使用 Storyboard（可能有内存开销，作为最后手段）
+                if (useSbFallBack && !(hasVideo && hasStoryboard))
+                {
+                    try
+                    {
+                        var sb = working?.Storyboard;
+
+                        if (sb != null)
+                        {
+                            var elements = sb.Layers.SelectMany(l => l.Elements);
+
+                            if (!hasVideo)
+                                hasVideo = elements.Any(e => e is StoryboardVideo);
+
+                            if (!hasStoryboard)
+                                hasStoryboard = elements.Any(e => e is StoryboardAnimation || (e is StoryboardSprite && !(e is StoryboardVideo)));
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error(e, $"Storyboard check failed for beatmap {beatmapInfo}");
+                    }
                 }
             }
-            catch
+            catch (Exception e)
             {
+                Logger.Error(e, $"Tag detection failed for beatmap {beatmapInfo}");
+            }
+            finally
+            {
+                working = null;
             }
 
             return new CachedTagInfo(beatmapInfo.Hash, hasVideo, hasStoryboard);
-        }
-
-        private static void scanEventFile(Stream stream, ref bool hasVideo, ref bool hasStoryboard)
-        {
-            if (stream == null)
-                return;
-
-            using (stream)
-            using (var reader = new StreamReader(stream))
-            {
-                bool inEventsSection = false;
-
-                while (reader.ReadLine() is string line)
-                {
-                    string trimmed = line.Trim();
-
-                    if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal))
-                        continue;
-
-                    if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
-                    {
-                        if (inEventsSection)
-                            break;
-
-                        inEventsSection = trimmed.Equals("[Events]", StringComparison.OrdinalIgnoreCase);
-                        continue;
-                    }
-
-                    if (!inEventsSection)
-                        continue;
-
-                    int commentIndex = trimmed.IndexOf("//", StringComparison.Ordinal);
-
-                    if (commentIndex >= 0)
-                        trimmed = trimmed[..commentIndex].TrimEnd();
-
-                    if (trimmed.Length == 0)
-                        continue;
-
-                    string eventType = trimmed.Split(',')[0].Trim();
-
-                    if (!hasVideo && matchesEventType(eventType, LegacyEventType.Video, "Video"))
-                        hasVideo = true;
-
-                    if (!hasStoryboard && (matchesEventType(eventType, LegacyEventType.Sprite, "Sprite") || matchesEventType(eventType, LegacyEventType.Animation, "Animation")))
-                        hasStoryboard = true;
-
-                    if (hasVideo && hasStoryboard)
-                        break;
-                }
-            }
-        }
-
-        private static string getMainStoryboardFilename(IBeatmapMetadataInfo metadata)
-        {
-            string baseFilename = (metadata.Artist.Length > 0 ? metadata.Artist + @" - " + metadata.Title : Path.GetFileNameWithoutExtension(metadata.AudioFile))
-                                  + (metadata.Author.Username.Length > 0 ? @" (" + metadata.Author.Username + @")" : string.Empty)
-                                  + @".osb";
-            return baseFilename.GetValidFilename();
         }
 
         private static bool matchesEventType(string value, LegacyEventType eventType, string eventName)
