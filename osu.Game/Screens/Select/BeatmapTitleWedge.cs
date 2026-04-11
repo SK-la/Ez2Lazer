@@ -206,12 +206,8 @@ namespace osu.Game.Screens.Select
             mods.BindValueChanged(m =>
             {
                 settingChangeTracker?.Dispose();
-                settingChangeTracker = null;
 
                 updateLengthAndBpmStatistics();
-
-                if (!m.NewValue.Any())
-                    return;
 
                 settingChangeTracker = new ModSettingChangeTracker(m.NewValue);
                 settingChangeTracker.SettingChanged += _ => updateLengthAndBpmStatistics();
@@ -262,8 +258,8 @@ namespace osu.Game.Screens.Select
             artistLink.Action = () => songSelect?.Search(artistText.GetPreferred(localisation.CurrentParameters.Value.PreferOriginalScript));
             DisplayedArtist = artistText.ToString();
 
-            updateOnlineDisplay();
             updateLengthAndBpmStatistics();
+            updateOnlineDisplay();
         }
 
         private CancellationTokenSource? lengthBpmCancellationSource;
@@ -271,7 +267,6 @@ namespace osu.Game.Screens.Select
         private void updateLengthAndBpmStatistics()
         {
             lengthBpmCancellationSource?.Cancel();
-            lengthBpmCancellationSource?.Dispose();
             lengthBpmCancellationSource = new CancellationTokenSource();
 
             var token = lengthBpmCancellationSource.Token;
@@ -298,7 +293,7 @@ namespace osu.Game.Screens.Select
 
                 if (selectedMods.Count == 0
                     && analysisDatabase.TryGetStoredAnalysis(beatmapInfo, selectedRuleset, out var storedAnalysis)
-                    && storedAnalysis.CommonAttributes?.KpsList is { Count: > 0 } storedKpsList)
+                    && storedAnalysis.KpsList is { Count: > 0 } storedKpsList)
                 {
                     kpsList = storedKpsList;
                 }
@@ -387,13 +382,6 @@ namespace osu.Game.Screens.Select
 
         protected override void Dispose(bool isDisposing)
         {
-            settingChangeTracker?.Dispose();
-
-            lengthBpmCancellationSource?.Cancel();
-            lengthBpmCancellationSource?.Dispose();
-            lengthBpmCancellationSource = null;
-
-            onlineDisplayCancellationSource?.Cancel();
             onlineDisplayCancellationSource?.Dispose();
             onlineDisplayCancellationSource = null;
             base.Dispose(isDisposing);

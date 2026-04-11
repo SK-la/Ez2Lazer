@@ -83,6 +83,46 @@ namespace osu.Game.EzOsuGame.UserInterface
             });
         }
 
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                // release managed buffers and UI children so external callers don't need to call SetPoints to free memory
+                values = null;
+                valuesCount = 0;
+                hasData = false;
+                ActualMaxValue = float.NaN;
+                ActualMinValue = float.NaN;
+
+                try
+                {
+                    graphDrawable?.Clear();
+                    graphDrawable?.Dispose();
+                }
+                catch
+                {
+                }
+
+                if (hoverCreated)
+                {
+                    try
+                    {
+                        hoverRoot?.Dispose();
+                    }
+                    catch
+                    {
+                    }
+
+                    hoverRoot = null!;
+                    hoverLabel = null!;
+                    hoverText = null!;
+                    hoverCreated = false;
+                }
+            }
+
+            base.Dispose(isDisposing);
+        }
+
         private void createHoverContainers()
         {
             if (hoverCreated) return;
@@ -327,13 +367,26 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Invalidate(Invalidation.DrawNode);
             }
 
+            protected override void Dispose(bool isDisposing)
+            {
+                if (isDisposing)
+                {
+                    // clear managed data and break references to renderer resources to allow GC
+                    points.Clear();
+                    texture = null!;
+                    shader = null!;
+                }
+
+                base.Dispose(isDisposing);
+            }
+
             protected override DrawNode CreateDrawNode() => new KpsLineDrawNode(this);
 
             private class KpsLineDrawNode : DrawNode
             {
                 private Texture texture = null!;
                 private IShader shader = null!;
-                private readonly List<float> points = new List<float>();
+                private List<float> points = null!;
                 private Vector2 drawSize;
                 private float minValue;
                 private float maxValue;
@@ -365,8 +418,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     if (version == Source.version)
                         return;
 
-                    points.Clear();
-                    points.AddRange(Source.points);
+                    points = Source.points;
                     version = Source.version;
                 }
 

@@ -366,8 +366,6 @@ namespace osu.Game.Screens.Select
 
             ezTagDisplay.Beatmap = null;
             scratchText = null;
-            ezKpsDisplay.SetKps(0, 0);
-            ezDisplayKpsGraph.SetPoints(Array.Empty<double>());
 
             displayXxySR.Current.Value = default;
             ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY;
