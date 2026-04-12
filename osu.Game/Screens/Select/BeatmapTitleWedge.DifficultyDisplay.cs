@@ -312,8 +312,8 @@ namespace osu.Game.Screens.Select
                     }
 
                     // This can take time as it is a synchronous task.
-                    // TODO: We're calling `GetPlayableBeatmap` multiple times every map load at song select.
-                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset);
+                    // 使用可取消重载，避免快速切歌时后台任务继续持有旧谱面对象。
+                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset, Array.Empty<Mod>(), cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
 

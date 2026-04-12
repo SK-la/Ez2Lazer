@@ -345,6 +345,8 @@ namespace osu.Game.Screens.Select
             spreadDisplay.Beatmap.Value = null;
 
             starDifficultyCancellationSource?.Cancel();
+            starDifficultyCancellationSource?.Dispose();
+            starDifficultyCancellationSource = null;
 
             clearEzAnalysisBinding();
         }
@@ -398,6 +400,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
             ezAnalysisCancellationSource = new CancellationTokenSource();
 
             if (Item == null)
@@ -419,6 +422,7 @@ namespace osu.Game.Screens.Select
         private void computeStarRating()
         {
             starDifficultyCancellationSource?.Cancel();
+            starDifficultyCancellationSource?.Dispose();
             starDifficultyCancellationSource = new CancellationTokenSource();
 
             if (Item == null)
@@ -439,9 +443,11 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
             {
                 starDifficultyCancellationSource?.Cancel();
+                starDifficultyCancellationSource?.Dispose();
                 starDifficultyCancellationSource = null;
 
                 ezAnalysisCancellationSource?.Cancel();
+                ezAnalysisCancellationSource?.Dispose();
                 ezAnalysisCancellationSource = null;
             }
 

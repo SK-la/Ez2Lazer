@@ -840,6 +840,7 @@ namespace osu.Game.Screens.Select
 
             var workingBeatmap = Beatmap.Value;
             var ruleset = Ruleset.Value;
+            var selectedMods = Mods.Value;
 
             Task.Run(() =>
             {
@@ -847,7 +848,7 @@ namespace osu.Game.Screens.Select
                 {
                     if (token.IsCancellationRequested) return;
 
-                    var playable = workingBeatmap.GetPlayableBeatmap(ruleset, Mods.Value, token);
+                    var playable = workingBeatmap.GetPlayableBeatmap(ruleset, selectedMods, token);
 
                     Schedule(() => ezBeatmapPreviewOverlay.UpdateSelection(playable, ruleset, forceReload));
                 }
@@ -873,6 +874,10 @@ namespace osu.Game.Screens.Select
 
             previewOverlayModSettingTracker?.Dispose();
             previewOverlayModSettingTracker = null;
+
+            previewPlayableCancellation?.Cancel();
+            previewPlayableCancellation?.Dispose();
+            previewPlayableCancellation = null;
 
             modSelectOverlay.SelectedMods.UnbindFrom(Mods);
             modSelectOverlay.Beatmap.UnbindFrom(Beatmap);
@@ -1257,6 +1262,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             onlineLookupCancellation?.Cancel();
+            onlineLookupCancellation?.Dispose();
             onlineLookupCancellation = null;
 
             if (beatmapSetInfo.OnlineID < 0)
@@ -1420,6 +1426,15 @@ namespace osu.Game.Screens.Select
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
+
+            previewPlayableCancellation?.Cancel();
+            previewPlayableCancellation?.Dispose();
+            previewPlayableCancellation = null;
+
+            onlineLookupCancellation?.Cancel();
+            onlineLookupCancellation?.Dispose();
+            onlineLookupCancellation = null;
+
             modSelectOverlayRegistration?.Dispose();
         }
     }
