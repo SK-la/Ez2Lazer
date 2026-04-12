@@ -582,7 +582,8 @@ namespace osu.Game.EzOsuGame.Analysis
             foreach (ActiveSongsBranchState activeBranch in activeBranches)
             {
                 IReadOnlyDictionary<Guid, double> branchValues = persistentStore.GetSongsBranchValues(activeBranch.DatabasePath, beatmapList);
-                IReadOnlySet<string> branchBeatmapMd5Hashes = persistentStore.GetSongsBranchCollectionBeatmapMd5Hashes(activeBranch.DatabasePath);
+
+                List<BeatmapInfo>? unresolvedBeatmaps = null;
 
                 foreach (BeatmapInfo beatmap in beatmapList)
                 {
@@ -595,7 +596,25 @@ namespace osu.Game.EzOsuGame.Analysis
                         continue;
                     }
 
-                    if (string.IsNullOrWhiteSpace(beatmap.MD5Hash) || !branchBeatmapMd5Hashes.Contains(beatmap.MD5Hash))
+                    if (string.IsNullOrWhiteSpace(beatmap.MD5Hash))
+                        continue;
+
+                    unresolvedBeatmaps ??= new List<BeatmapInfo>();
+                    unresolvedBeatmaps.Add(beatmap);
+                }
+
+                if (unresolvedBeatmaps == null || unresolvedBeatmaps.Count == 0)
+                    continue;
+
+                IReadOnlySet<string> matchedMd5Hashes = persistentStore.GetSongsBranchCollectionMatchingMd5Hashes(activeBranch.DatabasePath,
+                    unresolvedBeatmaps.Select(b => b.MD5Hash).Where(h => !string.IsNullOrWhiteSpace(h)));
+
+                if (matchedMd5Hashes.Count == 0)
+                    continue;
+
+                foreach (BeatmapInfo beatmap in unresolvedBeatmaps)
+                {
+                    if (!matchedMd5Hashes.Contains(beatmap.MD5Hash))
                         continue;
 
                     resolvedValues[beatmap.ID] = 0;

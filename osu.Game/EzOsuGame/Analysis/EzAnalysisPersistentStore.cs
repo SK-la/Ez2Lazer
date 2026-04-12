@@ -1091,6 +1091,84 @@ FROM xxy_sr_branch;
             }
         }
 
+        public IReadOnlySet<string> GetSongsBranchCollectionMatchingMd5Hashes(string databasePath, IEnumerable<string> candidateMd5Hashes)
+        {
+            var matchedMd5Hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return matchedMd5Hashes;
+
+            var candidates = candidateMd5Hashes.Where(hash => !string.IsNullOrWhiteSpace(hash))
+                                               .Distinct(StringComparer.OrdinalIgnoreCase)
+                                               .ToList();
+
+            if (candidates.Count == 0)
+                return matchedMd5Hashes;
+
+            try
+            {
+                using var connection = openConnection(databasePath);
+
+                if (!isValidSongsBranchConnection(connection))
+                    return matchedMd5Hashes;
+
+                bool queriedSourceCollection = false;
+
+                try
+                {
+                    queryMatchedMd5Hashes(connection, "source_collection_beatmap", candidates, matchedMd5Hashes);
+                    queriedSourceCollection = true;
+                }
+                catch (SqliteException)
+                {
+                }
+
+                if (!queriedSourceCollection || matchedMd5Hashes.Count == 0)
+                    queryMatchedMd5Hashes(connection, "xxy_sr_branch", candidates, matchedMd5Hashes);
+
+                return matchedMd5Hashes;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetSongsBranchCollectionMatchingMd5Hashes failed.", Ez2ConfigManager.LOGGER_NAME);
+                return matchedMd5Hashes;
+            }
+        }
+
+        private static void queryMatchedMd5Hashes(SqliteConnection connection, string tableName, IReadOnlyList<string> candidates, HashSet<string> output)
+        {
+            for (int offset = 0; offset < candidates.Count; offset += 800)
+            {
+                using var command = connection.CreateCommand();
+
+                int batchCount = Math.Min(800, candidates.Count - offset);
+                var parameterNames = new List<string>(batchCount);
+
+                for (int i = 0; i < batchCount; i++)
+                {
+                    string parameterName = $"$md5{i}";
+                    parameterNames.Add(parameterName);
+                    command.Parameters.AddWithValue(parameterName, candidates[offset + i]);
+                }
+
+                command.CommandText = $@"
+SELECT beatmap_md5
+FROM {tableName}
+WHERE beatmap_md5 IN ({string.Join(", ", parameterNames)});
+";
+
+                using var reader = command.ExecuteReader();
+
+                while (reader.Read())
+                {
+                    string beatmapMd5 = reader.GetString(0);
+
+                    if (!string.IsNullOrWhiteSpace(beatmapMd5))
+                        output.Add(beatmapMd5);
+                }
+            }
+        }
+
         public IReadOnlyList<SongsBranchDescriptor> GetAvailableSongsBranches()
         {
             if (!Enabled)
