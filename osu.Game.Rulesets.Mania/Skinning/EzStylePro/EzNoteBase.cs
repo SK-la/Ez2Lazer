@@ -80,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (enabledColorBindable.Value && !UseColorization) return "white";
+                if ((enabledColorBindable.Value && UseColorization) || !UseColorization) return "white";
 
                 return noteTypeBindable.Value switch
                 {
