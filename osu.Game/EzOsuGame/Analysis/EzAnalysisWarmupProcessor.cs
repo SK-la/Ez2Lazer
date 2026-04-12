@@ -63,6 +63,8 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly object pendingBeatmapLock = new object();
         private readonly HashSet<Guid> pendingBeatmapIds = new HashSet<Guid>();
         private readonly HashSet<Guid> inFlightBeatmapIds = new HashSet<Guid>();
+        private ProgressNotification? startupWarmupProgressNotification;
+        private int startupWarmupTotalCount;
         private readonly SemaphoreSlim startupWarmupSignal = new SemaphoreSlim(0, 1);
         private readonly SemaphoreSlim selectedBeatmapRecomputeSignal = new SemaphoreSlim(0, 1);
         private readonly CancellationTokenSource startupWarmupCancellationSource = new CancellationTokenSource();
@@ -335,7 +337,26 @@ namespace osu.Game.EzOsuGame.Analysis
                                 .GetResult();
 
                 lock (pendingBeatmapLock)
+                {
                     pendingBeatmapIds.Remove(beatmapId);
+
+                    int remaining = pendingBeatmapIds.Count;
+
+                    if (startupWarmupProgressNotification != null)
+                    {
+                        int processed = startupWarmupTotalCount > 0 ? startupWarmupTotalCount - remaining : 0;
+                        startupWarmupProgressNotification.Text = $"Ez analysis startup scan queued {startupWarmupTotalCount} beatmaps for recompute ({processed} of {startupWarmupTotalCount})";
+                        startupWarmupProgressNotification.Progress = startupWarmupTotalCount > 0 ? (float)processed / startupWarmupTotalCount : 1;
+
+                        if (remaining <= 0)
+                        {
+                            startupWarmupProgressNotification.CompletionText = $"{startupWarmupTotalCount} beatmaps' analysis recompute complete";
+                            startupWarmupProgressNotification.State = ProgressNotificationState.Completed;
+                            startupWarmupProgressNotification = null;
+                            startupWarmupTotalCount = 0;
+                        }
+                    }
+                }
 
                 ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
@@ -362,10 +383,9 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 foreach (Guid pendingBeatmapId in pendingBeatmapIds)
                 {
-                    if (inFlightBeatmapIds.Contains(pendingBeatmapId))
+                    if (!inFlightBeatmapIds.Add(pendingBeatmapId))
                         continue;
 
-                    inFlightBeatmapIds.Add(pendingBeatmapId);
                     beatmapId = pendingBeatmapId;
                     return true;
                 }
@@ -395,10 +415,31 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (remainingCount <= 0 || !isStartupWarmupScanEnabled())
                         return;
 
-                    notificationOverlay.Post(new SimpleNotification
+                    // For small workloads, a simple notification is sufficient.
+                    if (totalCount < 10)
                     {
-                        Text = $"Ez analysis startup scan queued {totalCount} beatmaps for recompute. Background sqlite warmup is still processing {remainingCount} remaining result(s)."
-                    });
+                        notificationOverlay.Post(new SimpleNotification
+                        {
+                            Text = $"Ez analysis startup scan queued {totalCount} beatmaps for recompute. Background sqlite warmup is still processing {remainingCount} remaining result(s)."
+                        });
+
+                        return;
+                    }
+
+                    var notification = new ProgressNotification
+                    {
+                        Text = $"Ez analysis startup scan queued {totalCount} beatmaps for recompute ({totalCount - remainingCount} of {totalCount})",
+                        CompletionText = "beatmaps' analysis recompute is complete",
+                        State = ProgressNotificationState.Active
+                    };
+
+                    lock (pendingBeatmapLock)
+                    {
+                        startupWarmupProgressNotification = notification;
+                        startupWarmupTotalCount = totalCount;
+                    }
+
+                    notificationOverlay.Post(notification);
                 }
                 catch (Exception e)
                 {
@@ -445,6 +486,23 @@ namespace osu.Game.EzOsuGame.Analysis
                 startupWarmupSignal.Dispose();
                 selectedBeatmapRecomputeCancellationSource.Dispose();
                 selectedBeatmapRecomputeSignal.Dispose();
+
+                lock (pendingBeatmapLock)
+                {
+                    if (startupWarmupProgressNotification != null)
+                    {
+                        try
+                        {
+                            startupWarmupProgressNotification.CompleteSilently();
+                        }
+                        catch
+                        {
+                        }
+
+                        startupWarmupProgressNotification = null;
+                        startupWarmupTotalCount = 0;
+                    }
+                }
             }
 
             base.Dispose(isDisposing);
