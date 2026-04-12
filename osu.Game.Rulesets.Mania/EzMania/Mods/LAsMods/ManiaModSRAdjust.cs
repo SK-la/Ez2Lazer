@@ -75,9 +75,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public static readonly LocalisableString SR_ADJUST_RESCALE_THRESHOLD_LABEL = new EzLocalizationManager.EzLocalisableString("重缩放阈值", "Rescale Threshold");
 
         public static readonly LocalisableString SR_ADJUST_RESCALE_THRESHOLD_DESCRIPTION =
-            new EzLocalizationManager.EzLocalisableString("超过此阈值后将降低难度膨胀速度", "Reduce difficulty inflation speed when above this threshold.");
+            new EzLocalizationManager.EzLocalisableString("超过此阈值后将降低星级的膨胀速度。原项目默认为9", "Reduce SR value inflation speed when above this threshold.");
 
         public static readonly LocalisableString SR_ADJUST_LN_MULTIPLIER_LABEL = new EzLocalizationManager.EzLocalisableString("LN 因子", "LN Integral Multiplier");
-        public static readonly LocalisableString SR_ADJUST_LN_MULTIPLIER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("LN 因子", "LN integral multiplier.");
+
+        public static readonly LocalisableString SR_ADJUST_LN_MULTIPLIER_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "用于调整LN分析时的难度系数。原项目默认为6。\n"
+            + "对于7k以下玩家，建议使用6左右。对于10K玩家，建议降低至4.5-5.5。",
+            "Adjust LN analysis difficulty factor. Default is 6. \n"
+            + "For 7k players, try 6. For 10K players, try 4.5-5.5.");
     }
 }

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Objects;
@@ -19,8 +20,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
     public class SRCalculator
     {
         // 可通过 Mod 进行调整的参数（保持与原始实现一致的默认值）
-        public static double RescaleHighThreshold { get; set; } = 8.0;
-        public static double LnIntegralMultiplier { get; set; } = 4.0;
+        public static double RescaleHighThreshold { get; set; } = 8.0; // 默认9
+        public static double LnIntegralMultiplier { get; set; } = 5.5; // 默认6
 
         #region 工具方法
 
@@ -30,6 +31,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         /// <param name="beatmap">Beatmap instance.</param>
         /// <param name="times">Timing breakdown produced by the calculation.</param>
         /// <returns>Calculated SR value.</returns>
+        [UsedImplicitly]
         public static double CalculateSRWithTime(IBeatmap beatmap, out Dictionary<string, long>? times)
         {
             (double sr, var collectedTimes) = computeInternalXxySR(beatmap, 1.0);
@@ -37,6 +39,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return sr;
         }
 
+        [UsedImplicitly]
         public static double CalculateSR(IBeatmap beatmap)
         {
             (double sr, _) = computeInternalXxySR(beatmap, 1.0);
@@ -60,6 +63,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
         /// </summary>
         /// <param name="beatmap">Beatmap instance.</param>
         /// <returns>Tuple containing the SR value and timing breakdown.</returns>
+        [UsedImplicitly]
         public Task<(double sr, Dictionary<string, long> times)> CalculateSRAsync(IBeatmap beatmap)
         {
             return Task.FromResult(computeInternalXxySR(beatmap, 1.0));
