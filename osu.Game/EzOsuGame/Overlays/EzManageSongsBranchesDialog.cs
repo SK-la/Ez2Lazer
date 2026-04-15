@@ -63,6 +63,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private TruncatingSpriteText selectedBranchText = null!;
         private FillFlowContainer listFlow = null!;
         private RoundedButton generateButton = null!;
+        private RoundedButton applyModsButton = null!;
         private Func<IReadOnlyList<BeatmapInfo>>? filteredBeatmapsProvider;
 
         private IReadOnlyList<BranchManagerEntry> displayedEntries = Array.Empty<BranchManagerEntry>();
@@ -301,6 +302,7 @@ namespace osu.Game.EzOsuGame.Overlays
                                                     new Dimension(),
                                                     new Dimension(),
                                                     new Dimension(),
+                                                    new Dimension(),
                                                 },
                                                 Content = new[]
                                                 {
@@ -326,6 +328,13 @@ namespace osu.Game.EzOsuGame.Overlays
                                                             Height = 48,
                                                             Text = EzManageSongsBranchesDialogStrings.OPEN_BRANCH_DIRECTORY,
                                                             Action = openBranchDirectory,
+                                                        },
+                                                        applyModsButton = new RoundedButton
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            Height = 48,
+                                                            Text = EzManageSongsBranchesDialogStrings.APPLY_BRANCH_MODS,
+                                                            Action = applySelectedBranchMods,
                                                         },
                                                     }
                                                 }
@@ -1216,6 +1225,56 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void openBranchDirectory() => storage.GetStorageForDirectory(EzAnalysisPersistentStore.SONGS_BRANCH_DATABASE_DIRECTORY).PresentExternally();
 
+        private void applySelectedBranchMods()
+        {
+            if (getSelectedEntry() is not BranchManagerEntry selectedEntry || !selectedEntry.HasBranch || selectedEntry.BranchDatabasePath == null)
+            {
+                postNotification(new SimpleErrorNotification
+                {
+                    Text = EzManageSongsBranchesDialogStrings.SELECT_GENERATED_BRANCH_FIRST,
+                });
+                return;
+            }
+
+            var selectedBranch = selectedEntry.BranchValue;
+
+            if (selectedBranch == null)
+            {
+                postNotification(new SimpleErrorNotification
+                {
+                    Text = EzManageSongsBranchesDialogStrings.SELECT_GENERATED_BRANCH_FIRST,
+                });
+                return;
+            }
+
+            var metadata = selectedBranch.Metadata;
+
+            if (metadata.RulesetOnlineId != ruleset.Value.OnlineID)
+            {
+                postNotification(new SimpleErrorNotification
+                {
+                    Text = EzManageSongsBranchesDialogStrings.APPLY_BRANCH_MODS_RULESET_MISMATCH,
+                });
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(metadata.ModsJson))
+            {
+                postNotification(new SimpleNotification
+                {
+                    Text = EzManageSongsBranchesDialogStrings.APPLY_BRANCH_MODS_NO_MODS,
+                });
+                return;
+            }
+
+            tryApplyBranchMods(metadata);
+
+            postNotification(new SimpleNotification
+            {
+                Text = EzManageSongsBranchesDialogStrings.APPLY_BRANCH_MODS_ATTEMPTED,
+            });
+        }
+
         private BranchManagerEntry? getSelectedEntry()
         {
             foreach (var entry in displayedEntries)
@@ -1235,9 +1294,15 @@ namespace osu.Game.EzOsuGame.Overlays
             generateButton.Enabled.Value = hasVisible;
 
             if (selectedEntry is BranchManagerEntry entry)
+            {
                 selectedBranchText.Text = LocalisableString.Format(EzManageSongsBranchesDialogStrings.SELECTED_ITEM, entry.DisplayName);
+                applyModsButton.Enabled.Value = entry.HasBranch && entry.BranchDatabasePath != null;
+            }
             else
+            {
                 selectedBranchText.Text = EzManageSongsBranchesDialogStrings.NO_ITEM_SELECTED;
+                applyModsButton.Enabled.Value = false;
+            }
         }
 
         private static string createCollectionSelectionKey(Guid collectionId) => $"collection:{collectionId:D}";
@@ -1295,6 +1360,11 @@ namespace osu.Game.EzOsuGame.Overlays
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_FILTER_BRANCH = new EzLocalizationManager.EzLocalisableString("生成过滤分支库", "Generate Filter Branch Library");
             internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_COLLECTION_BRANCH = new EzLocalizationManager.EzLocalisableString("生成收藏夹分支库", "Generate Collection Branch Library");
             internal static readonly EzLocalizationManager.EzLocalisableString OPEN_BRANCH_DIRECTORY = new EzLocalizationManager.EzLocalisableString("打开分支库目录", "Open Branch Directory");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS = new EzLocalizationManager.EzLocalisableString("套用分支 Mod 配置", "Apply branch mod configuration");
+            internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS_ATTEMPTED = new EzLocalizationManager.EzLocalisableString("已尝试套用分支 Mod 配置（可能有部分未套用）。", "Attempted to apply branch mod configuration (some mods/settings may have been ignored).");
+            internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS_NO_MODS = new EzLocalizationManager.EzLocalisableString("该分支不包含 Mod 配置。", "The selected branch does not contain mod configuration.");
+            internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS_RULESET_MISMATCH = new EzLocalizationManager.EzLocalisableString("该分支的规则集与当前规则集不匹配，已跳过。", "The branch ruleset does not match the current ruleset; skipped.");
 
             internal static readonly EzLocalizationManager.EzLocalisableString NO_ITEMS_AVAILABLE = new EzLocalizationManager.EzLocalisableString("当前没有收藏夹或分支曲库。",
                 "No collections or branch libraries are currently available.");
