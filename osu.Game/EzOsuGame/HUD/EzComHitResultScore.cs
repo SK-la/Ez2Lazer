@@ -10,8 +10,8 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Input.Events;
 using osu.Game.Configuration;
+using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play;
@@ -34,9 +34,19 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 1f
         };
 
-        [SettingSource("HitResult Text Font", "HitResult Text Font", SettingControlType = typeof(EzSelectorEnumList))]
+        [SettingSource("HitResult Text Font", "HitResult Text Font")]
         public Bindable<EzEnumGameThemeName> NameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
+        [SettingSource("Alpha", "The alpha value of this box")]
+        public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
+        {
+            MinValue = 0,
+            MaxValue = 1,
+            Precision = 0.01f,
+        };
+
+        [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour))]
+        public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
 
@@ -50,9 +60,7 @@ namespace osu.Game.EzOsuGame.HUD
         //     Value = Anchor.TopCentre
         // };
 
-        private Vector2 dragStartPosition;
-        private bool isDragging;
-        public Sprite? StaticSprite;
+        private Drawable? anime;
         private Container? fullComboSprite;
         private Sample? fullComboSound;
 
@@ -81,6 +89,7 @@ namespace osu.Game.EzOsuGame.HUD
         [BackgroundDependencyLoader]
         private void load()
         {
+            AlwaysPresent = true;
             // Schedule(() =>
             // {
             //     AddInternal(previewButton = new IconButton
@@ -94,13 +103,6 @@ namespace osu.Game.EzOsuGame.HUD
             //
             //     previewOverlay = new EzComsPreviewOverlay(this);
             //     game.Add(previewOverlay);
-            // });
-
-            AlwaysPresent = true;
-
-            // Schedule(() =>
-            // {
-
             // });
         }
 
@@ -154,10 +156,12 @@ namespace osu.Game.EzOsuGame.HUD
 
             NameDropdown.BindValueChanged(_ =>
             {
-                ClearInternal(true);
-
-                StaticSprite?.Invalidate();
+                ClearInternal();
+                anime?.Invalidate();
             }, true);
+
+            BoxAlpha.BindValueChanged(alpha => Alpha = alpha.NewValue, true);
+            AccentColour.BindValueChanged(_ => Colour = AccentColour.Value, true);
         }
 
         private void processorNewJudgement(JudgementResult j)
@@ -166,7 +170,8 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 OnNewJudgement(j);
 
-                if (processor.JudgedHits == processor.MaximumCombo)
+                // 没有对比过.JudgedHits和.HighestCombo.MaxValue
+                if (processor.HighestCombo.MaxValue == processor.MaximumCombo)
                     checkFullCombo();
             });
         }
@@ -185,10 +190,10 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
 
             // 清除内部元素前先结束所有变换
-            StaticSprite?.FinishTransforms();
+            anime?.FinishTransforms();
 
             ClearInternal();
-            StaticSprite = null;
+            anime = null;
 
             var judgementText = CreateJudgementTexture(judgement.Type);
             AddInternal(judgementText);
@@ -197,61 +202,60 @@ namespace osu.Game.EzOsuGame.HUD
         protected Drawable CreateJudgementTexture(HitResult result)
         {
             string resultName = getHitResultPath(result);
-            string baseDir = $@"EzResources/GameTheme/{NameDropdown.Value}/judgement";
+            string name = NameDropdown.Value.ToString();
+            // TODO：应使用语法拼接路径，兼容不同平台
+            string baseDir = $@"EzResources/GameTheme/{name}/judgement";
 
             // 尝试多种大小写变体以处理文件名大小写不确定性
-            // 由于 TextureStore 的 Get 方法区分大小写，我们尝试常见变体：小写（默认）和大写
-            string[] possibleResultNames = { resultName, resultName.ToUpperInvariant() };
-            Texture? singleTexture = null;
+            // 由于 TextureStore 的 Get 方法区分大小写，我们尝试常见变体：小写和大写
+            string[] possibleResultNames = { resultName, resultName.ToLowerInvariant(), resultName.ToUpperInvariant() };
 
             foreach (string rn in possibleResultNames)
             {
                 string path = $"{baseDir}/{rn}";
-                singleTexture = textures.Get($"{path}.png");
+                var singleTexture = textures.Get($"{path}");
+
                 if (singleTexture != null)
-                    break;
-            }
-
-            if (singleTexture != null)
-            {
-                StaticSprite = new Sprite
                 {
-                    Anchor = Anchor.Centre,
-                    Origin = Anchor.Centre,
-                    Scale = new Vector2(0.5f),
-                    Texture = singleTexture,
-                    Alpha = 0,
-                    // 设置混合模式
-                    Blending = new BlendingParameters
+                    anime = new Sprite
                     {
-                        // 1. 标准透明混合（最常用）
-                        // Source = BlendingType.SrcAlpha,
-                        // Destination = BlendingType.OneMinusSrcAlpha,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        Scale = new Vector2(0.5f),
+                        Texture = singleTexture,
+                        Alpha = 0,
+                        // 设置混合模式
+                        Blending = new BlendingParameters
+                        {
+                            // 1. 标准透明混合（最常用）
+                            // Source = BlendingType.SrcAlpha,
+                            // Destination = BlendingType.OneMinusSrcAlpha,
 
-                        // 2. 加法混合（发光效果）
-                        Source = BlendingType.SrcAlpha,
-                        Destination = BlendingType.One
+                            // 2. 加法混合（发光效果）
+                            Source = BlendingType.SrcAlpha,
+                            Destination = BlendingType.One
 
-                        // 3. 减法混合（暗色透明）
-                        // Source = BlendingType.Zero,
-                        // Destination = BlendingType.OneMinusSrcColor,
+                            // 3. 减法混合（暗色透明）
+                            // Source = BlendingType.Zero,
+                            // Destination = BlendingType.OneMinusSrcColor,
 
-                        // 4. 纯色叠加（忽略黑色）
-                        // Source = BlendingType.One,
-                        // Destination = BlendingType.One,
+                            // 4. 纯色叠加（忽略黑色）
+                            // Source = BlendingType.One,
+                            // Destination = BlendingType.One,
 
-                        // 5. 柔和混合
-                        // Source = BlendingType.DstColor,
-                        // Destination = BlendingType.One,
-                    }
-                };
+                            // 5. 柔和混合
+                            // Source = BlendingType.DstColor,
+                            // Destination = BlendingType.One,
+                        }
+                    };
 
-                Schedule(() =>
-                {
-                    PlayAnimation(result, StaticSprite);
-                });
+                    Schedule(() =>
+                    {
+                        PlayAnimation(result, anime);
+                    });
 
-                return StaticSprite;
+                    return anime;
+                }
             }
 
             // 不存在单张图片时，尝试加载动画帧
@@ -260,7 +264,6 @@ namespace osu.Game.EzOsuGame.HUD
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 Scale = new Vector2(1.2f),
-                DefaultFrameLength = 1000 / PlaybackFps.Value,
                 Loop = false
             };
 
@@ -284,10 +287,7 @@ namespace osu.Game.EzOsuGame.HUD
                     break; // 如果找到帧，使用这个路径
             }
 
-            PlaybackFps.BindValueChanged(fps =>
-            {
-                animation.DefaultFrameLength = 1000 / fps.NewValue;
-            }, true);
+            animation.DefaultFrameLength = 1000 / PlaybackFps.Value;
 
             PlayAnimationGif(result, animation);
 
@@ -300,6 +300,7 @@ namespace osu.Game.EzOsuGame.HUD
             return animation;
         }
 
+        // 如果考虑拓展能力，则倾向nameof(HitResult)，并回退到这个方法
         private string getHitResultPath(HitResult hitResult)
         {
             string resultName = hitResult switch
@@ -332,14 +333,14 @@ namespace osu.Game.EzOsuGame.HUD
                         Origin = Anchor.Centre,
                         Scale = new Vector2(1.5f),
                         Alpha = 1,
-                        Texture = textures.Get(@$"{EzModifyPath.FULL_COMBO}/full-combo.png")
+                        Texture = textures.Get(@$"{EzModifyPath.FULL_COMBO}/full-combo")
                     }
                 };
 
                 AddInternal(fullComboSprite);
                 fullComboSprite.FadeIn(50).Then().FadeOut(3000);
 
-                fullComboSound = sampleStore.Get(@$"{EzModifyPath.FULL_COMBO}/full-combo-sound.ogg");
+                fullComboSound = sampleStore.Get(@$"{EzModifyPath.FULL_COMBO}/full-combo-sound");
                 fullComboSound?.Play();
             }
             else
@@ -487,8 +488,6 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
-        #region Other
-
         protected virtual void Clear()
         {
             FinishTransforms(true);
@@ -498,35 +497,9 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override void Dispose(bool isDisposing)
         {
-            PlaybackFps.UnbindAll();
-            NameDropdown.UnbindAll();
             processor.NewJudgement -= processorNewJudgement;
             gameplayClockContainer.OnSeek -= Clear;
             base.Dispose(isDisposing);
         }
-
-        protected override bool OnDragStart(DragStartEvent e)
-        {
-            dragStartPosition = e.ScreenSpaceMousePosition;
-            isDragging = true;
-            return true;
-        }
-
-        protected override void OnDrag(DragEvent e)
-        {
-            if (isDragging)
-            {
-                var delta = e.ScreenSpaceMousePosition - dragStartPosition;
-                Position += delta;
-                dragStartPosition = e.ScreenSpaceMousePosition;
-            }
-        }
-
-        protected override void OnDragEnd(DragEndEvent e)
-        {
-            isDragging = false;
-        }
-
-        #endregion
     }
 }
