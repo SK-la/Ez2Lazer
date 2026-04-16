@@ -285,7 +285,7 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
-                    ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY;
+                    ezKpcDisplay.ManiaAttributes = null;
                     return;
                 }
 
@@ -298,17 +298,14 @@ namespace osu.Game.Screens.Select
                     cancellationToken.ThrowIfCancellationRequested();
 
                     bool hasMods = selectedMods.Length > 0;
-                    EzManiaSummary storedManiaSummary = EzManiaSummary.EMPTY;
-                    bool canUseStoredManiaSummary = false;
+                    EzManiaAnalysisAttributes? maniaAttributes = null;
 
                     if (!hasMods
                         && selectedRuleset != null
                         && selectedRuleset.OnlineID == 3
-                        && analysisDatabase.TryGetStoredAnalysis(selectedBeatmap.BeatmapInfo, selectedRuleset, out var storedAnalysis)
-                        && storedAnalysis.EzManiaSummary.HasData)
+                        && analysisDatabase.TryGetStoredAnalysis(selectedBeatmap.BeatmapInfo, selectedRuleset, out var storedAnalysis))
                     {
-                        canUseStoredManiaSummary = true;
-                        storedManiaSummary = storedAnalysis.EzManiaSummary;
+                        maniaAttributes = storedAnalysis.ManiaAttributes;
                     }
 
                     // This can take time as it is a synchronous task.
@@ -324,22 +321,23 @@ namespace osu.Game.Screens.Select
                                                     .Select(s => new StatisticDifficulty.Data(s.Name, s.BarDisplayLength ?? 0, s.BarDisplayLength ?? 0, 1, s.Content))
                                                     .ToList();
 
+                    maniaAttributes ??= OptimizedBeatmapCalculator.GetEzManiaAttributes(playableBeatmap);
+
                     // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
                     if (selectedRuleset != null && selectedRuleset.OnlineID == 3)
                     {
-                        var maniaSummary = canUseStoredManiaSummary ? storedManiaSummary : OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
                         Schedule(() =>
                         {
                             if (cancellationToken.IsCancellationRequested)
                                 return;
 
-                            ezKpcDisplay.ManiaSummary = maniaSummary;
+                            ezKpcDisplay.ManiaAttributes = maniaAttributes;
                         });
                     }
                     else
                     {
                         // 非 Mania 情况隐藏组件
-                        Schedule(() => ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY);
+                        Schedule(() => ezKpcDisplay.ManiaAttributes = null);
                     }
 
                     Schedule(() =>

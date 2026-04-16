@@ -21,22 +21,23 @@ using osuTK.Graphics;
 
 namespace osu.Game.Screens.Select
 {
-    public partial class EzKpcDisplay : CompositeDrawable, IHasCurrentValue<EzManiaSummary>
+    public partial class EzKpcDisplay : CompositeDrawable
     {
         public Bindable<EzEnumChartDisplay> KpcDisplayModeBindable { get; } = new Bindable<EzEnumChartDisplay>(EzEnumChartDisplay.BarChart);
 
-        private readonly BindableWithCurrent<EzManiaSummary> current = new BindableWithCurrent<EzManiaSummary>();
+        private EzManiaAnalysisAttributes? maniaAttributes;
 
-        public Bindable<EzManiaSummary> Current
+        public EzManiaAnalysisAttributes? ManiaAttributes
         {
-            get => current.Current;
-            set => current.Current = value;
-        }
+            get => maniaAttributes;
+            set
+            {
+                if (value == null)
+                    return;
 
-        public EzManiaSummary ManiaSummary
-        {
-            get => Current.Value;
-            set => Current.Value = value;
+                maniaAttributes = value;
+                refresh();
+            }
         }
 
         private readonly List<NumberColumnEntry> numberEntries = new List<NumberColumnEntry>();
@@ -54,8 +55,6 @@ namespace osu.Game.Screens.Select
 
         public EzKpcDisplay()
         {
-            Current.Value = EzManiaSummary.EMPTY;
-
             AutoSizeAxes = Axes.X;
             RelativeSizeAxes = Axes.Y;
 
@@ -96,8 +95,6 @@ namespace osu.Game.Screens.Select
                 buildForMode(e.NewValue);
                 refresh();
             }, true);
-
-            Current.BindValueChanged(_ => refresh());
         }
 
         private void buildForMode(EzEnumChartDisplay mode)
@@ -181,15 +178,9 @@ namespace osu.Game.Screens.Select
 
         private void refresh()
         {
-            if (!ManiaSummary.HasData)
-            {
-                Hide();
-                return;
-            }
-
             ensureModeBuilt();
-            updateColumnCounts(ManiaSummary.ColumnCounts, ManiaSummary.HoldNoteCounts);
-            Show();
+            if (ManiaAttributes != null)
+                updateColumnCounts(ManiaAttributes.ColumnCounts, ManiaAttributes.HoldNoteCounts);
         }
 
         private void ensureModeBuilt()

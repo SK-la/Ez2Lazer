@@ -64,9 +64,6 @@ namespace osu.Game.EzOsuGame.Analysis
         [JsonIgnore]
         public bool HasManiaData => ColumnCounts.Count > 0 || HoldNoteCounts.Count > 0 || XxySr.HasValue || XxySrFullLN4.HasValue || XxySrFullLN8.HasValue;
 
-        [JsonIgnore]
-        public EzManiaSummary Summary => new EzManiaSummary(ColumnCounts, HoldNoteCounts, XxySr, XxySrFullLN4, XxySrFullLN8);
-
         public static EzManiaAnalysisAttributes Create(Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts, double? xxySr,
                                                        double? xxySrFullLN4 = null, double? xxySrFullLN8 = null)
             => new EzManiaAnalysisAttributes
@@ -94,46 +91,11 @@ namespace osu.Game.EzOsuGame.Analysis
             RulesetAttributes = rulesetAttributes;
         }
 
-        public EzAnalysisResult(KpsSummary kpsSummary, EzManiaSummary ezManiaSummary)
-            : this(EzCommonAnalysisAttributes.Create(kpsSummary.AvgKPS, kpsSummary.MaxKPS, kpsSummary.KpsList),
-                EzManiaAnalysisAttributes.Create(ezManiaSummary.ColumnCounts, ezManiaSummary.HoldNoteCounts, ezManiaSummary.XxySr, ezManiaSummary.XxySrFullLN4,
-                    ezManiaSummary.XxySrFullLN8))
-        {
-        }
-
-        public EzAnalysisResult(double averageKps, double maxKps)
-            : this(EzCommonAnalysisAttributes.Create(averageKps, maxKps, Array.Empty<double>()))
-        {
-        }
-
         [JsonIgnore]
         public EzManiaAnalysisAttributes? ManiaAttributes => RulesetAttributes as EzManiaAnalysisAttributes;
 
         [JsonIgnore]
         public IReadOnlyList<double> KpsList => CommonAttributes?.KpsList ?? Array.Empty<double>();
-
-        [JsonIgnore]
-        public KpsSummary KpsSummary => new KpsSummary(AverageKps, MaxKps, KpsList);
-
-        [JsonIgnore]
-        public EzManiaSummary EzManiaSummary => ManiaAttributes?.Summary ?? EzManiaSummary.EMPTY;
-    }
-
-    /// <summary>
-    /// 轻量级的 KPS 概要，用于 UI 快速展示/下采样。
-    /// </summary>
-    public readonly struct KpsSummary
-    {
-        public readonly double AvgKPS;
-        public readonly double MaxKPS;
-        public readonly IReadOnlyList<double> KpsList;
-
-        public KpsSummary(double avgKPS, double maxKps, IReadOnlyList<double> kpsList)
-        {
-            AvgKPS = avgKPS;
-            MaxKPS = maxKps;
-            KpsList = kpsList;
-        }
     }
 
     /// <summary>
@@ -149,8 +111,6 @@ namespace osu.Game.EzOsuGame.Analysis
         public readonly double? XxySr;
         public readonly double? XxySrFullLN4;
         public readonly double? XxySrFullLN8;
-
-        public bool HasData => (ColumnCounts?.Count > 0) || (HoldNoteCounts?.Count > 0) || XxySr.HasValue || XxySrFullLN4.HasValue || XxySrFullLN8.HasValue;
 
         public EzManiaSummary(Dictionary<int, int> columnCounts, Dictionary<int, int> holdNoteCounts, double? xxySr, double? xxySrFullLN4 = null, double? xxySrFullLN8 = null)
         {

@@ -304,7 +304,7 @@ namespace osu.Game.Screens.Select
             }
             else
             {
-                ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY;
+                ezKpcDisplay.ManiaAttributes = null;
                 displayXxySR.Current.Value = default;
                 displayXxySR.Hide();
             }
@@ -353,7 +353,7 @@ namespace osu.Game.Screens.Select
             scratchText = null;
 
             displayXxySR.Current.Value = default;
-            ezKpcDisplay.ManiaSummary = EzManiaSummary.EMPTY;
+            ezKpcDisplay.ManiaAttributes = null;
         }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
@@ -368,11 +368,10 @@ namespace osu.Game.Screens.Select
             {
                 var maniaAttributes = ezAnalysisResult.ManiaAttributes;
                 var columnCounts = maniaAttributes?.ColumnCounts ?? new Dictionary<int, int>();
-                var maniaSummary = maniaAttributes?.Summary ?? EzManiaSummary.EMPTY;
 
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 updateKeyCount();
-                ezKpcDisplay.ManiaSummary = maniaSummary;
+                ezKpcDisplay.ManiaAttributes = maniaAttributes;
                 displayXxySR.Current.Value = ezAnalysisResult;
             }
         }

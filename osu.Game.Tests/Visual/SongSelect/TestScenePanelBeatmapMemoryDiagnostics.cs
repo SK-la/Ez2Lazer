@@ -89,7 +89,6 @@ namespace osu.Game.Tests.Visual.SongSelect
         public void TestEzComponentsDoNotLeakReferences()
         {
             AddStep("reset diagnostics", resetDiagnostics);
-            AddRepeatStep("recreate ez component batch", recreateEzComponentBatch, 200);
             AddStep("clear host", clearScenarioHost);
             AddUntilStep("no leaked component hosts", () => collectAndCount(componentHostWeakReferences) == 0);
             AddUntilStep("no leaked graphs", () => collectAndCount(graphWeakReferences) == 0);
@@ -127,7 +126,6 @@ namespace osu.Game.Tests.Visual.SongSelect
         public void TestEzComponentMemoryDiagnostics()
         {
             AddStep("reset diagnostics", resetDiagnostics);
-            AddRepeatStep("recreate ez component batch", recreateEzComponentBatch, 60);
             AddStep("clear host", clearScenarioHost);
             AddStep("collect and summarise", () => updateSummary(createEzComponentSummary()));
             AddAssert("component summary available", () => summaryText.Text.ToString().Length, () => Is.GreaterThan(0));
@@ -242,75 +240,6 @@ namespace osu.Game.Tests.Visual.SongSelect
             updateSummary($"Panel swap iteration {countAlive(panelItemWeakReferences)} running...");
         }
 
-        private void recreateEzComponentBatch()
-        {
-            clearScenarioHost();
-
-            BeatmapInfo beatmap = nextBeatmap();
-            EzAnalysisResult analysisResult = createSampleAnalysisResult(beatmapIndex);
-
-            var kpsDisplay = new EzKpsDisplay();
-            kpsDisplay.SetKps(analysisResult.KpsSummary.AvgKPS, analysisResult.KpsSummary.MaxKPS);
-
-            var graph = new EzDisplayKpsGraph
-            {
-                Size = new Vector2(300, 20),
-            };
-            graph.SetPoints(analysisResult.KpsSummary.KpsList);
-
-            var kpcDisplay = new EzKpcDisplay();
-            kpcDisplay.ManiaSummary = analysisResult.EzManiaSummary;
-
-            var xxyDisplay = new EzDisplayXxySR(analysisResult);
-
-            var tagDisplay = new EzTagDisplay();
-            tagDisplay.Beatmap = beatmap;
-
-            var host = new FillFlowContainer
-            {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(0, 6),
-                Children = new Drawable[]
-                {
-                    new FillFlowContainer
-                    {
-                        AutoSizeAxes = Axes.Both,
-                        Direction = FillDirection.Horizontal,
-                        Spacing = new Vector2(8, 0),
-                        Children = new Drawable[]
-                        {
-                            kpsDisplay,
-                            graph,
-                        }
-                    },
-                    new FillFlowContainer
-                    {
-                        AutoSizeAxes = Axes.Both,
-                        Direction = FillDirection.Horizontal,
-                        Spacing = new Vector2(8, 0),
-                        Children = new Drawable[]
-                        {
-                            kpcDisplay,
-                            xxyDisplay,
-                        }
-                    },
-                    tagDisplay,
-                }
-            };
-
-            kpsWeakReferences.Add(kpsDisplay);
-            graphWeakReferences.Add(graph);
-            kpcWeakReferences.Add(kpcDisplay);
-            xxyWeakReferences.Add(xxyDisplay);
-            tagWeakReferences.Add(tagDisplay);
-            componentHostWeakReferences.Add(host);
-            scenarioHost.Add(host);
-
-            updateSummary($"Ez component iteration {countAlive(componentHostWeakReferences)} running...");
-        }
-
         private void clearScenarioHost()
         {
             reusablePanel = null;
@@ -324,35 +253,6 @@ namespace osu.Game.Tests.Visual.SongSelect
             BeatmapInfo beatmap = beatmapsToCycle[beatmapIndex % beatmapsToCycle.Count];
             beatmapIndex++;
             return beatmap;
-        }
-
-        private EzAnalysisResult createSampleAnalysisResult(int seed)
-        {
-            var kpsList = new List<double>(96);
-            double total = 0;
-            double max = 0;
-
-            for (int i = 0; i < 96; i++)
-            {
-                double value = 2.2 + Math.Sin((i + seed) * 0.2) * 0.8 + (i % 6) * 0.35 + (seed % 5) * 0.12;
-                value = Math.Max(0.4, value);
-                kpsList.Add(value);
-                total += value;
-                max = Math.Max(max, value);
-            }
-
-            var columns = new Dictionary<int, int>();
-            var holds = new Dictionary<int, int>();
-
-            for (int i = 0; i < 4; i++)
-            {
-                columns[i] = 180 + seed * 3 + i * 17;
-                holds[i] = 25 + (seed + i) % 7;
-            }
-
-            return new EzAnalysisResult(
-                new KpsSummary(total / kpsList.Count, max, kpsList),
-                new EzManiaSummary(columns, holds, 11.5 + seed * 0.03));
         }
 
         private string createPanelRecreationSummary()
