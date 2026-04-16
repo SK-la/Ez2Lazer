@@ -885,46 +885,47 @@ namespace osu.Game.EzOsuGame.Overlays
             }
         }
 
-        private void toggleBranchHidden(BranchManagerEntry entry)
-        {
-            if (!entry.HasBranch || entry.BranchDatabasePath == null)
-                return;
-
-            if (!ezAnalysisCache.TryToggleSongsBranchHidden(entry.BranchDatabasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets))
-            {
-                postNotification(new SimpleErrorNotification
-                {
-                    Text = message,
-                });
-
-                refreshBranches();
-                return;
-            }
-
-            selectedEntryKey = entry.SelectionKey;
-
-            postNotification(new SimpleNotification
-            {
-                Text = message,
-            });
-
-            refreshBranches();
-
-            if (nonHideableBeatmapSets.Count == 0)
-                return;
-
-            if (dialogOverlay != null)
-            {
-                dialogOverlay.Push(new DeleteNonHideableBeatmapSetsDialog(nonHideableBeatmapSets.Count,
-                    () => deleteNonHideableBeatmapSets(nonHideableBeatmapSets)));
-                return;
-            }
-
-            postNotification(new SimpleNotification
-            {
-                Text = LocalisableString.Format(EzManageSongsBranchesDialogStrings.NON_HIDEABLE_BEATMAPSETS_FOUND, nonHideableBeatmapSets.Count),
-            });
-        }
+        // 备份用法，激活通过分支库隐藏图池
+        // private void toggleBranchHidden(BranchManagerEntry entry)
+        // {
+        //     if (!entry.HasBranch || entry.BranchDatabasePath == null)
+        //         return;
+        //
+        //     if (!ezAnalysisCache.TryToggleSongsBranchHidden(entry.BranchDatabasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets))
+        //     {
+        //         postNotification(new SimpleErrorNotification
+        //         {
+        //             Text = message,
+        //         });
+        //
+        //         refreshBranches();
+        //         return;
+        //     }
+        //
+        //     selectedEntryKey = entry.SelectionKey;
+        //
+        //     postNotification(new SimpleNotification
+        //     {
+        //         Text = message,
+        //     });
+        //
+        //     refreshBranches();
+        //
+        //     if (nonHideableBeatmapSets.Count == 0)
+        //         return;
+        //
+        //     if (dialogOverlay != null)
+        //     {
+        //         dialogOverlay.Push(new DeleteNonHideableBeatmapSetsDialog(nonHideableBeatmapSets.Count,
+        //             () => deleteNonHideableBeatmapSets(nonHideableBeatmapSets)));
+        //         return;
+        //     }
+        //
+        //     postNotification(new SimpleNotification
+        //     {
+        //         Text = LocalisableString.Format(EzManageSongsBranchesDialogStrings.NON_HIDEABLE_BEATMAPSETS_FOUND, nonHideableBeatmapSets.Count),
+        //     });
+        // }
 
         private void toggleCollectionHidden(BranchManagerEntry entry) => _ = toggleCollectionHiddenAsync(entry);
 

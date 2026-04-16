@@ -399,67 +399,6 @@ namespace osu.Game.EzOsuGame.Analysis
             return true;
         }
 
-        public bool TryToggleSongsBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
-        {
-            nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
-
-            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
-            {
-                message = SongsBranchStrings.SQLITE_DISABLED;
-                return false;
-            }
-
-            if (!persistentStore.TryGetSongsBranchDescriptor(databasePath, out var branch))
-            {
-                message = SongsBranchStrings.INVALID_BRANCH;
-                return false;
-            }
-
-            List<BeatmapInfo> localBeatmaps = beatmapManager.GetAllUsableBeatmapSets().SelectMany(set => set.Beatmaps).Distinct().ToList();
-            IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5 = createLocalBeatmapsByMd5Lookup(localBeatmaps);
-            List<BeatmapInfo> branchBeatmaps = getLocalBeatmapsForBranchCollection(branch.DatabasePath, localBeatmapsByMd5);
-
-            if (branchBeatmaps.Count == 0)
-            {
-                message = LocalisableString.Format(SongsBranchStrings.BRANCH_HIDE_NO_LOCAL_BEATMAPS, branch.Metadata.DisplayName);
-                return false;
-            }
-
-            if (branch.Metadata.HiddenApplied)
-                return tryRestoreBranchHiddenState(branch, localBeatmapsByMd5, branchBeatmaps, out message);
-
-            return tryApplyBranchHiddenState(branch, localBeatmapsByMd5, branchBeatmaps, out message, out nonHideableBeatmapSets);
-        }
-
-        public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
-                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
-        {
-            nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
-
-            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
-            {
-                message = SongsBranchStrings.SQLITE_DISABLED;
-                return false;
-            }
-
-            if (collectionId == Guid.Empty)
-            {
-                message = SongsBranchStrings.INVALID_COLLECTION;
-                return false;
-            }
-
-            List<BeatmapInfo> localBeatmaps = beatmapManager.GetAllUsableBeatmapSets().SelectMany(set => set.Beatmaps).Distinct().ToList();
-            IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5 = createLocalBeatmapsByMd5Lookup(localBeatmaps);
-            List<BeatmapInfo> collectionBeatmaps = getLocalBeatmapsForCollection(beatmapMd5Hashes, localBeatmapsByMd5);
-            IReadOnlySet<Guid> hiddenCollectionIds = persistentStore.GetHiddenCollectionIds();
-            bool hiddenApplied = hiddenCollectionIds.Contains(collectionId);
-
-            if (hiddenApplied)
-                return tryRestoreCollectionHiddenState(collectionId, collectionName, localBeatmapsByMd5, collectionBeatmaps, out message);
-
-            return tryApplyCollectionHiddenState(collectionId, collectionName, beatmapMd5Hashes, localBeatmapsByMd5, collectionBeatmaps, out message, out nonHideableBeatmapSets);
-        }
-
         public IReadOnlySet<Guid> GetHiddenCollectionIds() => persistentStore.GetHiddenCollectionIds();
 
         public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps)
@@ -624,82 +563,137 @@ namespace osu.Game.EzOsuGame.Analysis
             return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
         }
 
-        private bool tryApplyBranchHiddenState(EzAnalysisPersistentStore.SongsBranchDescriptor branch, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5,
-                                               IReadOnlyList<BeatmapInfo> branchBeatmaps, out LocalisableString message,
-                                               out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+        #region 分支库隐藏功能
+
+        // public bool TryToggleSongsBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+        // {
+        //     nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
+        //
+        //     if (!persistentStore.TryGetSongsBranchDescriptor(databasePath, out var branch))
+        //     {
+        //         message = SongsBranchStrings.INVALID_BRANCH;
+        //         return false;
+        //     }
+        //
+        //     List<BeatmapInfo> localBeatmaps = beatmapManager.GetAllUsableBeatmapSets().SelectMany(set => set.Beatmaps).Distinct().ToList();
+        //     IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5 = createLocalBeatmapsByMd5Lookup(localBeatmaps);
+        //     List<BeatmapInfo> branchBeatmaps = getLocalBeatmapsForBranchCollection(branch.DatabasePath, localBeatmapsByMd5);
+        //
+        //     if (branchBeatmaps.Count == 0)
+        //     {
+        //         message = LocalisableString.Format(SongsBranchStrings.BRANCH_HIDE_NO_LOCAL_BEATMAPS, branch.Metadata.DisplayName);
+        //         return false;
+        //     }
+        //
+        //     if (branch.Metadata.HiddenApplied)
+        //         return tryRestoreBranchHiddenState(branch, localBeatmapsByMd5, branchBeatmaps, out message);
+        //
+        //     return tryApplyBranchHiddenState(branch, localBeatmapsByMd5, branchBeatmaps, out message, out nonHideableBeatmapSets);
+        // }
+        //
+        // private bool tryApplyBranchHiddenState(EzAnalysisPersistentStore.SongsBranchDescriptor branch, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5,
+        //                                        IReadOnlyList<BeatmapInfo> branchBeatmaps, out LocalisableString message,
+        //                                        out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+        // {
+        //     HashSet<Guid> hiddenByOtherBranches = getHiddenBeatmapIdsFromOtherSources(localBeatmapsByMd5, excludedBranchDatabasePath: branch.DatabasePath);
+        //     var preexistingHiddenBeatmapIds = new HashSet<Guid>();
+        //     var nonHideableBeatmapSetIds = new HashSet<Guid>();
+        //     var nonHideableBeatmapSetList = new List<BeatmapSetInfo>();
+        //     int hiddenCount = 0;
+        //     int skippedCount = 0;
+        //
+        //     foreach (BeatmapInfo beatmap in branchBeatmaps)
+        //     {
+        //         if (beatmap.Hidden)
+        //         {
+        //             if (!hiddenByOtherBranches.Contains(beatmap.ID))
+        //                 preexistingHiddenBeatmapIds.Add(beatmap.ID);
+        //
+        //             continue;
+        //         }
+        //
+        //         if (beatmapManager.Hide(beatmap))
+        //             hiddenCount++;
+        //         else
+        //         {
+        //             skippedCount++;
+        //
+        //             if (beatmap.BeatmapSet != null && nonHideableBeatmapSetIds.Add(beatmap.BeatmapSet.ID))
+        //                 nonHideableBeatmapSetList.Add(beatmap.BeatmapSet);
+        //         }
+        //     }
+        //
+        //     nonHideableBeatmapSets = nonHideableBeatmapSetList;
+        //
+        //     if (!persistentStore.TrySetSongsBranchHideState(branch.DatabasePath, true, preexistingHiddenBeatmapIds))
+        //     {
+        //         nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
+        //         message = SongsBranchStrings.HIDE_BRANCH_FAILED;
+        //         return false;
+        //     }
+        //
+        //     message = skippedCount > 0
+        //         ? LocalisableString.Format(SongsBranchStrings.HIDDEN_BRANCH_WITH_SKIPS, branch.Metadata.DisplayName, hiddenCount, skippedCount)
+        //         : LocalisableString.Format(SongsBranchStrings.HIDDEN_BRANCH, branch.Metadata.DisplayName, hiddenCount);
+        //
+        //     return true;
+        // }
+        //
+        // private bool tryRestoreBranchHiddenState(EzAnalysisPersistentStore.SongsBranchDescriptor branch, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5,
+        //                                          IReadOnlyList<BeatmapInfo> branchBeatmaps, out LocalisableString message)
+        // {
+        //     HashSet<Guid> keepHiddenBeatmapIds = getHiddenBeatmapIdsFromOtherSources(localBeatmapsByMd5, excludedBranchDatabasePath: branch.DatabasePath);
+        //
+        //     foreach (Guid beatmapId in getPersistedPreexistingHiddenBeatmapIds())
+        //         keepHiddenBeatmapIds.Add(beatmapId);
+        //
+        //     int restoredCount = 0;
+        //
+        //     foreach (BeatmapInfo beatmap in branchBeatmaps)
+        //     {
+        //         if (keepHiddenBeatmapIds.Contains(beatmap.ID) || !beatmap.Hidden)
+        //             continue;
+        //
+        //         beatmapManager.Restore(beatmap);
+        //         restoredCount++;
+        //     }
+        //
+        //     if (!persistentStore.TrySetSongsBranchHideState(branch.DatabasePath, false,
+        //             persistentStore.GetSongsBranchPreexistingHiddenBeatmapIds(branch.DatabasePath)))
+        //     {
+        //         message = SongsBranchStrings.RESTORE_BRANCH_HIDE_FAILED;
+        //         return false;
+        //     }
+        //
+        //     message = LocalisableString.Format(SongsBranchStrings.RESTORED_BRANCH_HIDDEN, branch.Metadata.DisplayName, restoredCount);
+        //     return true;
+        // }
+
+        #endregion
+
+        #region 收藏夹隐藏功能
+
+        public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
+                                              out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
         {
-            HashSet<Guid> hiddenByOtherBranches = getHiddenBeatmapIdsFromOtherSources(localBeatmapsByMd5, excludedBranchDatabasePath: branch.DatabasePath);
-            var preexistingHiddenBeatmapIds = new HashSet<Guid>();
-            var nonHideableBeatmapSetIds = new HashSet<Guid>();
-            var nonHideableBeatmapSetList = new List<BeatmapSetInfo>();
-            int hiddenCount = 0;
-            int skippedCount = 0;
+            nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
 
-            foreach (BeatmapInfo beatmap in branchBeatmaps)
+            if (collectionId == Guid.Empty)
             {
-                if (beatmap.Hidden)
-                {
-                    if (!hiddenByOtherBranches.Contains(beatmap.ID))
-                        preexistingHiddenBeatmapIds.Add(beatmap.ID);
-
-                    continue;
-                }
-
-                if (beatmapManager.Hide(beatmap))
-                    hiddenCount++;
-                else
-                {
-                    skippedCount++;
-
-                    if (beatmap.BeatmapSet != null && nonHideableBeatmapSetIds.Add(beatmap.BeatmapSet.ID))
-                        nonHideableBeatmapSetList.Add(beatmap.BeatmapSet);
-                }
-            }
-
-            nonHideableBeatmapSets = nonHideableBeatmapSetList;
-
-            if (!persistentStore.TrySetSongsBranchHideState(branch.DatabasePath, true, preexistingHiddenBeatmapIds))
-            {
-                nonHideableBeatmapSets = Array.Empty<BeatmapSetInfo>();
-                message = SongsBranchStrings.HIDE_BRANCH_FAILED;
+                message = SongsBranchStrings.INVALID_COLLECTION;
                 return false;
             }
 
-            message = skippedCount > 0
-                ? LocalisableString.Format(SongsBranchStrings.HIDDEN_BRANCH_WITH_SKIPS, branch.Metadata.DisplayName, hiddenCount, skippedCount)
-                : LocalisableString.Format(SongsBranchStrings.HIDDEN_BRANCH, branch.Metadata.DisplayName, hiddenCount);
+            List<BeatmapInfo> localBeatmaps = beatmapManager.GetAllUsableBeatmapSets().SelectMany(set => set.Beatmaps).Distinct().ToList();
+            IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5 = createLocalBeatmapsByMd5Lookup(localBeatmaps);
+            List<BeatmapInfo> collectionBeatmaps = getLocalBeatmapsForCollection(beatmapMd5Hashes, localBeatmapsByMd5);
+            IReadOnlySet<Guid> hiddenCollectionIds = persistentStore.GetHiddenCollectionIds();
+            bool hiddenApplied = hiddenCollectionIds.Contains(collectionId);
 
-            return true;
-        }
+            if (hiddenApplied)
+                return tryRestoreCollectionHiddenState(collectionId, collectionName, localBeatmapsByMd5, collectionBeatmaps, out message);
 
-        private bool tryRestoreBranchHiddenState(EzAnalysisPersistentStore.SongsBranchDescriptor branch, IReadOnlyDictionary<string, List<BeatmapInfo>> localBeatmapsByMd5,
-                                                 IReadOnlyList<BeatmapInfo> branchBeatmaps, out LocalisableString message)
-        {
-            HashSet<Guid> keepHiddenBeatmapIds = getHiddenBeatmapIdsFromOtherSources(localBeatmapsByMd5, excludedBranchDatabasePath: branch.DatabasePath);
-
-            foreach (Guid beatmapId in getPersistedPreexistingHiddenBeatmapIds())
-                keepHiddenBeatmapIds.Add(beatmapId);
-
-            int restoredCount = 0;
-
-            foreach (BeatmapInfo beatmap in branchBeatmaps)
-            {
-                if (keepHiddenBeatmapIds.Contains(beatmap.ID) || !beatmap.Hidden)
-                    continue;
-
-                beatmapManager.Restore(beatmap);
-                restoredCount++;
-            }
-
-            if (!persistentStore.TrySetSongsBranchHideState(branch.DatabasePath, false,
-                    persistentStore.GetSongsBranchPreexistingHiddenBeatmapIds(branch.DatabasePath)))
-            {
-                message = SongsBranchStrings.RESTORE_BRANCH_HIDE_FAILED;
-                return false;
-            }
-
-            message = LocalisableString.Format(SongsBranchStrings.RESTORED_BRANCH_HIDDEN, branch.Metadata.DisplayName, restoredCount);
-            return true;
+            return tryApplyCollectionHiddenState(collectionId, collectionName, beatmapMd5Hashes, localBeatmapsByMd5, collectionBeatmaps, out message, out nonHideableBeatmapSets);
         }
 
         private bool tryApplyCollectionHiddenState(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes,
@@ -778,6 +772,8 @@ namespace osu.Game.EzOsuGame.Analysis
             message = LocalisableString.Format(SongsBranchStrings.RESTORED_COLLECTION_HIDDEN, collectionName, restoredCount);
             return true;
         }
+
+        #endregion
 
         private static IReadOnlyDictionary<string, List<BeatmapInfo>> createLocalBeatmapsByMd5Lookup(IEnumerable<BeatmapInfo> localBeatmaps)
         {
@@ -1011,11 +1007,15 @@ namespace osu.Game.EzOsuGame.Analysis
             internal static readonly EzLocalizationManager.EzLocalisableString DELETED_BRANCH = new EzLocalizationManager.EzLocalisableString("已删除分支曲库：{0}", "Deleted branch library: {0}");
             internal static readonly EzLocalizationManager.EzLocalisableString DELETE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("删除分支曲库失败。", "Failed to delete the branch library.");
             internal static readonly EzLocalizationManager.EzLocalisableString BRANCH_HIDE_NO_LOCAL_BEATMAPS = new EzLocalizationManager.EzLocalisableString("分支曲库“{0}”当前没有可处理的本地谱面。", "Branch library \"{0}\" currently has no local beatmaps to process.");
-            internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_BRANCH = new EzLocalizationManager.EzLocalisableString("已对分支曲库“{0}”应用隐藏，隐藏 {1:#,0} 张。", "Applied hide for branch library \"{0}\". Hid {1:#,0} beatmaps.");
-            internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_BRANCH_WITH_SKIPS = new EzLocalizationManager.EzLocalisableString("已对分支曲库“{0}”应用隐藏，隐藏 {1:#,0} 张，跳过 {2:#,0} 张。", "Applied hide for branch library \"{0}\". Hid {1:#,0} beatmaps and skipped {2:#,0}.");
-            internal static readonly EzLocalizationManager.EzLocalisableString HIDE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("应用分支曲库隐藏失败。", "Failed to apply branch library hide.");
-            internal static readonly EzLocalizationManager.EzLocalisableString RESTORED_BRANCH_HIDDEN = new EzLocalizationManager.EzLocalisableString("已取消分支曲库“{0}”的隐藏，恢复 {1:#,0} 张。", "Removed branch library hide for \"{0}\". Restored {1:#,0} beatmaps.");
-            internal static readonly EzLocalizationManager.EzLocalisableString RESTORE_BRANCH_HIDE_FAILED = new EzLocalizationManager.EzLocalisableString("取消分支曲库隐藏失败。", "Failed to remove branch library hide.");
+
+            // 分支库隐藏
+            // internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_BRANCH = new EzLocalizationManager.EzLocalisableString("已对分支曲库“{0}”应用隐藏，隐藏 {1:#,0} 张。", "Applied hide for branch library \"{0}\". Hid {1:#,0} beatmaps.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_BRANCH_WITH_SKIPS = new EzLocalizationManager.EzLocalisableString("已对分支曲库“{0}”应用隐藏，隐藏 {1:#,0} 张，跳过 {2:#,0} 张。", "Applied hide for branch library \"{0}\". Hid {1:#,0} beatmaps and skipped {2:#,0}.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString HIDE_BRANCH_FAILED = new EzLocalizationManager.EzLocalisableString("应用分支曲库隐藏失败。", "Failed to apply branch library hide.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString RESTORED_BRANCH_HIDDEN = new EzLocalizationManager.EzLocalisableString("已取消分支曲库“{0}”的隐藏，恢复 {1:#,0} 张。", "Removed branch library hide for \"{0}\". Restored {1:#,0} beatmaps.");
+            // internal static readonly EzLocalizationManager.EzLocalisableString RESTORE_BRANCH_HIDE_FAILED = new EzLocalizationManager.EzLocalisableString("取消分支曲库隐藏失败。", "Failed to remove branch library hide.");
+
+            // 收藏夹隐藏
             internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_COLLECTION = new EzLocalizationManager.EzLocalisableString("已对收藏夹“{0}”应用隐藏，隐藏 {1:#,0} 张。", "Applied hide for collection \"{0}\". Hid {1:#,0} beatmaps.");
             internal static readonly EzLocalizationManager.EzLocalisableString HIDDEN_COLLECTION_WITH_SKIPS = new EzLocalizationManager.EzLocalisableString("已对收藏夹“{0}”应用隐藏，隐藏 {1:#,0} 张，跳过 {2:#,0} 张。", "Applied hide for collection \"{0}\". Hid {1:#,0} beatmaps and skipped {2:#,0}.");
             internal static readonly EzLocalizationManager.EzLocalisableString HIDE_COLLECTION_FAILED = new EzLocalizationManager.EzLocalisableString("应用收藏夹隐藏失败。", "Failed to apply collection hide.");

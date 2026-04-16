@@ -207,8 +207,8 @@ namespace osu.Game.EzOsuGame.Analysis
         public bool TryDeleteSongsBranch(string databasePath, out LocalisableString message)
             => analysisDatabase.TryDeleteSongsBranch(databasePath, out message);
 
-        public bool TryToggleSongsBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
-            => analysisDatabase.TryToggleSongsBranchHidden(databasePath, out message, out nonHideableBeatmapSets);
+        // public bool TryToggleSongsBranchHidden(string databasePath, out LocalisableString message, out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
+        //     => analysisDatabase.TryToggleSongsBranchHidden(databasePath, out message, out nonHideableBeatmapSets);
 
         public bool TryToggleCollectionHidden(Guid collectionId, string collectionName, IEnumerable<string> beatmapMd5Hashes, out LocalisableString message,
                                               out IReadOnlyList<BeatmapSetInfo> nonHideableBeatmapSets)
