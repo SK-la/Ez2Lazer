@@ -25,7 +25,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     public partial class EzKeyModeSelector : CompositeDrawable
     {
         private Bindable<string> keyModeId = new Bindable<string>();
-        private readonly BindableBool isMultiSelectMode = new BindableBool();
+        private readonly BindableBool isMultiSelectMode = new BindableBool(true);
         private readonly Dictionary<int, HashSet<string>> modeSelections = new Dictionary<int, HashSet<string>>();
         private int currentRulesetId = -1;
 
@@ -78,7 +78,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     {
                         new Drawable[]
                         {
-                            labelButton = new ShearedButton()
+                            labelButton = new ShearedButton
                             {
                                 Text = "Keys",
                                 TextSize = 16,
@@ -206,25 +206,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             return new HashSet<string>(value.Split(','));
         }
 
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                keyModeId?.UnbindAll();
-                isMultiSelectMode?.UnbindAll();
-                ruleset?.UnbindAll();
-
-                tabControl?.Current?.UnbindAll();
-                multiSelectButton?.Active?.UnbindAll();
-                labelButton.Action = null;
-
-                SelectedModeIds.Clear();
-                modeSelections.Clear();
-            }
-
-            base.Dispose(isDisposing);
-        }
-
         public partial class ShearedCsModeTabControl : OsuTabControl<string>
         {
             private HashSet<string> currentSelection = new HashSet<string>();
@@ -233,7 +214,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             public bool IsMultiSelectMode { get; set; }
 
             public Action<HashSet<string>>? SetCurrentSelections;
-            //
+
             // [Resolved]
             // private OverlayColourProvider colourProvider { get; set; } = null!;
 
@@ -288,8 +269,6 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             public void UpdateTabItemUI(HashSet<string> selectedModes)
             {
-                currentSelection = new HashSet<string>(selectedModes);
-
                 foreach (var tabItem in TabContainer.Children.Cast<ShearedCsModeTabItem>())
                 {
                     bool isSelected = selectedModes.Contains(tabItem.Value);

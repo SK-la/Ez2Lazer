@@ -431,9 +431,9 @@ namespace osu.Game.Screens.Select
             if (!difficultyRangeSlider.UpperBound.IsDefault)
                 criteria.UserStarDifficulty.Max = difficultyRangeSlider.UpperBound.Value;
 
-            applyCircleSizeFilter(criteria);
-
             criteria.RulesetCriteria = ruleset.Value.CreateInstance().CreateRulesetFilterCriteria();
+
+            applyCircleSizeFilter(criteria);
 
             FilterQueryParser.ApplyQueries(criteria, query);
 
@@ -457,9 +457,13 @@ namespace osu.Game.Screens.Select
             if (selectedModes.Count == 0)
                 return;
 
-            criteria.DiscreteCircleSizeValues = new List<float>(selectedModes);
-
-            if (ruleset.Value.OnlineID != 3)
+            // 通过 TryParseCustomKeywordCriteria 隐式设置过滤条件（不在搜索框显示）
+            if (criteria.RulesetCriteria != null && ruleset.Value.OnlineID == 3)
+            {
+                string keyValues = string.Join(",", selectedModes.Select(m => m.ToString("0")));
+                criteria.RulesetCriteria.TryParseCustomKeywordCriteria("keys", Operator.Equal, keyValues);
+            }
+            else if (ruleset.Value.OnlineID != 3)
             {
                 // For no mania rulesets, ±0.5 is an intuitive range.
                 criteria.CircleSize = new FilterCriteria.OptionalRange<float>

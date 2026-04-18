@@ -43,34 +43,16 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             var hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
             if (beatmap.BeatmapInfo.BPM > 0) hitWindows.BPM = beatmap.BeatmapInfo.BPM;
-            double sr = skills[0].DifficultyValue() * difficulty_multiplier;
-
-            // 此方法用于开启mod后，修改star数值。暂时禁用
-            // sr = AdditionalMethod(beatmap, mods, skills, clockRate, sr);
 
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {
-                StarRating = sr > 0
-                    ? sr
-                    : skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
+                StarRating = skills.OfType<Strain>().Single().DifficultyValue() * difficulty_multiplier,
                 Mods = mods,
                 MaxCombo = beatmap.HitObjects.Sum(maxComboForObject),
             };
 
             return attributes;
         }
-
-        // public double AdditionalMethod(IBeatmap beatmap, Mod[] mods, Skill[] skills, double clockRate, double originalValue)
-        // {
-        //     double sr = originalValue;
-        //
-        //     if (mods.Any(m => m is ModStarRatingRebirth))
-        //     {
-        //         sr = SRCalculator.CalculateSR(beatmap, clockRate);
-        //     }
-        //
-        //     return sr;
-        // }
 
         private static int maxComboForObject(HitObject hitObject)
         {
