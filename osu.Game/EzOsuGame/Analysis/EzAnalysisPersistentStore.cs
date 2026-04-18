@@ -575,9 +575,8 @@ WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
                 return;
             }
 
-            // 跳过空谱面（no notes）- 不需要存储和管理。
-            // KPS 是通用分析数据，因此这里以通用 KPS 列表是否为空作为存储门槛。
-            if (commonAttributes == null || commonAttributes.KpsList.Count == 0)
+            // 跳过失败的分析结果
+            if (commonAttributes == null)
                 return;
 
             try
@@ -738,9 +737,9 @@ LIMIT 1;
                 return;
             }
 
-            // 跳过空谱面（no notes）- 不需要存储和管理。
-            // 非 mania/common-only 结果也应允许持久化，因此不再依赖 mania 列统计是否存在。
-            if (commonAttributes == null || commonAttributes.KpsList.Count == 0)
+            // 跳过无效的分析结果（commonAttributes 为 null）。
+            // 允许保存 0-note 谱面的分析结果（KpsList 为空），避免启动时重复预热。
+            if (commonAttributes == null)
                 return;
 
             // Enqueue pending write and return quickly. Background writer will flush to SQLite.
