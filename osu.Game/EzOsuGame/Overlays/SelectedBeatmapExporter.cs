@@ -5,10 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Extensions;
@@ -82,8 +80,8 @@ namespace osu.Game.EzOsuGame.Overlays
                 BeatmapExportUtils.ApplyExportMetadata(playableBeatmap, mods);
 
                 using var outStream = exportStorage.CreateFileSafely(filename);
-                using var writer = new StreamWriter(outStream, Encoding.UTF8, 1024, true);
-                new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(writer);
+                using var stream = BeatmapExportUtils.EncodeToStream(playableBeatmap, workingBeatmap.Skin);
+                stream.CopyTo(outStream);
             }
             catch
             {
@@ -187,12 +185,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             BeatmapExportUtils.ApplyExportMetadata(playableBeatmap, mods);
 
-            var stream = new MemoryStream();
-            using (var sw = new StreamWriter(stream, Encoding.UTF8, 1024, true))
-                new LegacyBeatmapEncoder(playableBeatmap, workingBeatmap.Skin).Encode(sw);
-
-            stream.Seek(0, SeekOrigin.Begin);
-            return stream;
+            return BeatmapExportUtils.EncodeToStream(playableBeatmap, workingBeatmap.Skin);
         }
 
         private static string createBeatmapFilenameFromMetadata(BeatmapInfo beatmap)
