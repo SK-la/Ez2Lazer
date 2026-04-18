@@ -67,7 +67,6 @@ namespace osu.Game.Screens.Select
         private FavouriteButton favouriteButton = null!;
         private Statistic lengthStatistic = null!;
         private Statistic bpmStatistic = null!;
-        private EzDisplayKpsGraph kpsGraph = null!;
 
         [Resolved]
         private ISongSelect? songSelect { get; set; }
@@ -80,6 +79,8 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
+
+        private EzDisplayKpsGraph kpsGraph = null!;
 
         private FillFlowContainer statisticsFlow = null!;
 

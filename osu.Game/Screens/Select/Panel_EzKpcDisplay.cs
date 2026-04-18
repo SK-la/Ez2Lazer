@@ -11,11 +11,10 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
-using osu.Framework.Graphics.UserInterface;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osuTK;
 using osuTK.Graphics;
 
@@ -33,22 +32,33 @@ namespace osu.Game.Screens.Select
             set
             {
                 if (value == null)
+                {
+                    maniaAttributes = null;
+                    clear();
                     return;
+                }
 
+                bool dataChanged = maniaAttributes != value;
                 maniaAttributes = value;
-                refresh();
+
+                // 只在数据真正变化时才更新显示
+                if (dataChanged)
+                    onDataChanged();
             }
         }
 
-        private readonly List<NumberColumnEntry> numberEntries = new List<NumberColumnEntry>();
-        private readonly List<BarChartColumnEntry> barEntries = new List<BarChartColumnEntry>();
-        private FillFlowContainer? columnNotesContainer;
-        private OsuSpriteText? headerText;
-        private Container? modePlaceholder;
+        private readonly FillFlowContainer columnNotesContainer;
+        private readonly OsuSpriteText notesText;
 
+        private List<NumberColumnEntry>? numberEntries;
+        private List<BarChartColumnEntry>? barEntries;
+
+        private EzEnumChartDisplay mode;
+
+        // 用于缓存列数，以避免每次更新都重建 UI
         private int currentColumnCount;
 
-        // last received data so mode switches can immediately refresh
+        // 缓存上次已知的列音符数量和面条数量，以便在模式切换时快速刷新显示而无需重新计算（如果数据未变）
         private int[]? lastKnownColumns;
         private int[]? lastKnownHolds;
         private int lastKnownCount;
@@ -71,11 +81,33 @@ namespace osu.Game.Screens.Select
                         RelativeSizeAxes = Axes.Both,
                         Colour = Colour4.Black.Opacity(0.6f),
                     },
-                    modePlaceholder = new Container
+                    new Container
                     {
                         Anchor = Anchor.CentreLeft,
                         Origin = Anchor.CentreLeft,
                         AutoSizeAxes = Axes.Both,
+                        Children = new[]
+                        {
+                            notesText = new OsuSpriteText
+                            {
+                                Text = "[Notes]",
+                                Font = OsuFont.GetFont(size: 14),
+                                Colour = Colour4.GhostWhite,
+                                Anchor = Anchor.CentreLeft,
+                                Origin = Anchor.CentreLeft,
+                                Alpha = 0f
+                            },
+                            Empty(),
+                            columnNotesContainer = new FillFlowContainer
+                            {
+                                AutoSizeAxes = Axes.Both,
+                                Anchor = Anchor.CentreLeft,
+                                Origin = Anchor.CentreLeft,
+                                Direction = FillDirection.Horizontal,
+                                Spacing = new Vector2(5f, 0),
+                                Padding = new MarginPadding { Horizontal = 0 },
+                            },
+                        }
                     }
                 }
             };
@@ -84,123 +116,73 @@ namespace osu.Game.Screens.Select
         [BackgroundDependencyLoader]
         private void load()
         {
+            mode = KpcDisplayModeBindable.Value;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            KpcDisplayModeBindable.BindValueChanged(e =>
-            {
-                buildForMode(e.NewValue);
-                refresh();
-            }, true);
+            KpcDisplayModeBindable.BindValueChanged(onDisplayModeChanged, true);
         }
 
-        private void buildForMode(EzEnumChartDisplay mode)
+        /// <summary>
+        /// 处理显示模式切换
+        /// </summary>
+        private void onDisplayModeChanged(ValueChangedEvent<EzEnumChartDisplay> v)
         {
-            modePlaceholder?.Clear();
-            columnNotesContainer = null;
-            headerText = null;
-            numberEntries.Clear();
-            barEntries.Clear();
-            currentColumnCount = 0;
+            mode = v.NewValue;
 
+            // 更新 UI 可见性
+            updateModeVisibility();
+
+            // 如果有数据，用新模弍重新渲染
+            if (maniaAttributes != null && lastKnownColumns != null)
+                rebuildAndRender(lastKnownColumns, lastKnownHolds, lastKnownCount);
+        }
+
+        /// <summary>
+        /// 数据变化时调用（ManiaAttributes setter）
+        /// </summary>
+        private void onDataChanged()
+        {
+            if (maniaAttributes == null)
+                return;
+
+            // 解析并缓存数据
+            parseAndCacheData(maniaAttributes.ColumnCounts, maniaAttributes.HoldNoteCounts);
+
+            // 渲染显示
+            if (lastKnownColumns != null)
+                rebuildAndRender(lastKnownColumns, lastKnownHolds, lastKnownCount);
+        }
+
+        /// <summary>
+        /// 更新模式相关的 UI 可见性
+        /// </summary>
+        private void updateModeVisibility()
+        {
             switch (mode)
             {
                 case EzEnumChartDisplay.Numbers:
-                {
-                    columnNotesContainer = new FillFlowContainer
-                    {
-                        Direction = FillDirection.Horizontal,
-                        AutoSizeAxes = Axes.Both,
-                        Spacing = new Vector2(5),
-                        Padding = new MarginPadding { Horizontal = 0 },
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                    };
-
-                    headerText = new OsuSpriteText
-                    {
-                        Text = "[Notes]",
-                        Font = OsuFont.GetFont(size: 14),
-                        Colour = Colour4.GhostWhite,
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                    };
-
-                    var grid = new GridContainer
-                    {
-                        AutoSizeAxes = Axes.Both,
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                        Padding = new MarginPadding { Horizontal = 5f },
-                        ColumnDimensions = new[]
-                        {
-                            new Dimension(GridSizeMode.AutoSize),
-                            new Dimension(GridSizeMode.Absolute, 3f),
-                            new Dimension(GridSizeMode.AutoSize),
-                        },
-                        RowDimensions = new[] { new Dimension(GridSizeMode.AutoSize) },
-                        Content = new[] { new[] { headerText, Empty(), columnNotesContainer } }
-                    };
-
-                    modePlaceholder?.Add(grid);
-
-                    if (lastKnownColumns != null)
-                        updateDisplay(lastKnownColumns, lastKnownHolds, lastKnownCount);
-                }
-
+                    notesText.Alpha = 1f;
                     break;
 
                 case EzEnumChartDisplay.BarChart:
-                {
-                    columnNotesContainer = new FillFlowContainer
-                    {
-                        Direction = FillDirection.Horizontal,
-                        AutoSizeAxes = Axes.Both,
-                        Spacing = new Vector2(5),
-                        Padding = new MarginPadding { Horizontal = 0 },
-                        Margin = new MarginPadding { Horizontal = 5f },
-                        Anchor = Anchor.CentreLeft,
-                        Origin = Anchor.CentreLeft,
-                    };
-
-                    modePlaceholder?.Add(columnNotesContainer);
-
-                    if (lastKnownColumns != null)
-                        updateDisplay(lastKnownColumns, lastKnownHolds, lastKnownCount);
-                }
-
+                    notesText.Alpha = 0f;
+                    columnNotesContainer.Margin = new MarginPadding { Horizontal = 5f };
                     break;
             }
         }
 
-        private void refresh()
-        {
-            ensureModeBuilt();
-            if (ManiaAttributes != null)
-                updateColumnCounts(ManiaAttributes.ColumnCounts, ManiaAttributes.HoldNoteCounts);
-        }
-
-        private void ensureModeBuilt()
-        {
-            if (modePlaceholder == null || columnNotesContainer != null)
-                return;
-
-            buildForMode(KpcDisplayModeBindable.Value);
-        }
-
         /// <summary>
-        /// 更新列音符数量显示
+        /// 解析并缓存数据
         /// </summary>
-        /// <param name="columnNoteCounts">每列的音符数量</param>
-        /// <param name="holdNoteCounts">面条数量</param>
-        private void updateColumnCounts(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
+        private void parseAndCacheData(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
         {
             if (columnNoteCounts.Count == 0)
             {
-                updateDisplay(columnNoteCounts, holdNoteCounts);
+                clear();
                 return;
             }
 
@@ -226,7 +208,7 @@ namespace osu.Game.Screens.Select
                     normalizedHold[i] = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
                 }
 
-                // 复用已有数组，避免重复分配
+                // 缓存数据
                 if (lastKnownColumns == null || lastKnownColumns.Length < kc)
                     lastKnownColumns = new int[kc];
 
@@ -236,8 +218,6 @@ namespace osu.Game.Screens.Select
                 Array.Copy(normalized, lastKnownColumns, kc);
                 Array.Copy(normalizedHold, lastKnownHolds, kc);
                 lastKnownCount = kc;
-
-                updateDisplay(normalized, normalizedHold, kc);
             }
             finally
             {
@@ -246,42 +226,99 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        private void releaseState()
+        /// <summary>
+        /// 根据当前模式和列数重建 UI 并渲染数值
+        /// </summary>
+        private void rebuildAndRender(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
         {
-            modePlaceholder = null;
-            columnNotesContainer = null;
-            headerText = null;
+            // 步骤 1: 确保 UI 元素数量与列数匹配
+            ensureColumnEntries(columns);
 
-            numberEntries.Clear();
-            barEntries.Clear();
-            currentColumnCount = 0;
-
-            lastKnownColumns = null;
-            lastKnownHolds = null;
-            lastKnownCount = 0;
+            // 步骤 2: 更新数值显示
+            renderValues(columnNoteCounts, holdNoteCounts, columns);
         }
 
-        private void updateDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        /// <summary>
+        /// 确保 UI 元素数量与目标列数匹配
+        /// </summary>
+        private void ensureColumnEntries(int targetColumns)
         {
-            switch (KpcDisplayModeBindable.Value)
+            if (currentColumnCount == targetColumns)
+                return;
+
+            // 清空容器并释放旧 Entry
+            columnNotesContainer.Clear();
+
+            if (numberEntries != null)
+            {
+                foreach (var entry in numberEntries)
+                    entry.Dispose();
+                numberEntries = null;
+            }
+
+            if (barEntries != null)
+            {
+                foreach (var entry in barEntries)
+                    entry.Dispose();
+                barEntries = null;
+            }
+
+            // 根据目标列数创建新的列表
+            switch (mode)
             {
                 case EzEnumChartDisplay.Numbers:
-                    updateNumbersDisplay(columnNoteCounts, holdNoteCounts, columns);
+                    numberEntries = new List<NumberColumnEntry>(targetColumns);
+
+                    for (int i = 0; i < targetColumns; i++)
+                    {
+                        var entry = new NumberColumnEntry(i);
+                        numberEntries.Add(entry);
+                        columnNotesContainer.Add(entry.Container);
+                    }
+
                     break;
 
                 case EzEnumChartDisplay.BarChart:
-                    updateBarChartDisplay(columnNoteCounts, holdNoteCounts, columns);
+                    barEntries = new List<BarChartColumnEntry>(targetColumns);
+
+                    for (int i = 0; i < targetColumns; i++)
+                    {
+                        var entry = new BarChartColumnEntry(i);
+                        barEntries.Add(entry);
+                        columnNotesContainer.Add(entry.Container);
+                    }
+
+                    break;
+            }
+
+            currentColumnCount = targetColumns;
+        }
+
+        /// <summary>
+        /// 渲染数值到现有的 UI 元素
+        /// </summary>
+        private void renderValues(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        {
+            switch (mode)
+            {
+                case EzEnumChartDisplay.Numbers:
+                    renderNumbersValues(columnNoteCounts, holdNoteCounts, columns);
+                    break;
+
+                case EzEnumChartDisplay.BarChart:
+                    renderBarChartValues(columnNoteCounts, holdNoteCounts, columns);
                     break;
             }
         }
 
-        private void updateNumbersDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        /// <summary>
+        /// 渲染 Numbers 模式的数值
+        /// </summary>
+        private void renderNumbersValues(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
         {
-            rebuildForModeIfNeeded(columns);
+            if (numberEntries == null) return;
 
-            int visible = currentColumnCount;
-
-            for (int i = 0; i < visible; i++)
+            for (int i = 0; i < currentColumnCount; i++)
             {
                 int total = i < columns ? columnNoteCounts[i] : 0;
                 int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
@@ -291,15 +328,17 @@ namespace osu.Game.Screens.Select
             }
         }
 
-        private void updateBarChartDisplay(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
+        /// <summary>
+        /// 渲染 BarChart 模式的数值
+        /// </summary>
+        private void renderBarChartValues(int[] columnNoteCounts, int[]? holdNoteCounts, int columns)
         {
-            rebuildForModeIfNeeded(columns);
+            if (barEntries == null) return;
 
-            int visible = currentColumnCount;
-
+            // 计算最大值用于归一化
             int maxCount = 0;
 
-            for (int i = 0; i < visible; i++)
+            for (int i = 0; i < currentColumnCount; i++)
             {
                 int total = i < columns ? columnNoteCounts[i] : 0;
                 int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
@@ -310,199 +349,20 @@ namespace osu.Game.Screens.Select
 
             if (maxCount == 0)
             {
-                for (int i = 0; i < visible; i++)
+                for (int i = 0; i < currentColumnCount; i++)
                 {
                     var c = barEntries[i].Container;
                     if (c.Alpha < 0.99f) c.Show();
-                }
-
-                for (int i = 0; i < visible; i++)
                     barEntries[i].SetValues(0, 0, 1);
+                }
 
                 return;
             }
 
-            for (int i = 0; i < visible; i++)
+            for (int i = 0; i < currentColumnCount; i++)
             {
                 int total = i < columns ? columnNoteCounts[i] : 0;
                 int hold = (holdNoteCounts != null && i < columns) ? holdNoteCounts[i] : 0;
-                var c = barEntries[i].Container;
-                if (c.Alpha < 0.99f) c.Show();
-                barEntries[i].SetValues(total, hold, maxCount);
-            }
-        }
-
-        private void updateDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
-        {
-            switch (KpcDisplayModeBindable.Value)
-            {
-                case EzEnumChartDisplay.Numbers:
-                    updateNumbersDisplay(columnNoteCounts, holdNoteCounts);
-                    break;
-
-                case EzEnumChartDisplay.BarChart:
-                    updateBarChartDisplay(columnNoteCounts, holdNoteCounts);
-                    break;
-            }
-        }
-
-        private void rebuildForModeIfNeeded(int columns)
-        {
-            if (currentColumnCount == columns)
-                return;
-
-            // If increasing column count, add new entries. If decreasing, hide extras.
-            if (columns > currentColumnCount)
-            {
-                switch (KpcDisplayModeBindable.Value)
-                {
-                    case EzEnumChartDisplay.Numbers:
-                        numberEntries.EnsureCapacity(columns);
-
-                        for (int i = currentColumnCount; i < columns; i++)
-                        {
-                            var entry = new NumberColumnEntry(i);
-                            numberEntries.Add(entry);
-                            columnNotesContainer?.Add(entry.Container);
-                        }
-
-                        break;
-
-                    case EzEnumChartDisplay.BarChart:
-                        barEntries.EnsureCapacity(columns);
-
-                        for (int i = currentColumnCount; i < columns; i++)
-                        {
-                            var entry = new BarChartColumnEntry(i);
-                            barEntries.Add(entry);
-                            columnNotesContainer?.Add(entry.Container);
-                        }
-
-                        break;
-                }
-            }
-            else
-            {
-                switch (KpcDisplayModeBindable.Value)
-                {
-                    case EzEnumChartDisplay.Numbers:
-                        if (numberEntries.Count > columns)
-                        {
-                            for (int i = numberEntries.Count - 1; i >= columns; i--)
-                            {
-                                var toRemove = numberEntries[i];
-                                columnNotesContainer?.Remove(toRemove.Container, true);
-                                numberEntries.RemoveAt(i);
-                            }
-                        }
-
-                        break;
-
-                    case EzEnumChartDisplay.BarChart:
-                        if (barEntries.Count > columns)
-                        {
-                            for (int i = barEntries.Count - 1; i >= columns; i--)
-                            {
-                                var toRemove = barEntries[i];
-                                columnNotesContainer?.Remove(toRemove.Container, true);
-                                barEntries.RemoveAt(i);
-                            }
-                        }
-
-                        break;
-                }
-            }
-
-            currentColumnCount = columns;
-        }
-
-        private void updateNumbersDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
-        {
-            rebuildForModeIfNeeded(columnNoteCounts.Count);
-
-            int visible = currentColumnCount;
-
-            // 必须使用方法补0
-            if (columnNoteCounts.Count >= visible && columnNoteCounts.ContainsKey(0))
-            {
-                for (int i = 0; i < visible; i++)
-                {
-                    int total = columnNoteCounts.GetValueOrDefault(i);
-                    int hold = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
-                    var c = numberEntries[i].Container;
-                    if (c.Alpha < 0.99f) c.Show();
-                    numberEntries[i].SetValues(total, hold);
-                }
-
-                return;
-            }
-
-            int idx = 0;
-
-            // Avoid LINQ allocations by sorting keys into a small array (columns are small).
-            int[] keys = new int[columnNoteCounts.Count];
-            int kptr = 0;
-            foreach (int k in columnNoteCounts.Keys)
-                keys[kptr++] = k;
-            Array.Sort(keys);
-
-            foreach (int key in keys)
-            {
-                if (idx >= visible)
-                    break;
-
-                int hold = holdNoteCounts?.GetValueOrDefault(key) ?? 0;
-                var c = numberEntries[idx].Container;
-                if (c.Alpha < 0.99f) c.Show();
-                numberEntries[idx].SetValues(columnNoteCounts.GetValueOrDefault(key), hold);
-                idx++;
-            }
-
-            // Zero-fill remaining visible slots.
-            for (int i = idx; i < visible; i++)
-            {
-                var c = numberEntries[i].Container;
-                if (c.Alpha < 0.99f) c.Show();
-                numberEntries[i].SetValues(0, 0);
-            }
-        }
-
-        private void updateBarChartDisplay(Dictionary<int, int> columnNoteCounts, Dictionary<int, int>? holdNoteCounts = null)
-        {
-            rebuildForModeIfNeeded(columnNoteCounts.Count);
-
-            int visible = currentColumnCount;
-
-            int maxCount = 0;
-
-            for (int i = 0; i < visible; i++)
-            {
-                int total = columnNoteCounts.GetValueOrDefault(i);
-                int hold = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
-                int sum = total + hold;
-                if (sum > maxCount)
-                    maxCount = sum;
-            }
-
-            if (maxCount == 0)
-            {
-                // Nothing to show: zero-fill visible slots.
-                for (int i = 0; i < visible; i++)
-                {
-                    var c = barEntries[i].Container;
-                    if (c.Alpha < 0.99f) c.Show();
-                }
-
-                for (int i = 0; i < visible; i++)
-                    barEntries[i].SetValues(0, 0, 1);
-
-                return;
-            }
-
-            for (int i = 0; i < visible; i++)
-            {
-                int total = columnNoteCounts.GetValueOrDefault(i);
-                int hold = holdNoteCounts?.GetValueOrDefault(i) ?? 0;
                 var c = barEntries[i].Container;
                 if (c.Alpha < 0.99f) c.Show();
                 barEntries[i].SetValues(total, hold, maxCount);
@@ -511,7 +371,7 @@ namespace osu.Game.Screens.Select
 
         #region ColumnEntry
 
-        private class NumberColumnEntry
+        private class NumberColumnEntry : IDisposable
         {
             public readonly Container Container;
 
@@ -584,9 +444,15 @@ namespace osu.Game.Screens.Select
 
                 holdText.X = x + 2f; // small spacing
             }
+
+            public void Dispose()
+            {
+                // Container 会从父容器移除时自动清理，这里不需要额外操作
+                // 但如果需要手动清理资源，可以在这里添加
+            }
         }
 
-        private class BarChartColumnEntry
+        private class BarChartColumnEntry : IDisposable
         {
             private const float bar_width = 7f;
             private const float max_bar_height = 12f;
@@ -710,20 +576,52 @@ namespace osu.Game.Screens.Select
                 //     valueText.Y = -(totalHeight + 6);
                 // }
             }
+
+            public void Dispose()
+            {
+                // Container 会从父容器移除时自动清理
+            }
         }
 
         #endregion
 
-        // protected override void Dispose(bool isDisposing)
-        // {
-        //     if (isDisposing)
-        //     {
-        //         KpcDisplayModeBindable.UnbindAll();
-        //         Current.UnbindAll();
-        //         releaseState();
-        //     }
-        //
-        //     base.Dispose(isDisposing);
-        // }
+        private void clear()
+        {
+            // 释放 Entry 对象
+            if (numberEntries != null)
+            {
+                foreach (var entry in numberEntries)
+                    entry.Dispose();
+                numberEntries = null;
+            }
+
+            if (barEntries != null)
+            {
+                foreach (var entry in barEntries)
+                    entry.Dispose();
+                barEntries = null;
+            }
+
+            // 只在未 dispose 状态下才清空容器（避免线程安全问题）
+            if (!IsDisposed)
+                columnNotesContainer.Clear();
+
+            currentColumnCount = 0;
+
+            lastKnownColumns = null;
+            lastKnownHolds = null;
+            lastKnownCount = 0;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            base.Dispose(isDisposing);
+
+            if (isDisposing)
+            {
+                maniaAttributes = null;
+                clear();
+            }
+        }
     }
 }

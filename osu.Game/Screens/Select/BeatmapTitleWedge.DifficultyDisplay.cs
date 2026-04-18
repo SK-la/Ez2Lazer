@@ -47,6 +47,8 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
+            private EzKpcDisplay ezKpcDisplay = null!;
+
             private ModSettingChangeTracker? settingChangeTracker;
 
             [Resolved]
@@ -62,7 +64,6 @@ namespace osu.Game.Screens.Select
             private GridContainer ratingAndNameContainer = null!;
             private DifficultyStatisticsDisplay countStatisticsDisplay = null!;
             private DifficultyStatisticsDisplay difficultyStatisticsDisplay = null!;
-            private EzKpcDisplay ezKpcDisplay = null!;
 
             private CancellationTokenSource? cancellationSource;
 
@@ -198,18 +199,11 @@ namespace osu.Game.Screens.Select
                                                     },
                                                     Empty(),
                                                     // 中间列：容器自动适配并居中放置 KPC 药丸组件，避免与右侧统计重叠
-                                                    new Container
+                                                    ezKpcDisplay = new EzKpcDisplay
                                                     {
-                                                        AutoSizeAxes = Axes.X,
-                                                        RelativeSizeAxes = Axes.Y,
                                                         Anchor = Anchor.CentreLeft,
                                                         Origin = Anchor.CentreLeft,
-                                                        Child = ezKpcDisplay = new EzKpcDisplay
-                                                        {
-                                                            Anchor = Anchor.CentreLeft,
-                                                            Origin = Anchor.CentreLeft,
-                                                            RelativeSizeAxes = Axes.Y,
-                                                        },
+                                                        RelativeSizeAxes = Axes.Y,
                                                     },
                                                     Empty(),
                                                     difficultyStatisticsDisplay = new DifficultyStatisticsDisplay(autoSize: true),
@@ -258,7 +252,6 @@ namespace osu.Game.Screens.Select
             private void updateDisplay()
             {
                 cancellationSource?.Cancel();
-                cancellationSource?.Dispose();
                 cancellationSource = new CancellationTokenSource();
 
                 if (beatmap.IsDefault)
@@ -314,9 +307,6 @@ namespace osu.Game.Screens.Select
 
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (playableBeatmap == null)
-                        return;
-
                     var statistics = playableBeatmap.GetStatistics()
                                                     .Select(s => new StatisticDifficulty.Data(s.Name, s.BarDisplayLength ?? 0, s.BarDisplayLength ?? 0, 1, s.Content))
                                                     .ToList();
@@ -349,21 +339,6 @@ namespace osu.Game.Screens.Select
                         countStatisticsDisplay.Statistics = statistics;
                     });
                 }, cancellationToken);
-            }
-
-            protected override void Dispose(bool isDisposing)
-            {
-                if (isDisposing)
-                {
-                    cancellationSource?.Cancel();
-                    cancellationSource?.Dispose();
-                    cancellationSource = null;
-
-                    settingChangeTracker?.Dispose();
-                    settingChangeTracker = null;
-                }
-
-                base.Dispose(isDisposing);
             }
 
             private void updateDifficultyStatistics() => Scheduler.AddOnce(() =>
