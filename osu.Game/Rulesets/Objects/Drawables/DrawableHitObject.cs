@@ -811,7 +811,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         /// <summary>
         /// 分发新的判定结果，但不会将当前 <see cref="DrawableHitObject"/> 标记为已判定。
-        /// 适用于需要报告中间结果（如 "poor"）的规则集，这些结果应被计数器统计但不应终止物体的生命周期。
+        /// 适用于一个note需要打出多个判定，这些结果应被计数器统计但不应终止物体的生命周期。
+        /// <para>注意此方法本意为语法糖，不会唯一指向poor判定。优先使用下方显示指定用法</para>
         /// </summary>
         /// <remarks>
         /// 此方法会填充 <see cref="Result"/> 的时间信息并触发 <see cref="OnNewResult"/> 事件，

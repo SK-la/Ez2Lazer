@@ -100,22 +100,25 @@ namespace osu.Game.Rulesets.Judgements
         public bool IsHit => Type.IsHit();
 
         /// <summary>
-        /// Optional override for combo processing.
-        /// When set, <see cref="osu.Game.Rulesets.Scoring.ScoreProcessor"/> will use this value in place of <see cref="IsHit"/>
-        /// when updating combo for results where <see cref="HitResultExtensions.AffectsCombo"/> is true.
+        /// 覆盖combo处理逻辑，用于实现非MISS判定可打断combo
+        /// <para></para>示例:
         /// </summary>
-        /// <remarks>
-        /// This is intended for hit modes that treat some hit results (e.g. <see cref="HitResult.Meh"/>) as combo breaks
-        /// while still keeping their original scoring/accuracy semantics.
-        /// 为了实现非MISS判定可打断combo
-        /// </remarks>
+        /// <code>
+        /// ApplyResult(static (r, state) =>
+        /// {
+        ///     r.Type = state;
+        ///
+        ///     if (state == HitResult.Meh)
+        ///         r.IsComboHit = false;
+        /// }, result);
+        /// </code>
         public bool? IsComboHit;
 
         /// <summary>
-        /// Whether this <see cref="JudgementResult"/> represents a final judgement that should
-        /// be considered for lifetime/rewind bookkeeping. Transient results (eg. emitted via
-        /// `DrawableHitObject.DispatchNewResult`) will have this set to <c>false</c>.
+        /// 在 HitObject 提供合适的 HitResult 后，覆盖生命周期判断。
+        /// <para>主要用于poor判定，不结束note显示。同一个note可以有多个poor判定，直到打出常规判定才结束note显示。</para>
         /// </summary>
+        /// <para></para>用法见<see cref="DrawableHitObject.DispatchNewResult(HitResult)"/>
         public bool IsFinal { get; set; } = true;
 
         /// <summary>

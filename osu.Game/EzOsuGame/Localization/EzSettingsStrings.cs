@@ -154,6 +154,8 @@ namespace osu.Game.EzOsuGame.Localization
 
 #endregion
 
+#region 音频&延迟&测试
+
         public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString("输入音频延迟追踪器", "Input Audio Latency Tracker");
 
         public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
@@ -162,5 +164,37 @@ namespace osu.Game.EzOsuGame.Localization
             "(Testing feature) When enabled, it can track the latency between key input and audio, used for debugging and optimizing the synchronization of hit sound effects. "
             + "A statistics window will pop up after the game ends. More detailed information can be found in the runtime.log file."
             + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
+
+#endregion
+
+#region 音频设备设置
+
+        public static readonly EzLocalizationManager.EzLocalisableString AUDIO_DEVICE_OUTPUT_HINT = new EzLocalizationManager.EzLocalisableString(
+            "ASIO 处于测试阶段！"
+            + "\n对于虚拟声卡，如VoiceMeeter，可能需要先切换到物理输出设备，之后再切换回VM。"
+            + "\n请不要以为ASIO4All这类虚拟ASIO比WASAPI更好，软件桥接并不提供真正的ASIO低延迟。"
+            + "\n硬件ASIO在 wasapi/VM 下，低延迟也依然是更好的。",
+            "ASIO is testing! "
+            + "\nFor virtual sound cards like VoiceMeeter, you may need to switch to a physical output device first, and then switch back to VM."
+            + "\nPlease don't assume that virtual ASIO like ASIO4All is better than WASAPI, software bridging does not provide true ASIO low latency."
+            + "\nHardware ASIO under wasapi/VM, low latency is still better.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "ASIO 采样率（测试）",
+            "ASIO Sample Rate (Testing)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_SAMPLE_RATE_HINT = new EzLocalizationManager.EzLocalisableString(
+            "48k 更佳，过高的值会导致延迟和时钟同步错误。",
+            "48k is better, too high a value will cause delays and clock synchronization errors.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "ASIO 缓冲区大小（测试）",
+            "ASIO Buffer Size (Testing)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_HINT = new EzLocalizationManager.EzLocalisableString(
+            "数值越低延迟越低，但过低可能会导致爆音或无法启动。默认为 128。",
+            "Lower is lower latency, but too low may crackle or fail to start. Default is 128.");
+
+#endregion
     }
 }

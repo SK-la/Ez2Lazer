@@ -504,8 +504,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             try
             {
                 int column = originalColumn.Column + 1;
-                var legacyRuleset = (ILegacyRuleset)ruleset.Value.CreateInstance();
-                int keys = legacyRuleset.GetKeyCount(beatmap.Value.BeatmapInfo, mods.Value);
+                var rulesetInstance = ruleset.Value.CreateInstance();
+                int keys = rulesetInstance.GetVariantForBeatmap(beatmap.Value.BeatmapInfo, mods.Value);
 
                 if (SelectColumn.Value == YuColumnPosition.Middle && keys / 2.0 != Math.Truncate(keys / 2.0) && column == (keys / 2) + 1)
                 {

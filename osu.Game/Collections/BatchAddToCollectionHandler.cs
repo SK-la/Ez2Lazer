@@ -129,7 +129,7 @@ namespace osu.Game.Collections
                     },
                     new PopupDialogCancelButton
                     {
-                        Text = "Cancel"
+                        Text = EzSettingsStrings.CANCEL_BUTTON,
                     }
                 };
             }

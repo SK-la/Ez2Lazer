@@ -180,12 +180,12 @@ namespace osu.Game.Beatmaps
         public bool IsRunning => finalClockSource.IsRunning;
 
         /// <summary>
-        /// Diagnostics: drift between interpolated time and raw BASS source time (ms).
+        /// 插值时钟与音频源的时间差（毫秒）。
         /// </summary>
         public double InterpolatedDrift => interpolatedTrack.Drift;
 
         /// <summary>
-        /// Diagnostics: the raw BASS source time before interpolation (ms).
+        /// 插值前的原始音频源时间（毫秒）。
         /// </summary>
         public double SourceCurrentTime => interpolatedTrack.SourceCurrentTime;
 

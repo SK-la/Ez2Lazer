@@ -14,6 +14,7 @@ using osu.Framework.Logging;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.Audio
@@ -46,8 +47,7 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 new SettingsItemV2(dropdown = new AudioDeviceDropdown
                 {
                     Caption = AudioSettingsStrings.OutputDevice,
-                    HintText =
-                        "ASIO is testing! For virtual devices, you may need to switch between physical devices before switching back to virtual devices, or the virtual device will be inactive.",
+                    HintText = EzSettingsStrings.AUDIO_DEVICE_OUTPUT_HINT,
                 })
                 {
                     Keywords = new[] { "speaker", "headphone", "output" },
@@ -58,8 +58,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
             {
                 Add(new SettingsItemV2(sampleRateDropdown = new FormDropdown<int>
                 {
-                    Caption = "ASIO Sample Rate(Testing)",
-                    HintText = "48k is better, too high a value will cause delays and clock synchronization errors",
+                    Caption = EzSettingsStrings.ASIO_SAMPLE_RATE_LABEL,
+                    HintText = EzSettingsStrings.ASIO_SAMPLE_RATE_HINT,
                     Current = ezConfig.GetBindable<int>(Ez2Setting.AsioSampleRate),
                     Items = AudioExtensions.COMMON_SAMPLE_RATES,
                 })
@@ -68,8 +68,8 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
                 });
                 Add(new SettingsItemV2(bufferSizeDropdown = new FormDropdown<int>
                 {
-                    Caption = "ASIO Buffer Size(Testing)",
-                    HintText = "Lower is lower latency, but too low may crackle or fail to start. Default is 128.",
+                    Caption = EzSettingsStrings.ASIO_BUFFER_SIZE_LABEL,
+                    HintText = EzSettingsStrings.ASIO_BUFFER_SIZE_HINT,
                     Current = ezConfig.GetBindable<int>(Ez2Setting.AsioBufferSize),
                     Items = AudioExtensions.COMMON_BUFFER_SIZES,
                 })

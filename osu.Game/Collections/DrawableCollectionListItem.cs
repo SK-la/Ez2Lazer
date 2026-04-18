@@ -13,6 +13,7 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -293,7 +294,7 @@ namespace osu.Game.Collections
 
                 RelativeSizeAxes = Axes.Y;
                 Width = button_width + item_height / 4;
-                TooltipText = "Add all visible beatmaps to collection";
+                TooltipText = EzSongSelectStrings.SAVE_TO_COLLECTION;
             }
 
             [BackgroundDependencyLoader]
