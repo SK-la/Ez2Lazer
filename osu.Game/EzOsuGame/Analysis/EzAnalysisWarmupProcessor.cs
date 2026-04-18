@@ -26,10 +26,6 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public partial class EzAnalysisWarmupProcessor : Component
     {
-        // 诊断开关：用于快速排除“启动预热导致内存无法回收”的问题。
-        // 设为 true 时，无论配置如何都强制跳过预热。
-        private bool forceDisableWarmupForDiagnostics { get; set; } = false;
-
         protected Task ProcessingTask { get; private set; } = null!;
 
         [Resolved]
@@ -56,7 +52,7 @@ namespace osu.Game.EzOsuGame.Analysis
         [Resolved]
         private IHighPerformanceSessionManager? highPerformanceSessionManager { get; set; }
 
-        private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
+        private bool sqliteEnabled;
 
         protected virtual int TimeToSleepDuringGameplay => 30000;
 
@@ -82,63 +78,46 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             base.LoadComplete();
 
-            ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+            sqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
 
-            startupWarmupTask = Task.Factory.StartNew(() => processStartupWarmupQueue(startupWarmupCancellationSource.Token),
-                startupWarmupCancellationSource.Token,
-                TaskCreationOptions.LongRunning,
-                TaskScheduler.Default);
-
-            selectedBeatmapRecomputeTask = Task.Factory.StartNew(() => processSelectedBeatmapRecomputeQueue(selectedBeatmapRecomputeCancellationSource.Token),
-                selectedBeatmapRecomputeCancellationSource.Token,
-                TaskCreationOptions.LongRunning,
-                TaskScheduler.Default);
-
-            currentBeatmap.BindValueChanged(beatmap => queueSelectedBeatmapRecomputeIfRequired(beatmap.NewValue), true);
-
-            ProcessingTask = Task.Factory.StartNew(scanBeatmapsNeedingWarmup, TaskCreationOptions.LongRunning).ContinueWith(t =>
+            if (sqliteEnabled)
             {
-                if (t.Exception?.InnerException is ObjectDisposedException)
+                startupWarmupTask = Task.Factory.StartNew(() => processStartupWarmupQueue(startupWarmupCancellationSource.Token),
+                    startupWarmupCancellationSource.Token,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default);
+
+                selectedBeatmapRecomputeTask = Task.Factory.StartNew(() => processSelectedBeatmapRecomputeQueue(selectedBeatmapRecomputeCancellationSource.Token),
+                    selectedBeatmapRecomputeCancellationSource.Token,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default);
+
+                currentBeatmap.BindValueChanged(beatmap => queueSelectedBeatmapRecomputeIfRequired(beatmap.NewValue), true);
+
+                ProcessingTask = Task.Factory.StartNew(scanBeatmapsNeedingWarmup, TaskCreationOptions.LongRunning).ContinueWith(t =>
                 {
-                    Logger.Log("Finished analysis startup scan aborted during shutdown", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
-                    return;
-                }
+                    if (t.Exception?.InnerException is ObjectDisposedException)
+                    {
+                        Logger.Log("Finished analysis startup scan aborted during shutdown", Ez2ConfigManager.LOGGER_NAME, LogLevel.Verbose);
+                        return;
+                    }
 
-                pendingScanCompleted = true;
-                Schedule(() => queueSelectedBeatmapRecomputeIfRequired(currentBeatmap.Value));
+                    pendingScanCompleted = true;
+                    Schedule(() => queueSelectedBeatmapRecomputeIfRequired(currentBeatmap.Value));
 
-                Logger.Log("Finished background analysis startup scan.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-            });
+                    Logger.Log("Finished background analysis startup scan.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                });
+            }
         }
-
-        private bool isStartupWarmupScanEnabled() =>
-            ezAnalysisSqliteEnabled.Value
-            && EzAnalysisPersistentStore.Enabled;
-
-        private bool isSelectedBeatmapWarmupEnabled() =>
-            ezAnalysisSqliteEnabled.Value
-            && EzAnalysisPersistentStore.Enabled;
 
         private void scanBeatmapsNeedingWarmup()
         {
-            if (forceDisableWarmupForDiagnostics)
+            if (!sqliteEnabled)
             {
-                Logger.Log("Ez analysis warmup scan is force-disabled by internal diagnostic switch.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                return;
-            }
-
-            if (!isStartupWarmupScanEnabled())
-            {
-                Logger.Log(ezAnalysisSqliteEnabled.Value
-                        ? "Ez analysis persistence is disabled; skipping startup scan."
-                        : "Ez analysis sqlite cache is disabled; skipping startup scan.",
-                    Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return;
             }
 
             List<(Guid id, string hash)> beatmaps = new List<(Guid id, string hash)>();
-
-            Logger.Log("Querying for beatmaps requiring analysis recompute...", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
             realmAccess.Run(r =>
             {
@@ -223,15 +202,12 @@ namespace osu.Game.EzOsuGame.Analysis
             if (shouldSignalStartupWarmup)
                 startupWarmupSignal.Release();
 
-            Logger.Log($"Startup scan found {needingRecompute.Count} beatmaps requiring analysis recompute. Background sqlite warmup will process them.",
-                Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-
             postWarmupSummaryNotification(needingRecompute.Count);
         }
 
         private void queueSelectedBeatmapRecomputeIfRequired(WorkingBeatmap? workingBeatmap)
         {
-            if (!pendingScanCompleted || !isSelectedBeatmapWarmupEnabled())
+            if (!pendingScanCompleted || !sqliteEnabled)
                 return;
 
             var beatmapInfo = workingBeatmap?.BeatmapInfo;
@@ -270,7 +246,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     lock (pendingBeatmapLock)
                         startupWarmupSignalPending = false;
 
-                    while (isStartupWarmupScanEnabled() && tryBeginAnyPendingBeatmap(out Guid beatmapId))
+                    while (sqliteEnabled && tryBeginAnyPendingBeatmap(out Guid beatmapId))
                         recomputePendingBeatmap(beatmapId, cancellationToken, "startup warmup");
                 }
             }
@@ -317,7 +293,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             try
             {
-                if (!isSelectedBeatmapWarmupEnabled())
+                if (!sqliteEnabled)
                     return;
 
                 sleepIfRequired(cancellationToken);
@@ -412,7 +388,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 {
                     int remainingCount = getPendingBeatmapCount();
 
-                    if (remainingCount <= 0 || !isStartupWarmupScanEnabled())
+                    if (remainingCount <= 0)
                         return;
 
                     // For small workloads, a simple notification is sufficient.
