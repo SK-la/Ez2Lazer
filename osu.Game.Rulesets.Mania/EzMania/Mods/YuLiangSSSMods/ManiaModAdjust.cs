@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -32,16 +32,16 @@ using osu.Game.Screens.Play;
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 {
     public partial class ManiaModAdjust : ModRateAdjust,
-                                          IApplicableAfterConversion,
+                                          IApplicableAfterBeatmapConversion,
                                           IApplicableToDifficulty,
                                           IApplicableToBeatmap,
-                                          IManiaRateAdjustmentMod,
-                                          IApplicableToDrawableRuleset<ManiaHitObject>,
                                           IApplicableFailOverride,
+                                          // IApplicableToHealthProcessor,
+                                          // IApplicableToScoreProcessor,
                                           IApplicableToHUD,
                                           IReadFromConfig,
-                                          IApplicableToHealthProcessor,
-                                          IApplicableToScoreProcessor,
+                                          IApplicableToDrawableRuleset<ManiaHitObject>,
+                                          IManiaRateAdjustmentMod,
                                           IHasSeed
     {
         public override string Name => @"Adjust";
@@ -57,8 +57,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         public override double ScoreMultiplier => ScoreMultiplierAdjust.Value;
 
         public override bool Ranked => false;
+
         public override bool ValidForMultiplayer => false;
+
         public override Type[] IncompatibleMods => new[] { typeof(ModEasy), typeof(ModHardRock), typeof(ModTimeRamp), typeof(ModAdaptiveSpeed), typeof(ModRateAdjust) };
+
+        public override string ExtendedIconInformation => "";
 
         [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.SCORE_MULTIPLIER_LABEL))]
         public BindableNumber<double> ScoreMultiplierAdjust { get; } = new BindableDouble(1)
@@ -68,8 +72,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             Precision = 0.01
         };
 
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.HP_DRAIN_LABEL), nameof(AdjustStrings.HP_DRAIN_DESCRIPTION), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
-        public DifficultyBindable DrainRate { get; } = new DifficultyBindable(0)
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.HP_OVERRIDE_LABEL), nameof(AdjustStrings.HP_OVERRIDE_DESCRIPTION), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        public DifficultyBindable DrainRate { get; } = new DifficultyBindable
         {
             Precision = 0.1f,
             MinValue = 0,
@@ -78,9 +82,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.DrainRate
         };
 
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ADJUST_ACCURACY_LABEL), nameof(AdjustStrings.ADJUST_ACCURACY_DESCRIPTION),
-            SettingControlType = typeof(DifficultyAdjustSettingsControl))]
-        public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable(0)
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.OD_OVERRIDE_LABEL), nameof(AdjustStrings.OD_OVERRIDE_DESCRIPTION), SettingControlType = typeof(DifficultyAdjustSettingsControl))]
+        public DifficultyBindable OverallDifficulty { get; } = new DifficultyBindable
         {
             Precision = 0.1f,
             MinValue = 0,
@@ -89,28 +92,166 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             ReadCurrentFromDifficulty = diff => diff.OverallDifficulty
         };
 
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RELEASE_LENIENCE_LABEL), nameof(AdjustStrings.RELEASE_LENIENCE_DESCRIPTION))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ENABLE_CUSTOM_RELEASE_LABEL))]
+        public BindableBool CustomRelease { get; } = new BindableBool();
+
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ENABLE_RELEASE_LENIENCE_LABEL), nameof(AdjustStrings.RELEASE_LENIENCE_DESCRIPTION))]
         public BindableDouble ReleaseLenience { get; } = new BindableDouble(2)
         {
             MaxValue = 4,
-            MinValue = 0.1,
-            Precision = 0.1
+            MinValue = 1,
+            Precision = 0.25
         };
 
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_HP_LABEL))]
-        public BindableBool CustomHP { get; } = new BindableBool(false);
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_OD_LABEL))]
-        public BindableBool CustomOD { get; } = new BindableBool(true);
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_RELEASE_LABEL))]
-        public BindableBool CustomRelease { get; } = new BindableBool();
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.EXTENDED_LIMITS_LABEL), nameof(AdjustStrings.EXTENDED_LIMITS_DESCRIPTION))]
-        public BindableBool ExtendedLimits { get; } = new BindableBool();
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ADJUST_CONSTANT_SPEED_LABEL), nameof(AdjustStrings.ADJUST_CONSTANT_SPEED_DESCRIPTION))]
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ENABLE_NO_SV_LABEL), nameof(AdjustStrings.ENABLE_NO_SV_DESCRIPTION))]
         public BindableBool ConstantSpeed { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION), SettingControlType = typeof(MultiplierSettingsSlider))]
+        public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
+        {
+            MinValue = 0.1,
+            MaxValue = 2.5,
+            Precision = 0.025
+        };
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
+        public BindableBool AdjustPitch { get; } = new BindableBool();
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.MIRROR_LABEL), nameof(EzCommonModStrings.MIRROR_DESCRIPTION))]
+        public BindableBool Mirror { get; } = new BindableBool();
+
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RANDOM_MIRROR_LABEL), nameof(AdjustStrings.RANDOM_MIRROR_DESCRIPTION))]
+        public BindableBool RandomMirror { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.NO_FAIL_LABEL))]
+        public BindableBool NoFail { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RESTART_LABEL))]
+        public BindableBool Restart { get; } = new BindableBool();
+
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RANDOM_SELECT_LABEL), nameof(AdjustStrings.RANDOM_SELECT_DESCRIPTION))]
+        public BindableBool RandomColumn { get; } = new BindableBool();
+
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.TRUE_RANDOM_LABEL), nameof(AdjustStrings.TRUE_RANDOM_DESCRIPTION))]
+        public BindableBool TrueRandom { get; } = new BindableBool();
+
+        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
+        public Bindable<int?> Seed { get; } = new Bindable<int?>();
+
+        #region Custom Hit Range
+
+        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.ENABLE_CUSTOM_HIT_RANGE_LABEL))]
+        public BindableBool EnableCustomHitRange { get; } = new BindableBool();
+
+        [SettingSource("Perfect HitRange")]
+        public BindableDouble PerfectHitRange { get; } = new BindableDouble(22.4D)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Great HitRange")]
+        public BindableDouble GreatHitRange { get; } = new BindableDouble(64)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Good HitRange")]
+        public BindableDouble GoodHitRange { get; } = new BindableDouble(97)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Ok HitRange")]
+        public BindableDouble OkHitRange { get; } = new BindableDouble(127)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Meh HitRange")]
+        public BindableDouble MehHitRange { get; } = new BindableDouble(151)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        [SettingSource("Miss HitRange")]
+        public BindableDouble MissHitRange { get; } = new BindableDouble(188)
+        {
+            Precision = 0.1,
+            MinValue = 0,
+            MaxValue = 250
+        };
+
+        #endregion
+
+        #region Custom Proportion Score
+
+        [SettingSource("Custom Proportion Score")]
+        public BindableBool CustomProportionScore { get; } = new BindableBool();
+
+        [SettingSource("Perfect Score")]
+        public BindableInt PerfectScore { get; } = new BindableInt(300)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Great Score")]
+        public BindableInt GreatScore { get; } = new BindableInt(300)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Good Score")]
+        public BindableInt GoodScore { get; } = new BindableInt(200)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Ok Score")]
+        public BindableInt OkScore { get; } = new BindableInt(100)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Meh Score")]
+        public BindableInt MehScore { get; } = new BindableInt(50)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        [SettingSource("Miss Score")]
+        public BindableInt MissScore { get; } = new BindableInt(0)
+        {
+            Precision = 5,
+            MinValue = 0,
+            MaxValue = 500
+        };
+
+        #endregion
+
+        #if DEBUG
+        [SettingSource("Test")]
+        public BindableBool Test { get; } = new BindableBool();
+        # endif
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -118,17 +259,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             {
                 if (!ScoreMultiplierAdjust.IsDefault) yield return (AdjustStrings.SCORE_MULTIPLIER_LABEL, $"{ScoreMultiplierAdjust.Value:N3}");
 
-                if (CustomHP.Value) yield return (AdjustStrings.HP_DRAIN_LABEL, $"{DrainRate.Value:N1}");
+                if (!DrainRate.IsDefault) yield return (AdjustStrings.HP_OVERRIDE_LABEL, $"{DrainRate.Value:N1}");
 
-                if (CustomOD.Value) yield return (AdjustStrings.ADJUST_ACCURACY_LABEL, $"{OverallDifficulty.Value:N1}");
+                if (!OverallDifficulty.IsDefault && !EnableCustomHitRange.Value) yield return (AdjustStrings.OD_OVERRIDE_LABEL, $"{OverallDifficulty.Value:N1}");
 
-                if (CustomRelease.Value) yield return (AdjustStrings.RELEASE_LENIENCE_LABEL, $"{ReleaseLenience.Value:N1}");
+                if (CustomRelease.Value) yield return (AdjustStrings.ENABLE_RELEASE_LENIENCE_LABEL, $"{ReleaseLenience.Value:N1}");
 
                 if (!SpeedChange.IsDefault) yield return (EzCommonModStrings.SPEED_CHANGE_LABEL, $"{SpeedChange.Value:N3}");
 
                 if (AdjustPitch.Value) yield return (EzCommonModStrings.ADJUST_PITCH_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (ConstantSpeed.Value) yield return (AdjustStrings.ADJUST_CONSTANT_SPEED_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
+                if (ConstantSpeed.Value) yield return (AdjustStrings.ENABLE_NO_SV_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
                 if (Mirror.Value) yield return (EzCommonModStrings.MIRROR_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
@@ -138,195 +279,35 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
                 if (Restart.Value) yield return (AdjustStrings.RESTART_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
-                if (RandomSelect.Value) yield return (AdjustStrings.RANDOM_SELECT_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
+                if (RandomColumn.Value) yield return (AdjustStrings.RANDOM_SELECT_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
                 if (TrueRandom.Value) yield return (AdjustStrings.TRUE_RANDOM_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
 
                 if (Seed.Value is not null) yield return (EzCommonModStrings.SEED_LABEL, $"Seed {Seed.Value}");
 
-                if (CustomHitRange.Value)
+                if (EnableCustomHitRange.Value)
                 {
-                    yield return ("Perfect Hit", $"{PerfectHit.Value}ms");
-                    yield return ("Great Hit", $"{GreatHit.Value}ms");
-                    yield return ("Good Hit", $"{GoodHit.Value}ms");
-                    yield return ("Ok Hit", $"{OkHit.Value}ms");
-                    yield return ("Meh Hit", $"{MehHit.Value}ms");
-                    yield return ("Miss Hit", $"{MissHit.Value}ms");
+                    yield return ("Perfect HitRange", $"{PerfectHitRange.Value}ms");
+                    yield return ("Great HitRange", $"{GreatHitRange.Value}ms");
+                    yield return ("Good HitRange", $"{GoodHitRange.Value}ms");
+                    yield return ("Ok HitRange", $"{OkHitRange.Value}ms");
+                    yield return ("Meh HitRange", $"{MehHitRange.Value}ms");
+                    yield return ("Miss HitRange", $"{MissHitRange.Value}ms");
                 }
 
                 if (CustomProportionScore.Value)
                 {
-                    yield return (new EzLocalizationManager.EzLocalisableString("完美分值", "Perfect"), $"{Perfect.Value}");
-                    yield return (new EzLocalizationManager.EzLocalisableString("极佳分值", "Great"), $"{Great.Value}");
-                    yield return (new EzLocalizationManager.EzLocalisableString("良好分值", "Good"), $"{Good.Value}");
-                    yield return (new EzLocalizationManager.EzLocalisableString("一般分值", "Ok"), $"{Ok.Value}");
-                    yield return (new EzLocalizationManager.EzLocalisableString("凑数分值", "Meh"), $"{Meh.Value}");
-                    yield return (new EzLocalizationManager.EzLocalisableString("Miss 分值", "Miss"), $"{Miss.Value}");
+                    yield return ("Perfect Score", $"{PerfectScore.Value}");
+                    yield return ("Great Score", $"{GreatScore.Value}");
+                    yield return ("Good Score", $"{GoodScore.Value}");
+                    yield return ("Ok Score", $"{OkScore.Value}");
+                    yield return ("Meh Score", $"{MehScore.Value}");
+                    yield return ("Miss Score", $"{MissScore.Value}");
                 }
             }
         }
 
-        public override string ExtendedIconInformation => "";
-
-        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SPEED_CHANGE_LABEL), nameof(EzCommonModStrings.SPEED_CHANGE_DESCRIPTION),
-            SettingControlType = typeof(MultiplierSettingsSlider))]
-        public override BindableNumber<double> SpeedChange { get; } = new BindableDouble(1)
-        {
-            MinValue = 0.1,
-            MaxValue = 2.5,
-            Precision = 0.025
-        };
-
-        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.ADJUST_PITCH_LABEL), nameof(EzCommonModStrings.ADJUST_PITCH_DESCRIPTION))]
-        public virtual BindableBool AdjustPitch { get; } = new BindableBool();
-
-        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.MIRROR_LABEL), nameof(EzCommonModStrings.MIRROR_DESCRIPTION))]
-        public BindableBool Mirror { get; } = new BindableBool();
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RANDOM_MIRROR_LABEL), nameof(AdjustStrings.RANDOM_MIRROR_DESCRIPTION))]
-        public BindableBool RandomMirror { get; } = new BindableBool(true);
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.NO_FAIL_LABEL), nameof(AdjustStrings.NO_FAIL_DESCRIPTION))]
-        public BindableBool NoFail { get; } = new BindableBool(true);
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RESTART_LABEL), nameof(AdjustStrings.RESTART_DESCRIPTION))]
-        public BindableBool Restart { get; } = new BindableBool();
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.RANDOM_SELECT_LABEL), nameof(AdjustStrings.RANDOM_SELECT_DESCRIPTION))]
-        public BindableBool RandomSelect { get; } = new BindableBool();
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.TRUE_RANDOM_LABEL), nameof(AdjustStrings.TRUE_RANDOM_DESCRIPTION))]
-        public BindableBool TrueRandom { get; } = new BindableBool();
-
-        [SettingSource(typeof(EzCommonModStrings), nameof(EzCommonModStrings.SEED_LABEL), nameof(EzCommonModStrings.SEED_DESCRIPTION), SettingControlType = typeof(SettingsNumberBox))]
-        public Bindable<int?> Seed { get; } = new Bindable<int?>();
-
-        [SettingSource(typeof(AdjustStrings), nameof(AdjustStrings.CUSTOM_HIT_RANGE_LABEL), nameof(AdjustStrings.CUSTOM_HIT_RANGE_DESCRIPTION))]
-        public BindableBool CustomHitRange { get; } = new BindableBool();
-
-        [SettingSource("Perfect")]
-        public BindableDouble PerfectHit { get; } = new BindableDouble(22.4D)
-        {
-            Precision = 0.1,
-            MinValue = 0,
-            MaxValue = 250
-        };
-
-        [SettingSource("Great")]
-        public BindableDouble GreatHit { get; } = new BindableDouble(64)
-        {
-            Precision = 0.1,
-            MinValue = 0,
-            MaxValue = 250
-        };
-
-        [SettingSource("Good")]
-        public BindableDouble GoodHit { get; } = new BindableDouble(97)
-        {
-            Precision = 0.1,
-            MinValue = 0,
-            MaxValue = 250
-        };
-
-        [SettingSource("Ok")]
-        public BindableDouble OkHit { get; } = new BindableDouble(127)
-        {
-            Precision = 0.1,
-            MinValue = 0,
-            MaxValue = 250
-        };
-
-        [SettingSource("Meh")]
-        public BindableDouble MehHit { get; } = new BindableDouble(151)
-        {
-            Precision = 0.1,
-            MinValue = 0,
-            MaxValue = 250
-        };
-
-        [SettingSource("Miss")]
-        public BindableDouble MissHit { get; } = new BindableDouble(188)
-        {
-            Precision = 0.1,
-            MinValue = 0,
-            MaxValue = 250
-        };
-
-        [SettingSource("Custom Proportion Score")]
-        public BindableBool CustomProportionScore { get; } = new BindableBool();
-
-        [SettingSource("Perfect")]
-        public BindableInt Perfect { get; } = new BindableInt(300)
-        {
-            Precision = 5,
-            MinValue = 0,
-            MaxValue = 500
-        };
-
-        [SettingSource("Great")]
-        public BindableInt Great { get; } = new BindableInt(300)
-        {
-            Precision = 5,
-            MinValue = 0,
-            MaxValue = 500
-        };
-
-        [SettingSource("Good")]
-        public BindableInt Good { get; } = new BindableInt(200)
-        {
-            Precision = 5,
-            MinValue = 0,
-            MaxValue = 500
-        };
-
-        [SettingSource("Ok")]
-        public BindableInt Ok { get; } = new BindableInt(100)
-        {
-            Precision = 5,
-            MinValue = 0,
-            MaxValue = 500
-        };
-
-        [SettingSource("Meh")]
-        public BindableInt Meh { get; } = new BindableInt(50)
-        {
-            Precision = 5,
-            MinValue = 0,
-            MaxValue = 500
-        };
-
-        [SettingSource("Miss")]
-        public BindableInt Miss { get; } = new BindableInt(0)
-        {
-            Precision = 5,
-            MinValue = 0,
-            MaxValue = 500
-        };
-
-        [SettingSource("Test")]
-        public BindableBool Test { get; } = new BindableBool();
-
-        public BindableDouble OriginalOD = new BindableDouble();
-
         private readonly RateAdjustModHelper rateAdjustHelper;
-
-        private readonly Bindable<bool> showHealthBar = new Bindable<bool>();
-
-        private readonly BindableInt combo = new BindableInt();
-
-        private readonly BindableDouble accuracy = new BindableDouble();
-
-        private Action? triggerFailureDelegate;
-
-        public bool RestartOnFail
-        {
-            get
-            {
-                if (NoFail.Value) return !NoFail.Value;
-
-                return Restart.Value;
-            }
-        }
 
         public ManiaModAdjust()
         {
@@ -335,28 +316,45 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             foreach (var (_, property) in this.GetOrderedSettingsSourceProperties())
             {
                 if (property.GetValue(this) is DifficultyBindable diffAdjustBindable)
-                    diffAdjustBindable.ExtendedLimits.BindTo(ExtendedLimits);
+                    diffAdjustBindable.ExtendedLimits.Value = true;
             }
 
             rateAdjustHelper.HandleAudioAdjustments(AdjustPitch);
         }
 
+        // private double originalOD;
+
         public void ApplyToDifficulty(BeatmapDifficulty difficulty)
         {
-            ApplySettings(difficulty);
-            AdjustHoldNote.ReleaseLenience = ReleaseLenience.Value;
-            AdjustTailNote.ReleaseLenience = ReleaseLenience.Value;
-            AdjustDrawableHoldNoteTail.ReleaseLenience = ReleaseLenience.Value;
+            // 设置会读取默认值，再对比设定值和原谱数值，如果不同则进行覆写。
+            if (DrainRate.Value != null && !Precision.AlmostEquals(DrainRate.Value.Value, difficulty.DrainRate, 0.01f))
+                difficulty.DrainRate = DrainRate.Value.Value;
 
-            if (CustomHitRange.Value)
+            if (OverallDifficulty.Value != null && !EnableCustomHitRange.Value && !Precision.AlmostEquals(OverallDifficulty.Value.Value, difficulty.OverallDifficulty, 0.01f))
+            {
+                // originalOD = difficulty.OverallDifficulty;
+                difficulty.OverallDifficulty = OverallDifficulty.Value.Value;
+            }
+
+            if (CustomRelease.Value)
+                TailNote.RELEASE_WINDOW_LENIENCE = ReleaseLenience.Value;
+            else
+            {
+                TailNote.RELEASE_WINDOW_LENIENCE = 1.5;
+            }
+            // AdjustHoldNote.ReleaseLenience = ReleaseLenience.Value;
+            // AdjustTailNote.ReleaseLenience = ReleaseLenience.Value;
+            // AdjustDrawableHoldNoteTail.ReleaseLenience = ReleaseLenience.Value;
+
+            if (EnableCustomHitRange.Value)
             {
                 ManiaHitWindows.SetModOverride(new ManiaModifyHitRange(
-                    PerfectHit.Value,
-                    GreatHit.Value,
-                    GoodHit.Value,
-                    OkHit.Value,
-                    MehHit.Value,
-                    MissHit.Value
+                    PerfectHitRange.Value,
+                    GreatHitRange.Value,
+                    GoodHitRange.Value,
+                    OkHitRange.Value,
+                    MehHitRange.Value,
+                    MissHitRange.Value
                 ));
             }
             else
@@ -376,19 +374,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
             if (ConstantSpeed.Value) maniaRuleset.VisualisationMethod = ScrollVisualisationMethod.Constant;
 
-            if (CustomRelease.Value)
-            {
-                foreach (var stage in maniaRuleset.Playfield.Stages)
-                {
-                    foreach (var column in stage.Columns) column.RegisterPool<AdjustTailNote, AdjustDrawableHoldNoteTail>(10, 50);
-                }
-            }
+            // if (CustomRelease.Value)
+            // {
+            //     foreach (var stage in maniaRuleset.Playfield.Stages)
+            //     {
+            //         foreach (var column in stage.Columns) column.RegisterPool<AdjustTailNote, AdjustDrawableHoldNoteTail>(10, 50);
+            //     }
+            // }
         }
 
         public void ApplyToBeatmap(IBeatmap beatmap)
         {
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
+            #if DEBUG
             if (Test.Value)
             {
                 var obj = maniaBeatmap;
@@ -399,8 +398,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                     Logger.Log($"Column {column.Key + 1}: {column.Count()} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 //Logger.Log($"Test:\nThis beatmap has {obj.HitObjects.Count} HitObjects.\n", level: LogLevel.Important);
             }
+            # endif
 
-            if (RandomSelect.Value)
+            if (RandomColumn.Value)
             {
                 Seed.Value ??= RNG.Next();
                 var rng = new Random((int)Seed.Value);
@@ -450,131 +450,131 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             }
         }
 
-        public bool PerformFail()
-        {
-            return !NoFail.Value;
-        }
+        #region NoFail
+
+        private readonly Bindable<bool> showHealthBar = new Bindable<bool>();
+
+        public bool PerformFail() => !NoFail.Value;
+
+        public bool RestartOnFail => !NoFail.Value && Restart.Value;
 
         public void ReadFromConfig(OsuConfigManager config)
         {
+            if (!NoFail.Value) return;
+
             config.BindWith(OsuSetting.ShowHealthDisplayWhenCantFail, showHealthBar);
         }
 
         public void ApplyToHUD(HUDOverlay overlay)
         {
+            if (!NoFail.Value) return;
+
             overlay.ShowHealthBar.BindTo(showHealthBar);
         }
 
-        public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
-        {
-            triggerFailureDelegate = healthProcessor.TriggerFailure;
-        }
+        #endregion
 
-        public ScoreRank AdjustRank(ScoreRank rank, double accuracy)
-        {
-            return rank;
-        }
+        // private readonly BindableInt combo = new BindableInt();
 
-        public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
-        {
-            combo.UnbindAll();
-            accuracy.UnbindAll();
-            combo.BindTo(scoreProcessor.Combo);
-            accuracy.BindTo(scoreProcessor.Accuracy);
-        }
+        // private readonly BindableDouble accuracy = new BindableDouble();
 
-        public void ApplyToBeatmapAfterConversion(IBeatmap beatmap)
-        {
-            var maniaBeatmap = (ManiaBeatmap)beatmap;
+        // private Action? triggerFailureDelegate;
 
-            if (CustomRelease.Value)
-            {
-                var hitObjects = maniaBeatmap.HitObjects.Select(obj =>
-                {
-                    if (obj is HoldNote hold)
-                        return new AdjustHoldNote(hold);
+        // public void ApplyToHealthProcessor(HealthProcessor healthProcessor)
+        // {
+        //     triggerFailureDelegate = healthProcessor.TriggerFailure;
+        // }
 
-                    return obj;
-                }).ToList();
+        // public void ApplyToScoreProcessor(ScoreProcessor scoreProcessor)
+        // {
+        //     combo.UnbindAll();
+        //     accuracy.UnbindAll();
+        //     combo.BindTo(scoreProcessor.Combo);
+        //     accuracy.BindTo(scoreProcessor.Accuracy);
+        // }
 
-                maniaBeatmap.HitObjects = hitObjects;
-            }
-        }
+        // public ScoreRank AdjustRank(ScoreRank rank, double accuracy)
+        // {
+        //     return rank;
+        // }
 
-        /// <summary>
-        /// Apply all custom settings to the provided beatmap.
-        /// </summary>
-        /// <param name="difficulty">The beatmap to have settings applied.</param>
-        protected void ApplySettings(BeatmapDifficulty difficulty)
-        {
-            if (DrainRate.Value != null && CustomHP.Value)
-                difficulty.DrainRate = DrainRate.Value.Value;
-
-            if (OverallDifficulty.Value != null && CustomOD.Value && !CustomHitRange.Value)
-            {
-                OriginalOD.Value = difficulty.OverallDifficulty;
-                difficulty.OverallDifficulty = OverallDifficulty.Value.Value;
-            }
-        }
-
-        public partial class AdjustDrawableHoldNoteTail : DrawableHoldNoteTail
-        {
-            public static double ReleaseLenience;
-
-            protected override void CheckForResult(bool userTriggered, double timeOffset)
-            {
-                base.CheckForResult(userTriggered, timeOffset * TailNote.RELEASE_WINDOW_LENIENCE / ReleaseLenience);
-            }
-        }
-
-        private class AdjustTailNote : TailNote
-        {
-            public override double MaximumJudgementOffset => base.MaximumJudgementOffset / RELEASE_WINDOW_LENIENCE * ReleaseLenience;
-            public static double ReleaseLenience;
-        }
-
-        private class AdjustHoldNote : HoldNote
-        {
-            public override double MaximumJudgementOffset => base.MaximumJudgementOffset / TailNote.RELEASE_WINDOW_LENIENCE * ReleaseLenience;
-            public static double ReleaseLenience;
-
-            public AdjustHoldNote(HoldNote hold)
-            {
-                StartTime = hold.StartTime;
-                Duration = hold.Duration;
-                Column = hold.Column;
-                NodeSamples = hold.NodeSamples;
-            }
-
-            protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
-            {
-                AddNested(Head = new HeadNote
-                {
-                    StartTime = StartTime,
-                    Column = Column,
-                    Samples = GetNodeSamples(0)
-                });
-
-                AddNested(Tail = new AdjustTailNote
-                {
-                    StartTime = EndTime,
-                    Column = Column,
-                    Samples = GetNodeSamples(NodeSamples?.Count - 1 ?? 1)
-                });
-
-                AddNested(Body = new HoldNoteBody
-                {
-                    StartTime = StartTime,
-                    Column = Column
-                });
-            }
-        }
+        // public void ApplyToBeatmapAfterConversion(IBeatmap beatmap)
+        // {
+        //     var maniaBeatmap = (ManiaBeatmap)beatmap;
+        //
+        //     if (CustomRelease.Value)
+        //     {
+        //         var hitObjects = maniaBeatmap.HitObjects.Select(obj =>
+        //         {
+        //             if (obj is HoldNote hold)
+        //                 return new AdjustHoldNote(hold);
+        //
+        //             return obj;
+        //         }).ToList();
+        //
+        //         maniaBeatmap.HitObjects = hitObjects;
+        //     }
+        // }
 
         public override void ResetSettingsToDefaults()
         {
             base.ResetSettingsToDefaults();
             ManiaHitWindows.ClearModOverride();
+            TailNote.RELEASE_WINDOW_LENIENCE = 1.5;
         }
+
+        // public partial class AdjustDrawableHoldNoteTail : DrawableHoldNoteTail
+        // {
+        //     public static double ReleaseLenience;
+        //
+        //     protected override void CheckForResult(bool userTriggered, double timeOffset)
+        //     {
+        //         base.CheckForResult(userTriggered, timeOffset * TailNote.RELEASE_WINDOW_LENIENCE / ReleaseLenience);
+        //     }
+        // }
+
+        // private class AdjustTailNote : TailNote
+        // {
+        //     public override double MaximumJudgementOffset => base.MaximumJudgementOffset / RELEASE_WINDOW_LENIENCE * ReleaseLenience;
+        //     public static double ReleaseLenience;
+        // }
+
+        // private class AdjustHoldNote : HoldNote
+        // {
+        //     public override double MaximumJudgementOffset => base.MaximumJudgementOffset / TailNote.RELEASE_WINDOW_LENIENCE * ReleaseLenience;
+        //     public static double ReleaseLenience;
+        //
+        //     public AdjustHoldNote(HoldNote hold)
+        //     {
+        //         StartTime = hold.StartTime;
+        //         Duration = hold.Duration;
+        //         Column = hold.Column;
+        //         NodeSamples = hold.NodeSamples;
+        //     }
+        //
+        //     protected override void CreateNestedHitObjects(CancellationToken cancellationToken)
+        //     {
+        //         AddNested(Head = new HeadNote
+        //         {
+        //             StartTime = StartTime,
+        //             Column = Column,
+        //             Samples = GetNodeSamples(0)
+        //         });
+        //
+        //         AddNested(Tail = new AdjustTailNote
+        //         {
+        //             StartTime = EndTime,
+        //             Column = Column,
+        //             Samples = GetNodeSamples(NodeSamples?.Count - 1 ?? 1)
+        //         });
+        //
+        //         AddNested(Body = new HoldNoteBody
+        //         {
+        //             StartTime = StartTime,
+        //             Column = Column
+        //         });
+        //     }
+        // }
 
         public static class AdjustStrings
         {
@@ -582,10 +582,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
             public static readonly LocalisableString RANDOM_MIRROR_LABEL = new EzLocalizationManager.EzLocalisableString("随机镜像", "Random Mirror");
             public static readonly LocalisableString RANDOM_MIRROR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("随机决定是否镜像音符", "Random Mirror. Mirror or not mirror notes by random.");
-            public static readonly LocalisableString NO_FAIL_LABEL = new EzLocalizationManager.EzLocalisableString("无失败", "No Fail");
-            public static readonly LocalisableString NO_FAIL_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("无论如何都不会失败", "No Fail. You can't fail, no matter what.");
-            public static readonly LocalisableString RESTART_LABEL = new EzLocalizationManager.EzLocalisableString("失败重启", "Restart on fail");
-            public static readonly LocalisableString RESTART_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("失败时自动重启", "Restart on fail. Automatically restarts when failed.");
+            public static readonly LocalisableString NO_FAIL_LABEL = new EzLocalizationManager.EzLocalisableString("不会失败", "No Fail");
+            public static readonly LocalisableString RESTART_LABEL = new EzLocalizationManager.EzLocalisableString("失败后重启", "Restart on fail");
             public static readonly LocalisableString RANDOM_SELECT_LABEL = new EzLocalizationManager.EzLocalisableString("随机选择", "Random");
             public static readonly LocalisableString RANDOM_SELECT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("随机排列按键", "Random. Shuffle around the keys.");
             public static readonly LocalisableString TRUE_RANDOM_LABEL = new EzLocalizationManager.EzLocalisableString("真随机", "True Random");
@@ -611,26 +609,32 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             );
 
             public static readonly LocalisableString SCORE_MULTIPLIER_LABEL = new EzLocalizationManager.EzLocalisableString("分数倍数", "Score Multiplier");
-            public static readonly LocalisableString HP_DRAIN_LABEL = new EzLocalizationManager.EzLocalisableString("HP消耗", "HP Drain");
-            public static readonly LocalisableString HP_DRAIN_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("覆盖谱面的HP设置", "Override a beatmap's set HP.");
-            public static readonly LocalisableString ADJUST_ACCURACY_LABEL = new EzLocalizationManager.EzLocalisableString("准确度", "Accuracy");
-            public static readonly LocalisableString ADJUST_ACCURACY_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("覆盖谱面的OD设置", "Override a beatmap's set OD.");
-            public static readonly LocalisableString RELEASE_LENIENCE_LABEL = new EzLocalizationManager.EzLocalisableString("释放宽容度", "Release Lenience");
+
+            public static readonly LocalisableString ENABLE_CUSTOM_HP_LABEL = new EzLocalizationManager.EzLocalisableString("启用自定义HP", "Enable Custom HP");
+            public static readonly LocalisableString HP_OVERRIDE_LABEL = new EzLocalizationManager.EzLocalisableString("HP 覆盖", "HP Drain Override");
+            public static readonly LocalisableString HP_OVERRIDE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("修改谱面的掉血速率", "Override a beatmap's HP drain rate.");
+
+            public static readonly LocalisableString ENABLE_CUSTOM_OD_LABEL = new EzLocalizationManager.EzLocalisableString("启用自定义OD", "Enable Custom OD");
+            public static readonly LocalisableString OD_OVERRIDE_LABEL = new EzLocalizationManager.EzLocalisableString("OD 覆盖", "OD Override");
+            public static readonly LocalisableString OD_OVERRIDE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("修改谱面的判定严格程度", "Override a beatmap's overall difficulty.");
+
+            public static readonly LocalisableString ENABLE_CUSTOM_RELEASE_LABEL = new EzLocalizationManager.EzLocalisableString("启用自定义LN释放", "Enable Custom LN Release");
+            public static readonly LocalisableString ENABLE_RELEASE_LENIENCE_LABEL = new EzLocalizationManager.EzLocalisableString("调整 LN 尾部的判定宽容度", "Custom LN Release Lenience");
 
             public static readonly LocalisableString RELEASE_LENIENCE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-                "调整LN尾部释放窗口宽容度。（Score v2中的尾部默认有1.5倍打击窗口）",
-                "Adjust LN tail release window lenience.(Tail in Score v2 has default 1.5x hit window)");
+                "数值越大，判定越轻松。Lazer默认为1.5x。",
+                "The larger the value, the more lenient the judgement. Lazer's default is 1.5x.");
 
-            public static readonly LocalisableString CUSTOM_HP_LABEL = new EzLocalizationManager.EzLocalisableString("自定义HP", "Custom HP");
-            public static readonly LocalisableString CUSTOM_OD_LABEL = new EzLocalizationManager.EzLocalisableString("自定义OD", "Custom OD");
-            public static readonly LocalisableString CUSTOM_RELEASE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义释放", "Custom Release");
             public static readonly LocalisableString EXTENDED_LIMITS_LABEL = new EzLocalizationManager.EzLocalisableString("扩展限制", "Extended Limits");
             public static readonly LocalisableString EXTENDED_LIMITS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("调整难度超出合理限制", "Adjust difficulty beyond sane limits.");
-            public static readonly LocalisableString ADJUST_CONSTANT_SPEED_LABEL = new EzLocalizationManager.EzLocalisableString("恒定速度", "Constant Speed");
-            public static readonly LocalisableString ADJUST_CONSTANT_SPEED_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("不再有棘手的速度变化", "No more tricky speed changes.");
 
-            public static readonly LocalisableString CUSTOM_HIT_RANGE_LABEL = new EzLocalizationManager.EzLocalisableString("自定义打击窗口", "Custom Hit Range");
-            public static readonly LocalisableString CUSTOM_HIT_RANGE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("自定义每个判定的打击窗口", "Customize hit windows for each judgement.");
+            public static readonly LocalisableString ENABLE_NO_SV_LABEL = new EzLocalizationManager.EzLocalisableString("恒定滚动速度, 无SV", "Constant Scrolling Speed, No SV");
+
+            public static readonly LocalisableString ENABLE_NO_SV_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+                "游戏中途不会出现滚动速度变化",
+                "No scrolling speed changes will occur during gameplay.");
+
+            public static readonly LocalisableString ENABLE_CUSTOM_HIT_RANGE_LABEL = new EzLocalizationManager.EzLocalisableString("启用自定义判定区间", "Enable Custom Hit Range");
         }
     }
 }

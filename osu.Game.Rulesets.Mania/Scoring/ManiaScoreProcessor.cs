@@ -19,6 +19,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
     public partial class ManiaScoreProcessor : ScoreProcessor
     {
         private const double combo_base = 4;
+        private double calOD = 8;
 
         public ManiaScoreProcessor()
             : base(new ManiaRuleset())
@@ -27,8 +28,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
         {
-            od = Mods.Value.OfType<ManiaModAdjust>().FirstOrDefault(m => m.OverallDifficulty.Value is not null && m.CustomOD.Value)
-                     ?.OverallDifficulty.Value ?? beatmap.Difficulty.OverallDifficulty;
+            calOD = Mods.Value.OfType<ManiaModAdjust>().FirstOrDefault(m => m.OverallDifficulty.Value != beatmap.Difficulty.OverallDifficulty)
+                        ?.OverallDifficulty.Value ?? beatmap.Difficulty.OverallDifficulty;
 
             return base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
         }
@@ -108,15 +109,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
-        private double od = 8;
-
         protected override void ApplyScoreChange(JudgementResult judgement)
         {
             // if (!IsLegacyScore) return;
 
             var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
             {
-                OverallDifficulty = od
+                OverallDifficulty = calOD
             };
             double offset = Math.Abs(judgement.TimeOffset);
             var result = hitWindows.ResultFor(offset);
@@ -155,7 +154,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
             {
-                OverallDifficulty = od
+                OverallDifficulty = calOD
             };
             double offset = Math.Abs(judgement.TimeOffset);
             var result = hitWindows.ResultFor(offset);

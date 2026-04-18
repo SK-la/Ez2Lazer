@@ -28,8 +28,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString ADJUST_PITCH_LABEL = new EzLocalizationManager.EzLocalisableString("调整音调", "Adjust pitch");
 
         public static readonly LocalisableString ADJUST_PITCH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
-            "速度改变时是否调整音调。（变速又变调）",
-            "Whether to adjust pitch when changing speed. (Pitch changes with rate)");
+            "歌曲播放速度改变时是否调整音调。（变速又变调）",
+            "Whether to adjust pitch when changing song rate. (Pitch changes with rate)");
 
         public static readonly LocalisableString MIRROR_LABEL = new EzLocalizationManager.EzLocalisableString("镜像", "Mirror");
         public static readonly LocalisableString MIRROR_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("左右镜像处理", "Mirror the beatmap horizontally.");

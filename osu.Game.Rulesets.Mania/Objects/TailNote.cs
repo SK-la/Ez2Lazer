@@ -5,6 +5,8 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Judgements;
 
+// ReSharper disable InconsistentNaming
+
 namespace osu.Game.Rulesets.Mania.Objects
 {
     /// <summary>
@@ -17,7 +19,7 @@ namespace osu.Game.Rulesets.Mania.Objects
         /// is timed alongside presses of other hit objects less awkward.
         /// Todo: This shouldn't exist for non-LegacyBeatmapDecoder beatmaps
         /// </summary>
-        public const double RELEASE_WINDOW_LENIENCE = 1.5;
+        public static double RELEASE_WINDOW_LENIENCE { get; set; } = 1.5D;
 
         public override Judgement CreateJudgement()
         {
