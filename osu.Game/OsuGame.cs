@@ -165,12 +165,6 @@ namespace osu.Game
         [Resolved]
         private FrameworkConfigManager frameworkConfig { get; set; }
 
-        private Bindable<FrameSync> frameSyncMode;
-
-        private GameHost gameHost;
-
-        private bool gameplayScreenActive;
-
         private DifficultyRecommender difficultyRecommender;
 
         [Cached]
@@ -366,8 +360,6 @@ namespace osu.Game
         public override void SetHost(GameHost host)
         {
             base.SetHost(host);
-
-            gameHost = host;
 
             if (host.Window != null)
             {
@@ -1063,9 +1055,6 @@ namespace osu.Game
         {
             base.LoadComplete();
 
-            frameSyncMode = frameworkConfig.GetBindable<FrameSync>(FrameworkSetting.FrameSync);
-            frameSyncMode.BindValueChanged(_ => Schedule(updateDrawLimiter), true);
-
             // The next time this is updated is in UpdateAfterChildren, which occurs too late and results
             // in the cursor being shown for a few frames during the intro.
             // This prevents the cursor from showing until we have a screen with CursorVisible = true
@@ -1757,90 +1746,6 @@ namespace osu.Game
 
                 skinEditor.SetTarget(newOsuScreen);
             }
-
-            gameplayScreenActive = newScreen is Player || newScreen is PlayerLoader;
-            Schedule(updateDrawLimiter);
-        }
-
-        private void updateDrawLimiter()
-        {
-            // 暂时屏蔽测试情况
-            // return;
-
-            if (gameHost?.Window == null)
-                return;
-
-            int refreshRate = (int)MathF.Round(gameHost.Window.CurrentDisplayMode.Value.RefreshRate);
-
-            if (refreshRate <= 240)
-                refreshRate = 300;
-
-            int drawLimiter;
-            bool shouldVSync;
-            // bool shouldThrottleTextureUploads;
-
-            if (gameplayScreenActive)
-            {
-                // gameplay 期间遵循玩家配置的帧同步（FrameSync）。
-                drawLimiter = refreshRate;
-                shouldVSync = false;
-                // shouldThrottleTextureUploads = false;
-
-                if (frameSyncMode != null)
-                {
-                    switch (frameSyncMode.Value)
-                    {
-                        case FrameSync.Limit2x:
-                            drawLimiter *= 2;
-                            break;
-
-                        case FrameSync.Limit4x:
-                            drawLimiter *= 4;
-                            break;
-
-                        case FrameSync.Limit8x:
-                            drawLimiter *= 8;
-                            break;
-
-                        default:
-                            drawLimiter = int.MaxValue;
-                            shouldVSync = frameSyncMode.Value == FrameSync.VSync;
-                            break;
-                    }
-                }
-            }
-            else
-            {
-                // 非 gameplay 场景强制按显示器刷新率的 4 倍绘制。
-                drawLimiter = refreshRate * 4;
-
-                // 额外强制关闭 VSync，避免 draw 被量化到刷新率（并尽量避免 OpenGL 下类似 glFinish 的额外停顿）。
-                shouldVSync = false;
-
-                // UI 界面在快速滚动时可能会大量流式加载纹理（封面/背景等）。
-                // 通过限制“每帧上传预算”来降低帧时间尖刺。
-                // shouldThrottleTextureUploads = false;
-            }
-
-            // 仅对 draw 应用与 framework 类似的“合理上限”限制。
-            if (!gameHost.AllowBenchmarkUnlimitedFrames)
-                drawLimiter = Math.Min(8000, drawLimiter);
-
-            gameHost.MaximumDrawHz = drawLimiter;
-            gameHost.MaximumInactiveHz = drawLimiter;
-
-            gameHost.SetVerticalSync(shouldVSync);
-
-            // if (shouldThrottleTextureUploads)
-            // {
-            //     // 偏保守的默认值：优先保证交互流畅，代价是缩略图/封面加载完成会稍慢。
-            //     // 前者提高随机速度，后者提高顺序速度。
-            //     gameHost.SetTextureUploadLimits(maxTexturesUploadedPerFrame: 12, maxPixelsUploadedPerFrame: 1024 * 1024);
-            // }
-            // else
-            // {
-            //     gameHost.RestoreTextureUploadLimits();
-            // }
         }
 
         private void screenPushed(IScreen lastScreen, IScreen newScreen) => ScreenChanged((OsuScreen)lastScreen, (OsuScreen)newScreen);
