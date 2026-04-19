@@ -7,13 +7,13 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.Select
+namespace osu.Game.EzOsuGame.UserInterface
 {
-    public partial class EzKpsDisplay : CompositeDrawable
+    public partial class EzDisplayKps : CompositeDrawable
     {
         private readonly OsuSpriteText kpsText;
 
-        public EzKpsDisplay()
+        public EzDisplayKps()
         {
             AutoSizeAxes = Axes.Both;
 

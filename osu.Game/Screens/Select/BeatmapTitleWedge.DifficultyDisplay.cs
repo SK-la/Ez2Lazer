@@ -19,6 +19,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
@@ -47,7 +48,7 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
 
-            private EzKpcDisplay ezKpcDisplay = null!;
+            private EzDisplayKpc ezDisplayKpc = null!;
 
             private ModSettingChangeTracker? settingChangeTracker;
 
@@ -199,7 +200,7 @@ namespace osu.Game.Screens.Select
                                                     },
                                                     Empty(),
                                                     // 中间列：容器自动适配并居中放置 KPC 药丸组件，避免与右侧统计重叠
-                                                    ezKpcDisplay = new EzKpcDisplay
+                                                    ezDisplayKpc = new EzDisplayKpc
                                                     {
                                                         Anchor = Anchor.CentreLeft,
                                                         Origin = Anchor.CentreLeft,
@@ -278,7 +279,7 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
-                    ezKpcDisplay.ManiaAttributes = null;
+                    ezDisplayKpc.ManiaAttributes = null;
                     return;
                 }
 
@@ -321,13 +322,13 @@ namespace osu.Game.Screens.Select
                             if (cancellationToken.IsCancellationRequested)
                                 return;
 
-                            ezKpcDisplay.ManiaAttributes = maniaAttributes;
+                            ezDisplayKpc.ManiaAttributes = maniaAttributes;
                         });
                     }
                     else
                     {
                         // 非 Mania 情况隐藏组件
-                        Schedule(() => ezKpcDisplay.ManiaAttributes = null);
+                        Schedule(() => ezDisplayKpc.ManiaAttributes = null);
                     }
 
                     Schedule(() =>

@@ -57,10 +57,10 @@ namespace osu.Game.Screens.Select
         private TrianglesV2 triangles = null!;
 
         private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
-        private EzKpsDisplay ezKpsDisplay = null!;
-        private EzKpcDisplay ezKpcDisplay = null!;
+        private EzDisplayKps ezDisplayKps = null!;
+        private EzDisplayKpc ezDisplayKpc = null!;
         private EzDisplaySR displaySR = null!;
-        private EzTagDisplay ezTagDisplay = null!;
+        private EzDisplayTag ezDisplayTag = null!;
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
@@ -213,7 +213,7 @@ namespace osu.Game.Screens.Select
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
                                         },
-                                        ezKpcDisplay = new EzKpcDisplay(),
+                                        ezDisplayKpc = new EzDisplayKpc(),
                                     },
                                 },
                                 new FillFlowContainer
@@ -223,7 +223,7 @@ namespace osu.Game.Screens.Select
                                     // Padding = new MarginPadding { Bottom = 2 },
                                     Children = new Drawable[]
                                     {
-                                        ezKpsDisplay = new EzKpsDisplay
+                                        ezDisplayKps = new EzDisplayKps
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
@@ -238,7 +238,7 @@ namespace osu.Game.Screens.Select
                                         },
                                     }
                                 },
-                                ezTagDisplay = new EzTagDisplay
+                                ezDisplayTag = new EzDisplayTag
                                 {
                                     Margin = new MarginPadding { Top = 2 },
                                     Alpha = 0.9f,
@@ -254,7 +254,7 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezKpcDisplay.KpcDisplayModeBindable);
+            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezDisplayKpc.KpcDisplayModeBindable);
 
             bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
             bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
@@ -295,7 +295,7 @@ namespace osu.Game.Screens.Select
             updateKeyCount();
 
             resetEzDisplay();
-            ezTagDisplay.Beatmap = beatmap;
+            ezDisplayTag.Beatmap = beatmap;
             computeEzAnalysis();
         }
 
@@ -307,7 +307,7 @@ namespace osu.Game.Screens.Select
             }
             else
             {
-                ezKpcDisplay.ManiaAttributes = null;
+                ezDisplayKpc.ManiaAttributes = null;
                 displaySR.Current.Value = default;
                 displaySR.Hide();
             }
@@ -352,11 +352,11 @@ namespace osu.Game.Screens.Select
             if (!resetDisplay)
                 return;
 
-            ezTagDisplay.Beatmap = null;
+            ezDisplayTag.Beatmap = null;
             scratchText = null;
 
             displaySR.Current.Value = default;
-            ezKpcDisplay.ManiaAttributes = null;
+            ezDisplayKpc.ManiaAttributes = null;
         }
 
         private void updateKPS(EzAnalysisResult ezAnalysisResult)
@@ -364,7 +364,7 @@ namespace osu.Game.Screens.Select
             double avgKPS = ezAnalysisResult.AverageKps;
             double maxKps = ezAnalysisResult.MaxKps;
             var kpsList = ezAnalysisResult.KpsList;
-            ezKpsDisplay.SetKps(avgKPS, maxKps);
+            ezDisplayKps.SetKps(avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
             if (ezAnalysisEnabled)
@@ -374,7 +374,7 @@ namespace osu.Game.Screens.Select
 
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 updateKeyCount();
-                ezKpcDisplay.ManiaAttributes = maniaAttributes;
+                ezDisplayKpc.ManiaAttributes = maniaAttributes;
                 displaySR.Current.Value = maniaAttributes ?? default;
             }
         }

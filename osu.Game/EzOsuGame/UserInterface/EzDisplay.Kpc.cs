@@ -18,9 +18,9 @@ using osu.Game.Graphics.Sprites;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.Select
+namespace osu.Game.EzOsuGame.UserInterface
 {
-    public partial class EzKpcDisplay : CompositeDrawable
+    public partial class EzDisplayKpc : CompositeDrawable
     {
         public Bindable<EzEnumChartDisplay> KpcDisplayModeBindable { get; } = new Bindable<EzEnumChartDisplay>(EzEnumChartDisplay.BarChart);
 
@@ -63,7 +63,7 @@ namespace osu.Game.Screens.Select
         private int[]? lastKnownHolds;
         private int lastKnownCount;
 
-        public EzKpcDisplay()
+        public EzDisplayKpc()
         {
             AutoSizeAxes = Axes.X;
             RelativeSizeAxes = Axes.Y;

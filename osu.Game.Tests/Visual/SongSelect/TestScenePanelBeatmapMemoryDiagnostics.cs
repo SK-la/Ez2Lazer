@@ -40,10 +40,10 @@ namespace osu.Game.Tests.Visual.SongSelect
         private WeakList<PanelBeatmapStandalone> panelWeakReferences = new WeakList<PanelBeatmapStandalone>();
         private WeakList<CarouselItem> panelItemWeakReferences = new WeakList<CarouselItem>();
         private WeakList<EzDisplayKpsGraph> graphWeakReferences = new WeakList<EzDisplayKpsGraph>();
-        private WeakList<EzKpsDisplay> kpsWeakReferences = new WeakList<EzKpsDisplay>();
-        private WeakList<EzKpcDisplay> kpcWeakReferences = new WeakList<EzKpcDisplay>();
+        private WeakList<EzDisplayKps> kpsWeakReferences = new WeakList<EzDisplayKps>();
+        private WeakList<EzDisplayKpc> kpcWeakReferences = new WeakList<EzDisplayKpc>();
         private WeakList<EzDisplaySR> xxyWeakReferences = new WeakList<EzDisplaySR>();
-        private WeakList<EzTagDisplay> tagWeakReferences = new WeakList<EzTagDisplay>();
+        private WeakList<EzDisplayTag> tagWeakReferences = new WeakList<EzDisplayTag>();
         private WeakList<CompositeDrawable> componentHostWeakReferences = new WeakList<CompositeDrawable>();
 
         private PanelBeatmapStandalone? reusablePanel;
@@ -182,10 +182,10 @@ namespace osu.Game.Tests.Visual.SongSelect
             panelWeakReferences = new WeakList<PanelBeatmapStandalone>();
             panelItemWeakReferences = new WeakList<CarouselItem>();
             graphWeakReferences = new WeakList<EzDisplayKpsGraph>();
-            kpsWeakReferences = new WeakList<EzKpsDisplay>();
-            kpcWeakReferences = new WeakList<EzKpcDisplay>();
+            kpsWeakReferences = new WeakList<EzDisplayKps>();
+            kpcWeakReferences = new WeakList<EzDisplayKpc>();
             xxyWeakReferences = new WeakList<EzDisplaySR>();
-            tagWeakReferences = new WeakList<EzTagDisplay>();
+            tagWeakReferences = new WeakList<EzDisplayTag>();
             componentHostWeakReferences = new WeakList<CompositeDrawable>();
             reusablePanel = null;
             beatmapIndex = 0;

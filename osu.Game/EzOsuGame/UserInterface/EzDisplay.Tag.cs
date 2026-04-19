@@ -10,18 +10,19 @@ using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.Beatmaps;
-using osu.Game.Graphics;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
+using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
+using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
+using osu.Game.Screens.Select;
 using osuTK;
 
-namespace osu.Game.Screens.Select
+namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
     /// Tag 组件专用的最终显示数据。
@@ -44,7 +45,7 @@ namespace osu.Game.Screens.Select
     /// <summary>
     /// 用于在难度卡底部显示标签的组件，包括用户标签、视频标签、故事版标签
     /// </summary>
-    public partial class EzTagDisplay : CompositeDrawable
+    public partial class EzDisplayTag : CompositeDrawable
     {
         private const int max_visible_tags = 10;
         private const float tag_corner_radius = 3;
@@ -113,7 +114,7 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private ISongSelect? songSelect { get; set; }
 
-        public EzTagDisplay()
+        public EzDisplayTag()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
