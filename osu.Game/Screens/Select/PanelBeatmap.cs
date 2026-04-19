@@ -64,10 +64,9 @@ namespace osu.Game.Screens.Select
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
-        private IBindable<bool> ezAnalysisCacheEnabled = new BindableBool(true);
-        private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
         private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
+        private bool ezAnalysisEnabled;
         private string? scratchText;
         private const int mania_ui_update_throttle_ms = 15;
 
@@ -257,11 +256,13 @@ namespace osu.Game.Screens.Select
 
             ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezKpcDisplay.KpcDisplayModeBindable);
 
-            ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
-            ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+            bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
+            bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
 
             ruleset.BindValueChanged(_ =>
             {
+                ezAnalysisEnabled = ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled);
+
                 resetEzDisplay();
                 updateKeyCount();
             }, true);
@@ -300,7 +301,7 @@ namespace osu.Game.Screens.Select
 
         private void resetEzDisplay()
         {
-            if (ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled.Value || ezAnalysisSqliteEnabled.Value))
+            if (ezAnalysisEnabled)
             {
                 displayXxySR.Show();
             }
@@ -366,7 +367,7 @@ namespace osu.Game.Screens.Select
             ezKpsDisplay.SetKps(avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
-            if (ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled.Value || ezAnalysisSqliteEnabled.Value))
+            if (ezAnalysisEnabled)
             {
                 var maniaAttributes = ezAnalysisResult.ManiaAttributes;
                 var columnCounts = maniaAttributes?.ColumnCounts ?? new Dictionary<int, int>();
@@ -380,7 +381,7 @@ namespace osu.Game.Screens.Select
 
         private void computeEzAnalysis()
         {
-            if (!ezAnalysisCacheEnabled.Value && !ezAnalysisSqliteEnabled.Value)
+            if (!ezAnalysisEnabled)
                 return;
 
             ezAnalysisCancellationSource?.Cancel();

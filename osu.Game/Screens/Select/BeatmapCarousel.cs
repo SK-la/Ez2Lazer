@@ -27,10 +27,10 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
-using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Scoring;
@@ -145,7 +145,7 @@ namespace osu.Game.Screens.Select
             AddInternal(loading = new LoadingLayer());
 
 #if DEBUG
-            // Lightweight on-screen instrumentation for development.
+            // 调试用，显示过滤耗时
             var debugText = new OsuSpriteText
             {
                 Anchor = Anchor.TopLeft,
@@ -171,18 +171,9 @@ namespace osu.Game.Screens.Select
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
         }
 
-        private bool useActiveSongsBranchAsBeatmapSource
-        {
-            get
-            {
-                if (!ezAnalysisSqliteEnabled.Value)
-                    return false;
+        private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.HasActiveSongsBranchFor(ruleset.Value);
 
-                return ezAnalysisCache.HasActiveSongsBranchFor(ruleset.Value);
-            }
-        }
-
-        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && (xxySrFilterSetting.Value || useActiveSongsBranchAsBeatmapSource);
+        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && xxySrFilterSetting.Value;
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getActiveBranchDifficultiesAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {

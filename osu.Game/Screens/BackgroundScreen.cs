@@ -21,12 +21,6 @@ namespace osu.Game.Screens
 
         public bool AnimateEntry { get; set; } = true;
 
-        /// <summary>
-        /// 是否应该在这个背景屏上禁用视差效果。
-        /// 禁用后，背景将保持静态，不会响应鼠标移动。
-        /// </summary>
-        public bool DisableParallax { get; set; }
-
         protected BackgroundScreen()
         {
             Anchor = Anchor.Centre;
@@ -53,9 +47,7 @@ namespace osu.Game.Screens
         protected override void Update()
         {
             base.Update();
-
-            if (!DisableParallax)
-                Scale = new Vector2(1 + x_movement_amount / DrawSize.X * 2);
+            Scale = new Vector2(1 + x_movement_amount / DrawSize.X * 2);
         }
 
         public override void OnEntering(ScreenTransitionEvent e)

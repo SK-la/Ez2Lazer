@@ -754,6 +754,15 @@ namespace osu.Game.Screens.Select
             return base.OnExiting(e);
         }
 
+        /// <summary>
+        /// 获取当前过滤后的谱面列表（无谱包头，仅难度）。
+        /// 直接委托给 BeatmapCarousel.GetFilteredBeatmaps()，利用其内部优化。
+        /// </summary>
+        private IReadOnlyList<BeatmapInfo> getFilteredBeatmaps()
+        {
+            return carousel.GetFilteredBeatmaps();
+        }
+
         private void onArrivingAtScreen()
         {
             if (manageCollectionsDialog != null)
@@ -789,8 +798,6 @@ namespace osu.Game.Screens.Select
             Beatmap.BindValueChanged(updateVariousState, true);
             Ruleset.BindValueChanged(updateBeatmapPreviewSelection);
             Mods.BindValueChanged(updatePreviewSelectionFromModsChange);
-
-            // ezBeatmapPreviewOverlay.RestoreRememberedState();
         }
 
         private void updateVariousState(ValueChangedEvent<WorkingBeatmap> e)
@@ -885,19 +892,6 @@ namespace osu.Game.Screens.Select
             updateWedgeVisibility();
 
             endLooping();
-        }
-
-        private IEnumerable<BeatmapInfo> getFilteredBeatmaps()
-        {
-            var items = carousel.GetCarouselItems();
-
-            if (items == null)
-                return Enumerable.Empty<BeatmapInfo>();
-
-            return items.Select(i => i.Model)
-                        .OfType<GroupedBeatmap>()
-                        .Select(gb => gb.Beatmap)
-                        .DistinctBy(b => b.MD5Hash);
         }
 
         protected override void LogoArriving(OsuLogo logo, bool resuming)
@@ -1262,7 +1256,6 @@ namespace osu.Game.Screens.Select
                 return;
 
             onlineLookupCancellation?.Cancel();
-            onlineLookupCancellation?.Dispose();
             onlineLookupCancellation = null;
 
             if (beatmapSetInfo.OnlineID < 0)
@@ -1426,15 +1419,6 @@ namespace osu.Game.Screens.Select
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
-
-            previewPlayableCancellation?.Cancel();
-            previewPlayableCancellation?.Dispose();
-            previewPlayableCancellation = null;
-
-            onlineLookupCancellation?.Cancel();
-            onlineLookupCancellation?.Dispose();
-            onlineLookupCancellation = null;
-
             modSelectOverlayRegistration?.Dispose();
         }
     }

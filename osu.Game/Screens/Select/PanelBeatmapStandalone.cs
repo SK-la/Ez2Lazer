@@ -68,11 +68,9 @@ namespace osu.Game.Screens.Select
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
-        private IBindable<bool> ezAnalysisCacheEnabled = new BindableBool(true);
-        private IBindable<bool> ezAnalysisSqliteEnabled = new BindableBool(true);
-
         private ScheduledDelegate? scheduledEzAnalysisUpdate;
 
+        private bool ezAnalysisEnabled;
         private string? scratchText;
 
         private const int mania_ui_update_throttle_ms = 15;
@@ -270,19 +268,18 @@ namespace osu.Game.Screens.Select
             ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezKpcDisplay.KpcDisplayModeBindable);
             // 不订阅 ez 分析开关变更；统一依赖 panel 生命周期（PrepareForUse/FreeAfterUse）进行刷新。
             // 这样可减少滚动场景下的回调抖动与绑定链复杂度。
-            ezAnalysisCacheEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled);
-            ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+            bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
+            bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
 
             ruleset.BindValueChanged(_ =>
             {
+                ezAnalysisEnabled = ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled);
+
                 resetEzDisplay();
                 updateKeyCount();
             }, true);
 
-            mods.BindValueChanged(_ =>
-            {
-                updateKeyCount();
-            }, true);
+            mods.BindValueChanged(_ => updateKeyCount(), true);
 
             Selected.BindValueChanged(s =>
             {
@@ -297,7 +294,12 @@ namespace osu.Game.Screens.Select
 
             var beatmapSet = beatmap.BeatmapSet!;
 
-            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
+            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b =>
+            {
+                var workingBeatmap = beatmaps.GetWorkingBeatmap(b);
+                beatmapBackground.Beatmap = workingBeatmap;
+                ezTagDisplay.Working = workingBeatmap;
+            }, beatmap, 50);
 
             titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
             artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
@@ -315,13 +317,12 @@ namespace osu.Game.Screens.Select
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
 
-            ezTagDisplay.Beatmap = beatmap;
             computeEzAnalysis();
         }
 
         private void resetEzDisplay()
         {
-            if (ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled.Value || ezAnalysisSqliteEnabled.Value))
+            if (ezAnalysisEnabled)
             {
                 displayXxySR.Show();
             }
@@ -367,7 +368,7 @@ namespace osu.Game.Screens.Select
             if (!resetDisplay)
                 return;
 
-            ezTagDisplay.Beatmap = null;
+            ezTagDisplay.Working = null;
             scratchText = null;
 
             displayXxySR.Current.Value = default;
@@ -382,7 +383,7 @@ namespace osu.Game.Screens.Select
             ezKpsDisplay.SetKps(avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
-            if (ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled.Value || ezAnalysisSqliteEnabled.Value))
+            if (ezAnalysisEnabled)
             {
                 var maniaAttributes = ezAnalysisResult.ManiaAttributes;
                 var columnCounts = maniaAttributes?.ColumnCounts ?? new Dictionary<int, int>();
@@ -396,7 +397,7 @@ namespace osu.Game.Screens.Select
 
         private void computeEzAnalysis()
         {
-            if (!ezAnalysisCacheEnabled.Value && !ezAnalysisSqliteEnabled.Value)
+            if (!ezAnalysisEnabled)
                 return;
 
             ezAnalysisCancellationSource?.Cancel();

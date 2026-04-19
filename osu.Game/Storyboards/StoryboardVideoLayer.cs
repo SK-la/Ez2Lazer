@@ -22,7 +22,7 @@ namespace osu.Game.Storyboards
         public partial class DrawableStoryboardVideoLayer : DrawableStoryboardLayer
         {
             private DrawableStoryboard? drawableStoryboard;
-            private readonly Bindable<bool> autoVideSizeEnable;
+            private readonly bool autoVideSizeEnable;
 
             public DrawableStoryboardVideoLayer(StoryboardVideoLayer layer)
                 : base(layer)
@@ -32,7 +32,7 @@ namespace osu.Game.Storyboards
                 ElementContainer.RelativeSizeAxes = Axes.Both;
                 ElementContainer.Size = Vector2.One;
 
-                autoVideSizeEnable = GlobalConfigStore.EzConfig.GetBindable<bool>(Ez2Setting.StoryboardAutoVideoSize);
+                autoVideSizeEnable = GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.StoryboardAutoVideoSize);
             }
 
             // 在 LoadComplete() 缓存 DrawableStoryboard 引用（不再每帧向上找父级）。
@@ -41,7 +41,7 @@ namespace osu.Game.Storyboards
             {
                 base.LoadComplete();
 
-                if (autoVideSizeEnable.Value)
+                if (autoVideSizeEnable)
                 {
                     Drawable? current = Parent;
 
@@ -62,7 +62,7 @@ namespace osu.Game.Storyboards
             {
                 base.Update();
 
-                if (autoVideSizeEnable.Value)
+                if (autoVideSizeEnable)
                 {
                     // When storyboard uses legacy 640x480 coordinates, it can be narrower than the actual screen.
                     // Expand the video layer to match the outer container so video can truly fill the screen.

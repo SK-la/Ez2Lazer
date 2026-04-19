@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using osu.Framework.Extensions;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Utils;
@@ -98,17 +97,6 @@ namespace osu.Game.Screens.Select
 
             BeatmapItemsCount = countMatching;
             return matchedItems;
-        }
-
-        private static bool checkDifficultyCriteriaMatch(FilterCriteria criteria, double starDifficultyForFilter)
-        {
-            if (criteria.StarDifficulty.HasFilter && !criteria.StarDifficulty.IsInRange(starDifficultyForFilter.FloorToDecimalDigits(2)))
-                return false;
-
-            if (criteria.UserStarDifficulty.HasFilter && !criteria.UserStarDifficulty.IsInRange(starDifficultyForFilter))
-                return false;
-
-            return true;
         }
 
         public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter)
