@@ -298,6 +298,7 @@ namespace osu.Game.Screens.Select
             {
                 var workingBeatmap = beatmaps.GetWorkingBeatmap(b);
                 beatmapBackground.Beatmap = workingBeatmap;
+                ezDisplayTag.TagSummary = null;
                 ezDisplayTag.Working = workingBeatmap;
             }, beatmap, 50);
 
@@ -369,6 +370,7 @@ namespace osu.Game.Screens.Select
                 return;
 
             ezDisplayTag.Working = null;
+            ezDisplayTag.TagSummary = null;
             scratchText = null;
 
             displaySR.Current.Value = EzManiaSummary.EMPTY;
@@ -387,6 +389,9 @@ namespace osu.Game.Screens.Select
             {
                 var maniaSummary = ezAnalysisResult.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
+
+                if (ezAnalysisResult.TagSummary != null)
+                    ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
 
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 updateKeyCount();

@@ -70,6 +70,9 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string xxy_sr_branch_kind = "xxy_sr_branch";
         private const int xxy_sr_branch_schema_version = 1;
 
+        // 兼容策略：v3 及以前版本不考虑就地兼容。只有 v4（及以后）才考虑就地升级以避免重算。
+        private const int min_inplace_upgrade_version = 4;
+
         // 手动维护：算法/序列化格式变更时递增。版本发生变化时，会强制重算所有已存条目。
         // 注意：此版本号与 osu! 官方服务器端的版本号无关，仅用于本地持久化存储的失效控制。
         // 注意：更新版本号后，务必通过注释保存旧版本的变更记录，方便日后排查问题。
@@ -77,7 +80,8 @@ namespace osu.Game.EzOsuGame.Analysis
         // v3: 添加 hold_note_counts_json 字段，分离普通note和长按note统计
         // v4: 添加 beatmap_md5 校验字段；kps_list_json 仅保存用于 UI 的下采样曲线（<=256 点）。
         // v5: 删除scratchText存储，改为动态计算。数据库可兼容，不升版。
-        public const int ANALYSIS_VERSION = 5;
+        // v6: 重建为主体主表 + mania 扩展表 + tag group 的切片结构，修改LN因子数值为5.5。
+        public const int ANALYSIS_VERSION = 6;
 
         // 列定义集中管理：避免在代码中到处硬写列名，便于审计与迁移。
         private record ColumnInfo(string Name, bool Required = true);
@@ -124,9 +128,6 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly ConcurrentDictionary<Guid, PendingWrite> pendingWrites = new ConcurrentDictionary<Guid, PendingWrite>();
         private CancellationTokenSource? writeCts;
         private Task? backgroundWriterTask;
-
-        // 兼容策略：v3 及以前版本不考虑就地兼容。只有 v4（及以后）才考虑就地升级以避免重算。
-        private const int min_inplace_upgrade_version = 4;
 
         // 常量化的表名与 meta key，避免在代码中散落硬编码字符串。
         private const string table_mania_analysis = "mania_analysis";
@@ -182,85 +183,11 @@ namespace osu.Game.EzOsuGame.Analysis
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 
-                    // If this is a new versioned DB file, attempt to clone from the latest previous version to avoid
-                    // forcing a full recompute (when changes are only schema/serialization related).
-                    tryClonePreviousDatabaseIfMissing();
-
                     Logger.Log($"EzManiaAnalysisPersistentStore path: {dbPath}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
 
                     using var connection = openConnection();
 
-                    using (var cmd = connection.CreateCommand())
-                    {
-                        cmd.CommandText = @"
-PRAGMA journal_mode=WAL;
-PRAGMA synchronous=NORMAL;
-PRAGMA temp_store=MEMORY;
-";
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    using (var cmd = connection.CreateCommand())
-                    {
-                        // 确保 meta 表存在（集中管理），再创建主分析表。
-                        ensureMetaTableExists(connection);
-
-                        cmd.CommandText = $@"
-CREATE TABLE IF NOT EXISTS {table_mania_analysis} (
-    {col_beatmap_id} TEXT PRIMARY KEY,
-    {col_beatmap_hash} TEXT NOT NULL,
-    {col_beatmap_md5} TEXT NOT NULL,
-    {col_analysis_version} INTEGER NOT NULL,
-    {col_average_kps} REAL NOT NULL,
-    {col_max_kps} REAL NOT NULL,
-    {col_kps_list_json} TEXT NOT NULL,
-    {col_xxy_sr} REAL NULL,
-    {col_column_counts_json} TEXT NOT NULL,
-    {col_hold_note_counts_json} TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON {table_mania_analysis}({col_analysis_version});
-";
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    ensureCollectionHideTables(connection);
-
-                    // 从旧版本平滑升级：如果缺少列则补齐（SQLite 不支持 IF NOT EXISTS 语法的 ADD COLUMN）。
-                    if (!hasColumn(connection, table_mania_analysis, col_kps_list_json))
-                    {
-                        using var cmd = connection.CreateCommand();
-                        cmd.CommandText = $"ALTER TABLE {table_mania_analysis} ADD COLUMN {col_kps_list_json} TEXT NOT NULL DEFAULT '[]';";
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    if (!hasColumn(connection, table_mania_analysis, col_hold_note_counts_json))
-                    {
-                        using var cmd = connection.CreateCommand();
-                        cmd.CommandText = $"ALTER TABLE {table_mania_analysis} ADD COLUMN {col_hold_note_counts_json} TEXT NOT NULL DEFAULT '{{}}';";
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    if (!hasColumn(connection, table_mania_analysis, col_beatmap_md5))
-                    {
-                        using var cmd = connection.CreateCommand();
-                        cmd.CommandText = $"ALTER TABLE {table_mania_analysis} ADD COLUMN {col_beatmap_md5} TEXT NOT NULL DEFAULT '';";
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    // Store the current analysis version as meta (informational).
-                    setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
-
-                    // Ensure last_updated column exists for bookkeeping (minimal schema extension).
-                    if (!hasColumn(connection, table_mania_analysis, col_last_updated))
-                    {
-                        using var add = connection.CreateCommand();
-                        add.CommandText = $"ALTER TABLE {table_mania_analysis} ADD COLUMN {col_last_updated} INTEGER NOT NULL DEFAULT 0;";
-                        add.ExecuteNonQuery();
-                    }
-
-                    // 检查并清理不需要的列（处理版本升级时删除的字段）
-                    cleanupUnrecognizedColumns(connection);
+                    EzAnalysisSchemaManager.InitializeMainDatabase(connection);
 
                     initialised = true;
 
@@ -304,119 +231,27 @@ CREATE INDEX IF NOT EXISTS idx_mania_analysis_version ON {table_mania_analysis}(
             {
                 Initialise();
 
-                // If we have a pending write for this beatmap, prefer that (latest in-memory result).
-                if (pendingWrites.TryGetValue(beatmap.ID, out var pending))
+                pendingWrites.TryGetValue(beatmap.ID, out var pending);
+
+                using var connection = openConnection();
+
+                if (EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE))
+                    return false;
+
+                if (!tryGetRawData(connection, beatmap, out var storedAnalysis))
                 {
-                    // Basic validation against hash to avoid returning stale pending for different beatmap content.
-                    if (string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
                     {
                         result = pending.Analysis;
                         return true;
                     }
-                    // otherwise fall through to DB lookup
-                }
 
-                using var connection = openConnection();
-
-                string storedHash;
-                string storedMd5;
-                int storedVersion;
-                double averageKps;
-                double maxKps;
-                string kpsListJson;
-                double? xxySr;
-                string columnCountsJson;
-                string holdNoteCountsJson;
-
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.CommandText = $@"
-SELECT {col_beatmap_hash}, {col_beatmap_md5}, {col_analysis_version}, {col_average_kps}, {col_max_kps}, {col_kps_list_json}, {col_xxy_sr}, {col_column_counts_json}, {col_hold_note_counts_json}
-FROM {table_mania_analysis}
-WHERE {col_beatmap_id} = $id
-LIMIT 1;
-";
-                    cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
-
-                    using var reader = cmd.ExecuteReader();
-
-                    if (!reader.Read())
-                        return false;
-
-                    storedHash = reader.GetString(0);
-                    storedMd5 = reader.GetString(1);
-                    storedVersion = reader.GetInt32(2);
-                    averageKps = reader.GetDouble(3);
-                    maxKps = reader.GetDouble(4);
-                    kpsListJson = reader.GetString(5);
-                    xxySr = reader.IsDBNull(6) ? null : reader.GetDouble(6);
-                    columnCountsJson = reader.GetString(7);
-                    holdNoteCountsJson = reader.GetString(8);
-                }
-
-                if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
-                {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_hash mismatch for {beatmap.ID}: stored={storedHash} runtime={beatmap.Hash}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     return false;
                 }
 
-                // md5 validation:
-                // - If stored md5 is empty (older versions), accept hash match and upgrade in-place.
-                // - If stored md5 is present, require it to match.
-                if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
-                {
-                    Logger.Log($"[EzManiaAnalysisPersistentStore] stored_md5 mismatch for {beatmap.ID}: stored={storedMd5} runtime={beatmap.MD5Hash}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                    return false;
-                }
-
-                // If the stored version is newer than this build, ignore and let caller recompute.
-                if (storedVersion > ANALYSIS_VERSION)
-                    return false;
-
-                var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
-                var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
-                var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
-
-                // If DB-level 强制重建 开关被设置，则对低于当前版本的条目直接视为 miss，避免就地升级逻辑。
-                try
-                {
-                    if (getMetaBool(connection, meta_key_force_recompute) && storedVersion < ANALYSIS_VERSION)
-                        return false;
-                }
-                catch
-                {
-                    // ignore meta read failures and fall back to default behavior
-                }
-
-                // Allow in-place upgrade of compatible older entries to avoid full recompute.
-                // If an older version is not compatible, treat it as a miss.
-                if (storedVersion != ANALYSIS_VERSION)
-                {
-                    // 对表头一致性进行检查，只有在表头与期待列一致时才允许就地升级。
-                    bool schemaCompatible = isTableSchemaCompatible(connection, table_mania_analysis);
-
-                    if (!canUpgradeInPlace(storedVersion, schemaCompatible))
-                        return false;
-
-                    bool mutated = string.IsNullOrEmpty(storedMd5);
-
-                    // v4: store md5 for extra safety (hash already guards real content).
-
-                    // v4: kps_list_json is UI graph only; keep it capped for perf.
-                    if (kpsList.Count > OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS)
-                    {
-                        kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
-                        mutated = true;
-                    }
-
-                    if (mutated)
-                    {
-                        // Persist the upgraded row (without recomputing analysis).
-                        writeUpgradedRow(connection, beatmap, averageKps, maxKps, kpsList, xxySr, columnCounts, holdNoteCounts);
-                    }
-                }
-
-                result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), new EzManiaSummary(columnCounts, holdNoteCounts, xxySr));
+                result = pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal)
+                    ? mergeAnalysisResult(storedAnalysis, pending.Analysis)
+                    : storedAnalysis;
 
                 // Validate the analysis result to ensure it's reasonable
                 if (!isValidAnalysisResult(result))
@@ -473,20 +308,8 @@ LIMIT 1;
 
                 using var connection = openConnection();
 
-                // 读取 DB 层面的强制重建开关（若存在）以在批量读取时应用统一策略。
-                bool forceRecompute = false;
-
-                try
-                {
-                    forceRecompute = getMetaBool(connection, meta_key_force_recompute);
-                }
-                catch
-                {
-                    // ignore meta read failures
-                }
-
-                // 预先判断表头是否与期望列集合一致；只有在表头一致时才考虑就地升级。
-                bool schemaCompatible = isTableSchemaCompatible(connection, table_mania_analysis);
+                if (EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE))
+                    return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
 
                 for (int offset = 0; offset < idsNeedingDatabaseLookup.Count; offset += 800)
                 {
@@ -503,10 +326,16 @@ LIMIT 1;
                     }
 
                     cmd.CommandText = $@"
-SELECT {col_beatmap_id}, {col_beatmap_hash}, {col_beatmap_md5}, {col_analysis_version}, {col_xxy_sr}
-FROM {table_mania_analysis}
-WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
-    AND {col_xxy_sr} IS NOT NULL;
+SELECT entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID},
+       entry.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
+       entry.{EzAnalysisSchemaManager.COL_BEATMAP_MD5},
+       mania.{EzAnalysisSchemaManager.COL_XXY_SR}
+FROM {EzAnalysisSchemaManager.TABLE_ENTRY} entry
+JOIN {EzAnalysisSchemaManager.TABLE_MANIA} mania
+    ON mania.{EzAnalysisSchemaManager.COL_BEATMAP_ID} = entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID}
+WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} IN ({string.Join(", ", parameterNames)})
+    AND mania.{EzAnalysisSchemaManager.COL_UPDATED_AT} > 0
+    AND mania.{EzAnalysisSchemaManager.COL_XXY_SR} IS NOT NULL;
 ";
 
                     using var reader = cmd.ExecuteReader();
@@ -521,7 +350,6 @@ WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
 
                         string storedHash = reader.GetString(1);
                         string storedMd5 = reader.GetString(2);
-                        int storedVersion = reader.GetInt32(3);
 
                         if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                             continue;
@@ -529,16 +357,7 @@ WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
                         if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
                             continue;
 
-                        if (storedVersion > ANALYSIS_VERSION)
-                            continue;
-
-                        if (forceRecompute && storedVersion < ANALYSIS_VERSION)
-                            continue;
-
-                        if (storedVersion != ANALYSIS_VERSION && !canUpgradeInPlace(storedVersion, schemaCompatible))
-                            continue;
-
-                        resolvedValues[beatmapId] = reader.GetDouble(4);
+                        resolvedValues[beatmapId] = reader.GetDouble(3);
                     }
                 }
 
@@ -585,6 +404,12 @@ WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
 
                 using var connection = openConnection();
 
+                if (EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE))
+                {
+                    Store(beatmap, analysis);
+                    return;
+                }
+
                 // 尝试从 SQLite 读取旧数据
                 if (!tryGetRawData(connection, beatmap, out var storedAnalysis))
                 {
@@ -592,6 +417,9 @@ WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
                     Store(beatmap, analysis);
                     return;
                 }
+
+                if (analysis.TagSummary == null && storedAnalysis.TagSummary != null)
+                    analysis = analysis.WithTagSummary(storedAnalysis.TagSummary);
 
                 // 对比两个结果是否有差异
                 if (hasDifference(storedAnalysis, analysis))
@@ -615,22 +443,28 @@ WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
 
             try
             {
-                // Check pending writes first to ensure we return the freshest data even if not flushed.
-                if (pendingWrites.TryGetValue(beatmap.ID, out var pending))
-                {
-                    if (string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
-                    {
-                        result = pending.Analysis;
-                        return true;
-                    }
-                }
+                pendingWrites.TryGetValue(beatmap.ID, out var pending);
 
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = $@"
-SELECT average_kps, max_kps, kps_list_json, xxy_sr, column_counts_json, hold_note_counts_json
-FROM {table_mania_analysis}
-WHERE beatmap_id = $id
+SELECT entry.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
+       entry.{EzAnalysisSchemaManager.COL_BEATMAP_MD5},
+       entry.{EzAnalysisSchemaManager.COL_RULESET_ONLINE_ID},
+       entry.{EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
+       entry.{EzAnalysisSchemaManager.COL_AVERAGE_KPS},
+       entry.{EzAnalysisSchemaManager.COL_MAX_KPS},
+       entry.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
+       entry.{EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
+       entry.{EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON},
+       mania.{EzAnalysisSchemaManager.COL_UPDATED_AT},
+       mania.{EzAnalysisSchemaManager.COL_XXY_SR},
+       mania.{EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
+       mania.{EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON}
+FROM {EzAnalysisSchemaManager.TABLE_ENTRY} entry
+LEFT JOIN {EzAnalysisSchemaManager.TABLE_MANIA} mania
+    ON mania.{EzAnalysisSchemaManager.COL_BEATMAP_ID} = entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID}
+WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id
 LIMIT 1;
 ";
                     cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
@@ -638,20 +472,57 @@ LIMIT 1;
                     using var reader = cmd.ExecuteReader();
 
                     if (!reader.Read())
+                    {
+                        if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                        {
+                            result = pending.Analysis;
+                            return true;
+                        }
+
+                        return false;
+                    }
+
+                    string storedHash = reader.GetString(0);
+                    string storedMd5 = reader.GetString(1);
+                    int storedRulesetOnlineId = reader.GetInt32(2);
+                    long commonUpdatedAt = reader.GetInt64(3);
+
+                    if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
                         return false;
 
-                    double averageKps = reader.GetDouble(0);
-                    double maxKps = reader.GetDouble(1);
-                    string kpsListJson = reader.GetString(2);
-                    double? xxySr = reader.IsDBNull(3) ? null : reader.GetDouble(3);
-                    string columnCountsJson = reader.GetString(4);
-                    string holdNoteCountsJson = reader.GetString(5);
+                    if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                        return false;
+
+                    if (storedRulesetOnlineId != beatmap.Ruleset.OnlineID)
+                        return false;
+
+                    if (commonUpdatedAt <= 0)
+                        return false;
+
+                    double averageKps = reader.GetDouble(4);
+                    double maxKps = reader.GetDouble(5);
+                    string kpsListJson = reader.GetString(6);
+                    long tagUpdatedAt = reader.GetInt64(7);
+                    string tagPayloadJson = reader.GetString(8);
+                    long maniaUpdatedAt = reader.IsDBNull(9) ? 0 : reader.GetInt64(9);
+                    double? xxySr = reader.IsDBNull(10) ? null : reader.GetDouble(10);
+                    string columnCountsJson = reader.IsDBNull(11) ? "{}" : reader.GetString(11);
+                    string holdNoteCountsJson = reader.IsDBNull(12) ? "{}" : reader.GetString(12);
 
                     var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                     var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
                     var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
 
-                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), new EzManiaSummary(columnCounts, holdNoteCounts, xxySr));
+                    EzManiaSummary? maniaSummary = storedRulesetOnlineId == 3 && maniaUpdatedAt > 0
+                        ? new EzManiaSummary(columnCounts, holdNoteCounts, xxySr)
+                        : null;
+
+                    EzBeatmapTagSummary? tagSummary = deserializeTagSummary(tagPayloadJson, tagUpdatedAt);
+
+                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), maniaSummary, tagSummary);
+
+                    if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                        result = mergeAnalysisResult(result, pending.Analysis);
 
                     return true;
                 }
@@ -720,6 +591,9 @@ LIMIT 1;
                     return true;
             }
 
+            if (stored.TagSummary != computed.TagSummary)
+                return true;
+
             return false;
         }
 
@@ -769,9 +643,17 @@ LIMIT 1;
             }
         }
 
-        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps) => GetBeatmapsNeedingRecompute(beatmaps, progress: null);
+        public bool NeedsOnDemandBackfill(BeatmapInfo beatmap)
+        {
+            if (!Enabled)
+                return false;
 
-        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps, Action<int, int>? progress)
+            return !TryGet(beatmap, out var storedAnalysis) || storedAnalysis.TagSummary == null;
+        }
+
+        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash, int rulesetOnlineId)> beatmaps) => GetBeatmapsNeedingRecompute(beatmaps, progress: null);
+
+        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash, int rulesetOnlineId)> beatmaps, Action<int, int>? progress)
         {
             if (!Enabled)
                 return Array.Empty<Guid>();
@@ -780,44 +662,55 @@ LIMIT 1;
             {
                 Initialise();
 
-                var beatmapList = beatmaps as IList<(Guid id, string hash)> ?? beatmaps.ToList();
+                var beatmapList = beatmaps as IList<(Guid id, string hash, int rulesetOnlineId)> ?? beatmaps.ToList();
 
-                // 读出已有条目（id -> (hash, version)）。
-                Dictionary<Guid, (string hash, int version)> existing = new Dictionary<Guid, (string hash, int version)>();
+                var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt, long tagUpdatedAt)>();
+                var maniaUpdated = new HashSet<Guid>();
 
-                // 在读取现有行时，也同时读取 DB 层面的强制重建开关（meta.force_recompute），并检查表头一致性，以便后续判断使用。
                 bool forceRecompute = false;
-                bool dbSchemaCompatible;
 
                 using (var connection = openConnection())
-                using (var cmd = connection.CreateCommand())
                 {
-                    cmd.CommandText = $"SELECT {col_beatmap_id}, {col_beatmap_hash}, {col_analysis_version} FROM {table_mania_analysis};";
-
-                    using var reader = cmd.ExecuteReader();
-
-                    while (reader.Read())
+                    using (var entryCommand = connection.CreateCommand())
                     {
-                        if (!Guid.TryParse(reader.GetString(0), out var id))
-                            continue;
+                        entryCommand.CommandText = $@"
+SELECT {EzAnalysisSchemaManager.COL_BEATMAP_ID},
+       {EzAnalysisSchemaManager.COL_BEATMAP_HASH},
+       {EzAnalysisSchemaManager.COL_RULESET_ONLINE_ID},
+    {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
+    {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT}
+FROM {EzAnalysisSchemaManager.TABLE_ENTRY};
+";
 
-                        string storedHash = reader.GetString(1);
-                        int storedVersion = reader.GetInt32(2);
-                        existing[id] = (storedHash, storedVersion);
+                        using var reader = entryCommand.ExecuteReader();
+
+                        while (reader.Read())
+                        {
+                            if (!Guid.TryParse(reader.GetString(0), out var id))
+                                continue;
+
+                            existing[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt64(3), reader.GetInt64(4));
+                        }
                     }
 
-                    try
+                    using (var maniaCommand = connection.CreateCommand())
                     {
-                        if (getMetaBool(connection, meta_key_force_recompute))
-                            forceRecompute = true;
-                    }
-                    catch
-                    {
-                        // ignore meta read failures
+                        maniaCommand.CommandText = $@"
+SELECT {EzAnalysisSchemaManager.COL_BEATMAP_ID}
+FROM {EzAnalysisSchemaManager.TABLE_MANIA}
+WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
+";
+
+                        using var maniaReader = maniaCommand.ExecuteReader();
+
+                        while (maniaReader.Read())
+                        {
+                            if (Guid.TryParse(maniaReader.GetString(0), out var id))
+                                maniaUpdated.Add(id);
+                        }
                     }
 
-                    // 在此处检查表头是否匹配期望列集合；只有匹配时才允许就地升级。
-                    dbSchemaCompatible = isTableSchemaCompatible(connection, table_mania_analysis);
+                    forceRecompute = EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE);
                 }
 
                 List<Guid> needing = new List<Guid>();
@@ -825,7 +718,7 @@ LIMIT 1;
                 int processed = 0;
                 int total = beatmapList.Count;
 
-                foreach (var (id, hash) in beatmapList)
+                foreach (var (id, hash, rulesetOnlineId) in beatmapList)
                 {
                     processed++;
 
@@ -838,16 +731,12 @@ LIMIT 1;
                         continue;
                     }
 
-                    // Only force recompute on:
-                    // - missing entries
-                    // - hash mismatch (beatmap changed)
-                    // - version newer than this build
-                    // - 全局或 DB 层面强制重建开关开启时：所有低于当前版本的条目都需重建
-                    // - 无法就地升级的旧版本
                     if (!string.Equals(row.hash, hash, StringComparison.Ordinal)
-                        || row.version > ANALYSIS_VERSION
-                        || (forceRecompute && row.version < ANALYSIS_VERSION)
-                        || !canUpgradeInPlace(row.version, dbSchemaCompatible))
+                        || row.rulesetOnlineId != rulesetOnlineId
+                        || row.commonUpdatedAt <= 0
+                        || row.tagUpdatedAt <= 0
+                        || forceRecompute
+                        || (rulesetOnlineId == 3 && !maniaUpdated.Contains(id)))
                         needing.Add(id);
                 }
 
@@ -862,18 +751,28 @@ LIMIT 1;
                 {
                     using var connection = openConnection();
                     using var transaction = connection.BeginTransaction();
-                    using var cmd = connection.CreateCommand();
-                    cmd.Transaction = transaction;
-                    cmd.CommandText = $"DELETE FROM {table_mania_analysis} WHERE {col_beatmap_id} = $id;";
+                    using var deleteMania = connection.CreateCommand();
+                    deleteMania.Transaction = transaction;
+                    deleteMania.CommandText = $"DELETE FROM {EzAnalysisSchemaManager.TABLE_MANIA} WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;";
 
-                    var idParam = cmd.CreateParameter();
+                    using var deleteEntry = connection.CreateCommand();
+                    deleteEntry.Transaction = transaction;
+                    deleteEntry.CommandText = $"DELETE FROM {EzAnalysisSchemaManager.TABLE_ENTRY} WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;";
+
+                    var idParam = deleteEntry.CreateParameter();
                     idParam.ParameterName = "$id";
-                    cmd.Parameters.Add(idParam);
+                    deleteEntry.Parameters.Add(idParam);
+
+                    var maniaIdParam = deleteMania.CreateParameter();
+                    maniaIdParam.ParameterName = "$id";
+                    deleteMania.Parameters.Add(maniaIdParam);
 
                     foreach (var id in toDelete)
                     {
                         idParam.Value = id.ToString();
-                        cmd.ExecuteNonQuery();
+                        maniaIdParam.Value = id.ToString();
+                        deleteMania.ExecuteNonQuery();
+                        deleteEntry.ExecuteNonQuery();
                     }
 
                     transaction.Commit();
@@ -920,6 +819,7 @@ LIMIT 1;
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
+                // songs branch 是独立导出的快照库，这里允许整库重建；主分析库补写仍然按 beatmap 增量 upsert。
                 if (File.Exists(fullPath))
                     File.Delete(fullPath);
 
@@ -981,13 +881,6 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
                 setMeta(connection, meta_key_source_collection_beatmap_count, sourceCollectionBeatmapCount.ToString(CultureInfo.InvariantCulture));
 
                 using var transaction = connection.BeginTransaction();
-
-                using (var deleteSourceCollection = connection.CreateCommand())
-                {
-                    deleteSourceCollection.Transaction = transaction;
-                    deleteSourceCollection.CommandText = $"DELETE FROM {table_songs_branch_source_collection};";
-                    deleteSourceCollection.ExecuteNonQuery();
-                }
 
                 if (sourceCollection is SourceCollectionSnapshot sourceCollectionSnapshot)
                 {
@@ -1487,7 +1380,7 @@ ON CONFLICT(collection_id, beatmap_md5) DO NOTHING;
                 Initialise();
 
                 using var connection = openConnection();
-                setMeta(connection, meta_key_force_recompute, force ? "1" : "0");
+                EzAnalysisSchemaManager.SetMeta(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE, force ? "1" : "0");
                 return true;
             }
             catch (Exception e)
@@ -1506,7 +1399,7 @@ ON CONFLICT(collection_id, beatmap_md5) DO NOTHING;
             {
                 Initialise();
                 using var connection = openConnection();
-                return getMetaBool(connection, meta_key_force_recompute);
+                return EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE);
             }
             catch
             {
@@ -1732,6 +1625,11 @@ FROM hidden_preexisting_beatmap;
             // 这里每次操作打开一个连接，避免跨线程复用连接导致的问题。
             var connection = new SqliteConnection($"Data Source={databasePath};Cache=Shared;Mode=ReadWriteCreate");
             connection.Open();
+
+            using var pragma = connection.CreateCommand();
+            pragma.CommandText = "PRAGMA foreign_keys=ON;";
+            pragma.ExecuteNonQuery();
+
             return connection;
         }
 
@@ -2171,88 +2069,135 @@ WHERE {col_beatmap_id} = $id;
 
         private void writePendingEntryToConnection(SqliteConnection connection, BeatmapInfo beatmap, EzAnalysisResult analysis, SqliteTransaction? transaction = null)
         {
-            using var cmd = connection.CreateCommand();
-            cmd.Transaction = transaction;
-
             var commonSummary = analysis.CommonSummary;
             var maniaSummary = analysis.ManiaSummary;
 
-            string kpsListJson = JsonSerializer.Serialize(commonSummary?.KpsList ?? Array.Empty<double>());
-            string columnCountsJson = JsonSerializer.Serialize(maniaSummary?.ColumnCounts ?? new Dictionary<int, int>());
-            string holdNoteCountsJson = JsonSerializer.Serialize(maniaSummary?.HoldNoteCounts ?? new Dictionary<int, int>());
+            if (commonSummary == null)
+                return;
 
-            cmd.CommandText = $@"
-INSERT INTO {table_mania_analysis}(
-    {col_beatmap_id},
-    {col_beatmap_hash},
-    {col_beatmap_md5},
-    {col_analysis_version},
-    {col_average_kps},
-    {col_max_kps},
-    {col_kps_list_json},
-    {col_xxy_sr},
-    {col_column_counts_json},
-    {col_hold_note_counts_json}
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            string kpsListJson = JsonSerializer.Serialize(commonSummary.Value.KpsList);
+            string tagPayloadJson = serializeTagSummary(analysis.TagSummary);
+
+            using (var entry = connection.CreateCommand())
+            {
+                entry.Transaction = transaction;
+                entry.CommandText = $@"
+INSERT INTO {EzAnalysisSchemaManager.TABLE_ENTRY}(
+    {EzAnalysisSchemaManager.COL_BEATMAP_ID},
+    {EzAnalysisSchemaManager.COL_BEATMAP_HASH},
+    {EzAnalysisSchemaManager.COL_BEATMAP_MD5},
+    {EzAnalysisSchemaManager.COL_RULESET_ONLINE_ID},
+    {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
+    {EzAnalysisSchemaManager.COL_AVERAGE_KPS},
+    {EzAnalysisSchemaManager.COL_MAX_KPS},
+    {EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
+    {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
+    {EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON}
 )
 VALUES(
     $id,
     $hash,
     $md5,
-    $version,
+    $ruleset,
+    $common_updated_at,
     $avg,
     $max,
     $kps,
-    $xxy,
-    $cols,
-    $holds
+    $tag_updated_at,
+    $tag_payload_json
 )
-ON CONFLICT({col_beatmap_id}) DO UPDATE SET
-    {col_beatmap_hash} = excluded.{col_beatmap_hash},
-    {col_beatmap_md5} = excluded.{col_beatmap_md5},
-    {col_analysis_version} = excluded.{col_analysis_version},
-    {col_average_kps} = excluded.{col_average_kps},
-    {col_max_kps} = excluded.{col_max_kps},
-    {col_kps_list_json} = excluded.{col_kps_list_json},
-    {col_xxy_sr} = excluded.{col_xxy_sr},
-    {col_column_counts_json} = excluded.{col_column_counts_json},
-    {col_hold_note_counts_json} = excluded.{col_hold_note_counts_json};
+ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
+    {EzAnalysisSchemaManager.COL_BEATMAP_HASH} = excluded.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
+    {EzAnalysisSchemaManager.COL_BEATMAP_MD5} = excluded.{EzAnalysisSchemaManager.COL_BEATMAP_MD5},
+    {EzAnalysisSchemaManager.COL_RULESET_ONLINE_ID} = excluded.{EzAnalysisSchemaManager.COL_RULESET_ONLINE_ID},
+    {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT} = excluded.{EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
+    {EzAnalysisSchemaManager.COL_AVERAGE_KPS} = excluded.{EzAnalysisSchemaManager.COL_AVERAGE_KPS},
+    {EzAnalysisSchemaManager.COL_MAX_KPS} = excluded.{EzAnalysisSchemaManager.COL_MAX_KPS},
+    {EzAnalysisSchemaManager.COL_KPS_LIST_JSON} = excluded.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
+    {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT} = excluded.{EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
+    {EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON} = excluded.{EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON};
 ";
+                entry.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+                entry.Parameters.AddWithValue("$hash", beatmap.Hash);
+                entry.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
+                entry.Parameters.AddWithValue("$ruleset", beatmap.Ruleset.OnlineID);
+                entry.Parameters.AddWithValue("$common_updated_at", now);
+                entry.Parameters.AddWithValue("$avg", analysis.AverageKps);
+                entry.Parameters.AddWithValue("$max", analysis.MaxKps);
+                entry.Parameters.AddWithValue("$kps", kpsListJson);
+                entry.Parameters.AddWithValue("$tag_updated_at", analysis.TagSummary != null ? now : 0);
+                entry.Parameters.AddWithValue("$tag_payload_json", tagPayloadJson);
+                entry.ExecuteNonQuery();
+            }
 
-            cmd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
-            cmd.Parameters.AddWithValue("$hash", beatmap.Hash);
-            cmd.Parameters.AddWithValue("$md5", beatmap.MD5Hash);
-            cmd.Parameters.AddWithValue("$version", ANALYSIS_VERSION);
-            cmd.Parameters.AddWithValue("$avg", analysis.AverageKps);
-            cmd.Parameters.AddWithValue("$max", analysis.MaxKps);
-            cmd.Parameters.AddWithValue("$kps", kpsListJson);
-
-            if (maniaSummary?.XxySr is double xxySr)
-                cmd.Parameters.AddWithValue("$xxy", xxySr);
-            else
-                cmd.Parameters.AddWithValue("$xxy", DBNull.Value);
-
-            cmd.Parameters.AddWithValue("$cols", columnCountsJson);
-            cmd.Parameters.AddWithValue("$holds", holdNoteCountsJson);
-
-            cmd.ExecuteNonQuery();
-
-            // Update last_updated if column exists
-            try
+            using (var mania = connection.CreateCommand())
             {
-                if (hasColumn(connection, table_mania_analysis, col_last_updated))
+                mania.Transaction = transaction;
+
+                if (maniaSummary == null)
                 {
-                    using var upd = connection.CreateCommand();
-                    upd.Transaction = transaction;
-                    upd.CommandText = $"UPDATE {table_mania_analysis} SET {col_last_updated} = $ts WHERE {col_beatmap_id} = $id";
-                    upd.Parameters.AddWithValue("$ts", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-                    upd.Parameters.AddWithValue("$id", beatmap.ID.ToString());
-                    upd.ExecuteNonQuery();
+                    mania.CommandText = $@"
+DELETE FROM {EzAnalysisSchemaManager.TABLE_MANIA}
+WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;
+";
+                    mania.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+                    mania.ExecuteNonQuery();
+                    return;
                 }
+
+                string columnCountsJson = JsonSerializer.Serialize(maniaSummary.Value.ColumnCounts);
+                string holdNoteCountsJson = JsonSerializer.Serialize(maniaSummary.Value.HoldNoteCounts);
+
+                mania.CommandText = $@"
+INSERT INTO {EzAnalysisSchemaManager.TABLE_MANIA}(
+    {EzAnalysisSchemaManager.COL_BEATMAP_ID},
+    {EzAnalysisSchemaManager.COL_UPDATED_AT},
+    {EzAnalysisSchemaManager.COL_XXY_SR},
+    {EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
+    {EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON}
+)
+VALUES(
+    $id,
+    $updated_at,
+    $xxy,
+    $column_counts_json,
+    $hold_note_counts_json
+)
+ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
+    {EzAnalysisSchemaManager.COL_UPDATED_AT} = excluded.{EzAnalysisSchemaManager.COL_UPDATED_AT},
+    {EzAnalysisSchemaManager.COL_XXY_SR} = excluded.{EzAnalysisSchemaManager.COL_XXY_SR},
+    {EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON} = excluded.{EzAnalysisSchemaManager.COL_COLUMN_COUNTS_JSON},
+    {EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON} = excluded.{EzAnalysisSchemaManager.COL_HOLD_NOTE_COUNTS_JSON};
+";
+                mania.Parameters.AddWithValue("$id", beatmap.ID.ToString());
+                mania.Parameters.AddWithValue("$updated_at", now);
+                mania.Parameters.AddWithValue("$xxy", maniaSummary.Value.XxySr is double xxySr ? xxySr : DBNull.Value);
+                mania.Parameters.AddWithValue("$column_counts_json", columnCountsJson);
+                mania.Parameters.AddWithValue("$hold_note_counts_json", holdNoteCountsJson);
+                mania.ExecuteNonQuery();
             }
-            catch
-            {
-                // ignore last_updated failures
-            }
+        }
+
+        private static EzAnalysisResult mergeAnalysisResult(EzAnalysisResult storedAnalysis, EzAnalysisResult computedAnalysis)
+            => computedAnalysis.TagSummary == null
+                ? computedAnalysis.WithTagSummary(storedAnalysis.TagSummary)
+                : computedAnalysis;
+
+        private static string serializeTagSummary(EzBeatmapTagSummary? tagSummary)
+            => tagSummary is EzBeatmapTagSummary value
+                ? JsonSerializer.Serialize(value)
+                : string.Empty;
+
+        private static EzBeatmapTagSummary? deserializeTagSummary(string tagPayloadJson, long tagUpdatedAt)
+        {
+            if (tagUpdatedAt <= 0)
+                return null;
+
+            if (string.IsNullOrWhiteSpace(tagPayloadJson))
+                return EzBeatmapTagSummary.EMPTY;
+
+            return JsonSerializer.Deserialize<EzBeatmapTagSummary>(tagPayloadJson);
         }
 
         private void cleanupUnrecognizedColumns(SqliteConnection connection)

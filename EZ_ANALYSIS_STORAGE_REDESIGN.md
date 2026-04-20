@@ -14,8 +14,8 @@
 
 1. `EzAnalysisResult` 只做读模型，不再承担持久化写入模型职责。
 2. SQLite 采用“自建主体主表 + mania 扩展表 + 轻量标签属性组”的结构，不再让每个 slice 兼职主体，也不直接复用官方 `BeatmapInfo` 作为 EzAnalysis 的持久化主体。
-3. 启动 warmup 只补核心 analysis，不在启动阶段批量补 `beatmap data`。
-4. 运行时选中谱面按需补齐缺失项，包括标签属性组。
+3. 启动 warmup 补核心 analysis，并一并补齐轻量 tag group，但不在启动阶段批量补 `beatmap data`。
+4. 运行时选中谱面继续按需补齐遗漏项；若运行中开启 sqlite 开关，应主动触发一次预热扫描，而不是强制重启游戏。
 5. warmup/回填写库保留后台批写器，但它只能是统一回填入口的落库执行器，不能再演变成第二套悬空业务链。
 6. 标签相关数据只允许走轻量文本解析，不允许回退到 storyboard 完整解码。
 
@@ -185,23 +185,29 @@
 
 启动 warmup 的最终结论是：
 
-1. 只处理核心 analysis backfill。
-2. 不在启动阶段批量补 `beatmap data` 或 tag group。
+1. 处理核心 analysis backfill，并同时补齐轻量 tag group。
+2. 不在启动阶段批量补 `beatmap data`，也不允许回退到 storyboard 完整对象解码。
 3. 队列只保留 beatmap id 和回填计划，不缓存全量 detached beatmap 集合。
 4. worker 使用有限并发，目标是接近旧版 `单总队列 + 有限 worker` 的吞吐，而不是完全串行。
 
 原因：
 
-1. 启动阶段把标签/资源解析一起做，会显著扩大真实热点范围。
+1. 启动阶段把重资源解析一起做，会显著扩大真实热点范围；但轻量 tag 文本解析仍可接受。
 2. 完全串行虽然更像官方表面行为，但在 EzAnalysis 这条链上已经验证会导致吞吐明显下降。
 3. 全量 detached beatmap cache 已验证会带来启动期 GC 爆炸和卡顿。
+
+### 运行中开启 sqlite
+
+1. 当 sqlite 开关从关闭切到开启时，应立即启动后台 worker 并主动触发一次预热扫描。
+2. 该扫描应复用现有 warmup/backfill 主链，不额外分叉另一套临时补算逻辑。
+3. 行为目标是“开启即可开始补库”，避免为了触发预热强制重启游戏。
 
 ### 运行时选中谱面补算
 
 运行时 selected beatmap worker 负责：
 
 1. 检查当前谱面缺失的 `common`、`mania`、`tag group`。
-2. 优先补齐当前谱面缺失的轻量标签组。
+2. 兜底补齐当前谱面仍然缺失的轻量标签组或其他遗漏切片。
 3. 继续复用统一的 `BackfillStoredData()`，不再单独长出另一套补算 API。
 
 ### 与官方机制的关系
@@ -291,9 +297,10 @@
 
 ### Phase 2：重建 warmup 和运行时补算
 
-1. 启动阶段只做 analysis-only backfill。
+1. 启动阶段做 analysis + 轻量 tag group backfill。
 2. 运行时 selected beatmap on-demand backfill。
-3. 保留取消、通知、节流逻辑。
+3. 运行中开启 sqlite 开关时，主动触发一次预热扫描。
+4. 保留取消、通知、节流逻辑。
 
 ### Phase 3：收敛标签属性组
 
@@ -318,12 +325,13 @@
 
 ## 验证清单
 
-1. 使用干净库启动，确认启动阶段只出现 analysis backfill，不出现大批量 tag/beatmap data 预热。
+1. 使用干净库启动，确认启动阶段出现 analysis + 轻量 tag group backfill，但不出现 `beatmap data` 或 storyboard 对象解码式预热。
 2. 在大量谱面环境下启动游戏，确认不会再出现明显 GC 爆炸和持续卡顿。
-3. 在缺失缓存的谱面上打开选歌，确认 panel 可以先显示核心信息，再由后台补齐 tag group。
-4. 在已有完整 tag group 的谱面上快速滚动选歌，确认不会重新触发 storyboard 回退解析。
-5. 在 mania 谱面上确认 `common` 和 `mania` 可通过同一次回填完成，并且写入仍保持正确。
-6. 验证 SQLite schema 的建表、补列、重建表三条路径完全一致。
+3. 在运行中关闭再开启 sqlite，确认无需重启游戏也会主动触发一次预热扫描。
+4. 在缺失缓存的谱面上打开选歌，确认 panel 可以先显示核心信息，并由后台兜底补齐仍遗漏的 tag group。
+5. 在已有完整 tag group 的谱面上快速滚动选歌，确认不会重新触发 storyboard 回退解析。
+6. 在 mania 谱面上确认 `common` 和 `mania` 可通过同一次回填完成，并且写入仍保持正确。
+7. 验证 SQLite schema 的建表、补列、重建表三条路径完全一致。
 
 ## 最终取舍
 
@@ -332,6 +340,6 @@
 1. 保留“自建主体主表 + mania 扩展表”的主体方向，借官方主体分层思路，但不直接复用官方 `BeatmapInfo` 作为持久化主体。
 2. 但标签类轻量字段不再继续污染核心分析版本语义，而是收敛成独立属性组。
 3. 保留后台批写，但它必须从属于统一回填主链。
-4. 启动 warmup 只做核心 analysis，tag group 和其他轻量补算交给运行时按需完成。
+4. 启动 warmup 做核心 analysis + 轻量 tag group，运行时补算只负责兜底遗漏项；运行中开启 sqlite 开关时也要主动触发一次 warmup。
 
 这套结构同时吸收了旧版存储设计和后续吞吐/卡顿排查的结论，后续实现应直接围绕这份文档展开。

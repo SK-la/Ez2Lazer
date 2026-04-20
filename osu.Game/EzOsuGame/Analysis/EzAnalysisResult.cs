@@ -62,21 +62,48 @@ namespace osu.Game.EzOsuGame.Analysis
         }
     }
 
+    /// <summary>
+    /// 轻量标签概要。
+    /// </summary>
+    public readonly record struct EzBeatmapTagSummary
+    {
+        public static readonly EzBeatmapTagSummary EMPTY = new EzBeatmapTagSummary(false, false);
+
+        public bool HasVideo { get; }
+
+        public bool HasStoryboard { get; }
+
+        public bool HasAnyTag => HasVideo || HasStoryboard;
+
+        public EzBeatmapTagSummary(bool hasVideo, bool hasStoryboard)
+        {
+            HasVideo = hasVideo;
+            HasStoryboard = hasStoryboard;
+        }
+    }
+
     public readonly record struct EzAnalysisResult
     {
         public readonly double AverageKps;
         public readonly double MaxKps;
         public readonly KpsSummary? CommonSummary;
         public readonly EzManiaSummary? ManiaSummary;
+        public readonly EzBeatmapTagSummary? TagSummary;
 
-        public EzAnalysisResult(KpsSummary commonSummary, EzManiaSummary? maniaSummary = null)
+        public EzAnalysisResult(KpsSummary commonSummary, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null)
         {
             AverageKps = double.IsFinite(commonSummary.AverageKps) ? commonSummary.AverageKps : 0;
             MaxKps = double.IsFinite(commonSummary.MaxKps) ? commonSummary.MaxKps : 0;
             CommonSummary = commonSummary;
             ManiaSummary = maniaSummary;
+            TagSummary = tagSummary;
         }
 
         public IReadOnlyList<double> KpsList => CommonSummary?.KpsList ?? Array.Empty<double>();
+
+        public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary)
+            => CommonSummary is KpsSummary commonSummary
+                ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary)
+                : this;
     }
 }

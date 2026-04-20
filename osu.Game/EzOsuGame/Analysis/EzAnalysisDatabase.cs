@@ -413,7 +413,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public IReadOnlySet<Guid> GetHiddenCollectionIds() => persistentStore.GetHiddenCollectionIds();
 
-        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash)> beatmaps)
+        public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash, int rulesetOnlineId)> beatmaps)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Array.Empty<Guid>();
@@ -421,7 +421,16 @@ namespace osu.Game.EzOsuGame.Analysis
             return persistentStore.GetBeatmapsNeedingRecompute(beatmaps);
         }
 
-        public Task<EzAnalysisResult?> RecomputeStoredAnalysisAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+        public bool NeedsOnDemandBackfill(IBeatmapInfo beatmapInfo)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return false;
+
+            return beatmapInfo is BeatmapInfo localBeatmapInfo && persistentStore.NeedsOnDemandBackfill(localBeatmapInfo);
+        }
+
+        public Task<EzAnalysisResult?> BackfillStoredDataAsync(BeatmapInfo beatmapInfo, bool includeTagData = false, bool skipExistingComparison = false,
+                                                               CancellationToken cancellationToken = default)
         {
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.FromResult<EzAnalysisResult?>(null);
@@ -429,8 +438,11 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!tryCreateStoredLookup(beatmapInfo, beatmapInfo.Ruleset, mods: null, out var lookup))
                 return Task.FromResult<EzAnalysisResult?>(null);
 
-            return Task.Run(() => computeAndStore(beatmapInfo, lookup, cancellationToken), cancellationToken);
+            return Task.Run(() => backfillStoredData(beatmapInfo, lookup, includeTagData, skipExistingComparison, cancellationToken), cancellationToken);
         }
+
+        public Task<EzAnalysisResult?> RecomputeStoredAnalysisAsync(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+            => BackfillStoredDataAsync(beatmapInfo, includeTagData: false, skipExistingComparison: false, cancellationToken);
 
         internal static bool CanUseStoredAnalysis(BeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo, IEnumerable<Mod>? mods)
         {
@@ -445,12 +457,38 @@ namespace osu.Game.EzOsuGame.Analysis
             return mods == null || !mods.Any();
         }
 
-        private EzAnalysisResult? computeAndStore(BeatmapInfo beatmapInfo, EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
+        private EzAnalysisResult? backfillStoredData(BeatmapInfo beatmapInfo, EzAnalysisLookupCache lookup, bool includeTagData, bool skipExistingComparison,
+                                                     CancellationToken cancellationToken)
         {
             try
             {
-                var result = EzAnalysisComputation.Compute(beatmapManager, lookup, cancellationToken);
-                persistentStore.StoreIfDifferent(beatmapInfo, result);
+                EzAnalysisResult? storedAnalysis = persistentStore.TryGet(beatmapInfo, out var existingAnalysis)
+                    ? existingAnalysis
+                    : null;
+
+                bool needsAnalysis = storedAnalysis == null;
+                bool needsTag = includeTagData && storedAnalysis?.TagSummary == null;
+
+                if (!needsAnalysis && !needsTag)
+                    return storedAnalysis;
+
+                var workingBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
+
+                EzAnalysisResult result = needsAnalysis
+                    ? EzAnalysisComputation.Compute(workingBeatmap, lookup, cancellationToken)
+                    : storedAnalysis!.Value;
+
+                if (includeTagData && (needsAnalysis || needsTag))
+                    result = result.WithTagSummary(EzBeatmapTagParser.Parse(workingBeatmap));
+
+                if (!includeTagData && storedAnalysis?.TagSummary != null && result.TagSummary == null)
+                    result = result.WithTagSummary(storedAnalysis.Value.TagSummary);
+
+                if (skipExistingComparison)
+                    persistentStore.Store(beatmapInfo, result);
+                else
+                    persistentStore.StoreIfDifferent(beatmapInfo, result);
+
                 return result;
             }
             catch (OperationCanceledException)
@@ -473,7 +511,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 {
                     string mods = lookup.OrderedMods.Length == 0 ? "(none)" : string.Join(',', lookup.OrderedMods.Select(m => m.Acronym));
                     Logger.Error(ex,
-                        $"[EzAnalysisDatabase] computeAndStore failed. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}",
+                        $"[EzAnalysisDatabase] backfillStoredData failed. beatmapId={lookup.BeatmapInfo.ID} diff=\"{lookup.BeatmapInfo.DifficultyName}\" ruleset={lookup.Ruleset.ShortName} mods={mods}",
                         Ez2ConfigManager.LOGGER_NAME);
                 }
 

@@ -10,10 +10,9 @@ using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
-using osu.Game.Beatmaps.Legacy;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -25,24 +24,6 @@ using osuTK;
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// Tag 组件专用的最终显示数据。
-    /// 组件只负责展示，不再自行取库或解析谱面。
-    /// </summary>
-    // TODO:未来重构，Panel系列组件在外部读取sqlite获取结构体传入 EzDisplayTag，sqlite失败则从DTO中获取。当前组件即不在做任何数据处理。
-    // 注意，尽可能不要直接访问
-    public readonly record struct EzDisplayTagData
-    {
-        public readonly bool HasVideo;
-        public readonly bool HasStoryboard;
-
-        public EzDisplayTagData(bool hasVideo, bool hasStoryboard)
-        {
-            HasVideo = hasVideo;
-            HasStoryboard = hasStoryboard;
-        }
-    };
-
-    /// <summary>
     /// 用于在难度卡底部显示标签的组件，包括用户标签、视频标签、故事版标签
     /// </summary>
     public partial class EzDisplayTag : CompositeDrawable
@@ -53,6 +34,29 @@ namespace osu.Game.EzOsuGame.UserInterface
         private readonly FillFlowContainer tagFlow;
 
         private ScheduledDelegate? scheduledTagUpdate;
+        private EzBeatmapTagSummary? tagSummary;
+
+        public EzBeatmapTagSummary? TagSummary
+        {
+            get => tagSummary;
+            set
+            {
+                if (tagSummary == value)
+                    return;
+
+                tagSummary = value;
+
+                scheduledTagUpdate?.Cancel();
+                scheduledTagUpdate = Scheduler.AddDelayed(() =>
+                {
+                    if (!IsAlive)
+                        return;
+
+                    updateSubscription();
+                    scheduledTagUpdate = null;
+                }, 0);
+            }
+        }
 
         private WorkingBeatmap? working;
 
@@ -147,12 +151,12 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             // 先准备数据，统一全部释放，之后更新UI.
             var userTags = beatmap.Metadata.UserTags.Take(max_visible_tags);
-            var tagInfo = getTagInfo(beatmap);
+            EzBeatmapTagSummary resolvedTagSummary = tagSummary ?? getFallbackTagSummary(beatmap);
 
-            if (tagInfo.HasVideo)
+            if (resolvedTagSummary.HasVideo)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Film, BeatmapsetsStrings.ShowInfoVideo));
 
-            if (tagInfo.HasStoryboard)
+            if (resolvedTagSummary.HasStoryboard)
                 tagFlow.Add(new IconTag(FontAwesome.Solid.Image, BeatmapsetsStrings.ShowInfoStoryboard));
 
             foreach (string tag in userTags)
@@ -176,68 +180,15 @@ namespace osu.Game.EzOsuGame.UserInterface
 
                 beatmap = null;
                 working = null;
+                tagSummary = null;
             }
         }
 
-        private EzDisplayTagData getTagInfo(BeatmapInfo beatmapInfo)
+        private EzBeatmapTagSummary getFallbackTagSummary(BeatmapInfo beatmapInfo)
         {
-            bool hasVideo = false;
-            bool hasStoryboard = false;
-
-            try
-            {
-                // 强制 refetch 以提升在 detached 模型下拿到完整数据的概率。
-                working ??= beatmaps.GetWorkingBeatmap(beatmapInfo);
-
-                // 检查已解析的 beatmap 的 UnhandledEventLines
-                var bm = working?.Beatmap;
-
-                if (bm?.UnhandledEventLines != null)
-                {
-                    foreach (string raw in bm.UnhandledEventLines)
-                    {
-                        if (string.IsNullOrWhiteSpace(raw))
-                            continue;
-
-                        string trimmed = raw.Trim();
-
-                        if (trimmed.StartsWith("//", StringComparison.Ordinal))
-                            continue;
-
-                        int commentIndex = trimmed.IndexOf("//", StringComparison.Ordinal);
-                        if (commentIndex >= 0)
-                            trimmed = trimmed[..commentIndex].TrimEnd();
-
-                        if (trimmed.Length == 0)
-                            continue;
-
-                        string eventType = trimmed.Split(',')[0].Trim();
-
-                        if (!hasVideo && matchesEventType(eventType, LegacyEventType.Video, "Video"))
-                            hasVideo = true;
-
-                        if (!hasStoryboard && (matchesEventType(eventType, LegacyEventType.Sprite, "Sprite") || matchesEventType(eventType, LegacyEventType.Animation, "Animation")))
-                            hasStoryboard = true;
-
-                        if (hasVideo && hasStoryboard)
-                            break;
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, $"Tag detection failed for beatmap {beatmapInfo}");
-            }
-            finally
-            {
-                working = null;
-            }
-
-            return new EzDisplayTagData(hasVideo, hasStoryboard);
+            WorkingBeatmap fallbackWorking = working ?? beatmaps.GetWorkingBeatmap(beatmapInfo);
+            return EzBeatmapTagParser.Parse(fallbackWorking);
         }
-
-        private static bool matchesEventType(string value, LegacyEventType eventType, string eventName)
-            => value.Equals(eventName, StringComparison.OrdinalIgnoreCase) || value == ((int)eventType).ToString();
 
         private partial class IconTag : CompositeDrawable, IHasTooltip
         {
