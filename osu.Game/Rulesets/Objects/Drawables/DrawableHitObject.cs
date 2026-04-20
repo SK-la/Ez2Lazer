@@ -164,7 +164,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
         [Resolved(CanBeNull = true)]
         private Ez2ConfigManager ezConfig { get; set; }
 
-        private ScheduledDelegate autoplayDelegate;
+        private bool autoplaySampleTriggered;
         private IBindable<double> offsetBindable;
         private IBindable<bool> hitObjectLifetimeUsesOwnTimeBindable = new BindableBool();
 
@@ -341,30 +341,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 UpdateComboColour();
             }
 
-            // 自动触发音效
-            bool isAutoPlayPlus = GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) == KeySoundPreviewMode.AutoPlayPlus;
-
-            if (isAutoPlayPlus)
-            {
-                autoplayDelegate?.Cancel();
-
-                double delay = HitObject.StartTime - Time.Current;
-                if (delay < 0) delay = 0;
-
-                autoplayDelegate = Scheduler.AddDelayed(() =>
-                {
-                    if (Judged) return;
-
-                    // Ensure samples are loaded before attempting to play them.
-                    if (!samplesLoaded)
-                    {
-                        samplesLoaded = true;
-                        LoadSamples();
-                    }
-
-                    PlaySamples();
-                }, delay);
-            }
+            autoplaySampleTriggered = false;
         }
 
         private void updateStateFromResult()
@@ -391,8 +368,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             samplesBindable.UnbindFrom(HitObject.SamplesBindable);
 
-            // cancel any pending autoplay scheduling
-            autoplayDelegate?.Cancel();
+            // 回收时一并重置自动播样状态。
+            autoplaySampleTriggered = false;
 
             // Release the samples for other hitobjects to use.
             samplesLoaded = false;
@@ -456,6 +433,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         private void onRevertResult()
         {
+            autoplaySampleTriggered = false;
             UpdateState(ArmedState.Idle);
             OnRevertResult?.Invoke(this, Result);
         }
@@ -684,6 +662,39 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 Samples.Stop();
         }
 
+        private void updateAutoplaySamplePlayback()
+        {
+            if (Entry == null)
+                return;
+
+            if (GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) != KeySoundPreviewMode.AutoPlayPlus)
+            {
+                autoplaySampleTriggered = false;
+                return;
+            }
+
+            if (Judged)
+                return;
+
+            if (Time.Current < HitObject.StartTime)
+            {
+                autoplaySampleTriggered = false;
+                return;
+            }
+
+            if (autoplaySampleTriggered || Time.Current - Time.Elapsed > HitObject.StartTime)
+                return;
+
+            if (!samplesLoaded)
+            {
+                samplesLoaded = true;
+                LoadSamples();
+            }
+
+            autoplaySampleTriggered = true;
+            PlaySamples();
+        }
+
         #endregion
 
         protected override void Update()
@@ -709,6 +720,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 samplesLoaded = true;
                 LoadSamples();
             }
+
+            updateAutoplaySamplePlayback();
 
             base.Update();
         }
@@ -800,8 +813,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
             Result.RawTime = Time.Current;
             Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
-            // cancel any pending autoplay since this object is being judged
-            autoplayDelegate?.Cancel();
+            // 已命中后不应再触发自动播样。
+            autoplaySampleTriggered = true;
 
             if (Result.HasResult)
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
