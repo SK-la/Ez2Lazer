@@ -83,46 +83,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             });
         }
 
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                // release managed buffers and UI children so external callers don't need to call SetPoints to free memory
-                values = null;
-                valuesCount = 0;
-                hasData = false;
-                ActualMaxValue = float.NaN;
-                ActualMinValue = float.NaN;
-
-                try
-                {
-                    graphDrawable?.Clear();
-                    graphDrawable?.Dispose();
-                }
-                catch
-                {
-                }
-
-                if (hoverCreated)
-                {
-                    try
-                    {
-                        hoverRoot?.Dispose();
-                    }
-                    catch
-                    {
-                    }
-
-                    hoverRoot = null!;
-                    hoverLabel = null!;
-                    hoverText = null!;
-                    hoverCreated = false;
-                }
-            }
-
-            base.Dispose(isDisposing);
-        }
-
         private void createHoverContainers()
         {
             if (hoverCreated) return;

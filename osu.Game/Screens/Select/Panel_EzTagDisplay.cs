@@ -2,8 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -21,11 +19,28 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
-using osu.Game.Storyboards;
 using osuTK;
 
 namespace osu.Game.Screens.Select
 {
+    /// <summary>
+    /// Tag 组件专用的最终显示数据。
+    /// 组件只负责展示，不再自行取库或解析谱面。
+    /// </summary>
+    // TODO:未来重构，Panel系列组件在外部读取sqlite获取结构体传入 EzDisplayTag，sqlite失败则从DTO中获取。当前组件即不在做任何数据处理。
+    // 注意，尽可能不要直接访问
+    public readonly record struct EzDisplayTagData
+    {
+        public readonly bool HasVideo;
+        public readonly bool HasStoryboard;
+
+        public EzDisplayTagData(bool hasVideo, bool hasStoryboard)
+        {
+            HasVideo = hasVideo;
+            HasStoryboard = hasStoryboard;
+        }
+    };
+
     /// <summary>
     /// 用于在难度卡底部显示标签的组件，包括用户标签、视频标签、故事版标签
     /// </summary>
@@ -33,9 +48,6 @@ namespace osu.Game.Screens.Select
     {
         private const int max_visible_tags = 10;
         private const float tag_corner_radius = 3;
-
-        private static readonly Dictionary<Guid, CachedTagInfo> tag_info_cache = new Dictionary<Guid, CachedTagInfo>();
-        private static readonly object tag_info_cache_lock = new object();
 
         private readonly FillFlowContainer tagFlow;
 
@@ -163,107 +175,51 @@ namespace osu.Game.Screens.Select
 
                 beatmap = null;
                 working = null;
-
-                lock (tag_info_cache_lock)
-                {
-                    tag_info_cache.Clear();
-                }
             }
         }
 
-        // TODO：故事版和背景识别不出来
-        private CachedTagInfo getTagInfo(BeatmapInfo beatmapInfo)
-        {
-            lock (tag_info_cache_lock)
-            {
-                if (tag_info_cache.TryGetValue(beatmapInfo.ID, out var cachedTagInfo) && cachedTagInfo.BeatmapHash == beatmapInfo.Hash)
-                    return cachedTagInfo;
-            }
-
-            var detectedTagInfo = detectTagInfo(beatmapInfo);
-
-            lock (tag_info_cache_lock)
-                tag_info_cache[beatmapInfo.ID] = detectedTagInfo;
-
-            return detectedTagInfo;
-        }
-
-        private CachedTagInfo detectTagInfo(BeatmapInfo beatmapInfo)
+        private EzDisplayTagData getTagInfo(BeatmapInfo beatmapInfo)
         {
             bool hasVideo = false;
             bool hasStoryboard = false;
 
-            // 优先使用解析后轻量的数据：
-            // 1) `WorkingBeatmap.Beatmap.UnhandledEventLines`（内存负担最小）
-            // 2) `WorkingBeatmap.Storyboard`（作为回退）
             try
             {
                 // 强制 refetch 以提升在 detached 模型下拿到完整数据的概率。
                 working ??= beatmaps.GetWorkingBeatmap(beatmapInfo);
 
-                // 先检查已解析的 beatmap 的 UnhandledEventLines（优先）
-                try
+                // 检查已解析的 beatmap 的 UnhandledEventLines
+                var bm = working?.Beatmap;
+
+                if (bm?.UnhandledEventLines != null)
                 {
-                    var bm = working?.Beatmap;
-
-                    if (bm?.UnhandledEventLines != null)
+                    foreach (string raw in bm.UnhandledEventLines)
                     {
-                        foreach (string raw in bm.UnhandledEventLines)
-                        {
-                            if (string.IsNullOrWhiteSpace(raw))
-                                continue;
+                        if (string.IsNullOrWhiteSpace(raw))
+                            continue;
 
-                            string trimmed = raw.Trim();
+                        string trimmed = raw.Trim();
 
-                            if (trimmed.StartsWith("//", StringComparison.Ordinal))
-                                continue;
+                        if (trimmed.StartsWith("//", StringComparison.Ordinal))
+                            continue;
 
-                            int commentIndex = trimmed.IndexOf("//", StringComparison.Ordinal);
-                            if (commentIndex >= 0)
-                                trimmed = trimmed[..commentIndex].TrimEnd();
+                        int commentIndex = trimmed.IndexOf("//", StringComparison.Ordinal);
+                        if (commentIndex >= 0)
+                            trimmed = trimmed[..commentIndex].TrimEnd();
 
-                            if (trimmed.Length == 0)
-                                continue;
+                        if (trimmed.Length == 0)
+                            continue;
 
-                            string eventType = trimmed.Split(',')[0].Trim();
+                        string eventType = trimmed.Split(',')[0].Trim();
 
-                            if (!hasVideo && matchesEventType(eventType, LegacyEventType.Video, "Video"))
-                                hasVideo = true;
+                        if (!hasVideo && matchesEventType(eventType, LegacyEventType.Video, "Video"))
+                            hasVideo = true;
 
-                            if (!hasStoryboard && (matchesEventType(eventType, LegacyEventType.Sprite, "Sprite") || matchesEventType(eventType, LegacyEventType.Animation, "Animation")))
-                                hasStoryboard = true;
+                        if (!hasStoryboard && (matchesEventType(eventType, LegacyEventType.Sprite, "Sprite") || matchesEventType(eventType, LegacyEventType.Animation, "Animation")))
+                            hasStoryboard = true;
 
-                            if (hasVideo && hasStoryboard)
-                                break;
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, $"Beatmap UnhandledEventLines check failed for beatmap {beatmapInfo}");
-                }
-
-                // 若仍未确定，则回退使用 Storyboard（可能有内存开销，作为最后手段）
-                if (useSbFallBack && !(hasVideo && hasStoryboard))
-                {
-                    try
-                    {
-                        var sb = working?.Storyboard;
-
-                        if (sb != null)
-                        {
-                            var elements = sb.Layers.SelectMany(l => l.Elements);
-
-                            if (!hasVideo)
-                                hasVideo = elements.Any(e => e is StoryboardVideo);
-
-                            if (!hasStoryboard)
-                                hasStoryboard = elements.Any(e => e is StoryboardAnimation || (e is StoryboardSprite && !(e is StoryboardVideo)));
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.Error(e, $"Storyboard check failed for beatmap {beatmapInfo}");
+                        if (hasVideo && hasStoryboard)
+                            break;
                     }
                 }
             }
@@ -276,25 +232,11 @@ namespace osu.Game.Screens.Select
                 working = null;
             }
 
-            return new CachedTagInfo(beatmapInfo.Hash, hasVideo, hasStoryboard);
+            return new EzDisplayTagData(hasVideo, hasStoryboard);
         }
 
         private static bool matchesEventType(string value, LegacyEventType eventType, string eventName)
             => value.Equals(eventName, StringComparison.OrdinalIgnoreCase) || value == ((int)eventType).ToString();
-
-        private readonly struct CachedTagInfo
-        {
-            public readonly string BeatmapHash;
-            public readonly bool HasVideo;
-            public readonly bool HasStoryboard;
-
-            public CachedTagInfo(string beatmapHash, bool hasVideo, bool hasStoryboard)
-            {
-                BeatmapHash = beatmapHash;
-                HasVideo = hasVideo;
-                HasStoryboard = hasStoryboard;
-            }
-        }
 
         private partial class IconTag : CompositeDrawable, IHasTooltip
         {

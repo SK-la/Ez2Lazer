@@ -4,19 +4,17 @@
 using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
-using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
+using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Overlays;
 using osu.Game.Utils;
 using osuTK;
-using osuTK.Graphics;
 using osu.Game.EzOsuGame.Analysis;
 
 namespace osu.Game.EzOsuGame.UserInterface
@@ -24,36 +22,57 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// <summary>
     /// 模仿 StarRatingDisplay 形式的显示XxySR
     /// </summary>
-    public partial class EzDisplayXxySR : CompositeDrawable, IHasCurrentValue<EzAnalysisResult>
+    public partial class EzDisplaySR : CompositeDrawable, IHasCurrentValue<EzManiaAnalysisAttributes>
     {
         private readonly bool animated;
         private readonly Box background;
         private readonly SpriteIcon srIcon;
         private readonly OsuSpriteText srText;
 
-        private readonly BindableWithCurrent<EzAnalysisResult> current = new BindableWithCurrent<EzAnalysisResult>();
+        private readonly BindableWithCurrent<EzManiaAnalysisAttributes> current = new BindableWithCurrent<EzManiaAnalysisAttributes>();
 
-        public Bindable<EzAnalysisResult> Current
+        public Bindable<EzManiaAnalysisAttributes> Current
         {
             get => current.Current;
             set => current.Current = value;
         }
 
+        private readonly Bindable<double> displayedStars = new Bindable<double>();
+
+        // 对外提供当前数值
+        // public IBindable<double?> DisplayedStars => displayedStars;
         // public Color4 DisplayedDifficultyColour => background.Colour;
         // public Color4 DisplayedDifficultyTextColour => srText.Colour;
-        // private readonly Bindable<double> displayedStars = new BindableDouble();
-        // public IBindable<double> DisplayedStars => displayedStars;
+
+        private double sr;
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
-        public EzDisplayXxySR(EzAnalysisResult ezAnalysisResult, bool animated = false)
+        public EzDisplaySR(EzManiaAnalysisAttributes ezAnalysisResult, StarRatingDisplaySize size = StarRatingDisplaySize.Regular, bool animated = false)
         {
-            // this.animated = animated;
+            this.animated = animated;
 
             Current.Value = ezAnalysisResult;
 
             AutoSizeAxes = Axes.Both;
+
+            MarginPadding margin = default;
+
+            switch (size)
+            {
+                case StarRatingDisplaySize.Small:
+                    margin = new MarginPadding { Horizontal = 7f };
+                    break;
+
+                case StarRatingDisplaySize.Range:
+                    margin = new MarginPadding { Horizontal = 8f };
+                    break;
+
+                case StarRatingDisplaySize.Regular:
+                    margin = new MarginPadding { Horizontal = 8f, Vertical = 2f };
+                    break;
+            }
 
             InternalChild = new CircularContainer
             {
@@ -70,7 +89,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                         Anchor = Anchor.Centre,
                         Origin = Anchor.Centre,
                         AutoSizeAxes = Axes.Both,
-                        Margin = new MarginPadding { Horizontal = 7f },
+                        Margin = margin,
                         ColumnDimensions = new[]
                         {
                             new Dimension(GridSizeMode.AutoSize),
@@ -112,25 +131,25 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             Current.BindValueChanged(c =>
             {
-                // if (animated)
-                //     // Animation roughly matches `StarCounter`'s implementation.
-                //     this.TransformBindableTo(displayedStars, c.NewValue.XxySr, 100 + 80 * Math.Abs(c.NewValue.XxySr - c.OldValue.XxySr), Easing.OutQuint);
-                // else
-                //     displayedStars.Value = c.NewValue.XxySr;
-                updateDisplay(c.NewValue.ManiaAttributes?.XxySr);
+                sr = c.NewValue.XxySr ?? 0;
+
+                if (animated)
+                {
+                    double diff = sr - c.OldValue.XxySr ?? 0;
+                    this.TransformBindableTo(displayedStars, sr, 100 + 80 * Math.Abs(diff), Easing.OutQuint);
+                }
+                else
+                    displayedStars.Value = sr;
+
+                // updateDisplay(c.NewValue.ManiaAttributes?.XxySr);
             }, true);
 
-            // displayedStars.Value = Current.Value.ManiaAttributes?.XxySr;
-            //
-            // displayedStars.BindValueChanged(s =>
-            // {
-            //     srText.Text = s.NewValue < 0 ? "-" : s.NewValue.FormatStarRating();
-            //
-            //     background.Colour = colours.ForStarDifficulty(s.NewValue);
-            //
-            //     srIcon.Colour = colours.ForStarDifficultyText(s.NewValue);
-            //     srText.Colour = colours.ForStarDifficultyText(s.NewValue);
-            // }, true);
+            displayedStars.Value = Current.Value.XxySr ?? 0;
+
+            displayedStars.BindValueChanged(s =>
+            {
+                updateDisplay(s.NewValue);
+            }, true);
         }
 
         private void updateDisplay(double? sr)
@@ -154,11 +173,8 @@ namespace osu.Game.EzOsuGame.UserInterface
             else
             {
 #if DEBUG
-                // Debug: show 4 decimal places for easier detection of value reuse.
-                // Keep the same "never round up" behaviour as FormatUtils.FormatStarRating().
                 srText.Text = sr.Value.FloorToDecimalDigits(4).ToLocalisableString("0.0000");
 #else
-                // Release: match official star formatting (2 decimal places).
                 srText.Text = sr.Value.FormatStarRating();
 #endif
             }
@@ -167,14 +183,6 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             srIcon.Colour = colours.ForStarDifficultyText(sr.Value);
             srText.Colour = colours.ForStarDifficultyText(sr.Value);
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-                Current.UnbindAll();
-
-            base.Dispose(isDisposing);
         }
     }
 }

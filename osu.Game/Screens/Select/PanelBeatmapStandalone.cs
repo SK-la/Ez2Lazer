@@ -63,7 +63,7 @@ namespace osu.Game.Screens.Select
         private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
         private EzKpsDisplay ezKpsDisplay = null!;
         private EzKpcDisplay ezKpcDisplay = null!;
-        private EzDisplayXxySR displayXxySR = null!;
+        private EzDisplaySR displaySR = null!;
         private EzTagDisplay ezTagDisplay = null!;
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
@@ -231,7 +231,7 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
-                                        displayXxySR = new EzDisplayXxySR(default, true)
+                                        displaySR = new EzDisplaySR(default, StarRatingDisplaySize.Small, animated: true)
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
@@ -324,13 +324,13 @@ namespace osu.Game.Screens.Select
         {
             if (ezAnalysisEnabled)
             {
-                displayXxySR.Show();
+                displaySR.Show();
             }
             else
             {
                 ezKpcDisplay.ManiaAttributes = null;
-                displayXxySR.Current.Value = default;
-                displayXxySR.Hide();
+                displaySR.Current.Value = default;
+                displaySR.Hide();
             }
         }
 
@@ -371,7 +371,7 @@ namespace osu.Game.Screens.Select
             ezTagDisplay.Working = null;
             scratchText = null;
 
-            displayXxySR.Current.Value = default;
+            displaySR.Current.Value = default;
             ezKpcDisplay.ManiaAttributes = null;
         }
 
@@ -391,7 +391,7 @@ namespace osu.Game.Screens.Select
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 updateKeyCount();
                 ezKpcDisplay.ManiaAttributes = maniaAttributes;
-                displayXxySR.Current.Value = ezAnalysisResult;
+                displaySR.Current.Value = maniaAttributes ?? default;
             }
         }
 
