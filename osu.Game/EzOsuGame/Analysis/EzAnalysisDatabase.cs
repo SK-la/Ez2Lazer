@@ -285,16 +285,28 @@ namespace osu.Game.EzOsuGame.Analysis
                     }
                 }
 
-                persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection);
-                deleteBranchesForSourceCollection(resolvedSourceCollectionId, databasePath);
-
-                if (activateAfterCreate)
+                try
                 {
-                    activateSongsBranch(databasePath, metadata);
-                    return new SongsBranchBuildResult(true, SongsBranchStrings.GENERATED_AND_ACTIVATED, databasePath, displayName, beatmapList.Count, rows.Count);
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    persistentStore.StoreSongsBranch(databasePath, metadata, rows, sourceCollection, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                return new SongsBranchBuildResult(true, SongsBranchStrings.GENERATED_ONLY, databasePath, displayName, beatmapList.Count, rows.Count);
+                    deleteBranchesForSourceCollection(resolvedSourceCollectionId, databasePath);
+
+                    if (activateAfterCreate)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        activateSongsBranch(databasePath, metadata);
+                        return new SongsBranchBuildResult(true, SongsBranchStrings.GENERATED_AND_ACTIVATED, databasePath, displayName, beatmapList.Count, rows.Count);
+                    }
+
+                    return new SongsBranchBuildResult(true, SongsBranchStrings.GENERATED_ONLY, databasePath, displayName, beatmapList.Count, rows.Count);
+                }
+                catch (OperationCanceledException)
+                {
+                    persistentStore.DeleteSongsBranch(databasePath);
+                    throw;
+                }
             }, cancellationToken);
         }
 

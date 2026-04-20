@@ -65,6 +65,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly SemaphoreSlim selectedBeatmapRecomputeSignal = new SemaphoreSlim(0, 1);
         private readonly CancellationTokenSource startupWarmupCancellationSource = new CancellationTokenSource();
         private readonly CancellationTokenSource selectedBeatmapRecomputeCancellationSource = new CancellationTokenSource();
+        private readonly CancellationTokenSource pendingBeatmapRecomputeCancellationSource = new CancellationTokenSource();
 
         private Task startupWarmupTask = Task.CompletedTask;
         private Task selectedBeatmapRecomputeTask = Task.CompletedTask;
@@ -247,7 +248,10 @@ namespace osu.Game.EzOsuGame.Analysis
                         startupWarmupSignalPending = false;
 
                     while (sqliteEnabled && tryBeginAnyPendingBeatmap(out Guid beatmapId))
-                        recomputePendingBeatmap(beatmapId, cancellationToken, "startup warmup");
+                    {
+                        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
+                        recomputePendingBeatmap(beatmapId, linkedCancellation.Token, "startup warmup");
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -279,7 +283,10 @@ namespace osu.Game.EzOsuGame.Analysis
                     }
 
                     if (beatmapId.HasValue)
-                        recomputePendingBeatmap(beatmapId.Value, cancellationToken, "selected-beatmap warmup");
+                    {
+                        using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, pendingBeatmapRecomputeCancellationSource.Token);
+                        recomputePendingBeatmap(beatmapId.Value, linkedCancellation.Token, "selected-beatmap warmup");
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -377,6 +384,21 @@ namespace osu.Game.EzOsuGame.Analysis
                 return pendingBeatmapIds.Count;
         }
 
+        private void cancelPendingBeatmapProcessing()
+        {
+            lock (pendingBeatmapLock)
+            {
+                pendingBeatmapIds.Clear();
+                queuedSelectedBeatmapId = null;
+                startupWarmupSignalPending = false;
+                selectedBeatmapRecomputeSignalPending = false;
+                startupWarmupProgressNotification = null;
+                startupWarmupTotalCount = 0;
+            }
+
+            pendingBeatmapRecomputeCancellationSource.Cancel();
+        }
+
         private void postWarmupSummaryNotification(int totalCount)
         {
             if (notificationOverlay == null || totalCount <= 0)
@@ -406,6 +428,11 @@ namespace osu.Game.EzOsuGame.Analysis
                     {
                         Text = $"Ez analysis startup scan queued {totalCount} beatmaps for recompute ({totalCount - remainingCount} of {totalCount})",
                         CompletionText = "beatmaps' analysis recompute is complete",
+                        CancelRequested = () =>
+                        {
+                            cancelPendingBeatmapProcessing();
+                            return true;
+                        },
                         State = ProgressNotificationState.Active
                     };
 
@@ -441,6 +468,7 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 startupWarmupCancellationSource.Cancel();
                 selectedBeatmapRecomputeCancellationSource.Cancel();
+                pendingBeatmapRecomputeCancellationSource.Cancel();
 
                 try
                 {
@@ -462,6 +490,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 startupWarmupSignal.Dispose();
                 selectedBeatmapRecomputeCancellationSource.Dispose();
                 selectedBeatmapRecomputeSignal.Dispose();
+                pendingBeatmapRecomputeCancellationSource.Dispose();
 
                 lock (pendingBeatmapLock)
                 {

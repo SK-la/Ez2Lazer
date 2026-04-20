@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public static bool Enabled = true;
 
-        public static readonly string DATABASE_FILENAME = $@"mania-analysis_v{ANALYSIS_VERSION}.sqlite";
+        public static readonly string DATABASE_FILENAME = $@"ez-analysis_v{ANALYSIS_VERSION}.sqlite";
 
         public const string SONGS_BRANCH_DATABASE_DIRECTORY = "EzData";
         private const string xxy_sr_branch_kind = "xxy_sr_branch";
@@ -86,8 +86,8 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string col_beatmap_hash = "beatmap_hash";
         private const string col_beatmap_md5 = "beatmap_md5";
         private const string col_analysis_version = "analysis_version";
-        private const string col_average_kps = "average_kps";
-        private const string col_max_kps = "max_kps";
+        private const string col_average_kps = "kps_avg";
+        private const string col_max_kps = "kps_max";
         private const string col_kps_list_json = "kps_list_json";
         private const string col_xxy_sr = "xxy_sr";
         private const string col_column_counts_json = "column_counts_json";
@@ -907,34 +907,41 @@ LIMIT 1;
             return storage.GetFullPath(Path.Combine(SONGS_BRANCH_DATABASE_DIRECTORY, $"songs_{safeCollectionName}_{safeModsDisplay}_{timestamp}_{uniqueSuffix}.sqlite"), true);
         }
 
-        public void StoreSongsBranch(string databasePath, SongsBranchMetadata metadata, IEnumerable<SongsBranchRow> rows, SourceCollectionSnapshot? sourceCollection = null)
+        public void StoreSongsBranch(string databasePath, SongsBranchMetadata metadata, IEnumerable<SongsBranchRow> rows, SourceCollectionSnapshot? sourceCollection = null,
+                                     CancellationToken cancellationToken = default)
         {
             if (!Enabled)
                 return;
 
-            Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+            string fullPath = Path.GetFullPath(databasePath);
+            bool success = false;
 
-            if (File.Exists(databasePath))
-                File.Delete(databasePath);
-
-            using var connection = openConnection(databasePath);
-
-            using (var cmd = connection.CreateCommand())
+            try
             {
-                cmd.CommandText = @"
+                Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+
+                if (File.Exists(fullPath))
+                    File.Delete(fullPath);
+
+                using var connection = openConnection(fullPath);
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
 PRAGMA journal_mode=WAL;
 PRAGMA synchronous=NORMAL;
 PRAGMA temp_store=MEMORY;
 ";
-                cmd.ExecuteNonQuery();
-            }
+                    cmd.ExecuteNonQuery();
+                }
 
-            using (var cmd = connection.CreateCommand())
-            {
-                // Ensure meta table exists for songs-branch DB as well.
-                ensureMetaTableExists(connection);
+                using (var cmd = connection.CreateCommand())
+                {
+                    ensureMetaTableExists(connection);
 
-                cmd.CommandText = $@"
+                    cmd.CommandText = $@"
 CREATE TABLE IF NOT EXISTS {table_xxy_sr_branch} (
     {col_beatmap_id} TEXT PRIMARY KEY,
     {col_beatmap_hash} TEXT NOT NULL,
@@ -950,62 +957,63 @@ CREATE TABLE IF NOT EXISTS {table_songs_branch_source_collection} (
     {col_beatmap_md5} TEXT PRIMARY KEY
 );
 ";
-                cmd.ExecuteNonQuery();
-            }
+                    cmd.ExecuteNonQuery();
+                }
 
-            long sourceCollectionLastModified = sourceCollection?.LastModifiedUnixMilliseconds ?? metadata.SourceCollectionLastModifiedUnixMilliseconds;
-            int sourceCollectionBeatmapCount = sourceCollection?.BeatmapMd5Hashes.Count ?? metadata.SourceCollectionBeatmapCount;
+                long sourceCollectionLastModified = sourceCollection?.LastModifiedUnixMilliseconds ?? metadata.SourceCollectionLastModifiedUnixMilliseconds;
+                int sourceCollectionBeatmapCount = sourceCollection?.BeatmapMd5Hashes.Count ?? metadata.SourceCollectionBeatmapCount;
 
-            setMeta(connection, meta_key_kind, xxy_sr_branch_kind);
-            setMeta(connection, meta_key_schema_version, xxy_sr_branch_schema_version.ToString(CultureInfo.InvariantCulture));
-            setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
-            setMeta(connection, meta_key_ruleset_online_id, metadata.RulesetOnlineId.ToString(CultureInfo.InvariantCulture));
-            setMeta(connection, meta_key_ruleset_short_name, metadata.RulesetShortName);
-            setMeta(connection, meta_key_mods_fingerprint, metadata.ModsFingerprint);
-            setMeta(connection, meta_key_mods_display, metadata.ModsDisplay);
-            setMeta(connection, meta_key_beatmap_count, metadata.BeatmapCount.ToString(CultureInfo.InvariantCulture));
-            setMeta(connection, meta_key_created_at, metadata.CreatedAtUnixMilliseconds.ToString(CultureInfo.InvariantCulture));
-            setMeta(connection, meta_key_display_name, metadata.DisplayName);
-            setMeta(connection, meta_key_mods_json, metadata.ModsJson);
-            setMeta(connection, meta_key_hidden_applied, metadata.HiddenApplied ? "1" : "0");
-            setMeta(connection, meta_key_source_collection_id, metadata.SourceCollectionId == Guid.Empty ? string.Empty : metadata.SourceCollectionId.ToString());
-            setMeta(connection, meta_key_source_collection_name, metadata.SourceCollectionName);
-            setMeta(connection, meta_key_source_collection_last_modified, sourceCollectionLastModified.ToString(CultureInfo.InvariantCulture));
-            setMeta(connection, meta_key_source_collection_beatmap_count, sourceCollectionBeatmapCount.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, meta_key_kind, xxy_sr_branch_kind);
+                setMeta(connection, meta_key_schema_version, xxy_sr_branch_schema_version.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, meta_key_analysis_version, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, meta_key_ruleset_online_id, metadata.RulesetOnlineId.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, meta_key_ruleset_short_name, metadata.RulesetShortName);
+                setMeta(connection, meta_key_mods_fingerprint, metadata.ModsFingerprint);
+                setMeta(connection, meta_key_mods_display, metadata.ModsDisplay);
+                setMeta(connection, meta_key_beatmap_count, metadata.BeatmapCount.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, meta_key_created_at, metadata.CreatedAtUnixMilliseconds.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, meta_key_display_name, metadata.DisplayName);
+                setMeta(connection, meta_key_mods_json, metadata.ModsJson);
+                setMeta(connection, meta_key_hidden_applied, metadata.HiddenApplied ? "1" : "0");
+                setMeta(connection, meta_key_source_collection_id, metadata.SourceCollectionId == Guid.Empty ? string.Empty : metadata.SourceCollectionId.ToString());
+                setMeta(connection, meta_key_source_collection_name, metadata.SourceCollectionName);
+                setMeta(connection, meta_key_source_collection_last_modified, sourceCollectionLastModified.ToString(CultureInfo.InvariantCulture));
+                setMeta(connection, meta_key_source_collection_beatmap_count, sourceCollectionBeatmapCount.ToString(CultureInfo.InvariantCulture));
 
-            using var transaction = connection.BeginTransaction();
+                using var transaction = connection.BeginTransaction();
 
-            using (var deleteSourceCollection = connection.CreateCommand())
-            {
-                deleteSourceCollection.Transaction = transaction;
-                deleteSourceCollection.CommandText = $"DELETE FROM {table_songs_branch_source_collection};";
-                deleteSourceCollection.ExecuteNonQuery();
-            }
+                using (var deleteSourceCollection = connection.CreateCommand())
+                {
+                    deleteSourceCollection.Transaction = transaction;
+                    deleteSourceCollection.CommandText = $"DELETE FROM {table_songs_branch_source_collection};";
+                    deleteSourceCollection.ExecuteNonQuery();
+                }
 
-            if (sourceCollection is SourceCollectionSnapshot sourceCollectionSnapshot)
-            {
-                using var insertSourceCollection = connection.CreateCommand();
-                insertSourceCollection.Transaction = transaction;
-                insertSourceCollection.CommandText = $@"
+                if (sourceCollection is SourceCollectionSnapshot sourceCollectionSnapshot)
+                {
+                    using var insertSourceCollection = connection.CreateCommand();
+                    insertSourceCollection.Transaction = transaction;
+                    insertSourceCollection.CommandText = $@"
 INSERT INTO {table_songs_branch_source_collection}({col_beatmap_md5})
 VALUES($md5)
 ON CONFLICT({col_beatmap_md5}) DO NOTHING;
 ";
 
-                var sourceCollectionMd5Param = insertSourceCollection.CreateParameter();
-                sourceCollectionMd5Param.ParameterName = "$md5";
-                insertSourceCollection.Parameters.Add(sourceCollectionMd5Param);
+                    var sourceCollectionMd5Param = insertSourceCollection.CreateParameter();
+                    sourceCollectionMd5Param.ParameterName = "$md5";
+                    insertSourceCollection.Parameters.Add(sourceCollectionMd5Param);
 
-                foreach (string beatmapMd5 in sourceCollectionSnapshot.BeatmapMd5Hashes.Where(hash => !string.IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
-                {
-                    sourceCollectionMd5Param.Value = beatmapMd5;
-                    insertSourceCollection.ExecuteNonQuery();
+                    foreach (string beatmapMd5 in sourceCollectionSnapshot.BeatmapMd5Hashes.Where(hash => !string.IsNullOrWhiteSpace(hash)).Distinct(StringComparer.OrdinalIgnoreCase))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        sourceCollectionMd5Param.Value = beatmapMd5;
+                        insertSourceCollection.ExecuteNonQuery();
+                    }
                 }
-            }
 
-            using var insert = connection.CreateCommand();
-            insert.Transaction = transaction;
-            insert.CommandText = $@"
+                using var insert = connection.CreateCommand();
+                insert.Transaction = transaction;
+                insert.CommandText = $@"
 INSERT INTO {table_xxy_sr_branch}(
     {col_beatmap_id},
     {col_beatmap_hash},
@@ -1024,32 +1032,52 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
     {col_xxy_sr} = excluded.{col_xxy_sr};
 ";
 
-            var idParam = insert.CreateParameter();
-            idParam.ParameterName = "$id";
-            insert.Parameters.Add(idParam);
+                var idParam = insert.CreateParameter();
+                idParam.ParameterName = "$id";
+                insert.Parameters.Add(idParam);
 
-            var hashParam = insert.CreateParameter();
-            hashParam.ParameterName = "$hash";
-            insert.Parameters.Add(hashParam);
+                var hashParam = insert.CreateParameter();
+                hashParam.ParameterName = "$hash";
+                insert.Parameters.Add(hashParam);
 
-            var md5Param = insert.CreateParameter();
-            md5Param.ParameterName = "$md5";
-            insert.Parameters.Add(md5Param);
+                var md5Param = insert.CreateParameter();
+                md5Param.ParameterName = "$md5";
+                insert.Parameters.Add(md5Param);
 
-            var xxySrParam = insert.CreateParameter();
-            xxySrParam.ParameterName = "$xxy_sr";
-            insert.Parameters.Add(xxySrParam);
+                var xxySrParam = insert.CreateParameter();
+                xxySrParam.ParameterName = "$xxy_sr";
+                insert.Parameters.Add(xxySrParam);
 
-            foreach (var row in rows)
-            {
-                idParam.Value = row.BeatmapId.ToString();
-                hashParam.Value = row.BeatmapHash;
-                md5Param.Value = row.BeatmapMd5;
-                xxySrParam.Value = row.XxySr;
-                insert.ExecuteNonQuery();
+                foreach (var row in rows)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    idParam.Value = row.BeatmapId.ToString();
+                    hashParam.Value = row.BeatmapHash;
+                    md5Param.Value = row.BeatmapMd5;
+                    xxySrParam.Value = row.XxySr;
+                    insert.ExecuteNonQuery();
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                transaction.Commit();
+                success = true;
             }
+            finally
+            {
+                if (!success)
+                {
+                    try
+                    {
+                        SqliteConnection.ClearAllPools();
 
-            transaction.Commit();
+                        if (File.Exists(fullPath))
+                            File.Delete(fullPath);
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
         }
 
         public IReadOnlyDictionary<Guid, double> GetSongsBranchValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
