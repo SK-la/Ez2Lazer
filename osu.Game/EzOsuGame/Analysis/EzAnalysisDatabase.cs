@@ -84,7 +84,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!TryGetStoredAnalysis(beatmapInfo, rulesetInfo, out var result))
                 return false;
 
-            if (result.ManiaAttributes?.XxySr is not double storedXxySr)
+            if (result.ManiaSummary?.XxySr is not double storedXxySr)
                 return false;
 
             xxySr = storedXxySr;

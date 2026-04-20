@@ -24,22 +24,22 @@ namespace osu.Game.EzOsuGame.UserInterface
     {
         public Bindable<EzEnumChartDisplay> KpcDisplayModeBindable { get; } = new Bindable<EzEnumChartDisplay>(EzEnumChartDisplay.BarChart);
 
-        private EzManiaAnalysisAttributes? maniaAttributes;
+        private EzManiaSummary? maniaSummary;
 
-        public EzManiaAnalysisAttributes? ManiaAttributes
+        public EzManiaSummary? ManiaSummary
         {
-            get => maniaAttributes;
+            get => maniaSummary;
             set
             {
                 if (value == null)
                 {
-                    maniaAttributes = null;
+                    maniaSummary = null;
                     clear();
                     return;
                 }
 
-                bool dataChanged = maniaAttributes != value;
-                maniaAttributes = value;
+                bool dataChanged = maniaSummary != value;
+                maniaSummary = value;
 
                 // 只在数据真正变化时才更新显示
                 if (dataChanged)
@@ -137,20 +137,20 @@ namespace osu.Game.EzOsuGame.UserInterface
             updateModeVisibility();
 
             // 如果有数据，用新模弍重新渲染
-            if (maniaAttributes != null && lastKnownColumns != null)
+            if (maniaSummary != null && lastKnownColumns != null)
                 rebuildAndRender(lastKnownColumns, lastKnownHolds, lastKnownCount);
         }
 
         /// <summary>
-        /// 数据变化时调用（ManiaAttributes setter）
+        /// 数据变化时调用（ManiaSummary setter）
         /// </summary>
         private void onDataChanged()
         {
-            if (maniaAttributes == null)
+            if (maniaSummary == null)
                 return;
 
             // 解析并缓存数据
-            parseAndCacheData(maniaAttributes.ColumnCounts, maniaAttributes.HoldNoteCounts);
+            parseAndCacheData(maniaSummary.Value.ColumnCounts, maniaSummary.Value.HoldNoteCounts);
 
             // 渲染显示
             if (lastKnownColumns != null)
@@ -619,7 +619,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (isDisposing)
             {
-                maniaAttributes = null;
+                maniaSummary = null;
                 clear();
             }
         }

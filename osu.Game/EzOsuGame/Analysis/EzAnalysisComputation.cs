@@ -77,12 +77,12 @@ namespace osu.Game.EzOsuGame.Analysis
 
             kpsList = OptimizedBeatmapCalculator.DownsampleToFixedCount(kpsList, OptimizedBeatmapCalculator.DEFAULT_KPS_GRAPH_POINTS);
 
-            var commonAttributes = EzCommonAnalysisAttributes.Create(averageKps, maxKps, kpsList);
-            EzRulesetAnalysisAttributes? rulesetAttributes = onlyKps
+            var commonSummary = new KpsSummary(averageKps, maxKps, kpsList);
+            EzManiaSummary? maniaSummary = onlyKps
                 ? null
-                : EzManiaAnalysisAttributes.Create(columnCounts, holdNoteCounts, xxySr);
+                : new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
 
-            return new EzAnalysisResult(commonAttributes, rulesetAttributes);
+            return new EzAnalysisResult(commonSummary, maniaSummary);
         }
 
         private static double getRateAdjustMultiplier(Mod[] mods)

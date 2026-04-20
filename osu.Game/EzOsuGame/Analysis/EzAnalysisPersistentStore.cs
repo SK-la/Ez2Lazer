@@ -416,7 +416,7 @@ LIMIT 1;
                     }
                 }
 
-                result = new EzAnalysisResult(EzCommonAnalysisAttributes.Create(averageKps, maxKps, kpsList), EzManiaAnalysisAttributes.Create(columnCounts, holdNoteCounts, xxySr));
+                result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), new EzManiaSummary(columnCounts, holdNoteCounts, xxySr));
 
                 // Validate the analysis result to ensure it's reasonable
                 if (!isValidAnalysisResult(result))
@@ -459,7 +459,7 @@ LIMIT 1;
                     if (pendingWrites.TryGetValue(beatmap.ID, out var pending)
                         && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
                     {
-                        if (pending.Analysis.ManiaAttributes?.XxySr is double pendingXxySr)
+                        if (pending.Analysis.ManiaSummary?.XxySr is double pendingXxySr)
                             resolvedValues[beatmap.ID] = pendingXxySr;
 
                         continue;
@@ -566,7 +566,7 @@ WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
             if (!Enabled)
                 return;
 
-            var commonAttributes = analysis.CommonAttributes;
+            var commonSummary = analysis.CommonSummary;
 
             // Validate the analysis result before storing
             if (!isValidAnalysisResult(analysis))
@@ -576,7 +576,7 @@ WHERE {col_beatmap_id} IN ({string.Join(", ", parameterNames)})
             }
 
             // 跳过失败的分析结果
-            if (commonAttributes == null)
+            if (commonSummary == null)
                 return;
 
             try
@@ -651,7 +651,7 @@ LIMIT 1;
                     var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
                     var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
 
-                    result = new EzAnalysisResult(EzCommonAnalysisAttributes.Create(averageKps, maxKps, kpsList), EzManiaAnalysisAttributes.Create(columnCounts, holdNoteCounts, xxySr));
+                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), new EzManiaSummary(columnCounts, holdNoteCounts, xxySr));
 
                     return true;
                 }
@@ -668,12 +668,12 @@ LIMIT 1;
         /// </summary>
         private bool hasDifference(EzAnalysisResult stored, EzAnalysisResult computed)
         {
-            var storedCommonAttributes = stored.CommonAttributes;
-            var computedCommonAttributes = computed.CommonAttributes;
-            var storedManiaAttributes = stored.ManiaAttributes;
-            var computedManiaAttributes = computed.ManiaAttributes;
-            double? storedXxySr = storedManiaAttributes?.XxySr;
-            double? computedXxySr = computedManiaAttributes?.XxySr;
+            var storedCommonSummary = stored.CommonSummary;
+            var computedCommonSummary = computed.CommonSummary;
+            var storedManiaSummary = stored.ManiaSummary;
+            var computedManiaSummary = computed.ManiaSummary;
+            double? storedXxySr = storedManiaSummary?.XxySr;
+            double? computedXxySr = computedManiaSummary?.XxySr;
 
             // 检查 xxysr 差异（最重要）
             // 如果 stored 是 null 而 computed 有值，必须更新
@@ -691,11 +691,11 @@ LIMIT 1;
             if (!stored.AverageKps.Equals(computed.AverageKps) || !stored.MaxKps.Equals(computed.MaxKps))
                 return true;
 
-            if (!(storedCommonAttributes?.KpsList ?? Array.Empty<double>()).SequenceEqual(computedCommonAttributes?.KpsList ?? Array.Empty<double>()))
+            if (!(storedCommonSummary?.KpsList ?? Array.Empty<double>()).SequenceEqual(computedCommonSummary?.KpsList ?? Array.Empty<double>()))
                 return true;
 
-            var storedColumnCounts = storedManiaAttributes?.ColumnCounts ?? new Dictionary<int, int>();
-            var computedColumnCounts = computedManiaAttributes?.ColumnCounts ?? new Dictionary<int, int>();
+            var storedColumnCounts = storedManiaSummary?.ColumnCounts ?? new Dictionary<int, int>();
+            var computedColumnCounts = computedManiaSummary?.ColumnCounts ?? new Dictionary<int, int>();
 
             // 检查列统计
             if (storedColumnCounts.Count != computedColumnCounts.Count)
@@ -707,8 +707,8 @@ LIMIT 1;
                     return true;
             }
 
-            var storedHoldNoteCounts = storedManiaAttributes?.HoldNoteCounts ?? new Dictionary<int, int>();
-            var computedHoldNoteCounts = computedManiaAttributes?.HoldNoteCounts ?? new Dictionary<int, int>();
+            var storedHoldNoteCounts = storedManiaSummary?.HoldNoteCounts ?? new Dictionary<int, int>();
+            var computedHoldNoteCounts = computedManiaSummary?.HoldNoteCounts ?? new Dictionary<int, int>();
 
             // 检查长按统计
             if (storedHoldNoteCounts.Count != computedHoldNoteCounts.Count)
@@ -728,7 +728,7 @@ LIMIT 1;
             if (!Enabled)
                 return;
 
-            var commonAttributes = analysis.CommonAttributes;
+            var commonSummary = analysis.CommonSummary;
 
             // Validate the analysis result before storing
             if (!isValidAnalysisResult(analysis))
@@ -737,9 +737,9 @@ LIMIT 1;
                 return;
             }
 
-            // 跳过无效的分析结果（commonAttributes 为 null）。
+            // 跳过无效的分析结果（commonSummary 为 null）。
             // 允许保存 0-note 谱面的分析结果（KpsList 为空），避免启动时重复预热。
-            if (commonAttributes == null)
+            if (commonSummary == null)
                 return;
 
             // Enqueue pending write and return quickly. Background writer will flush to SQLite.
@@ -2174,12 +2174,12 @@ WHERE {col_beatmap_id} = $id;
             using var cmd = connection.CreateCommand();
             cmd.Transaction = transaction;
 
-            var commonAttributes = analysis.CommonAttributes;
-            var maniaAttributes = analysis.ManiaAttributes;
+            var commonSummary = analysis.CommonSummary;
+            var maniaSummary = analysis.ManiaSummary;
 
-            string kpsListJson = JsonSerializer.Serialize(commonAttributes?.KpsList ?? Array.Empty<double>());
-            string columnCountsJson = JsonSerializer.Serialize(maniaAttributes?.ColumnCounts ?? new Dictionary<int, int>());
-            string holdNoteCountsJson = JsonSerializer.Serialize(maniaAttributes?.HoldNoteCounts ?? new Dictionary<int, int>());
+            string kpsListJson = JsonSerializer.Serialize(commonSummary?.KpsList ?? Array.Empty<double>());
+            string columnCountsJson = JsonSerializer.Serialize(maniaSummary?.ColumnCounts ?? new Dictionary<int, int>());
+            string holdNoteCountsJson = JsonSerializer.Serialize(maniaSummary?.HoldNoteCounts ?? new Dictionary<int, int>());
 
             cmd.CommandText = $@"
 INSERT INTO {table_mania_analysis}(
@@ -2226,7 +2226,7 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
             cmd.Parameters.AddWithValue("$max", analysis.MaxKps);
             cmd.Parameters.AddWithValue("$kps", kpsListJson);
 
-            if (maniaAttributes?.XxySr is double xxySr)
+            if (maniaSummary?.XxySr is double xxySr)
                 cmd.Parameters.AddWithValue("$xxy", xxySr);
             else
                 cmd.Parameters.AddWithValue("$xxy", DBNull.Value);
@@ -2357,7 +2357,7 @@ FROM {table_mania_analysis};
         /// </summary>
         private static bool isValidAnalysisResult(EzAnalysisResult result)
         {
-            if (result.ManiaAttributes?.XxySr is double xxySr && (double.IsNaN(xxySr) || double.IsInfinity(xxySr)))
+            if (result.ManiaSummary?.XxySr is double xxySr && (double.IsNaN(xxySr) || double.IsInfinity(xxySr)))
                 return false;
 
             return true;

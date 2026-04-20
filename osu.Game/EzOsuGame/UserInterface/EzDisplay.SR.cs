@@ -22,16 +22,16 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// <summary>
     /// 模仿 StarRatingDisplay 形式的显示XxySR
     /// </summary>
-    public partial class EzDisplaySR : CompositeDrawable, IHasCurrentValue<EzManiaAnalysisAttributes>
+    public partial class EzDisplaySR : CompositeDrawable, IHasCurrentValue<EzManiaSummary>
     {
         private readonly bool animated;
         private readonly Box background;
         private readonly SpriteIcon srIcon;
         private readonly OsuSpriteText srText;
 
-        private readonly BindableWithCurrent<EzManiaAnalysisAttributes> current = new BindableWithCurrent<EzManiaAnalysisAttributes>();
+        private readonly BindableWithCurrent<EzManiaSummary> current = new BindableWithCurrent<EzManiaSummary>();
 
-        public Bindable<EzManiaAnalysisAttributes> Current
+        public Bindable<EzManiaSummary> Current
         {
             get => current.Current;
             set => current.Current = value;
@@ -49,7 +49,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
-        public EzDisplaySR(EzManiaAnalysisAttributes ezAnalysisResult, StarRatingDisplaySize size = StarRatingDisplaySize.Regular, bool animated = false)
+        public EzDisplaySR(EzManiaSummary ezAnalysisResult, StarRatingDisplaySize size = StarRatingDisplaySize.Regular, bool animated = false)
         {
             this.animated = animated;
 
@@ -141,7 +141,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 else
                     displayedStars.Value = sr;
 
-                // updateDisplay(c.NewValue.ManiaAttributes?.XxySr);
+                // updateDisplay(c.NewValue.ManiaSummary?.XxySr);
             }, true);
 
             displayedStars.Value = Current.Value.XxySr ?? 0;

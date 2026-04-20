@@ -279,7 +279,7 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
-                    ezDisplayKpc.ManiaAttributes = null;
+                    ezDisplayKpc.ManiaSummary = null;
                     return;
                 }
 
@@ -292,14 +292,14 @@ namespace osu.Game.Screens.Select
                     cancellationToken.ThrowIfCancellationRequested();
 
                     bool hasMods = selectedMods.Length > 0;
-                    EzManiaAnalysisAttributes? maniaAttributes = null;
+                    EzManiaSummary? maniaSummary = null;
 
                     if (!hasMods
                         && selectedRuleset != null
                         && selectedRuleset.OnlineID == 3
                         && analysisDatabase.TryGetStoredAnalysis(selectedBeatmap.BeatmapInfo, selectedRuleset, out var storedAnalysis))
                     {
-                        maniaAttributes = storedAnalysis.ManiaAttributes;
+                        maniaSummary = storedAnalysis.ManiaSummary;
                     }
 
                     // This can take time as it is a synchronous task.
@@ -312,7 +312,7 @@ namespace osu.Game.Screens.Select
                                                     .Select(s => new StatisticDifficulty.Data(s.Name, s.BarDisplayLength ?? 0, s.BarDisplayLength ?? 0, 1, s.Content))
                                                     .ToList();
 
-                    maniaAttributes ??= OptimizedBeatmapCalculator.GetEzManiaAttributes(playableBeatmap);
+                    maniaSummary ??= OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
 
                     // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
                     if (selectedRuleset != null && selectedRuleset.OnlineID == 3)
@@ -322,13 +322,13 @@ namespace osu.Game.Screens.Select
                             if (cancellationToken.IsCancellationRequested)
                                 return;
 
-                            ezDisplayKpc.ManiaAttributes = maniaAttributes;
+                            ezDisplayKpc.ManiaSummary = maniaSummary;
                         });
                     }
                     else
                     {
                         // 非 Mania 情况隐藏组件
-                        Schedule(() => ezDisplayKpc.ManiaAttributes = null);
+                        Schedule(() => ezDisplayKpc.ManiaSummary = null);
                     }
 
                     Schedule(() =>

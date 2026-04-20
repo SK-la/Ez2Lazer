@@ -196,7 +196,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// 快速仅统计列计数与长按计数（单次遍历，避免 KPS 相关开销）。
         /// </summary>
-        public static EzManiaAnalysisAttributes GetEzManiaAttributes(IBeatmap beatmap)
+        public static EzManiaSummary GetEzManiaSummary(IBeatmap beatmap)
         {
             var columnCounts = new Dictionary<int, int>();
             var holdNoteCounts = new Dictionary<int, int>();
@@ -211,7 +211,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 }
             }
 
-            return EzManiaAnalysisAttributes.Create(columnCounts, holdNoteCounts, 0);
+            return new EzManiaSummary(columnCounts, holdNoteCounts, 0);
         }
 
         /// <summary>
