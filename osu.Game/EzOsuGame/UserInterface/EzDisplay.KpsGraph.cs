@@ -284,7 +284,7 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         private partial class KpsLineDrawable : Drawable
         {
-            private readonly List<float> points = new List<float>();
+            private float[] points = Array.Empty<float>();
             private float minValue;
             private float maxValue;
             private float thickness;
@@ -303,10 +303,10 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             public void SetValues(float[] source, int count, float minValue, float maxValue, float thickness, bool heatmapEnabled)
             {
-                points.Clear();
+                float[] snapshot = new float[count];
+                Array.Copy(source, snapshot, count);
 
-                for (int i = 0; i < count; i++)
-                    points.Add(source[i]);
+                points = snapshot;
 
                 this.minValue = minValue;
                 this.maxValue = maxValue;
@@ -319,10 +319,10 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             public void Clear()
             {
-                if (points.Count == 0)
+                if (points.Length == 0)
                     return;
 
-                points.Clear();
+                points = Array.Empty<float>();
                 version++;
                 Invalidate(Invalidation.DrawNode);
             }
@@ -331,8 +331,8 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 if (isDisposing)
                 {
-                    // clear managed data and break references to renderer resources to allow GC
-                    points.Clear();
+                    // 使用数组快照，避免绘制线程遍历时被更新线程改写导致越界。
+                    points = Array.Empty<float>();
                     texture = null!;
                     shader = null!;
                 }
@@ -346,7 +346,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 private Texture texture = null!;
                 private IShader shader = null!;
-                private List<float> points = null!;
+                private float[] points = Array.Empty<float>();
                 private Vector2 drawSize;
                 private float minValue;
                 private float maxValue;
@@ -386,7 +386,10 @@ namespace osu.Game.EzOsuGame.UserInterface
                 {
                     base.Draw(renderer);
 
-                    if (points.Count < 2 || !texture.Available)
+                    float[] localPoints = points;
+                    int pointCount = localPoints.Length;
+
+                    if (pointCount < 2 || !texture.Available)
                         return;
 
                     shader.Bind();
@@ -394,7 +397,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     if (!renderer.BindTexture(texture))
                         return;
 
-                    quadBatch ??= renderer.CreateQuadBatch<TexturedVertex2D>(Math.Min(points.Count - 1, 1024), 4);
+                    quadBatch ??= renderer.CreateQuadBatch<TexturedVertex2D>(Math.Min(pointCount - 1, 1024), 4);
 
                     renderer.PushLocalMatrix(DrawInfo.Matrix);
 
@@ -404,14 +407,14 @@ namespace osu.Game.EzOsuGame.UserInterface
                     var add = quadBatch.AddAction;
 
                     float halfThickness = thickness / 2f;
-                    int denominator = Math.Max(1, points.Count - 1);
+                    int denominator = Math.Max(1, pointCount - 1);
 
-                    for (int i = 0; i < points.Count - 1; i++)
+                    for (int i = 0; i < pointCount - 1; i++)
                     {
-                        Vector2 start = new Vector2(i / (float)denominator * drawSize.X, getYPosition(points[i]) * drawSize.Y);
-                        Vector2 end = new Vector2((i + 1) / (float)denominator * drawSize.X, getYPosition(points[i + 1]) * drawSize.Y);
-                        Colour4 startColour = heatmapEnabled ? getHeatColour(points[i]) : Colour4.CornflowerBlue;
-                        Colour4 endColour = heatmapEnabled ? getHeatColour(points[i + 1]) : Colour4.CornflowerBlue;
+                        Vector2 start = new Vector2(i / (float)denominator * drawSize.X, getYPosition(localPoints[i]) * drawSize.Y);
+                        Vector2 end = new Vector2((i + 1) / (float)denominator * drawSize.X, getYPosition(localPoints[i + 1]) * drawSize.Y);
+                        Colour4 startColour = heatmapEnabled ? getHeatColour(localPoints[i]) : Colour4.CornflowerBlue;
+                        Colour4 endColour = heatmapEnabled ? getHeatColour(localPoints[i + 1]) : Colour4.CornflowerBlue;
 
                         Vector2 direction = end - start;
                         float length = direction.Length;
