@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using osu.Game.Beatmaps;
+using osu.Game.Rulesets.Mania.EzMania.Analysis.SR4Pattern;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
@@ -279,6 +280,202 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return sr;
         }
 
+        #region 指标提取
+
+        internal static EzManiaSR4PatternSnapshot CalculateSR4PatternSnapshot(ManiaBeatmap maniaBeatmap, double clockRate = 1.0)
+        {
+            int keyCount = Math.Max(1, maniaBeatmap.TotalColumns > 0 ? maniaBeatmap.TotalColumns : (int)Math.Round(maniaBeatmap.BeatmapInfo.Difficulty.CircleSize));
+            double[]? cross = CrossMatrixProvider.GetMatrix(keyCount);
+
+            if (cross == null || cross[0] == -1)
+            {
+                Console.WriteLine($@"[SR][ERROR] Key mode {keyCount}k is not supported by the SR algorithm.");
+                throw new NotSupportedException($"Key mode {keyCount}k is not supported by the SR algorithm.");
+            }
+
+            int estimatedNotes = maniaBeatmap.HitObjects.Count;
+
+            if (estimatedNotes == 0)
+            {
+                return new EzManiaSR4PatternSnapshot(
+                    keyCount,
+                    Array.Empty<double>(),
+                    Array.Empty<double>(),
+                    Array.Empty<double>(),
+                    Array.Empty<double>(),
+                    Array.Empty<double>(),
+                    Array.Empty<double>(),
+                    Array.Empty<double>(),
+                    Array.Empty<double>(),
+                    Array.Empty<double>(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0);
+            }
+
+            var notes = new List<NoteStruct>(estimatedNotes);
+            var notesByColumn = new List<NoteStruct>[keyCount];
+
+            for (int i = 0; i < keyCount; i++)
+                notesByColumn[i] = new List<NoteStruct>((estimatedNotes / keyCount) + 1);
+
+            foreach (var hitObject in maniaBeatmap.HitObjects)
+            {
+                int column = Math.Clamp(hitObject.Column, 0, keyCount - 1);
+                int head = (int)Math.Round(hitObject.StartTime / clockRate);
+                int tail = (int)Math.Round(hitObject.GetEndTime() / clockRate);
+
+                if ((hitObject as IHasDuration)?.EndTime == null)
+                    tail = -1;
+
+                if (tail <= head)
+                    tail = -1;
+
+                var note = new NoteStruct(column, head, tail);
+                notes.Add(note);
+                notesByColumn[column].Add(note);
+            }
+
+            notes.Sort(note_comparer);
+
+            foreach (var columnNotes in notesByColumn)
+                columnNotes.Sort(note_comparer);
+
+            var longNotes = notes.Where(n => n.IsLongNote).ToList();
+            var longNotesByTails = longNotes.OrderBy(n => n.TailTime).ToList();
+
+            double x = computeHitLeniency(maniaBeatmap.BeatmapInfo.Difficulty.OverallDifficulty);
+            int maxHead = notes.Max(n => n.HeadTime);
+            int maxTail = longNotes.Count > 0 ? longNotes.Max(n => n.TailTime) : maxHead;
+            int totalTime = Math.Max(maxHead, maxTail) + 1;
+
+            (double[] allCorners, double[] baseCorners, double[] aCorners) = buildCorners(totalTime, notes);
+            bool[][] keyUsage = buildKeyUsage(keyCount, totalTime, notes, baseCorners);
+            int[][] activeColumns = deriveActiveColumns(keyUsage);
+            double[][] keyUsage400 = buildKeyUsage400(keyCount, totalTime, notes, baseCorners);
+            double[] anchorBase = computeAnchor(keyCount, keyUsage400, baseCorners);
+            LNRepStruct? lnRep = longNotes.Count > 0 ? buildLNRepresentation(longNotes, totalTime) : null;
+
+            double[] neutralAnchorBase = Enumerable.Repeat(1.0, baseCorners.Length).ToArray();
+
+            (double[][] deltaKs, double[] jBarBase) = computeJBar(keyCount, totalTime, x, notesByColumn, baseCorners);
+            double[] jBar = interpValues(allCorners, baseCorners, jBarBase);
+
+            double[] xBarBase = computeXBar(keyCount, totalTime, x, notesByColumn, activeColumns, baseCorners, cross);
+            double[] xBar = interpValues(allCorners, baseCorners, xBarBase);
+
+            double[] burstBase = computePBar(keyCount, totalTime, x, notes, null, neutralAnchorBase, baseCorners);
+            double[] burstBar = interpValues(allCorners, baseCorners, burstBase);
+
+            double[] longNoteUsageBase = computePBar(keyCount, totalTime, x, notes, lnRep, neutralAnchorBase, baseCorners);
+            double[] longNoteUsageBar = interpValues(allCorners, baseCorners, longNoteUsageBase);
+
+            double[] anchoredBurstBase = computePBar(keyCount, totalTime, x, notes, lnRep, anchorBase, baseCorners);
+            double[] anchoredBurstBar = interpValues(allCorners, baseCorners, anchoredBurstBase);
+
+            double[] rBarBase = computeRBar(keyCount, totalTime, x, notesByColumn, longNotesByTails, baseCorners);
+            double[] rBar = interpValues(allCorners, baseCorners, rBarBase);
+
+            double[] aBarBase = computeABar(keyCount, totalTime, deltaKs, activeColumns, aCorners, baseCorners);
+            double[] aBar = interpValues(allCorners, aCorners, aBarBase);
+
+            (double[] cStep, double[] ksStep) = computeCAndKs(keyCount, notes, keyUsage, baseCorners);
+            double[] cArr = stepInterp(allCorners, baseCorners, cStep);
+            double[] ksArr = stepInterp(allCorners, baseCorners, ksStep);
+            double[] gaps = computeGaps(allCorners);
+            double[] effectiveWeights = new double[allCorners.Length];
+            double[] totalDifficulty = new double[allCorners.Length];
+            double[] bracketContribution = new double[allCorners.Length];
+            double[] jackContribution = new double[allCorners.Length];
+            double[] burstContribution = new double[allCorners.Length];
+            double[] longNoteUsageContribution = new double[allCorners.Length];
+            double[] longNoteReleaseContribution = new double[allCorners.Length];
+            double[] anchorContribution = new double[allCorners.Length];
+            double[] bracketAllocated = new double[allCorners.Length];
+            double[] jackAllocated = new double[allCorners.Length];
+            double[] burstAllocated = new double[allCorners.Length];
+            double[] longNoteUsageAllocated = new double[allCorners.Length];
+            double[] longNoteReleaseAllocated = new double[allCorners.Length];
+            double[] anchorAllocated = new double[allCorners.Length];
+
+            for (int i = 0; i < allCorners.Length; i++)
+            {
+                effectiveWeights[i] = cArr[i] * gaps[i];
+
+                double actualTerm1 = computeSR4JackTerm(jBar[i], aBar[i], ksArr[i]);
+                double burstOnlyTerm2 = computeSR4BurstTerm(burstBar[i], 0, aBar[i], cArr[i]);
+                double longNoteUsageTerm2 = computeSR4BurstTerm(longNoteUsageBar[i], 0, aBar[i], cArr[i]);
+                double anchoredBurstTerm2 = computeSR4BurstTerm(anchoredBurstBar[i], 0, aBar[i], cArr[i]);
+                double actualTerm2 = computeSR4BurstTerm(anchoredBurstBar[i], rBar[i], aBar[i], cArr[i]);
+
+                double difficultyWithoutBurstBranch = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, 0);
+                double difficultyWithBurstOnly = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, burstOnlyTerm2);
+                double difficultyWithLongNoteUsage = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, longNoteUsageTerm2);
+                double difficultyWithAnchor = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, anchoredBurstTerm2);
+                double actualDifficulty = computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], actualTerm1, actualTerm2);
+
+                totalDifficulty[i] = actualDifficulty;
+                bracketContribution[i] = Math.Max(0, actualDifficulty - computeSR4LocalDifficulty(0, aBar[i], ksArr[i], actualTerm1, actualTerm2));
+                jackContribution[i] = Math.Max(0, actualDifficulty - computeSR4LocalDifficulty(xBar[i], aBar[i], ksArr[i], 0, actualTerm2));
+                burstContribution[i] = Math.Max(0, difficultyWithBurstOnly - difficultyWithoutBurstBranch);
+                longNoteUsageContribution[i] = Math.Max(0, difficultyWithLongNoteUsage - difficultyWithBurstOnly);
+                anchorContribution[i] = Math.Max(0, difficultyWithAnchor - difficultyWithLongNoteUsage);
+                longNoteReleaseContribution[i] = Math.Max(0, actualDifficulty - difficultyWithAnchor);
+
+                double totalMarginalContribution = bracketContribution[i] + jackContribution[i] + burstContribution[i] + longNoteUsageContribution[i] + longNoteReleaseContribution[i] + anchorContribution[i];
+
+                if (actualDifficulty <= 0 || totalMarginalContribution <= 0)
+                    continue;
+
+                double allocationScale = actualDifficulty / totalMarginalContribution;
+                bracketAllocated[i] = bracketContribution[i] * allocationScale;
+                jackAllocated[i] = jackContribution[i] * allocationScale;
+                burstAllocated[i] = burstContribution[i] * allocationScale;
+                longNoteUsageAllocated[i] = longNoteUsageContribution[i] * allocationScale;
+                longNoteReleaseAllocated[i] = longNoteReleaseContribution[i] * allocationScale;
+                anchorAllocated[i] = anchorContribution[i] * allocationScale;
+            }
+
+            double totalSr = finaliseDifficulty(totalDifficulty, effectiveWeights, notes, longNotes);
+            double bracketStar = computeSR4ContributionStar(bracketAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
+            double jackStar = computeSR4ContributionStar(jackAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
+            double burstStar = computeSR4ContributionStar(burstAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
+            double longNoteUsageStar = computeSR4ContributionStar(longNoteUsageAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
+            double longNoteReleaseStar = computeSR4ContributionStar(longNoteReleaseAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
+            double anchorStar = computeSR4ContributionStar(anchorAllocated, totalDifficulty, effectiveWeights, notes, longNotes, totalSr);
+
+            normaliseSR4ComponentStars(totalSr,
+                ref bracketStar,
+                ref jackStar,
+                ref burstStar,
+                ref longNoteUsageStar,
+                ref longNoteReleaseStar,
+                ref anchorStar);
+
+            return new EzManiaSR4PatternSnapshot(
+                keyCount,
+                effectiveWeights,
+                cArr,
+                ksArr,
+                bracketContribution,
+                jackContribution,
+                burstContribution,
+                longNoteUsageContribution,
+                longNoteReleaseContribution,
+                anchorContribution,
+                bracketStar,
+                jackStar,
+                burstStar,
+                longNoteUsageStar,
+                longNoteReleaseStar,
+                anchorStar);
+        }
+
+            #endregion
+
         private static double computeHitLeniency(double overallDifficulty)
         {
             double leniency = 0.3 * Math.Sqrt((64.5 - Math.Ceiling(overallDifficulty * 3.0)) / 500.0);
@@ -493,6 +690,64 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             }
 
             return total;
+        }
+
+        private static double lnIntegralClamped(LNRepStruct repStruct, int a, int b)
+        {
+            int[] points = repStruct.Points;
+            double[] cumulative = repStruct.Cumulative;
+            double[] values = repStruct.Values;
+
+            if (values.Length == 0)
+                return 0;
+
+            a = Math.Clamp(a, points[0], points[^1]);
+            b = Math.Clamp(b, points[0], points[^1]);
+
+            if (b <= a)
+                return 0;
+
+            int lastSegmentIndex = values.Length - 1;
+            int startIndex = Math.Clamp(upperBound(points, a) - 1, 0, lastSegmentIndex);
+            int endIndex = Math.Clamp(upperBound(points, b) - 1, 0, lastSegmentIndex);
+
+            if (endIndex < startIndex)
+                endIndex = startIndex;
+
+            double total = 0;
+
+            if (startIndex == endIndex)
+                total = (b - a) * values[startIndex];
+            else
+            {
+                total += (points[startIndex + 1] - a) * values[startIndex];
+                total += cumulative[endIndex] - cumulative[startIndex + 1];
+                total += (b - points[endIndex]) * values[endIndex];
+            }
+
+            return total;
+        }
+
+        private static double[] computeLongNoteUsageBar(int totalTime, LNRepStruct? lnRep, double[] baseCorners)
+        {
+            if (!lnRep.HasValue)
+                return new double[baseCorners.Length];
+
+            double[] usage = new double[baseCorners.Length];
+
+            for (int i = 0; i < baseCorners.Length; i++)
+            {
+                int left = (int)Math.Max(Math.Round(baseCorners[i] - 250), 0);
+                int right = (int)Math.Min(Math.Round(baseCorners[i] + 250), totalTime);
+
+                if (right <= left)
+                    continue;
+
+                double average = lnIntegralClamped(lnRep.Value, left, right) / Math.Max(right - left, 1);
+                usage[i] = average;
+            }
+
+            return SmoothOnCorners(baseCorners, usage, 250, 0, SmoothMode.Average);
         }
 
         #endregion
@@ -916,6 +1171,100 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
 
             return gaps;
         }
+
+        #region 指标映射
+
+        private static double computeSR4JackTerm(double jackValue, double aBar, double activeColumns)
+        {
+            double coordinationExponent = 3.0 / Math.Max(activeColumns, 1e-6);
+            double coordinationPower = aBar <= 0 ? 0 : Math.Pow(aBar, coordinationExponent);
+            double minCandidate = 8 + 0.85 * jackValue;
+            double limitedJack = Math.Min(jackValue, minCandidate);
+            double jackComponent = coordinationPower * limitedJack;
+
+            return 0.4 * safePow(jackComponent, 1.5);
+        }
+
+        private static double computeSR4BurstTerm(double burstValue, double releaseValue, double aBar, double densityValue)
+        {
+            double burstComponent = (0.8 * burstValue) + (releaseValue * 35.0 / (densityValue + 8));
+            double coordinationFactor = aBar <= 0 ? 0 : Math.Pow(aBar, 2.0 / 3.0);
+
+            return 0.6 * safePow(coordinationFactor * burstComponent, 1.5);
+        }
+
+        private static double computeSR4LocalDifficulty(double bracketValue, double aBar, double activeColumns, double jackTerm, double burstTerm)
+        {
+            double coordinationExponent = 3.0 / Math.Max(activeColumns, 1e-6);
+            double coordinationPower = aBar <= 0 ? 0 : Math.Pow(aBar, coordinationExponent);
+            double sumTerms = jackTerm + burstTerm;
+            double s = sumTerms <= 0 ? 0 : Math.Pow(sumTerms, 2.0 / 3.0);
+            double denominator = bracketValue + s + 1;
+            double tValue = denominator <= 0 ? 0 : coordinationPower * bracketValue / denominator;
+            double primaryImpact = 2.7 * Math.Sqrt(Math.Max(s, 0)) * safePow(tValue, 1.5);
+            double secondaryImpact = s * 0.27;
+
+            return primaryImpact + secondaryImpact;
+        }
+
+        private static double computeSR4ContributionStar(double[] localContribution, double[] totalDifficulty, double[] weights, List<NoteStruct> notes, List<NoteStruct> longNotes, double totalSr)
+        {
+            if (localContribution.Length == 0 || totalDifficulty.Length == 0 || weights.Length == 0 || totalSr <= 0)
+                return 0;
+
+            int count = Math.Min(localContribution.Length, Math.Min(totalDifficulty.Length, weights.Length));
+            double[] clampedContribution = new double[count];
+            double[] localWeights = new double[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                clampedContribution[i] = Math.Min(Math.Max(localContribution[i], 0), Math.Max(totalDifficulty[i], 0));
+                localWeights[i] = weights[i];
+            }
+
+            if (clampedContribution.All(v => v <= 0))
+                return 0;
+
+            double componentSr = finaliseDifficulty(clampedContribution, localWeights, notes, longNotes);
+            return Math.Round(Math.Clamp(componentSr, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static void normaliseSR4ComponentStars(double totalSr,
+                                                       ref double bracketStar,
+                                                       ref double jackStar,
+                                                       ref double burstStar,
+                                                       ref double longNoteUsageStar,
+                                                       ref double longNoteReleaseStar,
+                                                       ref double anchorStar)
+        {
+            if (totalSr <= 0)
+            {
+                bracketStar = 0;
+                jackStar = 0;
+                burstStar = 0;
+                longNoteUsageStar = 0;
+                longNoteReleaseStar = 0;
+                anchorStar = 0;
+                return;
+            }
+
+            double maxComponentStar = Math.Max(
+                Math.Max(Math.Max(bracketStar, jackStar), Math.Max(burstStar, longNoteUsageStar)),
+                Math.Max(longNoteReleaseStar, anchorStar));
+
+            if (maxComponentStar <= 0)
+                return;
+
+            double scale = totalSr / maxComponentStar;
+            bracketStar = Math.Round(Math.Clamp(bracketStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            jackStar = Math.Round(Math.Clamp(jackStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            burstStar = Math.Round(Math.Clamp(burstStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            longNoteUsageStar = Math.Round(Math.Clamp(longNoteUsageStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            longNoteReleaseStar = Math.Round(Math.Clamp(longNoteReleaseStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+            anchorStar = Math.Round(Math.Clamp(anchorStar * scale, 0, totalSr), 2, MidpointRounding.AwayFromZero);
+        }
+
+        #endregion
 
         private static double finaliseDifficulty(List<double> difficulties, List<double> weights, List<NoteStruct> notes, List<NoteStruct> longNotes)
         {
