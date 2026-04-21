@@ -52,7 +52,7 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.Mania
 {
-    public class ManiaRuleset : Ruleset, ILegacyRuleset, IXxySrCalculator
+    public class ManiaRuleset : Ruleset, ILegacyRuleset
     {
         /// <summary>
         /// The maximum number of supported keys in a single stage.
@@ -77,20 +77,7 @@ namespace osu.Game.Rulesets.Mania
 
         public override IBeatmapVerifier CreateBeatmapVerifier() => new ManiaBeatmapVerifier();
 
-        public bool TryCalculateXxySr(IBeatmap beatmap, double clockRate, out double sr)
-        {
-            sr = 0;
-
-            int keyCount = beatmap is ManiaBeatmap maniaBeatmap && maniaBeatmap.TotalColumns > 0
-                ? maniaBeatmap.TotalColumns
-                : Math.Max(1, (int)Math.Round(beatmap.BeatmapInfo.Difficulty.CircleSize));
-
-            if (keyCount >= 11 && keyCount % 2 == 1)
-                return false;
-
-            sr = SRCalculator.CalculateSR(beatmap, clockRate);
-            return !double.IsNaN(sr) && !double.IsInfinity(sr);
-        }
+        public override IEzAnalysisProvider CreateEzAnalysisProvider() => new EzManiaAnalysisProvider();
 
         public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
         {
