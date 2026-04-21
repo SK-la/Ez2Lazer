@@ -37,13 +37,13 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float panel_right_margin = 20;
         private const float default_panel_height = 340;
         private const float min_panel_width = 360;
-        private const float max_panel_width = 800;
+        private const float max_panel_width = 580;
         private const float min_panel_height = 180;
         private const float max_panel_height = 800;
         private const float bottom_controls_height = 56;
         private const float resize_handle_height = 10;
         private const float resize_handle_width = 10;
-        private const float preview_mode_button_width = 120;
+        private const float preview_mode_button_width = 90;
         private const float preview_mode_list_width = preview_mode_button_width;
         private const float preview_mode_button_height = 30;
         private const float preview_mode_button_spacing = 6;
@@ -200,6 +200,8 @@ namespace osu.Game.EzOsuGame.Overlays
                                     stageViewport = new Container
                                     {
                                         RelativeSizeAxes = Axes.Both,
+                                        Anchor = Anchor.BottomLeft,
+                                        Origin = Anchor.BottomLeft,
                                         Masking = true,
                                         CornerRadius = 6,
                                         Children = new Drawable[]
@@ -211,9 +213,9 @@ namespace osu.Game.EzOsuGame.Overlays
                                             },
                                             stageScaleContainer = new Container
                                             {
-                                                Anchor = Anchor.Centre,
-                                                Origin = Anchor.Centre,
-                                                Size = new Vector2(1366, 768),
+                                                Anchor = Anchor.BottomLeft,
+                                                Origin = Anchor.BottomLeft,
+                                                Size = new Vector2(640, 480),
                                             },
                                             stateText = new OsuSpriteText
                                             {
