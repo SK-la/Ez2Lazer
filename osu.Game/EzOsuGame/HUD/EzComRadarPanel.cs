@@ -249,7 +249,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private bool beginRulesetSpecificRadarUpdate()
         {
-            if (!EzRulesetSpecificRadarAnalysis.Supports(ruleset.Value))
+            if (!EzAnalysisProviderBridge.HasAnalysisProvider(ruleset.Value))
                 return false;
 
             cancelRadarAnalysis();
@@ -260,8 +260,7 @@ namespace osu.Game.EzOsuGame.HUD
                 return true;
             }
 
-            if (EzRulesetSpecificRadarAnalysis.TryCreatePlaceholder(ruleset.Value, out EzRadarChartData<string> placeholderData))
-                applyRadarData(placeholderData, getRulesetSpecificAxisMaxValues());
+            clearChartData();
 
             radarAnalysisCancellationSource = new CancellationTokenSource();
 

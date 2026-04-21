@@ -1273,15 +1273,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
             var selectedBranch = selectedEntry.BranchValue;
 
-            if (selectedBranch == null)
-            {
-                postNotification(new SimpleErrorNotification
-                {
-                    Text = EzManageSongsBranchesDialogStrings.SELECT_GENERATED_BRANCH_FIRST,
-                });
-                return;
-            }
-
             var metadata = selectedBranch.Metadata;
 
             if (metadata.RulesetOnlineId != ruleset.Value.OnlineID)

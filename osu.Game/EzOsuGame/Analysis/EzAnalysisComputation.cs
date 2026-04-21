@@ -22,9 +22,6 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             xxySr = 0;
 
-            if (lookup.Ruleset.OnlineID != 3)
-                return false;
-
             PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
             IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
@@ -35,11 +32,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
 
-            if (!XxySrCalculatorBridge.TryCalculate(lookup.Ruleset, analysisBeatmap, rate, out double sr) || double.IsNaN(sr) || double.IsInfinity(sr))
-                return false;
-
-            xxySr = sr;
-            return true;
+            return EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.XXY_SR, cancellationToken, out xxySr);
         }
 
         public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
@@ -69,11 +62,14 @@ namespace osu.Game.EzOsuGame.Analysis
             }
 
             double? xxySr = null;
+            double sr = 0;
 
             bool shouldCalculateXxy = !onlyKps && lookup.Ruleset.OnlineID == 3;
+            bool hasXxySr = shouldCalculateXxy
+                            && analysisBeatmap.HitObjects.Count > 0
+                            && EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.XXY_SR, cancellationToken, out sr);
 
-            if (shouldCalculateXxy && analysisBeatmap.HitObjects.Count > 0 && XxySrCalculatorBridge.TryCalculate(lookup.Ruleset, analysisBeatmap, rate, out double sr) && !double.IsNaN(sr)
-                && !double.IsInfinity(sr))
+            if (hasXxySr)
                 xxySr = sr;
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -93,26 +89,15 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             radarData = default;
 
-            if (!EzRulesetSpecificRadarAnalysis.Supports(lookup.Ruleset))
-                return false;
-
             PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
             IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
-            double? xxySr = null;
 
-            if (analysisBeatmap.HitObjects.Count > 0
-                && XxySrCalculatorBridge.TryCalculate(lookup.Ruleset, analysisBeatmap, rate, out double sr)
-                && !double.IsNaN(sr)
-                && !double.IsInfinity(sr))
-                xxySr = sr;
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            return EzRulesetSpecificRadarAnalysis.TryCompute(lookup.Ruleset, analysisBeatmap, xxySr, cancellationToken, out radarData);
+            return EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.RULESET_SPECIFIC_RADAR_DATA, cancellationToken,
+                out radarData);
         }
 
         private static double getRateAdjustMultiplier(Mod[] mods)
