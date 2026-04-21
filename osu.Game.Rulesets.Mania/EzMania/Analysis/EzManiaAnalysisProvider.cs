@@ -65,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
                     hasXxySr = true;
                 }
 
-                bag.Set(EzAnalysisFields.RULESET_SPECIFIC_RADAR_DATA, computeRadarData(beatmap, hasXxySr ? xxySr : null, cancellationToken));
+                bag.Set(EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT, new EzRulesetSpecificRadarResult(computeRadarData(beatmap, cancellationToken), hasXxySr ? xxySr : null));
             }
 
             analysis = bag;
@@ -87,12 +87,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return !double.IsNaN(sr) && !double.IsInfinity(sr);
         }
 
-        private static EzRadarChartData<string> computeRadarData(ManiaBeatmap beatmap, double? xxySr, CancellationToken cancellationToken)
+        private static EzRadarChartData<string> computeRadarData(ManiaBeatmap beatmap, CancellationToken cancellationToken)
         {
             var columnObjects = getColumnObjects(beatmap);
 
             if (columnObjects.Count == 0)
-                return createRadarData(0, 0, 0, 0, 0, xxySr ?? 0);
+                return createRadarData(0, 0, 0, 0, 0, 0);
 
             var rows = buildRows(beatmap, columnObjects, cancellationToken);
             int totalColumns = columnObjects.Max(obj => obj.Column) + 1;
@@ -100,20 +100,46 @@ namespace osu.Game.Rulesets.Mania.EzMania.Analysis
             return createRadarData(
                 computeBracketScore(rows, totalColumns, cancellationToken),
                 computeChordScore(rows, cancellationToken),
-                computeDelayScore(rows, cancellationToken),
-                computeDumpScore(rows, cancellationToken),
+                computeLongNoteRatioScore(beatmap),
                 computeJackScore(beatmap, columnObjects, cancellationToken),
-                xxySr ?? 0);
+                computeDelayScore(rows, cancellationToken),
+                computeDumpScore(rows, cancellationToken));
         }
 
-        private static EzRadarChartData<string> createRadarData(double bracket, double chord, double delay, double dump, double jack, double xxySr)
+        private static EzRadarChartData<string> createRadarData(double bracket, double chord, double longNoteRatio, double jack, double delay, double dump)
             => EzRadarChartData<string>.Create(
                 new EzRadarAxisValue<string>("Bracket", toKeyPatternScore(bracket), "0.00"),
                 new EzRadarAxisValue<string>("Chord", toKeyPatternScore(chord), "0.00"),
-                new EzRadarAxisValue<string>("Delay", toKeyPatternScore(delay), "0.00"),
-                new EzRadarAxisValue<string>("Dump", toKeyPatternScore(dump), "0.00"),
+                new EzRadarAxisValue<string>("LN%", longNoteRatio, "0.00"),
                 new EzRadarAxisValue<string>("Jack", toKeyPatternScore(jack), "0.00"),
-                new EzRadarAxisValue<string>("XXYSR", xxySr, "0.00"));
+                new EzRadarAxisValue<string>("Delay", toKeyPatternScore(delay), "0.00"),
+                new EzRadarAxisValue<string>("Dump", toKeyPatternScore(dump), "0.00"));
+
+        private static double computeLongNoteRatioScore(ManiaBeatmap beatmap)
+        {
+            int noteObjectCount = 0;
+            int holdNoteCount = 0;
+
+            for (int i = 0; i < beatmap.HitObjects.Count; i++)
+            {
+                switch (beatmap.HitObjects[i])
+                {
+                    case HoldNote:
+                        holdNoteCount++;
+                        noteObjectCount++;
+                        break;
+
+                    case Note:
+                        noteObjectCount++;
+                        break;
+                }
+            }
+
+            if (noteObjectCount == 0)
+                return 0;
+
+            return Math.Round(holdNoteCount / (double)noteObjectCount * 100, 2, MidpointRounding.AwayFromZero);
+        }
 
         private static List<ColumnHitObject> getColumnObjects(ManiaBeatmap beatmap)
         {

@@ -85,9 +85,9 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         public static bool TryComputeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
-                                                              out EzRadarChartData<string> radarData)
+                                                              out EzRulesetSpecificRadarResult radarResult)
         {
-            radarData = default;
+            radarResult = default;
 
             PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
             IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
@@ -96,8 +96,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             double rate = getRateAdjustMultiplier(lookup.OrderedMods);
 
-            return EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.RULESET_SPECIFIC_RADAR_DATA, cancellationToken,
-                out radarData);
+            return EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.RULESET_SPECIFIC_RADAR_RESULT,
+                cancellationToken, out radarResult);
         }
 
         private static double getRateAdjustMultiplier(Mod[] mods)
