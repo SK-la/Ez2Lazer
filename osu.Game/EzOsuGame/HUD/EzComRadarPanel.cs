@@ -49,6 +49,8 @@ namespace osu.Game.EzOsuGame.HUD
         private const float axis_label_padding = 52f;
         private const float axis_label_offset = 16f;
         private const float axis_label_alpha = 1f;
+        private const float key_pattern_full_score = 10f;
+        private const float long_note_ratio_max = 100f;
 
         private float[] parameterRatios = new float[6];
         private float[] parameterValues = new float[6];
@@ -76,6 +78,9 @@ namespace osu.Game.EzOsuGame.HUD
 
         [SettingSource("Radar data mode", "Switch between general data and ruleset-specific data.")]
         public Bindable<EzRadarDisplayMode> RadarDisplayMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.General);
+
+        [SettingSource("Absolute pattern value", "Scale ruleset-specific values by xxySR.")]
+        public Bindable<bool> UseAbsolutePatternValue { get; } = new BindableBool();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 210, 230));
@@ -188,7 +193,6 @@ namespace osu.Game.EzOsuGame.HUD
             BaseAreaColour.BindValueChanged(_ => applyChartColours(), true);
             DataLineColour.BindValueChanged(_ => applyChartColours(), true);
             DataAreaColour.BindValueChanged(_ => applyChartColours(), true);
-            RadarDisplayMode.BindValueChanged(_ => updateParameterRatios(difficultyBindable?.Value ?? default), true);
 
             chart?.SetData(parameterRatios);
             updateAxisTexts();
@@ -278,25 +282,25 @@ namespace osu.Game.EzOsuGame.HUD
                         if (cancellationToken.IsCancellationRequested)
                             return;
 
-                        EzRadarChartData<string>? radarData = task.GetResultSafely();
+                        EzRulesetSpecificRadarResult? radarResult = task.GetResultSafely();
 
-                        if (radarData != null)
-                            applyRadarData(radarData.Value, getRulesetSpecificAxisMaxValues());
+                        if (radarResult != null)
+                            applyRulesetSpecificRadarResult(radarResult.Value);
                     });
                 }, cancellationToken);
 
             return true;
         }
 
-        private EzRadarChartData<string>? computeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, BeatmapInfo beatmapInfo, RulesetInfo localRuleset,
-                                                                          IReadOnlyList<Mod> localMods, CancellationToken cancellationToken)
+        private EzRulesetSpecificRadarResult? computeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, BeatmapInfo beatmapInfo, RulesetInfo localRuleset,
+                                                                              IReadOnlyList<Mod> localMods, CancellationToken cancellationToken)
         {
             try
             {
                 var lookup = new EzAnalysisLookupCache(beatmapInfo, localRuleset, localMods);
 
-                return EzAnalysisComputation.TryComputeRulesetSpecificRadarData(workingBeatmap, lookup, cancellationToken, out EzRadarChartData<string> radarData)
-                    ? radarData
+                return EzAnalysisComputation.TryComputeRulesetSpecificRadarData(workingBeatmap, lookup, cancellationToken, out EzRulesetSpecificRadarResult radarResult)
+                    ? radarResult
                     : null;
             }
             catch (OperationCanceledException)
@@ -350,10 +354,42 @@ namespace osu.Game.EzOsuGame.HUD
             updateAxisTexts();
         }
 
+        private void applyRulesetSpecificRadarResult(EzRulesetSpecificRadarResult radarResult)
+        {
+            EzRadarChartData<string> displayedRadarData = createDisplayedRulesetRadarData(radarResult);
+            applyRadarData(displayedRadarData, getRulesetSpecificAxisMaxValues());
+        }
+
         private IReadOnlyList<float> getGeneralAxisMaxValues() => new[] { MaxBpm, MaxStar, MaxCs, MaxOd, MaxDr, MaxAr };
 
         private IReadOnlyList<float> getRulesetSpecificAxisMaxValues()
-            => new[] { MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore, MaxXxySr };
+            => UseAbsolutePatternValue.Value
+                ? new[] { MaxXxySr, MaxXxySr, long_note_ratio_max, MaxXxySr, MaxXxySr, MaxXxySr }
+                : new[] { MaxKeyPatternScore, MaxKeyPatternScore, long_note_ratio_max, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore };
+
+        private EzRadarChartData<string> createDisplayedRulesetRadarData(EzRulesetSpecificRadarResult radarResult)
+        {
+            if (!UseAbsolutePatternValue.Value || radarResult.XxySr is not double xxySr || xxySr <= 0)
+                return radarResult.RadarData;
+
+            var axes = new EzRadarAxisValue<string>[radarResult.RadarData.Count];
+
+            for (int i = 0; i < radarResult.RadarData.Count; i++)
+            {
+                EzRadarAxisValue<string> axis = radarResult.RadarData[i];
+
+                if (axis.Axis == "LN%")
+                {
+                    axes[i] = axis;
+                    continue;
+                }
+
+                double absoluteValue = Math.Round(axis.Value / key_pattern_full_score * xxySr, 2, MidpointRounding.AwayFromZero);
+                axes[i] = new EzRadarAxisValue<string>(axis.Axis, absoluteValue, "0.00");
+            }
+
+            return EzRadarChartData<string>.Create(axes);
+        }
 
         private void clearChartData()
         {
@@ -472,6 +508,7 @@ namespace osu.Game.EzOsuGame.HUD
                 DataLineColour.UnbindAll();
                 DataAreaColour.UnbindAll();
                 RadarDisplayMode.UnbindAll();
+                UseAbsolutePatternValue.UnbindAll();
 
                 beatmap.UnbindAll();
                 mods.UnbindAll();

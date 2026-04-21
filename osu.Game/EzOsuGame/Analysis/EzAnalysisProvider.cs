@@ -40,8 +40,8 @@ namespace osu.Game.EzOsuGame.Analysis
     {
         public static readonly EzAnalysisField<double> XXY_SR = new EzAnalysisField<double>("xxy_sr", EzAnalysisScope.XxySr);
 
-        public static readonly EzAnalysisField<EzRadarChartData<string>> RULESET_SPECIFIC_RADAR_DATA
-            = new EzAnalysisField<EzRadarChartData<string>>("ruleset_specific_radar_data", EzAnalysisScope.RulesetSpecificRadarData);
+        public static readonly EzAnalysisField<EzRulesetSpecificRadarResult> RULESET_SPECIFIC_RADAR_RESULT
+            = new EzAnalysisField<EzRulesetSpecificRadarResult>("ruleset_specific_radar_result", EzAnalysisScope.RulesetSpecificRadarData);
     }
 
     public sealed class EzAnalysisBag : IEzAnalysis
@@ -105,6 +105,10 @@ namespace osu.Game.EzOsuGame.Analysis
             try
             {
                 return provider.TryCompute(request, cancellationToken, out analysis);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
