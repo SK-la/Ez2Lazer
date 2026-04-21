@@ -88,6 +88,33 @@ namespace osu.Game.EzOsuGame.Analysis
             return new EzAnalysisResult(commonSummary, maniaSummary);
         }
 
+        public static bool TryComputeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
+                                                              out EzRadarChartData<string> radarData)
+        {
+            radarData = default;
+
+            if (!EzRulesetSpecificRadarAnalysis.Supports(lookup.Ruleset))
+                return false;
+
+            PlayableCachedWorkingBeatmap playableWorkingBeatmap = new PlayableCachedWorkingBeatmap(workingBeatmap);
+            IBeatmap analysisBeatmap = playableWorkingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+            double? xxySr = null;
+
+            if (analysisBeatmap.HitObjects.Count > 0
+                && XxySrCalculatorBridge.TryCalculate(lookup.Ruleset, analysisBeatmap, rate, out double sr)
+                && !double.IsNaN(sr)
+                && !double.IsInfinity(sr))
+                xxySr = sr;
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return EzRulesetSpecificRadarAnalysis.TryCompute(lookup.Ruleset, analysisBeatmap, xxySr, cancellationToken, out radarData);
+        }
+
         private static double getRateAdjustMultiplier(Mod[] mods)
         {
             try
