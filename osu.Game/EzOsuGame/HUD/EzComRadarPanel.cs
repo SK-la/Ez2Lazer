@@ -4,16 +4,21 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
+using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Sprites;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
 using osu.Game.Rulesets;
@@ -27,6 +32,15 @@ using Triangle = osu.Framework.Graphics.Primitives.Triangle;
 
 namespace osu.Game.EzOsuGame.HUD
 {
+    public enum EzRadarDisplayMode
+    {
+        [Description("General")]
+        General,
+
+        [Description("Ruleset specific")]
+        RulesetSpecific
+    }
+
     /// <summary>
     /// 雷达图面板，显示当前谱面参数的六边形图形化表示
     /// </summary>
@@ -40,6 +54,7 @@ namespace osu.Game.EzOsuGame.HUD
         private float[] parameterValues = new float[6];
 
         private static readonly string[] default_axis_labels = { "BPM", "STAR", "CS", "OD", "HP", "AR" };
+        private static readonly string[] default_axis_formats = { "0", "0.00", "0.0", "0.0", "0.0", "0.0" };
 
         public bool UsesFixedAnchor { get; set; }
 
@@ -54,6 +69,13 @@ namespace osu.Game.EzOsuGame.HUD
         public float MaxDr { get; set; } = 10f;
 
         public float MaxAr { get; set; } = 10f;
+
+        public float MaxKeyPatternScore { get; set; } = 10f;
+
+        public float MaxXxySr { get; set; } = 10f;
+
+        [SettingSource("Radar data mode", "Switch between general data and ruleset-specific data.")]
+        public Bindable<EzRadarDisplayMode> RadarDisplayMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.General);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 210, 230));
@@ -105,11 +127,14 @@ namespace osu.Game.EzOsuGame.HUD
 
         private IBindable<StarDifficulty>? difficultyBindable;
         private CancellationTokenSource? difficultyCancellationSource;
+        private CancellationTokenSource? radarAnalysisCancellationSource;
         private ModSettingChangeTracker? modSettingTracker;
 
         private Container? axisLabelContainer;
         private RadarChart? chart;
         private OsuSpriteText[] axisTexts = Array.Empty<OsuSpriteText>();
+        private string[] activeAxisLabels = default_axis_labels;
+        private string[] activeAxisFormats = default_axis_formats;
 
         public EzComRadarPanel()
         {
@@ -163,6 +188,7 @@ namespace osu.Game.EzOsuGame.HUD
             BaseAreaColour.BindValueChanged(_ => applyChartColours(), true);
             DataLineColour.BindValueChanged(_ => applyChartColours(), true);
             DataAreaColour.BindValueChanged(_ => applyChartColours(), true);
+            RadarDisplayMode.BindValueChanged(_ => updateParameterRatios(difficultyBindable?.Value ?? default), true);
 
             chart?.SetData(parameterRatios);
             updateAxisTexts();
@@ -214,46 +240,135 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateParameterRatios(StarDifficulty difficulty)
         {
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.RulesetSpecific && beginRulesetSpecificRadarUpdate())
+                return;
+
+            cancelRadarAnalysis();
+            applyRadarData(createGeneralRadarData(difficulty), getGeneralAxisMaxValues());
+        }
+
+        private bool beginRulesetSpecificRadarUpdate()
+        {
+            if (!EzRulesetSpecificRadarAnalysis.Supports(ruleset.Value))
+                return false;
+
+            cancelRadarAnalysis();
+
+            if (beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
+            {
+                clearChartData();
+                return true;
+            }
+
+            if (EzRulesetSpecificRadarAnalysis.TryCreatePlaceholder(ruleset.Value, out EzRadarChartData<string> placeholderData))
+                applyRadarData(placeholderData, getRulesetSpecificAxisMaxValues());
+
+            radarAnalysisCancellationSource = new CancellationTokenSource();
+
+            CancellationToken cancellationToken = radarAnalysisCancellationSource.Token;
+            WorkingBeatmap workingBeatmap = beatmap.Value;
+            RulesetInfo localRuleset = ruleset.Value;
+            IReadOnlyList<Mod> localMods = mods.Value;
+
+            Task.Factory.StartNew(() => computeRulesetSpecificRadarData(workingBeatmap, beatmapInfo, localRuleset, localMods, cancellationToken), cancellationToken,
+                    TaskCreationOptions.HideScheduler | TaskCreationOptions.RunContinuationsAsynchronously, TaskScheduler.Default)
+                .ContinueWith(task =>
+                {
+                    Schedule(() =>
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            return;
+
+                        EzRadarChartData<string>? radarData = task.GetResultSafely();
+
+                        if (radarData != null)
+                            applyRadarData(radarData.Value, getRulesetSpecificAxisMaxValues());
+                    });
+                }, cancellationToken);
+
+            return true;
+        }
+
+        private EzRadarChartData<string>? computeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, BeatmapInfo beatmapInfo, RulesetInfo localRuleset,
+                                                                          IReadOnlyList<Mod> localMods, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var lookup = new EzAnalysisLookupCache(beatmapInfo, localRuleset, localMods);
+
+                return EzAnalysisComputation.TryComputeRulesetSpecificRadarData(workingBeatmap, lookup, cancellationToken, out EzRadarChartData<string> radarData)
+                    ? radarData
+                    : null;
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"[EzComRadarPanel] Failed to compute ruleset radar for beatmapId={beatmapInfo.ID}.");
+                return null;
+            }
+        }
+
+        private EzRadarChartData<string> createGeneralRadarData(StarDifficulty difficulty)
+        {
             var beatmapInfo = beatmap.Value.BeatmapInfo;
 
-            if (parameterRatios.Length > 0)
+            return EzRadarChartData<string>.Create(
+                new EzRadarAxisValue<string>("BPM", beatmapInfo.BPM, "0"),
+                new EzRadarAxisValue<string>("STAR", difficulty.Stars > 0 ? difficulty.Stars : beatmapInfo.StarRating, "0.00"),
+                new EzRadarAxisValue<string>("CS", beatmapInfo.Difficulty.CircleSize, "0.0"),
+                new EzRadarAxisValue<string>("OD", beatmapInfo.Difficulty.OverallDifficulty, "0.0"),
+                new EzRadarAxisValue<string>("HP", beatmapInfo.Difficulty.DrainRate, "0.0"),
+                new EzRadarAxisValue<string>("AR", beatmapInfo.Difficulty.ApproachRate, "0.0"));
+        }
+
+        private void applyRadarData(EzRadarChartData<string> radarData, IReadOnlyList<float> maxValues)
+        {
+            AxisCount = radarData.Count;
+
+            activeAxisLabels = new string[radarData.Count];
+            activeAxisFormats = new string[radarData.Count];
+
+            for (int i = 0; i < radarData.Count; i++)
             {
-                parameterValues[0] = (float)beatmapInfo.BPM;
-                parameterRatios[0] = normalise(parameterValues[0], MaxBpm);
+                EzRadarAxisValue<string> axis = radarData[i];
+
+                activeAxisLabels[i] = axis.Axis;
+                activeAxisFormats[i] = axis.Format;
+                parameterValues[i] = (float)axis.Value;
+                parameterRatios[i] = normalise(parameterValues[i], i < maxValues.Count ? maxValues[i] : 0);
             }
 
-            if (parameterRatios.Length > 1)
+            for (int i = radarData.Count; i < parameterValues.Length; i++)
             {
-                parameterValues[1] = (float)(difficulty.Stars > 0 ? difficulty.Stars : beatmapInfo.StarRating);
-                parameterRatios[1] = normalise(parameterValues[1], MaxStar);
-            }
-
-            if (parameterRatios.Length > 2)
-            {
-                parameterValues[2] = beatmapInfo.Difficulty.CircleSize;
-                parameterRatios[2] = normalise(parameterValues[2], MaxCs);
-            }
-
-            if (parameterRatios.Length > 3)
-            {
-                parameterValues[3] = beatmapInfo.Difficulty.OverallDifficulty;
-                parameterRatios[3] = normalise(parameterValues[3], MaxOd);
-            }
-
-            if (parameterRatios.Length > 4)
-            {
-                parameterValues[4] = beatmapInfo.Difficulty.DrainRate;
-                parameterRatios[4] = normalise(parameterValues[4], MaxDr);
-            }
-
-            if (parameterRatios.Length > 5)
-            {
-                parameterValues[5] = beatmapInfo.Difficulty.ApproachRate;
-                parameterRatios[5] = normalise(parameterValues[5], MaxAr);
+                parameterValues[i] = 0;
+                parameterRatios[i] = 0;
             }
 
             chart?.SetData(parameterRatios);
             updateAxisTexts();
+        }
+
+        private IReadOnlyList<float> getGeneralAxisMaxValues() => new[] { MaxBpm, MaxStar, MaxCs, MaxOd, MaxDr, MaxAr };
+
+        private IReadOnlyList<float> getRulesetSpecificAxisMaxValues()
+            => new[] { MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore, MaxXxySr };
+
+        private void clearChartData()
+        {
+            Array.Clear(parameterValues, 0, parameterValues.Length);
+            Array.Clear(parameterRatios, 0, parameterRatios.Length);
+            chart?.SetData(parameterRatios);
+            updateAxisTexts();
+        }
+
+        private void cancelRadarAnalysis()
+        {
+            radarAnalysisCancellationSource?.Cancel();
+            radarAnalysisCancellationSource?.Dispose();
+            radarAnalysisCancellationSource = null;
         }
 
         private static float normalise(float value, float maxValue)
@@ -334,7 +449,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private string getAxisLabel(int index)
         {
-            return index < default_axis_labels.Length ? default_axis_labels[index] : $"P{index + 1}";
+            return index < activeAxisLabels.Length ? activeAxisLabels[index] : $"P{index + 1}";
         }
 
         private string formatAxisValue(int index)
@@ -343,13 +458,8 @@ namespace osu.Game.EzOsuGame.HUD
                 return "0";
 
             float value = parameterValues[index];
-
-            return index switch
-            {
-                0 => value.ToString("0"),
-                1 => value.ToString("0.00"),
-                _ => value.ToString("0.0"),
-            };
+            string format = index < activeAxisFormats.Length ? activeAxisFormats[index] : "0.0";
+            return value.ToString(string.IsNullOrEmpty(format) ? "0.0" : format);
         }
 
         private static Color4 withFixedAlpha(Color4 colour) => new Color4(colour.R, colour.G, colour.B, axis_label_alpha);
@@ -362,6 +472,7 @@ namespace osu.Game.EzOsuGame.HUD
                 BaseAreaColour.UnbindAll();
                 DataLineColour.UnbindAll();
                 DataAreaColour.UnbindAll();
+                RadarDisplayMode.UnbindAll();
 
                 beatmap.UnbindAll();
                 mods.UnbindAll();
@@ -369,6 +480,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                 difficultyCancellationSource?.Cancel();
                 difficultyCancellationSource?.Dispose();
+                cancelRadarAnalysis();
                 difficultyBindable?.UnbindAll();
                 modSettingTracker?.Dispose();
             }
