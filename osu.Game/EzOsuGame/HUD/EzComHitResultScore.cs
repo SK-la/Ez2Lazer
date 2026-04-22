@@ -228,8 +228,8 @@ namespace osu.Game.EzOsuGame.HUD
                         Blending = new BlendingParameters
                         {
                             // 1. 标准透明混合（最常用）
-                            // Source = BlendingType.SrcAlpha,
-                            // Destination = BlendingType.OneMinusSrcAlpha,
+                            Source = BlendingType.SrcAlpha,
+                            Destination = BlendingType.OneMinusSrcAlpha,
 
                             // 2. 加法混合（发光效果）
                             // Source = BlendingType.SrcAlpha,
@@ -244,8 +244,8 @@ namespace osu.Game.EzOsuGame.HUD
                             // Destination = BlendingType.One,
 
                             // 5. 柔和混合
-                            Source = BlendingType.DstColor,
-                            Destination = BlendingType.One,
+                            // Source = BlendingType.DstColor,
+                            // Destination = BlendingType.One,
                         }
                     };
 
