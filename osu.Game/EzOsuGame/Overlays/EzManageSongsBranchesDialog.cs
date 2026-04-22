@@ -20,6 +20,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Extensions;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
@@ -308,32 +309,24 @@ namespace osu.Game.EzOsuGame.Overlays
                                                 {
                                                     new Drawable[]
                                                     {
-                                                        generateButton = new RoundedButton
+                                                        generateButton = new EzTwoLineTextRoundedButton(EzManageSongsBranchesDialogStrings.GENERATE_FILTER_BRANCH)
                                                         {
                                                             RelativeSizeAxes = Axes.X,
-                                                            Height = 48,
-                                                            Text = EzManageSongsBranchesDialogStrings.GENERATE_FILTER_BRANCH,
                                                             Action = generateVisibleBranch,
                                                         },
-                                                        new RoundedButton
+                                                        new EzTwoLineTextRoundedButton(EzManageSongsBranchesDialogStrings.GENERATE_COLLECTION_BRANCH)
                                                         {
                                                             RelativeSizeAxes = Axes.X,
-                                                            Height = 48,
-                                                            Text = EzManageSongsBranchesDialogStrings.GENERATE_COLLECTION_BRANCH,
                                                             Action = generateSelectedBranch,
                                                         },
-                                                        new RoundedButton
+                                                        new EzTwoLineTextRoundedButton(EzManageSongsBranchesDialogStrings.OPEN_BRANCH_DIRECTORY)
                                                         {
                                                             RelativeSizeAxes = Axes.X,
-                                                            Height = 48,
-                                                            Text = EzManageSongsBranchesDialogStrings.OPEN_BRANCH_DIRECTORY,
                                                             Action = openBranchDirectory,
                                                         },
-                                                        applyModsButton = new RoundedButton
+                                                        applyModsButton = new EzTwoLineTextRoundedButton(EzManageSongsBranchesDialogStrings.APPLY_BRANCH_MODS)
                                                         {
                                                             RelativeSizeAxes = Axes.X,
-                                                            Height = 48,
-                                                            Text = EzManageSongsBranchesDialogStrings.APPLY_BRANCH_MODS,
                                                             Action = applySelectedBranchMods,
                                                         },
                                                     }
@@ -1383,11 +1376,11 @@ namespace osu.Game.EzOsuGame.Overlays
             internal static readonly EzLocalizationManager.EzLocalisableString ACTIVATION_SUBTITLE = new EzLocalizationManager.EzLocalisableString("分支曲库右侧可逐个启用/停用与删除，可叠加启用多个分支；收藏夹右侧可按来源收藏夹切换隐藏。",
                 "Use the right-side controls on branch entries to activate/deactivate or delete each branch (multiple can be active). Use the right-side controls on collection entries to toggle hide by source collection.");
 
-            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_FILTER_BRANCH = new EzLocalizationManager.EzLocalisableString("生成过滤分支库", "Generate Filter Branch Library");
-            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_COLLECTION_BRANCH = new EzLocalizationManager.EzLocalisableString("生成收藏夹分支库", "Generate Collection Branch Library");
-            internal static readonly EzLocalizationManager.EzLocalisableString OPEN_BRANCH_DIRECTORY = new EzLocalizationManager.EzLocalisableString("打开分支库目录", "Open Branch Directory");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_FILTER_BRANCH = new EzLocalizationManager.EzLocalisableString("生成过滤分支库", "Generate Filter\nBranch Library");
+            internal static readonly EzLocalizationManager.EzLocalisableString GENERATE_COLLECTION_BRANCH = new EzLocalizationManager.EzLocalisableString("生成收藏夹分支库", "Generate Collection\nBranch Library");
+            internal static readonly EzLocalizationManager.EzLocalisableString OPEN_BRANCH_DIRECTORY = new EzLocalizationManager.EzLocalisableString("打开分支库目录", "Open Branch\nDirectory");
 
-            internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS = new EzLocalizationManager.EzLocalisableString("套用分支 Mod 配置", "Apply branch mod configuration");
+            internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS = new EzLocalizationManager.EzLocalisableString("套用分支 Mod", "Apply Branch\nMods");
             internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS_ATTEMPTED = new EzLocalizationManager.EzLocalisableString("已尝试套用分支 Mod 配置（可能有部分未套用）。", "Attempted to apply branch mod configuration (some mods/settings may have been ignored).");
             internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS_NO_MODS = new EzLocalizationManager.EzLocalisableString("该分支不包含 Mod 配置。", "The selected branch does not contain mod configuration.");
             internal static readonly EzLocalizationManager.EzLocalisableString APPLY_BRANCH_MODS_RULESET_MISMATCH = new EzLocalizationManager.EzLocalisableString("该分支的规则集与当前规则集不匹配，已跳过。", "The branch ruleset does not match the current ruleset; skipped.");

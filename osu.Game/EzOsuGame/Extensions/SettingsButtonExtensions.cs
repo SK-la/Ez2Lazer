@@ -1,66 +1,90 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using osu.Framework.Allocation;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Shapes;
+using osu.Framework.Localisation;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Overlays.Settings;
+using osu.Game.Graphics.UserInterfaceV2;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Extensions
 {
     /// <summary>
-    /// 让按钮支持同时显示两行文本的扩展方法
+    /// 支持显式换行文本的圆角按钮。
     /// </summary>
-    public static class SettingsButtonExtensions
+    public partial class EzTwoLineTextRoundedButton : RoundedButton
     {
-        public static SettingsButton WithTwoLineText(this SettingsButton button, string topText, string bottomText, int fontSize = 14)
-        {
-            button.Child = new Container
-            {
-                RelativeSizeAxes = Axes.Both,
-                Children = new Drawable[]
-                {
-                    new Box
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Colour = Color4.AliceBlue,
-                        Alpha = 0.1f
-                    },
-                    // 文本层
-                    new FillFlowContainer
-                    {
-                        RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                        Direction = FillDirection.Vertical,
-                        Spacing = new Vector2(0, 2),
-                        Anchor = Anchor.Centre,
-                        Origin = Anchor.Centre,
-                        Children = new Drawable[]
-                        {
-                            new OsuSpriteText
-                            {
-                                Text = topText,
-                                Font = OsuFont.GetFont(size: fontSize),
-                                Anchor = Anchor.Centre,
-                                Origin = Anchor.Centre
-                            },
-                            new OsuSpriteText
-                            {
-                                Text = bottomText,
-                                Font = OsuFont.GetFont(size: fontSize),
-                                Anchor = Anchor.Centre,
-                                Origin = Anchor.Centre
-                            }
-                        }
-                    }
-                }
-            };
+        private readonly LocalisableString text;
+        private readonly float fontSize;
+        private readonly FillFlowContainer textFlow;
 
-            return button;
+        private ILocalisedBindableString localisedText = null!;
+
+        [Resolved]
+        private LocalisationManager localisation { get; set; } = null!;
+
+        public EzTwoLineTextRoundedButton(LocalisableString text, float fontSize = 14f)
+        {
+            this.text = text;
+            this.fontSize = fontSize;
+
+            Height = 38;
+
+            Text = string.Empty;
+            SpriteText.Hide();
+
+            Content.Add(textFlow = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 0),
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+            });
+        }
+
+        [BackgroundDependencyLoader]
+        private void load()
+        {
+            localisedText = localisation.GetLocalisedBindableString(text);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            localisedText.BindValueChanged(value => updateText(value.NewValue), true);
+        }
+
+        private void updateText(string resolvedText)
+        {
+            string[] lines = string.IsNullOrEmpty(resolvedText)
+                ? new[] { string.Empty }
+                : resolvedText.Split('\n');
+
+            float displayFontSize = lines.Length > 1 ? fontSize : fontSize + 3f;
+
+            textFlow.Spacing = new Vector2(0, lines.Length > 1 ? 4 : 0);
+
+            textFlow.Clear();
+
+            foreach (string line in lines)
+            {
+                textFlow.Add(new OsuSpriteText
+                {
+                    Text = line,
+                    Font = OsuFont.GetFont(size: displayFontSize, weight: FontWeight.Bold),
+                    UseFullGlyphHeight = false,
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                });
+            }
         }
     }
 }
