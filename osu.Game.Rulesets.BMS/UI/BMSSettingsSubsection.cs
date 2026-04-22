@@ -2,7 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -32,7 +34,8 @@ namespace osu.Game.Rulesets.BMS.UI
         protected override LocalisableString Header => "BMS";
 
         private BMSRulesetConfigManager bmsConfig = null!;
-        private Bindable<string> rootPathBindable = null!;
+        private Bindable<string> libraryPathsBindable = null!;
+        private Bindable<string> legacyRootPathBindable = null!;
 
         private OsuTextFlowContainer pathDisplay = null!;
         private OsuTextFlowContainer statusDisplay = null!;
@@ -58,12 +61,14 @@ namespace osu.Game.Rulesets.BMS.UI
         private void load()
         {
             bmsConfig = (BMSRulesetConfigManager)Config;
-            rootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
+            libraryPathsBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsLibraryPaths);
+            legacyRootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
 
             // Create beatmap manager with proper cache directory
             string cacheDir = storage.GetFullPath("bms_cache");
             beatmapManager = new BMSBeatmapManager(cacheDir);
             beatmapManager.LoadCache();
+            beatmapManager.SetRootPaths(getConfiguredPaths());
 
             Children = new Drawable[]
             {
@@ -74,7 +79,7 @@ namespace osu.Game.Rulesets.BMS.UI
                 },
                 new SettingsButton
                 {
-                    Text = "选择 BMS 文件夹路径",
+                    Text = "打开 BMS 曲库设置向导",
                     Action = selectPath,
                 },
                 pathDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 14))
@@ -128,7 +133,8 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             base.LoadComplete();
 
-            rootPathBindable.BindValueChanged(e => updatePathDisplay(e.NewValue), true);
+            libraryPathsBindable.BindValueChanged(_ => updatePathDisplay(), true);
+            legacyRootPathBindable.BindValueChanged(_ => updatePathDisplay());
 
             // Show initial cache status
             if (beatmapManager?.LibraryCache != null)
@@ -137,12 +143,17 @@ namespace osu.Game.Rulesets.BMS.UI
             }
         }
 
-        private void updatePathDisplay(string path)
+        private IReadOnlyList<string> getConfiguredPaths()
+            => BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value);
+
+        private void updatePathDisplay()
         {
-            if (string.IsNullOrEmpty(path))
+            IReadOnlyList<string> paths = getConfiguredPaths();
+
+            if (paths.Count == 0)
                 pathDisplay.Text = "未设置路径";
             else
-                pathDisplay.Text = $"当前路径: {path}";
+                pathDisplay.Text = $"当前路径 ({paths.Count}):{Environment.NewLine}{string.Join(Environment.NewLine, paths.Select(path => $"- {path}"))}";
         }
 
         private void openBmsSongSelect()
@@ -157,7 +168,7 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             game?.PerformFromScreen(screen =>
             {
-                screen.Push(new BMSDirectorySelectScreen(rootPathBindable));
+                screen.Push(new BMSDirectorySelectScreen(libraryPathsBindable, legacyRootPathBindable));
             });
         }
 
@@ -165,13 +176,14 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             if (beatmapManager == null) return;
 
-            string path = rootPathBindable.Value;
+            IReadOnlyList<string> paths = getConfiguredPaths();
+            beatmapManager.SetRootPaths(paths);
 
-            if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
+            if (paths.Count == 0 || !paths.Any(Directory.Exists))
             {
                 notificationOverlay?.Post(new SimpleErrorNotification
                 {
-                    Text = "请先选择有效的 BMS 文件夹路径"
+                    Text = "请先在向导中添加至少一个有效的 BMS 文件夹路径"
                 });
                 return;
             }
@@ -203,7 +215,7 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 try
                 {
-                    await beatmapManager.ScanLibraryAsync(path).ConfigureAwait(false);
+                    await beatmapManager.ScanLibraryAsync(paths).ConfigureAwait(false);
 
                     Schedule(() =>
                     {
@@ -235,21 +247,26 @@ namespace osu.Game.Rulesets.BMS.UI
     /// </summary>
     public partial class BMSDirectorySelectScreen : OsuScreen
     {
-        private readonly Bindable<string> pathBindable;
+        private readonly Bindable<string> libraryPathsBindable;
+        private readonly Bindable<string> legacyRootPathBindable;
+        private readonly List<string> stagedPaths;
         private OsuDirectorySelector directorySelector = null!;
+        private FillFlowContainer pathList = null!;
 
         [Cached]
         private OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Purple);
 
-        public BMSDirectorySelectScreen(Bindable<string> pathBindable)
+        public BMSDirectorySelectScreen(Bindable<string> libraryPathsBindable, Bindable<string> legacyRootPathBindable)
         {
-            this.pathBindable = pathBindable;
+            this.libraryPathsBindable = libraryPathsBindable;
+            this.legacyRootPathBindable = legacyRootPathBindable;
+            stagedPaths = BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value).ToList();
         }
 
         [BackgroundDependencyLoader]
         private void load()
         {
-            string? initialPath = string.IsNullOrEmpty(pathBindable.Value) ? null : pathBindable.Value;
+            string? initialPath = stagedPaths.LastOrDefault();
 
             InternalChild = new Container
             {
@@ -279,20 +296,106 @@ namespace osu.Game.Rulesets.BMS.UI
                         {
                             new Drawable[]
                             {
-                                new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 24))
+                                new FillFlowContainer
                                 {
-                                    Text = "选择 BMS 歌曲文件夹",
-                                    TextAnchor = Anchor.TopCentre,
-                                    Margin = new MarginPadding(10),
                                     RelativeSizeAxes = Axes.X,
                                     AutoSizeAxes = Axes.Y,
+                                    Direction = FillDirection.Vertical,
+                                    Spacing = new Vector2(0, 6),
+                                    Margin = new MarginPadding(10),
+                                    Children = new Drawable[]
+                                    {
+                                        new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 24))
+                                        {
+                                            Text = "BMS 曲库设置向导",
+                                            TextAnchor = Anchor.TopCentre,
+                                            RelativeSizeAxes = Axes.X,
+                                            AutoSizeAxes = Axes.Y,
+                                        },
+                                        new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 14))
+                                        {
+                                            Text = "先添加任意数量的文件夹路径，再手动应用。扫描和建索引仍在外层设置页触发。",
+                                            RelativeSizeAxes = Axes.X,
+                                            AutoSizeAxes = Axes.Y,
+                                        }
+                                    }
                                 }
                             },
                             new Drawable[]
                             {
-                                directorySelector = new OsuDirectorySelector(initialPath)
+                                new GridContainer
                                 {
                                     RelativeSizeAxes = Axes.Both,
+                                    RowDimensions = new[]
+                                    {
+                                        new Dimension(GridSizeMode.Absolute, 260),
+                                        new Dimension(),
+                                    },
+                                    Content = new[]
+                                    {
+                                        new Drawable[]
+                                        {
+                                            directorySelector = new OsuDirectorySelector(initialPath)
+                                            {
+                                                RelativeSizeAxes = Axes.Both,
+                                            }
+                                        },
+                                        new Drawable[]
+                                        {
+                                            new FillFlowContainer
+                                            {
+                                                RelativeSizeAxes = Axes.Both,
+                                                Direction = FillDirection.Vertical,
+                                                Spacing = new Vector2(0, 8),
+                                                Children = new Drawable[]
+                                                {
+                                                    new FillFlowContainer
+                                                    {
+                                                        RelativeSizeAxes = Axes.X,
+                                                        AutoSizeAxes = Axes.Y,
+                                                        Direction = FillDirection.Horizontal,
+                                                        Spacing = new Vector2(10, 0),
+                                                        Children = new Drawable[]
+                                                        {
+                                                            new RoundedButton
+                                                            {
+                                                                Width = 180,
+                                                                Text = "添加当前路径",
+                                                                Action = addSelectedPath,
+                                                            },
+                                                            new RoundedButton
+                                                            {
+                                                                Width = 140,
+                                                                Text = "清空列表",
+                                                                Action = () =>
+                                                                {
+                                                                    stagedPaths.Clear();
+                                                                    refreshPathList();
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                    new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 16))
+                                                    {
+                                                        Text = "已添加的路径",
+                                                        RelativeSizeAxes = Axes.X,
+                                                        AutoSizeAxes = Axes.Y,
+                                                    },
+                                                    new OsuScrollContainer
+                                                    {
+                                                        RelativeSizeAxes = Axes.Both,
+                                                        Child = pathList = new FillFlowContainer
+                                                        {
+                                                            RelativeSizeAxes = Axes.X,
+                                                            AutoSizeAxes = Axes.Y,
+                                                            Direction = FillDirection.Vertical,
+                                                            Spacing = new Vector2(0, 8),
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             },
                             new Drawable[]
@@ -315,15 +418,8 @@ namespace osu.Game.Rulesets.BMS.UI
                                         new RoundedButton
                                         {
                                             Width = 200,
-                                            Text = "确定",
-                                            Action = () =>
-                                            {
-                                                if (directorySelector.CurrentPath.Value != null)
-                                                {
-                                                    pathBindable.Value = directorySelector.CurrentPath.Value.FullName;
-                                                }
-                                                this.Exit();
-                                            },
+                                            Text = "应用",
+                                            Action = applyPaths,
                                         },
                                     }
                                 }
@@ -332,6 +428,81 @@ namespace osu.Game.Rulesets.BMS.UI
                     }
                 }
             };
+
+            refreshPathList();
+        }
+
+        private void addSelectedPath()
+        {
+            string? selectedPath = directorySelector.CurrentPath.Value?.FullName;
+
+            if (string.IsNullOrWhiteSpace(selectedPath) || !Directory.Exists(selectedPath))
+                return;
+
+            if (stagedPaths.Any(path => string.Equals(path, selectedPath, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            stagedPaths.Add(selectedPath);
+            refreshPathList();
+        }
+
+        private void applyPaths()
+        {
+            libraryPathsBindable.Value = BMSRulesetConfigManager.SerialiseLibraryPaths(stagedPaths);
+            legacyRootPathBindable.Value = stagedPaths.FirstOrDefault() ?? string.Empty;
+            this.Exit();
+        }
+
+        private void refreshPathList()
+        {
+            pathList.Clear();
+
+            if (stagedPaths.Count == 0)
+            {
+                pathList.Add(new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 14))
+                {
+                    Text = "暂未添加路径。",
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                });
+                return;
+            }
+
+            foreach (string path in stagedPaths)
+            {
+                pathList.Add(new GridContainer
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    ColumnDimensions = new[]
+                    {
+                        new Dimension(),
+                        new Dimension(GridSizeMode.Absolute, 100),
+                    },
+                    Content = new[]
+                    {
+                        new Drawable[]
+                        {
+                            new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 13))
+                            {
+                                Text = path,
+                                RelativeSizeAxes = Axes.X,
+                                AutoSizeAxes = Axes.Y,
+                            },
+                            new RoundedButton
+                            {
+                                Width = 90,
+                                Text = "移除",
+                                Action = () =>
+                                {
+                                    stagedPaths.Remove(path);
+                                    refreshPathList();
+                                },
+                            },
+                        }
+                    }
+                });
+            }
         }
 
         public override void OnSuspending(ScreenTransitionEvent e)

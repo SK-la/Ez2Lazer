@@ -313,6 +313,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             {
                 var backgroundEvents = createBackgroundSoundEvents(timingPoints);
                 bmsBeatmap.BackgroundSoundEvents.AddRange(backgroundEvents);
+
+                if (backgroundEvents.Count > 0)
+                {
+                    beatmap.BeatmapInfo.Metadata.AudioFile = backgroundEvents[0].Filename;
+                    beatmap.BeatmapInfo.Metadata.PreviewTime = (int)Math.Max(0, backgroundEvents[0].Time);
+                }
+                else if (wavDefinitions.Count > 0)
+                {
+                    beatmap.BeatmapInfo.Metadata.AudioFile = wavDefinitions.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value).First();
+                }
+
                 Logger.Log($"[BMS] Background sound events: {backgroundEvents.Count}", LoggingTarget.Runtime, LogLevel.Debug);
             }
 

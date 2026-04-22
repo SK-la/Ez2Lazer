@@ -1,7 +1,14 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using osu.Game.Beatmaps;
+using osu.Game.Rulesets.BMS.Objects;
 using osu.Framework.Localisation;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Rulesets.BMS.Mods
@@ -34,21 +41,89 @@ namespace osu.Game.Rulesets.BMS.Mods
         public override LocalisableString Description => "Watch a perfect automated play through the song.";
     }
 
-    public class BMSModRandom : Mod
+    public class BMSModRandom : ModRandom, IApplicableAfterBeatmapConversion
     {
-        public override string Name => "Random";
-        public override string Acronym => "RD";
-        public override ModType Type => ModType.Fun;
         public override LocalisableString Description => "Randomize the lane positions of notes.";
-        public override double ScoreMultiplier => 1;
+
+        public void ApplyToBeatmap(IBeatmap beatmap)
+        {
+            Seed.Value ??= osu.Framework.Utils.RNG.Next();
+
+            var rng = new Random((int)Seed.Value);
+            var maniaBeatmap = (ManiaBeatmap)beatmap;
+
+            foreach (int[] group in BMSStageModHelper.GetRegularLaneGroups(maniaBeatmap))
+            {
+                var shuffledColumns = group.OrderBy(_ => rng.Next()).ToArray();
+
+                foreach (ManiaHitObject hitObject in maniaBeatmap.HitObjects.OfType<ManiaHitObject>())
+                {
+                    int columnIndex = Array.IndexOf(group, hitObject.Column);
+
+                    if (columnIndex >= 0)
+                        hitObject.Column = shuffledColumns[columnIndex];
+                }
+            }
+        }
     }
 
-    public class BMSModMirror : Mod
+    public class BMSModMirror : ModMirror, IApplicableAfterBeatmapConversion
     {
-        public override string Name => "Mirror";
-        public override string Acronym => "MR";
-        public override ModType Type => ModType.Fun;
         public override LocalisableString Description => "Flip the playfield horizontally.";
-        public override double ScoreMultiplier => 1;
+
+        public void ApplyToBeatmap(IBeatmap beatmap)
+        {
+            var maniaBeatmap = (ManiaBeatmap)beatmap;
+
+            foreach (int[] group in BMSStageModHelper.GetRegularLaneGroups(maniaBeatmap))
+            {
+                foreach (ManiaHitObject hitObject in maniaBeatmap.HitObjects.OfType<ManiaHitObject>())
+                {
+                    int columnIndex = Array.IndexOf(group, hitObject.Column);
+
+                    if (columnIndex >= 0)
+                        hitObject.Column = group[group.Length - 1 - columnIndex];
+                }
+            }
+        }
+    }
+
+    internal static class BMSStageModHelper
+    {
+        public static IEnumerable<int[]> GetRegularLaneGroups(ManiaBeatmap beatmap)
+        {
+            List<int> scratchColumns = beatmap.HitObjects.OfType<ManiaHitObject>()
+                                             .Where(isScratchObject)
+                                             .Select(hitObject => hitObject.Column)
+                                             .Distinct()
+                                             .OrderBy(column => column)
+                                             .ToList();
+
+            if (scratchColumns.Count == 0)
+            {
+                yield return Enumerable.Range(0, beatmap.TotalColumns).ToArray();
+                yield break;
+            }
+
+            int start = 0;
+
+            foreach (int scratchColumn in scratchColumns)
+            {
+                if (scratchColumn > start)
+                    yield return Enumerable.Range(start, scratchColumn - start).ToArray();
+
+                start = scratchColumn + 1;
+            }
+
+            if (start < beatmap.TotalColumns)
+                yield return Enumerable.Range(start, beatmap.TotalColumns - start).ToArray();
+        }
+
+        private static bool isScratchObject(ManiaHitObject hitObject) => hitObject switch
+        {
+            BmsManiaNote note => note.IsScratch,
+            BmsManiaHoldNote holdNote => holdNote.IsScratch,
+            _ => false,
+        };
     }
 }

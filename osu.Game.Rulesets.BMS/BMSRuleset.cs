@@ -17,6 +17,7 @@ using osu.Game.Rulesets.BMS.Difficulty;
 using osu.Game.Rulesets.BMS.Mods;
 using osu.Game.Rulesets.BMS.Scoring;
 using osu.Game.Rulesets.BMS.UI;
+using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mods;
@@ -61,29 +62,39 @@ namespace osu.Game.Rulesets.BMS
                 case ModType.DifficultyReduction:
                     return new Mod[]
                     {
-                        new BMSModEasy(),
-                        new BMSModNoFail(),
+                        new ManiaModEasy(),
+                        new ManiaModNoFail(),
+                        new ManiaModHalfTime(),
                     };
 
                 case ModType.DifficultyIncrease:
                     return new Mod[]
                     {
-                        new BMSModHardRock(),
-                        new BMSModSuddenDeath(),
+                        new ManiaModHardRock(),
+                        new ManiaModSuddenDeath(),
+                        new ManiaModPerfect(),
+                        new ManiaModDoubleTime(),
+                        new ManiaModNightcore(),
+                        new ManiaModHidden(),
+                        new ManiaModFadeIn(),
+                        new ManiaModFlashlight(),
                     };
 
                 case ModType.Automation:
                     return new Mod[]
                     {
-                        new BMSModAutoplay(),
+                        new ManiaModAutoplay(),
                     };
 
-                case ModType.Fun:
+                case ModType.Conversion:
                     return new Mod[]
                     {
                         new BMSModRandom(),
                         new BMSModMirror(),
                     };
+
+                case ModType.Fun:
+                    return Array.Empty<Mod>();
 
                 default:
                     return Array.Empty<Mod>();
@@ -127,7 +138,23 @@ namespace osu.Game.Rulesets.BMS
                 new KeyBinding(InputKey.L, BMSAction.Key8),
                 new KeyBinding(InputKey.Semicolon, BMSAction.Key9),
             },
-            // 14 Keys (Double Play)
+            // 10 Keys + 2 Scratch (Double Play)
+            10 => new[]
+            {
+                new KeyBinding(InputKey.A, BMSAction.Key1),
+                new KeyBinding(InputKey.S, BMSAction.Key2),
+                new KeyBinding(InputKey.D, BMSAction.Key3),
+                new KeyBinding(InputKey.F, BMSAction.Key4),
+                new KeyBinding(InputKey.G, BMSAction.Key5),
+                new KeyBinding(InputKey.Shift, BMSAction.Scratch1),
+                new KeyBinding(InputKey.Keypad7, BMSAction.Key8),
+                new KeyBinding(InputKey.Keypad8, BMSAction.Key9),
+                new KeyBinding(InputKey.Keypad9, BMSAction.Key10),
+                new KeyBinding(InputKey.Keypad4, BMSAction.Key11),
+                new KeyBinding(InputKey.Keypad5, BMSAction.Key12),
+                new KeyBinding(InputKey.Control, BMSAction.Scratch2),
+            },
+            // 14 Keys + 2 Scratch (Double Play)
             14 => new[]
             {
                 // 1P side
@@ -152,14 +179,15 @@ namespace osu.Game.Rulesets.BMS
             _ => GetDefaultKeyBindings(7),
         };
 
-        public override IEnumerable<int> AvailableVariants => new[] { 5, 7, 9, 14 };
+        public override IEnumerable<int> AvailableVariants => new[] { 5, 7, 9, 10, 14 };
 
         public override LocalisableString GetVariantName(int variant) => variant switch
         {
-            5 => "5K",
-            7 => "7K",
-            9 => "9K (PMS)",
-            14 => "14K (DP)",
+            5 => "5K1S",
+            7 => "7K1S",
+            9 => "9K",
+            10 => "10K2S",
+            14 => "14K2S",
             _ => $"{variant}K"
         };
 

@@ -161,6 +161,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     maniaHitObject = new BmsManiaHoldNote
                     {
                         Column = column,
+                        IsScratch = holdNote.IsScratch,
                         StartTime = holdNote.StartTime,
                         Duration = holdNote.Duration,
                         KeysoundSamples = holdNote.Samples.ToList(),
@@ -172,6 +173,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     maniaHitObject = new BmsManiaNote
                     {
                         Column = column,
+                        IsScratch = bmsHitObject.IsScratch,
                         StartTime = bmsHitObject.StartTime,
                         KeysoundSamples = bmsHitObject.Samples.ToList(),
                         Samples = new List<HitSampleInfo>(),

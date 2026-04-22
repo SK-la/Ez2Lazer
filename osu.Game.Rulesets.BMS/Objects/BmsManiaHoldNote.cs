@@ -12,6 +12,8 @@ namespace osu.Game.Rulesets.BMS.Objects
     /// </summary>
     public class BmsManiaHoldNote : HoldNote, IBmsKeysoundProvider
     {
+        public bool IsScratch { get; init; }
+
         public List<HitSampleInfo> KeysoundSamples { get; init; } = new List<HitSampleInfo>();
 
         IReadOnlyList<HitSampleInfo> IBmsKeysoundProvider.KeysoundSamples => KeysoundSamples;
