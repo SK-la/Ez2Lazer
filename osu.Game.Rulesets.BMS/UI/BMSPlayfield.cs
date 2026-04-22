@@ -36,7 +36,12 @@ namespace osu.Game.Rulesets.BMS.UI
 
             for (int i = 0; i < totalColumns; i++)
             {
-                bool isScratch = i == 0 || i == totalColumns / 2;
+                bool isScratch = totalColumns switch
+                {
+                    6 or 8 => i == 0,
+                    12 or 16 => i == 0 || i == totalColumns / 2,
+                    _ => false,
+                };
                 float width = isScratch ? SCRATCH_WIDTH : COLUMN_WIDTH;
 
                 columns.Add(new BMSColumn(i)

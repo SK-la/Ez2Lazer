@@ -24,6 +24,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// </summary>
         public Bindable<string> RootPath { get; } = new Bindable<string>(string.Empty);
 
+        public IReadOnlyList<string> RootPaths => rootPaths;
+
         /// <summary>
         ///     Progress of the current scan operation (0-1).
         /// </summary>
@@ -52,6 +54,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private static readonly string[] bms_extensions = { ".bms", ".bme", ".bml", ".pms" };
 
         private readonly string cacheDirectory;
+        private readonly List<string> rootPaths = new List<string>();
 
         /// <summary>
         ///     Get the cache file path.
@@ -75,9 +78,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             if (LibraryCache != null)
             {
-                RootPath.Value = LibraryCache.RootPath;
+                SetRootPaths(LibraryCache.RootPaths.Count > 0 ? LibraryCache.RootPaths : new[] { LibraryCache.RootPath });
                 StatusMessage.Value = $"已加载 {LibraryCache.Songs.Count} 首歌曲, {LibraryCache.TotalCharts} 张谱面";
             }
+        }
+
+        public void SetRootPaths(IEnumerable<string> paths)
+        {
+            rootPaths.Clear();
+            rootPaths.AddRange(normaliseRootPaths(paths));
+            RootPath.Value = rootPaths.FirstOrDefault() ?? string.Empty;
         }
 
         /// <summary>
@@ -100,6 +110,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         ///     Scan the BMS root path and rebuild the cache.
         /// </summary>
         public async Task ScanLibraryAsync(string rootPath, CancellationToken cancellationToken = default)
+            => await ScanLibraryAsync(new[] { rootPath }, cancellationToken).ConfigureAwait(false);
+
+        public async Task ScanLibraryAsync(IEnumerable<string> scanPaths, CancellationToken cancellationToken = default)
         {
             if (IsScanning.Value)
             {
@@ -117,16 +130,23 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             try
             {
-                if (!Directory.Exists(rootPath))
+                List<string> configuredPaths = normaliseRootPaths(scanPaths);
+                List<string> existingPaths = configuredPaths.Where(Directory.Exists).ToList();
+
+                if (existingPaths.Count == 0)
                 {
-                    StatusMessage.Value = "错误: 路径不存在";
+                    StatusMessage.Value = "错误: 没有可用的路径";
                     return;
                 }
 
                 // Find all BMS files
                 var bmsFiles = new List<string>();
 
-                foreach (string ext in bms_extensions) bmsFiles.AddRange(Directory.GetFiles(rootPath, $"*{ext}", SearchOption.AllDirectories));
+                foreach (string rootPath in existingPaths)
+                {
+                    foreach (string ext in bms_extensions)
+                        bmsFiles.AddRange(Directory.GetFiles(rootPath, $"*{ext}", SearchOption.AllDirectories));
+                }
 
                 if (bmsFiles.Count == 0)
                 {
@@ -141,7 +161,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                 var cache = new BMSLibraryCache
                 {
-                    RootPath = rootPath,
+                    RootPath = existingPaths.FirstOrDefault() ?? string.Empty,
+                    RootPaths = existingPaths,
                     LastScanTime = DateTime.Now
                 };
 
@@ -162,7 +183,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 }
 
                 LibraryCache = cache;
-                RootPath.Value = rootPath;
+                SetRootPaths(existingPaths);
                 SaveCache();
 
                 StatusMessage.Value = $"扫描完成: {cache.Songs.Count} 首歌曲, {cache.TotalCharts} 张谱面";
@@ -254,6 +275,32 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return channel[0] == '5' || channel[0] == '6';
         }
 
+        private static List<string> normaliseRootPaths(IEnumerable<string> paths)
+        {
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<string> result = new List<string>();
+
+            foreach (string path in paths)
+            {
+                string trimmed = path?.Trim() ?? string.Empty;
+
+                if (string.IsNullOrEmpty(trimmed) || !seen.Add(trimmed))
+                    continue;
+
+                result.Add(trimmed);
+            }
+
+            return result;
+        }
+
+        private static bool IsBackgroundSoundChannel(string channel)
+        {
+            if (IsNoteChannel(channel))
+                return false;
+
+            return channel is not "02" and not "03" and not "04" and not "06" and not "07" and not "08" and not "09";
+        }
+
         private static int CountNotes(string data)
         {
             // Each note is 2 characters, "00" means no note
@@ -266,6 +313,44 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
 
             return count;
+        }
+
+        private static (string Key, double Position)? FindFirstObjectKey(string data)
+        {
+            int objectCount = data.Length / 2;
+
+            if (objectCount <= 0)
+                return null;
+
+            for (int i = 0; i + 1 < data.Length; i += 2)
+            {
+                string key = data.Substring(i, 2);
+
+                if (key == "00")
+                    continue;
+
+                return (key, ((double)i / 2) / objectCount);
+            }
+
+            return null;
+        }
+
+        private static int determineKeyCount(HashSet<string> noteChannels)
+        {
+            bool hasPlayerTwo = noteChannels.Any(c => c[0] is '2' or '6');
+
+            if (hasPlayerTwo)
+            {
+                int playerOneKeys = noteChannels.Count(c => c[0] is '1' or '5' && c[1] is not '6' and not '7');
+                int playerTwoKeys = noteChannels.Count(c => c[0] is '2' or '6' && c[1] is not '6' and not '7');
+                return playerOneKeys + playerTwoKeys;
+            }
+
+            if (noteChannels.Contains("11") && noteChannels.Contains("12") && noteChannels.Contains("13") && noteChannels.Contains("14") && noteChannels.Contains("15")
+                && noteChannels.Contains("18") && noteChannels.Contains("19"))
+                return 7;
+
+            return noteChannels.Count(c => c[0] is '1' or '5' && c[1] is not '6' and not '7');
         }
 
         private static string[] ReadBmsLines(string filePath)
@@ -388,12 +473,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 // Parse the BMS file for metadata
                 string[] lines = ReadBmsLines(filePath);
                 var keysoundFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var wavDefinitions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var noteChannels = new HashSet<string>();
                 var bpmValues = new List<double>();
-                bool hasNotes = false;
                 bool hasLongNotes = false;
                 bool hasScratch = false;
                 int noteCount = 0;
                 int maxMeasure = 0;
+                string? previewAudioFile = null;
+                int previewMeasure = int.MaxValue;
+                double previewPosition = double.MaxValue;
 
                 // For BPM calculation
                 double baseBpm = 130;
@@ -464,9 +553,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                         if (spaceIdx > 4)
                         {
+                            string key = line.Substring(4, spaceIdx - 4).Trim();
                             string soundFile = line.Substring(spaceIdx + 1).Trim();
+
                             if (!string.IsNullOrEmpty(soundFile))
+                            {
                                 keysoundFiles.Add(soundFile);
+
+                                if (!string.IsNullOrEmpty(key))
+                                    wavDefinitions[key] = soundFile;
+                            }
                         }
                     }
                     else if (upperLine.StartsWith("#LNTYPE ", StringComparison.Ordinal) || upperLine.StartsWith("#LNOBJ ", StringComparison.Ordinal))
@@ -487,7 +583,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         // Note channels
                         if (IsNoteChannel(channelStr))
                         {
-                            hasNotes = true;
+                            noteChannels.Add(channelStr);
                             string data = line.Substring(7);
                             int notesInChannel = CountNotes(data);
                             noteCount += notesInChannel;
@@ -497,6 +593,19 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                             if (IsLongNoteChannel(channelStr))
                                 hasLongNotes = true;
+                        }
+                        else if (IsBackgroundSoundChannel(channelStr))
+                        {
+                            var firstObject = FindFirstObjectKey(line.Substring(7));
+
+                            if (firstObject.HasValue
+                                && wavDefinitions.TryGetValue(firstObject.Value.Key, out string? audioFile)
+                                && (measureNum < previewMeasure || measureNum == previewMeasure && firstObject.Value.Position < previewPosition))
+                            {
+                                previewMeasure = measureNum;
+                                previewPosition = firstObject.Value.Position;
+                                previewAudioFile = audioFile;
+                            }
                         }
                     }
                 }
@@ -508,14 +617,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 cache.HasScratch = hasScratch;
                 cache.HasLongNotes = hasLongNotes;
                 cache.KeysoundFiles = keysoundFiles.ToList();
+                cache.AudioFile = previewAudioFile;
 
                 // Calculate duration from max measure and BPM
                 // Standard: 4 beats per measure, duration = measures * 4 * 60000 / BPM
                 if (baseBpm > 0 && maxMeasure > 0) cache.Duration = (maxMeasure + 1) * 4.0 * 60000.0 / baseBpm;
 
-                // Determine key count based on channels used
-                // This is simplified - would need full parse for accuracy
-                cache.KeyCount = hasScratch ? 8 : 7; // Default to 7K+1 or 7K
+                if (baseBpm > 0 && previewMeasure != int.MaxValue)
+                    cache.PreviewTime = (int)Math.Max(0, ((previewMeasure * 4) + (previewPosition * 4)) * 60000.0 / baseBpm);
+
+                cache.KeyCount = Math.Max(1, determineKeyCount(noteChannels));
 
                 return cache;
             }, token);

@@ -34,6 +34,7 @@ namespace osu.Game.Rulesets.BMS.Audio
         private readonly Dictionary<string, double> keysoundPlayTimes = new Dictionary<string, double>(); // filename -> scheduled play time
         private double currentOffset;
         private double gameplayTime;
+        private double sampleVolume = 1;
         private List<BmsBackgroundSoundEvent> backgroundEvents = new List<BmsBackgroundSoundEvent>();
         private int nextBackgroundIndex;
         private double lastBackgroundUpdateTime = double.MinValue;
@@ -200,6 +201,9 @@ namespace osu.Game.Rulesets.BMS.Audio
                 {
                     var channel = sample.Play();
 
+                    if (channel != null)
+                        channel.Volume.Value = sampleVolume;
+
                     // Log detailed playback info for first few triggers
                     if (nextBackgroundIndex < 5 || gameplayTime < 10000)
                     {
@@ -273,6 +277,11 @@ namespace osu.Game.Rulesets.BMS.Audio
         public void SetOffset(double offsetMs)
         {
             currentOffset = offsetMs;
+        }
+
+        public void SetVolume(double volume)
+        {
+            sampleVolume = Math.Clamp(volume, 0, 1);
         }
 
         /// <summary>

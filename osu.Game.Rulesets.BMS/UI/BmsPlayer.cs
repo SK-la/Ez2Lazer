@@ -4,12 +4,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BMS.Audio;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Objects;
+using osu.Game.Rulesets.Configuration;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Screens.Play;
@@ -26,6 +31,24 @@ namespace osu.Game.Rulesets.BMS.UI
         private BmsKeysoundManager? keysoundManager;
         private int updateCount = 0;
         private int triggerCount = 0;
+        private Bindable<double>? bmsKeysoundVolume;
+        private Bindable<double>? bmsScrollSpeed;
+        private Bindable<double>? maniaScrollSpeed;
+        private double? previousManiaScrollSpeed;
+        private bool syncingScrollSpeed;
+
+        [Resolved]
+        private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
+
+        public BmsPlayer()
+            : base(new PlayerConfiguration
+            {
+                AllowPause = false,
+            })
+        {
+        }
+
+        protected override bool PauseOnFocusLost => false;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -40,6 +63,50 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 Logger.Log($"{BMS_LOG_PREFIX} Warning: Beatmap is not ManiaConvertedWorkingBeatmap", LoggingTarget.Runtime, LogLevel.Error);
             }
+
+            var bmsConfig = rulesetConfigCache.GetConfigFor(new BMSRuleset()) as BMSRulesetConfigManager;
+            var maniaConfig = rulesetConfigCache.GetConfigFor(new ManiaRuleset()) as ManiaRulesetConfigManager;
+
+            if (bmsConfig != null)
+            {
+                bmsKeysoundVolume = bmsConfig.GetBindable<double>(BMSRulesetSetting.KeysoundVolume);
+                bmsKeysoundVolume.BindValueChanged(onKeysoundVolumeChanged, true);
+
+                bmsScrollSpeed = bmsConfig.GetBindable<double>(BMSRulesetSetting.ScrollSpeed);
+                bmsScrollSpeed.BindValueChanged(onBmsScrollSpeedChanged, true);
+            }
+
+            if (maniaConfig != null)
+            {
+                maniaScrollSpeed = maniaConfig.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed);
+                previousManiaScrollSpeed = maniaScrollSpeed.Value;
+                maniaScrollSpeed.BindValueChanged(onManiaScrollSpeedChanged);
+            }
+        }
+
+        private void onKeysoundVolumeChanged(ValueChangedEvent<double> volume)
+        {
+            keysoundManager?.SetVolume(volume.NewValue);
+        }
+
+        private void onBmsScrollSpeedChanged(ValueChangedEvent<double> speed)
+        {
+            if (maniaScrollSpeed == null || syncingScrollSpeed)
+                return;
+
+            syncingScrollSpeed = true;
+            maniaScrollSpeed.Value = speed.NewValue;
+            syncingScrollSpeed = false;
+        }
+
+        private void onManiaScrollSpeedChanged(ValueChangedEvent<double> speed)
+        {
+            if (bmsScrollSpeed == null || syncingScrollSpeed)
+                return;
+
+            syncingScrollSpeed = true;
+            bmsScrollSpeed.Value = speed.NewValue;
+            syncingScrollSpeed = false;
         }
 
         protected override void LoadComplete()
@@ -120,6 +187,20 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             if (DrawableRuleset != null)
                 DrawableRuleset.NewResult -= onNewResult;
+
+            if (bmsKeysoundVolume != null)
+                bmsKeysoundVolume.ValueChanged -= onKeysoundVolumeChanged;
+
+            if (bmsScrollSpeed != null)
+                bmsScrollSpeed.ValueChanged -= onBmsScrollSpeedChanged;
+
+            if (maniaScrollSpeed != null)
+            {
+                maniaScrollSpeed.ValueChanged -= onManiaScrollSpeedChanged;
+
+                if (previousManiaScrollSpeed.HasValue)
+                    maniaScrollSpeed.Value = previousManiaScrollSpeed.Value;
+            }
 
             keysoundManager?.Dispose();
             base.Dispose(isDisposing);

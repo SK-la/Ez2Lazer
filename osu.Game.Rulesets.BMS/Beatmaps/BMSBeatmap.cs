@@ -19,7 +19,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// <summary>
         /// Whether this beatmap includes a scratch lane.
         /// </summary>
-        public bool HasScratch => TotalColumns == 6 || TotalColumns == 8 || TotalColumns == 16;
+        public bool HasScratch => TotalColumns == 6 || TotalColumns == 8 || TotalColumns == 12 || TotalColumns == 16;
 
         /// <summary>
         /// Whether this is a Double Play beatmap (14K).

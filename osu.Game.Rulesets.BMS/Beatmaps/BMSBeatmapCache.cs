@@ -139,6 +139,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public int KeyCount { get; set; } = 7;
 
         /// <summary>
+        /// Preferred backing audio file resolved from the chart.
+        /// </summary>
+        public string? AudioFile { get; set; }
+
+        /// <summary>
+        /// Preview start time in milliseconds.
+        /// </summary>
+        public int PreviewTime { get; set; } = -1;
+
+        /// <summary>
         /// Whether this chart has scratch lane.
         /// </summary>
         public bool HasScratch { get; set; }
@@ -188,12 +198,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// <summary>
         /// Version of the cache format (for migration).
         /// </summary>
-        public int Version { get; set; } = 1;
+        public int Version { get; set; } = 2;
 
         /// <summary>
         /// The root path that was scanned.
         /// </summary>
         public string RootPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// All configured root paths that were scanned.
+        /// </summary>
+        public List<string> RootPaths { get; set; } = new();
 
         /// <summary>
         /// When the cache was last updated.

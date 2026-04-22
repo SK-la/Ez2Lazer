@@ -105,6 +105,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     BeatmapInfo.Metadata.Title = cachedBeatmap.BeatmapInfo.Metadata.Title;
                     BeatmapInfo.Metadata.Artist = cachedBeatmap.BeatmapInfo.Metadata.Artist;
                     BeatmapInfo.Metadata.Source = "BMS Import";
+                    BeatmapInfo.Metadata.AudioFile = cachedBeatmap.BeatmapInfo.Metadata.AudioFile;
+                    BeatmapInfo.Metadata.BackgroundFile = cachedBeatmap.BeatmapInfo.Metadata.BackgroundFile;
+                    BeatmapInfo.Metadata.PreviewTime = cachedBeatmap.BeatmapInfo.Metadata.PreviewTime;
                     BeatmapInfo.BPM = cachedBeatmap.BeatmapInfo.BPM;
                 }
                 else
@@ -268,6 +271,41 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 track?.Dispose();
             }
             keysoundCache.Clear();
+        }
+
+        internal static string? ResolveAudioPath(string folderPath, string? relativePath)
+        {
+            if (!string.IsNullOrWhiteSpace(relativePath))
+            {
+                string normalisedRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
+                string directPath = Path.Combine(folderPath, normalisedRelativePath);
+
+                if (File.Exists(directPath))
+                    return directPath;
+
+                string directory = Path.GetDirectoryName(normalisedRelativePath) ?? string.Empty;
+                string baseName = Path.GetFileNameWithoutExtension(normalisedRelativePath);
+
+                foreach (string extension in new[] { ".wav", ".ogg", ".mp3", ".flac" })
+                {
+                    string candidate = Path.Combine(folderPath, directory, baseName + extension);
+
+                    if (File.Exists(candidate))
+                        return candidate;
+                }
+            }
+
+            foreach (string extension in new[] { "*.ogg", "*.mp3", "*.wav", "*.flac" })
+            {
+                string? fallback = Directory.GetFiles(folderPath, extension, SearchOption.TopDirectoryOnly)
+                                          .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
+                                          .FirstOrDefault();
+
+                if (fallback != null)
+                    return fallback;
+            }
+
+            return null;
         }
     }
 

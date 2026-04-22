@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -54,10 +55,12 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private LoadingSpinner loadingSpinner = null!;
         private SearchTextBox searchBox = null!;
         private BMSInfoPanel infoPanel = null!;
+        private Track? previewTrack;
 
         private readonly Bindable<BMSSongCache?> selectedSong = new Bindable<BMSSongCache?>();
         private readonly Bindable<BMSChartCache?> selectedChart = new Bindable<BMSChartCache?>();
-        private Bindable<string> rootPathBindable = null!;
+        private Bindable<string> libraryPathsBindable = null!;
+        private Bindable<string> legacyRootPathBindable = null!;
 
         [Resolved]
         private AudioManager audioManager { get; set; } = null!;
@@ -95,11 +98,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             var config = rulesetConfigCache.GetConfigFor(ruleset);
             if (config is BMSRulesetConfigManager bmsConfig)
             {
-                rootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
+                libraryPathsBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsLibraryPaths);
+                legacyRootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
             }
             else
             {
-                rootPathBindable = new Bindable<string>(string.Empty);
+                libraryPathsBindable = new Bindable<string>(string.Empty);
+                legacyRootPathBindable = new Bindable<string>(string.Empty);
             }
 
             // Initialize manager
@@ -108,10 +113,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             beatmapManager.LoadCache();
 
             // Sync root path from config to manager
-            if (!string.IsNullOrEmpty(rootPathBindable.Value))
-            {
-                beatmapManager.RootPath.Value = rootPathBindable.Value;
-            }
+            beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));
 
             // Register OverlayColourProvider for child components (required for BMSInfoPanel)
             var colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
@@ -273,9 +275,40 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             // Bind events
             searchBox.Current.BindValueChanged(e => FilterSongs(e.NewValue));
             beatmapManager.StatusMessage.BindValueChanged(e => statusText.Text = e.NewValue);
+            selectedChart.BindValueChanged(e => updatePreviewTrack(e.NewValue), true);
 
             // Load songs
             RefreshSongList();
+        }
+
+        private void updatePreviewTrack(BMSChartCache? chart)
+        {
+            previewTrack?.Stop();
+            previewTrack?.Dispose();
+            previewTrack = null;
+
+            if (chart == null)
+                return;
+
+            string? audioPath = BMSWorkingBeatmap.ResolveAudioPath(chart.FolderPath, chart.AudioFile);
+
+            if (string.IsNullOrEmpty(audioPath))
+                return;
+
+            previewTrack = audioManager.Tracks.Get(audioPath);
+            previewTrack.Looping = true;
+
+            if (!previewTrack.IsLoaded)
+                previewTrack.Seek(previewTrack.CurrentTime);
+
+            double restartPoint = chart.PreviewTime;
+
+            if (restartPoint < 0 || restartPoint > previewTrack.Length)
+                restartPoint = previewTrack.Length * 0.4;
+
+            previewTrack.RestartPoint = restartPoint;
+            previewTrack.Seek(restartPoint);
+            previewTrack.Start();
         }
 
         private void RefreshSongList()
@@ -335,7 +368,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private void RefreshLibrary()
         {
-            if (string.IsNullOrEmpty(beatmapManager.RootPath.Value))
+            if (beatmapManager.RootPaths.Count == 0)
             {
                 notifications?.Post(new SimpleNotification
                 {
@@ -365,7 +398,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 notification.Text = e.NewValue;
             });
 
-            _ = beatmapManager.ScanLibraryAsync(beatmapManager.RootPath.Value).ContinueWith(_ =>
+            _ = beatmapManager.ScanLibraryAsync(beatmapManager.RootPaths).ContinueWith(_ =>
             {
                 Schedule(() =>
                 {
@@ -417,6 +450,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         public override bool OnExiting(ScreenExitEvent e)
         {
+            previewTrack?.Stop();
+            previewTrack?.Dispose();
+            previewTrack = null;
             this.FadeOut(200);
             return base.OnExiting(e);
         }
