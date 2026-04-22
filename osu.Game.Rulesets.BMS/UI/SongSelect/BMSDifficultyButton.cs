@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     {
         private readonly BMSChartCache chart;
         private Box background = null!;
-        private OsuSpriteText difficultyText = null!;
+        private TruncatingSpriteText difficultyText = null!;
         private Container clearLamp = null!;
 
         public readonly Bindable<BMSChartCache?> SelectedChart = new Bindable<BMSChartCache?>();
@@ -42,8 +42,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         [BackgroundDependencyLoader]
         private void load()
         {
-            Width = 120;
-            Height = 40;
+            RelativeSizeAxes = Axes.X;
+            Height = 58;
             Masking = true;
             CornerRadius = 5;
 
@@ -83,16 +83,15 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                             Spacing = new Vector2(0, 2),
                             Children = new Drawable[]
                             {
-                                difficultyText = new OsuSpriteText
+                                difficultyText = new TruncatingSpriteText
                                 {
-                                    Text = chart.SubTitle ?? "Unknown",
+                                    Text = BMSChartDisplayFormatter.GetDifficultyTitle(chart),
                                     Font = OsuFont.GetFont(size: 14, weight: FontWeight.Bold),
-                                    Truncate = true,
                                     RelativeSizeAxes = Axes.X,
                                 },
                                 new OsuSpriteText
                                 {
-                                    Text = $"★{chart.PlayLevel}",
+                                    Text = $"{BMSChartDisplayFormatter.GetModeText(chart)} | {BMSChartDisplayFormatter.GetLevelText(chart)} | {BMSChartDisplayFormatter.GetFlagsText(chart)}",
                                     Font = OsuFont.GetFont(size: 11),
                                     Colour = colourProvider.Content2,
                                 }

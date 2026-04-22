@@ -38,6 +38,8 @@ namespace osu.Game.Rulesets.BMS.Audio
         private List<BmsBackgroundSoundEvent> backgroundEvents = new List<BmsBackgroundSoundEvent>();
         private int nextBackgroundIndex;
         private double lastBackgroundUpdateTime = double.MinValue;
+        private bool loggedMissingBackgroundEvents;
+        private bool loggedFirstBackgroundUpdate;
 
         public BmsKeysoundManager(AudioManager audioManager, string bmsFolder)
         {
@@ -101,6 +103,8 @@ namespace osu.Game.Rulesets.BMS.Audio
                                .ToList();
             nextBackgroundIndex = 0;
             lastBackgroundUpdateTime = double.MinValue;
+            loggedMissingBackgroundEvents = false;
+            loggedFirstBackgroundUpdate = false;
 
             Logger.Log($"{BMS_LOG_PREFIX} Background sound events set: {backgroundEvents.Count}", LoggingTarget.Runtime, LogLevel.Debug);
         }
@@ -231,17 +235,20 @@ namespace osu.Game.Rulesets.BMS.Audio
             if (backgroundEvents.Count == 0)
             {
                 // Only log this once
-                if (nextBackgroundIndex == 0)
+                if (!loggedMissingBackgroundEvents)
                 {
                     Logger.Log($"{BMS_LOG_PREFIX} Update called but no background events loaded", LoggingTarget.Runtime, LogLevel.Debug);
-                    nextBackgroundIndex = -1; // Mark as logged
+                    loggedMissingBackgroundEvents = true;
                 }
                 return;
             }
 
             // Log first update with background events
-            if (nextBackgroundIndex == 0)
+            if (!loggedFirstBackgroundUpdate)
+            {
                 Logger.Log($"{BMS_LOG_PREFIX} First Update with {backgroundEvents.Count} background events, currentTime={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+                loggedFirstBackgroundUpdate = true;
+            }
 
             if (currentGameplayTime < lastBackgroundUpdateTime)
             {

@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
 
-        public override bool CanConvert() => Beatmap.HitObjects.All(h => h is BMSHitObject);
+        public override bool CanConvert() => true;
 
         protected override Beatmap<BMSHitObject> CreateBeatmap()
         {
