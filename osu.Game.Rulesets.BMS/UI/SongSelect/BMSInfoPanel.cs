@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -26,6 +27,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private OsuSpriteText artistText = null!;
         private OsuSpriteText genreText = null!;
         private OsuSpriteText bpmText = null!;
+        private OsuSpriteText chartTitleText = null!;
+        private OsuSpriteText chartMetaText = null!;
+        private OsuSpriteText chartStatsText = null!;
+        private OsuSpriteText chartExtraText = null!;
         private Container scoreContainer = null!;
 
         public readonly Bindable<BMSSongCache?> SelectedSong = new Bindable<BMSSongCache?>();
@@ -63,7 +68,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                             new Container
                             {
                                 RelativeSizeAxes = Axes.X,
-                                Height = 50,
+                                Height = 220,
                                 Child = difficultySelector = new BMSDifficultySelector
                                 {
                                     RelativeSizeAxes = Axes.Both,
@@ -96,6 +101,11 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                                         Colour = colourProvider.Content2,
                                         Text = string.Empty,
                                     },
+                                    chartTitleText = new OsuSpriteText
+                                    {
+                                        Font = OsuFont.GetFont(size: 18, weight: FontWeight.SemiBold),
+                                        Text = string.Empty,
+                                    },
                                     new FillFlowContainer
                                     {
                                         AutoSizeAxes = Axes.Both,
@@ -116,6 +126,24 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                                                 Text = string.Empty,
                                             }
                                         }
+                                    },
+                                    chartMetaText = new OsuSpriteText
+                                    {
+                                        Font = OsuFont.GetFont(size: 14),
+                                        Colour = colourProvider.Content2,
+                                        Text = string.Empty,
+                                    },
+                                    chartStatsText = new OsuSpriteText
+                                    {
+                                        Font = OsuFont.GetFont(size: 14),
+                                        Colour = colourProvider.Content2,
+                                        Text = string.Empty,
+                                    },
+                                    chartExtraText = new OsuSpriteText
+                                    {
+                                        Font = OsuFont.GetFont(size: 14),
+                                        Colour = colourProvider.Content2,
+                                        Text = string.Empty,
                                     }
                                 }
                             },
@@ -157,14 +185,18 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 artistText.Text = string.Empty;
                 genreText.Text = string.Empty;
                 bpmText.Text = string.Empty;
+                chartTitleText.Text = string.Empty;
+                chartMetaText.Text = string.Empty;
+                chartStatsText.Text = string.Empty;
+                chartExtraText.Text = string.Empty;
                 difficultySelector.Clear();
                 return;
             }
 
             var song = e.NewValue;
-            titleText.Text = song.Title ?? "Unknown Title";
-            artistText.Text = song.Artist ?? "Unknown Artist";
-            genreText.Text = $"Genre: {song.Genre ?? "Unknown"}";
+            titleText.Text = string.IsNullOrWhiteSpace(song.Title) ? "Unknown Title" : song.Title;
+            artistText.Text = string.IsNullOrWhiteSpace(song.Artist) ? "Unknown Artist" : song.Artist;
+            genreText.Text = $"Genre: {(string.IsNullOrWhiteSpace(song.Genre) ? "Unknown" : song.Genre)}";
 
             // 设置难度列表
             difficultySelector.SetDifficulties(song.Charts);
@@ -175,11 +207,19 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             if (e.NewValue == null)
             {
                 bpmText.Text = string.Empty;
+                chartTitleText.Text = string.Empty;
+                chartMetaText.Text = string.Empty;
+                chartStatsText.Text = string.Empty;
+                chartExtraText.Text = string.Empty;
                 return;
             }
 
             var chart = e.NewValue;
-            bpmText.Text = $"BPM: {chart.Bpm:F0}";
+            bpmText.Text = $"BPM: {BMSChartDisplayFormatter.GetBpmText(chart)}";
+            chartTitleText.Text = $"难度: {BMSChartDisplayFormatter.GetDifficultyTitle(chart)}";
+            chartMetaText.Text = $"模式: {BMSChartDisplayFormatter.GetModeText(chart)} | {BMSChartDisplayFormatter.GetLevelText(chart)} | Rank {chart.Rank}";
+            chartStatsText.Text = $"{chart.TotalNotes} Notes | Keysounds {chart.KeysoundFiles.Count} | Total {chart.Total:F0}";
+            chartExtraText.Text = $"时长: {BMSChartDisplayFormatter.GetDurationText(chart.Duration)} | {BMSChartDisplayFormatter.GetFlagsText(chart)} | 文件: {chart.FileName}";
 
             // TODO: 加载并显示该难度的成绩
             updateScores(chart);

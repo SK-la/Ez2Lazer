@@ -265,7 +265,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// </summary>
         public BmsKeysoundManager? KeysoundManager { get; }
 
-        protected override ISkin GetSkin() => new BMSSkin(SourceBeatmap.FolderPath, audioManager);
+        protected override ISkin GetSkin() => null;
 
         public override Stream? GetStream(string storagePath) => SourceBeatmap.GetStream(storagePath);
 

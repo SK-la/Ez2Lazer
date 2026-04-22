@@ -13,6 +13,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.BMS.UI;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
@@ -27,6 +28,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     /// </summary>
     public partial class BMSPlayerLoader : OsuScreen
     {
+        public override bool DisallowExternalBeatmapRulesetChanges => true;
+
         protected override bool InitialBackButtonVisibility => false;
 
         private readonly BMSWorkingBeatmap workingBeatmap;
@@ -147,15 +150,12 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             try
             {
-                // Convert BMS beatmap to Mania beatmap and create a working beatmap wrapper
                 var maniaWorkingBeatmap = new ManiaConvertedWorkingBeatmap(workingBeatmap, audioManager);
                 var maniaRuleset = new ManiaRuleset();
 
-                // Set the global beatmap and ruleset to the converted Mania beatmap
                 Beatmap.Value = maniaWorkingBeatmap;
                 Ruleset.Value = maniaRuleset.RulesetInfo;
 
-                // Use BmsPlayer for keysound integration
                 var playerLoader = new PlayerLoader(() => new BmsPlayer());
                 this.Push(playerLoader);
             }

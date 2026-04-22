@@ -12,6 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.IO;
+using osu.Game.Rulesets.BMS;
 using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
 
@@ -294,6 +295,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             beatmap.BeatmapInfo.Metadata.Author.Username = "Ez2Lazer BMSDecoder";
             beatmap.BeatmapInfo.Metadata.Source = "BMS Import";
             beatmap.BeatmapInfo.Metadata.Tags = $"bms {genre}";
+            beatmap.BeatmapInfo.Ruleset = new BMSRuleset().RulesetInfo;
             beatmap.BeatmapInfo.DifficultyName = getDifficultyName();
 
             if (!string.IsNullOrEmpty(stageFile))
@@ -311,6 +313,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             // Store background (non-note) sound events
             if (beatmap is BMSBeatmap bmsBeatmap)
             {
+                bmsBeatmap.TotalColumns = totalKeys;
                 var backgroundEvents = createBackgroundSoundEvents(timingPoints);
                 bmsBeatmap.BackgroundSoundEvents.AddRange(backgroundEvents);
 

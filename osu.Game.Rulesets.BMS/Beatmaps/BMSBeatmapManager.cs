@@ -19,6 +19,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </summary>
     public class BMSBeatmapManager
     {
+        private static readonly object shared_manager_lock = new object();
+        private static BMSBeatmapManager? sharedManager;
+        private static string? sharedCacheDirectory;
+
         /// <summary>
         ///     Bindable for the BMS root path.
         /// </summary>
@@ -62,6 +66,21 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private string cacheFilePath => Path.Combine(cacheDirectory, cache_filename);
 
         private CancellationTokenSource? scanCts;
+
+        public static BMSBeatmapManager GetShared(string cacheDirectory)
+        {
+            lock (shared_manager_lock)
+            {
+                if (sharedManager == null || !string.Equals(sharedCacheDirectory, cacheDirectory, StringComparison.Ordinal))
+                {
+                    sharedManager = new BMSBeatmapManager(cacheDirectory);
+                    sharedManager.LoadCache();
+                    sharedCacheDirectory = cacheDirectory;
+                }
+
+                return sharedManager;
+            }
+        }
 
         public BMSBeatmapManager(string cacheDirectory)
         {

@@ -39,7 +39,6 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private OsuTextFlowContainer pathDisplay = null!;
         private OsuTextFlowContainer statusDisplay = null!;
-        private RoundedButton scanButton = null!;
 
         [Resolved]
         private OsuGame? game { get; set; }
@@ -64,17 +63,15 @@ namespace osu.Game.Rulesets.BMS.UI
             libraryPathsBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsLibraryPaths);
             legacyRootPathBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsRootPath);
 
-            // Create beatmap manager with proper cache directory
             string cacheDir = storage.GetFullPath("bms_cache");
-            beatmapManager = new BMSBeatmapManager(cacheDir);
-            beatmapManager.LoadCache();
+            beatmapManager = BMSBeatmapManager.GetShared(cacheDir);
             beatmapManager.SetRootPaths(getConfiguredPaths());
 
             Children = new Drawable[]
             {
                 new SettingsButton
                 {
-                    Text = "进入 BMS 选歌界面",
+                    Text = "进入 BMS 特殊选歌界面",
                     Action = openBmsSongSelect,
                 },
                 new SettingsButton
@@ -87,21 +84,6 @@ namespace osu.Game.Rulesets.BMS.UI
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
                     Padding = new MarginPadding { Left = SettingsPanel.CONTENT_MARGINS, Right = SettingsPanel.CONTENT_MARGINS },
-                },
-                new Container
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Padding = new MarginPadding { Top = 10 },
-                    Children = new Drawable[]
-                    {
-                        scanButton = new RoundedButton
-                        {
-                            RelativeSizeAxes = Axes.X,
-                            Text = "扫描 / 重建缓存",
-                            Action = startScan,
-                        },
-                    }
                 },
                 statusDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 12))
                 {
@@ -160,7 +142,7 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             game?.PerformFromScreen(screen =>
             {
-                screen.Push(new BMSSongSelectScreen());
+                screen.Push(new BMSSongSelectScreen(BMSSongSelectScreenMode.SpecialEntry));
             });
         }
 
@@ -168,15 +150,22 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             game?.PerformFromScreen(screen =>
             {
-                screen.Push(new BMSDirectorySelectScreen(libraryPathsBindable, legacyRootPathBindable));
+                screen.Push(new BMSDirectorySelectScreen(libraryPathsBindable, legacyRootPathBindable, applyPathsAndScan));
             });
         }
 
-        private void startScan()
+        private void applyPathsAndScan(IReadOnlyList<string> paths)
+        {
+            libraryPathsBindable.Value = BMSRulesetConfigManager.SerialiseLibraryPaths(paths);
+            legacyRootPathBindable.Value = paths.FirstOrDefault() ?? string.Empty;
+            startScan(paths);
+        }
+
+        private void startScan(IReadOnlyList<string>? configuredPaths = null)
         {
             if (beatmapManager == null) return;
 
-            IReadOnlyList<string> paths = getConfiguredPaths();
+            IReadOnlyList<string> paths = configuredPaths ?? getConfiguredPaths();
             beatmapManager.SetRootPaths(paths);
 
             if (paths.Count == 0 || !paths.Any(Directory.Exists))
@@ -188,7 +177,6 @@ namespace osu.Game.Rulesets.BMS.UI
                 return;
             }
 
-            scanButton.Enabled.Value = false;
             statusDisplay.Text = "正在扫描...";
 
             var notification = new ProgressNotification
@@ -225,8 +213,6 @@ namespace osu.Game.Rulesets.BMS.UI
                         {
                             statusDisplay.Text = $"扫描完成! {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面";
                         }
-
-                        scanButton.Enabled.Value = true;
                     });
                 }
                 catch (Exception ex)
@@ -235,7 +221,6 @@ namespace osu.Game.Rulesets.BMS.UI
                     {
                         notification.State = ProgressNotificationState.Cancelled;
                         statusDisplay.Text = $"扫描失败: {ex.Message}";
-                        scanButton.Enabled.Value = true;
                     });
                 }
             });
@@ -250,16 +235,18 @@ namespace osu.Game.Rulesets.BMS.UI
         private readonly Bindable<string> libraryPathsBindable;
         private readonly Bindable<string> legacyRootPathBindable;
         private readonly List<string> stagedPaths;
+        private readonly Action<IReadOnlyList<string>>? applyAction;
         private OsuDirectorySelector directorySelector = null!;
         private FillFlowContainer pathList = null!;
 
         [Cached]
         private OverlayColourProvider colourProvider = new OverlayColourProvider(OverlayColourScheme.Purple);
 
-        public BMSDirectorySelectScreen(Bindable<string> libraryPathsBindable, Bindable<string> legacyRootPathBindable)
+        public BMSDirectorySelectScreen(Bindable<string> libraryPathsBindable, Bindable<string> legacyRootPathBindable, Action<IReadOnlyList<string>>? applyAction = null)
         {
             this.libraryPathsBindable = libraryPathsBindable;
             this.legacyRootPathBindable = legacyRootPathBindable;
+            this.applyAction = applyAction;
             stagedPaths = BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value).ToList();
         }
 
@@ -314,7 +301,7 @@ namespace osu.Game.Rulesets.BMS.UI
                                         },
                                         new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 14))
                                         {
-                                            Text = "先添加任意数量的文件夹路径，再手动应用。扫描和建索引仍在外层设置页触发。",
+                                            Text = "先添加任意数量的文件夹路径。应用会立即保存并重建扫描，确定只关闭当前向导。",
                                             RelativeSizeAxes = Axes.X,
                                             AutoSizeAxes = Axes.Y,
                                         }
@@ -412,7 +399,7 @@ namespace osu.Game.Rulesets.BMS.UI
                                         new RoundedButton
                                         {
                                             Width = 200,
-                                            Text = "取消",
+                                            Text = "确定",
                                             Action = this.Exit,
                                         },
                                         new RoundedButton
@@ -450,7 +437,7 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             libraryPathsBindable.Value = BMSRulesetConfigManager.SerialiseLibraryPaths(stagedPaths);
             legacyRootPathBindable.Value = stagedPaths.FirstOrDefault() ?? string.Empty;
-            this.Exit();
+            applyAction?.Invoke(stagedPaths.ToArray());
         }
 
         private void refreshPathList()

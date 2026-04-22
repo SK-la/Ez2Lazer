@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
@@ -13,9 +14,6 @@ using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.Configuration;
-using osu.Game.Rulesets.Mania;
-using osu.Game.Rulesets.Mania.Configuration;
-using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Screens.Play;
 
@@ -32,13 +30,12 @@ namespace osu.Game.Rulesets.BMS.UI
         private int updateCount = 0;
         private int triggerCount = 0;
         private Bindable<double>? bmsKeysoundVolume;
-        private Bindable<double>? bmsScrollSpeed;
-        private Bindable<double>? maniaScrollSpeed;
-        private double? previousManiaScrollSpeed;
-        private bool syncingScrollSpeed;
 
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
+
+        [Resolved]
+        private AudioManager audioManager { get; set; } = null!;
 
         public BmsPlayer()
             : base(new PlayerConfiguration
@@ -53,60 +50,33 @@ namespace osu.Game.Rulesets.BMS.UI
         [BackgroundDependencyLoader]
         private void load()
         {
-            // Extract the keysound manager from the working beatmap if available
-            if (Beatmap.Value is ManiaConvertedWorkingBeatmap maniaConverted)
+            if (Beatmap.Value is BMSWorkingBeatmap bmsWorkingBeatmap)
+            {
+                keysoundManager = new BmsKeysoundManager(audioManager, bmsWorkingBeatmap.FolderPath);
+
+                if (bmsWorkingBeatmap.Beatmap is BMSBeatmap bmsBeatmap)
+                {
+                    keysoundManager.PreloadKeysounds(bmsBeatmap.HitObjects);
+                    keysoundManager.SetBackgroundSoundEvents(bmsBeatmap.BackgroundSoundEvents);
+                }
+            }
+            else if (Beatmap.Value is ManiaConvertedWorkingBeatmap maniaConverted)
             {
                 keysoundManager = maniaConverted.KeysoundManager;
-                Logger.Log($"{BMS_LOG_PREFIX} Player loaded, keysound manager initialized", LoggingTarget.Runtime, LogLevel.Debug);
-            }
-            else
-            {
-                Logger.Log($"{BMS_LOG_PREFIX} Warning: Beatmap is not ManiaConvertedWorkingBeatmap", LoggingTarget.Runtime, LogLevel.Error);
             }
 
             var bmsConfig = rulesetConfigCache.GetConfigFor(new BMSRuleset()) as BMSRulesetConfigManager;
-            var maniaConfig = rulesetConfigCache.GetConfigFor(new ManiaRuleset()) as ManiaRulesetConfigManager;
 
             if (bmsConfig != null)
             {
                 bmsKeysoundVolume = bmsConfig.GetBindable<double>(BMSRulesetSetting.KeysoundVolume);
                 bmsKeysoundVolume.BindValueChanged(onKeysoundVolumeChanged, true);
-
-                bmsScrollSpeed = bmsConfig.GetBindable<double>(BMSRulesetSetting.ScrollSpeed);
-                bmsScrollSpeed.BindValueChanged(onBmsScrollSpeedChanged, true);
-            }
-
-            if (maniaConfig != null)
-            {
-                maniaScrollSpeed = maniaConfig.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed);
-                previousManiaScrollSpeed = maniaScrollSpeed.Value;
-                maniaScrollSpeed.BindValueChanged(onManiaScrollSpeedChanged);
             }
         }
 
         private void onKeysoundVolumeChanged(ValueChangedEvent<double> volume)
         {
             keysoundManager?.SetVolume(volume.NewValue);
-        }
-
-        private void onBmsScrollSpeedChanged(ValueChangedEvent<double> speed)
-        {
-            if (maniaScrollSpeed == null || syncingScrollSpeed)
-                return;
-
-            syncingScrollSpeed = true;
-            maniaScrollSpeed.Value = speed.NewValue;
-            syncingScrollSpeed = false;
-        }
-
-        private void onManiaScrollSpeedChanged(ValueChangedEvent<double> speed)
-        {
-            if (bmsScrollSpeed == null || syncingScrollSpeed)
-                return;
-
-            syncingScrollSpeed = true;
-            bmsScrollSpeed.Value = speed.NewValue;
-            syncingScrollSpeed = false;
         }
 
         protected override void LoadComplete()
@@ -158,16 +128,16 @@ namespace osu.Game.Rulesets.BMS.UI
             if (!result.IsHit)
                 return;
 
-            if (result.HitObject is not ManiaHitObject hitObject)
+            if (result.HitObject == null)
                 return;
 
             // Get keysound samples
-            IEnumerable<HitSampleInfo> samples = hitObject.Samples;
+            IEnumerable<HitSampleInfo> samples = result.HitObject.Samples;
 
-            if (hitObject is IBmsKeysoundProvider provider && provider.KeysoundSamples.Count > 0)
+            if (result.HitObject is IBmsKeysoundProvider provider && provider.KeysoundSamples.Count > 0)
                 samples = provider.KeysoundSamples;
-            else if (hitObject.AuxiliarySamples.Count > 0)
-                samples = hitObject.AuxiliarySamples;
+            else if (result.HitObject.AuxiliarySamples.Count > 0)
+                samples = result.HitObject.AuxiliarySamples;
 
             // Trigger the keysound
             foreach (var sample in samples)
@@ -190,17 +160,6 @@ namespace osu.Game.Rulesets.BMS.UI
 
             if (bmsKeysoundVolume != null)
                 bmsKeysoundVolume.ValueChanged -= onKeysoundVolumeChanged;
-
-            if (bmsScrollSpeed != null)
-                bmsScrollSpeed.ValueChanged -= onBmsScrollSpeedChanged;
-
-            if (maniaScrollSpeed != null)
-            {
-                maniaScrollSpeed.ValueChanged -= onManiaScrollSpeedChanged;
-
-                if (previousManiaScrollSpeed.HasValue)
-                    maniaScrollSpeed.Value = previousManiaScrollSpeed.Value;
-            }
 
             keysoundManager?.Dispose();
             base.Dispose(isDisposing);

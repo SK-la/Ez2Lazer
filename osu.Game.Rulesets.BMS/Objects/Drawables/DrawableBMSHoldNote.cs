@@ -7,9 +7,12 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.BMS.UI;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BMS.Objects.Drawables
@@ -19,9 +22,9 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
         private const float note_height = 20f;
 
         private Container bodyContainer = null!;
-        private Box noteBody = null!;
-        private Box noteHead = null!;
-        private Box noteTail = null!;
+        private Drawable noteBody = null!;
+        private Drawable noteHead = null!;
+        private Drawable noteTail = null!;
 
         private bool isHolding;
 
@@ -38,8 +41,6 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
         [BackgroundDependencyLoader]
         private void load()
         {
-            var colour = BMSColumn.GetColumnColour(HitObject.Column);
-
             AddInternal(bodyContainer = new Container
             {
                 RelativeSizeAxes = Axes.X,
@@ -48,27 +49,32 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
                 Children = new Drawable[]
                 {
                     // Body (the hold bar)
-                    noteBody = new Box
+                    noteBody = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HoldNoteBody), _ => new Box
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Colour = colour,
-                        Alpha = 0.6f,
+                    })
+                    {
+                        RelativeSizeAxes = Axes.Both,
                     },
                     // Head
-                    noteHead = new Box
+                    noteHead = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HoldNoteHead), _ => new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                    })
                     {
                         RelativeSizeAxes = Axes.X,
                         Height = note_height,
-                        Colour = colour,
                         Anchor = Anchor.BottomCentre,
                         Origin = Anchor.BottomCentre,
                     },
                     // Tail
-                    noteTail = new Box
+                    noteTail = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HoldNoteTail), _ => new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                    })
                     {
                         RelativeSizeAxes = Axes.X,
                         Height = note_height,
-                        Colour = colour,
                         Anchor = Anchor.TopCentre,
                         Origin = Anchor.TopCentre,
                     },

@@ -6,9 +6,12 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.BMS.UI;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Skinning;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BMS.Objects.Drawables
@@ -17,7 +20,7 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
     {
         private const float note_height = 20f;
 
-        private Box noteBody = null!;
+        private Drawable noteBody = null!;
 
         public DrawableBMSNote()
             : this(null!)
@@ -36,8 +39,15 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
             AddInternal(noteBody = new Box
             {
                 RelativeSizeAxes = Axes.Both,
-                Colour = BMSColumn.GetColumnColour(HitObject.Column),
             });
+
+            noteBody = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.Note), _ => new Box
+            {
+                RelativeSizeAxes = Axes.Both,
+            });
+
+            ClearInternal();
+            AddInternal(noteBody);
         }
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)

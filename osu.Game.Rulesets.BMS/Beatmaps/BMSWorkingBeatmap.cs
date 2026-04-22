@@ -17,9 +17,11 @@ using osu.Framework.Platform;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
+using osu.Game.Rulesets.BMS;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Skinning;
+using osu.Game.Storyboards;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
@@ -34,6 +36,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private readonly AudioManager audioManager;
         private readonly TextureStore? textures;
         private readonly IResourceStore<TextureUpload>? backgroundTextureLoader;
+        private readonly BMSChartCache? chartCache;
 
         private BMSBeatmap? cachedBeatmap;
         private readonly Dictionary<string, Track> keysoundCache = new();
@@ -46,13 +49,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public BMSWorkingBeatmap(
             string bmsFilePath,
             AudioManager audioManager,
-            TextureStore? textures = null)
-            : base(CreateBeatmapInfo(bmsFilePath), audioManager)
+            TextureStore? textures = null,
+            BMSChartCache? chartCache = null)
+            : base(CreateBeatmapInfo(bmsFilePath, chartCache), audioManager)
         {
             this.bmsFilePath = bmsFilePath;
             this.folderPath = Path.GetDirectoryName(bmsFilePath) ?? string.Empty;
             this.audioManager = audioManager;
             this.textures = textures;
+            this.chartCache = chartCache;
 
             if (this.textures != null && Directory.Exists(folderPath))
             {
@@ -66,24 +71,55 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// Create a BeatmapInfo from BMS file path (minimal info for display).
         /// Full parsing happens in GetBeatmap().
         /// </summary>
-        private static BeatmapInfo CreateBeatmapInfo(string bmsFilePath)
+        private static BeatmapInfo CreateBeatmapInfo(string bmsFilePath, BMSChartCache? chartCache)
         {
             var fileInfo = new System.IO.FileInfo(bmsFilePath);
 
-            return new BeatmapInfo
+            string title = chartCache?.Title;
+            if (string.IsNullOrWhiteSpace(title))
+                title = fileInfo.Name;
+
+            string artist = chartCache?.Artist;
+            if (string.IsNullOrWhiteSpace(artist))
+                artist = "BMS";
+
+            string difficultyName = chartCache?.SubTitle;
+            if (string.IsNullOrWhiteSpace(difficultyName))
+                difficultyName = Path.GetFileNameWithoutExtension(bmsFilePath);
+
+            var beatmapInfo = new BeatmapInfo(new BMSRuleset().RulesetInfo)
             {
                 Metadata = new BeatmapMetadata
                 {
-                    Title = fileInfo.Name,
-                    Artist = "BMS",
+                    Title = title,
+                    Artist = artist,
                     Source = "BMS Import",
+                    AudioFile = chartCache?.AudioFile ?? string.Empty,
                 },
-                DifficultyName = Path.GetFileNameWithoutExtension(bmsFilePath),
+                DifficultyName = difficultyName,
+                Difficulty = new BeatmapDifficulty
+                {
+                    CircleSize = chartCache?.KeyCount ?? 7,
+                },
+                BPM = chartCache?.Bpm ?? 0,
+                Length = chartCache?.Duration ?? 0,
+                MD5Hash = chartCache?.Md5Hash ?? string.Empty,
+                Hash = chartCache?.Md5Hash ?? string.Empty,
+                TotalObjectCount = chartCache?.TotalNotes ?? -1,
+                EndTimeObjectCount = chartCache?.TotalNotes ?? -1,
                 BeatmapSet = new BeatmapSetInfo
                 {
                     OnlineID = -1,
                 },
             };
+
+            if (chartCache != null)
+            {
+                beatmapInfo.Metadata.PreviewTime = chartCache.PreviewTime;
+                beatmapInfo.Metadata.BackgroundFile = string.Empty;
+            }
+
+            return beatmapInfo;
         }
 
         protected override IBeatmap GetBeatmap()
@@ -102,12 +138,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 {
                     cachedBeatmap = bmsBeatmap;
                     // Update BeatmapInfo with parsed metadata
+                    BeatmapInfo.Ruleset = cachedBeatmap.BeatmapInfo.Ruleset;
                     BeatmapInfo.Metadata.Title = cachedBeatmap.BeatmapInfo.Metadata.Title;
                     BeatmapInfo.Metadata.Artist = cachedBeatmap.BeatmapInfo.Metadata.Artist;
                     BeatmapInfo.Metadata.Source = "BMS Import";
                     BeatmapInfo.Metadata.AudioFile = cachedBeatmap.BeatmapInfo.Metadata.AudioFile;
                     BeatmapInfo.Metadata.BackgroundFile = cachedBeatmap.BeatmapInfo.Metadata.BackgroundFile;
                     BeatmapInfo.Metadata.PreviewTime = cachedBeatmap.BeatmapInfo.Metadata.PreviewTime;
+                    BeatmapInfo.DifficultyName = cachedBeatmap.BeatmapInfo.DifficultyName;
+                    BeatmapInfo.Difficulty = cachedBeatmap.BeatmapInfo.Difficulty.Clone();
                     BeatmapInfo.BPM = cachedBeatmap.BeatmapInfo.BPM;
                 }
                 else
@@ -159,6 +198,23 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
 
             return audioManager.Tracks.GetVirtual(Math.Max(length, 60000));
+        }
+
+        protected override Storyboard GetStoryboard()
+        {
+            var storyboard = base.GetStoryboard();
+
+            if (GetBeatmap() is not BMSBeatmap beatmap || beatmap.BackgroundSoundEvents.Count == 0)
+                return storyboard;
+
+            var sampleLayer = storyboard.GetLayer("BMSBackgroundSamples");
+
+            foreach (var backgroundEvent in beatmap.BackgroundSoundEvents)
+            {
+                sampleLayer.Add(new StoryboardSampleInfo(backgroundEvent.Filename.Replace('\\', '/'), backgroundEvent.Time, 100));
+            }
+
+            return storyboard;
         }
 
         protected override ISkin GetSkin()
@@ -329,40 +385,41 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         public ISample? GetSample(ISampleInfo sampleInfo)
         {
-            if (sampleInfo is not ConvertHitObjectParser.FileHitSampleInfo fileSample)
-                return null;
-
-            string filename = fileSample.Filename;
-            string fullPath = Path.Combine(folderPath, filename);
-
-            // Try different extensions
-            if (!File.Exists(fullPath))
+            foreach (string lookupName in sampleInfo.LookupNames.Where(name => !string.IsNullOrWhiteSpace(name)))
             {
-                var extensions = new[] { ".wav", ".ogg", ".mp3", ".flac" };
-                string baseName = Path.GetFileNameWithoutExtension(filename);
+                string normalisedLookup = lookupName.Replace('/', Path.DirectorySeparatorChar);
+                string fullPath = Path.Combine(folderPath, normalisedLookup);
 
-                foreach (var ext in extensions)
+                if (!File.Exists(fullPath))
                 {
-                    string testPath = Path.Combine(folderPath, baseName + ext);
-                    if (File.Exists(testPath))
+                    string directory = Path.GetDirectoryName(normalisedLookup) ?? string.Empty;
+                    string baseName = Path.GetFileNameWithoutExtension(normalisedLookup);
+
+                    foreach (var ext in new[] { ".wav", ".ogg", ".mp3", ".flac" })
                     {
-                        fullPath = testPath;
-                        break;
+                        string testPath = Path.Combine(folderPath, directory, baseName + ext);
+
+                        if (File.Exists(testPath))
+                        {
+                            fullPath = testPath;
+                            break;
+                        }
                     }
+                }
+
+                if (!File.Exists(fullPath))
+                    continue;
+
+                try
+                {
+                    return audioManager.Samples.Get(fullPath);
+                }
+                catch
+                {
                 }
             }
 
-            if (!File.Exists(fullPath))
-                return null;
-
-            try
-            {
-                return audioManager.Samples.Get(fullPath);
-            }
-            catch
-            {
-                return null;
-            }
+            return null;
         }
 
         public IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)

@@ -2,20 +2,23 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
-using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
+using osu.Game.EzOsuGame.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -34,6 +37,12 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
+    public enum BMSSongSelectScreenMode
+    {
+        RulesetEntry,
+        SpecialEntry,
+    }
+
     /// <summary>
     /// V2-style song select screen for BMS ruleset.
     /// Loads songs from BMSBeatmapManager cache with improved layout.
@@ -46,16 +55,19 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
     /// </summary>
     public partial class BMSSongSelectScreen : OsuScreen
     {
+        public override bool ShowFooter => false;
+
         protected override bool InitialBackButtonVisibility => true;
 
+        private readonly BMSSongSelectScreenMode mode;
+
         private BMSBeatmapManager beatmapManager = null!;
-        private OsuScrollContainer scrollContainer = null!;
         private OsuSpriteText statusText = null!;
         private FillFlowContainer<BMSSongCardV2> songList = null!;
         private LoadingSpinner loadingSpinner = null!;
         private SearchTextBox searchBox = null!;
-        private BMSInfoPanel infoPanel = null!;
-        private Track? previewTrack;
+        private EzPreviewTrackManager previewManager = null!;
+        private BMSWorkingBeatmap? previewBeatmap;
 
         private readonly Bindable<BMSSongCache?> selectedSong = new Bindable<BMSSongCache?>();
         private readonly Bindable<BMSChartCache?> selectedChart = new Bindable<BMSChartCache?>();
@@ -74,11 +86,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notifications { get; set; }
 
-        [Resolved(canBeNull: true)]
-        private IPerformFromScreenRunner? performer { get; set; }
-
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
+
+        public BMSSongSelectScreen(BMSSongSelectScreenMode mode = BMSSongSelectScreenMode.RulesetEntry)
+        {
+            this.mode = mode;
+        }
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
         {
@@ -96,6 +110,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             // Get config for BMS ruleset
             var ruleset = new BMSRuleset();
             var config = rulesetConfigCache.GetConfigFor(ruleset);
+
             if (config is BMSRulesetConfigManager bmsConfig)
             {
                 libraryPathsBindable = bmsConfig.GetBindable<string>(BMSRulesetSetting.BmsLibraryPaths);
@@ -107,13 +122,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 legacyRootPathBindable = new Bindable<string>(string.Empty);
             }
 
-            // Initialize manager
-            var cacheDir = storage.GetStorageForDirectory("bms").GetFullPath(string.Empty);
-            beatmapManager = new BMSBeatmapManager(cacheDir);
-            beatmapManager.LoadCache();
-
-            // Sync root path from config to manager
-            beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));
+            string cacheDir = storage.GetFullPath("bms_cache");
+            beatmapManager = BMSBeatmapManager.GetShared(cacheDir);
+            syncConfiguredPaths();
 
             // Register OverlayColourProvider for child components (required for BMSInfoPanel)
             var colourProvider = new OverlayColourProvider(OverlayColourScheme.Blue);
@@ -153,7 +164,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                                         Padding = new MarginPadding { Left = 10, Top = 10, Bottom = 10, Right = 5 },
                                         Children = new Drawable[]
                                         {
-                                            infoPanel = new BMSInfoPanel
+                                            new BMSInfoPanel
                                             {
                                                 RelativeSizeAxes = Axes.Both,
                                                 SelectedSong = { BindTarget = selectedSong },
@@ -181,14 +192,14 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                                                             Text = "开始游戏",
                                                             Width = 150,
                                                             Height = 50,
-                                                            Action = StartGame,
+                                                            Action = startGame,
                                                         },
                                                         new RoundedButton
                                                         {
                                                             Text = "刷新曲库",
                                                             Width = 120,
                                                             Height = 50,
-                                                            Action = RefreshLibrary,
+                                                            Action = refreshLibrary,
                                                         },
                                                     },
                                                 },
@@ -226,7 +237,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                                                         {
                                                             new OsuSpriteText
                                                             {
-                                                                Text = "BMS曲库",
+                                                                Text = mode == BMSSongSelectScreenMode.SpecialEntry ? "BMS 特殊选歌" : "BMS 选歌",
                                                                 Font = OsuFont.GetFont(size: 24, weight: FontWeight.Bold),
                                                             },
                                                             searchBox = new SearchTextBox
@@ -237,13 +248,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                                                             },
                                                             statusText = new OsuSpriteText
                                                             {
-                                                                Text = beatmapManager.StatusMessage.Value,
+                                                                Text = string.Empty,
                                                                 Font = OsuFont.GetFont(size: 14),
                                                                 Colour = colours.Yellow,
                                                             },
                                                         }
                                                     },
-                                                    scrollContainer = new OsuScrollContainer
+                                                    new OsuScrollContainer
                                                     {
                                                         RelativeSizeAxes = Axes.Both,
                                                         Child = songList = new FillFlowContainer<BMSSongCardV2>
@@ -268,51 +279,64 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                             Origin = Anchor.Centre,
                             State = { Value = Visibility.Hidden },
                         },
+                        previewManager = new EzPreviewTrackManager(),
                     }
                 },
             };
 
+            previewManager.EnabledBindable.Value = true;
+            previewManager.OverridePreviewStartTime = 0;
+
             // Bind events
-            searchBox.Current.BindValueChanged(e => FilterSongs(e.NewValue));
-            beatmapManager.StatusMessage.BindValueChanged(e => statusText.Text = e.NewValue);
+            searchBox.Current.BindValueChanged(e => filterSongs(e.NewValue));
             selectedChart.BindValueChanged(e => updatePreviewTrack(e.NewValue), true);
 
             // Load songs
-            RefreshSongList();
+            refreshSongList();
         }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (mode == BMSSongSelectScreenMode.RulesetEntry)
+                Ruleset.BindValueChanged(onRulesetChanged);
+        }
+
+        private void onRulesetChanged(ValueChangedEvent<RulesetInfo> ruleset)
+        {
+            if (!this.IsCurrentScreen() || string.Equals(ruleset.NewValue.ShortName, "bms", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            this.Exit();
+        }
+
+        private void syncConfiguredPaths()
+            => beatmapManager.SetRootPaths(BMSRulesetConfigManager.ParseLibraryPaths(libraryPathsBindable.Value, legacyRootPathBindable.Value));
 
         private void updatePreviewTrack(BMSChartCache? chart)
         {
-            previewTrack?.Stop();
-            previewTrack?.Dispose();
-            previewTrack = null;
+            previewManager.StopPreview();
+            previewBeatmap = null;
 
             if (chart == null)
                 return;
 
-            string? audioPath = BMSWorkingBeatmap.ResolveAudioPath(chart.FolderPath, chart.AudioFile);
-
-            if (string.IsNullOrEmpty(audioPath))
-                return;
-
-            previewTrack = audioManager.Tracks.Get(audioPath);
-            previewTrack.Looping = true;
-
-            if (!previewTrack.IsLoaded)
-                previewTrack.Seek(previewTrack.CurrentTime);
-
-            double restartPoint = chart.PreviewTime;
-
-            if (restartPoint < 0 || restartPoint > previewTrack.Length)
-                restartPoint = previewTrack.Length * 0.4;
-
-            previewTrack.RestartPoint = restartPoint;
-            previewTrack.Seek(restartPoint);
-            previewTrack.Start();
+            try
+            {
+                previewBeatmap = new BMSWorkingBeatmap(chart.FullPath, audioManager, textures, chart);
+                previewBeatmap.LoadTrack();
+                previewManager.StartPreview(previewBeatmap, true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to start BMS enhanced preview");
+            }
         }
 
-        private void RefreshSongList()
+        private void refreshSongList()
         {
+            syncConfiguredPaths();
             songList.Clear();
 
             if (beatmapManager.LibraryCache == null || beatmapManager.LibraryCache.Songs.Count == 0)
@@ -325,14 +349,29 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 songList.Add(new BMSSongCardV2(song)
                 {
-                    Action = () => SelectSong(song),
+                    Action = () => selectSong(song),
                 });
             }
 
             statusText.Text = $"共 {beatmapManager.LibraryCache.Songs.Count} 首歌曲";
+            filterSongs(searchBox.Current.Value);
+
+            if (selectedSong.Value != null)
+            {
+                var existingSong = beatmapManager.LibraryCache.Songs.FirstOrDefault(song => string.Equals(song.FolderPath, selectedSong.Value.FolderPath, StringComparison.OrdinalIgnoreCase));
+
+                if (existingSong != null)
+                {
+                    selectSong(existingSong);
+                    return;
+                }
+            }
+
+            if (beatmapManager.LibraryCache.Songs.Count > 0)
+                selectSong(beatmapManager.LibraryCache.Songs.OrderBy(song => song.Title).First());
         }
 
-        private void FilterSongs(string filter)
+        private void filterSongs(string filter)
         {
             foreach (var card in songList)
             {
@@ -345,14 +384,14 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
         }
 
-        private void SelectSong(BMSSongCache song)
+        private void selectSong(BMSSongCache song)
         {
             selectedSong.Value = song;
 
             // Auto-select first chart
             if (song.Charts.Count > 0)
             {
-                selectedChart.Value = song.Charts[0];
+                selectedChart.Value = song.Charts.OrderBy(chart => chart.PlayLevel).ThenBy(chart => chart.FileName).First();
             }
             else
             {
@@ -366,7 +405,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
         }
 
-        private void RefreshLibrary()
+        private void refreshLibrary()
         {
             if (beatmapManager.RootPaths.Count == 0)
             {
@@ -379,6 +418,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }
 
             loadingSpinner.Show();
+            statusText.Text = "正在扫描曲库...";
 
             var notification = new ProgressNotification
             {
@@ -387,29 +427,18 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             notifications?.Post(notification);
 
-            // Bind progress
-            beatmapManager.ScanProgress.BindValueChanged(e =>
-            {
-                notification.Progress = (float)e.NewValue;
-            });
-
-            beatmapManager.StatusMessage.BindValueChanged(e =>
-            {
-                notification.Text = e.NewValue;
-            });
-
             _ = beatmapManager.ScanLibraryAsync(beatmapManager.RootPaths).ContinueWith(_ =>
             {
                 Schedule(() =>
                 {
                     loadingSpinner.Hide();
                     notification.State = ProgressNotificationState.Completed;
-                    RefreshSongList();
+                    refreshSongList();
                 });
             });
         }
 
-        private void StartGame()
+        private void startGame()
         {
             if (selectedChart.Value == null)
             {
@@ -426,7 +455,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 var workingBeatmap = new BMSWorkingBeatmap(
                     selectedChart.Value.FullPath,
                     audioManager,
-                    textures);
+                    textures,
+                    selectedChart.Value);
 
                 // Push to player
                 this.Push(new BMSPlayerLoader(workingBeatmap));
@@ -445,14 +475,14 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         public override void OnEntering(ScreenTransitionEvent e)
         {
             base.OnEntering(e);
+            refreshSongList();
             this.FadeInFromZero(300);
         }
 
         public override bool OnExiting(ScreenExitEvent e)
         {
-            previewTrack?.Stop();
-            previewTrack?.Dispose();
-            previewTrack = null;
+            previewManager.StopPreview();
+            previewBeatmap = null;
             this.FadeOut(200);
             return base.OnExiting(e);
         }
@@ -499,7 +529,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private void load()
         {
             RelativeSizeAxes = Axes.X;
-            Height = 70;
+            Height = 96;
             Masking = true;
             CornerRadius = 5;
 
@@ -527,11 +557,18 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         Spacing = new Vector2(0, 5),
                         Children = new Drawable[]
                         {
-                            new OsuSpriteText
+                            new TruncatingSpriteText
                             {
                                 Text = string.IsNullOrEmpty(Song.Title) ? "(无标题)" : Song.Title,
                                 Font = OsuFont.GetFont(size: 18, weight: FontWeight.Bold),
-                                Truncate = true,
+                                RelativeSizeAxes = Axes.X,
+                            },
+                            new TruncatingSpriteText
+                            {
+                                Text = string.IsNullOrEmpty(Song.Artist) ? "(未知艺术家)" : Song.Artist,
+                                Font = OsuFont.GetFont(size: 14),
+                                RelativeSizeAxes = Axes.X,
+                                Colour = colourProvider.Content2,
                             },
                             new FillFlowContainer
                             {
@@ -542,13 +579,19 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                                 {
                                     new OsuSpriteText
                                     {
-                                        Text = string.IsNullOrEmpty(Song.Artist) ? "(未知艺术家)" : Song.Artist,
+                                        Text = BMSChartDisplayFormatter.GetSongSummaryText(Song),
                                         Font = OsuFont.GetFont(size: 14),
                                         Colour = colourProvider.Content2,
                                     },
                                     new OsuSpriteText
                                     {
-                                        Text = $"{Song.Charts.Count} 个难度",
+                                        Text = $"BPM {BMSChartDisplayFormatter.GetSongBpmText(Song.Charts)}",
+                                        Font = OsuFont.GetFont(size: 14),
+                                        Colour = colourProvider.Content2,
+                                    },
+                                    new OsuSpriteText
+                                    {
+                                        Text = string.IsNullOrEmpty(Song.Genre) ? "Unknown Genre" : Song.Genre,
                                         Font = OsuFont.GetFont(size: 14),
                                         Colour = colourProvider.Content2,
                                     },
@@ -595,5 +638,105 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 background.FadeColour(colourProvider.Background4, 200);
             }
         }
+    }
+
+    internal static class BMSChartDisplayFormatter
+    {
+        public static string GetDifficultyTitle(BMSChartCache chart)
+        {
+            if (!string.IsNullOrWhiteSpace(chart.SubTitle))
+                return chart.SubTitle;
+
+            if (!string.IsNullOrWhiteSpace(chart.Title))
+                return chart.Title;
+
+            return Path.GetFileNameWithoutExtension(chart.FileName);
+        }
+
+        public static string GetModeText(BMSChartCache chart)
+        {
+            int scratchCount = chart.HasScratch ? (chart.KeyCount >= 10 ? 2 : 1) : 0;
+            return scratchCount > 0 ? $"{Math.Max(1, chart.KeyCount)}K{scratchCount}S" : $"{Math.Max(1, chart.KeyCount)}K";
+        }
+
+        public static string GetLevelText(BMSChartCache chart)
+            => chart.PlayLevel > 0 ? $"Lv {chart.PlayLevel}" : "Lv ?";
+
+        public static string GetFlagsText(BMSChartCache chart)
+        {
+            List<string> flags = new List<string>();
+
+            if (chart.HasScratch)
+                flags.Add(chart.KeyCount >= 10 ? "双盘" : "单盘");
+
+            if (chart.HasLongNotes)
+                flags.Add("LN");
+
+            if (flags.Count == 0)
+                flags.Add("标准");
+
+            return string.Join(" / ", flags);
+        }
+
+        public static string GetBpmText(BMSChartCache chart)
+        {
+            double minBpm = chart.MinBpm > 0 ? chart.MinBpm : chart.Bpm;
+            double maxBpm = chart.MaxBpm > 0 ? chart.MaxBpm : chart.Bpm;
+
+            if (Math.Abs(maxBpm - minBpm) < 0.01)
+                return $"{chart.Bpm:F0}";
+
+            return $"{minBpm:F0}-{maxBpm:F0}";
+        }
+
+        public static string GetSongBpmText(IEnumerable<BMSChartCache> charts)
+        {
+            List<double> bpmValues = charts.SelectMany(chart => new[]
+            {
+                chart.MinBpm > 0 ? chart.MinBpm : chart.Bpm,
+                chart.MaxBpm > 0 ? chart.MaxBpm : chart.Bpm,
+            }).Where(bpm => bpm > 0).ToList();
+
+            if (bpmValues.Count == 0)
+                return "?";
+
+            double minBpm = bpmValues.Min();
+            double maxBpm = bpmValues.Max();
+
+            if (Math.Abs(maxBpm - minBpm) < 0.01)
+                return $"{minBpm:F0}";
+
+            return $"{minBpm:F0}-{maxBpm:F0}";
+        }
+
+        public static string GetDurationText(double duration)
+        {
+            if (duration <= 0)
+                return "--:--";
+
+            TimeSpan time = TimeSpan.FromMilliseconds(duration);
+            return time.TotalHours >= 1 ? time.ToString(@"h\:mm\:ss") : time.ToString(@"m\:ss");
+        }
+
+        public static string GetSongSummaryText(BMSSongCache song)
+        {
+            if (song.Charts.Count == 0)
+                return "暂无难度";
+
+            return $"{song.Charts.Count} 难度 | {GetLevelRangeText(song.Charts)} | {GetModeSummaryText(song.Charts)}";
+        }
+
+        private static string GetLevelRangeText(IEnumerable<BMSChartCache> charts)
+        {
+            List<int> levels = charts.Select(chart => chart.PlayLevel).Where(level => level > 0).OrderBy(level => level).ToList();
+
+            if (levels.Count == 0)
+                return "Lv ?";
+
+            return levels[0] == levels[^1] ? $"Lv {levels[0]}" : $"Lv {levels[0]}-{levels[^1]}";
+        }
+
+        private static string GetModeSummaryText(IEnumerable<BMSChartCache> charts)
+            => string.Join("/", charts.Select(GetModeText).Distinct());
     }
 }
