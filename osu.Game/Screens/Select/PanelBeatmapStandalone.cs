@@ -273,7 +273,7 @@ namespace osu.Game.Screens.Select
 
             ruleset.BindValueChanged(_ =>
             {
-                ezAnalysisEnabled = ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled);
+                ezAnalysisEnabled = ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled;
 
                 resetEzDisplay();
                 updateKeyCount();
@@ -323,7 +323,7 @@ namespace osu.Game.Screens.Select
 
         private void resetEzDisplay()
         {
-            if (ezAnalysisEnabled)
+            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
             {
                 displaySR.Show();
             }
@@ -382,16 +382,16 @@ namespace osu.Game.Screens.Select
             double avgKPS = ezAnalysisResult.AverageKps;
             double maxKps = ezAnalysisResult.MaxKps;
             IReadOnlyList<double> kpsList = ezAnalysisResult.KpsList;
-            ezDisplayKps.SetKps(avgKPS, maxKps);
+            ezDisplayKps.SetKps(ezAnalysisResult.Pp, avgKPS, maxKps);
             ezDisplayKpsGraph.SetPoints(kpsList);
 
-            if (ezAnalysisEnabled)
+            if (ezAnalysisEnabled && ezAnalysisResult.TagSummary != null)
+                ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
+
+            if (ezAnalysisEnabled && ruleset.Value.OnlineID == 3)
             {
                 var maniaSummary = ezAnalysisResult.ManiaSummary;
                 var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
-
-                if (ezAnalysisResult.TagSummary != null)
-                    ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
 
                 scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
                 updateKeyCount();

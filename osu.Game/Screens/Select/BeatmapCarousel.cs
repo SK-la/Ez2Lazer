@@ -60,6 +60,7 @@ namespace osu.Game.Screens.Select
         private Bindable<bool> ezAnalysisSqliteEnabled = null!;
         private IBindable<int> activeSongsBranchVersion = null!;
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<Guid, double>?>();
+        private readonly AsyncLocal<Dictionary<Guid, double>?> operationPpCache = new AsyncLocal<Dictionary<Guid, double>?>();
         private static readonly IReadOnlyDictionary<BeatmapInfo, double> empty_operation_difficulties = new Dictionary<BeatmapInfo, double>();
 
         private readonly LoadingLayer loading;
@@ -130,7 +131,7 @@ namespace osu.Game.Screens.Select
             Filters = new ICarouselFilter[]
             {
                 new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, () => useActiveSongsBranchAsBeatmapSource, getDifficultiesForOperationsAsync, getActiveBranchDifficultiesAsync),
-                new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync),
+                new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
                     GetCriteria = () => Criteria!,
@@ -243,6 +244,49 @@ namespace osu.Game.Screens.Select
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
         }
 
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getPpValuesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        {
+            if (!ezAnalysisSqliteEnabled.Value)
+                return Task.FromResult(empty_operation_difficulties);
+
+            var beatmapList = beatmaps.Distinct().ToList();
+
+            if (beatmapList.Count == 0)
+                return Task.FromResult(empty_operation_difficulties);
+
+            var cachedPpValues = operationPpCache.Value ??= new Dictionary<Guid, double>();
+            var uncachedBeatmaps = beatmapList.Where(b => !cachedPpValues.ContainsKey(b.ID)).ToList();
+
+            if (uncachedBeatmaps.Count > 0)
+            {
+                bool useCurrentModBranch = (Criteria?.Mods?.Count ?? 0) > 0 && ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, Criteria?.Mods);
+
+                IReadOnlyDictionary<Guid, double> sourceValues = useCurrentModBranch
+                    ? ezAnalysisCache.GetActiveSongsBranchPpValues(uncachedBeatmaps, ruleset.Value, Criteria?.Mods)
+                    : ezAnalysisCache.GetStoredPpValues(uncachedBeatmaps, ruleset.Value, Criteria?.Mods);
+
+                foreach (var beatmap in uncachedBeatmaps)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (sourceValues.TryGetValue(beatmap.ID, out double pp))
+                        cachedPpValues[beatmap.ID] = pp;
+                }
+            }
+
+            var resolvedValues = new Dictionary<BeatmapInfo, double>(beatmapList.Count);
+
+            foreach (var beatmap in beatmapList)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (cachedPpValues.TryGetValue(beatmap.ID, out double pp))
+                    resolvedValues[beatmap] = pp;
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
+        }
+
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getStrictActiveBranchDifficultiesAsync(IReadOnlyList<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
             var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<Guid, double>();
@@ -285,6 +329,7 @@ namespace osu.Game.Screens.Select
                 Schedule(() =>
                 {
                     operationDifficultyCache.Value = null;
+                    operationPpCache.Value = null;
 
                     if (Criteria != null)
                         Filter(Criteria, true);
@@ -953,6 +998,7 @@ namespace osu.Game.Screens.Select
             bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
 
             operationDifficultyCache.Value = null;
+            operationPpCache.Value = null;
             Criteria = criteria;
 
             loadingDebounce ??= Scheduler.AddDelayed(() =>

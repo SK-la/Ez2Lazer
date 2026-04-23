@@ -186,8 +186,14 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
             => analysisDatabase.GetActiveSongsBranchValues(beatmaps, rulesetInfo);
 
+        public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+            => analysisDatabase.GetActiveSongsBranchPpValues(beatmaps, rulesetInfo, mods);
+
         public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
             => analysisDatabase.GetStoredXxySrValues(beatmaps, rulesetInfo, mods);
+
+        public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+            => analysisDatabase.GetStoredPpValues(beatmaps, rulesetInfo, mods);
 
         public bool IsActiveSongsBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
             => analysisDatabase.IsActiveSongsBranchFor(rulesetInfo, mods);

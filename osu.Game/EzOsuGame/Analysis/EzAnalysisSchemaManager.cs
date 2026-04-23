@@ -12,8 +12,8 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     internal static class EzAnalysisSchemaManager
     {
-        public const int ANALYSIS_VERSION = 6;
-        public const int MAIN_SCHEMA_VERSION = 1;
+        public const int ANALYSIS_VERSION = EzAnalysisPersistentStore.ANALYSIS_VERSION;
+        public const int MAIN_SCHEMA_VERSION = 2;
         public const string MAIN_DATABASE_KIND = "ez_analysis";
 
         public const string TABLE_ENTRY = "ez_analysis_entry";
@@ -32,6 +32,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public const string COL_UPDATED_AT = "updated_at";
         public const string COL_XXY_SR = "xxy_sr";
+        public const string COL_PP = "pp";
         public const string COL_COLUMN_COUNTS_JSON = "column_counts_json";
         public const string COL_HOLD_NOTE_COUNTS_JSON = "hold_note_counts_json";
 
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS {TABLE_ENTRY} (
     {COL_AVERAGE_KPS} REAL NOT NULL DEFAULT 0,
     {COL_MAX_KPS} REAL NOT NULL DEFAULT 0,
     {COL_KPS_LIST_JSON} TEXT NOT NULL DEFAULT '[]',
+    {COL_PP} REAL NULL,
     {COL_TAG_UPDATED_AT} INTEGER NOT NULL DEFAULT 0,
     {COL_TAG_PAYLOAD_JSON} TEXT NOT NULL DEFAULT ''
 );
@@ -94,10 +96,17 @@ CREATE INDEX IF NOT EXISTS idx_ez_analysis_mania_updated ON {TABLE_MANIA}({COL_U
                 create.ExecuteNonQuery();
             }
 
+            EnsureMainSchemaCompatibility(connection);
             EnsureCollectionHideTables(connection);
             SetMeta(connection, META_KEY_KIND, MAIN_DATABASE_KIND);
             SetMeta(connection, META_KEY_SCHEMA_VERSION, MAIN_SCHEMA_VERSION.ToString(CultureInfo.InvariantCulture));
             SetMeta(connection, META_KEY_ANALYSIS_VERSION, ANALYSIS_VERSION.ToString(CultureInfo.InvariantCulture));
+        }
+
+        public static void EnsureMainSchemaCompatibility(SqliteConnection connection)
+        {
+            ensureColumnExists(connection, TABLE_ENTRY, COL_PP, "REAL NULL");
+            tryMigrateLegacyManiaPp(connection);
         }
 
         public static void EnsureMetaTableExists(SqliteConnection connection)
@@ -129,6 +138,56 @@ CREATE TABLE IF NOT EXISTS collection_hidden_beatmap_md5 (
 );
 ";
             cmd.ExecuteNonQuery();
+        }
+
+        private static void ensureColumnExists(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
+        {
+            if (hasColumn(connection, tableName, columnName))
+                return;
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+            cmd.ExecuteNonQuery();
+        }
+
+        private static void tryMigrateLegacyManiaPp(SqliteConnection connection)
+        {
+            if (!hasColumn(connection, TABLE_ENTRY, COL_PP) || !hasColumn(connection, TABLE_MANIA, COL_PP))
+                return;
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"
+UPDATE {TABLE_ENTRY}
+SET {COL_PP} = (
+    SELECT mania.{COL_PP}
+    FROM {TABLE_MANIA} mania
+    WHERE mania.{COL_BEATMAP_ID} = {TABLE_ENTRY}.{COL_BEATMAP_ID}
+)
+WHERE {COL_PP} IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM {TABLE_MANIA} mania
+      WHERE mania.{COL_BEATMAP_ID} = {TABLE_ENTRY}.{COL_BEATMAP_ID}
+        AND mania.{COL_PP} IS NOT NULL
+  );
+";
+            cmd.ExecuteNonQuery();
+        }
+
+        private static bool hasColumn(SqliteConnection connection, string tableName, string columnName)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $@"PRAGMA table_info({tableName});";
+
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         public static void SetMeta(SqliteConnection connection, string key, string value)

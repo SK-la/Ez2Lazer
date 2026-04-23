@@ -57,7 +57,7 @@ namespace osu.Game.Screens.Select
         private CollectionDropdown collectionDropdown = null!;
         private EzKeyModeSelector csSelector = null!;
         private ShearedKSPreviewButton ksPreviewButton = null!;
-        private ShearedToggleButton xxySrFilterButton = null!;
+        private ShearedToggleButton sqliteFilterButton = null!;
         private ShearedDropdown<EzEnumChartDisplay> kpcDropdown = null!;
 
         [Resolved]
@@ -259,13 +259,13 @@ namespace osu.Game.Screens.Select
                                                 RelativeSizeAxes = Axes.X,
                                             },
                                             Empty(),
-                                            xxySrFilterButton = new ShearedToggleButton
+                                            sqliteFilterButton = new ShearedToggleButton
                                             {
                                                 Anchor = Anchor.Centre,
                                                 Origin = Anchor.Centre,
                                                 AutoSizeAxes = Axes.X,
-                                                Text = "xxy SR",
-                                                TooltipText = EzSongSelectStrings.XXY_SR_FILTER_TOOLTIP,
+                                                Text = "sqlite",
+                                                TooltipText = EzSongSelectStrings.SQLITE_FILTER_TOOLTIP,
                                                 Height = 30f,
                                             },
                                         },
@@ -295,7 +295,7 @@ namespace osu.Game.Screens.Select
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
 
             ezConfig.BindWith(Ez2Setting.KpcDisplayMode, kpcDropdown.Current);
-            ezConfig.BindWith(Ez2Setting.XxySRFilter, xxySrFilterButton.Active);
+            ezConfig.BindWith(Ez2Setting.XxySRFilter, sqliteFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, ksPreviewButton.State);
 
             ruleset.BindValueChanged(_ =>
@@ -315,7 +315,7 @@ namespace osu.Game.Screens.Select
                     return;
 
                 var rulesetCriteria = currentCriteria.RulesetCriteria;
-                if (rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
+                if (sortDropdown.Current.Value == SortMode.PP || rulesetCriteria?.FilterMayChangeFromMods(currentCriteria, m) == true)
                     updateCriteria();
             });
 
@@ -357,7 +357,7 @@ namespace osu.Game.Screens.Select
             ScopedBeatmapSet.BindValueChanged(_ => updateCriteria(clearScopedSet: false));
 
             csSelector.Current.BindValueChanged(_ => updateCriteria());
-            xxySrFilterButton.Active.BindValueChanged(_ => updateCriteria());
+            sqliteFilterButton.Active.BindValueChanged(_ => updateCriteria());
 
             updateEzControlVisibility();
             updateVisibleResultsActionAvailability();
@@ -371,8 +371,6 @@ namespace osu.Game.Screens.Select
             if (id == 3)
             {
                 csSelector.Show();
-
-                xxySrFilterButton.Show();
                 kpcDropdown.Show();
 
                 return;
@@ -381,14 +379,12 @@ namespace osu.Game.Screens.Select
             if (id == 1) // Taiko
             {
                 csSelector.Hide();
-                xxySrFilterButton.Hide();
                 kpcDropdown.Show();
 
                 return;
             }
 
             csSelector.Show();
-            xxySrFilterButton.Hide();
             kpcDropdown.Hide();
         }
 

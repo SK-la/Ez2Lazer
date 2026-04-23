@@ -37,6 +37,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private static int computeFailCount;
         private static int songsBranchComputeFailCount;
         private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
+        private static readonly IReadOnlyDictionary<Guid, double> empty_pp_values = new Dictionary<Guid, double>();
 
         private readonly EzAnalysisPersistentStore persistentStore;
         private readonly BeatmapManager beatmapManager;
@@ -120,7 +121,15 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled || !HasActiveSongsBranchFor(rulesetInfo))
                 return empty_xxy_sr_values;
 
-            return getResolvedActiveBranchValues(beatmaps, rulesetInfo);
+            return getResolvedActiveBranchValues(beatmaps, rulesetInfo, null, persistentStore.GetSongsBranchValues, empty_xxy_sr_values);
+        }
+
+        public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled || !IsActiveSongsBranchFor(rulesetInfo, mods))
+                return empty_pp_values;
+
+            return getResolvedActiveBranchValues(beatmaps, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchPpValues, empty_pp_values);
         }
 
         public IReadOnlyDictionary<Guid, double> GetStoredXxySrValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
@@ -137,7 +146,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (HasActiveSongsBranchFor(rulesetInfo))
             {
-                foreach (var kvp in getResolvedActiveBranchValues(beatmapList, rulesetInfo))
+                foreach (var kvp in getResolvedActiveBranchValues(beatmapList, rulesetInfo, null, persistentStore.GetSongsBranchValues, empty_xxy_sr_values))
                     resolvedValues[kvp.Key] = kvp.Value;
             }
 
@@ -150,6 +159,25 @@ namespace osu.Game.EzOsuGame.Analysis
                 resolvedValues[kvp.Key] = kvp.Value;
 
             return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
+        }
+
+        public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
+        {
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
+                return empty_pp_values;
+
+            var beatmapList = beatmaps.Distinct().ToList();
+
+            if (beatmapList.Count == 0)
+                return empty_pp_values;
+
+            var eligibleBeatmaps = beatmapList.Where(b => CanUseStoredAnalysis(b, rulesetInfo, mods)).ToList();
+
+            if (eligibleBeatmaps.Count == 0)
+                return empty_pp_values;
+
+            var resolvedValues = persistentStore.GetStoredPpValues(eligibleBeatmaps);
+            return resolvedValues.Count == 0 ? empty_pp_values : resolvedValues;
         }
 
         public bool IsActiveSongsBranchFor(IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods)
@@ -206,8 +234,8 @@ namespace osu.Game.EzOsuGame.Analysis
             if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled)
                 return Task.FromResult(new SongsBranchBuildResult(false, SongsBranchStrings.SQLITE_DISABLED, null, null, 0, 0));
 
-            if (rulesetInfo is not RulesetInfo localRulesetInfo || localRulesetInfo.OnlineID != 3)
-                return Task.FromResult(new SongsBranchBuildResult(false, SongsBranchStrings.MANIA_ONLY, null, null, 0, 0));
+            if (rulesetInfo is not RulesetInfo localRulesetInfo)
+                return Task.FromResult(new SongsBranchBuildResult(false, SongsBranchStrings.NO_WRITABLE_RESULTS, null, null, 0, 0));
 
             var requestedBeatmaps = beatmaps.Distinct().ToList();
 
@@ -249,13 +277,19 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     var beatmap = beatmapList[i];
                     double xxySr = 0;
+                    double? pp = null;
 
                     try
                     {
                         var lookup = new EzAnalysisLookupCache(beatmap, localRulesetInfo, mods);
 
-                        if (EzAnalysisComputation.TryComputeXxySr(beatmapManager, lookup, cancellationToken, out double computedXxySr))
-                            xxySr = computedXxySr;
+                        if (EzAnalysisComputation.TryComputeXxySrAndPp(beatmapManager, lookup, cancellationToken, out double? computedXxySr, out double? computedPp))
+                        {
+                            if (computedXxySr is double resolvedXxySr)
+                                xxySr = resolvedXxySr;
+
+                            pp = computedPp;
+                        }
                     }
                     catch (OperationCanceledException)
                     {
@@ -274,7 +308,7 @@ namespace osu.Game.EzOsuGame.Analysis
                         }
                     }
 
-                    rows.Add(new EzAnalysisPersistentStore.SongsBranchRow(beatmap.ID, beatmap.Hash, beatmap.MD5Hash, xxySr));
+                    rows.Add(new EzAnalysisPersistentStore.SongsBranchRow(beatmap.ID, beatmap.Hash, beatmap.MD5Hash, xxySr, pp));
 
                     long now = Environment.TickCount64;
 
@@ -542,35 +576,39 @@ namespace osu.Game.EzOsuGame.Analysis
                 ? $"songs | {createModsDisplay(mods)}"
                 : $"{sourceCollectionName.Trim()} | {createModsDisplay(mods)}";
 
-        private IReadOnlyDictionary<Guid, double> getResolvedActiveBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
+        private IReadOnlyDictionary<Guid, double> getResolvedActiveBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo,
+                                                                                string? modsFingerprint,
+                                                                                Func<string, IEnumerable<BeatmapInfo>, IReadOnlyDictionary<Guid, double>> getBranchValues,
+                                                                                IReadOnlyDictionary<Guid, double> emptyValues)
         {
             int? rulesetOnlineId = rulesetInfo?.OnlineID;
 
             if (!rulesetOnlineId.HasValue)
-                return empty_xxy_sr_values;
+                return emptyValues;
 
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
-                return empty_xxy_sr_values;
+                return emptyValues;
 
             List<ActiveSongsBranchState> activeBranches;
 
             lock (activeSongsBranchStateLock)
             {
                 activeBranches = activeSongsBranches
-                                 .Where(branch => branch.RulesetOnlineId == rulesetOnlineId.Value)
+                                 .Where(branch => branch.RulesetOnlineId == rulesetOnlineId.Value
+                                                  && (modsFingerprint == null || string.Equals(branch.ModsFingerprint, modsFingerprint, StringComparison.Ordinal)))
                                  .ToList();
             }
 
             if (activeBranches.Count == 0)
-                return empty_xxy_sr_values;
+                return emptyValues;
 
             var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
 
             foreach (ActiveSongsBranchState activeBranch in activeBranches)
             {
-                IReadOnlyDictionary<Guid, double> branchValues = persistentStore.GetSongsBranchValues(activeBranch.DatabasePath, beatmapList);
+                IReadOnlyDictionary<Guid, double> branchValues = getBranchValues(activeBranch.DatabasePath, beatmapList);
 
                 List<BeatmapInfo>? unresolvedBeatmaps = null;
 
@@ -579,9 +617,9 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (beatmap.Ruleset.OnlineID != rulesetOnlineId.Value)
                         continue;
 
-                    if (branchValues.TryGetValue(beatmap.ID, out double branchXxySr))
+                    if (branchValues.TryGetValue(beatmap.ID, out double branchValue))
                     {
-                        resolvedValues[beatmap.ID] = branchXxySr;
+                        resolvedValues[beatmap.ID] = branchValue;
                         continue;
                     }
 
@@ -610,7 +648,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 }
             }
 
-            return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
+            return resolvedValues.Count == 0 ? emptyValues : resolvedValues;
         }
 
         #region 分支库隐藏功能

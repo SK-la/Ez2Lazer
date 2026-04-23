@@ -35,9 +35,11 @@ namespace osu.Game.EzOsuGame.Localization
             "移除交集",
             "Remove intersection");
 
-        public static readonly LocalisableString XXY_SR_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "使用 xxy SR 进行难度过滤、排序、分组, 可能会增加加载时间",
-            "Use xxy SR for difficulty filtering, sorting, and grouping, which may increase load times");
+        public static readonly LocalisableString SQLITE_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "使用 sqlite 库进行过滤、排序、分组；"
+            + "\n启用xxySR、PP的支持，搭配分支库时可以获得mod处理结果的支持；",
+            "Use sqlite library for filtering, sorting and grouping;"
+            + "\nEnable xxySR and PP support, with branch library can get mod processing results support;");
 
         public static readonly LocalisableString KEY_SOUND_PREVIEW_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "按键音预览：\n0 关闭; \n1 蓝灯开启 (全量音效预览); \n2 黄灯开启 (全量音效预览, 游戏中自动播放 note 音效, 按键不再触发样本播放) ",

@@ -34,7 +34,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public class EzAnalysisPersistentStore
     {
-        public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr);
+        public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr, double? Pp);
 
         public readonly record struct SongsBranchDescriptor(string DatabasePath, string RelativePath, SongsBranchMetadata Metadata);
 
@@ -68,7 +68,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public const string SONGS_BRANCH_DATABASE_DIRECTORY = "EzData";
         private const string xxy_sr_branch_kind = "xxy_sr_branch";
-        private const int xxy_sr_branch_schema_version = 1;
+        private const int xxy_sr_branch_schema_version = 2;
 
         // 兼容策略：v3 及以前版本不考虑就地兼容。只有 v4（及以后）才考虑就地升级以避免重算。
         private const int min_inplace_upgrade_version = 4;
@@ -81,6 +81,7 @@ namespace osu.Game.EzOsuGame.Analysis
         // v4: 添加 beatmap_md5 校验字段；kps_list_json 仅保存用于 UI 的下采样曲线（<=256 点）。
         // v5: 删除scratchText存储，改为动态计算。数据库可兼容，不升版。
         // v6: 重建为主体主表 + mania 扩展表 + tag group 的切片结构，修改LN因子数值为5.5。
+        // v6.1: 增加PP字段，追加数据，不升版。
         public const int ANALYSIS_VERSION = 6;
 
         // 列定义集中管理：避免在代码中到处硬写列名，便于审计与迁移。
@@ -94,6 +95,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private const string col_max_kps = "kps_max";
         private const string col_kps_list_json = "kps_list_json";
         private const string col_xxy_sr = "xxy_sr";
+        private const string col_pp = "pp";
         private const string col_column_counts_json = "column_counts_json";
         private const string col_hold_note_counts_json = "hold_note_counts_json";
         private const string col_last_updated = "last_updated";
@@ -108,6 +110,7 @@ namespace osu.Game.EzOsuGame.Analysis
             new ColumnInfo(col_max_kps),
             new ColumnInfo(col_kps_list_json),
             new ColumnInfo(col_xxy_sr),
+            new ColumnInfo(col_pp),
             new ColumnInfo(col_column_counts_json),
             new ColumnInfo(col_hold_note_counts_json),
             new ColumnInfo(col_last_updated)
@@ -119,6 +122,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly Storage storage;
         private readonly object initLock = new object();
         private static readonly IReadOnlyDictionary<Guid, double> empty_xxy_sr_values = new Dictionary<Guid, double>();
+        private static readonly IReadOnlyDictionary<Guid, double> empty_pp_values = new Dictionary<Guid, double>();
 
         private bool initialised;
         private string dbPath = string.Empty;
@@ -370,6 +374,103 @@ WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} IN ({string.Join(", ", para
             }
         }
 
+        public IReadOnlyDictionary<Guid, double> GetStoredPpValues(IEnumerable<BeatmapInfo> beatmaps)
+        {
+            if (!Enabled)
+                return empty_pp_values;
+
+            try
+            {
+                Initialise();
+
+                var beatmapList = beatmaps.Distinct().ToList();
+
+                if (beatmapList.Count == 0)
+                    return empty_pp_values;
+
+                var beatmapsById = beatmapList.ToDictionary(b => b.ID);
+                var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
+                var idsNeedingDatabaseLookup = new List<Guid>(beatmapList.Count);
+
+                foreach (var beatmap in beatmapList)
+                {
+                    if (pendingWrites.TryGetValue(beatmap.ID, out var pending)
+                        && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
+                    {
+                        if (pending.Analysis.Pp is double pendingPp)
+                            resolvedValues[beatmap.ID] = pendingPp;
+
+                        continue;
+                    }
+
+                    idsNeedingDatabaseLookup.Add(beatmap.ID);
+                }
+
+                if (idsNeedingDatabaseLookup.Count == 0)
+                    return resolvedValues;
+
+                using var connection = openConnection();
+
+                if (EzAnalysisSchemaManager.GetMetaBool(connection, EzAnalysisSchemaManager.META_KEY_FORCE_RECOMPUTE))
+                    return resolvedValues.Count == 0 ? empty_pp_values : resolvedValues;
+
+                for (int offset = 0; offset < idsNeedingDatabaseLookup.Count; offset += 800)
+                {
+                    using var cmd = connection.CreateCommand();
+
+                    int batchCount = Math.Min(800, idsNeedingDatabaseLookup.Count - offset);
+                    var parameterNames = new List<string>(batchCount);
+
+                    for (int i = 0; i < batchCount; i++)
+                    {
+                        string parameterName = $"$id{i}";
+                        parameterNames.Add(parameterName);
+                        cmd.Parameters.AddWithValue(parameterName, idsNeedingDatabaseLookup[offset + i].ToString());
+                    }
+
+                    cmd.CommandText = $@"
+SELECT entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID},
+       entry.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
+       entry.{EzAnalysisSchemaManager.COL_BEATMAP_MD5},
+       entry.{EzAnalysisSchemaManager.COL_PP}
+FROM {EzAnalysisSchemaManager.TABLE_ENTRY} entry
+WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} IN ({string.Join(", ", parameterNames)})
+    AND entry.{EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT} > 0
+    AND entry.{EzAnalysisSchemaManager.COL_PP} IS NOT NULL;
+";
+
+                    using var reader = cmd.ExecuteReader();
+
+                    while (reader.Read())
+                    {
+                        if (!Guid.TryParse(reader.GetString(0), out var beatmapId))
+                            continue;
+
+                        if (!beatmapsById.TryGetValue(beatmapId, out var beatmap))
+                            continue;
+
+                        string storedHash = reader.GetString(1);
+                        string storedMd5 = reader.GetString(2);
+
+                        if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
+                            continue;
+
+                        if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                            continue;
+
+                        resolvedValues[beatmapId] = reader.GetDouble(3);
+                    }
+                }
+
+                return resolvedValues;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetStoredPpValues failed.", Ez2ConfigManager.LOGGER_NAME);
+                return empty_pp_values;
+            }
+        }
+
         /// <summary>
         /// 对比新计算结果和 SQLite 中的旧数据，如果有差异则更新。
         /// 主要场景：
@@ -455,6 +556,7 @@ SELECT entry.{EzAnalysisSchemaManager.COL_BEATMAP_HASH},
        entry.{EzAnalysisSchemaManager.COL_AVERAGE_KPS},
        entry.{EzAnalysisSchemaManager.COL_MAX_KPS},
        entry.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
+    entry.{EzAnalysisSchemaManager.COL_PP},
        entry.{EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
        entry.{EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON},
        mania.{EzAnalysisSchemaManager.COL_UPDATED_AT},
@@ -502,12 +604,13 @@ LIMIT 1;
                     double averageKps = reader.GetDouble(4);
                     double maxKps = reader.GetDouble(5);
                     string kpsListJson = reader.GetString(6);
-                    long tagUpdatedAt = reader.GetInt64(7);
-                    string tagPayloadJson = reader.GetString(8);
-                    long maniaUpdatedAt = reader.IsDBNull(9) ? 0 : reader.GetInt64(9);
-                    double? xxySr = reader.IsDBNull(10) ? null : reader.GetDouble(10);
-                    string columnCountsJson = reader.IsDBNull(11) ? "{}" : reader.GetString(11);
-                    string holdNoteCountsJson = reader.IsDBNull(12) ? "{}" : reader.GetString(12);
+                    double? pp = reader.IsDBNull(7) ? null : reader.GetDouble(7);
+                    long tagUpdatedAt = reader.GetInt64(8);
+                    string tagPayloadJson = reader.GetString(9);
+                    long maniaUpdatedAt = reader.IsDBNull(10) ? 0 : reader.GetInt64(10);
+                    double? xxySr = reader.IsDBNull(11) ? null : reader.GetDouble(11);
+                    string columnCountsJson = reader.IsDBNull(12) ? "{}" : reader.GetString(12);
+                    string holdNoteCountsJson = reader.IsDBNull(13) ? "{}" : reader.GetString(13);
 
                     var columnCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(columnCountsJson) ?? new Dictionary<int, int>();
                     var holdNoteCounts = JsonSerializer.Deserialize<Dictionary<int, int>>(holdNoteCountsJson) ?? new Dictionary<int, int>();
@@ -519,7 +622,7 @@ LIMIT 1;
 
                     EzBeatmapTagSummary? tagSummary = deserializeTagSummary(tagPayloadJson, tagUpdatedAt);
 
-                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), maniaSummary, tagSummary);
+                    result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), pp, maniaSummary, tagSummary);
 
                     if (pending is not null && string.Equals(pending.Beatmap.Hash, beatmap.Hash, StringComparison.Ordinal))
                         result = mergeAnalysisResult(result, pending.Analysis);
@@ -545,6 +648,8 @@ LIMIT 1;
             var computedManiaSummary = computed.ManiaSummary;
             double? storedXxySr = storedManiaSummary?.XxySr;
             double? computedXxySr = computedManiaSummary?.XxySr;
+            double? storedPp = stored.Pp;
+            double? computedPp = computed.Pp;
 
             // 检查 xxysr 差异（最重要）
             // 如果 stored 是 null 而 computed 有值，必须更新
@@ -555,6 +660,15 @@ LIMIT 1;
             if (storedXxySr.HasValue && computedXxySr.HasValue)
             {
                 if (!storedXxySr.Value.Equals(computedXxySr.Value))
+                    return true;
+            }
+
+            if (!storedPp.HasValue && computedPp.HasValue)
+                return true;
+
+            if (storedPp.HasValue && computedPp.HasValue)
+            {
+                if (!storedPp.Value.Equals(computedPp.Value))
                     return true;
             }
 
@@ -667,7 +781,7 @@ LIMIT 1;
                 var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt, long tagUpdatedAt)>();
                 var maniaUpdated = new HashSet<Guid>();
 
-                bool forceRecompute = false;
+                bool forceRecompute;
 
                 using (var connection = openConnection())
                 {
@@ -846,7 +960,8 @@ CREATE TABLE IF NOT EXISTS {table_xxy_sr_branch} (
     {col_beatmap_id} TEXT PRIMARY KEY,
     {col_beatmap_hash} TEXT NOT NULL,
     {col_beatmap_md5} TEXT NOT NULL,
-    {col_xxy_sr} REAL NOT NULL
+    {col_xxy_sr} REAL NOT NULL,
+    {col_pp} REAL NULL
 );
 
 CREATE TABLE IF NOT EXISTS {table_songs_branch_hidden_preexisting} (
@@ -911,18 +1026,21 @@ INSERT INTO {table_xxy_sr_branch}(
     {col_beatmap_id},
     {col_beatmap_hash},
     {col_beatmap_md5},
-    {col_xxy_sr}
+    {col_xxy_sr},
+    {col_pp}
 )
 VALUES(
     $id,
     $hash,
     $md5,
-    $xxy_sr
+    $xxy_sr,
+    $pp
 )
 ON CONFLICT({col_beatmap_id}) DO UPDATE SET
     {col_beatmap_hash} = excluded.{col_beatmap_hash},
     {col_beatmap_md5} = excluded.{col_beatmap_md5},
-    {col_xxy_sr} = excluded.{col_xxy_sr};
+    {col_xxy_sr} = excluded.{col_xxy_sr},
+    {col_pp} = excluded.{col_pp};
 ";
 
                 var idParam = insert.CreateParameter();
@@ -941,6 +1059,10 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                 xxySrParam.ParameterName = "$xxy_sr";
                 insert.Parameters.Add(xxySrParam);
 
+                var ppParam = insert.CreateParameter();
+                ppParam.ParameterName = "$pp";
+                insert.Parameters.Add(ppParam);
+
                 foreach (var row in rows)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -948,6 +1070,7 @@ ON CONFLICT({col_beatmap_id}) DO UPDATE SET
                     hashParam.Value = row.BeatmapHash;
                     md5Param.Value = row.BeatmapMd5;
                     xxySrParam.Value = row.XxySr;
+                    ppParam.Value = row.Pp is double pp ? pp : DBNull.Value;
                     insert.ExecuteNonQuery();
                 }
 
@@ -1043,6 +1166,80 @@ WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
             {
                 Logger.Error(e, "EzManiaAnalysisPersistentStore GetSongsBranchValues failed.", Ez2ConfigManager.LOGGER_NAME);
                 return empty_xxy_sr_values;
+            }
+        }
+
+        public IReadOnlyDictionary<Guid, double> GetSongsBranchPpValues(string databasePath, IEnumerable<BeatmapInfo> beatmaps)
+        {
+            if (!Enabled || string.IsNullOrEmpty(databasePath) || !File.Exists(databasePath))
+                return empty_pp_values;
+
+            try
+            {
+                var beatmapList = beatmaps.Distinct().ToList();
+
+                if (beatmapList.Count == 0)
+                    return empty_pp_values;
+
+                using var connection = openConnection(databasePath);
+
+                if (!isValidSongsBranchConnection(connection))
+                    return empty_pp_values;
+
+                var beatmapsById = beatmapList.ToDictionary(b => b.ID);
+                var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
+                var idsToQuery = beatmapList.Select(b => b.ID).ToList();
+
+                for (int offset = 0; offset < idsToQuery.Count; offset += 800)
+                {
+                    using var cmd = connection.CreateCommand();
+
+                    int batchCount = Math.Min(800, idsToQuery.Count - offset);
+                    var parameterNames = new List<string>(batchCount);
+
+                    for (int i = 0; i < batchCount; i++)
+                    {
+                        string parameterName = $"$id{i}";
+                        parameterNames.Add(parameterName);
+                        cmd.Parameters.AddWithValue(parameterName, idsToQuery[offset + i].ToString());
+                    }
+
+                    cmd.CommandText = $@"
+SELECT beatmap_id, beatmap_hash, beatmap_md5, {col_pp}
+FROM {table_xxy_sr_branch}
+WHERE beatmap_id IN ({string.Join(", ", parameterNames)});
+";
+
+                    using var reader = cmd.ExecuteReader();
+
+                    while (reader.Read())
+                    {
+                        if (!Guid.TryParse(reader.GetString(0), out var beatmapId))
+                            continue;
+
+                        if (!beatmapsById.TryGetValue(beatmapId, out var beatmap))
+                            continue;
+
+                        string storedHash = reader.GetString(1);
+                        string storedMd5 = reader.GetString(2);
+
+                        if (!string.Equals(storedHash, beatmap.Hash, StringComparison.Ordinal))
+                            continue;
+
+                        if (!string.IsNullOrEmpty(storedMd5) && !string.Equals(storedMd5, beatmap.MD5Hash, StringComparison.Ordinal))
+                            continue;
+
+                        if (!reader.IsDBNull(3))
+                            resolvedValues[beatmapId] = reader.GetDouble(3);
+                    }
+                }
+
+                return resolvedValues;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "EzManiaAnalysisPersistentStore GetSongsBranchPpValues failed.", Ez2ConfigManager.LOGGER_NAME);
+                return empty_pp_values;
             }
         }
 
@@ -2092,6 +2289,7 @@ INSERT INTO {EzAnalysisSchemaManager.TABLE_ENTRY}(
     {EzAnalysisSchemaManager.COL_AVERAGE_KPS},
     {EzAnalysisSchemaManager.COL_MAX_KPS},
     {EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
+    {EzAnalysisSchemaManager.COL_PP},
     {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
     {EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON}
 )
@@ -2104,6 +2302,7 @@ VALUES(
     $avg,
     $max,
     $kps,
+    $pp,
     $tag_updated_at,
     $tag_payload_json
 )
@@ -2115,6 +2314,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
     {EzAnalysisSchemaManager.COL_AVERAGE_KPS} = excluded.{EzAnalysisSchemaManager.COL_AVERAGE_KPS},
     {EzAnalysisSchemaManager.COL_MAX_KPS} = excluded.{EzAnalysisSchemaManager.COL_MAX_KPS},
     {EzAnalysisSchemaManager.COL_KPS_LIST_JSON} = excluded.{EzAnalysisSchemaManager.COL_KPS_LIST_JSON},
+    {EzAnalysisSchemaManager.COL_PP} = excluded.{EzAnalysisSchemaManager.COL_PP},
     {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT} = excluded.{EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
     {EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON} = excluded.{EzAnalysisSchemaManager.COL_TAG_PAYLOAD_JSON};
 ";
@@ -2126,6 +2326,7 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
                 entry.Parameters.AddWithValue("$avg", analysis.AverageKps);
                 entry.Parameters.AddWithValue("$max", analysis.MaxKps);
                 entry.Parameters.AddWithValue("$kps", kpsListJson);
+                entry.Parameters.AddWithValue("$pp", analysis.Pp is double pp ? pp : DBNull.Value);
                 entry.Parameters.AddWithValue("$tag_updated_at", analysis.TagSummary != null ? now : 0);
                 entry.Parameters.AddWithValue("$tag_payload_json", tagPayloadJson);
                 entry.ExecuteNonQuery();
