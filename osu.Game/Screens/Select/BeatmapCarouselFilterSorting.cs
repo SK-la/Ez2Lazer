@@ -38,16 +38,18 @@ namespace osu.Game.Screens.Select
             var itemList = items.ToList();
 
             bool groupedSets = BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
+            bool useXxyDifficultyValues = shouldUseXxySrForDifficultyOperations()
+                                          && (criteria.Sort == SortMode.Difficulty || groupedSets);
+            bool usePpValues = criteria.Sort == SortMode.PP;
             bool useSortOperationValues = itemList.Count > 1
-                                          && ((criteria.Sort == SortMode.Difficulty && shouldUseXxySrForDifficultyOperations())
-                                              || criteria.Sort == SortMode.PP);
+                                          && (useXxyDifficultyValues || usePpValues);
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationSortValues = null;
 
             if (useSortOperationValues)
             {
                 var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
-                operationSortValues = criteria.Sort == SortMode.PP
+                operationSortValues = usePpValues
                     ? await getPpForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false)
                     : await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
             }
