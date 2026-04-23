@@ -61,7 +61,8 @@ namespace osu.Game.Beatmaps
             // high precision times (on windows there's generally only 5-10ms reporting intervals, as an example).
             interpolatedTrack = new InterpolatingFramedClock(decoupledTrack)
             {
-                DriftRecoveryHalfLife = 80,
+                // [Ez] 插值时钟在修正音频漂移时的反应速度与稳定性的权衡。过短可能导致不稳定，过长则可能导致修正不及时。
+                DriftRecoveryHalfLife = 10,
             };
 
             if (applyOffsets)
@@ -177,6 +178,16 @@ namespace osu.Game.Beatmaps
         public double CurrentTime => finalClockSource.CurrentTime;
 
         public bool IsRunning => finalClockSource.IsRunning;
+
+        /// <summary>
+        /// 插值时钟与音频源的时间差（毫秒）。
+        /// </summary>
+        public double InterpolatedDrift => interpolatedTrack.Drift;
+
+        /// <summary>
+        /// 插值前的原始音频源时间（毫秒）。
+        /// </summary>
+        public double SourceCurrentTime => interpolatedTrack.SourceCurrentTime;
 
         public void ProcessFrame()
         {

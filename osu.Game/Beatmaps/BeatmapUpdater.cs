@@ -9,6 +9,7 @@ using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Online.API;
 using osu.Game.Rulesets.Objects.Types;
 
@@ -20,16 +21,19 @@ namespace osu.Game.Beatmaps
 
         private readonly BeatmapDifficultyCache difficultyCache;
 
+        private readonly EzAnalysisCache ezAnalysisCache;
+
         private readonly BeatmapUpdaterMetadataLookup metadataLookup;
 
         private const int update_queue_request_concurrency = 4;
 
         private readonly ThreadedTaskScheduler updateScheduler = new ThreadedTaskScheduler(update_queue_request_concurrency, nameof(BeatmapUpdaterMetadataLookup));
 
-        public BeatmapUpdater(IWorkingBeatmapCache workingBeatmapCache, BeatmapDifficultyCache difficultyCache, IAPIProvider api, Storage storage)
+        public BeatmapUpdater(IWorkingBeatmapCache workingBeatmapCache, BeatmapDifficultyCache difficultyCache, EzAnalysisCache ezAnalysisCache, IAPIProvider api, Storage storage)
         {
             this.workingBeatmapCache = workingBeatmapCache;
             this.difficultyCache = difficultyCache;
+            this.ezAnalysisCache = ezAnalysisCache;
 
             metadataLookup = new BeatmapUpdaterMetadataLookup(api, storage);
         }
@@ -56,6 +60,7 @@ namespace osu.Game.Beatmaps
                     var working = workingBeatmapCache.GetWorkingBeatmap(beatmap);
 
                     difficultyCache.Invalidate(beatmap, working.BeatmapInfo);
+                    ezAnalysisCache.Invalidate(beatmap, working.BeatmapInfo);
 
                     var ruleset = working.BeatmapInfo.Ruleset.CreateInstance();
                     var calculator = ruleset.CreateDifficultyCalculator(working);

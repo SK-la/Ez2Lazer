@@ -18,7 +18,6 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Difficulty
 {
@@ -41,8 +40,9 @@ namespace osu.Game.Rulesets.Mania.Difficulty
             if (beatmap.HitObjects.Count == 0)
                 return new ManiaDifficultyAttributes { Mods = mods };
 
-            HitWindows hitWindows = new ManiaHitWindows();
+            var hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
+            if (beatmap.BeatmapInfo.BPM > 0) hitWindows.BPM = beatmap.BeatmapInfo.BPM;
 
             ManiaDifficultyAttributes attributes = new ManiaDifficultyAttributes
             {

@@ -130,7 +130,7 @@ namespace osu.Game.Overlays
 
                 // All looks good, forward away!
                 forwardNotification(notification);
-            }, notification.IsImportant ? 12000 : 2500);
+            }, notification.IsImportant ? 3000 : 1000); //缩短通知驻留时长
         }
 
         private void forwardNotification(Notification notification)

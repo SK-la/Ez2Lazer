@@ -3,10 +3,23 @@
 
 using System;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
+    public readonly record struct ManiaModifyHitRange(double Perfect, double Great, double Good, double Ok, double Meh, double Miss, double Poor = 0);
+
+    /// <summary>
+    /// 提供给Mod，实现自定义判定区间后刷新显示
+    /// but does not go through <c>IApplicableToDifficulty</c>.
+    /// </summary>
+    public interface IManiaHitRangeProvider
+    {
+        ManiaModifyHitRange? GetDisplayHitRange(IBeatmapInfo beatmapInfo);
+    }
+
     public class ManiaHitWindows : HitWindows
     {
         public static readonly DifficultyRange PERFECT_WINDOW_RANGE = new DifficultyRange(22.4D, 19.4D, 13.9D);
@@ -17,6 +30,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private static readonly DifficultyRange miss_window_range = new DifficultyRange(188, 173, 158);
 
         private double speedMultiplier = 1;
+
+        public static double PerfectRange;
+        public static double GreatRange;
+        public static double GoodRange;
+        public static double OkRange;
+        public static double MehRange;
+        public static double MissRange;
+        public static double PoorRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -95,12 +116,44 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
         }
 
+        public bool HasReset { get; private set; }
+
+        /// <summary>
+        /// 用于静态Mod覆写，设置后切换自定义判定区间
+        /// <see cref="WindowFor"/>将返回这些值，不受实例级计算影响。
+        /// </summary>
+        private static ManiaModifyHitRange? modOverride;
+
+        public static void SetModOverride(ManiaModifyHitRange range) => modOverride = range;
+        public static void ClearModOverride() => modOverride = null;
+
         private double perfect;
         private double great;
         private double good;
         private double ok;
         private double meh;
         private double miss;
+        private double pool;
+
+        private static double bpm;
+
+        public double BPM
+        {
+            get => bpm;
+            set
+            {
+                bpm = value;
+                setHitMode();
+                updateWindows();
+            }
+        }
+
+        public bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
+
+        public ManiaHitWindows()
+        {
+            updateWindows();
+        }
 
         public override bool IsHitResultAllowed(HitResult result)
         {
@@ -113,6 +166,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Meh:
                 case HitResult.Miss:
                     return true;
+
+                case HitResult.Poor:
+                    return AllowPoorEnabled;
             }
 
             return false;
@@ -124,8 +180,72 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
+        private void modifyManiaHitRange(double[] difficultyRangeArray)
+        {
+            PerfectRange = difficultyRangeArray[0];
+            GreatRange = difficultyRangeArray[1];
+            GoodRange = difficultyRangeArray[2];
+            OkRange = difficultyRangeArray[3];
+            MehRange = difficultyRangeArray[4];
+            MissRange = difficultyRangeArray[5];
+            PoorRange = difficultyRangeArray[6] == 0 ? MissRange : difficultyRangeArray[6];
+        }
+
+        public void ResetRange()
+        {
+            HasReset = true;
+            updateWindows();
+        }
+
+        private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper();
+
+        private bool setHitMode()
+        {
+            EzEnumHitMode hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+
+            if (hitMode == EzEnumHitMode.Lazer)
+            {
+                return false;
+            }
+
+            switch (hitMode)
+            {
+                case EzEnumHitMode.O2Jam:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsO2Jam(BPM));
+                    break;
+
+                case EzEnumHitMode.EZ2AC:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsEZ2AC());
+                    break;
+
+                case EzEnumHitMode.IIDX_HD:
+                case EzEnumHitMode.LR2_HD:
+                case EzEnumHitMode.Raja_NM:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsBMS(hitMode));
+                    break;
+
+                case EzEnumHitMode.Malody:
+                    modifyManiaHitRange(custom_helper.GetHitWindowsMelody());
+                    break;
+            }
+
+            return true;
+        }
+
         private void updateWindows()
         {
+            if (setHitMode() && !HasReset)
+            {
+                perfect = PerfectRange;
+                great = GreatRange;
+                good = GoodRange;
+                ok = OkRange;
+                meh = MehRange;
+                miss = MissRange;
+                pool = PoorRange;
+                return;
+            }
+
             if (ClassicModActive && !ScoreV2Active)
             {
                 if (IsConvert)
@@ -162,8 +282,27 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public override double WindowFor(HitResult result)
         {
+            // Mod override takes absolute priority — survives per-HitObject instance re-creation.
+            if (modOverride is { } mo)
+            {
+                return result switch
+                {
+                    HitResult.Poor => mo.Poor,
+                    HitResult.Perfect => mo.Perfect,
+                    HitResult.Great => mo.Great,
+                    HitResult.Good => mo.Good,
+                    HitResult.Ok => mo.Ok,
+                    HitResult.Meh => mo.Meh,
+                    HitResult.Miss => mo.Miss,
+                    _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
+                };
+            }
+
             switch (result)
             {
+                case HitResult.Poor:
+                    return pool;
+
                 case HitResult.Perfect:
                     return perfect;
 

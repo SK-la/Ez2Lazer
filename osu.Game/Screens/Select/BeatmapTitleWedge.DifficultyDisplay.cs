@@ -18,6 +18,8 @@ using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.Chat;
@@ -42,6 +44,11 @@ namespace osu.Game.Screens.Select
 
             [Resolved]
             private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
+
+            [Resolved]
+            private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
+
+            private EzDisplayKpc ezDisplayKpc = null!;
 
             private ModSettingChangeTracker? settingChangeTracker;
 
@@ -178,6 +185,8 @@ namespace osu.Game.Screens.Select
                                             ColumnDimensions = new[]
                                             {
                                                 new Dimension(),
+                                                new Dimension(GridSizeMode.Absolute),
+                                                new Dimension(GridSizeMode.AutoSize),
                                                 new Dimension(GridSizeMode.Absolute, 30),
                                                 new Dimension(GridSizeMode.AutoSize),
                                             },
@@ -188,6 +197,14 @@ namespace osu.Game.Screens.Select
                                                     countStatisticsDisplay = new DifficultyStatisticsDisplay
                                                     {
                                                         RelativeSizeAxes = Axes.X,
+                                                    },
+                                                    Empty(),
+                                                    // 中间列：容器自动适配并居中放置 KPC 药丸组件，避免与右侧统计重叠
+                                                    ezDisplayKpc = new EzDisplayKpc
+                                                    {
+                                                        Anchor = Anchor.CentreLeft,
+                                                        Origin = Anchor.CentreLeft,
+                                                        RelativeSizeAxes = Axes.Y,
                                                     },
                                                     Empty(),
                                                     difficultyStatisticsDisplay = new DifficultyStatisticsDisplay(autoSize: true),
@@ -262,17 +279,57 @@ namespace osu.Game.Screens.Select
                 if (beatmap.IsDefault)
                 {
                     countStatisticsDisplay.FadeOut(300, Easing.OutQuint);
+                    ezDisplayKpc.ManiaSummary = null;
                     return;
                 }
 
+                var selectedBeatmap = beatmap.Value;
+                var selectedRuleset = ruleset.Value;
+                var selectedMods = mods.Value.ToArray();
+
                 Task.Run(() =>
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    bool hasMods = selectedMods.Length > 0;
+                    EzManiaSummary? maniaSummary = null;
+
+                    if (!hasMods
+                        && selectedRuleset != null
+                        && selectedRuleset.OnlineID == 3
+                        && analysisDatabase.TryGetStoredAnalysis(selectedBeatmap.BeatmapInfo, selectedRuleset, out var storedAnalysis))
+                    {
+                        maniaSummary = storedAnalysis.ManiaSummary;
+                    }
+
                     // This can take time as it is a synchronous task.
-                    // TODO: We're calling `GetPlayableBeatmap` multiple times every map load at song select.
-                    var playableBeatmap = beatmap.Value.GetPlayableBeatmap(ruleset.Value);
+                    // 使用可取消重载，避免快速切歌时后台任务继续持有旧谱面对象。
+                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset, Array.Empty<Mod>(), cancellationToken);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     var statistics = playableBeatmap.GetStatistics()
                                                     .Select(s => new StatisticDifficulty.Data(s.Name, s.BarDisplayLength ?? 0, s.BarDisplayLength ?? 0, 1, s.Content))
                                                     .ToList();
+
+                    maniaSummary ??= OptimizedBeatmapCalculator.GetEzManiaSummary(playableBeatmap);
+
+                    // 如果是 mania，则计算列计数并更新中间的 KPC 药丸组件
+                    if (selectedRuleset != null && selectedRuleset.OnlineID == 3)
+                    {
+                        Schedule(() =>
+                        {
+                            if (cancellationToken.IsCancellationRequested)
+                                return;
+
+                            ezDisplayKpc.ManiaSummary = maniaSummary;
+                        });
+                    }
+                    else
+                    {
+                        // 非 Mania 情况隐藏组件
+                        Schedule(() => ezDisplayKpc.ManiaSummary = null);
+                    }
 
                     Schedule(() =>
                     {
@@ -309,7 +366,7 @@ namespace osu.Game.Screens.Select
                 Color4 col = starRatingDisplay.DisplayedStars.Value >= OsuColour.STAR_DIFFICULTY_DEFINED_COLOUR_CUTOFF ? starRatingDisplay.DisplayedDifficultyTextColour : starRatingDisplay.DisplayedDifficultyColour;
 
                 difficultyText.Colour = col;
-                mappedByText.Colour = col;
+                mappedByText.Colour = Colour4.WhiteSmoke;
                 countStatisticsDisplay.AccentColour = col;
                 difficultyStatisticsDisplay.AccentColour = col;
             }

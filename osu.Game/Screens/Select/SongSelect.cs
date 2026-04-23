@@ -37,6 +37,9 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Input.Bindings;
+using osu.Game.EzOsuGame.Audio;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -168,11 +171,17 @@ namespace osu.Game.Screens.Select
 
         private Bindable<bool> configBackgroundBlur = null!;
         private Bindable<bool> showConvertedBeatmaps = null!;
+        private Bindable<KeySoundPreviewMode> keySoundPreview = null!;
+        private EzPreviewTrackManager ezPreviewManager = null!;
+
+        private EzBeatmapPreviewOverlay ezBeatmapPreviewOverlay = null!;
+        private ModSettingChangeTracker? previewOverlayModSettingTracker;
+        private CancellationTokenSource? previewPlayableCancellation;
 
         private IDisposable? modSelectOverlayRegistration;
 
         [BackgroundDependencyLoader]
-        private void load(AudioManager audio, OsuConfigManager config)
+        private void load(AudioManager audio, OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             errorSample = audio.Samples.Get(@"UI/generic-error");
 
@@ -299,6 +308,13 @@ namespace osu.Game.Screens.Select
                                         },
                                     }
                                 },
+                                ezBeatmapPreviewOverlay = new EzBeatmapPreviewOverlay
+                                {
+                                    RelativeSizeAxes = Axes.Both,
+                                    Depth = float.MinValue,
+                                    DefaultPanelRightEdgeInScreenSpace = () => titleWedge.ScreenSpaceDrawQuad.AABBFloat.Right,
+                                },
+                                ezPreviewManager = new EzPreviewTrackManager()
                             }
                         },
                     }
@@ -323,6 +339,7 @@ namespace osu.Game.Screens.Select
                 updateBackgroundDim();
             });
 
+            keySoundPreview = ezConfig.GetBindable<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
             showConvertedBeatmaps = config.GetBindable<bool>(OsuSetting.ShowConvertedBeatmaps);
         }
 
@@ -376,7 +393,17 @@ namespace osu.Game.Screens.Select
             new FooterButtonOptions
             {
                 Hotkey = GlobalAction.ToggleBeatmapOptions,
-            }
+            },
+            new FooterButtonEzExport(
+                carousel.GetFilteredBeatmaps,
+                () => Beatmap.IsDefault ? null : Beatmap.Value.BeatmapInfo),
+            new FooterButtonEzPreView(
+                () =>
+                {
+                    ezBeatmapPreviewOverlay.Toggle();
+                    updateBeatmapPreviewSelection();
+                },
+                ezBeatmapPreviewOverlay.ExpandedState)
         };
 
         protected override void LoadComplete()
@@ -396,6 +423,17 @@ namespace osu.Game.Screens.Select
 
                 if (ShowOsuLogo)
                     logo?.FadeTo(v.NewValue == Visibility.Visible ? 0f : 1f, 200, Easing.OutQuint);
+            });
+
+            keySoundPreview.BindValueChanged(e =>
+            {
+                if (!this.IsCurrentScreen())
+                    return;
+
+                Logger.Log("[Key sound preview mode] changed to " + e.NewValue, Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                ezPreviewManager.EnabledBindable.Value = e.NewValue != 0;
+                ensureTrackLooping(Beatmap.Value, TrackChangeDirection.None);
+                ensurePlayingSelected();
             });
         }
 
@@ -525,13 +563,22 @@ namespace osu.Game.Screens.Select
             if (!isHandlingLooping)
                 return;
 
+            ezPreviewManager.StopPreview();
+
             music.CurrentTrack.Looping = isHandlingLooping = false;
 
             music.TrackChanged -= ensureTrackLooping;
         }
 
         private void ensureTrackLooping(IWorkingBeatmap beatmap, TrackChangeDirection changeDirection)
-            => beatmap.PrepareTrackForPreview(true);
+        {
+            if (!ezPreviewManager.StartPreview(beatmap) && keySoundPreview.Value == 0)
+            {
+                ezPreviewManager.StopPreview();
+            }
+
+            beatmap.PrepareTrackForPreview(true);
+        }
 
         #endregion
 
@@ -584,7 +631,7 @@ namespace osu.Game.Screens.Select
             debounceQueueSelection(groupedBeatmap.Beatmap);
         }
 
-        private bool ensureGlobalBeatmapValid()
+        private bool ensureGlobalBeatmapValid(bool refetch = false)
         {
             if (!this.IsCurrentScreen())
                 return false;
@@ -596,8 +643,9 @@ namespace osu.Game.Screens.Select
             if (IsFiltering)
                 return false;
 
-            // Refetch to be confident that the current selection is still valid. It may have been deleted or hidden.
-            var currentBeatmap = beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, true);
+            // Refetch only if explicitly requested (e.g. when returning to screen after potential external changes).
+            // Avoid refetching during normal beatmap selection to prevent unnecessary cache invalidation and memory spikes.
+            var currentBeatmap = beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, refetch);
             bool validSelection = checkBeatmapValidForSelection(currentBeatmap.BeatmapInfo);
 
             if (validSelection)
@@ -674,7 +722,8 @@ namespace osu.Game.Screens.Select
             this.FadeIn(fade_duration, Easing.OutQuint);
             onArrivingAtScreen();
 
-            ensureGlobalBeatmapValid();
+            // 保持原样
+            ensureGlobalBeatmapValid(refetch: true);
 
             detailsArea.Refresh();
 
@@ -705,14 +754,28 @@ namespace osu.Game.Screens.Select
             return base.OnExiting(e);
         }
 
+        /// <summary>
+        /// 获取当前过滤后的谱面列表（无谱包头，仅难度）。
+        /// 直接委托给 BeatmapCarousel.GetFilteredBeatmaps()，利用其内部优化。
+        /// </summary>
+        private IReadOnlyList<BeatmapInfo> getFilteredBeatmaps()
+        {
+            return carousel.GetFilteredBeatmaps();
+        }
+
         private void onArrivingAtScreen()
         {
+            if (manageCollectionsDialog != null)
+                manageCollectionsDialog.FilteredBeatmapsProvider = getFilteredBeatmaps;
+
             modSelectOverlay.Beatmap.BindTo(Beatmap);
             // required due to https://github.com/ppy/osu-framework/issues/3218
             modSelectOverlay.SelectedMods.Disabled = false;
             modSelectOverlay.SelectedMods.BindTo(Mods);
 
             carousel.VisuallyFocusSelected = false;
+
+            updateWedgeVisibility();
 
             if (ControlGlobalMusic)
             {
@@ -733,6 +796,8 @@ namespace osu.Game.Screens.Select
             }
 
             Beatmap.BindValueChanged(updateVariousState, true);
+            Ruleset.BindValueChanged(updateBeatmapPreviewSelection);
+            Mods.BindValueChanged(updatePreviewSelectionFromModsChange);
         }
 
         private void updateVariousState(ValueChangedEvent<WorkingBeatmap> e)
@@ -746,13 +811,80 @@ namespace osu.Game.Screens.Select
             updateBackgroundDim();
             updateWedgeVisibility();
             fetchOnlineInfo(force: ReferenceEquals(e.OldValue, e.NewValue));
+
+            updateBeatmapPreviewSelection();
+        }
+
+        private void updateBeatmapPreviewSelection(ValueChangedEvent<RulesetInfo> _)
+            => updateBeatmapPreviewSelection();
+
+        private void updatePreviewSelectionFromModsChange(ValueChangedEvent<IReadOnlyList<Mod>> e)
+        {
+            previewOverlayModSettingTracker?.Dispose();
+            previewOverlayModSettingTracker = null;
+
+            if (e.NewValue.Any())
+            {
+                previewOverlayModSettingTracker = new ModSettingChangeTracker(e.NewValue);
+                previewOverlayModSettingTracker.SettingChanged += _ => Scheduler.AddOnce(() => updateBeatmapPreviewSelection(forceReload: true));
+            }
+
+            updateBeatmapPreviewSelection();
+        }
+
+        private void updateBeatmapPreviewSelection(bool forceReload = false)
+        {
+            if (!this.IsCurrentScreen())
+                return;
+
+            if (!ezBeatmapPreviewOverlay.ExpandedState.Value)
+                return;
+
+            previewPlayableCancellation?.Cancel();
+            previewPlayableCancellation?.Dispose();
+            previewPlayableCancellation = new CancellationTokenSource();
+            var token = previewPlayableCancellation.Token;
+
+            var workingBeatmap = Beatmap.Value;
+            var ruleset = Ruleset.Value;
+            var selectedMods = Mods.Value;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    if (token.IsCancellationRequested) return;
+
+                    var playable = workingBeatmap.GetPlayableBeatmap(ruleset, selectedMods, token);
+
+                    Schedule(() => ezBeatmapPreviewOverlay.UpdateSelection(playable, ruleset, forceReload));
+                }
+                catch (OperationCanceledException)
+                {
+                    // ignore
+                }
+            }, token);
         }
 
         private void onLeavingScreen()
         {
             restoreBackground();
 
+            if (manageCollectionsDialog != null)
+                manageCollectionsDialog.FilteredBeatmapsProvider = null;
+
+            ezBeatmapPreviewOverlay.SuspendForScreenExit();
+
             Beatmap.ValueChanged -= updateVariousState;
+            Ruleset.ValueChanged -= updateBeatmapPreviewSelection;
+            Mods.ValueChanged -= updatePreviewSelectionFromModsChange;
+
+            previewOverlayModSettingTracker?.Dispose();
+            previewOverlayModSettingTracker = null;
+
+            previewPlayableCancellation?.Cancel();
+            previewPlayableCancellation?.Dispose();
+            previewPlayableCancellation = null;
 
             modSelectOverlay.SelectedMods.UnbindFrom(Mods);
             modSelectOverlay.Beatmap.UnbindFrom(Beatmap);

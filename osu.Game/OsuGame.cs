@@ -36,6 +36,9 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -1207,6 +1210,7 @@ namespace osu.Game
             // overlay elements
             loadComponentSingleFile(FirstRunOverlay = new FirstRunSetupOverlay(), footerBasedOverlayContent.Add, true);
             loadComponentSingleFile(new ManageCollectionsDialog(), overlayContent.Add, true);
+            loadComponentSingleFile(new EzManageSongsBranchesDialog(), overlayContent.Add, true);
             loadComponentSingleFile(beatmapListing = new BeatmapListingOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(dashboard = new DashboardOverlay(), overlayContent.Add, true);
             loadComponentSingleFile(news = new NewsOverlay(), overlayContent.Add, true);
@@ -1238,6 +1242,7 @@ namespace osu.Game
             loadComponentSingleFile(new MedalOverlay(), topMostOverlayContent.Add);
 
             loadComponentSingleFile(new BackgroundDataStoreProcessor(), Add);
+            loadComponentSingleFile(new EzAnalysisWarmupProcessor(), Add);
             loadComponentSingleFile<BeatmapStore>(detachedBeatmapStore = new RealmDetachedBeatmapStore(), Add, true);
             loadComponentSingleFile(new QueueController(), Add, true);
 
@@ -1350,6 +1355,24 @@ namespace osu.Game
             if (entry.Level < LogLevel.Important || entry.Target > LoggingTarget.Database || entry.Target == null) return;
 
             if (entry.Exception is SentryOnlyDiagnosticsException)
+                return;
+
+            // Custom builds may hit server-side gating for online features.
+            // These messages are not actionable for end-users of this fork, so avoid spamming notifications.
+            if (entry.Message?.Contains("Realtime online functionality is not supported on this version of the game", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("Please ensure that you are using the latest version of the official game releases", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("Your score will not be submitted", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            if (entry.Message?.Contains("This is not an official build of the game", StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            // Some of the above messages are logged with a blank separator line at important level.
+            if (string.IsNullOrWhiteSpace(entry.Message) && entry.Target == LoggingTarget.Network)
                 return;
 
             const int short_term_display_limit = 3;

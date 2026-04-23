@@ -19,6 +19,9 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
@@ -29,7 +32,7 @@ namespace osu.Game.Screens.Select
 {
     public partial class PanelBeatmapStandalone : Panel
     {
-        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT * 1.6f;
+        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT * 1.8f;
 
         [Resolved]
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
@@ -48,6 +51,31 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private BeatmapDifficultyCache difficultyCache { get; set; } = null!;
+
+        #region Ez功能
+
+        [Resolved]
+        private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
+        private EzDisplayKps ezDisplayKps = null!;
+        private EzDisplayKpc ezDisplayKpc = null!;
+        private EzDisplaySR displaySR = null!;
+        private EzDisplayTag ezDisplayTag = null!;
+
+        private IBindable<EzAnalysisResult>? ezAnalysisBindable;
+        private CancellationTokenSource? ezAnalysisCancellationSource;
+        private ScheduledDelegate? scheduledEzAnalysisUpdate;
+
+        private bool ezAnalysisEnabled;
+        private string? scratchText;
+
+        private const int mania_ui_update_throttle_ms = 15;
+
+        #endregion
 
         private IBindable<StarDifficulty>? starDifficultyBindable;
         private CancellationTokenSource? starDifficultyCancellationSource;
@@ -174,7 +202,20 @@ namespace osu.Game.Screens.Select
                                             Font = OsuFont.Style.Caption1.With(weight: FontWeight.SemiBold),
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft
-                                        }
+                                        },
+                                        ezDisplayKps = new EzDisplayKps
+                                        {
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                        },
+                                        Empty(),
+                                        ezDisplayKpsGraph = new EzDisplayKpsGraph
+                                        {
+                                            Size = new Vector2(300, 20),
+                                            Blending = BlendingParameters.Mixture,
+                                            Anchor = Anchor.BottomLeft,
+                                            Origin = Anchor.BottomLeft,
+                                        },
                                     }
                                 },
                                 new FillFlowContainer
@@ -190,12 +231,28 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
+                                        displaySR = new EzDisplaySR(EzManiaSummary.EMPTY, StarRatingDisplaySize.Small, animated: true)
+                                        {
+                                            Origin = Anchor.CentreLeft,
+                                            Anchor = Anchor.CentreLeft,
+                                            Scale = new Vector2(0.875f),
+                                        },
                                         spreadDisplay = new SpreadDisplay
                                         {
                                             Origin = Anchor.CentreLeft,
                                             Anchor = Anchor.CentreLeft,
-                                        }
+                                        },
+                                        ezDisplayKpc = new EzDisplayKpc
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                        },
                                     },
+                                },
+                                ezDisplayTag = new EzDisplayTag
+                                {
+                                    Margin = new MarginPadding { Top = 2 },
+                                    Alpha = 0.9f,
                                 }
                             }
                         }
@@ -208,7 +265,20 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            ruleset.BindValueChanged(_ => updateKeyCount());
+            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezDisplayKpc.KpcDisplayModeBindable);
+            // 不订阅 ez 分析开关变更；统一依赖 panel 生命周期（PrepareForUse/FreeAfterUse）进行刷新。
+            // 这样可减少滚动场景下的回调抖动与绑定链复杂度。
+            bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
+            bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+
+            ruleset.BindValueChanged(_ =>
+            {
+                ezAnalysisEnabled = ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled);
+
+                resetEzDisplay();
+                updateKeyCount();
+            }, true);
+
             mods.BindValueChanged(_ => updateKeyCount(), true);
 
             Selected.BindValueChanged(s =>
@@ -224,7 +294,13 @@ namespace osu.Game.Screens.Select
 
             var beatmapSet = beatmap.BeatmapSet!;
 
-            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b => beatmapBackground.Beatmap = beatmaps.GetWorkingBeatmap(b), beatmap, 50);
+            scheduledBackgroundRetrieval = Scheduler.AddDelayed(b =>
+            {
+                var workingBeatmap = beatmaps.GetWorkingBeatmap(b);
+                beatmapBackground.Beatmap = workingBeatmap;
+                ezDisplayTag.TagSummary = null;
+                ezDisplayTag.Working = workingBeatmap;
+            }, beatmap, 50);
 
             titleText.Text = new RomanisableString(beatmapSet.Metadata.TitleUnicode, beatmapSet.Metadata.Title);
             artistText.Text = new RomanisableString(beatmapSet.Metadata.ArtistUnicode, beatmapSet.Metadata.Artist);
@@ -241,6 +317,22 @@ namespace osu.Game.Screens.Select
             computeStarRating();
             spreadDisplay.Beatmap.Value = beatmap;
             updateKeyCount();
+
+            computeEzAnalysis();
+        }
+
+        private void resetEzDisplay()
+        {
+            if (ezAnalysisEnabled)
+            {
+                displaySR.Show();
+            }
+            else
+            {
+                ezDisplayKpc.ManiaSummary = null;
+                displaySR.Current.Value = EzManiaSummary.EMPTY;
+                displaySR.Hide();
+            }
         }
 
         protected override void FreeAfterUse()
@@ -256,11 +348,87 @@ namespace osu.Game.Screens.Select
             spreadDisplay.Beatmap.Value = null;
 
             starDifficultyCancellationSource?.Cancel();
+            starDifficultyCancellationSource?.Dispose();
+            starDifficultyCancellationSource = null;
+
+            clearEzAnalysisBinding();
+        }
+
+        private void clearEzAnalysisBinding(bool resetDisplay = true)
+        {
+            scheduledEzAnalysisUpdate?.Cancel();
+            scheduledEzAnalysisUpdate = null;
+
+            ezAnalysisBindable?.UnbindAll();
+            ezAnalysisBindable = null;
+
+            ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
+            ezAnalysisCancellationSource = null;
+
+            if (!resetDisplay)
+                return;
+
+            ezDisplayTag.Working = null;
+            ezDisplayTag.TagSummary = null;
+            scratchText = null;
+
+            displaySR.Current.Value = EzManiaSummary.EMPTY;
+            ezDisplayKpc.ManiaSummary = null;
+        }
+
+        private void updateKPS(EzAnalysisResult ezAnalysisResult)
+        {
+            double avgKPS = ezAnalysisResult.AverageKps;
+            double maxKps = ezAnalysisResult.MaxKps;
+            IReadOnlyList<double> kpsList = ezAnalysisResult.KpsList;
+            ezDisplayKps.SetKps(avgKPS, maxKps);
+            ezDisplayKpsGraph.SetPoints(kpsList);
+
+            if (ezAnalysisEnabled)
+            {
+                var maniaSummary = ezAnalysisResult.ManiaSummary;
+                var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
+
+                if (ezAnalysisResult.TagSummary != null)
+                    ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
+
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
+                updateKeyCount();
+                ezDisplayKpc.ManiaSummary = maniaSummary;
+                displaySR.Current.Value = maniaSummary ?? EzManiaSummary.EMPTY;
+            }
+        }
+
+        private void computeEzAnalysis()
+        {
+            if (!ezAnalysisEnabled)
+                return;
+
+            ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
+            ezAnalysisCancellationSource = new CancellationTokenSource();
+
+            if (Item == null)
+                return;
+
+            resetEzDisplay();
+            ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            ezAnalysisBindable.BindValueChanged(result =>
+            {
+                scheduledEzAnalysisUpdate?.Cancel();
+                scheduledEzAnalysisUpdate = Scheduler.AddDelayed(() =>
+                {
+                    updateKPS(result.NewValue);
+                    scheduledEzAnalysisUpdate = null;
+                }, mania_ui_update_throttle_ms);
+            }, true);
         }
 
         private void computeStarRating()
         {
             starDifficultyCancellationSource?.Cancel();
+            starDifficultyCancellationSource?.Dispose();
             starDifficultyCancellationSource = new CancellationTokenSource();
 
             if (Item == null)
@@ -281,7 +449,12 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
             {
                 starDifficultyCancellationSource?.Cancel();
+                starDifficultyCancellationSource?.Dispose();
                 starDifficultyCancellationSource = null;
+
+                ezAnalysisCancellationSource?.Cancel();
+                ezAnalysisCancellationSource?.Dispose();
+                ezAnalysisCancellationSource = null;
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.
@@ -310,7 +483,8 @@ namespace osu.Game.Screens.Select
                 var variantName = rulesetInstance.GetVariantName(variant);
 
                 keyCountText.Alpha = 1;
-                keyCountText.Text = LocalisableString.Interpolate($"[{variantName}] ");
+                keyCountText.Text = scratchText ?? LocalisableString.Interpolate($"[{variantName}] ");
+                keyCountText.Colour = Colour4.LightPink.ToLinear();
             }
             else
                 keyCountText.Alpha = 0;

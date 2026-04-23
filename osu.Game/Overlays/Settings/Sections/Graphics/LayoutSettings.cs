@@ -18,9 +18,12 @@ using osu.Framework.Platform.Windows;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation;
 using osuTK;
 using osuTK.Graphics;
+using WindowState = osu.Framework.Platform.WindowState;
 
 namespace osu.Game.Overlays.Settings.Sections.Graphics
 {
@@ -75,7 +78,7 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
         private const int transition_duration = 400;
 
         [BackgroundDependencyLoader]
-        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, GameHost host)
+        private void load(FrameworkConfigManager config, OsuConfigManager osuConfig, GameHost host, Ez2ConfigManager ezConfig)
         {
             window = host.Window;
 
@@ -174,6 +177,15 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 {
                     Caption = GraphicsSettingsStrings.ScreenScaling,
                     Current = osuConfig.GetBindable<ScalingMode>(OsuSetting.Scaling),
+                })
+                {
+                    Keywords = new[] { "scale", "letterbox" },
+                },
+                new SettingsItemV2(new FormEnumDropdown<ScalingGameMode>
+                {
+                    Caption = EzSettingsStrings.SCALING_GAME_MODE,
+                    HintText = EzSettingsStrings.SCALING_GAME_MODE_TOOLTIP,
+                    Current = ezConfig.GetBindable<ScalingGameMode>(Ez2Setting.ScalingGameMode),
                 })
                 {
                     Keywords = new[] { "scale", "letterbox" },
@@ -286,9 +298,9 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 if (size.NewValue == sizeWindowed.Value || windowModeDropdown.Current.Value != WindowMode.Windowed)
                     return;
 
-                if (window?.WindowState == Framework.Platform.WindowState.Maximised)
+                if (window?.WindowState == WindowState.Maximised)
                 {
-                    window.WindowState = Framework.Platform.WindowState.Normal;
+                    window.WindowState = WindowState.Normal;
                 }
 
                 // Adjust only for top decorations (assuming system titlebar).

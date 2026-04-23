@@ -139,6 +139,10 @@ namespace osu.Game.Graphics
                 case HitResult.Great:
                     return Blue;
 
+                // case HitResult.EmptyPoor:
+                case HitResult.Poor:
+                    return PurpleLight;
+
                 default:
                     return BlueLight;
             }
@@ -193,6 +197,12 @@ namespace osu.Game.Graphics
         {
             switch (modType)
             {
+                case ModType.LA_Mod:
+                    return BlueLight;
+
+                case ModType.YuLiangSSS_Mod:
+                    return Purple;
+
                 case ModType.Automation:
                     return Blue1;
 

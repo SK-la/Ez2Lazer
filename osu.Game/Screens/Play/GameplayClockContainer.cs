@@ -202,5 +202,15 @@ namespace osu.Game.Screens.Play
         public double ElapsedFrameTime => GameplayClock.ElapsedFrameTime;
 
         public double FramesPerSecond => GameplayClock.FramesPerSecond;
+
+        /// <summary>
+        /// Diagnostics: drift between interpolated time and raw audio source time (ms).
+        /// </summary>
+        internal double InterpolatedDrift => GameplayClock.InterpolatedDrift;
+
+        /// <summary>
+        /// Diagnostics: the raw audio source time before interpolation (ms).
+        /// </summary>
+        internal double BassSourceCurrentTime => GameplayClock.SourceCurrentTime;
     }
 }

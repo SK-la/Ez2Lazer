@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Threading;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ListExtensions;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -26,6 +27,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
+using osu.Game.EzOsuGame.Configuration;
 using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Objects.Drawables
@@ -156,6 +158,16 @@ namespace osu.Game.Rulesets.Objects.Drawables
         [Resolved(CanBeNull = true)]
         private IPooledHitObjectProvider pooledObjectProvider { get; set; }
 
+        [Resolved(CanBeNull = true)]
+        private DrawableRuleset drawableRuleset { get; set; }
+
+        [Resolved(CanBeNull = true)]
+        private Ez2ConfigManager ezConfig { get; set; }
+
+        private bool autoplaySampleTriggered;
+        private IBindable<double> offsetBindable;
+        private IBindable<bool> hitObjectLifetimeUsesOwnTimeBindable = new BindableBool();
+
         /// <summary>
         /// Whether the initialization logic in <see cref="Playfield" /> has applied.
         /// </summary>
@@ -210,6 +222,21 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
             CurrentSkin = skinSource;
             CurrentSkin.SourceChanged += skinSourceChanged;
+
+            // Choose the appropriate offset bindable once during load to avoid runtime reflection/namespace checks.
+            if (ezConfig != null)
+            {
+                hitObjectLifetimeUsesOwnTimeBindable = ezConfig.GetBindable<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime);
+
+                if (drawableRuleset != null)
+                {
+                    int onlineId = drawableRuleset.Ruleset.RulesetInfo.OnlineID;
+                    if (onlineId == 3) // Mania legacy ruleset id
+                        offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+                    else
+                        offsetBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+                }
+            }
         }
 
         protected override void LoadAsyncComplete()
@@ -313,6 +340,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 // Update here to ensure we're in a good state.
                 UpdateComboColour();
             }
+
+            autoplaySampleTriggered = false;
         }
 
         private void updateStateFromResult()
@@ -338,6 +367,9 @@ namespace osu.Game.Rulesets.Objects.Drawables
             }
 
             samplesBindable.UnbindFrom(HitObject.SamplesBindable);
+
+            // 回收时一并重置自动播样状态。
+            autoplaySampleTriggered = false;
 
             // Release the samples for other hitobjects to use.
             samplesLoaded = false;
@@ -401,6 +433,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
 
         private void onRevertResult()
         {
+            autoplaySampleTriggered = false;
             UpdateState(ArmedState.Idle);
             OnRevertResult?.Invoke(this, Result);
         }
@@ -470,6 +503,7 @@ namespace osu.Game.Rulesets.Objects.Drawables
             clearExistingStateTransforms();
 
             double initialTransformsTime = HitObject.StartTime - InitialLifetimeOffset;
+            double hitStateUpdateTime = HitStateUpdateTime;
 
             AnimationStartTime.Value = initialTransformsTime;
 
@@ -479,13 +513,13 @@ namespace osu.Game.Rulesets.Objects.Drawables
             using (BeginAbsoluteSequence(StateUpdateTime))
                 UpdateStartTimeStateTransforms();
 
-            using (BeginAbsoluteSequence(HitStateUpdateTime))
+            using (BeginAbsoluteSequence(hitStateUpdateTime))
                 UpdateHitStateTransforms(newState);
 
             state.Value = newState;
 
             if (LifetimeEnd == double.MaxValue && (state.Value != ArmedState.Idle || HitObject.HitWindows == null))
-                LifetimeEnd = Math.Max(LatestTransformEndTime, HitStateUpdateTime + (Samples?.Length ?? 0));
+                LifetimeEnd = Math.Max(LatestTransformEndTime, hitStateUpdateTime + (Samples?.Length ?? 0));
 
             // apply any custom state overrides
             ApplyCustomUpdateState?.Invoke(this, newState);
@@ -628,6 +662,39 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 Samples.Stop();
         }
 
+        private void updateAutoplaySamplePlayback()
+        {
+            if (Entry == null)
+                return;
+
+            if (GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode) != KeySoundPreviewMode.AutoPlayPlus)
+            {
+                autoplaySampleTriggered = false;
+                return;
+            }
+
+            if (Judged)
+                return;
+
+            if (Time.Current < HitObject.StartTime)
+            {
+                autoplaySampleTriggered = false;
+                return;
+            }
+
+            if (autoplaySampleTriggered || Time.Current - Time.Elapsed > HitObject.StartTime)
+                return;
+
+            if (!samplesLoaded)
+            {
+                samplesLoaded = true;
+                LoadSamples();
+            }
+
+            autoplaySampleTriggered = true;
+            PlaySamples();
+        }
+
         #endregion
 
         protected override void Update()
@@ -653,6 +720,8 @@ namespace osu.Game.Rulesets.Objects.Drawables
                 samplesLoaded = true;
                 LoadSamples();
             }
+
+            updateAutoplaySamplePlayback();
 
             base.Update();
         }
@@ -682,10 +751,15 @@ namespace osu.Game.Rulesets.Objects.Drawables
         public double StateUpdateTime => HitObject.StartTime;
 
         /// <summary>
-        /// The time at which judgement dependent state transforms should be applied. This is equivalent of the (end) time of the object, in addition to any judgement offset.
-        /// This is used to offset calls to <see cref="UpdateHitStateTransforms"/>.
+        /// 控制命中后状态变换是否固定使用物件自身时间作为基准。
         /// </summary>
-        public double HitStateUpdateTime => Result?.TimeAbsolute ?? HitObject.GetEndTime();
+        protected virtual bool HitObjectLifetimeUsesOwnTime => hitObjectLifetimeUsesOwnTimeBindable.Value;
+
+        /// <summary>
+        /// 当前物件命中后状态变换所使用的时间基准。
+        /// 默认使用实际判定时间；启用 Ez 生命周期开关后改为使用物件自身结束时间。
+        /// </summary>
+        public double HitStateUpdateTime => HitObjectLifetimeUsesOwnTime ? HitObject.GetEndTime() : Result?.TimeAbsolute ?? HitObject.GetEndTime();
 
         /// <summary>
         /// Will be called at least once after this <see cref="DrawableHitObject"/> has become not alive.
@@ -739,10 +813,54 @@ namespace osu.Game.Rulesets.Objects.Drawables
             Result.RawTime = Time.Current;
             Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
 
+            // 已命中后不应再触发自动播样。
+            autoplaySampleTriggered = true;
+
             if (Result.HasResult)
                 UpdateState(Result.IsHit ? ArmedState.Hit : ArmedState.Miss);
 
             OnNewResult?.Invoke(this, Result);
+        }
+
+        /// <summary>
+        /// 分发新的判定结果，但不会将当前 <see cref="DrawableHitObject"/> 标记为已判定。
+        /// 适用于一个note需要打出多个判定，这些结果应被计数器统计但不应终止物体的生命周期。
+        /// <para>注意此方法本意为语法糖，不会唯一指向poor判定。优先使用下方显示指定用法</para>
+        /// </summary>
+        /// <remarks>
+        /// 此方法会填充 <see cref="Result"/> 的时间信息并触发 <see cref="OnNewResult"/> 事件，
+        /// 但不会调用 <see cref="UpdateState"/> 或将该条目标记为已判定。
+        /// </remarks>
+        protected void DispatchNewResult()
+        {
+            if (Result == null) return;
+
+            // Populate timing info so processors can compute offsets.
+            Result.RawTime = Time.Current;
+            Result.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
+
+            OnNewResult?.Invoke(this, Result);
+        }
+
+        /// <summary>
+        /// 分发一个瞬时的判定结果，不修改存储的 <see cref="Result"/>。
+        /// 适用于报告中间结果（如 "poor"），同时保持物体的生命周期状态不变。
+        /// </summary>
+        /// <param name="transientType">要报告的临时 <see cref="HitResult"/>。</param>
+        protected void DispatchNewResult(HitResult transientType)
+        {
+            var transient = CreateResult(HitObject.Judgement);
+            if (transient == null) return;
+
+            transient.Type = transientType;
+            transient.RawTime = Time.Current;
+            transient.GameplayRate = (Clock as IGameplayClock)?.GetTrueGameplayRate() ?? Clock.Rate;
+
+            // Mark this result as a non-final (transient) result so consumers can
+            // distinguish between intermediate reports (eg. Poor) and final applied results.
+            transient.IsFinal = false;
+
+            OnNewResult?.Invoke(this, transient);
         }
 
         /// <summary>
@@ -759,7 +877,43 @@ namespace osu.Game.Rulesets.Objects.Drawables
             if (Judged)
                 return false;
 
-            CheckForResult(userTriggered, Time.Current - HitObject.GetEndTime());
+            double timeOffset = Time.Current - HitObject.GetEndTime();
+
+            if (offsetBindable != null)
+                timeOffset += offsetBindable.Value;
+
+            // [Ez] Sub-frame timing correction: compensate for judgment using previous frame's clock value.
+            // The key was pressed between the last FSC clock update and now; interpolate to the actual press time.
+            if (userTriggered)
+            {
+                long keyTs = Framework.Input.InputManager.EzSubFrameTimestamp;
+                double rate = (Clock as IGameplayClock)?.Rate ?? 1.0;
+                timeOffset += EzOsuGame.Timing.EzSubFrameCorrection.GetCorrectionMs(keyTs, rate);
+            }
+
+            // === Ez judgment timing diagnostics ===
+            if (userTriggered && EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Enabled)
+            {
+                double interpDrift = 0, bassSource = 0, frameElapsed = Clock.ElapsedFrameTime;
+
+                if (drawableRuleset?.FrameStableClock is FrameStabilityContainer fsc
+                    && fsc.ParentGameplayClock is GameplayClockContainer gcc)
+                {
+                    interpDrift = gcc.InterpolatedDrift;
+                    bassSource = gcc.BassSourceCurrentTime;
+                }
+
+                EzOsuGame.Diagnostics.EzJudgmentDiagnostics.Record(
+                    Time.Current,
+                    HitObject.GetEndTime(),
+                    timeOffset,
+                    Time.Current, // interpClockTime = FSC ManualClock time
+                    bassSource,
+                    interpDrift,
+                    frameElapsed);
+            }
+
+            CheckForResult(userTriggered, timeOffset);
 
             return Judged;
         }

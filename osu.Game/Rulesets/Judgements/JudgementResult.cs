@@ -100,6 +100,28 @@ namespace osu.Game.Rulesets.Judgements
         public bool IsHit => Type.IsHit();
 
         /// <summary>
+        /// 覆盖combo处理逻辑，用于实现非MISS判定可打断combo
+        /// <para></para>示例:
+        /// </summary>
+        /// <code>
+        /// ApplyResult(static (r, state) =>
+        /// {
+        ///     r.Type = state;
+        ///
+        ///     if (state == HitResult.Meh)
+        ///         r.IsComboHit = false;
+        /// }, result);
+        /// </code>
+        public bool? IsComboHit;
+
+        /// <summary>
+        /// 在 HitObject 提供合适的 HitResult 后，覆盖生命周期判断。
+        /// <para>主要用于poor判定，不结束note显示。同一个note可以有多个poor判定，直到打出常规判定才结束note显示。</para>
+        /// </summary>
+        /// <para></para>用法见<see cref="DrawableHitObject.DispatchNewResult(HitResult)"/>
+        public bool IsFinal { get; set; } = true;
+
+        /// <summary>
         /// The increase in health resulting from this judgement result.
         /// </summary>
         public double HealthIncrease => Judgement.HealthIncreaseFor(this);

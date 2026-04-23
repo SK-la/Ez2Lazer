@@ -46,6 +46,10 @@ using osu.Game.Graphics.UserInterface;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.IO;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Online;
 using osu.Game.Localisation;
 using osu.Game.Online;
 using osu.Game.Online.API;
@@ -64,6 +68,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Utils;
+using Logger = osu.Framework.Logging.Logger;
 using RuntimeInfo = osu.Framework.RuntimeInfo;
 
 namespace osu.Game
@@ -105,8 +110,27 @@ namespace osu.Game
 
         public virtual bool UseDevelopmentServer => DebugUtils.IsDebugBuild;
 
-        public virtual EndpointConfiguration CreateEndpoints() =>
-            UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();
+        public virtual EndpointConfiguration CreateEndpoints()
+        {
+            // 如果Ez2ConfigManager已初始化，根据服务器预设选择对应的配置
+            if (Ez2ConfigManager != null)
+            {
+                var serverPreset = Ez2ConfigManager.Get<ServerPreset>(Ez2Setting.ServerPreset);
+                Logger.Log($"[EzServer] Using server preset: {serverPreset}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                return serverPreset switch
+                {
+                    ServerPreset.Gu => new GuServerEndpointConfiguration(),
+                    ServerPreset.Manual => new ManualServerEndpointConfiguration(Ez2ConfigManager),
+                    _ => new ProductionEndpointConfiguration()
+                };
+            }
+
+            Logger.Log("[EzServer] Switch server failed: Ez2ConfigManager not initialized. Falling back to default configuration.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+            // 否则使用默认配置
+            return UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();
+        }
 
         protected override OnlineStore CreateOnlineStore() => new TrustedDomainOnlineStore();
 
@@ -173,6 +197,12 @@ namespace osu.Game
 
         protected Storage Storage { get; set; }
 
+        protected Ez2ConfigManager Ez2ConfigManager { get; private set; }
+
+        protected EzSkinInfo EzSkinInfo { get; private set; }
+
+        protected EzLocalTextureFactory NoteFactory { get; private set; }
+
         /// <summary>
         /// The language in which the game is currently displayed in.
         /// </summary>
@@ -205,6 +235,7 @@ namespace osu.Game
         public readonly Bindable<Dictionary<ModType, IReadOnlyList<Mod>>> AvailableMods = new Bindable<Dictionary<ModType, IReadOnlyList<Mod>>>(new Dictionary<ModType, IReadOnlyList<Mod>>());
 
         private BeatmapDifficultyCache difficultyCache;
+        private EzAnalysisCache ezAnalysisCache;
         private IBeatmapUpdater beatmapUpdater;
 
         private UserLookupCache userCache;
@@ -240,6 +271,7 @@ namespace osu.Game
         private readonly BindableNumber<double> globalTrackVolumeAdjust = new BindableNumber<double>(global_track_volume_adjust);
 
         private Bindable<string> frameworkLocale = null!;
+        private IBindable<bool> ezAnalysisSqliteEnabled;
 
         private IBindable<LocalisationParameters> localisationParameters = null!;
 
@@ -276,6 +308,22 @@ namespace osu.Game
             }
 
             Resources.AddStore(new DllResourceStore(OsuResources.ResourceAssembly));
+
+            // 初始化并注册EzSkinSettingsManager
+            Ez2ConfigManager = new Ez2ConfigManager(Storage);
+            ezAnalysisSqliteEnabled = Ez2ConfigManager.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+            EzAnalysisPersistentStore.Enabled = ezAnalysisSqliteEnabled.Value;
+            ezAnalysisSqliteEnabled.BindValueChanged(v => EzAnalysisPersistentStore.Enabled = v.NewValue, true);
+
+            GlobalConfigStore.Config = LocalConfig;
+            GlobalConfigStore.EzConfig = Ez2ConfigManager;
+            dependencies.Cache(Ez2ConfigManager);
+            EzSkinInfo = new EzSkinInfo(Ez2ConfigManager);
+            dependencies.CacheAs<IEzSkinInfo>(EzSkinInfo);
+            dependencies.Cache(NoteFactory = new EzLocalTextureFactory(
+                Ez2ConfigManager,
+                Host.Renderer,
+                Storage));
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 
@@ -327,11 +375,19 @@ namespace osu.Game
             dependencies.Cache(BeatmapManager = new BeatmapManager(Storage, realm, API, Audio, Resources, Host, defaultBeatmap, difficultyCache, performOnlineLookups: true));
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
+            var ezAnalysisPersistentStore = new EzAnalysisPersistentStore(Storage);
+            var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, Ez2ConfigManager);
+            ezAnalysisCache = new EzAnalysisCache(ezAnalysisDatabase, Ez2ConfigManager);
+            dependencies.Cache(ezAnalysisPersistentStore);
+            dependencies.Cache(ezAnalysisDatabase);
+            dependencies.Cache(ezAnalysisCache);
+
             dependencies.Cache(BeatmapDownloader = new BeatmapModelDownloader(BeatmapManager, API));
             dependencies.Cache(ScoreDownloader = new ScoreModelDownloader(ScoreManager, API));
 
             // Add after all the above cache operations as it depends on them.
             base.Content.Add(difficultyCache);
+            base.Content.Add(ezAnalysisCache);
 
             // TODO: OsuGame or OsuGameBase?
             dependencies.CacheAs(beatmapUpdater = CreateBeatmapUpdater());
@@ -630,7 +686,7 @@ namespace osu.Game
             }
         }
 
-        protected virtual IBeatmapUpdater CreateBeatmapUpdater() => new BeatmapUpdater(BeatmapManager, difficultyCache, API, Storage);
+        protected virtual IBeatmapUpdater CreateBeatmapUpdater() => new BeatmapUpdater(BeatmapManager, difficultyCache, ezAnalysisCache, API, Storage);
 
         protected override UserInputManager CreateUserInputManager() => new OsuUserInputManager();
 

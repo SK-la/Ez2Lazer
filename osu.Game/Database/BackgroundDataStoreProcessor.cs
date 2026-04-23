@@ -391,11 +391,34 @@ namespace osu.Game.Database
                         // ReSharper disable once MethodHasAsyncOverload
                         realmAccess.Write(r =>
                         {
-                            r.Find<ScoreInfo>(id)!.MaximumStatisticsJson = JsonConvert.SerializeObject(score.MaximumStatistics);
+                            var s = r.Find<ScoreInfo>(id);
+                            if (s != null)
+                                s.MaximumStatisticsJson = JsonConvert.SerializeObject(score.MaximumStatistics);
                         });
-                    }
 
-                    ++processedCount;
+                        ++processedCount;
+                    }
+                    else
+                    {
+                        // Score no longer exists, mark as failed to avoid re-processing
+                        Logger.Log($"Score {id} no longer exists, marking as failed.");
+
+                        try
+                        {
+                            realmAccess.Write(r =>
+                            {
+                                var s = r.Find<ScoreInfo>(id);
+                                if (s != null)
+                                    s.BackgroundReprocessingFailed = true;
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Log($"Failed to mark score {id} as failed: {ex}");
+                        }
+
+                        ++failedCount;
+                    }
                 }
                 catch (ObjectDisposedException)
                 {
@@ -404,7 +427,21 @@ namespace osu.Game.Database
                 catch (Exception e)
                 {
                     Logger.Log(@$"Failed to populate maximum statistics for {id}: {e}");
-                    realmAccess.Write(r => r.Find<ScoreInfo>(id)!.BackgroundReprocessingFailed = true);
+
+                    try
+                    {
+                        realmAccess.Write(r =>
+                        {
+                            var s = r.Find<ScoreInfo>(id);
+                            if (s != null)
+                                s.BackgroundReprocessingFailed = true;
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Failed to mark score {id} as failed: {ex}");
+                    }
+
                     ++failedCount;
                 }
             }
@@ -451,14 +488,25 @@ namespace osu.Game.Database
                 {
                     // Can't use async overload because we're not on the update thread.
                     // ReSharper disable once MethodHasAsyncOverload
-                    realmAccess.Write(r =>
+                    bool success = realmAccess.Write(r =>
                     {
-                        ScoreInfo s = r.Find<ScoreInfo>(id)!;
+                        ScoreInfo? s = r.Find<ScoreInfo>(id);
+
+                        if (s == null)
+                        {
+                            Logger.Log($"Score {id} no longer exists, skipping.");
+                            return false;
+                        }
+
                         StandardisedScoreMigrationTools.UpdateFromLegacy(s, beatmapManager.GetWorkingBeatmap(s.BeatmapInfo));
                         s.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+                        return true;
                     });
 
-                    ++processedCount;
+                    if (success)
+                        ++processedCount;
+                    else
+                        ++failedCount;
                 }
                 catch (ObjectDisposedException)
                 {
@@ -467,7 +515,21 @@ namespace osu.Game.Database
                 catch (Exception e)
                 {
                     Logger.Log($"Failed to convert total score for {id}: {e}");
-                    realmAccess.Write(r => r.Find<ScoreInfo>(id)!.BackgroundReprocessingFailed = true);
+
+                    try
+                    {
+                        realmAccess.Write(r =>
+                        {
+                            var s = r.Find<ScoreInfo>(id);
+                            if (s != null)
+                                s.BackgroundReprocessingFailed = true;
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Failed to mark score {id} as failed: {ex}");
+                    }
+
                     ++failedCount;
                 }
             }
@@ -511,14 +573,25 @@ namespace osu.Game.Database
                 {
                     // Can't use async overload because we're not on the update thread.
                     // ReSharper disable once MethodHasAsyncOverload
-                    realmAccess.Write(r =>
+                    bool success = realmAccess.Write(r =>
                     {
-                        ScoreInfo s = r.Find<ScoreInfo>(id)!;
+                        ScoreInfo? s = r.Find<ScoreInfo>(id);
+
+                        if (s == null)
+                        {
+                            Logger.Log($"Score {id} no longer exists, skipping.");
+                            return false;
+                        }
+
                         s.Rank = StandardisedScoreMigrationTools.ComputeRank(s);
                         s.TotalScoreVersion = LegacyScoreEncoder.LATEST_VERSION;
+                        return true;
                     });
 
-                    ++processedCount;
+                    if (success)
+                        ++processedCount;
+                    else
+                        ++failedCount;
                 }
                 catch (ObjectDisposedException)
                 {
@@ -527,7 +600,21 @@ namespace osu.Game.Database
                 catch (Exception e)
                 {
                     Logger.Log($"Failed to update rank score {id}: {e}");
-                    realmAccess.Write(r => r.Find<ScoreInfo>(id)!.BackgroundReprocessingFailed = true);
+
+                    try
+                    {
+                        realmAccess.Write(r =>
+                        {
+                            var s = r.Find<ScoreInfo>(id);
+                            if (s != null)
+                                s.BackgroundReprocessingFailed = true;
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Log($"Failed to mark score {id} as failed: {ex}");
+                    }
+
                     ++failedCount;
                 }
             }
@@ -596,9 +683,23 @@ namespace osu.Game.Database
                     // ReSharper disable once MethodHasAsyncOverload
                     bool succeeded = realmAccess.Write(r =>
                     {
-                        BeatmapSetInfo beatmapSet = r.Find<BeatmapSetInfo>(id)!;
+                        BeatmapSetInfo? beatmapSet = r.Find<BeatmapSetInfo>(id);
 
-                        var beatmap = beatmapSet.Beatmaps.First(b => b.Status >= BeatmapOnlineStatus.Ranked);
+                        if (beatmapSet == null)
+                        {
+                            Logger.Log($"Beatmap set {id} no longer exists, skipping.");
+                            return false;
+                        }
+
+                        var beatmap = beatmapSet.Beatmaps.FirstOrDefault(b => b.Status >= BeatmapOnlineStatus.Ranked);
+
+                        if (beatmap == null)
+                        {
+                            // No ranked beatmap found, set default dates to avoid re-processing
+                            beatmapSet.DateSubmitted ??= beatmapSet.DateAdded;
+                            beatmapSet.DateRanked ??= beatmapSet.DateAdded;
+                            return false;
+                        }
 
                         bool lookupSucceeded = localMetadataSource.TryLookup(beatmap, out var result);
 
@@ -610,7 +711,9 @@ namespace osu.Game.Database
                             return true;
                         }
 
-                        Logger.Log($"Could not find {beatmapSet.GetDisplayString()} in local cache while backpopulating missing submission/rank date");
+                        // Lookup failed, set default dates to avoid re-processing every startup
+                        beatmapSet.DateSubmitted ??= beatmapSet.DateAdded;
+                        beatmapSet.DateRanked ??= beatmapSet.DateAdded;
                         return false;
                     });
 
@@ -754,7 +857,7 @@ namespace osu.Game.Database
             notification.Text = notification.Text.ToString().Split('(').First().TrimEnd() + $" ({processedCount} of {totalCount})";
             notification.Progress = (float)processedCount / totalCount;
 
-            if (processedCount % 100 == 0)
+            if (processedCount > 0 && processedCount % 100 == 0)
                 Logger.Log(notification.Text.ToString());
         }
 

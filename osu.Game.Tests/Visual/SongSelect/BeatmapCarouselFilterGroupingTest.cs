@@ -405,6 +405,8 @@ namespace osu.Game.Tests.Visual.SongSelect
                 GetCollections = () => new List<BeatmapCollection>(),
                 GetLocalUserTopRanks = _ => new Dictionary<Guid, ScoreRank>(),
                 GetFavouriteBeatmapSets = () => favouriteBeatmapSets,
+                ShouldUseXxySrForDifficultyOperations = () => false,
+                GetDifficultiesForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.ToDictionary(b => b, b => b.StarRating)),
             };
 
             return await groupingFilter.Run(beatmapSets.SelectMany(s => s.Beatmaps.Select(b => new CarouselItem(b))).ToList(), CancellationToken.None);

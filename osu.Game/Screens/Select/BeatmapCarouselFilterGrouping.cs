@@ -47,6 +47,8 @@ namespace osu.Game.Screens.Select
         public required Func<List<BeatmapCollection>> GetCollections { get; init; }
         public required Func<FilterCriteria, IReadOnlyDictionary<Guid, ScoreRank>> GetLocalUserTopRanks { get; init; }
         public required Func<HashSet<int>> GetFavouriteBeatmapSets { get; init; }
+        public required Func<bool> ShouldUseXxySrForDifficultyOperations { get; init; }
+        public required Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> GetDifficultiesForOperationsAsync { get; init; }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
         {
@@ -59,10 +61,35 @@ namespace osu.Game.Screens.Select
 
                 var criteria = GetCriteria();
                 var newItems = new List<CarouselItem>();
+                var itemList = (List<CarouselItem>)items;
+
+                IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
+
+                // xxy_SR is only required when difficulty is the active grouping key.
+                // For 0/1 item, grouping key does not affect output.
+                bool useXxyDifficulty = criteria.Group == GroupMode.Difficulty
+                                        && ShouldUseXxySrForDifficultyOperations()
+                                        && itemList.Count > 1;
+
+                if (useXxyDifficulty)
+                {
+                    var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
+                    operationDifficulties = GetDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken)
+                                            .GetAwaiter()
+                                            .GetResult();
+                }
 
                 BeatmapSetsGroupedTogether = ShouldGroupBeatmapsTogether(criteria);
 
-                var groups = getGroups((List<CarouselItem>)items, criteria);
+                double getDifficulty(BeatmapInfo beatmap)
+                {
+                    if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double difficulty))
+                        return difficulty;
+
+                    return beatmap.StarRating;
+                }
+
+                var groups = getGroups(itemList, criteria, getDifficulty);
                 int displayedBeatmapsCount = 0;
 
                 foreach (var (group, itemsInGroup) in groups)
@@ -165,7 +192,7 @@ namespace osu.Game.Screens.Select
             return true;
         }
 
-        private List<GroupMapping> getGroups(List<CarouselItem> items, FilterCriteria criteria)
+        private List<GroupMapping> getGroups(List<CarouselItem> items, FilterCriteria criteria, Func<BeatmapInfo, double> getDifficulty)
         {
             switch (criteria.Group)
             {
@@ -205,13 +232,13 @@ namespace osu.Game.Screens.Select
                     return getGroupsBy(b => defineGroupByBPM(FormatUtils.RoundBPM(b.BPM)), items);
 
                 case GroupMode.Difficulty:
-                    return getGroupsBy(b => defineGroupByStars(b.StarRating), items);
+                    return getGroupsBy(b => defineGroupByStars(getDifficulty(b)), items);
 
                 case GroupMode.Length:
                     return getGroupsBy(b => defineGroupByLength(b.Length), items);
 
                 case GroupMode.Source:
-                    return getGroupsBy(b => defineGroupBySource(b.BeatmapSet!.Metadata.Source), items);
+                    return getGroupsBy(defineGroupBySource, items);
 
                 case GroupMode.Collections:
                 {
@@ -405,12 +432,78 @@ namespace osu.Game.Screens.Select
             return new GroupDefinition(11, "Over 10 minutes").Yield();
         }
 
-        private IEnumerable<GroupDefinition> defineGroupBySource(string source)
+        private IEnumerable<GroupDefinition> defineGroupBySource(BeatmapInfo beatmap)
         {
-            if (string.IsNullOrEmpty(source))
-                return new GroupDefinition(1, "Unsourced").Yield();
+            var meta = beatmap.BeatmapSet!.Metadata;
 
-            return new GroupDefinition(0, source).Yield();
+            string source = meta.Source;
+            string tags = meta.Tags;
+            string title = meta.Title;
+            string artist = meta.Artist;
+            string diff = beatmap.DifficultyName;
+
+            // combine fields for matching, but preserve whether source was provided
+            bool hasSource = !string.IsNullOrWhiteSpace(source);
+            string combined = string.Join(" ", source, tags, title, artist, diff).Trim();
+
+            if (string.IsNullOrWhiteSpace(combined))
+                return new GroupDefinition(200, "Unsourced").Yield();
+
+            // helper for case-insensitive contains
+            static bool containsAny(string haystack, params string[] needles)
+            {
+                if (string.IsNullOrEmpty(haystack)) return false;
+
+                foreach (string n in needles)
+                {
+                    if (!string.IsNullOrEmpty(n) && haystack.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
+                        return true;
+                }
+
+                return false;
+            }
+
+            // priority-ordered matching
+            if (containsAny(combined, "touhou", "東方", "东方", "touhou project", "東方Project", "東方プロジェクト", "동방프로젝트", "동방Project", "tohou",
+                    "瑶山百灵", "藤咲かりん", "小峠舞", "ZUN", "上海アリス幻樂団", "上海アリス", "Team Shanghai Alice", "IOSYS", "EastNewSound", "幽閉サテライト", "C-CLAYS", "Silver Forest", "Sound Holic", "Alstroemeria Records",
+                    "豚乙女", "Demetori", "SOUND HOLIC",
+                    "幽闭星光",
+                    "博麗", "霊夢", "霊夢", "魔理沙", "アリス", "咲夜", "レミリア", "フランドール", "チルノ", "パチュリー", "妖夢", "鈴仙", "早苗", "映姫", "幽々子", "蓮子", "メディスン", "妖怪",
+                    "地霊殿", "紅魔郷", "妖々夢", "永夜抄", "花映塚", "風神録", "神霊廟", "輝針城", "紺珠伝", "天空璋", "鬼形獣", "虹龍洞"))
+                return new GroupDefinition(2, "东方Project").Yield();
+
+            if (containsAny(combined, "vocaloid", "ボーカロイド", "보컬로이드", "vocaloids", "vocaloid music", "diva",
+                    "miku", "hatsune", "kagamine", "gumi", "luka", "meiko", "kaito", "鏡音", "初音", "巡音", "巡音ルカ", "鏡音リン", "鏡音レン", "MEIKO", "KAITO", "GUMI"))
+                return new GroupDefinition(4, "VOCALOID").Yield();
+
+            if (containsAny(combined, "ez2", "ez2ac", "ez2dj", "ez2on"))
+                return new GroupDefinition(1, "EZ2AC").Yield();
+
+            if (containsAny(combined, "djmax", "디제이맥스", "DJMAX"))
+                return new GroupDefinition(0, "DJMAX").Yield();
+
+            if (containsAny(combined, "bms", "bof"))
+                return new GroupDefinition(0, "BMS").Yield();
+
+            if (containsAny(combined, "iidx", "beatmania iidx", "beatmania", "beatmaniaIIDX", "konami", "bemani", "sdvx", "sound voltex",
+                    "pop'n music", "pop'n", "popn", "guitarFreaks", "drummania", "DDR", "dance dance revolution", "DanceDanceRevolution", "jubeat", "reflec beat", "REFLEC BEAT",
+                    "あさき", "dj TAKA", "DJ YOSHITAKA", " 猫叉Master", "U1", "L.E.D.", "wac", "Qrispy Joybox", "PON", "DJ TOTTO", "PHQUASE", "村井圣夜"
+                ))
+                return new GroupDefinition(0, "BEMANI SOUND").Yield();
+
+            if (containsAny(combined, "o2jam", "o2mania", "오투잼", "[荣誉]", "[木星灵魂]", "[木星]", "劲乐团"))
+                return new GroupDefinition(0, "O2").Yield();
+
+            if (containsAny(combined, "tv", "tv-size", "tv size", "anime", "op", "ed", "tv_ver", "アニメ", "动画", "acg", "galgame", "dmm", "Douga", "Nico",
+                    "game"))
+                return new GroupDefinition(3, "ACG").Yield();
+
+            // If none of the special rules matched but the source field was provided, put into Others
+            if (hasSource)
+                return new GroupDefinition(50, "Others").Yield();
+
+            // No source and no match -> Unsourced
+            return new GroupDefinition(200, "Unsourced").Yield();
         }
 
         private List<GroupMapping> defineGroupsByCollection(List<CarouselItem> carouselItems, List<BeatmapCollection> allCollections)

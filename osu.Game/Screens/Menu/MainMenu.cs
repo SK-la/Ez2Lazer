@@ -23,6 +23,7 @@ using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
@@ -97,6 +98,7 @@ namespace osu.Game.Screens.Menu
         private Bindable<double> holdDelay;
         private Bindable<bool> loginDisplayed;
         private Bindable<bool> showMobileDisclaimer;
+        private Bindable<bool> hideMainMenuOnlineBanner;
 
         private HoldToExitGameOverlay holdToExitGameOverlay;
 
@@ -120,11 +122,12 @@ namespace osu.Game.Screens.Menu
         private IDisposable logoProxy;
 
         [BackgroundDependencyLoader(true)]
-        private void load(BeatmapListingOverlay beatmapListing, SettingsOverlay settings, OsuConfigManager config, SessionStatics statics, AudioManager audio)
+        private void load(BeatmapListingOverlay beatmapListing, SettingsOverlay settings, OsuConfigManager config, SessionStatics statics, AudioManager audio, Ez2ConfigManager ezConfig)
         {
             holdDelay = config.GetBindable<double>(OsuSetting.UIHoldActivationDelay);
             loginDisplayed = statics.GetBindable<bool>(Static.LoginOverlayDisplayed);
             showMobileDisclaimer = config.GetBindable<bool>(OsuSetting.ShowMobileDisclaimer);
+            hideMainMenuOnlineBanner = ezConfig.GetBindable<bool>(Ez2Setting.HideMainMenuOnlineBanner);
 
             if (host.CanExit)
             {
@@ -227,20 +230,31 @@ namespace osu.Game.Screens.Menu
                     case ButtonSystemState.Initial:
                     case ButtonSystemState.Exit:
                         ApplyToBackground(b => b.FadeColour(OsuColour.Gray(baseDim), 500, Easing.OutSine));
-                        onlineMenuBanner.State.Value = Visibility.Hidden;
                         break;
 
                     default:
                         ApplyToBackground(b => b.FadeColour(OsuColour.Gray(baseDim * 0.8f), 500, Easing.OutSine));
-                        onlineMenuBanner.State.Value = Visibility.Visible;
                         break;
                 }
+
+                updateOnlineMenuBannerVisibility(state);
             };
+
+            hideMainMenuOnlineBanner.BindValueChanged(_ => updateOnlineMenuBannerVisibility(Buttons.State), true);
 
             Buttons.OnSettings = () => settings?.ToggleVisibility();
             Buttons.OnBeatmapListing = () => beatmapListing?.ToggleVisibility();
 
             reappearSampleSwoosh = audio.Samples.Get(@"Menu/reappear-swoosh");
+        }
+
+        private void updateOnlineMenuBannerVisibility(ButtonSystemState state)
+        {
+            bool shouldShow = !hideMainMenuOnlineBanner.Value
+                              && state != ButtonSystemState.Initial
+                              && state != ButtonSystemState.Exit;
+
+            onlineMenuBanner.State.Value = shouldShow ? Visibility.Visible : Visibility.Hidden;
         }
 
         protected override void LoadComplete()

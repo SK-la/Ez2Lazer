@@ -5,7 +5,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -16,6 +19,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
     public partial class ManiaScoreProcessor : ScoreProcessor
     {
         private const double combo_base = 4;
+        private double calOD = 8;
 
         public ManiaScoreProcessor()
             : base(new ManiaRuleset())
@@ -23,7 +27,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
         }
 
         protected override IEnumerable<HitObject> EnumerateHitObjects(IBeatmap beatmap)
-            => base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
+        {
+            calOD = Mods.Value.OfType<ManiaModAdjust>().FirstOrDefault(m => m.OverallDifficulty.Value != beatmap.Difficulty.OverallDifficulty)
+                        ?.OverallDifficulty.Value ?? beatmap.Difficulty.OverallDifficulty;
+
+            return base.EnumerateHitObjects(beatmap).Order(JudgementOrderComparer.DEFAULT);
+        }
 
         protected override double ComputeTotalScore(double comboProgress, double accuracyProgress, double bonusPortion)
         {
@@ -68,11 +77,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
             // SS is expected as long as all hitobjects have been hit with either a GREAT or PERFECT result.
 
-            bool anyImperfect =
-                results.GetValueOrDefault(HitResult.Good) > 0
-                || results.GetValueOrDefault(HitResult.Ok) > 0
-                || results.GetValueOrDefault(HitResult.Meh) > 0
-                || results.GetValueOrDefault(HitResult.Miss) > 0;
+            bool anyImperfect = results.GetValueOrDefault(HitResult.Good) > 0
+                                || results.GetValueOrDefault(HitResult.Ok) > 0
+                                || results.GetValueOrDefault(HitResult.Meh) > 0
+                                || results.GetValueOrDefault(HitResult.Miss) > 0;
 
             return anyImperfect ? rank : ScoreRank.X;
         }
@@ -99,6 +107,84 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     ? maniaX.Column.CompareTo(maniaY.Column)
                     : 0;
             }
+        }
+
+        protected override void ApplyScoreChange(JudgementResult judgement)
+        {
+            // if (!IsLegacyScore) return;
+
+            var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
+            {
+                OverallDifficulty = calOD
+            };
+            double offset = Math.Abs(judgement.TimeOffset);
+            var result = hitWindows.ResultFor(offset);
+            var hitObject = (ManiaHitObject)judgement.HitObject;
+
+            if (hitObject is HeadNote)
+            {
+                headOffsets[hitObject.Column] = offset;
+            }
+            else if (hitObject is TailNote)
+            {
+                ClassicMaxBaseScore += 300;
+                ClassicBaseScore += hitWindows.GetLNScore(headOffsets[hitObject.Column], offset);
+                headOffsets[hitObject.Column] = 0;
+            }
+            else if (hitObject is Note)
+            {
+                ClassicMaxBaseScore += 300;
+                ClassicBaseScore += result switch
+                {
+                    HitResult.Perfect => 300,
+                    HitResult.Great => 300,
+                    HitResult.Good => 200,
+                    HitResult.Ok => 100,
+                    HitResult.Meh => 50,
+                    _ => 0
+                };
+            }
+
+            UpdateScoreClassic();
+        }
+
+        private readonly double[] headOffsets = new double[18];
+
+        protected override void RemoveScoreChange(JudgementResult judgement)
+        {
+            var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
+            {
+                OverallDifficulty = calOD
+            };
+            double offset = Math.Abs(judgement.TimeOffset);
+            var result = hitWindows.ResultFor(offset);
+            var hitObject = (ManiaHitObject)judgement.HitObject;
+
+            if (hitObject is HeadNote)
+            {
+                headOffsets[hitObject.Column] = offset;
+            }
+            else if (hitObject is TailNote)
+            {
+                ClassicMaxBaseScore -= 300;
+                ClassicBaseScore -= hitWindows.GetLNScore(headOffsets[hitObject.Column], offset);
+                headOffsets[hitObject.Column] = 0;
+            }
+            else if (hitObject is Note)
+            {
+                ClassicMaxBaseScore -= 300;
+                ClassicBaseScore -= result switch
+                {
+                    HitResult.Perfect => 300,
+                    HitResult.Great => 300,
+                    HitResult.Good => 200,
+                    HitResult.Ok => 100,
+                    HitResult.Meh => 50,
+                    _ => 0
+                };
+            }
+
+            UpdateScoreClassic();
         }
     }
 }

@@ -53,12 +53,21 @@ namespace osu.Game.Screens.Edit
         /// </summary>
         public bool IsSeeking { get; private set; }
 
+        public IBindable<double> LoopStartTime => loopStartTime;
+        public IBindable<double> LoopEndTime => loopEndTime;
+        public BindableBool LoopEnabled { get; } = new BindableBool();
+
+        private readonly Bindable<double> loopStartTime = new Bindable<double>();
+        private readonly Bindable<double> loopEndTime = new Bindable<double>();
+
         public EditorClock(IBeatmap beatmap = null, BindableBeatDivisor beatDivisor = null)
         {
             Beatmap = beatmap ?? new Beatmap();
 
             this.beatDivisor = beatDivisor ?? new BindableBeatDivisor();
 
+            // 编辑器使用谱面原始时间。若在此应用偏移会破坏寻迹/循环逻辑
+            // （FramedBeatmapClock 在原始时间上进行寻迹，但报告的 CurrentTime 却应用了偏移）。
             underlyingClock = new FramedBeatmapClock(applyOffsets: true, requireDecoupling: true);
             AddInternal(underlyingClock);
 
@@ -88,7 +97,18 @@ namespace osu.Game.Screens.Edit
             if (position > nextTimingPoint?.Time)
                 position = nextTimingPoint.Time;
 
-            return Seek(position);
+            return Seek(GetSnappedTime(position));
+        }
+
+        /// <summary>
+        /// 这个方法返回根据当前编辑器节拍除数配置进行捕捉的<paramref name="time"/>。
+        /// 对其到显示的编辑器网格粒度。
+        /// TODO: 尽管如此，视觉上也依然难以发觉捕捉效果。最好在编辑器顶部的时间轴上同步显示光标位置。
+        /// </summary>
+        public double GetSnappedTime(double time)
+        {
+            double snapped = ControlPointInfo.GetClosestSnappedTime(time, beatDivisor.Value);
+            return Math.Clamp(snapped, 0, TrackLength);
         }
 
         /// <summary>
@@ -292,6 +312,12 @@ namespace osu.Game.Screens.Edit
                     underlyingClock.Seek(TrackLength);
             }
 
+            // Handle A-B loop
+            if (LoopEnabled.Value && IsRunning && CurrentTime >= loopEndTime.Value)
+            {
+                underlyingClock.Seek(loopStartTime.Value);
+            }
+
             updateSeekingState();
         }
 
@@ -340,5 +366,9 @@ namespace osu.Game.Screens.Edit
 
             protected override void ReadIntoStartValue(EditorClock clock) => StartValue = clock.currentTime;
         }
+
+        public void SetLoopStartTime(double time) => loopStartTime.Value = time;
+
+        public void SetLoopEndTime(double time) => loopEndTime.Value = time;
     }
 }

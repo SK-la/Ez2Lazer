@@ -15,9 +15,9 @@ namespace osu.Game.Skinning
     /// </summary>
     public partial class BeatmapSkinProvidingContainer : SkinProvidingContainer
     {
-        private Bindable<bool> beatmapSkins = null!;
-        private Bindable<bool> beatmapColours = null!;
-        private Bindable<bool> beatmapHitsounds = null!;
+        private Bindable<bool>? beatmapSkins;
+        private Bindable<bool>? beatmapColours;
+        private Bindable<bool>? beatmapHitsounds;
 
         protected override bool AllowConfigurationLookup
         {
@@ -59,7 +59,7 @@ namespace osu.Game.Skinning
 
         protected override bool AllowSampleLookup(ISampleInfo sampleInfo)
         {
-            if (beatmapSkins == null)
+            if (beatmapSkins == null || beatmapHitsounds == null)
                 throw new InvalidOperationException($"{nameof(BeatmapSkinProvidingContainer)} needs to be loaded before being consumed.");
 
             return sampleInfo is StoryboardSampleInfo || beatmapHitsounds.Value;
@@ -68,7 +68,7 @@ namespace osu.Game.Skinning
         private readonly ISkin skin;
         private readonly ISkin? classicFallback;
 
-        private Bindable<Skin> currentSkin = null!;
+        private Bindable<Skin>? currentSkin;
 
         public BeatmapSkinProvidingContainer(ISkin skin, ISkin? classicFallback = null)
             : base(skin)
@@ -81,9 +81,9 @@ namespace osu.Game.Skinning
         {
             var config = parent.Get<OsuConfigManager>();
 
-            beatmapSkins = config.GetBindable<bool>(OsuSetting.BeatmapSkins);
-            beatmapColours = config.GetBindable<bool>(OsuSetting.BeatmapColours);
-            beatmapHitsounds = config.GetBindable<bool>(OsuSetting.BeatmapHitsounds);
+            beatmapSkins = config.GetBindable<bool>(OsuSetting.BeatmapSkins).GetBoundCopy();
+            beatmapColours = config.GetBindable<bool>(OsuSetting.BeatmapColours).GetBoundCopy();
+            beatmapHitsounds = config.GetBindable<bool>(OsuSetting.BeatmapHitsounds).GetBoundCopy();
 
             return base.CreateChildDependencies(parent);
         }
@@ -91,9 +91,9 @@ namespace osu.Game.Skinning
         [BackgroundDependencyLoader]
         private void load(SkinManager skins)
         {
-            beatmapSkins.BindValueChanged(_ => TriggerSourceChanged());
-            beatmapColours.BindValueChanged(_ => TriggerSourceChanged());
-            beatmapHitsounds.BindValueChanged(_ => TriggerSourceChanged());
+            beatmapSkins!.BindValueChanged(_ => TriggerSourceChanged());
+            beatmapColours!.BindValueChanged(_ => TriggerSourceChanged());
+            beatmapHitsounds!.BindValueChanged(_ => TriggerSourceChanged());
 
             currentSkin = skins.CurrentSkin.GetBoundCopy();
             currentSkin.BindValueChanged(_ =>
@@ -116,6 +116,16 @@ namespace osu.Game.Skinning
                 else
                     SetSources(new[] { skin });
             }, true);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            beatmapSkins?.UnbindAll();
+            beatmapColours?.UnbindAll();
+            beatmapHitsounds?.UnbindAll();
+            currentSkin?.UnbindAll();
+
+            base.Dispose(isDisposing);
         }
     }
 }

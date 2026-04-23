@@ -35,6 +35,14 @@ namespace osu.Game.Screens.Play.HUD.HitErrorMeters
             Precision = 0.1f,
         };
 
+        [SettingSource("Icon Fade Out Duration", "Icon Fade Out Duration")]
+        public BindableNumber<int> JudgementFadeOutDuration { get; } = new BindableNumber<int>(1200)
+        {
+            MinValue = 100,
+            MaxValue = 5000,
+            Precision = 100,
+        };
+
         [SettingSource(typeof(BarHitErrorMeterStrings), nameof(BarHitErrorMeterStrings.ColourBarVisibility))]
         public Bindable<bool> ColourBarVisibility { get; } = new Bindable<bool>(true);
 
@@ -470,7 +478,7 @@ namespace osu.Game.Screens.Play.HUD.HitErrorMeters
                 base.PrepareForUse();
 
                 const int judgement_fade_in_duration = 100;
-                const int judgement_fade_out_duration = 5000;
+                // const int judgement_fade_out_duration = 1200;
 
                 Alpha = 0;
                 Width = 0;
@@ -479,8 +487,8 @@ namespace osu.Game.Screens.Play.HUD.HitErrorMeters
                     .FadeTo(0.6f, judgement_fade_in_duration, Easing.OutQuint)
                     .ResizeWidthTo(1, judgement_fade_in_duration, Easing.OutQuint)
                     .Then()
-                    .FadeOut(judgement_fade_out_duration)
-                    .ResizeWidthTo(0, judgement_fade_out_duration, Easing.InQuint)
+                    .FadeOut(barHitErrorMeter.JudgementFadeOutDuration.Value)
+                    .ResizeWidthTo(0, barHitErrorMeter.JudgementFadeOutDuration.Value, Easing.InQuint)
                     .Expire();
             }
         }

@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Framework.Testing;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -82,6 +83,7 @@ namespace osu.Game.Overlays.FirstRunSetup
                         new SkinSection(),
                         // InputSection is intentionally omitted for now due to its sub-panel being a pain to set up.
                         new UserInterfaceSection(),
+                        new EzGameSection(),
                         new GameplaySection(),
                         new RulesetSection(),
                         new AudioSection(),

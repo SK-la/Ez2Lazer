@@ -7,6 +7,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation;
 
 namespace osu.Game.Overlays.Settings.Sections.Gameplay
@@ -16,7 +18,7 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
         protected override LocalisableString Header => GameplaySettingsStrings.InputHeader;
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             Children = new Drawable[]
             {
@@ -48,6 +50,15 @@ namespace osu.Game.Overlays.Settings.Sections.Gameplay
                 {
                     Caption = GameplaySettingsStrings.DisableWinKey,
                     Current = config.GetBindable<bool>(OsuSetting.GameplayDisableWinKey)
+                }));
+            }
+
+            if (RuntimeInfo.OS == RuntimeInfo.Platform.macOS)
+            {
+                Add(new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.DISABLE_CMD_SPACE,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.GameplayDisableCmdSpace)
                 }));
             }
         }

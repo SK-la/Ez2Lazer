@@ -36,6 +36,16 @@ namespace osu.Game.Screens.Edit.Components.Timelines.Summary.Parts
 
         private double? lastSeekTime;
 
+        public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
+        {
+            if (!base.ReceivePositionalInputAt(screenSpacePos))
+                return false;
+
+            // 改为只在上半部分响应交互，为了配合A-B Loop光标仅下半区的UI交互
+            var localPos = ToLocalSpace(screenSpacePos);
+            return localPos.Y < DrawHeight / 2;
+        }
+
         protected override bool OnDragStart(DragStartEvent e) => true;
 
         protected override void OnDrag(DragEvent e)

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
@@ -11,10 +12,15 @@ using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame;
+using osu.Game.EzOsuGame.Audio;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -82,9 +88,45 @@ namespace osu.Game.Rulesets.Mania.UI
         [Resolved]
         private ISkinSource skin { get; set; } = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private EzLocalTextureFactory ezFactory { get; set; } = null!;
+
+        // 保留备用，以后有精力对比一下全局注入和列级缓存的差异
+        // [Cached(Type = typeof(IEzSkinInfo))]
+        // private readonly EzSkinInfo ezSkinInfo = new EzSkinInfo();
+        //
+        // public IEzSkinInfo EzSkinInfo => ezSkinInfo;
+
+        public Bindable<string> NoteSetNameBindable = null!;
+        public Bindable<bool> ColorSettingsEnabledBindable = null!;
+        public Bindable<Colour4> EzNoteColourBindable = null!;
+        public Bindable<Vector2> EzNoteSizeBindable = null!;
+        public Bindable<EzColumnType> EzNoteTypeBindable = null!;
+        private Bindable<EzEnumHitMode> hitModeBindable = null!;
+
+        private KeySoundPreviewMode keySoundPreviewMode;
+
+        private Action<int, int, EzColumnType>? onColumnTypeChangedHandler;
+        private Action? onNoteDrawableChangedHandler;
+        private Action? onNoteSizeChangedHandler;
+        private Action? onNoteColourChangedHandler;
+
+        // 缓存计算参数，避免闭包捕获
+        public int KeyMode;
+
         [BackgroundDependencyLoader]
-        private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig)
+        private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, StageDefinition stageDefinition)
         {
+            KeyMode = stageDefinition.Columns;
+            EzNoteTypeBindable = ezConfig.GetColumnTypeBindable(KeyMode, Index);
+            EzNoteSizeBindable = ezFactory.GetNoteSizeBindable(KeyMode, Index);
+            EzNoteColourBindable = ezConfig.GetColumnColorBindable(KeyMode, Index);
+            NoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
+            ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+
             SkinnableDrawable keyArea;
 
             skin.SourceChanged += onSourceChanged;
@@ -116,14 +158,12 @@ namespace osu.Game.Rulesets.Mania.UI
             BackgroundContainer.Add(background);
             TopLevelContainer.Add(HitObjectArea.Explosions.CreateProxy());
 
-            RegisterPool<Note, DrawableNote>(10, 50);
-            RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-            RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
-            RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
-            RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
-
             if (rulesetConfig != null)
                 touchOverlay = rulesetConfig.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay);
+
+            keySoundPreviewMode = ezConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode);
+            hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            hitModeBindable.BindValueChanged(configurePools, true);
         }
 
         private void onSourceChanged()
@@ -139,16 +179,48 @@ namespace osu.Game.Rulesets.Mania.UI
                                      ?.Value ?? Stage.COLUMN_SPACING;
         }
 
+        public event Action? NoteSetChanged;
+        public event Action? NoteSizeChanged;
+        public event Action? NoteColourChanged;
+
         protected override void LoadComplete()
         {
             base.LoadComplete();
             NewResult += OnNewResult;
+
+            onNoteDrawableChangedHandler = () => NoteSetChanged?.Invoke();
+            ezFactory.OnNoteDrawableChanged += onNoteDrawableChangedHandler;
+
+            onColumnTypeChangedHandler = (keyMode, columnIndex, _) =>
+            {
+                if (keyMode == KeyMode && columnIndex == Index)
+                    NoteSetChanged?.Invoke();
+            };
+            ezConfig.ColumnTypeChanged += onColumnTypeChangedHandler;
+
+            onNoteSizeChangedHandler = () => NoteSizeChanged?.Invoke();
+            ezFactory.OnNoteSizeChanged += onNoteSizeChangedHandler;
+
+            onNoteColourChangedHandler = () => NoteColourChanged?.Invoke();
+            ezFactory.OnNoteColourChanged += onNoteColourChangedHandler;
         }
 
         protected override void Dispose(bool isDisposing)
         {
             // must happen before children are disposed in base call to prevent illegal accesses to the hit explosion pool.
             NewResult -= OnNewResult;
+
+            if (onNoteDrawableChangedHandler != null)
+                ezFactory.OnNoteDrawableChanged -= onNoteDrawableChangedHandler;
+
+            if (onColumnTypeChangedHandler != null)
+                ezConfig.ColumnTypeChanged -= onColumnTypeChangedHandler;
+
+            if (onNoteSizeChangedHandler != null)
+                ezFactory.OnNoteSizeChanged -= onNoteSizeChangedHandler;
+
+            if (onNoteColourChangedHandler != null)
+                ezFactory.OnNoteColourChanged -= onNoteColourChangedHandler;
 
             base.Dispose(isDisposing);
 
@@ -160,6 +232,8 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
             dependencies.CacheAs<IBindable<ManiaAction>>(Action);
+            // dependencies.CacheAs(EzSkinInfo);
+
             return dependencies;
         }
 
@@ -189,7 +263,11 @@ namespace osu.Game.Rulesets.Mania.UI
             if (e.Action != Action.Value)
                 return false;
 
-            sampleTriggerSource.Play();
+            // 记录延迟追踪按键输入
+            InputAudioLatencyTracker.Instance?.RecordColumnPress(Index);
+
+            if (keySoundPreviewMode != KeySoundPreviewMode.AutoPlayPlus)
+                sampleTriggerSource.Play();
             return true;
         }
 
@@ -202,6 +280,54 @@ namespace osu.Game.Rulesets.Mania.UI
             // Extend input coverage to the gaps close to this column.
             var spacingInflation = new MarginPadding { Left = leftColumnSpacing, Right = rightColumnSpacing };
             return DrawRectangle.Inflate(spacingInflation).Contains(ToLocalSpace(screenSpacePos));
+        }
+
+        private void configurePools(ValueChangedEvent<EzEnumHitMode> v)
+        {
+            switch (v.NewValue)
+            {
+                case EzEnumHitMode.EZ2AC:
+                    RegisterPool<Note, Ez2AcDrawableNote>(10, 50);
+                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
+                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
+                    break;
+
+                case EzEnumHitMode.Malody:
+                    RegisterPool<Note, DrawableNote>(10, 50);
+                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, MalodyDrawableLNTail>(10, 50);
+                    RegisterPool<HoldNoteBody, MalodyDrawableLNBody>(10, 50);
+                    break;
+
+                case EzEnumHitMode.IIDX_HD:
+                case EzEnumHitMode.LR2_HD:
+                case EzEnumHitMode.Raja_NM:
+                    RegisterPool<Note, BMSDrawableNote>(10, 50);
+                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, BMSDrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, BMSDrawableHoldNoteTail>(10, 50);
+                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
+                    break;
+
+                case EzEnumHitMode.O2Jam:
+                    RegisterPool<Note, O2DrawableNote>(10, 50);
+                    RegisterPool<HoldNote, O2DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, O2DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, O2DrawableHoldNoteTail>(10, 50);
+                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
+                    break;
+
+                default:
+                    RegisterPool<Note, DrawableNote>(10, 50);
+                    RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
+                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<TailNote, DrawableHoldNoteTail>(10, 50);
+                    RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
+                    break;
+            }
         }
 
         #region Touch Input

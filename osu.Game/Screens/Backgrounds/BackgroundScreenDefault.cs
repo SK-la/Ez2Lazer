@@ -3,11 +3,16 @@
 
 #nullable disable
 
+using System;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
@@ -16,6 +21,8 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Backgrounds;
+using osu.Game.EzOsuGame.Background;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Skinning;
@@ -24,6 +31,8 @@ namespace osu.Game.Screens.Backgrounds
 {
     public partial class BackgroundScreenDefault : BackgroundScreen
     {
+        private bool storageTextureSourceAdded;
+
         private Background background;
 
         private int currentDisplay;
@@ -138,12 +147,129 @@ namespace osu.Game.Screens.Backgrounds
             currentDisplay++;
         }
 
+        [Resolved]
+        private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private TextureStore textures { get; set; } = null!;
+
+        [Resolved]
+        private LargeTextureStore largeTextures { get; set; } = null!;
+
+        // Try to pick a random file from storage under a relative path.
+        // Returns storage-relative resourcePath (for textures) and fullPath (absolute on disk) for file-based consumers like Video.
+        private bool tryGetRandomStorageFile(string relativePath, out string resourcePath, out string fullPath, string[] extensions = null)
+        {
+            resourcePath = null;
+            fullPath = null;
+
+            try
+            {
+                string[] files = storage.GetFiles(relativePath, "*").ToArray();
+
+                if (extensions != null && extensions.Length > 0)
+                    files = files.Where(f => extensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase))).ToArray();
+
+                // ensure directory exists on disk so users can drop files
+                string dataFolderPath = storage.GetFullPath(relativePath);
+
+                if (files.Length == 0)
+                {
+                    if (dataFolderPath != null && !Directory.Exists(dataFolderPath))
+                    {
+                        Directory.CreateDirectory(dataFolderPath);
+                        Logger.Log(EzSettingsStrings.STORAGE_FOLDER_CREATED.Format(dataFolderPath), LoggingTarget.Information, LogLevel.Important);
+                    }
+
+                    // directory exists but no files
+                    if (dataFolderPath != null)
+                        Logger.Log(EzSettingsStrings.STORAGE_FOLDER_EMPTY.Format(dataFolderPath), LoggingTarget.Information, LogLevel.Important);
+
+                    return false;
+                }
+
+                // ensure textures can resolve storage-backed resources (only add once)
+                if (!storageTextureSourceAdded)
+                {
+                    try
+                    {
+                        var loader = gameHost.CreateTextureLoaderStore(new StorageBackedResourceStore(storage));
+                        textures.AddTextureSource(loader);
+
+                        largeTextures?.AddTextureSource(loader);
+
+                        storageTextureSourceAdded = true;
+                    }
+                    catch
+                    {
+                        // ignore failures; callers will fall back
+                    }
+                }
+
+                string file = files[RNG.Next(files.Length)];
+
+                // Normalize separators for comparison.
+                string normalizedFile = file.Replace('\\', '/');
+                string normalizedRelative = relativePath.Replace('\\', '/').TrimEnd('/');
+
+                if (normalizedFile.StartsWith(normalizedRelative + "/", StringComparison.OrdinalIgnoreCase)
+                    || normalizedFile.Equals(normalizedRelative, StringComparison.OrdinalIgnoreCase))
+                {
+                    resourcePath = normalizedFile;
+                }
+                else if (Path.IsPathRooted(file))
+                {
+                    resourcePath = normalizedFile;
+                }
+                else
+                {
+                    resourcePath = (normalizedRelative + "/" + normalizedFile.TrimStart('/'));
+                }
+
+                // fullPath: prefer absolute if file contains full path, else resolve via storage
+                if (Path.IsPathRooted(file))
+                    fullPath = file;
+                else
+                    fullPath = storage.GetFullPath(file);
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private Background createBackground()
         {
+            switch (source.Value)
+            {
+                case BackgroundSource.WebmSource:
+                {
+                    string relativePath = Path.Combine("EzResources", "Webm");
+
+                    if (tryGetRandomStorageFile(relativePath, out string resourcePath, out string fullPath, new[] { ".webm", ".mp4", ".flv", ".mkv" }))
+                        return new VideoBackgroundScreen(fullPath ?? resourcePath);
+
+                    Stream videoName = textures.GetStream("EzResources/default_video.webm");
+                    return new StreamVideoBackgroundScreen(videoName);
+                }
+
+                case BackgroundSource.Slides:
+                {
+                    string relativePath = Path.Combine("EzResources", "BG");
+
+                    if (tryGetRandomStorageFile(relativePath, out string resourcePath, out string _, new[] { ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff" }))
+                        return new Background(resourcePath);
+
+                    return new Background($@"Backgrounds/bg{RNG.Next(0, 5) % 5 + 1}");
+                }
+            }
+
             // seasonal background loading gets highest priority.
             Background newBackground = seasonalBackgroundLoader.LoadNextBackground();
 
-            if (newBackground == null && user.Value?.IsSupporter == true)
+            if (newBackground == null)
             {
                 switch (source.Value)
                 {

@@ -6,6 +6,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Audio;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -34,6 +35,11 @@ namespace osu.Game.Rulesets.UI
 
         [Resolved]
         private IGameplayClock? gameplayClock { get; set; }
+
+        private bool isAutoPlay => GlobalConfigStore.EzConfig.Get<KeySoundPreviewMode>(Ez2Setting.KeySoundPreviewMode)
+                                   == KeySoundPreviewMode.AutoPlayPlus;
+
+        private HitObject? lastAutoPlayedObject;
 
         protected readonly AudioContainer AudioContainer;
 
@@ -73,6 +79,16 @@ namespace osu.Game.Rulesets.UI
 
         protected virtual void PlaySamples(ISampleInfo[] samples) => Schedule(() =>
         {
+            var existing = hitSounds.FirstOrDefault(h => h.IsPlaying && h.Samples.SequenceEqual(samples));
+
+            if (existing != null)
+            {
+                // 如果相同的音效正在播放，打断并重放
+                existing.Stop();
+                existing.Play();
+                return;
+            }
+
             var hitSound = GetNextSample();
             ApplySampleInfo(hitSound, samples);
             hitSound.Play();
@@ -94,7 +110,28 @@ namespace osu.Game.Rulesets.UI
             base.Update();
 
             if (gameplayClock?.IsRewinding == true)
+            {
                 mostValidObject = null;
+                lastAutoPlayedObject = null;
+            }
+
+            // Auto-play notes when KeySoundPreviewMode == 2
+            if (isAutoPlay)
+            {
+                double referenceTime = getReferenceTime();
+                var obj = GetMostValidObject();
+
+                if (obj != null && obj != lastAutoPlayedObject)
+                {
+                    // Play when we've reached or passed the object's start time
+                    if (referenceTime >= obj.StartTime)
+                    {
+                        var samples = obj.Samples.Cast<ISampleInfo>().ToArray();
+                        PlaySamples(samples);
+                        lastAutoPlayedObject = obj;
+                    }
+                }
+            }
         }
 
         protected HitObject? GetMostValidObject()

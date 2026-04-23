@@ -20,6 +20,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Containers;
 using osu.Game.Input.Bindings;
+using osu.Game.EzOsuGame.Edit;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -163,6 +164,23 @@ namespace osu.Game.Overlays.SkinEditor
             restoreSkinEditorRelevantSettings();
         }
 
+        /// <summary>
+        /// 在皮肤编辑器内切换 EzSkinEditorScreen。
+        /// </summary>
+        public void ToggleEzSkinEditor()
+        {
+            performer?.PerformFromScreen(screen =>
+            {
+                if (State.Value != Visibility.Visible)
+                    return;
+
+                if (screen is EzSkinEditorScreen)
+                    return;
+
+                screen.Push(new EzSkinEditorScreen());
+            }, new[] { typeof(EzSkinEditorScreen) });
+        }
+
         public void PresentGameplay() => presentGameplay(false);
 
         private void presentGameplay(bool attemptedBeatmapSwitch)
@@ -271,6 +289,9 @@ namespace osu.Game.Overlays.SkinEditor
         /// </summary>
         public void SetTarget(OsuScreen screen)
         {
+            if (screen is EzSkinEditorScreen)
+                return;
+
             nestedInputManagerDisable?.Dispose();
             nestedInputManagerDisable = null;
 

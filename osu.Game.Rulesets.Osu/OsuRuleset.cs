@@ -15,6 +15,8 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
+using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Configuration;
@@ -161,6 +163,14 @@ namespace osu.Game.Rulesets.Osu
         {
             switch (type)
             {
+                case ModType.LA_Mod:
+                    return new Mod[]
+                    {
+                        new ModNiceBPM(),
+                        new ModReconcile(),
+                        new UniversalLoopPlayClip(),
+                    };
+
                 case ModType.DifficultyReduction:
                     return new Mod[]
                     {
@@ -344,7 +354,11 @@ namespace osu.Game.Rulesets.Osu
                 {
                     new AverageHitError(timedHitEvents),
                     new UnstableRate(timedHitEvents)
-                }), true)
+                }), true),
+                new StatisticItem("HitResult Count", () => new EzScoreHitResultCountGraph(score)
+                {
+                    RelativeSizeAxes = Axes.X
+                }, true),
             };
         }
 

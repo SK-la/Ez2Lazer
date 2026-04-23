@@ -15,6 +15,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
+using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Graphics;
@@ -23,6 +24,9 @@ using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
@@ -33,7 +37,7 @@ namespace osu.Game.Screens.Select
 {
     public partial class PanelBeatmap : Panel
     {
-        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT;
+        public const float HEIGHT = CarouselItem.DEFAULT_HEIGHT + 26f;
 
         private StarCounter starCounter = null!;
         private ConstrainedIconContainer difficultyIcon = null!;
@@ -51,6 +55,26 @@ namespace osu.Game.Screens.Select
         private Box backgroundDifficultyTint = null!;
 
         private TrianglesV2 triangles = null!;
+
+        private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
+        private EzDisplayKps ezDisplayKps = null!;
+        private EzDisplayKpc ezDisplayKpc = null!;
+        private EzDisplaySR displaySR = null!;
+        private EzDisplayTag ezDisplayTag = null!;
+
+        private IBindable<EzAnalysisResult>? ezAnalysisBindable;
+        private CancellationTokenSource? ezAnalysisCancellationSource;
+        private ScheduledDelegate? scheduledEzAnalysisUpdate;
+
+        private bool ezAnalysisEnabled;
+        private string? scratchText;
+        private const int mania_ui_update_throttle_ms = 15;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
         [Resolved]
         private IRulesetStore rulesets { get; set; } = null!;
@@ -177,13 +201,47 @@ namespace osu.Game.Screens.Select
                                             Anchor = Anchor.CentreLeft,
                                             Scale = new Vector2(0.875f),
                                         },
+                                        displaySR = new EzDisplaySR(EzManiaSummary.EMPTY, StarRatingDisplaySize.Small, animated: true)
+                                        {
+                                            Origin = Anchor.CentreLeft,
+                                            Anchor = Anchor.CentreLeft,
+                                            Scale = new Vector2(0.875f),
+                                        },
                                         starCounter = new StarCounter
                                         {
                                             Anchor = Anchor.CentreLeft,
                                             Origin = Anchor.CentreLeft,
                                             Scale = new Vector2(0.4f)
-                                        }
+                                        },
+                                        ezDisplayKpc = new EzDisplayKpc(),
                                     },
+                                },
+                                new FillFlowContainer
+                                {
+                                    Direction = FillDirection.Horizontal,
+                                    AutoSizeAxes = Axes.Both,
+                                    // Padding = new MarginPadding { Bottom = 2 },
+                                    Children = new Drawable[]
+                                    {
+                                        ezDisplayKps = new EzDisplayKps
+                                        {
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                            Scale = new Vector2(0.875f),
+                                        },
+                                        ezDisplayKpsGraph = new EzDisplayKpsGraph
+                                        {
+                                            Size = new Vector2(300, 15),
+                                            Blending = BlendingParameters.Mixture,
+                                            Anchor = Anchor.CentreLeft,
+                                            Origin = Anchor.CentreLeft,
+                                        },
+                                    }
+                                },
+                                ezDisplayTag = new EzDisplayTag
+                                {
+                                    Margin = new MarginPadding { Top = 2 },
+                                    Alpha = 0.9f,
                                 }
                             }
                         }
@@ -196,8 +254,31 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
-            ruleset.BindValueChanged(_ => updateKeyCount());
-            mods.BindValueChanged(_ => updateKeyCount(), true);
+            ezConfig.BindWith(Ez2Setting.KpcDisplayMode, ezDisplayKpc.KpcDisplayModeBindable);
+
+            bool ezAnalysisCacheEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisRecEnabled);
+            bool ezAnalysisSqliteEnabled = ezConfig.Get<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
+
+            ruleset.BindValueChanged(_ =>
+            {
+                ezAnalysisEnabled = ruleset.Value.OnlineID == 3 && (ezAnalysisCacheEnabled || ezAnalysisSqliteEnabled);
+
+                resetEzDisplay();
+                updateKeyCount();
+            }, true);
+
+            mods.BindValueChanged(_ =>
+            {
+                updateKeyCount();
+            }, true);
+
+            var xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
+            xxySrFilterSetting.BindValueChanged(value =>
+            {
+                starCounter.Icon = value.NewValue
+                    ? FontAwesome.Solid.Moon
+                    : FontAwesome.Solid.Star;
+            }, true);
         }
 
         protected override void PrepareForUse()
@@ -212,6 +293,25 @@ namespace osu.Game.Screens.Select
 
             computeStarRating();
             updateKeyCount();
+
+            resetEzDisplay();
+            ezDisplayTag.TagSummary = null;
+            ezDisplayTag.Beatmap = beatmap;
+            computeEzAnalysis();
+        }
+
+        private void resetEzDisplay()
+        {
+            if (ezAnalysisEnabled)
+            {
+                displaySR.Show();
+            }
+            else
+            {
+                ezDisplayKpc.ManiaSummary = null;
+                displaySR.Current.Value = EzManiaSummary.EMPTY;
+                displaySR.Hide();
+            }
         }
 
         private Drawable getRulesetIcon(RulesetInfo rulesetInfo)
@@ -232,11 +332,86 @@ namespace osu.Game.Screens.Select
             starDifficultyBindable = null;
 
             starDifficultyCancellationSource?.Cancel();
+            starDifficultyCancellationSource?.Dispose();
+            starDifficultyCancellationSource = null;
+
+            clearEzAnalysisBinding();
+        }
+
+        private void clearEzAnalysisBinding(bool resetDisplay = true)
+        {
+            scheduledEzAnalysisUpdate?.Cancel();
+            scheduledEzAnalysisUpdate = null;
+
+            ezAnalysisBindable?.UnbindAll();
+            ezAnalysisBindable = null;
+
+            ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
+            ezAnalysisCancellationSource = null;
+
+            if (!resetDisplay)
+                return;
+
+            ezDisplayTag.Beatmap = null;
+            ezDisplayTag.TagSummary = null;
+            scratchText = null;
+
+            displaySR.Current.Value = EzManiaSummary.EMPTY;
+            ezDisplayKpc.ManiaSummary = null;
+        }
+
+        private void updateKPS(EzAnalysisResult ezAnalysisResult)
+        {
+            double avgKPS = ezAnalysisResult.AverageKps;
+            double maxKps = ezAnalysisResult.MaxKps;
+            var kpsList = ezAnalysisResult.KpsList;
+            ezDisplayKps.SetKps(avgKPS, maxKps);
+            ezDisplayKpsGraph.SetPoints(kpsList);
+
+            if (ezAnalysisEnabled)
+            {
+                var maniaSummary = ezAnalysisResult.ManiaSummary;
+                var columnCounts = maniaSummary?.ColumnCounts ?? new Dictionary<int, int>();
+
+                if (ezAnalysisResult.TagSummary != null)
+                    ezDisplayTag.TagSummary = ezAnalysisResult.TagSummary;
+
+                scratchText = EzBeatmapCalculator.GetScratchFromPrecomputed(columnCounts, maxKps, kpsList);
+                updateKeyCount();
+                ezDisplayKpc.ManiaSummary = maniaSummary;
+                displaySR.Current.Value = maniaSummary ?? EzManiaSummary.EMPTY;
+            }
+        }
+
+        private void computeEzAnalysis()
+        {
+            if (!ezAnalysisEnabled)
+                return;
+
+            ezAnalysisCancellationSource?.Cancel();
+            ezAnalysisCancellationSource?.Dispose();
+            ezAnalysisCancellationSource = new CancellationTokenSource();
+
+            if (Item == null)
+                return;
+
+            ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmap, ezAnalysisCancellationSource.Token, SongSelect.DIFFICULTY_CALCULATION_DEBOUNCE);
+            ezAnalysisBindable.BindValueChanged(result =>
+            {
+                scheduledEzAnalysisUpdate?.Cancel();
+                scheduledEzAnalysisUpdate = Scheduler.AddDelayed(() =>
+                {
+                    updateKPS(result.NewValue);
+                    scheduledEzAnalysisUpdate = null;
+                }, mania_ui_update_throttle_ms);
+            }, true);
         }
 
         private void computeStarRating()
         {
             starDifficultyCancellationSource?.Cancel();
+            starDifficultyCancellationSource?.Dispose();
             starDifficultyCancellationSource = new CancellationTokenSource();
 
             if (Item == null)
@@ -257,7 +432,12 @@ namespace osu.Game.Screens.Select
             if (Item?.IsVisible != true)
             {
                 starDifficultyCancellationSource?.Cancel();
+                starDifficultyCancellationSource?.Dispose();
                 starDifficultyCancellationSource = null;
+
+                ezAnalysisCancellationSource?.Cancel();
+                ezAnalysisCancellationSource?.Dispose();
+                ezAnalysisCancellationSource = null;
             }
 
             // Dirty hack to make sure we don't take up spacing in parent fill flow when not displaying a rank.
@@ -296,7 +476,8 @@ namespace osu.Game.Screens.Select
                 var variantName = rulesetInstance.GetVariantName(variant);
 
                 variantText.Alpha = 1;
-                variantText.Text = LocalisableString.Interpolate($"[{variantName}] ");
+                variantText.Text = scratchText ?? LocalisableString.Interpolate($"[{variantName}] ");
+                variantText.Colour = Colour4.LightPink.ToLinear();
             }
             else
                 variantText.Alpha = 0;

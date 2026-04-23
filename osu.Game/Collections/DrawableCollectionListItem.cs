@@ -13,6 +13,7 @@ using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Framework.Localisation;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -92,10 +93,19 @@ namespace osu.Game.Collections
                             IsTextBoxHovered = v => TextBox.ReceivePositionalInputAt(v)
                         }
                         : Empty(),
+                    collection.IsManaged
+                        ? new BatchAddToCollectionButton(collection)
+                        {
+                            Anchor = Anchor.CentreRight,
+                            Origin = Anchor.CentreRight,
+                            X = -button_width,
+                            IsTextBoxHovered = v => TextBox.ReceivePositionalInputAt(v),
+                        }
+                        : Empty(),
                     new Container
                     {
                         RelativeSizeAxes = Axes.Both,
-                        Padding = new MarginPadding { Right = collection.IsManaged ? button_width : 0 },
+                        Padding = new MarginPadding { Right = collection.IsManaged ? button_width * 2 : 0 },
                         Children = new Drawable[]
                         {
                             TextBox = new ItemTextBox(collection)
@@ -201,7 +211,7 @@ namespace osu.Game.Collections
                 this.collection = collection;
                 RelativeSizeAxes = Axes.Y;
 
-                Width = button_width + item_height / 2; // add corner radius to cover with fill
+                Width = button_width + item_height / 4; // add corner radius to cover with fill
             }
 
             [BackgroundDependencyLoader]
@@ -238,7 +248,14 @@ namespace osu.Game.Collections
                 };
             }
 
-            public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => base.ReceivePositionalInputAt(screenSpacePos) && !IsTextBoxHovered(screenSpacePos);
+            public override bool ReceivePositionalInputAt(Vector2 screenSpacePos)
+            {
+                if (!base.ReceivePositionalInputAt(screenSpacePos) || IsTextBoxHovered(screenSpacePos))
+                    return false;
+
+                float localX = ToLocalSpace(screenSpacePos).X;
+                return localX > item_height / 4;
+            }
 
             protected override bool OnHover(HoverEvent e)
             {
@@ -259,6 +276,77 @@ namespace osu.Game.Collections
             }
 
             private void deleteCollection() => collection.PerformWrite(c => c.Realm!.Remove(c));
+        }
+
+        public partial class BatchAddToCollectionButton : OsuClickableContainer
+        {
+            public Func<Vector2, bool> IsTextBoxHovered = null!;
+
+            private readonly Live<BeatmapCollection> collection;
+            private Color4 darkenedColour;
+            private Color4 normalColour;
+
+            private Drawable background = null!;
+
+            public BatchAddToCollectionButton(Live<BeatmapCollection> collection)
+            {
+                this.collection = collection;
+
+                RelativeSizeAxes = Axes.Y;
+                Width = button_width + item_height / 4;
+                TooltipText = EzSongSelectStrings.SAVE_TO_COLLECTION;
+            }
+
+            [BackgroundDependencyLoader]
+            private void load(OsuColour colours)
+            {
+                normalColour = colours.Yellow;
+                darkenedColour = normalColour.Darken(0.9f);
+
+                Child = new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Masking = true,
+                    CornerRadius = 10,
+                    Children = new[]
+                    {
+                        background = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = darkenedColour,
+                        },
+                        new SpriteIcon
+                        {
+                            Anchor = Anchor.CentreRight,
+                            Origin = Anchor.Centre,
+                            X = -button_width * 0.6f,
+                            Size = new Vector2(10),
+                            Icon = FontAwesome.Solid.Plus,
+                        }
+                    }
+                };
+
+                Action = () => this.FindClosestParent<ManageCollectionsDialog>()?.RequestBatchAddToCollection(collection);
+            }
+
+            public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => base.ReceivePositionalInputAt(screenSpacePos) && !IsTextBoxHovered(screenSpacePos);
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                background.FadeColour(normalColour, 100, Easing.Out);
+                return false;
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                background.FadeColour(darkenedColour, 100, Easing.Out);
+            }
+
+            protected override bool OnClick(ClickEvent e)
+            {
+                background.FlashColour(Color4.White, 150);
+                return base.OnClick(e);
+            }
         }
 
         public IEnumerable<LocalisableString> FilterTerms => Model.PerformRead(m => m.IsValid ? new[] { (LocalisableString)m.Name } : []);

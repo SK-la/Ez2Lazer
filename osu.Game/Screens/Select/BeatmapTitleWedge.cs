@@ -20,6 +20,8 @@ using osu.Game.Extensions;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
@@ -74,6 +76,11 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisDatabase analysisDatabase { get; set; } = null!;
+
+        private EzDisplayKpsGraph kpsGraph = null!;
 
         private FillFlowContainer statisticsFlow = null!;
 
@@ -162,6 +169,15 @@ namespace osu.Game.Screens.Select
                                 bpmStatistic = new Statistic(OsuIcon.Metronome)
                                 {
                                     TooltipText = BeatmapsetsStrings.ShowStatsBpm,
+                                    Margin = new MarginPadding { Left = 5f },
+                                },
+                                // KPS 折线图，所有模式通用。尺寸保持与统计栏高度一致。
+                                kpsGraph = new EzDisplayKpsGraph
+                                {
+                                    Anchor = Anchor.CentreLeft,
+                                    Origin = Anchor.CentreLeft,
+                                    Size = new Vector2(300, 30),
+                                    HoverValueEnabled = true,
                                     Margin = new MarginPadding { Left = 5f },
                                 },
                             },
@@ -261,8 +277,10 @@ namespace osu.Game.Screens.Select
                 var beatmapInfo = working.Value.BeatmapInfo;
                 // This can take time as it is a synchronous task.
                 var beatmap = working.Value.Beatmap;
+                var selectedRuleset = ruleset.Value;
+                var selectedMods = mods.Value;
 
-                double rate = ModUtils.CalculateRateWithMods(mods.Value);
+                double rate = ModUtils.CalculateRateWithMods(selectedMods);
 
                 int bpmMax = FormatUtils.RoundBPM(beatmap.ControlPointInfo.BPMMaximum, rate);
                 int bpmMin = FormatUtils.RoundBPM(beatmap.ControlPointInfo.BPMMinimum, rate);
@@ -270,6 +288,21 @@ namespace osu.Game.Screens.Select
 
                 double drainLength = Math.Round(beatmap.CalculateDrainLength() / rate);
                 double hitLength = Math.Round(beatmapInfo.Length / rate);
+                double audioLength = working.Value.TrackLoaded ? Math.Round(working.Value.Track.Length / rate) : hitLength;
+
+                IReadOnlyList<double> kpsList;
+
+                if (selectedMods.Count == 0
+                    && analysisDatabase.TryGetStoredAnalysis(beatmapInfo, selectedRuleset, out var storedAnalysis)
+                    && storedAnalysis.KpsList is { Count: > 0 } storedKpsList)
+                {
+                    kpsList = storedKpsList;
+                }
+                else
+                {
+                    var (_, _, computedKpsList) = OptimizedBeatmapCalculator.GetKpsCoarse(beatmap, buckets: 64);
+                    kpsList = computedKpsList;
+                }
 
                 Schedule(() =>
                 {
@@ -282,8 +315,21 @@ namespace osu.Game.Screens.Select
                     bpmStatistic.Text = bpmMin == bpmMax
                         ? $"{bpmMin}"
                         : LocalisableString.Interpolate($"{bpmMin}-{bpmMax} ({SongSelectStrings.MostlyBPM(mostCommonBPM)})");
+
+                    kpsGraph.SetPoints(kpsList, sourceLengthMs: drainLength, baselineLengthMs: Math.Max(drainLength, audioLength), extendToBaseline: true, heatmapEnabled: true);
+
+                    // 由于 bpmStatistic.Text 变化会触发布局动画（100ms），需要延迟更新 KPS 图表尺寸以确保获取正确的宽度
+                    Scheduler.Add(updateKPSGraphSize);
                 });
             }, token);
+        }
+
+        private void updateKPSGraphSize()
+        {
+            float availableWidth = DrawWidth - playCount.DrawWidth - favouriteButton.DrawWidth - lengthStatistic.DrawWidth - bpmStatistic.DrawWidth - statisticsFlow.Spacing.X * 3
+                                   - SongSelect.WEDGE_CONTENT_MARGIN * 2;
+            kpsGraph.Width = availableWidth;
+            // Logger.Log($"[EzTest] T: {DrawWidth}, {playCount.DrawWidth}, {favouriteButton.DrawWidth}, {lengthStatistic.DrawWidth}, {bpmStatistic.DrawWidth}", EzAnalysisPersistentStore.LOGGER_NAME);
         }
 
         private CancellationTokenSource? onlineDisplayCancellationSource;

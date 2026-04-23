@@ -1,13 +1,18 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Linq;
 using JetBrains.Annotations;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Shapes;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
@@ -60,6 +65,26 @@ namespace osu.Game.Rulesets.Mania.UI
 
         private ISkinSource currentSkin = null!;
 
+        [Resolved]
+        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+
+        [Resolved]
+        private OsuConfigManager osuConfig { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private IBackdropCaptureSourceProvider? backdropCaptureSourceProvider { get; set; }
+
+        // private Bindable<double> osuConfigDim = null!;
+        private Bindable<double> columnDim = null!;
+        private Bindable<double> columnBlur = null!;
+        private bool blurEnabledByConfig;
+
+        private bool showBlur => GlobalConfigStore.EzConfig.Get<double>(Ez2Setting.ColumnBlur) > 0;
+
+        private readonly Box dimBox;
+        private readonly BackdropBlurDrawable? stageBackdropBlur;
+        private readonly SkinnableDrawable stageForeground;
+
         public Stage(int firstColumnIndex, StageDefinition definition, ref ManiaAction columnStartAction)
         {
             this.firstColumnIndex = firstColumnIndex;
@@ -77,6 +102,23 @@ namespace osu.Game.Rulesets.Mania.UI
 
             InternalChildren = new Drawable[]
             {
+                (stageBackdropBlur = showBlur
+                    ? new BackdropBlurDrawable
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Anchor = Anchor.Centre,
+                        Origin = Anchor.Centre,
+                        EffectEnabled = false,
+                        // FrameBufferScale = new Vector2(0.2f),
+                        CaptureFrameInterval = 3,
+                        MaxCapturesPerSecond = 300,
+                    }
+                    : null) ?? Empty(),
+                dimBox = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Colour4.Black,
+                },
                 new Container
                 {
                     Anchor = Anchor.TopCentre,
@@ -116,7 +158,7 @@ namespace osu.Game.Rulesets.Mania.UI
                         {
                             RelativeSizeAxes = Axes.Y,
                         },
-                        new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageForeground))
+                        stageForeground = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.StageForeground))
                         {
                             RelativeSizeAxes = Axes.Both
                         },
@@ -136,6 +178,8 @@ namespace osu.Game.Rulesets.Mania.UI
             for (int i = 0; i < definition.Columns; i++)
             {
                 bool isSpecial = definition.IsSpecialColumn(i);
+                // 必须使用全局静态，类型构造时无法获取自动注入
+                // bool isSpecial = GlobalConfigStore.EzConfig.IsSpecialColumnFast(definition.Columns, i);
 
                 var action = columnStartAction;
                 columnStartAction++;
@@ -167,8 +211,42 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             currentSkin = skin;
 
-            skin.SourceChanged += onSkinChanged;
+            if (stageBackdropBlur != null)
+                stageBackdropBlur.CaptureSourceProvider = backdropCaptureSourceProvider;
+
+            currentSkin.SourceChanged += onSkinChanged;
             onSkinChanged();
+
+            // osuConfigDim = osuConfig.GetBindable<double>(OsuSetting.DimLevel);
+
+            columnDim = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnDim);
+            columnDim.BindValueChanged(v =>
+            {
+                // dimBox.Alpha = (float)Math.Max(v.NewValue, osuConfigDim.Value / 2);
+                dimBox.Alpha = (float)v.NewValue;
+            }, true);
+
+            columnBlur = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnBlur);
+            columnBlur.BindValueChanged(v =>
+            {
+                float sigma = (float)v.NewValue * 50;
+                blurEnabledByConfig = sigma > 0.01f;
+
+                if (stageBackdropBlur != null)
+                {
+                    stageBackdropBlur.BlurSigma = new Vector2(sigma);
+                    updateBackdropBlurState();
+                }
+            }, true);
+
+            var stagePanelEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.StagePanelEnabled);
+            stagePanelEnabled.BindValueChanged(e =>
+            {
+                if (e.NewValue)
+                    stageForeground.Show();
+                else
+                    stageForeground.Hide();
+            }, true);
         }
 
         private void onSkinChanged()
@@ -187,6 +265,21 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             // must happen before children are disposed in base call to prevent illegal accesses to the judgement pool.
             NewResult -= OnNewResult;
+
+            // 清理模糊容器的引用，释放 D3D11 渲染目标资源
+            if (stageBackdropBlur != null)
+            {
+                // 先禁用效果，防止清理过程中继续捕获
+                stageBackdropBlur.EffectEnabled = false;
+
+                // 断开所有捕获目标
+                stageBackdropBlur.CaptureSourceProvider = null;
+                stageBackdropBlur.CaptureTarget = null;
+                stageBackdropBlur.CaptureTargets.Clear();
+
+                // 强制过期并移除
+                stageBackdropBlur.Expire();
+            }
 
             base.Dispose(isDisposing);
 
@@ -216,7 +309,12 @@ namespace osu.Game.Rulesets.Mania.UI
                 return;
 
             judgements.Clear(false);
-            judgements.Add(judgementPooler.Get(result.Type, j => j.Apply(result, judgedObject))!);
+
+            var drawableJudgement = judgementPooler.Get(result.Type, j => j.Apply(result, judgedObject));
+            if (drawableJudgement == null)
+                return;
+
+            judgements.Add(drawableJudgement);
         }
 
         protected override void Update()
@@ -224,6 +322,14 @@ namespace osu.Game.Rulesets.Mania.UI
             // Due to masking differences, it is not possible to get the width of the columns container automatically
             // While masking on effectively only the Y-axis, so we need to set the width of the bar line container manually
             barLineContainer.Width = columnFlow.Width;
+        }
+
+        private void updateBackdropBlurState()
+        {
+            if (stageBackdropBlur == null)
+                return;
+
+            stageBackdropBlur.EffectEnabled = blurEnabledByConfig;
         }
     }
 }

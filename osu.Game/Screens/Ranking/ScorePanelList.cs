@@ -206,6 +206,9 @@ namespace osu.Game.Screens.Ranking
                 // In the end, it's easier to compute the scroll position manually.
                 float scrollOffset = flow.GetPanelIndex(expandedPanel.Score) * (ScorePanel.CONTRACTED_WIDTH + panel_spacing);
                 scroll.ScrollTo(scrollOffset);
+
+                // 进入结算自动展开拓展分析
+                PostExpandAction?.Invoke();
             });
         }
 

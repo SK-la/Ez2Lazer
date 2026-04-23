@@ -21,7 +21,7 @@
     <!-- Held back due to licencing change stupidness. Silenced vulnerability does not affect us. -->
     <PackageReference Include="AutoMapper" Version="13.0.1">
       <NoWarn>NU1903</NoWarn>
-    </PackageReference>   
+    </PackageReference>
     <PackageReference Include="DiffPlex" Version="1.9.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <!-- Held back due to .NET 9 requirement. See https://github.com/Humanizr/Humanizer?tab=readme-ov-file#supported-frameworks-->
@@ -39,8 +39,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Realm" Version="20.1.0" />
-<!--    <PackageReference Include="ppy.osu.Framework" Version="2026.416.0" />-->
-<!--    <PackageReference Include="ppy.osu.Game.Resources" Version="2026.420.0" />-->
+<!--    <PackageReference Include="ppy.osu.Framework" Version="2026.310.0" />-->
+<!--    <PackageReference Include="ppy.osu.Game.Resources" Version="2026.312.0" />-->
     <PackageReference Include="Sentry" Version="6.2.0" />
     <!-- Held back due to 0.34.0 failing AOT compilation on ZstdSharp.dll dependency. -->
     <PackageReference Include="SharpCompress" Version="0.47.0" />

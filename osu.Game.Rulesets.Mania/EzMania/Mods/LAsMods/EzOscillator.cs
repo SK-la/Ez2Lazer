@@ -1,0 +1,86 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using System.ComponentModel;
+
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
+{
+    // 简单振荡器生成器，支持多种波形。
+    // 默认正弦波，确定性输出。
+    public sealed class EzOscillator : IEzOscillator
+    {
+        public enum EzWaveform
+        {
+            [Description("正弦波")]
+            Sine = 0,
+
+            [Description("方波")]
+            Square,
+
+            [Description("三角波")]
+            Triangle,
+
+            [Description("锯齿波")]
+            Sawtooth
+        }
+
+        private readonly double frequency;
+        private readonly double phase;
+        private readonly double step;
+        private readonly EzWaveform ezWaveform;
+        private long counter;
+
+        public EzOscillator(int seed, double frequency = 1.0, double phase = 0.0, double step = 1.0, EzWaveform ezWaveform = EzWaveform.Sine)
+        {
+            // frequency: cycles per step unit
+            // phase: initial phase in radians
+            // step: increment per Next() call (allow sub-sampling)
+            this.frequency = frequency;
+            this.phase = phase;
+            this.step = step;
+            this.ezWaveform = ezWaveform;
+            counter = seed;
+        }
+
+        // 返回值范围 [-1, 1]
+        public double NextSigned()
+        {
+            double t = counter * step;
+            counter++;
+
+            double sine = Math.Sin(2.0 * Math.PI * frequency * t + phase);
+
+            switch (ezWaveform)
+            {
+                case EzWaveform.Sine:
+                    return sine;
+
+                case EzWaveform.Square:
+                    return sine >= 0 ? 1.0 : -1.0;
+
+                case EzWaveform.Triangle:
+                    return 2.0 / Math.PI * Math.Asin(sine);
+
+                case EzWaveform.Sawtooth:
+                    double frac = (t * frequency + phase / (2.0 * Math.PI)) % 1.0;
+                    return 2.0 * frac - 1.0;
+
+                default:
+                    return sine;
+            }
+        }
+
+        // 返回值范围 [0, 1]
+        public double Next()
+        {
+            return (NextSigned() + 1.0) * 0.5;
+        }
+
+        // 重置内部计数器（保证可复现）
+        public void Reset(long start = 0)
+        {
+            counter = start;
+        }
+    }
+}

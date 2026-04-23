@@ -1,0 +1,71 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using osu.Framework.Localisation;
+using osu.Framework.Allocation;
+using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Overlays.Settings;
+
+namespace osu.Game.EzOsuGame.Overlays
+{
+    public partial class EzUISettings : SettingsSubsection
+    {
+        protected override LocalisableString Header => EzSettingsStrings.EZ_UI_SETTINGS_HEADER;
+
+        [BackgroundDependencyLoader]
+        private void load(Ez2ConfigManager ezConfig)
+        {
+            AddRange(new Drawable[]
+            {
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED,
+                    HintText = EzSettingsStrings.EZ_ANALYSIS_REC_ENABLED_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisRecEnabled),
+                })
+                {
+                    Keywords = new[] { "analysis", "ez", "song select", "kps", "kpc" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.EZ_ANALYSIS_SQLITE_ENABLED,
+                    HintText = EzSettingsStrings.EZ_ANALYSIS_SQLITE_ENABLED_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled),
+                })
+                {
+                    Keywords = new[] { "analysis", "sqlite", "cache", "warmup", "persistent" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.HIDE_MAIN_MENU_ONLINE_BANNER,
+                    HintText = EzSettingsStrings.HIDE_MAIN_MENU_ONLINE_BANNER_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.HideMainMenuOnlineBanner),
+                })
+                {
+                    Keywords = new[] { "main menu", "banner", "news", "advertisement", "ui" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.STORYBOARD_VIDEO_AUTO_SIZE,
+                    HintText = EzSettingsStrings.STORYBOARD_VIDEO_AUTO_SIZE_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.StoryboardAutoVideoSize),
+                })
+                {
+                    Keywords = new[] { "storyboard", "video", "size", "auto", "scaling", "ui" }
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.HIT_OBJECT_LIFETIME_USES_OWN_TIME,
+                    HintText = EzSettingsStrings.HIT_OBJECT_LIFETIME_USES_OWN_TIME_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.HitObjectLifetimeUsesOwnTime),
+                })
+                {
+                    Keywords = new[] { "ez", "timing", "lifetime", "hitobject" }
+                },
+            });
+        }
+    }
+}

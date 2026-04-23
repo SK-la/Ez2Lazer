@@ -15,43 +15,91 @@ namespace osu.Game.Screens.Select
     public class BeatmapCarouselFilterMatching : ICarouselFilter
     {
         private readonly Func<FilterCriteria> getCriteria;
+        private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
+        private readonly Func<bool> shouldUseActiveSongsBranchAsBeatmapSource;
+        private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
+        private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync;
 
         public int BeatmapItemsCount { get; private set; }
 
-        public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria)
+        public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
+                                             Func<bool> shouldUseActiveSongsBranchAsBeatmapSource,
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync)
         {
             this.getCriteria = getCriteria;
+            this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
+            this.shouldUseActiveSongsBranchAsBeatmapSource = shouldUseActiveSongsBranchAsBeatmapSource;
+            this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
+            this.getActiveBranchDifficultiesAsync = getActiveBranchDifficultiesAsync;
         }
 
-        public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken) => await Task.Run(() =>
+        public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
         {
             var criteria = getCriteria();
-
-            return matchItems(items, criteria).ToList();
-        }, cancellationToken).ConfigureAwait(false);
-
-        private IEnumerable<CarouselItem> matchItems(IEnumerable<CarouselItem> items, FilterCriteria criteria)
-        {
+            var itemList = items.ToList();
             int countMatching = 0;
+            var matchedItems = new List<CarouselItem>();
 
-            foreach (var item in items)
+            bool useActiveBranchBeatmapSource = shouldUseActiveSongsBranchAsBeatmapSource();
+            bool useXxyDifficulty = shouldUseXxySrForDifficultyOperations();
+            bool requiresDifficultyForFiltering = useXxyDifficulty && (criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter);
+
+            IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
+            IReadOnlyDictionary<BeatmapInfo, double>? activeBranchDifficulties = null;
+
+            var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model)
+                                         .Where(b => !b.Hidden)
+                                         .Distinct()
+                                         .ToList();
+
+            if (useActiveBranchBeatmapSource)
+                activeBranchDifficulties = await getActiveBranchDifficultiesAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
+
+            if (requiresDifficultyForFiltering)
             {
+                operationDifficulties = await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
+            }
+
+            foreach (var item in itemList)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var beatmap = (BeatmapInfo)item.Model;
 
                 if (beatmap.Hidden)
                     continue;
 
-                if (!CheckCriteriaMatch(beatmap, criteria))
+                if (activeBranchDifficulties != null)
+                {
+                    if (!activeBranchDifficulties.TryGetValue(beatmap, out double branchDifficulty))
+                        continue;
+
+                    if (!CheckCriteriaMatch(beatmap, criteria, branchDifficulty))
+                        continue;
+
+                    countMatching++;
+                    matchedItems.Add(item);
+                    continue;
+                }
+
+                double starDifficultyForFilter = beatmap.StarRating;
+
+                if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
+                    starDifficultyForFilter = operationDifficulty;
+
+                if (!CheckCriteriaMatch(beatmap, criteria, starDifficultyForFilter))
                     continue;
 
                 countMatching++;
-                yield return item;
+                matchedItems.Add(item);
             }
 
             BeatmapItemsCount = countMatching;
+            return matchedItems;
         }
 
-        public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria)
+        public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter)
         {
             bool match = criteria.Ruleset == null || beatmap.AllowGameplayWithRuleset(criteria.Ruleset!, criteria.AllowConvertedBeatmaps);
 
@@ -78,7 +126,8 @@ namespace osu.Game.Screens.Select
 
             if (!match) return false;
 
-            match &= !criteria.StarDifficulty.HasFilter || criteria.StarDifficulty.IsInRange(beatmap.StarRating.FloorToDecimalDigits(2));
+            // truncation is intentional - compare `FormatUtils.FormatStarRating()`
+            match &= !criteria.StarDifficulty.HasFilter || criteria.StarDifficulty.IsInRange(starDifficultyForFilter.FloorToDecimalDigits(2));
             match &= !criteria.ApproachRate.HasFilter || criteria.ApproachRate.IsInRange(beatmap.Difficulty.ApproachRate);
             match &= !criteria.DrainRate.HasFilter || criteria.DrainRate.IsInRange(beatmap.Difficulty.DrainRate);
             match &= !criteria.CircleSize.HasFilter || criteria.CircleSize.IsInRange(beatmap.Difficulty.CircleSize);
@@ -140,7 +189,7 @@ namespace osu.Game.Screens.Select
                 }
             }
 
-            match &= !criteria.UserStarDifficulty.HasFilter || criteria.UserStarDifficulty.IsInRange(beatmap.StarRating);
+            match &= !criteria.UserStarDifficulty.HasFilter || criteria.UserStarDifficulty.IsInRange(starDifficultyForFilter);
 
             if (!match) return false;
 

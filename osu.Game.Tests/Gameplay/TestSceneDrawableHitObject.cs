@@ -192,6 +192,48 @@ namespace osu.Game.Tests.Gameplay
             AddAssert("DHO state is correct", () => dho.State.Value, () => Is.EqualTo(ArmedState.Hit));
         }
 
+        [Test]
+        public void TestHitStateUpdateTimeCanUseHitObjectTime()
+        {
+            const double hit_object_time = 1000;
+            const double judgement_offset = 200;
+            const double miss_fade_duration = 1000;
+
+            TestDrawableHitObject defaultLifetimeDho = null;
+            AddStep("create default lifetime DHO", () => Child = defaultLifetimeDho = createJudgedDrawableHitObject(false));
+            AddAssert("default hit state time uses judged time", () => defaultLifetimeDho.HitStateUpdateTime == hit_object_time + judgement_offset);
+            AddAssert("default lifetime end uses judged time", () => defaultLifetimeDho.LifetimeEnd == hit_object_time + judgement_offset + miss_fade_duration);
+
+            TestDrawableHitObject fixedLifetimeDho = null;
+            AddStep("create fixed lifetime DHO", () => Child = fixedLifetimeDho = createJudgedDrawableHitObject(true));
+            AddAssert("fixed hit state time uses hitobject time", () => fixedLifetimeDho.HitStateUpdateTime == hit_object_time);
+            AddAssert("fixed lifetime end uses hitobject time", () => fixedLifetimeDho.LifetimeEnd == hit_object_time + miss_fade_duration);
+        }
+
+        private static TestDrawableHitObject createJudgedDrawableHitObject(bool useHitObjectLifetimeUsesOwnTime)
+        {
+            var hitObject = new HitObject
+            {
+                StartTime = 1000,
+                HitWindows = new TestHitWindows()
+            };
+
+            var result = new JudgementResult(hitObject, hitObject.Judgement)
+            {
+                Type = HitResult.Miss,
+                TimeOffset = 200
+            };
+
+            return new TestDrawableHitObject
+            {
+                Entry = new HitObjectLifetimeEntry(hitObject)
+                {
+                    Result = result
+                },
+                UseHitObjectLifetimeUsesOwnTime = useHitObjectLifetimeUsesOwnTime
+            };
+        }
+
         private void assertJudged(Func<HitObjectLifetimeEntry> entry, bool val) =>
             AddAssert(val ? "Is judged" : "Not judged", () => entry().Judged, () => Is.EqualTo(val));
 
@@ -202,6 +244,9 @@ namespace osu.Game.Tests.Gameplay
             protected override double InitialLifetimeOffset => INITIAL_LIFETIME_OFFSET;
 
             public bool SetLifetimeStartOnApply;
+            public bool UseHitObjectLifetimeUsesOwnTime;
+
+            protected override bool HitObjectLifetimeUsesOwnTime => UseHitObjectLifetimeUsesOwnTime || base.HitObjectLifetimeUsesOwnTime;
 
             public TestDrawableHitObject(HitObject hitObject = null)
                 : base(hitObject)
@@ -239,6 +284,15 @@ namespace osu.Game.Tests.Gameplay
                 : base(hitObject)
             {
             }
+        }
+
+        private class TestHitWindows : HitWindows
+        {
+            public override void SetDifficulty(double difficulty)
+            {
+            }
+
+            public override double WindowFor(HitResult result) => result == HitResult.Miss ? 500 : 0;
         }
     }
 }

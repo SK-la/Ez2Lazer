@@ -104,7 +104,24 @@ namespace osu.Game.Storyboards
                 foreach (var l in loopingGroups)
                     latestEndTime = Math.Max(latestEndTime, l.StartTime + l.Duration * l.TotalIterations);
 
+                var alphaCommands = Commands.Alpha.Select(command => (command, displayEndTime: command.EndTime))
+                                            .Concat(loopingGroups.SelectMany(loop => loop.Alpha.Select(command => (command, displayEndTime: command.EndTime + loop.Duration * (loop.TotalIterations - 1)))))
+                                            .ToList();
+
+                if (alphaCommands.Count > 0)
+                {
+                    // Similar to StartTime, limit the drawable lifetime to the last point where the sprite can still be visible.
+                    // This avoids keeping fully transparent sprites alive solely because trailing non-visual transforms continue later.
+                    var lastAlpha = alphaCommands.MaxBy(c => c.displayEndTime);
+                    var lastRealAlpha = alphaCommands.Where(c => visibleAtStartOrEnd(c.command)).MaxBy(c => c.displayEndTime);
+
+                    if (lastAlpha.command.EndValue == 0 && lastRealAlpha.command != null)
+                        return lastRealAlpha.displayEndTime;
+                }
+
                 return latestEndTime;
+
+                bool visibleAtStartOrEnd(StoryboardCommand<float> command) => command.StartValue > 0 || command.EndValue > 0;
             }
         }
 

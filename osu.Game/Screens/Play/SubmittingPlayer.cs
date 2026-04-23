@@ -14,6 +14,7 @@ using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Online;
 using osu.Game.Online.API;
 using osu.Game.Online.Multiplayer;
@@ -47,6 +48,9 @@ namespace osu.Game.Screens.Play
         [Resolved(canBeNull: true)]
         [CanBeNull]
         private UserStatisticsWatcher userStatisticsWatcher { get; set; }
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; }
 
         private readonly object scoreSubmissionLock = new object();
         private TaskCompletionSource<bool> scoreSubmissionSource;
@@ -186,23 +190,24 @@ namespace osu.Game.Screens.Play
         /// <returns>Whether gameplay should be immediately exited as a result. Returning false allows the gameplay session to continue. Defaults to true.</returns>
         protected virtual bool ShouldExitOnTokenRetrievalFailure(Exception exception) => true;
 
-        public override bool AllowCriticalSettingsAdjustment
-        {
-            get
-            {
-                // General limitations to ensure players don't do anything too weird.
-                // These match stable for now.
-
-                // TODO: the blocking conditions should probably display a message.
-                if (!IsBreakTime.Value && GameplayClockContainer.CurrentTime - GameplayClockContainer.GameplayStartTime > 10000)
-                    return false;
-
-                if (GameplayClockContainer.IsPaused.Value)
-                    return false;
-
-                return base.AllowCriticalSettingsAdjustment;
-            }
-        }
+        // 重写允许在游戏过程中调整关键设置（如速度修改器）大于10秒后、非休息时间且未暂停时不允许调整
+        // public override bool AllowCriticalSettingsAdjustment
+        // {
+        //     get
+        //     {
+        //         // General limitations to ensure players don't do anything too weird.
+        //         // These match stable for now.
+        //
+        //         // TODO: the blocking conditions should probably display a message.
+        //         if (!IsBreakTime.Value && GameplayClockContainer.CurrentTime - GameplayClockContainer.GameplayStartTime > 10000)
+        //             return false;
+        //
+        //         if (GameplayClockContainer.IsPaused.Value)
+        //             return false;
+        //
+        //         return base.AllowCriticalSettingsAdjustment;
+        //     }
+        // }
 
         protected override async Task PrepareScoreForResultsAsync(Score score)
         {
@@ -257,6 +262,10 @@ namespace osu.Game.Screens.Play
             bool exiting = base.OnExiting(e);
             submitFromFailOrQuit(Score);
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());
+
+            // 生成延迟报告
+            LatencyTracker?.GenerateLatencyReport();
+
             return exiting;
         }
 
@@ -297,6 +306,35 @@ namespace osu.Game.Screens.Play
             if (masterClock?.PlaybackRateValid.Value != true)
             {
                 Logger.Log("Score submission cancelled due to audio playback rate discrepancy.");
+                return Task.CompletedTask;
+            }
+
+            var accCutoffABindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffA);
+            var accCutoffSBindable = ezConfig.GetBindable<double>(Ez2Setting.AccuracyCutoffS);
+            bool hasDefaultCutoffValues = accCutoffABindable.IsDefault || accCutoffSBindable.IsDefault;
+            // 如果当前所选的 HitMode 不是 Lazer，则强制跳过上传成绩
+            var hitMode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+
+            if (Ruleset.Value.OnlineID == 3 && (hitMode != EzEnumHitMode.Lazer || !hasDefaultCutoffValues))
+            {
+                Logger.Log($"[EzMania]Score submission blocked by custom rating settings (HitMode={hitMode}, CutoffA={accCutoffABindable.Value:0.####}, CutoffS={accCutoffSBindable.Value:0.####})."
+                  , Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return Task.CompletedTask;
+            }
+
+            // 如果任一 offsetPlus 设置非0，则禁止上传成绩以防止不公平的分数提交
+            var offsetManiaBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
+            var offsetNonStdBindable = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusNonMania);
+
+            if (Ruleset.Value.OnlineID == 3 && !offsetManiaBindable.IsDefault)
+            {
+                Logger.Log("[EzMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                return Task.CompletedTask;
+            }
+
+            if (Ruleset.Value.OnlineID != 3 && !offsetNonStdBindable.IsDefault)
+            {
+                Logger.Log("[EzNoMania]Score submission blocked by offset settings.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
                 return Task.CompletedTask;
             }
 

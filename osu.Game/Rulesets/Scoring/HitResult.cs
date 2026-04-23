@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using osu.Framework.Extensions.EnumExtensions;
+using osu.Framework.Logging;
 using osu.Framework.Utils;
 
 namespace osu.Game.Rulesets.Scoring
@@ -22,6 +23,24 @@ namespace osu.Game.Rulesets.Scoring
         [EnumMember(Value = "none")]
         [Order(15)]
         None,
+
+        // /// <summary>
+        // /// mania专用，无note时的按键结果
+        // /// 不计分、不断连、轻度扣血（介于BAD-POOR）
+        // /// </summary>
+        // [Description(@"Empty Poor")]
+        // [EnumMember(Value = "empty_poor")]
+        // [Order(18)]
+        // EmptyPoor,
+
+        /// <summary>
+        /// mania BMS系列专用: 未命中，或错按其他轨道上，不计分、不断连、轻度扣血
+        /// BMS 系列中, poor ≈ HitResult.Miss, EmptyPoor ≈ HitResult.Poor
+        /// </summary>
+        [Description(@"Poor")]
+        [EnumMember(Value = "poor")]
+        [Order(17)]
+        Poor,
 
         /// <summary>
         /// Indicates that the object has been judged as a miss.
@@ -217,6 +236,11 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.ComboBreak:
                     return false;
 
+                // 不影响ACC
+                // case HitResult.EmptyPoor:
+                case HitResult.Poor:
+                    return false;
+
                 default:
                     return IsScorable(result) && !IsBonus(result);
             }
@@ -236,6 +260,11 @@ namespace osu.Game.Rulesets.Scoring
                 // ComboBreak is a special type that only affects combo. It cannot be considered as basic, tick, bonus, or accuracy-affecting.
                 case HitResult.ComboBreak:
                     return false;
+
+                // 有这个才能把Pool添加到计数器控件中
+                // case HitResult.EmptyPoor:
+                case HitResult.Poor:
+                    return true;
 
                 default:
                     return IsScorable(result) && !IsTick(result) && !IsBonus(result);
@@ -340,6 +369,9 @@ namespace osu.Game.Rulesets.Scoring
                 case HitResult.SliderTailHit:
                     return true;
 
+                case HitResult.Poor:
+                    return false;
+
                 default:
                     // Note that IgnoreHit and IgnoreMiss are excluded as they do not affect score.
                     return result >= HitResult.Miss && result < HitResult.IgnoreMiss;
@@ -366,6 +398,11 @@ namespace osu.Game.Rulesets.Scoring
             if (result == minResult || result == maxResult)
                 return true;
 
+            if (result == HitResult.Poor || result == HitResult.Meh)
+                return true;
+// #if DEBUG
+//             Logger.Log($"Checking hit result {result} against range {minResult} to {maxResult}", LoggingTarget.Runtime, LogLevel.Debug);
+// #endif
             Debug.Assert(minResult <= maxResult);
             return result > minResult && result < maxResult;
         }
@@ -381,6 +418,10 @@ namespace osu.Game.Rulesets.Scoring
         {
             if (maxResult == HitResult.None || !IsHit(maxResult))
                 throw new ArgumentOutOfRangeException(nameof(maxResult), $"{maxResult} is not a valid maximum judgement result.");
+
+            // Pool is a special result that can be both max and min
+            if (minResult == HitResult.Poor)
+                return;
 
             if (minResult == HitResult.None || IsHit(minResult))
                 throw new ArgumentOutOfRangeException(nameof(minResult), $"{minResult} is not a valid minimum judgement result.");

@@ -28,6 +28,9 @@ using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Graphics.UserInterface;
+using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Scoring;
@@ -53,6 +56,11 @@ namespace osu.Game.Screens.Select
         public const float SPACING = 3f;
 
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
+        private Bindable<bool> xxySrFilterSetting = null!;
+        private Bindable<bool> ezAnalysisSqliteEnabled = null!;
+        private IBindable<int> activeSongsBranchVersion = null!;
+        private readonly AsyncLocal<Dictionary<Guid, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<Guid, double>?>();
+        private static readonly IReadOnlyDictionary<BeatmapInfo, double> empty_operation_difficulties = new Dictionary<BeatmapInfo, double>();
 
         private readonly LoadingLayer loading;
 
@@ -62,6 +70,25 @@ namespace osu.Game.Screens.Select
         /// Total number of beatmap difficulties displayed with the filter.
         /// </summary>
         public int MatchedBeatmapsCount => Filters.Last().BeatmapItemsCount;
+
+        public IReadOnlyList<BeatmapInfo> GetFilteredBeatmaps()
+        {
+            var filteredBeatmaps = new HashSet<BeatmapInfo>();
+            var carouselItems = GetCarouselItems();
+
+            if (carouselItems == null)
+                return filteredBeatmaps.ToList();
+
+            foreach (var item in carouselItems)
+            {
+                if (item.Model is not GroupedBeatmap groupedBeatmap)
+                    continue;
+
+                filteredBeatmaps.Add(groupedBeatmap.Beatmap);
+            }
+
+            return filteredBeatmaps.ToList();
+        }
 
         protected override float GetSpacingBetweenPanels(CarouselItem top, CarouselItem bottom)
         {
@@ -102,34 +129,167 @@ namespace osu.Game.Screens.Select
 
             Filters = new ICarouselFilter[]
             {
-                new BeatmapCarouselFilterMatching(() => Criteria!),
-                new BeatmapCarouselFilterSorting(() => Criteria!),
+                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, () => useActiveSongsBranchAsBeatmapSource, getDifficultiesForOperationsAsync, getActiveBranchDifficultiesAsync),
+                new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
                     GetCriteria = () => Criteria!,
                     GetCollections = GetAllCollections,
                     GetLocalUserTopRanks = GetBeatmapInfoGuidToTopRankMapping,
                     GetFavouriteBeatmapSets = GetFavouriteBeatmapSets,
+                    ShouldUseXxySrForDifficultyOperations = () => preferXxySrForDifficultyOperations,
+                    GetDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync,
                 }
             };
 
             AddInternal(loading = new LoadingLayer());
+
+#if DEBUG
+            // 调试用，显示过滤耗时
+            var debugText = new OsuSpriteText
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.TopLeft,
+                Colour = Colour4.White,
+                Alpha = 0.8f,
+                Margin = new MarginPadding { Left = 10, Top = 6 }
+            };
+
+            AddInternal(debugText);
+            Scheduler.AddDelayed(() => debugText.Text = $"filter: {LastFilterMs:F1}ms items: {LastFilterItems} panels: {LastFilterPanels} runs: {FilterRuns}", 250, true);
+#endif
         }
 
         [BackgroundDependencyLoader]
-        private void load(BeatmapStore beatmapStore, AudioManager audio, OsuConfigManager config, CancellationToken? cancellationToken)
+        private void load(BeatmapStore beatmapStore, AudioManager audio, OsuConfigManager config, Ez2ConfigManager ezConfig, CancellationToken? cancellationToken)
         {
             setupPools();
             detachedBeatmaps = beatmapStore.GetBeatmapSets(cancellationToken);
             loadSamples(audio);
-
+            xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
+            ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
+        }
+
+        private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.HasActiveSongsBranchFor(ruleset.Value);
+
+        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && xxySrFilterSetting.Value;
+
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getActiveBranchDifficultiesAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        {
+            if (!useActiveSongsBranchAsBeatmapSource)
+                return Task.FromResult(empty_operation_difficulties);
+
+            var beatmapList = beatmaps.Distinct().ToList();
+
+            if (beatmapList.Count == 0)
+                return Task.FromResult(empty_operation_difficulties);
+
+            var activeSongsBranchValues = ezAnalysisCache.GetActiveSongsBranchValues(beatmapList, ruleset.Value);
+
+            if (activeSongsBranchValues.Count == 0)
+                return Task.FromResult(empty_operation_difficulties);
+
+            var resolvedValues = new Dictionary<BeatmapInfo, double>(activeSongsBranchValues.Count);
+
+            foreach (var beatmap in beatmapList)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (activeSongsBranchValues.TryGetValue(beatmap.ID, out double xxySr))
+                    resolvedValues[beatmap] = xxySr;
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
+        }
+
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        {
+            if (!preferXxySrForDifficultyOperations)
+                return Task.FromResult(empty_operation_difficulties);
+
+            var beatmapList = beatmaps.Distinct().ToList();
+
+            if (beatmapList.Count == 0)
+                return Task.FromResult(empty_operation_difficulties);
+
+            if (useActiveSongsBranchAsBeatmapSource)
+                return getStrictActiveBranchDifficultiesAsync(beatmapList, cancellationToken);
+
+            var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<Guid, double>();
+            var uncachedBeatmaps = beatmapList.Where(b => !cachedDifficulties.ContainsKey(b.ID)).ToList();
+
+            if (uncachedBeatmaps.Count > 0)
+            {
+                var storedXxySrValues = ezAnalysisCache.GetStoredXxySrValues(uncachedBeatmaps, ruleset.Value, Criteria?.Mods);
+
+                foreach (var beatmap in uncachedBeatmaps)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    cachedDifficulties[beatmap.ID] = storedXxySrValues.TryGetValue(beatmap.ID, out double xxySr) ? xxySr : beatmap.StarRating;
+                }
+            }
+
+            var resolvedValues = new Dictionary<BeatmapInfo, double>(beatmapList.Count);
+
+            foreach (var beatmap in beatmapList)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (cachedDifficulties.TryGetValue(beatmap.ID, out double xxySr))
+                    resolvedValues[beatmap] = xxySr;
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
+        }
+
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getStrictActiveBranchDifficultiesAsync(IReadOnlyList<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        {
+            var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<Guid, double>();
+            var uncachedBeatmaps = beatmaps.Where(b => !cachedDifficulties.ContainsKey(b.ID)).ToList();
+
+            if (uncachedBeatmaps.Count > 0)
+            {
+                var activeSongsBranchValues = ezAnalysisCache.GetActiveSongsBranchValues(uncachedBeatmaps, ruleset.Value);
+
+                foreach (var beatmap in uncachedBeatmaps)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (activeSongsBranchValues.TryGetValue(beatmap.ID, out double xxySr))
+                        cachedDifficulties[beatmap.ID] = xxySr;
+                }
+            }
+
+            var resolvedValues = new Dictionary<BeatmapInfo, double>(beatmaps.Count);
+
+            foreach (var beatmap in beatmaps)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (cachedDifficulties.TryGetValue(beatmap.ID, out double xxySr))
+                    resolvedValues[beatmap] = xxySr;
+            }
+
+            return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
             detachedBeatmaps.BindCollectionChanged(beatmapSetsChanged, true);
+
+            activeSongsBranchVersion = ezAnalysisCache.ActiveSongsBranchVersion.GetBoundCopy();
+            activeSongsBranchVersion.BindValueChanged(_ =>
+            {
+                Schedule(() =>
+                {
+                    operationDifficultyCache.Value = null;
+
+                    if (Criteria != null)
+                        Filter(Criteria, true);
+                });
+            }, false);
         }
 
         #region Beatmap source hookup
@@ -777,10 +937,22 @@ namespace osu.Game.Screens.Select
 
         private ScheduledDelegate? loadingDebounce;
 
+        // Lightweight instrumentation for investigating filter performance regressions.
+        private int filterRuns;
+
+        public double LastFilterMs { get; private set; }
+
+        public int LastFilterItems { get; private set; }
+
+        public int LastFilterPanels { get; private set; }
+
+        public int FilterRuns => filterRuns;
+
         public void Filter(FilterCriteria criteria, bool showLoadingImmediately = false)
         {
             bool resetDisplay = grouping.BeatmapSetsGroupedTogether != BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
 
+            operationDifficultyCache.Value = null;
             Criteria = criteria;
 
             loadingDebounce ??= Scheduler.AddDelayed(() =>
@@ -792,13 +964,29 @@ namespace osu.Game.Screens.Select
                 loading.Show();
             }, showLoadingImmediately ? 0 : 250);
 
+            // Instrumented call: measure filter duration and record counts.
+            Interlocked.Increment(ref filterRuns);
+            var sw = Stopwatch.StartNew();
+
             FilterAsync(resetDisplay).ContinueWith(_ => Schedule(() =>
             {
-                loadingDebounce?.Cancel();
-                loadingDebounce = null;
+                try
+                {
+                    sw.Stop();
+                    LastFilterMs = sw.Elapsed.TotalMilliseconds;
 
-                Scroll.FadeColour(OsuColour.Gray(1f), 500, Easing.OutQuint);
-                loading.Hide();
+                    var items = GetCarouselItems();
+                    LastFilterItems = items?.Count ?? 0;
+                    LastFilterPanels = Scroll.Panels.Count;
+                }
+                finally
+                {
+                    loadingDebounce?.Cancel();
+                    loadingDebounce = null;
+
+                    Scroll.FadeColour(OsuColour.Gray(1f), 500, Easing.OutQuint);
+                    loading.Hide();
+                }
             }));
         }
 
@@ -819,6 +1007,12 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private IAPIProvider api { get; set; } = null!;
+
+        [Resolved]
+        private IBindable<RulesetInfo> ruleset { get; set; } = null!;
+
+        [Resolved]
+        private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
         /// <remarks>
         /// FOOTGUN WARNING: this being sorted on the realm side before detaching is IMPORTANT.

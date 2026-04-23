@@ -13,15 +13,19 @@ using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API;
 using osu.Game.Online.Placeholders;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking.Statistics.User;
 using osuTK;
@@ -48,6 +52,9 @@ namespace osu.Game.Screens.Ranking.Statistics
         private BeatmapManager beatmapManager { get; set; } = null!;
 
         [Resolved]
+        private ScoreManager scoreManager { get; set; } = null!;
+
+        [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
         [Resolved]
@@ -55,6 +62,7 @@ namespace osu.Game.Screens.Ranking.Statistics
 
         private readonly Container content;
         private readonly LoadingSpinner spinner;
+        private readonly EzScoreServer.AnalysisHost analysisHost;
 
         private bool wasOpened;
         private Sample? popInSample;
@@ -76,7 +84,8 @@ namespace osu.Game.Screens.Ranking.Statistics
                 Children = new Drawable[]
                 {
                     content = new Container { RelativeSizeAxes = Axes.Both },
-                    spinner = new LoadingSpinner()
+                    spinner = new LoadingSpinner(),
+                    analysisHost = new EzScoreServer.AnalysisHost(),
                 }
             };
         }
@@ -94,6 +103,7 @@ namespace osu.Game.Screens.Ranking.Statistics
         {
             loadCancellation?.Cancel();
             loadCancellation = null;
+            analysisHost.CancelPendingAnalysis();
 
             foreach (var child in content)
                 child.FadeOut(150).Expire();
@@ -112,7 +122,39 @@ namespace osu.Game.Screens.Ranking.Statistics
             var workingBeatmap = beatmapManager.GetWorkingBeatmap(newScore.BeatmapInfo);
 
             // Todo: The placement of this is temporary. Eventually we'll both generate the playable beatmap _and_ run through it in a background task to generate the hit events.
-            Task.Run(() => workingBeatmap.GetPlayableBeatmap(newScore.Ruleset, newScore.Mods), loadCancellation.Token).ContinueWith(task => Schedule(() =>
+            Task.Run(() =>
+            {
+                // 结算后加载一次分数，后台计算
+                var playable = workingBeatmap.GetPlayableBeatmap(newScore.Ruleset, newScore.Mods);
+
+                List<HitEvent>? generatedHitEvents = null;
+
+                if (newScore.HitEvents.Count == 0)
+                {
+                    // Only attempt generation when we have a local replay.
+                    var databasedScore = scoreManager.GetScore(newScore);
+
+                    if (databasedScore != null)
+                    {
+                        Logger.Log($"[EzScore] Score null: {newScore.OnlineID} ({databasedScore.ScoreInfo.HitEvents.Count}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+
+                        // try
+                        // {
+                        //     generatedHitEvents = analysisHost.GenerateAsync(databasedScore, loadCancellation.Token).GetResultSafely();
+                        // }
+                        // catch
+                        // {
+                        EzScoreReloadBridge.InitializeAllGenerators();
+                        generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
+                        // }
+                    }
+
+                    if (generatedHitEvents != null)
+                        newScore.HitEvents = generatedHitEvents;
+                }
+
+                return playable;
+            }, loadCancellation.Token).ContinueWith(task => Schedule(() =>
             {
                 bool hitEventsAvailable = newScore.HitEvents.Count != 0;
                 Container<Drawable> container;

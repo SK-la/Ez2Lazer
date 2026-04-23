@@ -272,7 +272,29 @@ namespace osu.Game.Scoring
                     return statistics;
 
                 if (!string.IsNullOrEmpty(StatisticsJson))
-                    statistics = JsonConvert.DeserializeObject<Dictionary<HitResult, int>>(StatisticsJson);
+                {
+                    // 保护自定义判定类型解析错误引发解析崩溃
+                    try
+                    {
+                        var raw = JsonConvert.DeserializeObject<Dictionary<string, int>>(StatisticsJson);
+                        statistics = new Dictionary<HitResult, int>();
+
+                        if (raw != null)
+                        {
+                            foreach (var kv in raw)
+                            {
+                                if (Enum.TryParse<HitResult>(kv.Key, ignoreCase: true, out var parsed))
+                                    statistics[parsed] = kv.Value;
+                                // Unknown keys are skipped to avoid deserialization failures from old/invalid values.
+                            }
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // If the JSON is malformed, fallback to empty statistics.
+                        statistics = new Dictionary<HitResult, int>();
+                    }
+                }
 
                 return statistics ??= new Dictionary<HitResult, int>();
             }
@@ -290,7 +312,27 @@ namespace osu.Game.Scoring
                     return maximumStatistics;
 
                 if (!string.IsNullOrEmpty(MaximumStatisticsJson))
-                    maximumStatistics = JsonConvert.DeserializeObject<Dictionary<HitResult, int>>(MaximumStatisticsJson);
+                {
+                    try
+                    {
+                        var raw = JsonConvert.DeserializeObject<Dictionary<string, int>>(MaximumStatisticsJson);
+                        maximumStatistics = new Dictionary<HitResult, int>();
+
+                        if (raw != null)
+                        {
+                            foreach (var kv in raw)
+                            {
+                                if (Enum.TryParse<HitResult>(kv.Key, ignoreCase: true, out var parsed))
+                                    maximumStatistics[parsed] = kv.Value;
+                                // Unknown keys are skipped.
+                            }
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        maximumStatistics = new Dictionary<HitResult, int>();
+                    }
+                }
 
                 return maximumStatistics ??= new Dictionary<HitResult, int>();
             }

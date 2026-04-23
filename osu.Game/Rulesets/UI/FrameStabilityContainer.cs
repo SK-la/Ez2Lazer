@@ -44,7 +44,7 @@ namespace osu.Game.Rulesets.UI
 
         public double GameplayStartTime { get; }
 
-        private IGameplayClock? parentGameplayClock;
+        internal IGameplayClock? ParentGameplayClock { get; private set; }
 
         /// <summary>
         /// A clock which is used as reference for time, rate and running state.
@@ -96,8 +96,8 @@ namespace osu.Game.Rulesets.UI
         {
             if (gameplayClock != null)
             {
-                parentGameplayClock = gameplayClock;
-                IsPaused.BindTo(parentGameplayClock.IsPaused);
+                ParentGameplayClock = gameplayClock;
+                IsPaused.BindTo(ParentGameplayClock.IsPaused);
             }
 
             referenceClock = gameplayClock ?? Clock;
@@ -195,6 +195,9 @@ namespace osu.Game.Rulesets.UI
             manualClock.CurrentTime = proposedTime;
             manualClock.Rate = Math.Abs(referenceClock.Rate) * direction;
             manualClock.IsRunning = referenceClock.IsRunning;
+
+            // [Ez] Record the wall-clock moment the ManualClock is set, for sub-frame timing correction.
+            EzOsuGame.Timing.EzSubFrameCorrection.RecordFscUpdate();
 
             // determine whether catch-up is required.
             if (state == PlaybackState.Valid && timeBehind > 0)
@@ -296,11 +299,11 @@ namespace osu.Game.Rulesets.UI
 
         public double FramesPerSecond => framedClock.FramesPerSecond;
 
-        public double StartTime => parentGameplayClock?.StartTime ?? 0;
+        public double StartTime => ParentGameplayClock?.StartTime ?? 0;
 
         private readonly AudioAdjustments gameplayAdjustments = new AudioAdjustments();
 
-        public IAdjustableAudioComponent AdjustmentsFromMods => parentGameplayClock?.AdjustmentsFromMods ?? gameplayAdjustments;
+        public IAdjustableAudioComponent AdjustmentsFromMods => ParentGameplayClock?.AdjustmentsFromMods ?? gameplayAdjustments;
 
         #endregion
 
