@@ -343,13 +343,14 @@ namespace osu.Game.Screens.Menu
 
         private void displayLoginIfApplicable()
         {
-            if (loginDisplayed.Value) return;
-
-            if (!api.IsLoggedIn || api.State.Value == APIState.RequiresSecondFactorAuth)
-            {
-                Scheduler.AddDelayed(() => login?.Show(), 500);
-                loginDisplayed.Value = true;
-            }
+            // 已禁用自动弹出登录界面
+            // if (loginDisplayed.Value) return;
+            //
+            // if (!api.IsLoggedIn || api.State.Value == APIState.RequiresSecondFactorAuth)
+            // {
+            //     Scheduler.AddDelayed(() => login?.Show(), 500);
+            //     loginDisplayed.Value = true;
+            // }
         }
 
         protected override void LogoSuspending(OsuLogo logo)
