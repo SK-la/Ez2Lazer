@@ -272,8 +272,8 @@ namespace osu.Game.Screens.Select
                 updateKeyCount();
             }, true);
 
-            var xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
-            xxySrFilterSetting.BindValueChanged(value =>
+            var sqliteFilter = ezConfig.GetBindable<bool>(Ez2Setting.SqliteFilter);
+            sqliteFilter.BindValueChanged(value =>
             {
                 starCounter.Icon = value.NewValue
                     ? FontAwesome.Solid.Moon

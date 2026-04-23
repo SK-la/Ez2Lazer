@@ -295,7 +295,7 @@ namespace osu.Game.Screens.Select
             config.BindWith(OsuSetting.SongSelectSortingMode, sortDropdown.Current);
 
             ezConfig.BindWith(Ez2Setting.KpcDisplayMode, kpcDropdown.Current);
-            ezConfig.BindWith(Ez2Setting.XxySRFilter, sqliteFilterButton.Active);
+            ezConfig.BindWith(Ez2Setting.SqliteFilter, sqliteFilterButton.Active);
             ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, ksPreviewButton.State);
 
             ruleset.BindValueChanged(_ =>

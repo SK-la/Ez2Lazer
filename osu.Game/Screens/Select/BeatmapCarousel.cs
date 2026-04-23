@@ -56,7 +56,7 @@ namespace osu.Game.Screens.Select
         public const float SPACING = 3f;
 
         private IBindableList<BeatmapSetInfo> detachedBeatmaps = null!;
-        private Bindable<bool> xxySrFilterSetting = null!;
+        private Bindable<bool> sqliteFilter = null!;
         private Bindable<bool> ezAnalysisSqliteEnabled = null!;
         private IBindable<int> activeSongsBranchVersion = null!;
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<Guid, double>?>();
@@ -167,14 +167,14 @@ namespace osu.Game.Screens.Select
             setupPools();
             detachedBeatmaps = beatmapStore.GetBeatmapSets(cancellationToken);
             loadSamples(audio);
-            xxySrFilterSetting = ezConfig.GetBindable<bool>(Ez2Setting.XxySRFilter);
+            sqliteFilter = ezConfig.GetBindable<bool>(Ez2Setting.SqliteFilter);
             ezAnalysisSqliteEnabled = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisSqliteEnabled);
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
         }
 
         private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.HasActiveSongsBranchFor(ruleset.Value);
 
-        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && xxySrFilterSetting.Value;
+        private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && sqliteFilter.Value;
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getActiveBranchDifficultiesAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
