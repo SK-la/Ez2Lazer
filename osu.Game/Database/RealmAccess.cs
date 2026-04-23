@@ -206,10 +206,10 @@ namespace osu.Game.Database
             if (!Filename.EndsWith(realm_extension, StringComparison.Ordinal))
                 Filename += realm_extension;
 
-#if DEBUG
+// #if DEBUG
             if (!DebugUtils.IsNUnitRunning)
                 applyFilenameSchemaSuffix(ref Filename);
-#endif
+// #endif
 
             // `prepareFirstRealmAccess()` triggers the first `getRealmInstance` call, which will implicitly run realm migrations and bring the schema up-to-date.
             using (var realm = prepareFirstRealmAccess())

@@ -1,7 +1,10 @@
 {
   "profiles": {
     "osu! Desktop": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "environmentVariables": {
+        "OSU_SDL3": "1"
+      }
     },
     "osu! Tournament": {
       "commandName": "Project",
