@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.Edit.Setup
                     {
                         Default = BeatmapDifficulty.DEFAULT_DIFFICULTY,
                         MinValue = 0,
-                        MaxValue = 10,
+                        MaxValue = ManiaRuleset.MAX_STAGE_KEYS,
                         Precision = 1,
                     },
                     TransferValueOnCommit = true,

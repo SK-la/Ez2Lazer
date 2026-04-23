@@ -44,6 +44,17 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor.Checks
         }
 
         [Test]
+        public void TestKeycountEighteen()
+        {
+            beatmap.Difficulty.CircleSize = ManiaRuleset.MAX_STAGE_KEYS;
+
+            var context = getContext();
+            var issues = check.Run(context).ToList();
+
+            Assert.That(issues, Has.Count.EqualTo(0));
+        }
+
+        [Test]
         public void TestKeycountSmallerThanFour()
         {
             beatmap.Difficulty.CircleSize = 1;
@@ -53,6 +64,18 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor.Checks
 
             Assert.That(issues, Has.Count.EqualTo(1));
             Assert.That(issues.Single().Template is CheckKeyCount.IssueTemplateKeycountTooLow);
+        }
+
+        [Test]
+        public void TestKeycountGreaterThanMaximum()
+        {
+            beatmap.Difficulty.CircleSize = ManiaRuleset.MAX_STAGE_KEYS + 1;
+
+            var context = getContext();
+            var issues = check.Run(context).ToList();
+
+            Assert.That(issues, Has.Count.EqualTo(1));
+            Assert.That(issues.Single().Template is CheckKeyCount.IssueTemplateKeycountTooHigh);
         }
 
         private BeatmapVerifierContext getContext()

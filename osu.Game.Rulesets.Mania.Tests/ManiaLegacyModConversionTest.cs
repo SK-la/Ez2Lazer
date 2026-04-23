@@ -2,9 +2,12 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Legacy;
 using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Tests.Beatmaps;
 
 namespace osu.Game.Rulesets.Mania.Tests
@@ -54,6 +57,37 @@ namespace osu.Game.Rulesets.Mania.Tests
         [TestCase(LegacyMods.Nightcore | LegacyMods.DoubleTime, new[] { typeof(ManiaModNightcore) })]
         [TestCase(LegacyMods.Perfect | LegacyMods.SuddenDeath, new[] { typeof(ManiaModPerfect) })]
         public new void TestToLegacy(LegacyMods legacyMods, Type[] givenMods) => base.TestToLegacy(legacyMods, givenMods);
+
+        [Test]
+        public void TestConversionModsPreferSingleStageKeyRange()
+        {
+            var ruleset = (ManiaRuleset)CreateRuleset();
+            var conversionMods = ruleset.GetModsFor(ModType.Conversion).ToList();
+
+            Assert.That(conversionMods.Any(mod => mod is ManiaModDualStages), Is.False);
+
+            var keyModGroup = conversionMods.OfType<MultiMod>().Single(mod => mod.Mods.OfType<ManiaKeyMod>().Any());
+
+            Assert.That(keyModGroup.Mods.OfType<ManiaKeyMod>().Select(mod => mod.KeyCount), Is.EqualTo(Enumerable.Range(1, ManiaRuleset.MAX_STAGE_KEYS)));
+        }
+
+        [TestCase(12)]
+        [TestCase(14)]
+        [TestCase(16)]
+        [TestCase(18)]
+        public void TestHigherSingleStageKeyModsAdjustConvertedKeyCount(int keyCount)
+        {
+            var ruleset = (ManiaRuleset)CreateRuleset();
+            var beatmapInfo = new BeatmapInfo(new RulesetInfo { ShortName = "osu" }, new BeatmapDifficulty { CircleSize = 4, OverallDifficulty = 4 });
+
+            var keyMod = ruleset.GetModsFor(ModType.Conversion)
+                                .OfType<MultiMod>()
+                                .SelectMany(mod => mod.Mods)
+                                .OfType<ManiaKeyMod>()
+                                .Single(mod => mod.KeyCount == keyCount);
+
+            Assert.That(ruleset.GetKeyCount(beatmapInfo, new[] { keyMod }), Is.EqualTo(keyCount));
+        }
 
         protected override Ruleset CreateRuleset() => new ManiaRuleset();
     }
