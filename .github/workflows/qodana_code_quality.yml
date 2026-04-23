@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches: # Specify your branches here
-      - locmain # The 'locmain' branch
+      - master # The 'master' branch
       - 'releases/*' # The release branches
 
 jobs:

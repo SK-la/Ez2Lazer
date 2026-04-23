@@ -8,15 +8,15 @@ on:
         required: false
         default: ''
       branch:
-        description: '主仓分支名，留空默认 locmain'
+        description: '主仓分支名，留空默认 master'
         required: false
         default: ''
       framework_branch:
-        description: 'osu-framework 分支名，留空默认 locmain'
+        description: 'osu-framework 分支名，留空默认 master'
         required: false
         default: ''
       resources_branch:
-        description: 'osu-resources 分支名，留空默认 locmain'
+        description: 'osu-resources 分支名，留空默认 master'
         required: false
         default: ''
       no_publish:
@@ -50,13 +50,13 @@ jobs:
           }
 
           $mainBranch = '${{ github.event.inputs.branch }}'
-          if ([string]::IsNullOrWhiteSpace($mainBranch)) { $mainBranch = 'locmain' }
+          if ([string]::IsNullOrWhiteSpace($mainBranch)) { $mainBranch = 'master' }
 
           $frameworkBranch = '${{ github.event.inputs.framework_branch }}'
-          if ([string]::IsNullOrWhiteSpace($frameworkBranch)) { $frameworkBranch = 'locmain' }
+          if ([string]::IsNullOrWhiteSpace($frameworkBranch)) { $frameworkBranch = 'master' }
 
           $resourcesBranch = '${{ github.event.inputs.resources_branch }}'
-          if ([string]::IsNullOrWhiteSpace($resourcesBranch)) { $resourcesBranch = 'locmain' }
+          if ([string]::IsNullOrWhiteSpace($resourcesBranch)) { $resourcesBranch = 'master' }
 
           Write-Output "release_tag=$inputTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           Write-Output "main_branch=$mainBranch" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append

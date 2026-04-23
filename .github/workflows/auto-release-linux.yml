@@ -7,9 +7,9 @@ on:
         description: '发布使用的 tag（格式 YYYY-M-D，年为四位，月禁止前导0 如 1-12，日为1-31，例如 2026-1-14），必填。工作流会在你选择的分支最新提交上创建该 tag（如果远程不存在）。'
         required: true
       branch:
-        description: '主仓要构建的分支（默认 locmain）'
+        description: '主仓要构建的分支（默认 master）'
         required: true
-        default: 'locmain'
+        default: 'master'
       framework_branch:
         description: '可选：用于 checkout osu-framework 的分支（留空则使用上面的 branch）'
         required: false
