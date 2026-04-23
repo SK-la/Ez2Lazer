@@ -207,6 +207,7 @@ namespace osu.Game.Screens.Select
                                         {
                                             Anchor = Anchor.BottomLeft,
                                             Origin = Anchor.BottomLeft,
+                                            Scale = new Vector2(0.875f),
                                         },
                                         Empty(),
                                         ezDisplayKpsGraph = new EzDisplayKpsGraph
