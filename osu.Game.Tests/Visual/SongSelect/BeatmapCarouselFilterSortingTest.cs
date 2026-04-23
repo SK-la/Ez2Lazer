@@ -91,6 +91,33 @@ namespace osu.Game.Tests.Visual.SongSelect
         }
 
         [Test]
+        public async Task TestSortingPpUsesSetMax()
+        {
+            var beatmapSets = new List<BeatmapSetInfo>
+            {
+                TestResources.CreateTestBeatmapSetInfo(2),
+                TestResources.CreateTestBeatmapSetInfo(2),
+                TestResources.CreateTestBeatmapSetInfo(2)
+            };
+
+            var ppValues = new Dictionary<BeatmapInfo, double>
+            {
+                [beatmapSets[0].Beatmaps[0]] = 100,
+                [beatmapSets[0].Beatmaps[1]] = 150,
+                [beatmapSets[1].Beatmaps[0]] = 160,
+                [beatmapSets[1].Beatmaps[1]] = 170,
+                [beatmapSets[2].Beatmaps[0]] = 120,
+                [beatmapSets[2].Beatmaps[1]] = 130,
+            };
+
+            var results = (await runSorting(SortMode.PP, beatmapSets, beatmaps => beatmaps.ToDictionary(b => b, b => ppValues[b]))).ToList();
+
+            Assert.That(results.Take(2).All(b => EqualityComparer<BeatmapSetInfo>.Default.Equals(b.BeatmapSet, beatmapSets[2])));
+            Assert.That(results.Skip(2).Take(2).All(b => EqualityComparer<BeatmapSetInfo>.Default.Equals(b.BeatmapSet, beatmapSets[0])));
+            Assert.That(results.Skip(4).All(b => EqualityComparer<BeatmapSetInfo>.Default.Equals(b.BeatmapSet, beatmapSets[1])));
+        }
+
+        [Test]
         public async Task TestSortByArtistUsesTitleAsTiebreaker()
         {
             List<BeatmapSetInfo> beatmapSets = new List<BeatmapSetInfo>();
@@ -169,12 +196,14 @@ namespace osu.Game.Tests.Visual.SongSelect
             Assert.That(results.Select(b => b.BeatmapSet!.DateAdded), Is.Ordered.Descending);
         }
 
-        private static async Task<IEnumerable<BeatmapInfo>> runSorting(SortMode sort, List<BeatmapSetInfo> beatmapSets)
+        private static async Task<IEnumerable<BeatmapInfo>> runSorting(SortMode sort, List<BeatmapSetInfo> beatmapSets,
+                                                                       Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? ppValueProvider = null)
         {
             var sorter = new BeatmapCarouselFilterSorting(
                 () => new FilterCriteria { Sort = sort },
                 () => false,
-                (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.ToDictionary(b => b, b => b.StarRating)));
+                (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.ToDictionary(b => b, b => b.StarRating)),
+                (beatmaps, _) => Task.FromResult(ppValueProvider?.Invoke(beatmaps) ?? new Dictionary<BeatmapInfo, double>()));
             var carouselItems = await sorter.Run(beatmapSets.SelectMany(s => s.Beatmaps.Select(b => new CarouselItem(b))), CancellationToken.None);
             return carouselItems.Select(ci => ci.Model).OfType<BeatmapInfo>();
         }

@@ -86,14 +86,16 @@ namespace osu.Game.EzOsuGame.Analysis
     {
         public readonly double AverageKps;
         public readonly double MaxKps;
+        public readonly double? Pp;
         public readonly KpsSummary? CommonSummary;
         public readonly EzManiaSummary? ManiaSummary;
         public readonly EzBeatmapTagSummary? TagSummary;
 
-        public EzAnalysisResult(KpsSummary commonSummary, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null)
+        public EzAnalysisResult(KpsSummary commonSummary, double? pp = null, EzManiaSummary? maniaSummary = null, EzBeatmapTagSummary? tagSummary = null)
         {
             AverageKps = double.IsFinite(commonSummary.AverageKps) ? commonSummary.AverageKps : 0;
             MaxKps = double.IsFinite(commonSummary.MaxKps) ? commonSummary.MaxKps : 0;
+            Pp = pp is double value && double.IsFinite(value) ? value : null;
             CommonSummary = commonSummary;
             ManiaSummary = maniaSummary;
             TagSummary = tagSummary;
@@ -103,7 +105,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary)
             => CommonSummary is KpsSummary commonSummary
-                ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary)
+                ? new EzAnalysisResult(commonSummary, Pp, ManiaSummary, tagSummary)
                 : this;
     }
 }

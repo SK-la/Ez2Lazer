@@ -10,6 +10,8 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
+using osu.Game.Scoring;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
 
@@ -27,12 +29,23 @@ namespace osu.Game.EzOsuGame.Analysis
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (analysisBeatmap.HitObjects.Count == 0)
+            if (!tryComputeXxySr(analysisBeatmap, lookup, cancellationToken, out double? computedXxySr)
+                || computedXxySr is not double resolvedXxySr)
                 return false;
 
-            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+            xxySr = resolvedXxySr;
+            return true;
+        }
 
-            return EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.XXY_SR, cancellationToken, out xxySr);
+        public static bool TryComputeXxySrAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
+                                                out double? xxySr, out double? pp)
+        {
+            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+            IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return tryComputeOperationValues(workingBeatmap, analysisBeatmap, lookup, cancellationToken, out xxySr, out pp);
         }
 
         public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
@@ -62,15 +75,10 @@ namespace osu.Game.EzOsuGame.Analysis
             }
 
             double? xxySr = null;
-            double sr = 0;
+            double? pp = tryComputePerfectPp(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken);
 
-            bool shouldCalculateXxy = !onlyKps && lookup.Ruleset.OnlineID == 3;
-            bool hasXxySr = shouldCalculateXxy
-                            && analysisBeatmap.HitObjects.Count > 0
-                            && EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.XXY_SR, cancellationToken, out sr);
-
-            if (hasXxySr)
-                xxySr = sr;
+            if (!onlyKps)
+                tryComputeXxySr(analysisBeatmap, lookup, cancellationToken, out xxySr);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -81,7 +89,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 ? null
                 : new EzManiaSummary(columnCounts, holdNoteCounts, xxySr);
 
-            return new EzAnalysisResult(commonSummary, maniaSummary);
+            return new EzAnalysisResult(commonSummary, pp, maniaSummary);
         }
 
         public static bool TryComputeRulesetSpecificRadarData(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
@@ -121,6 +129,72 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 return 1.0;
             }
+        }
+
+        private static bool tryComputeOperationValues(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
+                                                      in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
+                                                      out double? xxySr, out double? pp)
+        {
+            pp = tryComputePerfectPp(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken);
+
+            return tryComputeXxySr(analysisBeatmap, lookup, cancellationToken, out xxySr) || pp != null;
+        }
+
+        private static bool tryComputeXxySr(IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken, out double? xxySr)
+        {
+            xxySr = null;
+
+            if (analysisBeatmap.HitObjects.Count == 0)
+                return false;
+
+            if (lookup.Ruleset.OnlineID != 3)
+                return false;
+
+            double rate = getRateAdjustMultiplier(lookup.OrderedMods);
+
+            if (EzAnalysisProviderBridge.TryGetValue(lookup.Ruleset, new EzAnalysisRequest(analysisBeatmap, rate), EzAnalysisFields.XXY_SR, cancellationToken, out double sr))
+                xxySr = sr;
+
+            return xxySr != null;
+        }
+
+        private static double? tryComputePerfectPp(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
+                                                   in EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
+        {
+            var ruleset = lookup.Ruleset.CreateInstance();
+
+            if (ruleset == null)
+                return null;
+
+            var performanceCalculator = ruleset.CreatePerformanceCalculator();
+
+            if (performanceCalculator == null)
+                return null;
+
+            var difficulty = ruleset.CreateDifficultyCalculator(playableWorkingBeatmap).Calculate(lookup.OrderedMods, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ScoreProcessor scoreProcessor = ruleset.CreateScoreProcessor();
+            scoreProcessor.Mods.Value = lookup.OrderedMods;
+            scoreProcessor.ApplyBeatmap(analysisBeatmap);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ScoreInfo perfectScore = new ScoreInfo(lookup.BeatmapInfo, ruleset.RulesetInfo)
+            {
+                Passed = true,
+                Accuracy = 1,
+                Mods = lookup.OrderedMods,
+                MaxCombo = scoreProcessor.MaximumCombo,
+                Combo = scoreProcessor.MaximumCombo,
+                TotalScore = scoreProcessor.MaximumTotalScore,
+                Statistics = scoreProcessor.MaximumStatistics,
+                MaximumStatistics = scoreProcessor.MaximumStatistics
+            };
+
+            var performance = performanceCalculator.Calculate(perfectScore, difficulty);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return double.IsFinite(performance.Total) ? performance.Total : null;
         }
 
         private class PlayableCachedWorkingBeatmap : IWorkingBeatmap

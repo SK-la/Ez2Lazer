@@ -29,11 +29,33 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// <summary>
         /// 设置KPS显示值
         /// </summary>
+        /// <param name="pp">理论满分PP</param>
         /// <param name="averageKps">平均KPS</param>
         /// <param name="maxKps">最大KPS</param>
-        public void SetKps(double averageKps, double maxKps)
+        public void SetKps(double? pp, double averageKps, double maxKps)
         {
-            kpsText.Text = averageKps > 0 ? $"  [KPS] {averageKps:F1} ({maxKps:F1} Max)" : "";
+            string ppText = pp is double ppValue ? $"[PP] {ppValue:F1}" : string.Empty;
+            string kpsValueText = averageKps > 0 ? $"[KPS] {averageKps:F1} ({maxKps:F1} Max)" : string.Empty;
+
+            if (string.IsNullOrEmpty(ppText) && string.IsNullOrEmpty(kpsValueText))
+            {
+                kpsText.Text = string.Empty;
+                return;
+            }
+
+            if (string.IsNullOrEmpty(ppText))
+            {
+                kpsText.Text = $"  {kpsValueText}";
+                return;
+            }
+
+            if (string.IsNullOrEmpty(kpsValueText))
+            {
+                kpsText.Text = $"  {ppText}";
+                return;
+            }
+
+            kpsText.Text = $"  {ppText}  {kpsValueText}";
         }
     }
 }

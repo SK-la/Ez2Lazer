@@ -20,13 +20,16 @@ namespace osu.Game.Screens.Select
         private readonly Func<FilterCriteria> getCriteria;
         private readonly Func<bool> shouldUseXxySrForDifficultyOperations;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
+        private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync;
 
         public BeatmapCarouselFilterSorting(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
-                                            Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync)
+                                            Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
+                                            Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>>? getPpForOperationsAsync = null)
         {
             this.getCriteria = getCriteria;
             this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
             this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
+            this.getPpForOperationsAsync = getPpForOperationsAsync ?? ((_, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(new Dictionary<BeatmapInfo, double>()));
         }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
@@ -35,26 +38,26 @@ namespace osu.Game.Screens.Select
             var itemList = items.ToList();
 
             bool groupedSets = BeatmapCarouselFilterGrouping.ShouldGroupBeatmapsTogether(criteria);
-            // xxy_SR is only required when difficulty is the active sort key.
-            // For 0/1 item, sorting does not require any key fetches.
-            bool useXxyDifficulty = shouldUseXxySrForDifficultyOperations()
-                                    && criteria.Sort == SortMode.Difficulty
-                                    && itemList.Count > 1;
+            bool useSortOperationValues = itemList.Count > 1
+                                          && ((criteria.Sort == SortMode.Difficulty && shouldUseXxySrForDifficultyOperations())
+                                              || criteria.Sort == SortMode.PP);
 
-            IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
+            IReadOnlyDictionary<BeatmapInfo, double>? operationSortValues = null;
 
-            if (useXxyDifficulty)
+            if (useSortOperationValues)
             {
                 var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
-                operationDifficulties = await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
+                operationSortValues = criteria.Sort == SortMode.PP
+                    ? await getPpForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false)
+                    : await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
             }
 
-            double getDifficulty(BeatmapInfo beatmap)
+            double getSortValue(BeatmapInfo beatmap)
             {
-                if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double difficulty))
-                    return difficulty;
+                if (operationSortValues != null && operationSortValues.TryGetValue(beatmap, out double sortValue))
+                    return sortValue;
 
-                return beatmap.StarRating;
+                return criteria.Sort == SortMode.PP ? 0 : beatmap.StarRating;
             }
 
             BeatmapItemsCount = itemList.Count;
@@ -67,17 +70,17 @@ namespace osu.Game.Screens.Select
                 if (groupedSets)
                 {
                     if (ab.BeatmapSet!.Equals(bb.BeatmapSet))
-                        return compareDifficulty(ab, bb, criteria.Sort, getDifficulty);
+                        return compareDifficulty(ab, bb, criteria.Sort, getSortValue);
 
                     // If we're grouping by sets, all fallback sorts need to be aggregates for the set.
-                    return compare(ab, bb, criteria.Sort, aggregate: true, getDifficulty);
+                    return compare(ab, bb, criteria.Sort, aggregate: true, getSortValue);
                 }
 
-                return compare(ab, bb, criteria.Sort, aggregate: false, getDifficulty);
+                return compare(ab, bb, criteria.Sort, aggregate: false, getSortValue);
             })).ToList();
         }
 
-        private static int compare(BeatmapInfo a, BeatmapInfo b, SortMode sort, bool aggregate, Func<BeatmapInfo, double> getDifficulty)
+        private static int compare(BeatmapInfo a, BeatmapInfo b, SortMode sort, bool aggregate, Func<BeatmapInfo, double> getSortValue)
         {
             int comparison;
 
@@ -102,7 +105,14 @@ namespace osu.Game.Screens.Select
                     break;
 
                 case SortMode.Difficulty:
-                    comparison = getDifficulty(a).CompareTo(getDifficulty(b));
+                    comparison = getSortValue(a).CompareTo(getSortValue(b));
+                    break;
+
+                case SortMode.PP:
+                    if (aggregate)
+                        comparison = compareUsingAggregateMax(a, b, getSortValue);
+                    else
+                        comparison = getSortValue(a).CompareTo(getSortValue(b));
                     break;
 
                 case SortMode.DateAdded:
@@ -155,12 +165,12 @@ namespace osu.Game.Screens.Select
             return comparison;
         }
 
-        private static int compareDifficulty(BeatmapInfo a, BeatmapInfo b, SortMode sort, Func<BeatmapInfo, double> getDifficulty)
+        private static int compareDifficulty(BeatmapInfo a, BeatmapInfo b, SortMode sort, Func<BeatmapInfo, double> getSortValue)
         {
             int comparison = a.Ruleset.CompareTo(b.Ruleset);
 
             if (comparison == 0)
-                comparison = getDifficulty(a).CompareTo(getDifficulty(b));
+                comparison = getSortValue(a).CompareTo(getSortValue(b));
 
             return comparison;
         }
