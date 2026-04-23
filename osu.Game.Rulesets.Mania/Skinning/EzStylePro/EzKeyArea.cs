@@ -190,17 +190,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 downSprite?.Delay(LegacyHitExplosion.FADE_IN_DURATION).FadeTo(0);
             }
         }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                stageNameBindable.UnbindBindings();
-                hitPositonBindable.UnbindBindings();
-                noteSizeBindable.UnbindBindings();
-            }
-
-            base.Dispose(isDisposing);
-        }
     }
 }

@@ -42,12 +42,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             goodAnimation = Factory.CreateAnimation("noteflaregood", true);
 
             if (primaryAnimation != null)
-                MainContainer?.Add(primaryAnimation);
+                MainContainer.Add(primaryAnimation);
 
             if (goodAnimation != null)
             {
                 goodAnimation.Alpha = 0;
-                MainContainer?.Add(goodAnimation);
+                MainContainer.Add(goodAnimation);
             }
         }
 
@@ -72,15 +72,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 goodAnimation.GotoFrame(0);
                 // goodAnimation.Restart();
             }
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            // 清除引用以便 GC
-            primaryAnimation = null;
-            goodAnimation = null;
         }
     }
 }

@@ -73,12 +73,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         protected override void Dispose(bool isDisposing)
         {
-            if (isDisposing)
-            {
-                noteSetName.UnbindBindings();
-                hitPositonBindable.UnbindBindings();
-            }
-
             base.Dispose(isDisposing);
 
             container = null;

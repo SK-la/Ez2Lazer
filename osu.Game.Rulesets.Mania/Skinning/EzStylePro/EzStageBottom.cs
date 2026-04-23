@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         private Bindable<string> stageName = null!;
 
-        [Resolved]
+        [Resolved(CanBeNull = true)]
         private EzLocalTextureFactory factory { get; set; } = null!;
 
         [Resolved]

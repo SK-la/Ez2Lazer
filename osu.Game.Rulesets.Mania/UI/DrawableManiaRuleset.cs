@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -13,7 +13,6 @@ using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
-using osu.Framework.Platform;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
@@ -71,8 +70,6 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly Bindable<ManiaMobileLayout> mobileLayout = new Bindable<ManiaMobileLayout>();
         private readonly Bindable<bool> touchOverlay = new Bindable<bool>();
 
-        private static EzManiaScrollingStyle scrollingStyleStatic = EzManiaScrollingStyle.ScrollTimeStyleFixed;
-
         public double TargetTimeRange { get; protected set; }
 
         // Stores the current speed adjustment active in gameplay.
@@ -93,6 +90,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private readonly BindableDouble hitPositonBindable = new BindableDouble();
         private readonly Bindable<bool> globalHitPosition = new Bindable<bool>();
         private readonly Bindable<bool> barLinesBindable = new Bindable<bool>();
+        private static EzManiaScrollingStyle scrollingStyleStatic = EzManiaScrollingStyle.ScrollTimeStyleFixed;
 
         public DrawableManiaRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)
@@ -155,7 +153,6 @@ namespace osu.Game.Rulesets.Mania.UI
             Config.BindWith(ManiaRulesetSetting.TouchOverlay, touchOverlay);
             touchOverlay.BindValueChanged(_ => updateMobileLayout(), true);
 
-            // hitPositonBindable = ezConfig.GetBindable<double>(Ez2Setting.HitPosition);
             ezConfig.BindWith(Ez2Setting.HitPosition, hitPositonBindable);
             hitPositonBindable.BindValueChanged(_ => skinChanged(), true);
 
@@ -189,9 +186,6 @@ namespace osu.Game.Rulesets.Mania.UI
                 }
             }, true);
 
-            // 立即触发并在主线程等待预加载完成，尽量在进入游戏前确保纹理上传完毕以避免首局卡顿。
-            // if (currentSkin.GetType() == typeof(EzStyleProSkin))
-            // {
             try
             {
                 var factory = Dependencies.Get<EzLocalTextureFactory>();
@@ -201,7 +195,6 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 Logger.Log($"[DrawableManiaRuleset] Preload textures failed: {ex.Message}", LoggingTarget.Runtime, LogLevel.Error);
             }
-            // }
         }
 
         private ManiaTouchInputArea? touchInputArea;

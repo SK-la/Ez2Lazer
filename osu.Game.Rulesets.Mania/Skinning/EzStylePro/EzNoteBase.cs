@@ -17,7 +17,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected virtual bool UseColorization => false;
         protected virtual bool ShowSeparators => false;
 
-        [Resolved]
+        [Resolved(CanBeNull = true)]
         protected Column Column { get; private set; } = null!;
 
         [Resolved]

@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame
 
             try
             {
-                string currentNoteSetName = noteSetName.Value;
+                string currentNoteSetName = GlobalConfigStore.EzConfig.Get<string>(Ez2Setting.NoteSetName) ?? "default";
                 Logger.Log($"[EzLocalTextureFactory] Starting preload for note set: {currentNoteSetName}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 // 收集要强制加载的纹理路径（保持现有逻辑但不触发重复上传）
