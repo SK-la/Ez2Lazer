@@ -116,12 +116,12 @@ namespace osu.Game.EzOsuGame.Analysis
                 return activeSongsBranches.Any(branch => branch.RulesetOnlineId == rulesetOnlineId.Value);
         }
 
-        public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo)
+        public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
         {
-            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled || !HasActiveSongsBranchFor(rulesetInfo))
+            if (!sqliteAnalysisEnabled.Value || !EzAnalysisPersistentStore.Enabled || !IsActiveSongsBranchFor(rulesetInfo, mods))
                 return empty_xxy_sr_values;
 
-            return getResolvedActiveBranchValues(beatmaps, rulesetInfo, null, persistentStore.GetSongsBranchValues, empty_xxy_sr_values);
+            return getResolvedActiveBranchValues(beatmaps, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchValues, empty_xxy_sr_values);
         }
 
         public IReadOnlyDictionary<Guid, double> GetActiveSongsBranchPpValues(IEnumerable<BeatmapInfo> beatmaps, IRulesetInfo? rulesetInfo, IReadOnlyList<Mod>? mods = null)
@@ -142,22 +142,20 @@ namespace osu.Game.EzOsuGame.Analysis
             if (beatmapList.Count == 0)
                 return empty_xxy_sr_values;
 
-            var resolvedValues = new Dictionary<Guid, double>(beatmapList.Count);
-
-            if (HasActiveSongsBranchFor(rulesetInfo))
+            if (IsActiveSongsBranchFor(rulesetInfo, mods))
             {
-                foreach (var kvp in getResolvedActiveBranchValues(beatmapList, rulesetInfo, null, persistentStore.GetSongsBranchValues, empty_xxy_sr_values))
-                    resolvedValues[kvp.Key] = kvp.Value;
+                return getResolvedActiveBranchValues(beatmapList, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchValues, empty_xxy_sr_values);
             }
 
-            var eligibleBeatmaps = beatmapList.Where(b => !resolvedValues.ContainsKey(b.ID) && CanUseStoredAnalysis(b, rulesetInfo, mods: null)).ToList();
+            if (mods?.Any() == true)
+                return empty_xxy_sr_values;
+
+            var eligibleBeatmaps = beatmapList.Where(b => CanUseStoredAnalysis(b, rulesetInfo, mods: null)).ToList();
 
             if (eligibleBeatmaps.Count == 0)
-                return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
+                return empty_xxy_sr_values;
 
-            foreach (var kvp in persistentStore.GetStoredXxySrValues(eligibleBeatmaps))
-                resolvedValues[kvp.Key] = kvp.Value;
-
+            var resolvedValues = persistentStore.GetStoredXxySrValues(eligibleBeatmaps);
             return resolvedValues.Count == 0 ? empty_xxy_sr_values : resolvedValues;
         }
 
@@ -169,6 +167,12 @@ namespace osu.Game.EzOsuGame.Analysis
             var beatmapList = beatmaps.Distinct().ToList();
 
             if (beatmapList.Count == 0)
+                return empty_pp_values;
+
+            if (IsActiveSongsBranchFor(rulesetInfo, mods))
+                return getResolvedActiveBranchValues(beatmapList, rulesetInfo, createModsProfileFingerprint(mods), persistentStore.GetSongsBranchPpValues, empty_pp_values);
+
+            if (mods?.Any() == true)
                 return empty_pp_values;
 
             var eligibleBeatmaps = beatmapList.Where(b => CanUseStoredAnalysis(b, rulesetInfo, mods)).ToList();

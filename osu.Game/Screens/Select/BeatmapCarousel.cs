@@ -33,6 +33,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Online.API;
 using osu.Game.Rulesets;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 using Realms;
 
@@ -62,6 +63,7 @@ namespace osu.Game.Screens.Select
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationDifficultyCache = new AsyncLocal<Dictionary<Guid, double>?>();
         private readonly AsyncLocal<Dictionary<Guid, double>?> operationPpCache = new AsyncLocal<Dictionary<Guid, double>?>();
         private static readonly IReadOnlyDictionary<BeatmapInfo, double> empty_operation_difficulties = new Dictionary<BeatmapInfo, double>();
+        private static readonly IReadOnlyDictionary<Guid, double> empty_operation_values = new Dictionary<Guid, double>();
 
         private readonly LoadingLayer loading;
 
@@ -172,7 +174,7 @@ namespace osu.Game.Screens.Select
             config.BindWith(OsuSetting.RandomSelectAlgorithm, randomAlgorithm);
         }
 
-        private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.HasActiveSongsBranchFor(ruleset.Value);
+        private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, Criteria?.Mods);
 
         private bool preferXxySrForDifficultyOperations => ezAnalysisSqliteEnabled.Value && ruleset.Value.OnlineID == 3 && sqliteFilter.Value;
 
@@ -186,7 +188,7 @@ namespace osu.Game.Screens.Select
             if (beatmapList.Count == 0)
                 return Task.FromResult(empty_operation_difficulties);
 
-            var activeSongsBranchValues = ezAnalysisCache.GetActiveSongsBranchValues(beatmapList, ruleset.Value);
+            var activeSongsBranchValues = ezAnalysisCache.GetActiveSongsBranchValues(beatmapList, ruleset.Value, Criteria?.Mods);
 
             if (activeSongsBranchValues.Count == 0)
                 return Task.FromResult(empty_operation_difficulties);
@@ -214,15 +216,23 @@ namespace osu.Game.Screens.Select
             if (beatmapList.Count == 0)
                 return Task.FromResult(empty_operation_difficulties);
 
-            if (useActiveSongsBranchAsBeatmapSource)
-                return getStrictActiveBranchDifficultiesAsync(beatmapList, cancellationToken);
+            var currentMods = Criteria?.Mods;
+            bool useCurrentBranch = ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, currentMods);
+
+            if (useCurrentBranch)
+                return getStrictActiveBranchDifficultiesAsync(beatmapList, currentMods, cancellationToken);
+
+            if ((currentMods?.Count ?? 0) > 0)
+            {
+                return Task.FromResult(empty_operation_difficulties);
+            }
 
             var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<Guid, double>();
             var uncachedBeatmaps = beatmapList.Where(b => !cachedDifficulties.ContainsKey(b.ID)).ToList();
 
             if (uncachedBeatmaps.Count > 0)
             {
-                var storedXxySrValues = ezAnalysisCache.GetStoredXxySrValues(uncachedBeatmaps, ruleset.Value, Criteria?.Mods);
+                var storedXxySrValues = ezAnalysisCache.GetStoredXxySrValues(uncachedBeatmaps, ruleset.Value, mods: null);
 
                 foreach (var beatmap in uncachedBeatmaps)
                 {
@@ -259,11 +269,22 @@ namespace osu.Game.Screens.Select
 
             if (uncachedBeatmaps.Count > 0)
             {
-                bool useCurrentModBranch = (Criteria?.Mods?.Count ?? 0) > 0 && ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, Criteria?.Mods);
+                var currentMods = Criteria?.Mods;
+                bool useCurrentBranch = ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, currentMods);
+                IReadOnlyDictionary<Guid, double> sourceValues;
 
-                IReadOnlyDictionary<Guid, double> sourceValues = useCurrentModBranch
-                    ? ezAnalysisCache.GetActiveSongsBranchPpValues(uncachedBeatmaps, ruleset.Value, Criteria?.Mods)
-                    : ezAnalysisCache.GetStoredPpValues(uncachedBeatmaps, ruleset.Value, Criteria?.Mods);
+                if (useCurrentBranch)
+                {
+                    sourceValues = ezAnalysisCache.GetActiveSongsBranchPpValues(uncachedBeatmaps, ruleset.Value, currentMods);
+                }
+                else if ((currentMods?.Count ?? 0) > 0)
+                {
+                    sourceValues = empty_operation_values;
+                }
+                else
+                {
+                    sourceValues = ezAnalysisCache.GetStoredPpValues(uncachedBeatmaps, ruleset.Value, mods: null);
+                }
 
                 foreach (var beatmap in uncachedBeatmaps)
                 {
@@ -287,14 +308,14 @@ namespace osu.Game.Screens.Select
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
         }
 
-        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getStrictActiveBranchDifficultiesAsync(IReadOnlyList<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
+        private Task<IReadOnlyDictionary<BeatmapInfo, double>> getStrictActiveBranchDifficultiesAsync(IReadOnlyList<BeatmapInfo> beatmaps, IReadOnlyList<Mod>? mods, CancellationToken cancellationToken)
         {
             var cachedDifficulties = operationDifficultyCache.Value ??= new Dictionary<Guid, double>();
             var uncachedBeatmaps = beatmaps.Where(b => !cachedDifficulties.ContainsKey(b.ID)).ToList();
 
             if (uncachedBeatmaps.Count > 0)
             {
-                var activeSongsBranchValues = ezAnalysisCache.GetActiveSongsBranchValues(uncachedBeatmaps, ruleset.Value);
+                var activeSongsBranchValues = ezAnalysisCache.GetActiveSongsBranchValues(uncachedBeatmaps, ruleset.Value, mods);
 
                 foreach (var beatmap in uncachedBeatmaps)
                 {
