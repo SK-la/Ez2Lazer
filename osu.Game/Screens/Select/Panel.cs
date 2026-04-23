@@ -200,9 +200,9 @@ namespace osu.Game.Screens.Select
                     length *= 2;
 
                 box
-                    .FadeTo(0.8f, 40, Easing.Out)
+                    .FadeTo(0.5f, 40, Easing.Out)
                     .Then()
-                    .FadeTo(0.4f, length, Easing.Out);
+                    .FadeTo(0.2f, length, Easing.Out);
             }
         }
 
@@ -278,7 +278,7 @@ namespace osu.Game.Screens.Select
         {
             var backgroundColour = accentColour ?? Color4.White;
 
-            selectionLayer.Colour = ColourInfo.GradientHorizontal(backgroundColour.Opacity(0), backgroundColour.Opacity(0.5f));
+            selectionLayer.Colour = ColourInfo.GradientHorizontal(backgroundColour.Opacity(0), backgroundColour.Opacity(0.3f));
 
             updateSelectedState(animated: false);
         }

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -27,6 +28,7 @@ using osu.Game.Resources.Localisation.Web;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osuTK;
+using osuTK.Graphics;
 
 namespace osu.Game.Screens.Select
 {
@@ -98,6 +100,7 @@ namespace osu.Game.Screens.Select
         private FillFlowContainer mainFill = null!;
 
         private Box backgroundBorder = null!;
+        private Box backgroundDim = null!;
 
         private BeatmapInfo beatmap => ((GroupedBeatmap)Item!.Model).Beatmap;
 
@@ -126,6 +129,12 @@ namespace osu.Game.Screens.Select
             Content.Children = new Drawable[]
             {
                 beatmapBackground = new PanelSetBackground(),
+                // 背景暗化层，降低图片亮度以避免闪光过亮
+                backgroundDim = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Color4.Black.Opacity(0.3f),
+                },
                 new FillFlowContainer
                 {
                     AutoSizeAxes = Axes.Both,
