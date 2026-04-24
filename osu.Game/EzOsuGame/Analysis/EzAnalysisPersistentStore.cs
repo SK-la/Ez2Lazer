@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// 注意：此处使用 SQLite（而不是额外 Realm 文件），因为向 osu.Game 程序集新增 RealmObject 类型
     /// 会改变 client.realm 的 schema 并要求迁移；而 SQLite 独立文件更安全、易恢复。
     /// </summary>
-    public class EzAnalysisPersistentStore
+    public class EzAnalysisPersistentStore : IDisposable
     {
         [Flags]
         internal enum MissingDataKind
@@ -142,6 +142,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly ConcurrentDictionary<Guid, PendingWrite> pendingWrites = new ConcurrentDictionary<Guid, PendingWrite>();
         private CancellationTokenSource? writeCts;
         private Task? backgroundWriterTask;
+        private bool isDisposed;
 
         // 常量化的表名与 meta key，避免在代码中散落硬编码字符串。
         private const string table_mania_analysis = "mania_analysis";
@@ -2241,11 +2242,15 @@ WHERE {col_beatmap_id} = $id;
 
                     try
                     {
+                        token.ThrowIfCancellationRequested();
+
                         using var connection = openConnection();
                         using var transaction = connection.BeginTransaction();
 
                         foreach (var kv in batch)
                         {
+                            token.ThrowIfCancellationRequested();
+
                             var id = kv.Key;
                             var pw = kv.Value;
 
@@ -2280,6 +2285,36 @@ WHERE {col_beatmap_id} = $id;
             {
                 Logger.Error(e, "EzManiaAnalysisPersistentStore background writer crashed.");
             }
+        }
+
+        public void Dispose()
+        {
+            if (isDisposed)
+                return;
+
+            isDisposed = true;
+
+            var cancellationSource = writeCts;
+            var writerTask = backgroundWriterTask;
+
+            writeCts = null;
+            backgroundWriterTask = null;
+
+            cancellationSource?.Cancel();
+
+            if (writerTask != null)
+            {
+                try
+                {
+                    writerTask.Wait(1000);
+                }
+                catch
+                {
+                }
+            }
+
+            cancellationSource?.Dispose();
+            pendingWrites.Clear();
         }
 
         private void writePendingEntryToConnection(SqliteConnection connection, BeatmapInfo beatmap, EzAnalysisResult analysis, SqliteTransaction? transaction = null)

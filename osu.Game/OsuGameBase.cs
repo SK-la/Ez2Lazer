@@ -235,6 +235,7 @@ namespace osu.Game
         public readonly Bindable<Dictionary<ModType, IReadOnlyList<Mod>>> AvailableMods = new Bindable<Dictionary<ModType, IReadOnlyList<Mod>>>(new Dictionary<ModType, IReadOnlyList<Mod>>());
 
         private BeatmapDifficultyCache difficultyCache;
+        private EzAnalysisPersistentStore ezAnalysisPersistentStore;
         private EzAnalysisCache ezAnalysisCache;
         private IBeatmapUpdater beatmapUpdater;
 
@@ -375,7 +376,7 @@ namespace osu.Game
             dependencies.Cache(BeatmapManager = new BeatmapManager(Storage, realm, API, Audio, Resources, Host, defaultBeatmap, difficultyCache, performOnlineLookups: true));
             dependencies.CacheAs<IWorkingBeatmapCache>(BeatmapManager);
 
-            var ezAnalysisPersistentStore = new EzAnalysisPersistentStore(Storage);
+            ezAnalysisPersistentStore = new EzAnalysisPersistentStore(Storage);
             var ezAnalysisDatabase = new EzAnalysisDatabase(ezAnalysisPersistentStore, BeatmapManager, Ez2ConfigManager);
             ezAnalysisCache = new EzAnalysisCache(ezAnalysisDatabase, Ez2ConfigManager);
             dependencies.Cache(ezAnalysisPersistentStore);
@@ -835,6 +836,8 @@ namespace osu.Game
         protected override void Dispose(bool isDisposing)
         {
             base.Dispose(isDisposing);
+
+            ezAnalysisPersistentStore?.Dispose();
 
             RulesetStore?.Dispose();
             LocalConfig?.Dispose();
