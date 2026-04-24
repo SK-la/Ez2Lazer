@@ -276,7 +276,7 @@ def _build_macos_launcher_script(executable_name: str | None) -> str:
 
     if executable_name:
         lines.extend([
-            f'TARGET="${{CONTENTS_DIR}}/Resources/app/{executable_name}"',
+            f'TARGET="${{CONTENTS_DIR}}/Resources/{executable_name}"',
             'if [ ! -x "${TARGET}" ]; then',
             '  echo "Launcher target is not executable: ${TARGET}" >> "${LOG_DIR}/launcher.log"',
             '  exit 126',
@@ -285,7 +285,7 @@ def _build_macos_launcher_script(executable_name: str | None) -> str:
         ])
     else:
         lines.extend([
-            'echo "No safe executable launch target found in ${CONTENTS_DIR}/Resources/app" >> "${LOG_DIR}/launcher.log"',
+            'echo "No safe executable launch target found in ${CONTENTS_DIR}/Resources" >> "${LOG_DIR}/launcher.log"',
             'exit 127',
         ])
 
@@ -546,26 +546,26 @@ def main():
                 try:
                     print('Building .app bundle from release output')
                     app_name = 'Ez2Lazer'
-                    app_bundle = os.path.join(artifacts_dir, f'{app_name}.app')
+                    app_root = os.path.join(artifacts_dir, f'{app_name}')
+                    app_bundle = os.path.join(app_root, f'{app_name}.app')
                     # Clean existing
                     shutil.rmtree(app_bundle, ignore_errors=True)
                     contents = os.path.join(app_bundle, 'Contents')
                     macos_dir = os.path.join(contents, 'MacOS')
                     resources_dir = os.path.join(contents, 'Resources')
-                    app_resources = os.path.join(resources_dir, 'app')
                     os.makedirs(macos_dir, exist_ok=True)
-                    os.makedirs(app_resources, exist_ok=True)
+                    os.makedirs(resources_dir, exist_ok=True)
 
-                    # copy published files into Resources/app
+                    # copy published files into Resources
                     for item in os.listdir(release_dir):
                         s = os.path.join(release_dir, item)
-                        d = os.path.join(app_resources, item)
+                        d = os.path.join(resources_dir, item)
                         if os.path.isdir(s):
                             shutil.copytree(s, d, dirs_exist_ok=True)
                         else:
                             shutil.copy2(s, d)
 
-                    launch_executable = _resolve_macos_launch_executable(app_resources, args.project)
+                    launch_executable = _resolve_macos_launch_executable(resources_dir, args.project)
 
                     launcher_exec = os.path.join(macos_dir, app_name)
                     with open(launcher_exec, 'w', encoding='utf-8') as f:
@@ -579,15 +579,111 @@ def main():
 
                     # minimal Info.plist
                     info_path = os.path.join(contents, 'Info.plist')
-                    plist = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
-<plist version=\"1.0\">\n<dict>\n  <key>CFBundleName</key>\n  <string>{app_name}</string>\n  <key>CFBundleExecutable</key>\n  <string>{bundle_executable_name}</string>\n  <key>CFBundleIdentifier</key>\n  <string>com.example.ez2lazer</string>\n  <key>CFBundleVersion</key>\n  <string>{args.tag}</string>\n  <key>CFBundlePackageType</key>\n  <string>APPL</string>\n</dict>\n</plist>"""
+                    plist = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string>Ez2Lazer</string>
+	<key>CFBundleName</key>
+	<string>Ez2osu!</string>
+	<key>CFBundleGetInfoString</key>
+	<string>ez2osu</string>
+	<key>CFBundleIconFile</key>
+	<string>lazer.ico</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.skla.ez2osu</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>0.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>lazer</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>0.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>LSHasLocalizedDisplayName</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.7.0</string>
+	<key>NSPrincipalClass</key>
+	<string>CStubApplication</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Supported protocols</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>osu</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>osu! beatmap archive</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>osz</string>
+				<string>olz</string>
+			</array>
+			<key>CFBundleTypeMIMETypes</key>
+			<array>
+				<string>application/x-osu-beatmap-archive</string>
+			</array>
+			<key>LSTypeIsPackage</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>osu! skin archive</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>osk</string>
+			</array>
+			<key>CFBundleTypeMIMETypes</key>
+			<array>
+				<string>application/x-osu-skin-archive</string>
+			</array>
+			<key>LSTypeIsPackage</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>osu! replay</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>osr</string>
+			</array>
+			<key>CFBundleTypeMIMETypes</key>
+			<array>
+				<string>application/x-osu-replay</string>
+			</array>
+			<key>LSTypeIsPackage</key>
+			<false/>
+		</dict>
+	</array>
+</dict>
+</plist>"""
                     with open(info_path, 'w', encoding='utf-8') as f:
                         f.write(plist)
 
                     # zip the .app bundle
                     print('Zipping .app ->', release_zip)
-                    zip_folder(app_bundle, release_zip)
+                    zip_folder(app_root, release_zip)
                 except Exception as e:
                     print('Failed to build .app bundle:', e)
                     print('Falling back to zipping release folder')
