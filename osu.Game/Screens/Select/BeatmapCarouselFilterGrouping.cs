@@ -32,16 +32,16 @@ namespace osu.Game.Screens.Select
         /// <summary>
         /// Beatmap sets contain difficulties as related panels. This dictionary holds the relationships between set-difficulties to allow expanding them on selection.
         /// </summary>
-        public IDictionary<GroupedBeatmapSet, HashSet<CarouselItem>> SetItems => setMap;
+        public IDictionary<GroupedBeatmapSet, List<CarouselItem>> SetItems => setMap;
 
         /// <summary>
         /// Groups contain children which are group-selectable. This dictionary holds the relationships between groups-panels to allow expanding them on selection.
         /// </summary>
-        public IDictionary<GroupDefinition, HashSet<CarouselItem>> GroupItems => groupMap;
+        public IDictionary<GroupDefinition, List<CarouselItem>> GroupItems => groupMap;
 
         private Dictionary<object, (CarouselItem, int)> itemMap = new Dictionary<object, (CarouselItem, int)>();
-        private Dictionary<GroupedBeatmapSet, HashSet<CarouselItem>> setMap = new Dictionary<GroupedBeatmapSet, HashSet<CarouselItem>>();
-        private Dictionary<GroupDefinition, HashSet<CarouselItem>> groupMap = new Dictionary<GroupDefinition, HashSet<CarouselItem>>();
+        private Dictionary<GroupedBeatmapSet, List<CarouselItem>> setMap = new Dictionary<GroupedBeatmapSet, List<CarouselItem>>();
+        private Dictionary<GroupDefinition, List<CarouselItem>> groupMap = new Dictionary<GroupDefinition, List<CarouselItem>>();
 
         public required Func<FilterCriteria> GetCriteria { get; init; }
         public required Func<List<BeatmapCollection>> GetCollections { get; init; }
@@ -56,8 +56,8 @@ namespace osu.Game.Screens.Select
             {
                 // preallocate space for the new mappings using last known estimates
                 var newItemMap = new Dictionary<object, (CarouselItem, int)>(itemMap.Count);
-                var newSetMap = new Dictionary<GroupedBeatmapSet, HashSet<CarouselItem>>(setMap.Count);
-                var newGroupMap = new Dictionary<GroupDefinition, HashSet<CarouselItem>>(groupMap.Count);
+                var newSetMap = new Dictionary<GroupedBeatmapSet, List<CarouselItem>>(setMap.Count);
+                var newGroupMap = new Dictionary<GroupDefinition, List<CarouselItem>>(groupMap.Count);
 
                 var criteria = GetCriteria();
                 var newItems = new List<CarouselItem>();
@@ -97,13 +97,13 @@ namespace osu.Game.Screens.Select
                     cancellationToken.ThrowIfCancellationRequested();
 
                     CarouselItem? groupItem = null;
-                    HashSet<CarouselItem>? currentGroupItems = null;
-                    HashSet<CarouselItem>? currentSetItems = null;
+                    List<CarouselItem>? currentGroupItems = null;
+                    List<CarouselItem>? currentSetItems = null;
                     BeatmapInfo? lastBeatmap = null;
 
                     if (group != null)
                     {
-                        newGroupMap[group] = currentGroupItems = new HashSet<CarouselItem>();
+                        newGroupMap[group] = currentGroupItems = new List<CarouselItem>();
 
                         addItem(groupItem = new CarouselItem(group)
                         {
@@ -124,7 +124,7 @@ namespace osu.Game.Screens.Select
                         if (newBeatmapSet)
                         {
                             if (!newSetMap.TryGetValue(groupedBeatmapSet, out currentSetItems))
-                                newSetMap[groupedBeatmapSet] = currentSetItems = new HashSet<CarouselItem>();
+                                newSetMap[groupedBeatmapSet] = currentSetItems = new List<CarouselItem>();
                         }
 
                         if (BeatmapSetsGroupedTogether)

@@ -393,6 +393,40 @@ namespace osu.Game.Tests.Visual.SongSelect
             assertTotal(results, total);
         }
 
+        [Test]
+        public async Task TestSetItemsPreserveInputOrder()
+        {
+            var beatmapSet = TestResources.CreateTestBeatmapSetInfo(3);
+
+            var groupingFilter = new BeatmapCarouselFilterGrouping
+            {
+                GetCriteria = () => new FilterCriteria { Group = GroupMode.None },
+                GetCollections = () => new List<BeatmapCollection>(),
+                GetLocalUserTopRanks = _ => new Dictionary<Guid, ScoreRank>(),
+                GetFavouriteBeatmapSets = () => favouriteBeatmapSets,
+                ShouldUseXxySrForDifficultyOperations = () => false,
+                GetDifficultiesForOperationsAsync = (beatmaps, _) => Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(beatmaps.ToDictionary(b => b, b => b.StarRating)),
+            };
+
+            var inputOrder = new[]
+            {
+                beatmapSet.Beatmaps[2],
+                beatmapSet.Beatmaps[0],
+                beatmapSet.Beatmaps[1],
+            };
+
+            await groupingFilter.Run(inputOrder.Select(b => new CarouselItem(b)).ToList(), CancellationToken.None);
+
+            var groupedSet = groupingFilter.SetItems.Keys.Single();
+            var groupedBeatmaps = groupingFilter.SetItems[groupedSet]
+                                             .Select(i => i.Model)
+                                             .OfType<GroupedBeatmap>()
+                                             .Select(gb => gb.Beatmap)
+                                             .ToList();
+
+            Assert.That(groupedBeatmaps, Is.EqualTo(inputOrder));
+        }
+
         #endregion
 
         private HashSet<int> favouriteBeatmapSets = [];
