@@ -1,4 +1,4 @@
-name: Auto Release CL x64 (3 platform manual build + package + release)
+name: Auto Release CL arm64 (3 platform manual build + package + release)
 
 on:
   workflow_dispatch:
@@ -69,7 +69,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: ${{ fromJson(github.event.inputs.platform_index == '' && '["windows","linux","macos"]' || github.event.inputs.platform_index == '1' && '["windows"]' || github.event.inputs.platform_index == '2' && '["linux"]' || github.event.inputs.platform_index == '3' && '["macos"]') }}
-    runs-on: ${{ matrix.platform == 'windows' && 'windows-latest' || matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'macos' && 'macos-26-intel' }}
+    runs-on: ${{ matrix.platform == 'windows' && 'windows-11-arm' || matrix.platform == 'linux' && 'ubuntu-24.04-arm' || matrix.platform == 'macos' && 'macos-26' }}
     steps:
       - name: Checkout main repo into osu/
         uses: actions/checkout@v4
@@ -159,7 +159,7 @@ jobs:
           if ($platform -eq 'linux') {
             python (Join-Path (Get-Location) 'publish.py') --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --platform "$platform" --os "linux" --release-only
           } elseif ($platform -eq 'macos') {
-            python (Join-Path (Get-Location) 'publish.py') --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --platform "$platform" --os "osx" --release-only
+            python (Join-Path (Get-Location) 'publish.py') --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --platform "$platform" --release-only
           } else {
             python (Join-Path (Get-Location) 'publish.py') --project "$project" --workdir "$workdir" --outroot "$outroot" --deps-source none --resources-path "$resourcesPath" --tag "$tag" --platform "$platform" --release-only
           }
@@ -179,7 +179,7 @@ jobs:
 
           if ($platform -eq 'linux') {
             # Try AppImage first, then fall back to linux zip patterns (some runners cannot build AppImage due to missing FUSE)
-            $patterns = @('*.AppImage','Ez2Lazer_release_linux_x64*.zip','Ez2Lazer_release_linux*.zip')
+            $patterns = @('*.AppImage','Ez2Lazer_release_linux_arm64*.zip','Ez2Lazer_release_linux*.zip')
             $found = $null
             foreach ($p in $patterns) {
               $found = Get-ChildItem -Path $ws -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
@@ -190,15 +190,15 @@ jobs:
             if (-not $found) { Write-Error 'linux asset not found'; exit 1 }
             $ext = [IO.Path]::GetExtension($found.Name).ToLower()
             if ($ext -eq '.appimage') {
-              $destName = 'Ez2Lazer_release_linux_x64.AppImage'
+              $destName = 'Ez2Lazer_release_linux_arm64.AppImage'
             } else {
-              $destName = 'Ez2Lazer_release_linux_x64.zip'
+              $destName = 'Ez2Lazer_release_linux_arm64.zip'
             }
             $dest = Join-Path $artifactsDir $destName
             Copy-Item -Path $found.FullName -Destination $dest -Force
             Write-Output "asset_path=$dest" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } elseif ($platform -eq 'macos') {
-            $patterns = @('Ez2Lazer_release_macos_x64*.zip','Ez2Lazer_release_macos*.zip','Ez2Lazer_release_osx*.zip')
+            $patterns = @('Ez2Lazer_release_macos_arm64*.zip','Ez2Lazer_release_macos*.zip','Ez2Lazer_release_osx*.zip')
             $found = $null
             foreach ($p in $patterns) {
               $found = Get-ChildItem -Path $ws -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
@@ -207,12 +207,12 @@ jobs:
               if ($found) { break }
             }
             if (-not $found) { Write-Error 'zip asset not found for mac patterns'; exit 1 }
-            $dest = Join-Path $artifactsDir 'Ez2Lazer_release_macos_x64.zip'
+            $dest = Join-Path $artifactsDir 'Ez2Lazer_release_macos_arm64.zip'
             Copy-Item -Path $found.FullName -Destination $dest -Force
             Write-Output "asset_path=$dest" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           } else {
             # windows
-            $patterns = @('Ez2Lazer_release_windows_x64*.zip','Ez2Lazer_release_x64*.zip','Ez2Lazer_release_windows*.zip')
+            $patterns = @('Ez2Lazer_release_windows_arm64*.zip','Ez2Lazer_release_arm64*.zip','Ez2Lazer_release_windows*.zip')
             $found = $null
             foreach ($p in $patterns) {
               $found = Get-ChildItem -Path $ws -Filter $p -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Select-Object -First 1
@@ -221,7 +221,7 @@ jobs:
               if ($found) { break }
             }
             if (-not $found) { Write-Error 'zip asset not found for windows patterns'; exit 1 }
-            $dest = Join-Path $artifactsDir 'Ez2Lazer_release_x64.zip'
+            $dest = Join-Path $artifactsDir 'Ez2Lazer_release_windows_arm64.zip'
             Copy-Item -Path $found.FullName -Destination $dest -Force
             Write-Output "asset_path=$dest" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
           }
@@ -231,7 +231,7 @@ jobs:
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform == 'macos' && 'release-macos-x64' || format('release-{0}', matrix.platform) }}
+          name: ${{ format('release-{0}-arm64', matrix.platform) }}
           path: ${{ steps.prepare_asset.outputs.asset_path }}
 
   release:
