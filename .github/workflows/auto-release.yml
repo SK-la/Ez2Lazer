@@ -69,7 +69,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: ${{ fromJson(github.event.inputs.platform_index == '' && '["windows","linux","macos"]' || github.event.inputs.platform_index == '1' && '["windows"]' || github.event.inputs.platform_index == '2' && '["linux"]' || github.event.inputs.platform_index == '3' && '["macos"]') }}
-    runs-on: ${{ matrix.platform == 'windows' && 'windows-latest' || matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'macos' && 'macos-15' }}
+    runs-on: ${{ matrix.platform == 'windows' && 'windows-latest' || matrix.platform == 'linux' && 'ubuntu-latest' || matrix.platform == 'macos' && 'macos-26-intel' }}
     steps:
       - name: Checkout main repo into osu/
         uses: actions/checkout@v4
