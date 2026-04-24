@@ -263,6 +263,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
                 if (!OverallDifficulty.IsDefault && !EnableCustomHitRange.Value) yield return (AdjustStrings.OD_OVERRIDE_LABEL, $"{OverallDifficulty.Value:N1}");
 
+                if (CustomRelease.Value) yield return (AdjustStrings.ENABLE_CUSTOM_RELEASE_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
+
                 if (CustomRelease.Value) yield return (AdjustStrings.ENABLE_RELEASE_LENIENCE_LABEL, $"{ReleaseLenience.Value:N1}");
 
                 if (!SpeedChange.IsDefault) yield return (EzCommonModStrings.SPEED_CHANGE_LABEL, $"{SpeedChange.Value:N3}");
@@ -287,6 +289,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
                 if (EnableCustomHitRange.Value)
                 {
+                    yield return (AdjustStrings.ENABLE_CUSTOM_HIT_RANGE_LABEL, new EzLocalizationManager.EzLocalisableString("开启", "On"));
                     yield return ("Perfect HitRange", $"{PerfectHitRange.Value}ms");
                     yield return ("Great HitRange", $"{GreatHitRange.Value}ms");
                     yield return ("Good HitRange", $"{GoodHitRange.Value}ms");

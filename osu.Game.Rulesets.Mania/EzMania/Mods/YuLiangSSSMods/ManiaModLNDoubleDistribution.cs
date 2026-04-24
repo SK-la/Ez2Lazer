@@ -58,6 +58,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
                 yield return (EzCommonModStrings.COLUMN_NUM_LABEL, $"{SelectColumn.Value}");
                 yield return (EzCommonModStrings.GAP_LABEL, $"{Gap.Value}");
+                yield return (EzCommonModStrings.LINE_SPACING_LABEL, $"{LineSpacing.Value}");
+
+                if (InvertLineSpacing.Value)
+                {
+                    yield return (EzCommonModStrings.INVERT_LINE_SPACING_LABEL, "On");
+                }
 
                 if (DurationLimit.Value > 0)
                 {
@@ -65,6 +71,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 }
 
                 yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

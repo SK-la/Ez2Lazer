@@ -78,12 +78,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             get
             {
                 yield return (KrrN2NcStrings.KRR_N2N_TARGET_KEYS_LABEL, $"{TargetKeys.Value}");
+                yield return (KrrN2NcStrings.KRR_N2N_MAX_KEYS_LABEL, $"{MaxKeys.Value}");
+                yield return (KrrN2NcStrings.KRR_N2N_MIN_KEYS_LABEL, $"{MinKeys.Value}");
                 yield return (KrrN2NcStrings.KRR_N2N_BEAT_SPEED_LABEL, $"{BeatSpeed.Value}");
 
                 if (Seed.Value is null)
                     yield return (EzCommonModStrings.SEED_LABEL, new EzLocalizationManager.EzLocalisableString("无", "Null"));
                 else
                     yield return (EzCommonModStrings.SEED_LABEL, $"Seed {Seed.Value}");
+
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

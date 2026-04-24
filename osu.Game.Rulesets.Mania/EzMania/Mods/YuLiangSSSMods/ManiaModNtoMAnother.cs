@@ -68,6 +68,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 }
 
                 yield return (EzCommonModStrings.SEED_LABEL, $"Seed {(Seed.Value is null ? "Null" : Seed.Value)}");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

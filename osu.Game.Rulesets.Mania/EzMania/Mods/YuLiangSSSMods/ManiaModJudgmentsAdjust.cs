@@ -46,6 +46,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                     yield return ("Meh Range", $"{MehHit.Value:0.#}");
                     yield return ("Miss Range", $"{MissHit.Value:0.#}");
                 }
+
+                if (CustomProportionScore.Value)
+                {
+                    yield return (JudgmentsAdjustStrings.CUSTOM_PROPORTION_SCORE_LABEL, "On");
+                    yield return ("Perfect Score", $"{Perfect.Value}");
+                    yield return ("Great Score", $"{Great.Value}");
+                    yield return ("Good Score", $"{Good.Value}");
+                    yield return ("Ok Score", $"{Ok.Value}");
+                    yield return ("Meh Score", $"{Meh.Value}");
+                    yield return ("Miss Score", $"{Miss.Value}");
+                }
             }
         }
 

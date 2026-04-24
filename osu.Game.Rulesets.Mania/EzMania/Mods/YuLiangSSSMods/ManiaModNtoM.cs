@@ -45,6 +45,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 yield return (EzCommonModStrings.PROBABILITY_LABEL, $"{Probability.Value}%");
                 yield return (EzCommonModStrings.KEY_LABEL, $"{Key.Value}");
                 yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using JetBrains.Annotations;
@@ -40,6 +41,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         public override ModType Type => ModType.YuLiangSSS_Mod;
 
         public HitWindows HitWindows { get; set; } = new ManiaHitWindows();
+
+        public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
+        {
+            get
+            {
+                if (BodyJudgementSwitch.Value)
+                    yield return (LNJudgementAdjustStrings.BODY_JUDGEMENT_SWITCH_LABEL, "On");
+
+                if (TailJudgementSwitch.Value)
+                    yield return (LNJudgementAdjustStrings.TAIL_JUDGEMENT_SWITCH_LABEL, "On");
+            }
+        }
 
         [SettingSource(typeof(LNJudgementAdjustStrings), nameof(LNJudgementAdjustStrings.BODY_JUDGEMENT_SWITCH_LABEL), nameof(LNJudgementAdjustStrings.BODY_JUDGEMENT_SWITCH_DESCRIPTION))]
         public BindableBool BodyJudgementSwitch { get; } = new BindableBool();

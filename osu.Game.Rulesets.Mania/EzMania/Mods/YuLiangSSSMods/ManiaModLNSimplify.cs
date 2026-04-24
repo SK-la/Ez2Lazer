@@ -45,6 +45,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 yield return (LNSimplifyStrings.EASIER_DIVIDE_LABEL, $"{EasierDivide.Value}");
                 yield return (LNSimplifyStrings.LONGEST_LN_LABEL, $"{Gap.Value}");
                 yield return (LNSimplifyStrings.SHORTEST_LN_LABEL, $"{Len.Value}");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

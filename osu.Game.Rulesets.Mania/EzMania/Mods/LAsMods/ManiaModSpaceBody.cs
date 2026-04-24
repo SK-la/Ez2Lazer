@@ -176,6 +176,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     yield return (SpaceBodyStrings.MS_GAP_LABEL, $"{MsGap.Value}ms");
 
                 yield return (SpaceBodyStrings.ADD_SHIELD_LABEL, Shield.Value ? "On" : "Off");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
     }

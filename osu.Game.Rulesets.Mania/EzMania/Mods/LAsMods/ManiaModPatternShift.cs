@@ -117,6 +117,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 yield return (PatternShiftStrings.PATTERN_SHIFT_REGENERATE_LABEL, Regenerate.Value ? "On" : "Off");
                 yield return (PatternShiftStrings.PATTERN_SHIFT_REGENERATE_DIFFICULTY_LABEL, $"{RegenerateDifficulty.Value}");
                 yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "Random");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

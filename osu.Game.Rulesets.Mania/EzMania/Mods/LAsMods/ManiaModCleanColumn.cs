@@ -89,6 +89,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 if (EnableCustomDelete.Value) yield return (CleanColumnStrings.ENABLE_CUSTOM_DELETE_LABEL, string.IsNullOrWhiteSpace(CustomDeleteColumn.Value) ? "Enabled" : CustomDeleteColumn.Value);
                 if (EnableCustomReorder.Value) yield return (CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL, string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
                 if (UseHealthCapReduction.Value) yield return (CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_LABEL, "On");
+
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

@@ -132,6 +132,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "Random");
                 yield return (PatternShiftStrings.PATTERN_SHIFT_SKIP_FINE_THRESHOLD_LABEL, $"{SkipFineThreshold.Value}");
                 yield return (PatternShiftStrings.PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_LABEL, $"{SkipQuarterDivisor.Value}");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

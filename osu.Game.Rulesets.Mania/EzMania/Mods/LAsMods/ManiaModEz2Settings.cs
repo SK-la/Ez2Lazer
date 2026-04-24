@@ -90,7 +90,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     settings.Add((Ez2SettingsStrings.NO_PANEL_LABEL, new LocalisableString("Enabled")));
 
                 if (HealthScratch.Value)
+                {
+                    settings.Add((Ez2SettingsStrings.HEALTHY_SCRATCH_LABEL, new LocalisableString("Enabled")));
                     settings.Add((Ez2SettingsStrings.MAX_BEAT_LABEL, new LocalisableString($"1/{MaxBeat.Value} Beat")));
+                }
 
                 return settings;
             }

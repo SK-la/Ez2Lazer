@@ -122,10 +122,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             {
                 yield return (KrrLNStrings.KRR_LN_LONG_LEVEL_LABEL, $"{LongLevel.Value}");
                 yield return (KrrLNStrings.KRR_LN_SHORT_LEVEL_LABEL, $"{ShortLevel.Value}");
+
+                if (ProcessOriginalBool.Value)
+                    yield return (KrrLNStrings.KRR_LN_PROCESS_ORIGINAL_LABEL, "On");
+
+                yield return (KrrLNStrings.KRR_LN_LENGTH_THRESHOLD_LABEL, $"{LengthThreshold.Value}");
                 yield return (KrrLNStrings.KRR_LN_LONG_PERCENTAGE_LABEL, $"{LongPercentage.Value}%");
                 yield return (KrrLNStrings.KRR_LN_SHORT_PERCENTAGE_LABEL, $"{ShortPercentage.Value}%");
                 yield return (KrrLNStrings.KRR_LN_LONG_LIMIT_LABEL, $"{LongLimit.Value}");
                 yield return (KrrLNStrings.KRR_LN_SHORT_LIMIT_LABEL, $"{ShortLimit.Value}");
+                yield return (KrrLNStrings.KRR_LN_LONG_RANDOM_LABEL, $"{LongRandom.Value}");
+                yield return (KrrLNStrings.KRR_LN_SHORT_RANDOM_LABEL, $"{ShortRandom.Value}");
                 yield return (KrrLNStrings.KRR_LN_ALIGNMENT_LABEL, $"{Alignment.Value}");
                 yield return (KrrLNStrings.KRR_LN_LN_ALIGNMENT_LABEL, $"{LNAlignment.Value}");
 
@@ -134,6 +141,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                 else
                     yield return (EzCommonModStrings.SEED_LABEL, $"Seed {Seed.Value}");
+
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 

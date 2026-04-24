@@ -96,8 +96,31 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             {
                 yield return (KrrDPStrings.KRR_DP_ENABLE_MODIFY_KEYS_LABEL, EnableModifyKeys.Value ? "On" : "Off");
                 yield return (KrrDPStrings.KRR_DP_TARGET_KEYS_LABEL, $"{TargetKeys.Value}");
+
+                if (LDensity.Value)
+                {
+                    yield return (KrrDPStrings.KRR_DP_LEFT_DENSITY_LABEL, "On");
+                    yield return (KrrDPStrings.KRR_DP_LEFT_MAX_LABEL, $"{LMaxKeys.Value}");
+                    yield return (KrrDPStrings.KRR_DP_LEFT_MIN_LABEL, $"{LMinKeys.Value}");
+                }
+
+                if (LRemove.Value)
+                    yield return (KrrDPStrings.KRR_DP_LEFT_REMOVE_LABEL, "On");
+
                 yield return (KrrDPStrings.KRR_DP_LEFT_MIRROR_LABEL, LMirror.Value ? "On" : "Off");
+
+                if (RDensity.Value)
+                {
+                    yield return (KrrDPStrings.KRR_DP_RIGHT_DENSITY_LABEL, "On");
+                    yield return (KrrDPStrings.KRR_DP_RIGHT_MAX_LABEL, $"{RMaxKeys.Value}");
+                    yield return (KrrDPStrings.KRR_DP_RIGHT_MIN_LABEL, $"{RMinKeys.Value}");
+                }
+
+                if (RRemove.Value)
+                    yield return (KrrDPStrings.KRR_DP_RIGHT_REMOVE_LABEL, "On");
+
                 yield return (KrrDPStrings.KRR_DP_RIGHT_MIRROR_LABEL, RMirror.Value ? "On" : "Off");
+                yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
         }
 
