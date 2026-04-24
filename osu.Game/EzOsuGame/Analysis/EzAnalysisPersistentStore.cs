@@ -34,6 +34,16 @@ namespace osu.Game.EzOsuGame.Analysis
     /// </summary>
     public class EzAnalysisPersistentStore
     {
+        [Flags]
+        internal enum MissingDataKind
+        {
+            None = 0,
+            Common = 1 << 0,
+            Pp = 1 << 1,
+            Tag = 1 << 2,
+            Mania = 1 << 3,
+        }
+
         public readonly record struct SongsBranchRow(Guid BeatmapId, string BeatmapHash, string BeatmapMd5, double XxySr, double? Pp);
 
         public readonly record struct SongsBranchDescriptor(string DatabasePath, string RelativePath, SongsBranchMetadata Metadata);
@@ -523,7 +533,10 @@ WHERE entry.{EzAnalysisSchemaManager.COL_BEATMAP_ID} IN ({string.Join(", ", para
                     analysis = analysis.WithTagSummary(storedAnalysis.TagSummary);
 
                 // 对比两个结果是否有差异
-                if (hasDifference(storedAnalysis, analysis))
+                MissingDataKind filledMissingData = GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID, requireTagData: true) &
+                                                    ~GetMissingData(analysis, beatmap.Ruleset.OnlineID, requireTagData: true);
+
+                if (filledMissingData != MissingDataKind.None || hasDifference(storedAnalysis, analysis))
                 {
                     Logger.Log($"[EzManiaAnalysisPersistentStore] Data difference detected for {beatmap.ID}, updating SQLite.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                     Store(beatmap, analysis);
@@ -762,7 +775,11 @@ LIMIT 1;
             if (!Enabled)
                 return false;
 
-            return !TryGet(beatmap, out var storedAnalysis) || storedAnalysis.TagSummary == null;
+            EzAnalysisResult? storedAnalysis = TryGet(beatmap, out var existingAnalysis)
+                ? existingAnalysis
+                : null;
+
+            return GetMissingData(storedAnalysis, beatmap.Ruleset.OnlineID, requireTagData: true) != MissingDataKind.None;
         }
 
         public IReadOnlyList<Guid> GetBeatmapsNeedingRecompute(IEnumerable<(Guid id, string hash, int rulesetOnlineId)> beatmaps) => GetBeatmapsNeedingRecompute(beatmaps, progress: null);
@@ -778,7 +795,7 @@ LIMIT 1;
 
                 var beatmapList = beatmaps as IList<(Guid id, string hash, int rulesetOnlineId)> ?? beatmaps.ToList();
 
-                var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt, long tagUpdatedAt)>();
+                var existing = new Dictionary<Guid, (string hash, int rulesetOnlineId, long commonUpdatedAt, long tagUpdatedAt, bool hasPp)>();
                 var maniaUpdated = new HashSet<Guid>();
 
                 bool forceRecompute;
@@ -791,8 +808,9 @@ LIMIT 1;
 SELECT {EzAnalysisSchemaManager.COL_BEATMAP_ID},
        {EzAnalysisSchemaManager.COL_BEATMAP_HASH},
        {EzAnalysisSchemaManager.COL_RULESET_ONLINE_ID},
-    {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
-    {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT}
+       {EzAnalysisSchemaManager.COL_COMMON_UPDATED_AT},
+       {EzAnalysisSchemaManager.COL_TAG_UPDATED_AT},
+       {EzAnalysisSchemaManager.COL_PP}
 FROM {EzAnalysisSchemaManager.TABLE_ENTRY};
 ";
 
@@ -803,7 +821,7 @@ FROM {EzAnalysisSchemaManager.TABLE_ENTRY};
                             if (!Guid.TryParse(reader.GetString(0), out var id))
                                 continue;
 
-                            existing[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt64(3), reader.GetInt64(4));
+                            existing[id] = (reader.GetString(1), reader.GetInt32(2), reader.GetInt64(3), reader.GetInt64(4), !reader.IsDBNull(5));
                         }
                     }
 
@@ -845,12 +863,12 @@ WHERE {EzAnalysisSchemaManager.COL_UPDATED_AT} > 0;
                         continue;
                     }
 
+                    MissingDataKind missingData = getMissingData(row.commonUpdatedAt, row.tagUpdatedAt, row.hasPp, maniaUpdated.Contains(id), rulesetOnlineId, requireTagData: true);
+
                     if (!string.Equals(row.hash, hash, StringComparison.Ordinal)
                         || row.rulesetOnlineId != rulesetOnlineId
-                        || row.commonUpdatedAt <= 0
-                        || row.tagUpdatedAt <= 0
-                        || forceRecompute
-                        || (rulesetOnlineId == 3 && !maniaUpdated.Contains(id)))
+                        || missingData != MissingDataKind.None
+                        || forceRecompute)
                         needing.Add(id);
                 }
 
@@ -2384,6 +2402,64 @@ ON CONFLICT({EzAnalysisSchemaManager.COL_BEATMAP_ID}) DO UPDATE SET
             => computedAnalysis.TagSummary == null
                 ? computedAnalysis.WithTagSummary(storedAnalysis.TagSummary)
                 : computedAnalysis;
+
+        internal static MissingDataKind GetMissingData(EzAnalysisResult? storedAnalysis, int rulesetOnlineId, bool requireTagData)
+        {
+            if (!storedAnalysis.HasValue)
+                return getRequiredDataMask(rulesetOnlineId, requireTagData);
+
+            MissingDataKind missingData = MissingDataKind.None;
+            EzAnalysisResult analysis = storedAnalysis.Value;
+
+            if (analysis.CommonSummary == null)
+                missingData |= MissingDataKind.Common;
+
+            if (analysis.Pp == null)
+                missingData |= MissingDataKind.Pp;
+
+            if (requireTagData && analysis.TagSummary == null)
+                missingData |= MissingDataKind.Tag;
+
+            if (rulesetOnlineId == 3 && analysis.ManiaSummary == null)
+                missingData |= MissingDataKind.Mania;
+
+            return missingData;
+        }
+
+        internal static bool RequiresAnalysisComputation(MissingDataKind missingData)
+            => (missingData & (MissingDataKind.Common | MissingDataKind.Pp | MissingDataKind.Mania)) != MissingDataKind.None;
+
+        private static MissingDataKind getMissingData(long commonUpdatedAt, long tagUpdatedAt, bool hasPp, bool hasManiaData, int rulesetOnlineId, bool requireTagData)
+        {
+            MissingDataKind missingData = MissingDataKind.None;
+
+            if (commonUpdatedAt <= 0)
+                missingData |= MissingDataKind.Common;
+
+            if (!hasPp)
+                missingData |= MissingDataKind.Pp;
+
+            if (requireTagData && tagUpdatedAt <= 0)
+                missingData |= MissingDataKind.Tag;
+
+            if (rulesetOnlineId == 3 && !hasManiaData)
+                missingData |= MissingDataKind.Mania;
+
+            return missingData;
+        }
+
+        private static MissingDataKind getRequiredDataMask(int rulesetOnlineId, bool requireTagData)
+        {
+            MissingDataKind requiredData = MissingDataKind.Common | MissingDataKind.Pp;
+
+            if (requireTagData)
+                requiredData |= MissingDataKind.Tag;
+
+            if (rulesetOnlineId == 3)
+                requiredData |= MissingDataKind.Mania;
+
+            return requiredData;
+        }
 
         private static string serializeTagSummary(EzBeatmapTagSummary? tagSummary)
             => tagSummary is EzBeatmapTagSummary value

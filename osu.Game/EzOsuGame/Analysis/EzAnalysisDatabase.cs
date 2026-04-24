@@ -504,8 +504,9 @@ namespace osu.Game.EzOsuGame.Analysis
                     ? existingAnalysis
                     : null;
 
-                bool needsAnalysis = storedAnalysis == null;
-                bool needsTag = includeTagData && storedAnalysis?.TagSummary == null;
+                var missingData = EzAnalysisPersistentStore.GetMissingData(storedAnalysis, beatmapInfo.Ruleset.OnlineID, includeTagData);
+                bool needsAnalysis = EzAnalysisPersistentStore.RequiresAnalysisComputation(missingData);
+                bool needsTag = includeTagData && (missingData & EzAnalysisPersistentStore.MissingDataKind.Tag) != 0;
 
                 if (!needsAnalysis && !needsTag)
                     return storedAnalysis;
