@@ -59,6 +59,9 @@ namespace osu.Game.Screens.Select
                 case "bpm":
                     return TryUpdateCriteriaRange(ref criteria.BPM, op, value, 0.5f);
 
+                case "pp":
+                    return tryUpdatePpRange(ref criteria.Pp, op, value);
+
                 case "length":
                     return tryUpdateLengthRange(criteria, op, value);
 
@@ -319,6 +322,51 @@ namespace osu.Game.Screens.Select
         /// <param name="tolerance">Allowed tolerance of the parsed range boundary value.</param>
         public static bool TryUpdateCriteriaRange(ref FilterCriteria.OptionalRange<double> range, Operator op, string val, double tolerance = 0.05)
             => tryParseDoubleWithPoint(val, out double value) && tryUpdateCriteriaRange(ref range, op, value, tolerance);
+
+        private static bool tryUpdatePpRange(ref FilterCriteria.OptionalRange<double> range, Operator op, string val)
+        {
+            if (!tryParseDoubleWithPoint(val, out double value))
+                return false;
+
+            range.InvertRange = false;
+
+            switch (op)
+            {
+                default:
+                    return false;
+
+                case Operator.NotEqual:
+                    range.InvertRange = true;
+                    goto case Operator.Equal;
+
+                case Operator.Equal:
+                    range.Min = value - 1;
+                    range.Max = value + 1;
+                    range.IsLowerInclusive = true;
+                    range.IsUpperInclusive = true;
+                    return true;
+
+                case Operator.Greater:
+                    range.Min = value;
+                    range.IsLowerInclusive = false;
+                    return true;
+
+                case Operator.GreaterOrEqual:
+                    range.Min = value;
+                    range.IsLowerInclusive = true;
+                    return true;
+
+                case Operator.Less:
+                    range.Max = value;
+                    range.IsUpperInclusive = false;
+                    return true;
+
+                case Operator.LessOrEqual:
+                    range.Max = value;
+                    range.IsUpperInclusive = true;
+                    return true;
+            }
+        }
 
         private static bool tryUpdateCriteriaRange(ref FilterCriteria.OptionalRange<double> range, Operator op, double value, double tolerance = 0.05)
         {

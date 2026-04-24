@@ -132,7 +132,7 @@ namespace osu.Game.Screens.Select
 
             Filters = new ICarouselFilter[]
             {
-                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, () => useActiveSongsBranchAsBeatmapSource, getDifficultiesForOperationsAsync, getActiveBranchDifficultiesAsync),
+                new BeatmapCarouselFilterMatching(() => Criteria!, () => preferXxySrForDifficultyOperations, () => useActiveSongsBranchAsBeatmapSource, getDifficultiesForOperationsAsync, getActiveBranchDifficultiesAsync, getPpValuesForOperationsAsync),
                 new BeatmapCarouselFilterSorting(() => Criteria!, () => preferXxySrForDifficultyOperations, getDifficultiesForOperationsAsync, getPpValuesForOperationsAsync),
                 grouping = new BeatmapCarouselFilterGrouping
                 {
@@ -142,6 +142,7 @@ namespace osu.Game.Screens.Select
                     GetFavouriteBeatmapSets = GetFavouriteBeatmapSets,
                     ShouldUseXxySrForDifficultyOperations = () => preferXxySrForDifficultyOperations,
                     GetDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync,
+                    GetPpForOperationsAsync = getPpValuesForOperationsAsync,
                 }
             };
 

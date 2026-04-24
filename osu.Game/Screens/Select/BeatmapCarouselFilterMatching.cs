@@ -19,19 +19,22 @@ namespace osu.Game.Screens.Select
         private readonly Func<bool> shouldUseActiveSongsBranchAsBeatmapSource;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync;
         private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync;
+        private readonly Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync;
 
         public int BeatmapItemsCount { get; private set; }
 
         public BeatmapCarouselFilterMatching(Func<FilterCriteria> getCriteria, Func<bool> shouldUseXxySrForDifficultyOperations,
                                              Func<bool> shouldUseActiveSongsBranchAsBeatmapSource,
                                              Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getDifficultiesForOperationsAsync,
-                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync)
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getActiveBranchDifficultiesAsync,
+                                             Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> getPpForOperationsAsync)
         {
             this.getCriteria = getCriteria;
             this.shouldUseXxySrForDifficultyOperations = shouldUseXxySrForDifficultyOperations;
             this.shouldUseActiveSongsBranchAsBeatmapSource = shouldUseActiveSongsBranchAsBeatmapSource;
             this.getDifficultiesForOperationsAsync = getDifficultiesForOperationsAsync;
             this.getActiveBranchDifficultiesAsync = getActiveBranchDifficultiesAsync;
+            this.getPpForOperationsAsync = getPpForOperationsAsync;
         }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
@@ -44,9 +47,11 @@ namespace osu.Game.Screens.Select
             bool useActiveBranchBeatmapSource = shouldUseActiveSongsBranchAsBeatmapSource();
             bool useXxyDifficulty = shouldUseXxySrForDifficultyOperations();
             bool requiresDifficultyForFiltering = useXxyDifficulty && (criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter);
+            bool requiresPpForFiltering = criteria.Pp.HasFilter;
 
             IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
             IReadOnlyDictionary<BeatmapInfo, double>? activeBranchDifficulties = null;
+            IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues = null;
 
             var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model)
                                          .Where(b => !b.Hidden)
@@ -61,6 +66,9 @@ namespace osu.Game.Screens.Select
                 operationDifficulties = await getDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
             }
 
+            if (requiresPpForFiltering)
+                operationPpValues = await getPpForOperationsAsync(uniqueBeatmaps, cancellationToken).ConfigureAwait(false);
+
             foreach (var item in itemList)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -72,10 +80,12 @@ namespace osu.Game.Screens.Select
 
                 if (activeBranchDifficulties != null)
                 {
+                    double? ppForFilter = tryGetPpForFilter(beatmap, operationPpValues);
+
                     if (!activeBranchDifficulties.TryGetValue(beatmap, out double branchDifficulty))
                         continue;
 
-                    if (!CheckCriteriaMatch(beatmap, criteria, branchDifficulty))
+                    if (!CheckCriteriaMatch(beatmap, criteria, branchDifficulty, ppForFilter))
                         continue;
 
                     countMatching++;
@@ -88,7 +98,7 @@ namespace osu.Game.Screens.Select
                 if (operationDifficulties != null && operationDifficulties.TryGetValue(beatmap, out double operationDifficulty))
                     starDifficultyForFilter = operationDifficulty;
 
-                if (!CheckCriteriaMatch(beatmap, criteria, starDifficultyForFilter))
+                if (!CheckCriteriaMatch(beatmap, criteria, starDifficultyForFilter, tryGetPpForFilter(beatmap, operationPpValues)))
                     continue;
 
                 countMatching++;
@@ -99,7 +109,7 @@ namespace osu.Game.Screens.Select
             return matchedItems;
         }
 
-        public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter)
+        public static bool CheckCriteriaMatch(BeatmapInfo beatmap, FilterCriteria criteria, double starDifficultyForFilter, double? ppForFilter = null)
         {
             bool match = criteria.Ruleset == null || beatmap.AllowGameplayWithRuleset(criteria.Ruleset!, criteria.AllowConvertedBeatmaps);
 
@@ -137,6 +147,7 @@ namespace osu.Game.Screens.Select
             match &= !criteria.DateRanked.HasFilter || (beatmap.BeatmapSet?.DateRanked != null && criteria.DateRanked.IsInRange(beatmap.BeatmapSet.DateRanked.Value));
             match &= !criteria.DateSubmitted.HasFilter || (beatmap.BeatmapSet?.DateSubmitted != null && criteria.DateSubmitted.IsInRange(beatmap.BeatmapSet.DateSubmitted.Value));
             match &= !criteria.BPM.HasFilter || criteria.BPM.IsInRange(beatmap.BPM);
+            match &= !criteria.Pp.HasFilter || (ppForFilter.HasValue && criteria.Pp.IsInRange(ppForFilter.Value));
 
             match &= !criteria.BeatDivisor.HasFilter || criteria.BeatDivisor.IsInRange(beatmap.BeatDivisor);
             match &= !criteria.OnlineStatus.HasFilter || criteria.OnlineStatus.IsInRange(beatmap.Status);
@@ -204,6 +215,14 @@ namespace osu.Game.Screens.Select
                 match &= criteria.BeatmapSetId == beatmap.BeatmapSet?.OnlineID;
 
             return match;
+        }
+
+        private static double? tryGetPpForFilter(BeatmapInfo beatmap, IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues)
+        {
+            if (operationPpValues == null)
+                return null;
+
+            return operationPpValues.TryGetValue(beatmap, out double pp) ? pp : null;
         }
     }
 }

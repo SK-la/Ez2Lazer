@@ -49,6 +49,7 @@ namespace osu.Game.Screens.Select
         public required Func<HashSet<int>> GetFavouriteBeatmapSets { get; init; }
         public required Func<bool> ShouldUseXxySrForDifficultyOperations { get; init; }
         public required Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> GetDifficultiesForOperationsAsync { get; init; }
+        public required Func<IEnumerable<BeatmapInfo>, CancellationToken, Task<IReadOnlyDictionary<BeatmapInfo, double>>> GetPpForOperationsAsync { get; init; }
 
         public async Task<List<CarouselItem>> Run(IEnumerable<CarouselItem> items, CancellationToken cancellationToken)
         {
@@ -64,12 +65,14 @@ namespace osu.Game.Screens.Select
                 var itemList = (List<CarouselItem>)items;
 
                 IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
+                IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues = null;
 
                 // xxy_SR is only required when difficulty is the active grouping key.
                 // For 0/1 item, grouping key does not affect output.
                 bool useXxyDifficulty = criteria.Group == GroupMode.Difficulty
                                         && ShouldUseXxySrForDifficultyOperations()
                                         && itemList.Count > 1;
+                bool usePpGrouping = criteria.Group == GroupMode.PP && itemList.Count > 0;
 
                 if (useXxyDifficulty)
                 {
@@ -77,6 +80,14 @@ namespace osu.Game.Screens.Select
                     operationDifficulties = GetDifficultiesForOperationsAsync(uniqueBeatmaps, cancellationToken)
                                             .GetAwaiter()
                                             .GetResult();
+                }
+
+                if (usePpGrouping)
+                {
+                    var uniqueBeatmaps = itemList.Select(i => (BeatmapInfo)i.Model).Distinct().ToList();
+                    operationPpValues = GetPpForOperationsAsync(uniqueBeatmaps, cancellationToken)
+                                        .GetAwaiter()
+                                        .GetResult();
                 }
 
                 BeatmapSetsGroupedTogether = ShouldGroupBeatmapsTogether(criteria);
@@ -89,7 +100,15 @@ namespace osu.Game.Screens.Select
                     return beatmap.StarRating;
                 }
 
-                var groups = getGroups(itemList, criteria, getDifficulty);
+                double? getPp(BeatmapInfo beatmap)
+                {
+                    if (operationPpValues != null && operationPpValues.TryGetValue(beatmap, out double pp))
+                        return pp;
+
+                    return null;
+                }
+
+                var groups = getGroups(itemList, criteria, getDifficulty, getPp);
                 int displayedBeatmapsCount = 0;
 
                 foreach (var (group, itemsInGroup) in groups)
@@ -181,7 +200,7 @@ namespace osu.Game.Screens.Select
         {
             // In certain cases, we intentionally split out difficulties
             // where it's more relevant or convenient to view them as individual items.
-            if (criteria.Sort == SortMode.Difficulty || criteria.Group == GroupMode.Difficulty)
+            if (criteria.Sort == SortMode.Difficulty || criteria.Group == GroupMode.Difficulty || criteria.Group == GroupMode.PP)
                 return false;
             if (criteria.Sort == SortMode.LastPlayed && criteria.Group == GroupMode.LastPlayed)
                 return false;
@@ -192,7 +211,7 @@ namespace osu.Game.Screens.Select
             return true;
         }
 
-        private List<GroupMapping> getGroups(List<CarouselItem> items, FilterCriteria criteria, Func<BeatmapInfo, double> getDifficulty)
+        private List<GroupMapping> getGroups(List<CarouselItem> items, FilterCriteria criteria, Func<BeatmapInfo, double> getDifficulty, Func<BeatmapInfo, double?> getPp)
         {
             switch (criteria.Group)
             {
@@ -233,6 +252,9 @@ namespace osu.Game.Screens.Select
 
                 case GroupMode.Difficulty:
                     return getGroupsBy(b => defineGroupByStars(getDifficulty(b)), items);
+
+                case GroupMode.PP:
+                    return getGroupsBy(b => defineGroupByPp(getPp(b)), items);
 
                 case GroupMode.Length:
                     return getGroupsBy(b => defineGroupByLength(b.Length), items);
@@ -430,6 +452,15 @@ namespace osu.Game.Screens.Select
                 return new GroupDefinition(10, "10 minutes or less").Yield();
 
             return new GroupDefinition(11, "Over 10 minutes").Yield();
+        }
+
+        private IEnumerable<GroupDefinition> defineGroupByPp(double? pp)
+        {
+            if (pp is not double value || !double.IsFinite(value))
+                return new GroupDefinition(int.MaxValue, "Unknown PP").Yield();
+
+            int bucketStart = Math.Max(0, (int)Math.Floor(value / 100d) * 100);
+            return new GroupDefinition(bucketStart, $"{bucketStart} - {bucketStart + 100} PP").Yield();
         }
 
         private IEnumerable<GroupDefinition> defineGroupBySource(BeatmapInfo beatmap)

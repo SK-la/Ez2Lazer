@@ -199,6 +199,22 @@ namespace osu.Game.Tests.NonVisual.Filtering
             ClassicAssert.Null(filterCriteria.BPM.Max);
         }
 
+        [Test]
+        public void TestApplyPpQueries()
+        {
+            const string query = "pp=100 stamina";
+            var filterCriteria = new FilterCriteria();
+            FilterQueryParser.ApplyQueries(filterCriteria, query);
+
+            ClassicAssert.AreEqual("stamina", filterCriteria.SearchText.Trim());
+            ClassicAssert.NotNull(filterCriteria.Pp.Min);
+            ClassicAssert.NotNull(filterCriteria.Pp.Max);
+            ClassicAssert.AreEqual(99d, filterCriteria.Pp.Min!.Value);
+            ClassicAssert.AreEqual(101d, filterCriteria.Pp.Max!.Value);
+            ClassicAssert.True(filterCriteria.Pp.IsLowerInclusive);
+            ClassicAssert.True(filterCriteria.Pp.IsUpperInclusive);
+        }
+
         private static readonly object[] correct_length_query_examples =
         {
             new object[] { "23s", TimeSpan.FromSeconds(23), TimeSpan.FromSeconds(1) },

@@ -339,6 +339,33 @@ namespace osu.Game.Tests.NonVisual.Filtering
             ClassicAssert.AreEqual(filtered, carouselItem.Filtered.Value);
         }
 
+        [TestCase(99d, false)]
+        [TestCase(100d, false)]
+        [TestCase(101d, false)]
+        [TestCase(101.01d, true)]
+        [TestCase(98.99d, true)]
+        public void TestCriteriaMatchingPp(double pp, bool filtered)
+        {
+            var beatmap = getExampleBeatmap();
+            var criteria = new FilterCriteria();
+
+            FilterQueryParser.ApplyQueries(criteria, "pp=100");
+
+            bool matches = BeatmapCarouselFilterMatching.CheckCriteriaMatch(beatmap, criteria, beatmap.StarRating, pp);
+            ClassicAssert.AreEqual(filtered, !matches);
+        }
+
+        [Test]
+        public void TestCriteriaMatchingPpWithoutValueFails()
+        {
+            var beatmap = getExampleBeatmap();
+            var criteria = new FilterCriteria();
+
+            FilterQueryParser.ApplyQueries(criteria, "pp=100");
+
+            ClassicAssert.False(BeatmapCarouselFilterMatching.CheckCriteriaMatch(beatmap, criteria, beatmap.StarRating, null));
+        }
+
         [Test]
         [TestCase("artist")]
         [TestCase("unicode")]

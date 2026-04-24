@@ -670,6 +670,10 @@ namespace osu.Game.Screens.Select
                 {
                     switch (item)
                     {
+                        case GroupMode.PP:
+                            items.Add(new GroupModeDropdownItem(GroupMode.PP, "PP"));
+                            break;
+
                         default:
                             items.Add(new GroupModeDropdownItem(item, item.GetLocalisableDescription()));
                             break;
