@@ -34,11 +34,11 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public enum EzRadarDisplayMode
     {
-        [Description("General")]
-        General,
+        [Description("Metadate")]
+        Metadate,
 
         [Description("Key Pattern")]
-        RulesetSpecific,
+        KeyPattern,
 
         [Description("XxySR Pattern")]
         XxySrPattern
@@ -79,11 +79,11 @@ namespace osu.Game.EzOsuGame.HUD
 
         public float MaxXxySr { get; set; } = 10f;
 
-        [SettingSource("Radar data mode", "Switch between general data, key pattern data and SR-based pattern data.")]
-        public Bindable<EzRadarDisplayMode> RadarDisplayMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.General);
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DISPLAY_MODE), nameof(EzHUDStrings.RADAR_DISPLAY_MODE_TOOLTIP))]
+        public Bindable<EzRadarDisplayMode> RadarDisplayMode { get; } = new Bindable<EzRadarDisplayMode>();
 
-        [SettingSource("Absolute pattern value", "Scale heuristic key pattern values by xxySR.")]
-        public Bindable<bool> UseAbsolutePatternValue { get; } = new BindableBool();
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_USE_ABSOLUTE_VALUE), nameof(EzHUDStrings.RADAR_USE_ABSOLUTE_VALUE_TOOLTIP))]
+        public Bindable<bool> UseAbsoluteValue { get; } = new BindableBool();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 210, 230));
@@ -199,12 +199,12 @@ namespace osu.Game.EzOsuGame.HUD
             DataAreaColour.BindValueChanged(_ => applyChartColours(), true);
             RadarDisplayMode.BindValueChanged(_ =>
             {
-                if (RadarDisplayMode.Value == EzRadarDisplayMode.General)
+                if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
                     updateParameterRatios(difficultyBindable?.Value ?? default);
                 else
                     updateRulesetSpecificRadarPresentation();
             }, true);
-            UseAbsolutePatternValue.BindValueChanged(_ => updateRulesetSpecificRadarPresentation(), true);
+            UseAbsoluteValue.BindValueChanged(_ => updateRulesetSpecificRadarPresentation(), true);
 
             chart?.SetData(parameterRatios);
             updateAxisTexts();
@@ -262,7 +262,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateParameterRatios(StarDifficulty difficulty)
         {
-            if (RadarDisplayMode.Value != EzRadarDisplayMode.General && beginRulesetSpecificRadarUpdate())
+            if (RadarDisplayMode.Value != EzRadarDisplayMode.Metadate && beginRulesetSpecificRadarUpdate())
                 return;
 
             cancelRadarAnalysis();
@@ -271,7 +271,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         private void updateRulesetSpecificRadarPresentation()
         {
-            if (RadarDisplayMode.Value == EzRadarDisplayMode.General)
+            if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
                 return;
 
             if (cachedRulesetSpecificRadarResult is EzRulesetSpecificRadarResult cachedResult)
@@ -397,7 +397,7 @@ namespace osu.Game.EzOsuGame.HUD
         private IReadOnlyList<float> getRulesetSpecificAxisMaxValues()
             => RadarDisplayMode.Value == EzRadarDisplayMode.XxySrPattern
                 ? new[] { MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr, MaxXxySr }
-                : UseAbsolutePatternValue.Value
+                : UseAbsoluteValue.Value
                     ? new[] { MaxXxySr, MaxXxySr, long_note_ratio_max, MaxXxySr, MaxXxySr, MaxXxySr }
                     : new[] { MaxKeyPatternScore, MaxKeyPatternScore, long_note_ratio_max, MaxKeyPatternScore, MaxKeyPatternScore, MaxKeyPatternScore };
 
@@ -408,10 +408,10 @@ namespace osu.Game.EzOsuGame.HUD
             if (RadarDisplayMode.Value == EzRadarDisplayMode.XxySrPattern)
                 return sourceRadarData;
 
-            if (!UseAbsolutePatternValue.Value || radarResult.XxySr is not double xxySr || xxySr <= 0)
+            if (!UseAbsoluteValue.Value || radarResult.XxySr is not double xxySr || xxySr <= 0)
                 return sourceRadarData;
 
-            bool preserveLongNotePercentage = RadarDisplayMode.Value == EzRadarDisplayMode.RulesetSpecific;
+            bool preserveLongNotePercentage = RadarDisplayMode.Value == EzRadarDisplayMode.KeyPattern;
             var axes = new EzRadarAxisValue<string>[sourceRadarData.Count];
 
             for (int i = 0; i < sourceRadarData.Count; i++)
@@ -551,7 +551,7 @@ namespace osu.Game.EzOsuGame.HUD
                 DataLineColour.UnbindAll();
                 DataAreaColour.UnbindAll();
                 RadarDisplayMode.UnbindAll();
-                UseAbsolutePatternValue.UnbindAll();
+                UseAbsoluteValue.UnbindAll();
 
                 beatmap.UnbindAll();
                 mods.UnbindAll();
