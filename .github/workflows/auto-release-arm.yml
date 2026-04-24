@@ -122,16 +122,6 @@ jobs:
         with:
           python-version: '3.x'
 
-      # - name: Ensure arm64 runner
-      #   shell: bash
-      #   run: |
-      #     arch="$(uname -m)"
-      #     echo "Detected runner arch: ${arch}"
-      #     if [ "${arch}" != "arm64" ] && [ "${arch}" != "aarch64" ]; then
-      #       echo "::error::Expected arm64/aarch64 runner, but got ${arch}."
-      #       exit 1
-      #     fi
-
       - name: Dotnet restore (desktop project)
         working-directory: osu
         shell: pwsh
