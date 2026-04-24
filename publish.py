@@ -174,8 +174,11 @@ def zip_folder(src_dir: str, zip_path: str):
         for full, arcname in _iter_files(src_dir):
             zi = zipfile.ZipInfo(arcname)
             zi.date_time = FIXED_DATETIME
-            # set external attributes to a reasonable default (rw-r--r--)
-            zi.external_attr = 0o644 << 16
+            # Preserve source mode so macOS app launchers/binaries keep execute bits after unzip.
+            mode = os.stat(full).st_mode & 0o777
+            if mode == 0:
+                mode = 0o644
+            zi.external_attr = mode << 16
             with open(full, 'rb') as fh:
                 data = fh.read()
             zf.writestr(zi, data, compress_type=compression)
@@ -221,6 +224,72 @@ def _find_best_publish_candidate(search_root: str):
 
     candidates.sort(key=_size, reverse=True)
     return candidates[0]
+
+
+def _is_safe_bundle_name(name: str) -> bool:
+    if not name or name in {'.', '..'}:
+        return False
+    allowed = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-!')
+    return all(ch in allowed for ch in name)
+
+
+def _resolve_macos_launch_executable(app_resources: str, project_path: str) -> str | None:
+    published_files = sorted(os.listdir(app_resources))
+    entrypoint_bases: set[str] = set()
+
+    for suffix in ('.runtimeconfig.json', '.deps.json'):
+        for name in published_files:
+            if not name.endswith(suffix):
+                continue
+            base = name[:-len(suffix)]
+            low = base.lower()
+            if low.startswith('microsoft.') or low.startswith('system.'):
+                continue
+            if _is_safe_bundle_name(base):
+                entrypoint_bases.add(base)
+
+    candidate_bases: list[str] = []
+    project_base = os.path.splitext(os.path.basename(project_path))[0]
+    if project_base and _is_safe_bundle_name(project_base):
+        candidate_bases.append(project_base)
+
+    for base in sorted(entrypoint_bases):
+        if base != project_base:
+            candidate_bases.append(base)
+
+    for base in candidate_bases:
+        full_path = os.path.join(app_resources, base)
+        if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
+            return base
+
+    return None
+
+
+def _build_macos_launcher_script(executable_name: str | None) -> str:
+    lines = [
+        '#!/bin/sh',
+        'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
+        'CONTENTS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"',
+        'LOG_DIR="${HOME}/Library/Logs/Ez2Lazer"',
+        'mkdir -p "${LOG_DIR}"',
+    ]
+
+    if executable_name:
+        lines.extend([
+            f'TARGET="${{CONTENTS_DIR}}/Resources/app/{executable_name}"',
+            'if [ ! -x "${TARGET}" ]; then',
+            '  echo "Launcher target is not executable: ${TARGET}" >> "${LOG_DIR}/launcher.log"',
+            '  exit 126',
+            'fi',
+            'exec "${TARGET}" "$@" >> "${LOG_DIR}/launcher.log" 2>&1',
+        ])
+    else:
+        lines.extend([
+            'echo "No safe executable launch target found in ${CONTENTS_DIR}/Resources/app" >> "${LOG_DIR}/launcher.log"',
+            'exit 127',
+        ])
+
+    return '\n'.join(lines) + '\n'
 
 
 def main():
@@ -496,52 +565,17 @@ def main():
                         else:
                             shutil.copy2(s, d)
 
-                    # attempt to find executable inside the published files
-                    exe_candidate = None
-                    # 1) find an executable file
-                    for f in os.listdir(app_resources):
-                        fp = os.path.join(app_resources, f)
-                        if os.path.isfile(fp) and os.access(fp, os.X_OK):
-                            exe_candidate = f
-                            break
-                    # 2) fallback: match project name
-                    if not exe_candidate:
-                        proj_base = os.path.splitext(os.path.basename(args.project))[0]
-                        for f in os.listdir(app_resources):
-                            if f.lower().startswith(proj_base.lower()):
-                                exe_candidate = f
-                                break
-                    # 3) final fallback: pick first file with no extension
-                    if not exe_candidate:
-                        for f in os.listdir(app_resources):
-                            if os.path.isfile(os.path.join(app_resources, f)) and '.' not in f:
-                                exe_candidate = f
-                                break
+                    launch_executable = _resolve_macos_launch_executable(app_resources, args.project)
 
-                    if not exe_candidate:
-                        # leave as-is: use a launcher that runs the managed DLL via dotnet if necessary
-                        launcher_exec = os.path.join(macos_dir, app_name)
-                        with open(launcher_exec, 'w', encoding='utf-8') as f:
-                            f.write('#!/bin/sh\n')
-                            f.write('HERE="$(dirname "$(dirname "$(readlink -f "$0"))")"\n')
-                            f.write('exec "${HERE}/Resources/app/osu.Desktop" "$@"\n')
-                        try:
-                            os.chmod(launcher_exec, 0o755)
-                        except Exception:
-                            pass
-                        bundle_executable_name = app_name
-                    else:
-                        # create launcher that execs the discovered executable
-                        launcher_exec = os.path.join(macos_dir, app_name)
-                        with open(launcher_exec, 'w', encoding='utf-8') as f:
-                            f.write('#!/bin/sh\n')
-                            f.write('HERE="$(dirname "$(dirname "$(readlink -f "$0"))")"\n')
-                            f.write('exec "${HERE}/Resources/app/%s" "$@"\n' % exe_candidate)
-                        try:
-                            os.chmod(launcher_exec, 0o755)
-                        except Exception:
-                            pass
-                        bundle_executable_name = app_name
+                    launcher_exec = os.path.join(macos_dir, app_name)
+                    with open(launcher_exec, 'w', encoding='utf-8') as f:
+                        f.write(_build_macos_launcher_script(launch_executable))
+
+                    try:
+                        os.chmod(launcher_exec, 0o755)
+                    except Exception:
+                        pass
+                    bundle_executable_name = app_name
 
                     # minimal Info.plist
                     info_path = os.path.join(contents, 'Info.plist')
