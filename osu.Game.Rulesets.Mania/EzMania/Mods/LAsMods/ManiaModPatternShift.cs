@@ -109,14 +109,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             get
             {
-                yield return ("Key Count", $"{KeyCount.Value}");
-                yield return ("Density", $"{Density.Value}");
-                yield return ("Max Chord", $"{MaxChord.Value}");
-                yield return ("Align Divisor", AlignDivisor.Value == 0 ? "Off" : $"1/{AlignDivisor.Value}");
-                yield return ("Delay Level", $"{DelayLevel.Value}");
-                yield return ("Regenerate", Regenerate.Value ? "On" : "Off");
-                yield return ("Regenerate Difficulty", $"{RegenerateDifficulty.Value}");
-                yield return ("Seed", Seed.Value?.ToString() ?? "Random");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_KEY_COUNT_LABEL, $"{KeyCount.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_DENSITY_LABEL, $"{Density.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_MAX_CHORD_LABEL, $"{MaxChord.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_ALIGN_DIVISOR_LABEL, AlignDivisor.Value == 0 ? "Off" : $"1/{AlignDivisor.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_DELAY_LEVEL_LABEL, $"{DelayLevel.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_REGENERATE_LABEL, Regenerate.Value ? "On" : "Off");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_REGENERATE_DIFFICULTY_LABEL, $"{RegenerateDifficulty.Value}");
+                yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "Random");
             }
         }
 

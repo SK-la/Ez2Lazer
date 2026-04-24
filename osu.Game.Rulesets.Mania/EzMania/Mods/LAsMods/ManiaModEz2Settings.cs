@@ -84,13 +84,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 var settings = new List<(LocalisableString setting, LocalisableString value)>();
 
                 if (NoScratch.Value)
-                    settings.Add((new LocalisableString("No Scratch"), new LocalisableString("Enabled")));
+                    settings.Add((Ez2SettingsStrings.NO_SCRATCH_LABEL, new LocalisableString("Enabled")));
 
                 if (NoPanel.Value)
-                    settings.Add((new LocalisableString("No Panel"), new LocalisableString("Enabled")));
+                    settings.Add((Ez2SettingsStrings.NO_PANEL_LABEL, new LocalisableString("Enabled")));
 
                 if (HealthScratch.Value)
-                    settings.Add((new LocalisableString("Scratch MAX Beat Space"), new LocalisableString($"1/{MaxBeat.Value} Beat")));
+                    settings.Add((Ez2SettingsStrings.MAX_BEAT_LABEL, new LocalisableString($"1/{MaxBeat.Value} Beat")));
 
                 return settings;
             }

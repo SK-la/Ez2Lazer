@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                     3 => "Hard",
                     _ => "Unknown"
                 };
-                yield return ("Difficulty", difficultyName);
+                yield return (O2HealthStrings.DIFFICULTY_LABEL, difficultyName);
             }
         }
 

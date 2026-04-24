@@ -68,7 +68,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Min Scale", $"{MinScale.Value:0.##}");
+                yield return (PlayfieldTransformationStrings.MINIMUM_SCALE_LABEL, $"{MinScale.Value:0.##}");
             }
         }
 

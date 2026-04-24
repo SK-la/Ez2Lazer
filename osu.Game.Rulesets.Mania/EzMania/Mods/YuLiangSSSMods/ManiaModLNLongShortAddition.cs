@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Long / Short %", $"{LongShort.Value}%");
+                yield return (LNLongShortAdditionStrings.LONG_SHORT_PERCENT_LABEL, $"{LongShort.Value}%");
 
                 foreach (var (setting, value) in base.SettingDescription)
                     yield return (setting, value);

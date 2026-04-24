@@ -20,6 +20,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override LocalisableString Description => PatternShiftStrings.PATTERN_SHIFT_DESCRIPTION_DELAY;
         protected override int DefaultLevel => 1;
         protected override EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
+        protected override LocalisableString LevelSettingLabel => PatternShiftStrings.PATTERN_SHIFT_DELAY_LEVEL_LABEL;
         protected override int DefaultOscillationBeats => 1;
         protected override int DefaultWindowProcessInterval => 1;
         protected override int DefaultWindowProcessOffset => 1;

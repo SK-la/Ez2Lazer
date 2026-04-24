@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             {
                 if (CustomHitRange.Value)
                 {
-                    yield return ("Custom Hit Range", "On");
+                    yield return (JudgmentsAdjustStrings.CUSTOM_HIT_RANGE_LABEL, "On");
                     yield return ("Perfect Range", $"{PerfectHit.Value:0.#}");
                     yield return ("Great Range", $"{GreatHit.Value:0.#}");
                     yield return ("Good Range", $"{GoodHit.Value:0.#}");

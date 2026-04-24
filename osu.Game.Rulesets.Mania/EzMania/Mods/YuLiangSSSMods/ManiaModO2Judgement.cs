@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                if (PillMode.Value) yield return ("Pill", "On");
+                if (PillMode.Value) yield return (O2JudgementStrings.PILL_SWITCH_LABEL, "On");
             }
         }
 

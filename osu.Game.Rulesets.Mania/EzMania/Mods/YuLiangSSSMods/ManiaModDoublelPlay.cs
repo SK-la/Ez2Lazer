@@ -39,7 +39,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Style", $"Style {Style.Value}");
+                yield return (DoublePlayStrings.DOUBLE_PLAY_STYLE_LABEL, $"Style {Style.Value}");
             }
         }
 

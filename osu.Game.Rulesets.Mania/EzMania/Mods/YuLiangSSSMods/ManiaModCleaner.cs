@@ -36,9 +36,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Style", $"{Style.Value}");
-                yield return ("Interval", $"{Interval.Value}ms");
-                yield return ("LN Interval", $"{LNInterval.Value}ms");
+                yield return (CleanerStrings.STYLE_LABEL, $"{Style.Value}");
+                yield return (EzCommonModStrings.INTERVAL_LABEL, $"{Interval.Value}ms");
+                yield return (CleanerStrings.LN_INTERVAL_LABEL, $"{LNInterval.Value}ms");
             }
         }
 

@@ -83,11 +83,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Target Accuracy", $"{Accuracy.Value}%");
-                yield return ("Max Speed", $"{MaxSpeed.Value:0.##}x");
-                yield return ("Min Speed", $"{MinSpeed.Value:0.##}x");
+                yield return (ChangeSpeedByAccuracyStrings.CHANGE_SPEED_ACCURACY_LABEL, $"{Accuracy.Value}%");
+                yield return (ChangeSpeedByAccuracyStrings.MAX_SPEED_LABEL, $"{MaxSpeed.Value:0.##}x");
+                yield return (ChangeSpeedByAccuracyStrings.MIN_SPEED_LABEL, $"{MinSpeed.Value:0.##}x");
 
-                if (AdjustPitch.Value) yield return ("Adjust Pitch", "On");
+                if (AdjustPitch.Value) yield return (EzCommonModStrings.ADJUST_PITCH_LABEL, "On");
 
                 yield return ("Speed Change", $"{SpeedChange.Value:0.###}x");
             }

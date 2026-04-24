@@ -45,10 +45,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Bias", $"{Bias.Value}");
-                yield return ("Interval", $"{Interval.Value}ms");
-                yield return ("Probability", $"{Probability.Value}%");
-                yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+                yield return (GracerStrings.BIAS_LABEL, $"{Bias.Value}");
+                yield return (EzCommonModStrings.INTERVAL_LABEL, $"{Interval.Value}ms");
+                yield return (EzCommonModStrings.PROBABILITY_LABEL, $"{Probability.Value}%");
+                yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
             }
         }
 

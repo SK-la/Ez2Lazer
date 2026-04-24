@@ -94,10 +94,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             get
             {
-                yield return ("Enable Modify Keys", EnableModifyKeys.Value ? "On" : "Off");
-                yield return ("Target Keys", $"{TargetKeys.Value}");
-                yield return ("Left Mirror", LMirror.Value ? "On" : "Off");
-                yield return ("Right Mirror", RMirror.Value ? "On" : "Off");
+                yield return (KrrDPStrings.KRR_DP_ENABLE_MODIFY_KEYS_LABEL, EnableModifyKeys.Value ? "On" : "Off");
+                yield return (KrrDPStrings.KRR_DP_TARGET_KEYS_LABEL, $"{TargetKeys.Value}");
+                yield return (KrrDPStrings.KRR_DP_LEFT_MIRROR_LABEL, LMirror.Value ? "On" : "Off");
+                yield return (KrrDPStrings.KRR_DP_RIGHT_MIRROR_LABEL, RMirror.Value ? "On" : "Off");
             }
         }
 

@@ -37,12 +37,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                if (Original.Value) yield return ("Original OD", "On");
+                if (Original.Value) yield return (StarRatingRebirthStrings.USE_ORIGINAL_OD_LABEL, "On");
 
                 if (!Original.Value && Custom.Value)
                 {
-                    yield return ("Custom OD", "On");
-                    yield return ("OD", $"{OD.Value}");
+                    yield return (StarRatingRebirthStrings.USE_CUSTOM_OD_LABEL, "On");
+                    yield return (StarRatingRebirthStrings.OD_LABEL, $"{OD.Value}");
                 }
             }
         }

@@ -83,12 +83,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             get
             {
-                if (DeleteSColumn.Value) yield return ("Delete S Column", "On");
-                if (DeletePColumn.Value) yield return ("Delete P Column", "On");
-                if (DeleteEColumn.Value) yield return ("Delete E Column", "On");
-                if (EnableCustomDelete.Value) yield return ("Custom Delete", string.IsNullOrWhiteSpace(CustomDeleteColumn.Value) ? "Enabled" : CustomDeleteColumn.Value);
-                if (EnableCustomReorder.Value) yield return ("Custom Reorder", string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
-                if (UseHealthCapReduction.Value) yield return ("Health Cap Reduction", "On");
+                if (DeleteSColumn.Value) yield return (CleanColumnStrings.DELETE_S_COLUMN_LABEL, "On");
+                if (DeletePColumn.Value) yield return (CleanColumnStrings.DELETE_P_COLUMN_LABEL, "On");
+                if (DeleteEColumn.Value) yield return (CleanColumnStrings.DELETE_E_COLUMN_LABEL, "On");
+                if (EnableCustomDelete.Value) yield return (CleanColumnStrings.ENABLE_CUSTOM_DELETE_LABEL, string.IsNullOrWhiteSpace(CustomDeleteColumn.Value) ? "Enabled" : CustomDeleteColumn.Value);
+                if (EnableCustomReorder.Value) yield return (CleanColumnStrings.ENABLE_CUSTOM_REORDER_LABEL, string.IsNullOrWhiteSpace(CustomReorderColumn.Value) ? "Enabled" : CustomReorderColumn.Value);
+                if (UseHealthCapReduction.Value) yield return (CleanColumnStrings.USE_HEALTH_CAP_REDUCTION_LABEL, "On");
             }
         }
 

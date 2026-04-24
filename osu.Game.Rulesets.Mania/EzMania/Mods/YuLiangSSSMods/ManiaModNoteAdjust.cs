@@ -43,21 +43,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             {
                 if (Style.Value != 6)
                 {
-                    yield return ("Style", $"{Style.Value}");
-                    yield return ("Probability", $"{Probability.Value}%");
-                    yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+                    yield return (NoteAdjustStrings.NOTE_ADJUST_STYLE_LABEL, $"{Style.Value}");
+                    yield return (NoteAdjustStrings.NOTE_ADJUST_PROBABILITY_LABEL, $"{Probability.Value}%");
+                    yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
                 }
                 else
                 {
-                    yield return ("Style", $"{Style.Value}");
-                    yield return ("Probability", $"{Probability.Value}%");
-                    yield return ("Extremum", $"{Extremum.Value}");
-                    yield return ("Comparison Style", $"{ComparisonStyle.Value}");
-                    yield return ("Line", $"{Line.Value}");
-                    yield return ("Step", $"{Step.Value}");
-                    yield return ("Ignore Comparison", $"{IgnoreComparison}");
-                    yield return ("Ignore Interval", $"{IgnoreInterval}");
-                    yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+                    yield return (NoteAdjustStrings.NOTE_ADJUST_STYLE_LABEL, $"{Style.Value}");
+                    yield return (NoteAdjustStrings.NOTE_ADJUST_PROBABILITY_LABEL, $"{Probability.Value}%");
+                    yield return (NoteAdjustStrings.EXTREMUM_LABEL, $"{Extremum.Value}");
+                    yield return (NoteAdjustStrings.COMPARISON_STYLE_LABEL, $"{ComparisonStyle.Value}");
+                    yield return (NoteAdjustStrings.NOTE_ADJUST_LINE_LABEL, $"{Line.Value}");
+                    yield return (NoteAdjustStrings.STEP_LABEL, $"{Step.Value}");
+                    yield return (NoteAdjustStrings.IGNORE_COMPARISON_LABEL, $"{IgnoreComparison}");
+                    yield return (NoteAdjustStrings.IGNORE_INTERVAL_LABEL, $"{IgnoreInterval}");
+                    yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
                 }
             }
         }

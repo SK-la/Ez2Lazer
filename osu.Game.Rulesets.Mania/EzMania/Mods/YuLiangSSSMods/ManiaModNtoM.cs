@@ -42,9 +42,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Probability", $"{Probability.Value}%");
-                yield return ("Key", $"{Key.Value}");
-                yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+                yield return (EzCommonModStrings.PROBABILITY_LABEL, $"{Probability.Value}%");
+                yield return (EzCommonModStrings.KEY_LABEL, $"{Key.Value}");
+                yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
             }
         }
 

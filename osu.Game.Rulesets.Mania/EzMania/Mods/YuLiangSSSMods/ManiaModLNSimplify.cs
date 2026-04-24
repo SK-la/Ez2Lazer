@@ -41,10 +41,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Limit Divide", $"{LimitDivide.Value}");
-                yield return ("Easier Divide", $"{EasierDivide.Value}");
-                yield return ("Longest LN", $"{Gap.Value}");
-                yield return ("Shortest LN", $"{Len.Value}");
+                yield return (LNSimplifyStrings.LIMIT_DIVIDE_LABEL, $"{LimitDivide.Value}");
+                yield return (LNSimplifyStrings.EASIER_DIVIDE_LABEL, $"{EasierDivide.Value}");
+                yield return (LNSimplifyStrings.LONGEST_LN_LABEL, $"{Gap.Value}");
+                yield return (LNSimplifyStrings.SHORTEST_LN_LABEL, $"{Len.Value}");
             }
         }
 

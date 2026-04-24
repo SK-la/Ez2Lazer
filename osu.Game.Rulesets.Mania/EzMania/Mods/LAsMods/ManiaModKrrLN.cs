@@ -120,20 +120,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             get
             {
-                yield return ("Long Level", $"{LongLevel.Value}");
-                yield return ("Short Level", $"{ShortLevel.Value}");
-                yield return ("Long %", $"{LongPercentage.Value}%");
-                yield return ("Short %", $"{ShortPercentage.Value}%");
-                yield return ("Long Limit", $"{LongLimit.Value}");
-                yield return ("Short Limit", $"{ShortLimit.Value}");
-                yield return ("Alignment", $"{Alignment.Value}");
-                yield return ("LN Alignment", $"{LNAlignment.Value}");
+                yield return (KrrLNStrings.KRR_LN_LONG_LEVEL_LABEL, $"{LongLevel.Value}");
+                yield return (KrrLNStrings.KRR_LN_SHORT_LEVEL_LABEL, $"{ShortLevel.Value}");
+                yield return (KrrLNStrings.KRR_LN_LONG_PERCENTAGE_LABEL, $"{LongPercentage.Value}%");
+                yield return (KrrLNStrings.KRR_LN_SHORT_PERCENTAGE_LABEL, $"{ShortPercentage.Value}%");
+                yield return (KrrLNStrings.KRR_LN_LONG_LIMIT_LABEL, $"{LongLimit.Value}");
+                yield return (KrrLNStrings.KRR_LN_SHORT_LIMIT_LABEL, $"{ShortLimit.Value}");
+                yield return (KrrLNStrings.KRR_LN_ALIGNMENT_LABEL, $"{Alignment.Value}");
+                yield return (KrrLNStrings.KRR_LN_LN_ALIGNMENT_LABEL, $"{LNAlignment.Value}");
 
                 if (Seed.Value is null)
-                    yield return ("Seed", "Null");
+                    yield return (EzCommonModStrings.SEED_LABEL, "Null");
 
                 else
-                    yield return ("Seed", $"Seed {Seed.Value}");
+                    yield return (EzCommonModStrings.SEED_LABEL, $"Seed {Seed.Value}");
             }
         }
 

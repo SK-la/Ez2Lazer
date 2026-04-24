@@ -45,7 +45,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 foreach (var item in base.SettingDescription)
                     yield return item;
 
-                yield return ("Window Max Notes", $"{WindowMaxNotes.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_WINDOW_MAX_ITERATIONS_LABEL, $"{WindowMaxNotes.Value}");
             }
         }
 

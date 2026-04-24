@@ -43,28 +43,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Divide 1", $"1/{Divide1.Value}");
-                yield return ("Divide 2", $"1/{Divide2.Value}");
-                yield return ("Mu 1", $"{Mu1.Value}");
-                yield return ("Mu 2", $"{Mu2.Value}");
-                yield return ("Mu 1 : Mu 2", $"{Mu1DMu2.Value} : {1 - Mu1DMu2.Value}");
+                yield return (LNDoubleDistributionStrings.DIVIDE1_LABEL, $"1/{Divide1.Value}");
+                yield return (LNDoubleDistributionStrings.DIVIDE2_LABEL, $"1/{Divide2.Value}");
+                yield return (LNDoubleDistributionStrings.MU1_LABEL, $"{Mu1.Value}");
+                yield return (LNDoubleDistributionStrings.MU2_LABEL, $"{Mu2.Value}");
+                yield return (LNDoubleDistributionStrings.MU_RATIO_LABEL, $"{Mu1DMu2.Value} : {1 - Mu1DMu2.Value}");
                 yield return ("Sigma", $"{SigmaInteger.Value + SigmaDouble.Value}");
-                yield return ("Percentage", $"{Percentage.Value}%");
+                yield return (EzCommonModStrings.PERCENTAGE_LABEL, $"{Percentage.Value}%");
 
                 if (OriginalLN.Value)
                 {
-                    yield return ("Original LN", "On");
+                    yield return (EzCommonModStrings.ORIGINAL_LN_LABEL, "On");
                 }
 
-                yield return ("Column Num", $"{SelectColumn.Value}");
-                yield return ("Gap", $"{Gap.Value}");
+                yield return (EzCommonModStrings.COLUMN_NUM_LABEL, $"{SelectColumn.Value}");
+                yield return (EzCommonModStrings.GAP_LABEL, $"{Gap.Value}");
 
                 if (DurationLimit.Value > 0)
                 {
-                    yield return ("Duration Limit", $"{DurationLimit.Value}s");
+                    yield return (EzCommonModStrings.DURATION_LIMIT_LABEL, $"{DurationLimit.Value}s");
                 }
 
-                yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+                yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
             }
         }
 

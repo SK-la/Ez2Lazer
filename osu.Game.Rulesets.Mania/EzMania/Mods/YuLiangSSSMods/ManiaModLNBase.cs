@@ -99,17 +99,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Divide", $"1/{Divide.Value}");
-                yield return ("Percentage", $"{Percentage.Value}%");
+                yield return (LNStrings.DIVIDE_LABEL, $"1/{Divide.Value}");
+                yield return (EzCommonModStrings.PERCENTAGE_LABEL, $"{Percentage.Value}%");
 
-                if (OriginalLN.Value) yield return ("Original LN", "On");
+                if (OriginalLN.Value) yield return (EzCommonModStrings.ORIGINAL_LN_LABEL, "On");
 
-                yield return ("Column Num", $"{SelectColumn.Value}");
-                yield return ("Gap", $"{Gap.Value}");
+                yield return (EzCommonModStrings.COLUMN_NUM_LABEL, $"{SelectColumn.Value}");
+                yield return (EzCommonModStrings.GAP_LABEL, $"{Gap.Value}");
 
-                if (DurationLimit.Value > 0) yield return ("Duration Limit", $"{DurationLimit.Value}s");
+                if (DurationLimit.Value > 0) yield return (EzCommonModStrings.DURATION_LIMIT_LABEL, $"{DurationLimit.Value}s");
 
-                yield return ("Seed", $"{(Seed.Value == null ? "Null" : Seed.Value)}");
+                yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
             }
         }
     }

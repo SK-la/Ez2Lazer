@@ -171,11 +171,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             get
             {
                 if (!UseMsGap.Value)
-                    yield return ("Space Beat", $"1/{BeatGap.Value}");
+                    yield return (SpaceBodyStrings.BEAT_GAP_LABEL, $"1/{BeatGap.Value}");
                 else
-                    yield return ("Space Gap", $"{MsGap.Value}ms");
+                    yield return (SpaceBodyStrings.MS_GAP_LABEL, $"{MsGap.Value}ms");
 
-                yield return ("Shield", Shield.Value ? "On" : "Off");
+                yield return (SpaceBodyStrings.ADD_SHIELD_LABEL, Shield.Value ? "On" : "Off");
             }
         }
     }

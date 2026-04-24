@@ -47,27 +47,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             get
             {
-                yield return ("Key", $"{Key.Value}");
-                yield return ("Blank Column", $"{BlankColumn.Value}");
-                yield return ("Gap", $"{Gap.Value}");
+                yield return (EzCommonModStrings.KEY_LABEL, $"{Key.Value}");
+                yield return (NtoMAnotherStrings.BLANK_COLUMN_LABEL, $"{BlankColumn.Value}");
+                yield return (NtoMAnotherStrings.NTOM_GAP_LABEL, $"{Gap.Value}");
 
                 if (Clean.Value)
                 {
-                    yield return ("Clean", Clean.Value ? "On" : "Off");
-                    yield return ("Clean Divide", $"1/{CleanDivide.Value}");
+                    yield return (NtoMAnotherStrings.CLEAN_LABEL, Clean.Value ? "On" : "Off");
+                    yield return (NtoMAnotherStrings.CLEAN_DIVIDE_LABEL, $"1/{CleanDivide.Value}");
                 }
 
                 if (Adjust4Jack.Value)
                 {
-                    yield return ("1/4 Jack", Adjust4Jack.Value ? "On" : "Off");
+                    yield return (NtoMAnotherStrings.ADJUST_4_JACK_LABEL, Adjust4Jack.Value ? "On" : "Off");
                 }
 
                 if (Adjust4Speed.Value)
                 {
-                    yield return ("1/4 Speed", Adjust4Speed.Value ? "On" : "Off");
+                    yield return (NtoMAnotherStrings.ADJUST_4_SPEED_LABEL, Adjust4Speed.Value ? "On" : "Off");
                 }
 
-                yield return ("Seed", $"Seed {(Seed.Value is null ? "Null" : Seed.Value)}");
+                yield return (EzCommonModStrings.SEED_LABEL, $"Seed {(Seed.Value is null ? "Null" : Seed.Value)}");
             }
         }
 

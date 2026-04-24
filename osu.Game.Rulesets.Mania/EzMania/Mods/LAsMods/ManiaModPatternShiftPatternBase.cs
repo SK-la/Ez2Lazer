@@ -34,6 +34,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                                                       int maxIterationsPerWindow);
 
         protected virtual EzOscillator.EzWaveform DefaultWaveform => EzOscillator.EzWaveform.Sine;
+        protected virtual LocalisableString LevelSettingLabel => PatternShiftStrings.PATTERN_SHIFT_LEVEL_LABEL;
 
         protected virtual int DefaultLevel => 0;
         protected virtual int DefaultOscillationBeats => 1;
@@ -123,14 +124,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         {
             get
             {
-                yield return ("Level", $"{Level.Value}");
-                yield return ("Waveform", Waveform.Value.ToString());
-                yield return ("Oscillation Beats", $"{OscillationBeats.Value}");
-                yield return ("Window Interval", $"{WindowInterval.Value}");
-                yield return ("Window Start Offset", $"{WindowStartOffset.Value}");
-                yield return ("Seed", Seed.Value?.ToString() ?? "Random");
-                yield return ("Skip fine threshold", $"{SkipFineThreshold.Value}");
-                yield return ("Skip quarter divisor (1/n)", $"{SkipQuarterDivisor.Value}");
+                yield return (LevelSettingLabel, $"{Level.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_WAVEFORM_LABEL, Waveform.Value.ToString());
+                yield return (PatternShiftStrings.PATTERN_SHIFT_OSCILLATION_BEATS_LABEL, $"{OscillationBeats.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_WINDOW_INTERVAL_LABEL, $"{WindowInterval.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_WINDOW_START_OFFSET_LABEL, $"{WindowStartOffset.Value}");
+                yield return (EzCommonModStrings.SEED_LABEL, Seed.Value?.ToString() ?? "Random");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_SKIP_FINE_THRESHOLD_LABEL, $"{SkipFineThreshold.Value}");
+                yield return (PatternShiftStrings.PATTERN_SHIFT_SKIP_QUARTER_DIVISOR_LABEL, $"{SkipQuarterDivisor.Value}");
             }
         }
 
