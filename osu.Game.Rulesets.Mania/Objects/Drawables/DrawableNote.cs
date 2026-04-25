@@ -207,7 +207,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(startTime);
 
-            timingBasedOutputColour = getTimingBasedOutputColour(BindableBeatDivisor.GetColourFor(snapDivisor, colours));
+            timingBasedOutputColour = getTimingBasedOutputColour(GetColourFor(snapDivisor, colours));
             hasTimingBasedOutputColour = true;
             lastSnapDataStartTime = startTime;
             lastSnapDataBeatmap = beatmap;
@@ -222,6 +222,45 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 timingBasedGrayscaleColour.G + (timingBasedColour.G - timingBasedGrayscaleColour.G) * timing_based_colour_alpha,
                 timingBasedGrayscaleColour.B + (timingBasedColour.B - timingBasedGrayscaleColour.B) * timing_based_colour_alpha,
                 1f);
+        }
+
+        private static Color4 GetColourFor(int beatDivisor, OsuColour colours)
+        {
+            switch (beatDivisor)
+            {
+                case 1:
+                    return colours.Red;
+
+                case 2:
+                    return colours.Blue;
+
+                case 4:
+                    return colours.YellowLight;
+
+                case 8:
+                    return colours.DarkOrange2;
+
+                case 16:
+                    return colours.Green;
+
+
+                case 3:
+                    return colours.Purple;
+
+                case 6:
+                    return colours.Pink;
+
+                case 12:
+                    return colours.BlueLight;
+
+                case 5:
+                case 7:
+                case 9:
+                    return Color4.White;
+
+                default:
+                    return Color4.White;
+            }
         }
     }
 }
