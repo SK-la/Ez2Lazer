@@ -207,7 +207,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(startTime);
 
-            timingBasedOutputColour = getTimingBasedOutputColour(GetColourFor(snapDivisor, colours));
+            timingBasedOutputColour = getTimingBasedOutputColour(BindableBeatDivisor.GetColourFor(snapDivisor, colours));
             hasTimingBasedOutputColour = true;
             lastSnapDataStartTime = startTime;
             lastSnapDataBeatmap = beatmap;
