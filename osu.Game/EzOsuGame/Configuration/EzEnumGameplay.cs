@@ -41,13 +41,10 @@ namespace osu.Game.EzOsuGame.Configuration
         [Description("Raja Normal")]
         Raja_NM = 5,
 
-        // TODO: 需要测试MalodyDrawable，以往有过崩溃问题。
-        [Description("")]
-        // [Description("Malody E Judge")]
+        [Description("Malody E Judge")]
         Malody_E = 6,
 
-        [Description("")]
-        // [Description("Malody B Judge")]
+        [Description("Malody B Judge")]
         Malody_B = 7,
 
         [Description("")]

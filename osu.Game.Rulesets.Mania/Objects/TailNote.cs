@@ -27,7 +27,6 @@ namespace osu.Game.Rulesets.Mania.Objects
 
             switch (hitMode)
             {
-                case EzEnumHitMode.EZ2AC:
                 case EzEnumHitMode.Malody_E:
                 case EzEnumHitMode.Malody_B:
                     return new HoldNoteBodyJudgement();

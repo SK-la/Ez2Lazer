@@ -289,7 +289,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 case EzEnumHitMode.EZ2AC:
                     RegisterPool<Note, Ez2AcDrawableNote>(10, 50);
                     RegisterPool<HoldNote, DrawableHoldNote>(10, 50);
-                    RegisterPool<HeadNote, DrawableHoldNoteHead>(10, 50);
+                    RegisterPool<HeadNote, Ez2AcDrawableLNeHead>(10, 50);
                     RegisterPool<TailNote, Ez2AcDrawableLNTail>(10, 50);
                     RegisterPool<HoldNoteBody, DrawableHoldNoteBody>(10, 50);
                     break;
