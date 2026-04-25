@@ -106,36 +106,37 @@ namespace osu.Game.Screens.Edit
             switch (beatDivisor)
             {
                 case 1:
-                    return Color4.White;
-
-                case 2:
                     return colours.Red;
 
-                case 4:
+                case 2:
                     return colours.Blue;
 
+                case 4:
+                    return colours.YellowLight;
+
                 case 8:
-                    return colours.Yellow;
+                    return colours.DarkOrange2;
 
                 case 16:
-                    return colours.PurpleDark;
+                    return colours.Green;
+
 
                 case 3:
                     return colours.Purple;
 
                 case 6:
-                    return colours.YellowDark;
+                    return colours.Pink;
 
                 case 12:
-                    return colours.YellowDarker;
+                    return colours.BlueLight;
 
                 case 5:
                 case 7:
                 case 9:
-                    return colours.GreenLight;
+                    return Color4.White;
 
                 default:
-                    return Color4.Red;
+                    return Color4.White;
             }
         }
 

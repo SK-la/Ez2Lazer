@@ -7,6 +7,7 @@ using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
@@ -26,6 +27,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
     /// </summary>
     public partial class DrawableNote : DrawableManiaHitObject<Note>, IKeyBindingHandler<ManiaAction>
     {
+        private const float timing_based_target_grayscale = 1.5f;//0.72f;
+        private const float timing_based_colour_alpha = 0.8f;
+
         [Resolved]
         private OsuColour colours { get; set; }
 
@@ -36,6 +40,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
 
+        private BufferedContainer headPieceColourContainer;
+        private Color4 timingBasedGrayscaleColour;
+        private Color4 timingBasedOutputColour;
+        private bool hasTimingBasedOutputColour;
+        private double lastSnapDataStartTime = double.NaN;
+        private IBeatmap lastSnapDataBeatmap;
         private Drawable headPiece;
 
         public DrawableNote()
@@ -54,10 +64,21 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, configTimingBasedNoteColouring);
 
-            AddInternal(headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
+            timingBasedGrayscaleColour = new Color4(
+                timing_based_target_grayscale,
+                timing_based_target_grayscale,
+                timing_based_target_grayscale,
+                1f);
+
+            AddInternal(headPieceColourContainer = new BufferedContainer(cachedFrameBuffer: false, pixelSnapping: true)
             {
                 RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y
+                AutoSizeAxes = Axes.Y,
+                Child = headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y
+                }
             });
         }
 
@@ -65,13 +86,30 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.LoadComplete();
 
-            configTimingBasedNoteColouring.BindValueChanged(_ => updateSnapColour());
-            StartTimeBindable.BindValueChanged(_ => updateSnapColour(), true);
+            configTimingBasedNoteColouring.BindValueChanged(_ =>
+            {
+                if (configTimingBasedNoteColouring.Value)
+                    updateSnapData();
+
+                updateSnapColour();
+            });
+
+            StartTimeBindable.BindValueChanged(_ =>
+            {
+                if (configTimingBasedNoteColouring.Value)
+                    updateSnapData();
+
+                updateSnapColour();
+            }, true);
         }
 
         protected override void OnApply()
         {
             base.OnApply();
+
+            if (configTimingBasedNoteColouring.Value)
+                updateSnapData();
+
             updateSnapColour();
         }
 
@@ -79,7 +117,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.OnDirectionChanged(e);
 
-            headPiece.Anchor = headPiece.Origin = e.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
+            Anchor anchor = e.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
+
+            headPieceColourContainer.Anchor = headPieceColourContainer.Origin = anchor;
         }
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
@@ -125,11 +165,63 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         private void updateSnapColour()
         {
-            if (beatmap == null || HitObject == null) return;
+            if (!hasTimingBasedOutputColour)
+            {
+                headPieceColourContainer.GrayscaleStrength = 0;
+                headPieceColourContainer.Colour = Color4.White;
 
-            int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(HitObject.StartTime);
+                Colour = Color4.White;
+                return;
+            }
 
-            Colour = configTimingBasedNoteColouring.Value ? BindableBeatDivisor.GetColourFor(snapDivisor, colours) : Color4.White;
+            if (configTimingBasedNoteColouring.Value)
+            {
+                headPieceColourContainer.GrayscaleStrength = 1;
+                headPieceColourContainer.Colour = timingBasedOutputColour;
+
+                Colour = Color4.White;
+            }
+            else
+            {
+                headPieceColourContainer.GrayscaleStrength = 0;
+                headPieceColourContainer.Colour = Color4.White;
+
+                Colour = Color4.White;
+            }
+        }
+
+        private void updateSnapData()
+        {
+            if (beatmap == null || HitObject == null)
+            {
+                hasTimingBasedOutputColour = false;
+                lastSnapDataStartTime = double.NaN;
+                lastSnapDataBeatmap = null;
+                return;
+            }
+
+            double startTime = HitObject.StartTime;
+
+            if (hasTimingBasedOutputColour && lastSnapDataStartTime == startTime && ReferenceEquals(lastSnapDataBeatmap, beatmap))
+                return;
+
+            int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(startTime);
+
+            timingBasedOutputColour = getTimingBasedOutputColour(BindableBeatDivisor.GetColourFor(snapDivisor, colours));
+            hasTimingBasedOutputColour = true;
+            lastSnapDataStartTime = startTime;
+            lastSnapDataBeatmap = beatmap;
+        }
+
+        private Color4 getTimingBasedOutputColour(Color4 timingBasedColour)
+        {
+            // Equivalent to drawing an alpha-tinted layer on top of an opaque grayscale base,
+            // but computed directly to avoid a second proxy/container draw path.
+            return new Color4(
+                timingBasedGrayscaleColour.R + (timingBasedColour.R - timingBasedGrayscaleColour.R) * timing_based_colour_alpha,
+                timingBasedGrayscaleColour.G + (timingBasedColour.G - timingBasedGrayscaleColour.G) * timing_based_colour_alpha,
+                timingBasedGrayscaleColour.B + (timingBasedColour.B - timingBasedGrayscaleColour.B) * timing_based_colour_alpha,
+                1f);
         }
     }
 }
