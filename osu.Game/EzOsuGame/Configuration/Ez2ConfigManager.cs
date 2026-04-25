@@ -98,7 +98,6 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.AsioSampleRate, 48000);
             SetDefault(Ez2Setting.AsioBufferSize, 128);
-            SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
 
             SetDefault(Ez2Setting.OffsetPlusMania, 0.0, -200.0, 200.0, 1.0);
             SetDefault(Ez2Setting.OffsetPlusNonMania, 0.0, -200.0, 200.0, 1.0);
@@ -177,7 +176,10 @@ namespace osu.Game.EzOsuGame.Configuration
 
             #endregion
 
-            #region 判定时序诊断与校正
+            #region 实验性功能
+
+            SetDefault(Ez2Setting.InputAudioLatencyTracker, false);
+            SetDefault(Ez2Setting.ExperimentalLocalAccount, false);
 
             SetDefault(Ez2Setting.EzJudgmentDiagEnabled, false);
             SetDefault(Ez2Setting.EzSubFrameCorrectionEnabled, true);
@@ -750,7 +752,6 @@ namespace osu.Game.EzOsuGame.Configuration
         // 音频与输入
         AsioSampleRate,
         AsioBufferSize,
-        InputAudioLatencyTracker,
         OffsetPlusMania,
         OffsetPlusNonMania,
         HitObjectLifetimeUsesOwnTime,
@@ -829,6 +830,10 @@ namespace osu.Game.EzOsuGame.Configuration
         ServerGuToken,
         ServerManualUsername,
         ServerManualToken,
+
+        // 实验性功能
+        InputAudioLatencyTracker,
+        ExperimentalLocalAccount,
 
         // 判定时序诊断与校正
         EzJudgmentDiagEnabled,

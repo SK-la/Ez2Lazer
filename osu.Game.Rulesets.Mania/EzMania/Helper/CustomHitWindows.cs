@@ -13,7 +13,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
     {
         private static readonly double[,] hit_range_bms =
         {
-            //                              Bad Poor  空Poor
+            // Kool   Cool   Good      -   Bad   Poor  []Poor
             //  305    300     200     100   50  Miss  Poor
             { 16.67, 33.33, 116.67, 116.67, 250, 250, 500 }, // IIDX
             { 15.00, 30.00, 060.00, 060.00, 200, 1000, 1000 }, // LR2 Hard, TODO:此处poor范围过大，前后LN首尾间隙可能被覆盖，导致下一个note提前被结束。

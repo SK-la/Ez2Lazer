@@ -133,7 +133,8 @@ namespace osu.Game.Online.API
                         break;
 
                     case @"logout":
-                        if (state.Value == APIState.Online)
+                        // 在本地-only 模式下忽略来自服务器的 logout 事件，避免远程推送导致本地实验性登录被撤销。
+                        if (state.Value == APIState.Online && !IsLocalOnly)
                             Logout();
 
                         break;
@@ -194,11 +195,15 @@ namespace osu.Game.Online.API
                     }
                 }
 
-                // hard bail if we can't get a valid access token.
+                // 如果无法获取有效的 access token，则通常会强制登出。
+                // 对于本地-only 模式不需要 access token，因此在该模式下应避免登出操作。
                 if (authentication.RequestAccessToken() == null)
                 {
-                    Logout();
-                    continue;
+                    if (!IsLocalOnly)
+                    {
+                        Logout();
+                        continue;
+                    }
                 }
 
                 processQueuedRequests();
@@ -365,6 +370,9 @@ namespace osu.Game.Online.API
         {
             try
             {
+                if (IsLocalOnly)
+                    return;
+
                 request.AttachAPI(this);
                 request.Perform();
             }
@@ -384,6 +392,20 @@ namespace osu.Game.Online.API
 
             ProvidedUsername = username;
             this.password = password;
+            IsLocalOnly = false;
+        }
+
+        public void LoginLocal(string username)
+        {
+            NotificationsClient.Disconnect();
+
+            ProvidedUsername = username;
+            password = "__local__";
+            IsLocalOnly = true;
+
+            Schedule(() => localUserState.SetPlaceholderLocalUser(ProvidedUsername, true));
+            LastLoginError = null;
+            state.Value = APIState.Online;
         }
 
         public void AuthenticateSecondFactor(string code)
@@ -551,11 +573,16 @@ namespace osu.Game.Online.API
 
         public bool IsLoggedIn => State.Value > APIState.Offline;
 
+        public bool IsLocalOnly { get; private set; }
+
         public void Queue(APIRequest request)
         {
             lock (queue)
             {
                 request.AttachAPI(this);
+
+                if (IsLocalOnly)
+                    return;
 
                 if (state.Value == APIState.Offline)
                 {
@@ -590,6 +617,7 @@ namespace osu.Game.Online.API
             authentication.Clear();
 
             localUserState.ClearLocalUser();
+            IsLocalOnly = false;
 
             state.Value = APIState.Offline;
             flushQueue();

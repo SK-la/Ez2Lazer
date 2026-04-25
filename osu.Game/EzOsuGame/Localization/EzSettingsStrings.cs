@@ -7,10 +7,6 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public static class EzSettingsStrings
     {
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_JUDGMENT_DIAG_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 判定诊断", "Enable Ez Judgment Diagnostics");
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_SUB_FRAME_CORRECTION_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 子帧修正", "Enable Ez Sub-frame Correction");
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_TIMING_TRACE_ENABLED = new EzLocalizationManager.EzLocalisableString("启用 Ez 时序追踪", "Enable Ez Timing Trace");
-
 #region 分散设置
 
         public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE = new EzLocalizationManager.EzLocalisableString("缩放游戏模式", "Scaling Game Mode");
@@ -108,41 +104,54 @@ namespace osu.Game.EzOsuGame.Localization
             "When enabled, hit-state transforms and hit object lifetime end will use the hit object's own time instead of the actual judged interaction time."
             + "\nNotes will disappear consistently at the judgement line. Applies to all game modes.");
 
-        public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "(Mania) Hit Mode");
+        public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "Mania Hit Mode");
 
         public static readonly LocalisableString HIT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "Mania 判定系统, 获得不同音游的打击体验, 但是不保证所有模式都完全一比一复刻"
-            + "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\n 305     300      200      100     50     Miss    Poor"
-            + "\n16.67    33.33    116.67      -      250    250    500    IIDX"
-            + "\n15.00   30.00   60.00      -     200    1000  1000   LR2 Hard"
-            + "\n15.00   45.00    112.00     -      165     500    500   Raja Normal"
-            + "\n20.00  60.00   150.00    -      500    500    500   Raja Easy",
-            "(Mania) Hit Mode, get different rhythm game hit experiences, but not guaranteed to perfectly replicate all modes"
-            + "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\n 305     300      200      100     50     Miss    Poor"
-            + "\n16.67    33.33    116.67      -      250    250    500    IIDX"
-            + "\n15.00   30.00   60.00      -     200    1000  1000   LR2 Hard"
-            + "\n15.00   45.00    112.00     -      165     500    500   Raja Normal"
-            + "\n20.00  60.00   150.00    -      500    500    500   Raja Easy");
+            "最大限度的获得不同音游的打击体验, 如 O2,BMS系 具备对应的特殊机制。\n"
+            + "305  | 300  | 200  | 100 | 50  | Miss | Poor   | (UI)\n"
+            + "———  ———  ———  ———  ———  ———  ———  ———\n"
+            + "Cool | ---- | Good  | --- | Bad | Miss | ----   | (映射)\n"
+            + "0.3% | ---- | 0.2%  | --- | 1%  | 5%   | ----   | O2 Easy\n"
+            + "0.2% | ---- | 0.1%  | --- | 7%  | 4%   | ----   | O2 Normal\n"
+            + "0.1% | ---- | 0.0%  | --- | 5%  | 3%   | ----   | O2 Hard\n"
+            + "———  ———  ———  ———  ———  ———  ———  ———\n"
+            + "Kool | Cool | Good  | --- | Bad | Poor | []Poor | (映射)\n"
+            + "16.7 | 33.3 | 116.7 | --- | 250 | 250  | 500    | IIDX\n"
+            + "15.0 | 30.0 | 60.0   | --- | 200 | 1000 | 1000   | LR2 Hard\n"
+            + "15.0 | 45.0 | 112.0 | --- | 165 | 500  | 500    | Raja Normal\n"
+            + "20.0 | 60.0 | 150.0 | --- | 500 | 500  | 500    | Raja Easy",
+            "Get different rhythm game hit experiences to the maximum extent, such as O2 and BMS systems with corresponding special mechanisms.\n"
+            + "305  | 300  | 200   | 100 | 50  | Miss | Poor   | (UI)\n"
+            + "———  | ———  | ———   | ——— | ——— | ———  | ———    —\n"
+            + "Cool | ---- | Good  | --- | Bad | Miss | ----   | (映射)\n"
+            + "0.3% | ---- | 0.2%  | --- | 1%  | 5%   | ----   | O2 Easy\n"
+            + "0.2% | ---- | 0.1%  | --- | 7%  | 4%   | ----   | O2 Normal\n"
+            + "0.1% | ---- | 0.0%  | --- | 5%  | 3%   | ----   | O2 Hard\n"
+            + "———  | ———  | ———   | ——— | ——— | ———  | ———    —\n"
+            + "Kool | Cool | Good  | --- | Bad | Poor | []Poor | (映射)\n"
+            + "16.7 | 33.3 | 116.7 | --- | 250 | 250  | 500    | IIDX\n"
+            + "15.0 | 30.0 | 60.0  | --- | 200 | 1000 | 1000   | LR2 Hard\n"
+            + "15.0 | 45.0 | 112.0 | --- | 165 | 500  | 500    | Raja Normal\n"
+            + "20.0 | 60.0 | 150.0 | --- | 500 | 500  | 500    | Raja Easy");
 
-        public static readonly LocalisableString HEALTH_MODE = new EzLocalizationManager.EzLocalisableString("Mania 血量系统", "(Mania) Health Mode");
+        public static readonly LocalisableString HEALTH_MODE = new EzLocalizationManager.EzLocalisableString("Mania 血量系统", "Mania Health Mode");
 
         public static readonly LocalisableString HEALTH_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "\n——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\n 305    300    200   100    50   Miss       -"
-            + "\n0.4%   0.3%   0.1%    0%   -1%   - 6%     -0%  Lazer"
-            + "\n——— ——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\nKool        -   Good       -   Bad   Miss         -"
-            + "\n0.3%   0.0%   0.2%    0%   -1%   - 5%     -0%  O2 Easy"
-            + "\n0.2%   0.0%   0.1%    0%   -7%   - 4%     -0%  O2 Normal"
-            + "\n0.1%   0.0%   0.0%    0%   -5%   - 3%     -0%  O2 Hard"
-            + "\n——— ——— ——— ——— ——— ——— ——— ——— ——— ———"
-            + "\nKool   Cool   Good      -   Bad   Poor  []Poor"
-            + "\n0.4%   0.3%    0.1%    0%   -1%   - 5%      -5%  Ez2Ac"
-            + "\n1.6%   1.6%    0.0%    0%   -5%   - 9%      -5%  IIDX Hard"
-            + "\n1.0%   1.0%    0.5%    0%   -6%   -10%      -2%  LR2 Hard"
-            + "\n1.2%   1.2%    0.6%    0%   -3%   - 6%      -2%  raja normal");
+            ""
+            + "| 305  | 300  | 200  | 100 |   50  | Miss | Poor  | (UI)|\n"
+            + "| ——— | ——— | ——— | ——— | —— | ——— | ——— | ———|\n"
+            + "| 0.4% | 0.3% | 0.1% | ---  | -1% | -6%  | -0%    | Lazer|\n"
+            + "| ——— | ——— | ——— | ——— | —— | ——— | ——— | ———|\n"
+            + "| Cool | ---- |  Good | ---  | Bad | Miss |  ----   |\n"
+            + "| 0.3% | 0.0% | 0.2% | ---  | -1% | -5%  | -0%    | O2 Easy|\n"
+            + "| 0.2% | 0.0% | 0.1% | ---  | -7% | -4%  | -0%    | O2 Normal|\n"
+            + "| 0.1% | 0.0% | 0.0% | ---  | -5% | -3%  | -0%    | O2 Hard|\n"
+            + "| ——— | ——— | ——— | ——— | —— | ——— | ——— | ———|\n"
+            + "| Kool | Cool |  Good | ---  | Bad | Poor | []Poor |\n"
+            + "| 0.4% | 0.3% | 0.1% | ---  | -1% | -5%   | -5%    | Ez2Ac|\n"
+            + "| 1.6% | 1.6% | ----  | ---  | -5% | -9%   | -5%    | IIDX Hard|\n"
+            + "| 1.0% | 1.0% | 0.5% | ---  | -6% | -10% | -2%    | LR2 Hard|\n"
+            + "| 1.2% | 1.2% | 0.6% | ---  | -3% | -6%   | -2%    | Raja Normal|");
 
         public static readonly LocalisableString POOR_HIT_RESULT = new EzLocalizationManager.EzLocalisableString("增加 Poor 判定类型", "Additional Poor HitResult");
 
@@ -151,19 +160,6 @@ namespace osu.Game.EzOsuGame.Localization
             + "一个note可触发多个Pool判定, 只有早于Miss时才会触发, 不存在晚Pool",
             "The Poor HitResult type only takes effect under the BMS Health Mode, used for strict health deduction, does not affect Combo or Score\n"
             + "One note can trigger multiple Poor hit results, and it will only trigger if it is earlier than Miss, there is no late Poor");
-
-#endregion
-
-#region 音频&延迟&测试
-
-        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER = new EzLocalizationManager.EzLocalisableString("输入音频延迟追踪器", "Input Audio Latency Tracker");
-
-        public static readonly EzLocalizationManager.EzLocalisableString INPUT_AUDIO_LATENCY_TRACKER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "(测试功能)启用后可追踪按键输入与音频的延迟, 用于调试和优化打击音效的同步性。在游戏结束后会弹出一个统计窗口。更详细的内容可以查看runtime.log文件。"
-            + "\n延迟检测管线：按键 → 检查打击并应用 → 应用判定结果 → 播放note音频",
-            "(Testing feature) When enabled, it can track the latency between key input and audio, used for debugging and optimizing the synchronization of hit sound effects. "
-            + "A statistics window will pop up after the game ends. More detailed information can be found in the runtime.log file."
-            + "\nLatency detection pipeline: Key Press → Check Hit and Apply → Apply Hit Result → Play Note Audio");
 
 #endregion
 
@@ -194,6 +190,17 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString ASIO_BUFFER_SIZE_HINT = new EzLocalizationManager.EzLocalisableString(
             "数值越低延迟越低，但过低可能会导致爆音或无法启动。默认为 128。",
             "Lower is lower latency, but too low may crackle or fail to start. Default is 128.");
+
+#endregion
+
+#region 实验性功能
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT = new EzLocalizationManager.EzLocalisableString(
+            "本地账户（实验性）", "Local Account (Testing)");
+
+        public static readonly EzLocalizationManager.EzLocalisableString LOCAL_ACCOUNT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "允许无密码登录本地账户。跳过一切成绩上传、网络账户检查。",
+            "Allows local account login without password. Skip all score submissions and online account checks.");
 
 #endregion
     }

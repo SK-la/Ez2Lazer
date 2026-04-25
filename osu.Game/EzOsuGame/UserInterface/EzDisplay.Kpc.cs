@@ -166,6 +166,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 case EzEnumChartDisplay.Numbers:
                     notesText.Alpha = 1f;
+                    columnNotesContainer.Margin = new MarginPadding { Left = notesText.DrawWidth + 5f, Right = 0 };
                     break;
 
                 case EzEnumChartDisplay.BarChart:

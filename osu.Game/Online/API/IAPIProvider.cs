@@ -47,6 +47,11 @@ namespace osu.Game.Online.API
         bool IsLoggedIn { get; }
 
         /// <summary>
+        /// 本地模式，启用后不提交成绩
+        /// </summary>
+        bool IsLocalOnly { get; }
+
+        /// <summary>
         /// The last username provided by the end-user.
         /// May not be authenticated.
         /// </summary>
@@ -103,6 +108,13 @@ namespace osu.Game.Online.API
         /// <param name="username">The user's username.</param>
         /// <param name="password">The user's password.</param>
         void Login(string username, string password);
+
+        /// <summary>
+        /// Attempt to login as a local (offline) user without contacting the network.
+        /// This creates a placeholder local user and sets the API state to online for local-only usage.
+        /// </summary>
+        /// <param name="username">The local username to use.</param>
+        void LoginLocal(string username);
 
         /// <summary>
         /// The <see cref="SessionVerificationMethod"/> requested by the server to complete verification.
