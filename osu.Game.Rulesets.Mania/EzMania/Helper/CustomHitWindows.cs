@@ -96,6 +96,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             HitMode = hitMode;
         }
 
+        public double[] GetHitRangeList => new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
+
         public double[] GetHitWindowsClassic()
         {
             double invertedOd = Math.Clamp(10 - OverallDifficulty, 0, 10);
@@ -109,75 +111,62 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             return new[] { Range305, Range300, Range200, Range100, Range050, Range000, Range000 };
         }
 
-        public double[] GetHitWindowsO2Jam(double setBpm)
-        {
-            bpm = setBpm;
-            Range305 = 7500.0 / bpm * TotalMultiplier;
-            Range300 = Range305;
-            Range200 = 22500.0 / bpm * TotalMultiplier;
-            Range100 = Range200;
-            Range050 = 31250.0 / bpm * TotalMultiplier;
-            Range000 = Range050;
-            PoorRange = Range000 + poor_offset;
-
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
-        }
-
-        public double[] GetHitWindowsEZ2AC()
-        {
-            Range305 = 18.0 * TotalMultiplier;
-            Range300 = 38.0 * TotalMultiplier;
-            Range200 = 68.0 * TotalMultiplier;
-            Range100 = 88.0 * TotalMultiplier;
-            Range050 = 88.0 * TotalMultiplier;
-            Range000 = 100.0 * TotalMultiplier;
-            PoorRange = poor_offset;
-
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
-        }
-
-        public double[] GetHitWindowsBMS(EzEnumHitMode mode)
-        {
-            int row = 0;
-
-            switch (mode)
-            {
-                case EzEnumHitMode.IIDX_HD:
-                    row = 0;
-                    break;
-
-                case EzEnumHitMode.LR2_HD:
-                    row = 1;
-                    break;
-
-                case EzEnumHitMode.Raja_NM:
-                    row = 2;
-                    break;
-            }
-
-            Range305 = hit_range_bms[row, 0] * TotalMultiplier;
-            Range300 = hit_range_bms[row, 1] * TotalMultiplier;
-            Range200 = hit_range_bms[row, 2] * TotalMultiplier;
-            Range100 = hit_range_bms[row, 3] * TotalMultiplier;
-            Range050 = hit_range_bms[row, 4] * TotalMultiplier;
-            Range000 = hit_range_bms[row, 5] * TotalMultiplier;
-            PoorRange = hit_range_bms[row, 6] * TotalMultiplier;
-
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
-        }
-
-        public double[] GetHitWindowsMelody()
-        {
-            Range305 = 20.0 * TotalMultiplier;
-            Range300 = 40.0 * TotalMultiplier;
-            Range200 = 60.0 * TotalMultiplier;
-            Range100 = 80.0 * TotalMultiplier;
-            Range050 = 100.0 * TotalMultiplier;
-            Range000 = 120.0 * TotalMultiplier;
-            PoorRange = Range000 + poor_offset;
-
-            return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
-        }
+        // public double[] GetHitWindowsO2Jam(double setBpm)
+        // {
+        //     bpm = setBpm;
+        //     Range305 = 7500.0 / bpm * TotalMultiplier;
+        //     Range300 = Range305;
+        //     Range200 = 22500.0 / bpm * TotalMultiplier;
+        //     Range100 = Range200;
+        //     Range050 = 31250.0 / bpm * TotalMultiplier;
+        //     Range000 = Range050;
+        //     PoorRange = Range000 + poor_offset;
+        //
+        //     return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
+        // }
+        //
+        // public double[] GetHitWindowsEZ2AC()
+        // {
+        //     Range305 = 16.67 * TotalMultiplier;
+        //     Range300 = 33.33 * TotalMultiplier;
+        //     Range200 = 83.33 * TotalMultiplier;
+        //     Range100 = 83.33 * TotalMultiplier;
+        //     Range050 = 100.0 * TotalMultiplier;
+        //     Range000 = 116.67 * TotalMultiplier;
+        //     PoorRange = poor_offset;
+        //
+        //     return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
+        // }
+        //
+        // public double[] GetHitWindowsBMS(EzEnumHitMode mode)
+        // {
+        //     int row = 0;
+        //
+        //     switch (mode)
+        //     {
+        //         case EzEnumHitMode.IIDX_HD:
+        //             row = 0;
+        //             break;
+        //
+        //         case EzEnumHitMode.LR2_HD:
+        //             row = 1;
+        //             break;
+        //
+        //         case EzEnumHitMode.Raja_NM:
+        //             row = 2;
+        //             break;
+        //     }
+        //
+        //     Range305 = hit_range_bms[row, 0] * TotalMultiplier;
+        //     Range300 = hit_range_bms[row, 1] * TotalMultiplier;
+        //     Range200 = hit_range_bms[row, 2] * TotalMultiplier;
+        //     Range100 = hit_range_bms[row, 3] * TotalMultiplier;
+        //     Range050 = hit_range_bms[row, 4] * TotalMultiplier;
+        //     Range000 = hit_range_bms[row, 5] * TotalMultiplier;
+        //     PoorRange = hit_range_bms[row, 6] * TotalMultiplier;
+        //
+        //     return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
+        // }
 
         private void updateRanges()
         {
@@ -205,13 +194,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     break;
 
                 case EzEnumHitMode.EZ2AC:
-                    Range305 = 18.0 * TotalMultiplier;
-                    Range300 = 38.0 * TotalMultiplier;
-                    Range200 = 68.0 * TotalMultiplier;
-                    Range100 = 88.0 * TotalMultiplier;
-                    Range050 = 88.0 * TotalMultiplier;
-                    Range000 = 100.0 * TotalMultiplier;
-                    PoorRange = poor_offset;
+                    Range305 = 16.67 * TotalMultiplier;
+                    Range300 = 33.33 * TotalMultiplier;
+                    Range200 = 83.33 * TotalMultiplier;
+                    Range100 = 83.33 * TotalMultiplier;
+                    Range050 = 100.0 * TotalMultiplier;
+                    Range000 = 116.67 * TotalMultiplier;
+                    PoorRange = Range000 + poor_offset;
                     break;
 
                 case EzEnumHitMode.IIDX_HD:
@@ -226,17 +215,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range200 = hit_range_bms[row, 2] * TotalMultiplier;
                     Range100 = hit_range_bms[row, 3] * TotalMultiplier;
                     Range050 = hit_range_bms[row, 4] * TotalMultiplier;
-                    Range000 = hit_range_bms[row, 5] * TotalMultiplier;
-                    PoorRange = hit_range_bms[row, 6] * TotalMultiplier;
+                    Range000 = hit_range_bms[row, 5];
+                    PoorRange = hit_range_bms[row, 6];
                     break;
 
-                case EzEnumHitMode.Malody:
+                case EzEnumHitMode.Malody_E:
+                    Range305 = 44.0 * TotalMultiplier;
+                    Range300 = 84.0 * TotalMultiplier;
+                    Range200 = 118.0 * TotalMultiplier;
+                    Range100 = 118.0 * TotalMultiplier;
+                    Range050 = 118.0 * TotalMultiplier;
+                    Range000 = 150.0 * TotalMultiplier;
+                    PoorRange = Range000 + poor_offset;
+                    break;
+
+                case EzEnumHitMode.Malody_B:
                     Range305 = 20.0 * TotalMultiplier;
-                    Range300 = 40.0 * TotalMultiplier;
-                    Range200 = 60.0 * TotalMultiplier;
-                    Range100 = 80.0 * TotalMultiplier;
-                    Range050 = 100.0 * TotalMultiplier;
-                    Range000 = 120.0 * TotalMultiplier;
+                    Range300 = 60.0 * TotalMultiplier;
+                    Range200 = 94.0 * TotalMultiplier;
+                    Range100 = 94.0 * TotalMultiplier;
+                    Range050 = 94.0 * TotalMultiplier;
+                    Range000 = 150.0 * TotalMultiplier;
                     PoorRange = Range000 + poor_offset;
                     break;
 
@@ -311,7 +310,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         /// <summary>
-        /// Allow external code to replace the current windows (e.g. when switching hit modes).
+        /// 计划上是用于从外部Mod设置传入自定义值的，但目前Mod走另一套接口。
         /// </summary>
         public void SetRanges(double[]? ranges)
         {

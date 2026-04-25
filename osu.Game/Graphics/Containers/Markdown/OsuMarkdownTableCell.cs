@@ -46,9 +46,9 @@ namespace osu.Game.Graphics.Containers.Markdown
         private partial class TableHeadBorder : Box
         {
             [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colourProvider)
+            private void load(OverlayColourProvider? colourProvider)
             {
-                Colour = colourProvider.Background3;
+                Colour = colourProvider?.Background3 ?? new osuTK.Graphics.Color4(128, 128, 128, 255);
                 RelativeSizeAxes = Axes.X;
                 Height = 2;
                 Anchor = Anchor.BottomLeft;
@@ -59,9 +59,9 @@ namespace osu.Game.Graphics.Containers.Markdown
         private partial class TableBodyBorder : Box
         {
             [BackgroundDependencyLoader]
-            private void load(OverlayColourProvider colourProvider)
+            private void load(OverlayColourProvider? colourProvider)
             {
-                Colour = colourProvider.Background4;
+                Colour = colourProvider?.Background4 ?? new osuTK.Graphics.Color4(100, 100, 100, 255);
                 RelativeSizeAxes = Axes.X;
                 Height = 1;
             }

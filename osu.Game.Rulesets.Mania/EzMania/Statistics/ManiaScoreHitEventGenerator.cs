@@ -299,7 +299,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 return result;
             }
 
-            if (hitMode == EzEnumHitMode.Malody && isTail)
+            if ((hitMode == EzEnumHitMode.Malody_E || hitMode == EzEnumHitMode.Malody_B) && isTail)
             {
                 if (!headHit)
                     return HitResult.Miss;
