@@ -592,7 +592,9 @@ def main():
 	<key>CFBundleGetInfoString</key>
 	<string>ez2osu</string>
 	<key>CFBundleIconFile</key>
-	<string>lazer.ico</string>
+	<string>osu!</string>
+	<key>CFBundleIconName</key>
+	<string>osu!</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.skla.ez2osu</string>
 	<key>CFBundleInfoDictionaryVersion</key>

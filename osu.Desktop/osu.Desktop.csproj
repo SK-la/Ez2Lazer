@@ -31,6 +31,10 @@
   <ItemGroup Label="Resources">
     <EmbeddedResource Include="lazer.ico" />
   </ItemGroup>
+  <ItemGroup Label="macOS Bundle Assets" Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('osx'))">
+    <Content Include="MacOS/Assets.car" CopyToPublishDirectory="PreserveNewest" Link="Assets.car" />
+    <Content Include="MacOS/osu!.icns" CopyToPublishDirectory="PreserveNewest" Link="osu!.icns" />
+  </ItemGroup>
   <ItemGroup Label="Windows Icons">
     <Content Include="*.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
