@@ -133,7 +133,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double ok;
         private double meh;
         private double miss;
-        private double pool;
+        private double poor;
 
         private static double bpm;
 
@@ -242,7 +242,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ok = OkRange;
                 meh = MehRange;
                 miss = MissRange;
-                pool = PoorRange;
+                poor = PoorRange;
                 return;
             }
 
@@ -301,7 +301,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Poor:
-                    return pool;
+                    return poor;
 
                 case HitResult.Perfect:
                     return perfect;
