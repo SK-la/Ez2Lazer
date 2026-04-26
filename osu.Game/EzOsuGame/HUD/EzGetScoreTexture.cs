@@ -23,8 +23,9 @@ namespace osu.Game.EzOsuGame.HUD
 
         private readonly Func<char, string> getLookup;
         private GlyphStore? glyphStore;
-        private TextureLoaderStore? textureLoader;
-        private TextureStore? localSkinStore;
+
+        [Resolved]
+        private EzResourceProvider textures { get; set; } = null!;
 
         protected override char FixedWidthReferenceCharacter => '5';
 
@@ -38,13 +39,8 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         [BackgroundDependencyLoader]
-        private void load(GameHost host, IRenderer renderer)
+        private void load()
         {
-            Storage gameStorage = host.Storage;
-
-            var userResourceStore = new StorageBackedResourceStore(gameStorage);
-            textureLoader = new TextureLoaderStore(userResourceStore);
-            localSkinStore = new TextureStore(renderer, textureLoader);
             // Spacing = new Vector2(-2f, 0f);
             FontName.BindValueChanged(e =>
             {
@@ -52,7 +48,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                 // 清理旧的 GlyphStore 缓存
                 glyphStore?.ClearCache();
-                glyphStore = new GlyphStore(localSkinStore, getLookup);
+                glyphStore = new GlyphStore(textures, getLookup);
 
                 foreach (char c in new[] { '.', '%' })
                     glyphStore.Get(FontName.Value.ToString(), c);
@@ -63,37 +59,15 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override TextBuilder CreateTextBuilder(ITexturedGlyphLookupStore store) => base.CreateTextBuilder(glyphStore);
 
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                try
-                {
-                    FontName.UnbindAll();
-                }
-                catch
-                {
-                }
-
-                glyphStore?.ClearCache();
-                localSkinStore?.Dispose();
-                textureLoader?.Dispose();
-            }
-
-            base.Dispose(isDisposing);
-        }
-
         private class GlyphStore : ITexturedGlyphLookupStore
         {
-            // private readonly string fontFolder;
-            private readonly TextureStore textures;
+            private readonly EzResourceProvider textures;
             private readonly Func<char, string> getLookup;
 
             private readonly Dictionary<char, ITexturedCharacterGlyph?> cache = new Dictionary<char, ITexturedCharacterGlyph?>();
 
-            public GlyphStore(TextureStore textures, Func<char, string> getLookup)
+            public GlyphStore(EzResourceProvider textures, Func<char, string> getLookup)
             {
-                // this.fontFolder = fontFolder;
                 this.textures = textures;
                 this.getLookup = getLookup;
             }
@@ -116,8 +90,6 @@ namespace osu.Game.EzOsuGame.HUD
 
                     switch (character)
                     {
-                        case '.':
-                        case '%':
                         default:
                             possiblePaths = new[]
                             {

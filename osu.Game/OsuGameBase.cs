@@ -203,6 +203,8 @@ namespace osu.Game
 
         protected EzLocalTextureFactory NoteFactory { get; private set; }
 
+        protected EzResourceProvider EzResourceProvider { get; private set; }
+
         /// <summary>
         /// The language in which the game is currently displayed in.
         /// </summary>
@@ -325,6 +327,8 @@ namespace osu.Game
                 Ez2ConfigManager,
                 Host.Renderer,
                 Storage));
+            dependencies.CacheAs(EzResourceProvider = new EzResourceProvider(Ez2ConfigManager, Host.Renderer, Audio, Storage, realm));
+            dependencies.CacheAs<IStorageResourceProvider>(EzResourceProvider);
 
             dependencies.Cache(realm = new RealmAccess(Storage, CLIENT_DATABASE_FILENAME, Host.UpdateThread));
 

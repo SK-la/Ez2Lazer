@@ -4,7 +4,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using JetBrains.Annotations;
-using osu.Framework.Allocation;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -12,6 +11,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Game.Audio;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame;
 using osu.Game.IO;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.Screens.Play.HUD;
@@ -35,7 +35,7 @@ namespace osu.Game.Skinning
             InstantiationInfo = typeof(EzStyleProSkin).GetInvariantInstantiationInfo()
         };
 
-        protected readonly IStorageResourceProvider Resources;
+        protected EzResourceProvider? EzResources;
 
         public EzStyleProSkin(IStorageResourceProvider resources)
             : this(CreateInfo(), resources)
@@ -44,15 +44,23 @@ namespace osu.Game.Skinning
 
         [UsedImplicitly(ImplicitUseKindFlags.InstantiatedWithFixedConstructorSignature)]
         public EzStyleProSkin(SkinInfo skin, IStorageResourceProvider resources)
-            : base(
-                skin,
-                resources
-            )
+            : base(skin, resources)
         {
-            Resources = resources;
+            if (resources is EzResourceProvider ezProvider)
+            {
+                EzResources = ezProvider;
+            }
         }
 
-        public override Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT) => Textures?.Get(componentName, wrapModeS, wrapModeT);
+        public override Texture? GetTexture(string componentName, WrapMode wrapModeS, WrapMode wrapModeT)
+        {
+            Texture? texture = EzResources?.Get(componentName);
+            if (texture != null)
+                return texture;
+
+            // 回退到默认行为
+            return Textures?.Get(componentName, wrapModeS, wrapModeT);
+        }
 
         public override ISample GetSample(ISampleInfo sampleInfo)
         {
@@ -72,13 +80,23 @@ namespace osu.Game.Skinning
                         case GlobalSkinnableContainers.SongSelect:
                             var songSelectComponents = new DefaultSkinComponentsContainer(c =>
                             {
-                                var dim = c.OfType<EzComRadarPanel>().FirstOrDefault();
+                                var dim1 = c.OfType<EzComRadarPanel>().FirstOrDefault();
+                                var dim2 = c.OfType<EzComRadarPanel>().FirstOrDefault();
 
-                                if (dim != null)
+                                if (dim1 != null)
                                 {
-                                    dim.Anchor = Anchor.BottomCentre;
-                                    dim.Origin = Anchor.Centre;
-                                    dim.Position = new Vector2(0, -150);
+                                    dim1.Anchor = Anchor.BottomLeft;
+                                    dim1.Origin = Anchor.BottomLeft;
+                                    dim1.Position = new Vector2(-150, -150);
+                                    dim1.RadarDisplayMode.Value = EzRadarDisplayMode.KeyPattern;
+                                }
+
+                                if (dim2 != null)
+                                {
+                                    dim2.Anchor = Anchor.BottomLeft;
+                                    dim2.Origin = Anchor.BottomLeft;
+                                    dim2.Position = new Vector2(-330, -150);
+                                    dim2.RadarDisplayMode.Value = EzRadarDisplayMode.XxySrPattern;
                                 }
                             });
 

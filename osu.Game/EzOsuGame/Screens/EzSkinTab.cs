@@ -32,43 +32,31 @@ namespace osu.Game.EzOsuGame.Screens
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
         [Resolved]
-        private SkinManager skinManager { get; set; } = null!;
-
-        [Resolved]
         private Storage storage { get; set; } = null!;
 
         public EzSkinTab()
-            : base("EZ Skin Settings") { }
+            : base("Ez Skin Settings") { }
 
         private static readonly Dictionary<string, string> resource_paths = new Dictionary<string, string>
         {
-            ["note"] = Path.Combine("EzResources", "note"),
-            ["Stage"] = Path.Combine("EzResources", "Stage"),
-            ["GameTheme"] = Path.Combine("EzResources", "GameTheme")
+            ["note"] = EzModifyPath.NOTE_PATH,
+            ["Stage"] = EzModifyPath.STAGE_PATH,
+            ["GameTheme"] = EzModifyPath.GAME_THEME_PATH
         };
-
-        private static readonly Dictionary<bool, (Color4 Color, LocalisableString TopText, LocalisableString BottomText)> position_mode_config =
-            new Dictionary<bool, (Color4 Color, LocalisableString TopText, LocalisableString BottomText)>
-            {
-                [true] = (new Color4(0.2f, 0.4f, 0.8f, 0.3f), EzSkinStrings.SWITCH_TO_ABSOLUTE, EzSkinStrings.SWITCH_TO_ABSOLUTE),
-                [false] = (new Color4(0.8f, 0.2f, 0.4f, 0.3f), EzSkinStrings.SWITCH_TO_RELATIVE, EzSkinStrings.SWITCH_TO_RELATIVE)
-            };
 
         private readonly List<string> availableNoteSets = new List<string>();
         private readonly List<string> availableStageSets = new List<string>();
+        private readonly List<string> availableGameThemes = new List<string>();
         private Bindable<string> nameOfNote = null!;
         private Bindable<string> nameOfStage = null!;
         private Bindable<EzEnumGameThemeName> nameOfGameTheme = null!;
-
-        private SettingsButton refreshSkinButton = null!;
-        private bool isAbsolutePosition = true;
 
         [BackgroundDependencyLoader]
         private void load()
         {
             loadFolderSets("note");
             loadFolderSets("Stage");
-            // loadFolderSets("GameTheme");
+            loadFolderSets("GameTheme");
 
             nameOfNote = ezSkinConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             nameOfStage = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
@@ -189,12 +177,6 @@ namespace osu.Game.EzOsuGame.Screens
                         TooltipText = EzSkinStrings.NOTE_TRACK_LINE_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight),
                     },
-                    refreshSkinButton = new SettingsButton
-                    {
-                        Text = EzSkinStrings.REFRESH_SAVE_SKIN,
-                        TooltipText = EzSkinStrings.REFRESH_SAVE_SKIN_TOOLTIP,
-                        Action = refreshSkin,
-                    }
                 }
             };
         }
@@ -212,36 +194,6 @@ namespace osu.Game.EzOsuGame.Screens
             });
         }
 
-        #region Save按钮处理
-
-        private void refreshSkin()
-        {
-            isAbsolutePosition = !isAbsolutePosition;
-            skinManager.CurrentSkinInfo.TriggerChange();
-
-            updateButtonAppearance();
-        }
-
-        // 切换按钮外观以反映当前的定位模式, 可能不稳定，目前视为已废弃功能，通过按钮提示告知尽量不使用
-        private void updateButtonAppearance()
-        {
-            var config = position_mode_config[isAbsolutePosition];
-
-            var box = refreshSkinButton.ChildrenOfType<Box>().FirstOrDefault();
-            box?.FadeColour(config.Color, 200);
-
-            var textContainer = refreshSkinButton.ChildrenOfType<FillFlowContainer>().FirstOrDefault();
-            var texts = textContainer?.ChildrenOfType<OsuSpriteText>().ToArray();
-
-            if (texts?.Length >= 2)
-            {
-                texts[0].Text = config.TopText;
-                texts[1].Text = config.BottomText;
-            }
-        }
-
-        #endregion
-
         #region 刷新所有EzComponent的纹理名称
 
         private void updateAllEzTextureNames(EzEnumGameThemeName textureGameTheme)
@@ -257,7 +209,7 @@ namespace osu.Game.EzOsuGame.Screens
                 comboText.FontName.Value = textureGameTheme;
 
             foreach (var hitResultScore in hitResultScores)
-                hitResultScore.NameDropdown.Value = textureGameTheme;
+                hitResultScore.ThemeName.Value = textureGameTheme;
         }
 
         #endregion
@@ -270,8 +222,8 @@ namespace osu.Game.EzOsuGame.Screens
                 targetList = availableNoteSets;
             else if (type.Equals("Stage", StringComparison.OrdinalIgnoreCase))
                 targetList = availableStageSets;
-            // else if (type.Equals("GameTheme", StringComparison.OrdinalIgnoreCase))
-            //     targetList = availableGameThemes;
+            else if (type.Equals("GameTheme", StringComparison.OrdinalIgnoreCase))
+                targetList = availableGameThemes;
             else
             {
                 Logger.Log($"Unknown resource type: {type}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
@@ -305,17 +257,6 @@ namespace osu.Game.EzOsuGame.Screens
             catch (Exception ex)
             {
                 Logger.Error(ex, $"EzSkinTab Load {type} FolderSets Error");
-            }
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                availableNoteSets.Clear();
-                availableStageSets.Clear();
             }
         }
     }

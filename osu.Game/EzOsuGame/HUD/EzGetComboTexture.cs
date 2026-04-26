@@ -21,11 +21,11 @@ namespace osu.Game.EzOsuGame.HUD
     {
         public Bindable<EzEnumGameThemeName> FontName { get; }
 
-        private IResourceStore<byte[]>? store;
         private readonly Func<char, string> getLookup;
         private GlyphStore? glyphStore;
-        private TextureLoaderStore? textureLoader;
-        private TextureStore? localSkinStore;
+
+        [Resolved]
+        private EzResourceProvider textures { get; set; } = null!;
 
         protected override char FixedWidthReferenceCharacter => '6';
 
@@ -39,22 +39,15 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         [BackgroundDependencyLoader]
-        private void load(GameHost host, IRenderer renderer)
+        private void load()
         {
-            // TODO: 需要测试资源管理，以及退回方案
-            Storage gameStorage = host.Storage;
-
-            store = new StorageBackedResourceStore(gameStorage);
-            textureLoader = new TextureLoaderStore(store);
-            localSkinStore = new TextureStore(renderer, textureLoader);
-
             FontName.BindValueChanged(e =>
             {
                 Font = new FontUsage(FontName.Value.ToString(), 1);
 
                 // 清理旧的 GlyphStore 缓存，防止每次切换字体时，缓存堆积
                 glyphStore?.ClearCache();
-                glyphStore = new GlyphStore(localSkinStore, getLookup);
+                glyphStore = new GlyphStore(textures, getLookup);
 
                 foreach (char c in new[] { '.', '%', 'c', 'e', 'l', 'j' })
                     glyphStore.Get(FontName.Value.ToString(), c);
@@ -65,31 +58,15 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected override TextBuilder CreateTextBuilder(ITexturedGlyphLookupStore store) => base.CreateTextBuilder(glyphStore);
 
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                FontName.UnbindAll();
-
-                glyphStore?.ClearCache();
-                localSkinStore?.Dispose();
-                textureLoader?.Dispose();
-            }
-
-            base.Dispose(isDisposing);
-        }
-
         private class GlyphStore : ITexturedGlyphLookupStore
         {
-            // private readonly string fontFolder;
-            private readonly TextureStore textures;
+            private readonly EzResourceProvider textures;
             private readonly Func<char, string> getLookup;
 
             private readonly Dictionary<char, ITexturedCharacterGlyph?> cache = new Dictionary<char, ITexturedCharacterGlyph?>();
 
-            public GlyphStore(TextureStore textures, Func<char, string> getLookup)
+            public GlyphStore(EzResourceProvider textures, Func<char, string> getLookup)
             {
-                // this.fontFolder = fontFolder;
                 this.textures = textures;
                 this.getLookup = getLookup;
             }

@@ -8,8 +8,10 @@ namespace osu.Game.EzOsuGame
         // Ez-Stage 的默认判定线高度
         public const float EZ_STAGE_BODY_HEIGHT = 247f;
 
-        public const string RESOURCES_PATH = "EzResources/";
-
+        public const string RESOURCES_PATH = @"EzResources/";
+        public const string NOTE_PATH = @"EzResources/note/";
+        public const string STAGE_PATH = @"EzResources/Stage/";
+        public const string GAME_THEME_PATH = @"EzResources/GameTheme/";
         public const string FULL_COMBO = @"EzResources/Modify/AllCombo";
     }
 }

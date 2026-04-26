@@ -63,21 +63,21 @@ namespace osu.Game.EzOsuGame.HUD
 
         public bool UsesFixedAnchor { get; set; }
 
-        public float MaxBpm { get; set; } = 200f;
+        public float MaxBpm { get; } = 200f;
 
-        public float MaxStar { get; set; } = 10f;
+        public float MaxStar { get; } = 10f;
 
-        public float MaxCs { get; set; } = 10f;
+        public float MaxCs { get; } = 10f;
 
-        public float MaxOd { get; set; } = 10f;
+        public float MaxOd { get; } = 10f;
 
-        public float MaxDr { get; set; } = 10f;
+        public float MaxDr { get; } = 10f;
 
-        public float MaxAr { get; set; } = 10f;
+        public float MaxAr { get; } = 10f;
 
-        public float MaxKeyPatternScore { get; set; } = 10f;
+        public float MaxKeyPatternScore { get; } = 10f;
 
-        public float MaxXxySr { get; set; } = 10f;
+        public float MaxXxySr { get; } = 10f;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_DISPLAY_MODE), nameof(EzHUDStrings.RADAR_DISPLAY_MODE_TOOLTIP))]
         public Bindable<EzRadarDisplayMode> RadarDisplayMode { get; } = new Bindable<EzRadarDisplayMode>();
@@ -162,7 +162,7 @@ namespace osu.Game.EzOsuGame.HUD
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     AxisCount = parameterRatios.Length,
-                    Size = new Vector2(220),
+                    Size = new Vector2(180),
                     GridLevels = 4,
                     GridColour = BaseLineColour.Value,
                     AxisColour = BaseLineColour.Value,
@@ -175,7 +175,7 @@ namespace osu.Game.EzOsuGame.HUD
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Size = new Vector2(220 + axis_label_padding * 2),
+                    Size = new Vector2(180 + axis_label_padding * 2),
                 },
             };
 

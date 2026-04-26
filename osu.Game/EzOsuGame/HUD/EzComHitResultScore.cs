@@ -26,16 +26,16 @@ namespace osu.Game.EzOsuGame.HUD
     {
         public bool UsesFixedAnchor { get; set; }
 
+        [SettingSource("HitResult Text Font", "HitResult Text Font")]
+        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+
         [SettingSource("Playback FPS", "The FPS value of this Animation")]
-        public BindableNumber<float> PlaybackFps { get; } = new BindableNumber<float>(60)
+        public BindableNumber<float> FPS { get; } = new BindableNumber<float>(60)
         {
             MinValue = 1,
             MaxValue = 240,
             Precision = 1f
         };
-
-        [SettingSource("HitResult Text Font", "HitResult Text Font")]
-        public Bindable<EzEnumGameThemeName> NameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource("Alpha", "The alpha value of this box")]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
@@ -47,6 +47,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
+
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
 
@@ -65,7 +66,7 @@ namespace osu.Game.EzOsuGame.HUD
         private Sample? fullComboSound;
 
         [Resolved]
-        private TextureStore textures { get; set; } = null!;
+        private EzResourceProvider textures { get; set; } = null!;
 
         [Resolved]
         private ScoreProcessor processor { get; set; } = null!;
@@ -90,61 +91,7 @@ namespace osu.Game.EzOsuGame.HUD
         private void load()
         {
             AlwaysPresent = true;
-            // Schedule(() =>
-            // {
-            //     AddInternal(previewButton = new IconButton
-            //     {
-            //         Anchor = Anchor.TopRight,
-            //         Origin = Anchor.TopRight,
-            //         Position = new Vector2(-5, 5),
-            //         Icon = FontAwesome.Solid.Eye,
-            //         Action = showPreview
-            //     });
-            //
-            //     previewOverlay = new EzComsPreviewOverlay(this);
-            //     game.Add(previewOverlay);
-            // });
         }
-
-        // private void showPreview() => previewOverlay.Show();
-
-        // public Drawable CreatePreviewDrawable(EzSelectorGameThemeSet name)
-        // {
-        //     var container = new Container
-        //     {
-        //         AutoSizeAxes = Axes.Both,
-        //         Child = new FillFlowContainer
-        //         {
-        //             AutoSizeAxes = Axes.Both,
-        //             Direction = FillDirection.Horizontal,
-        //             Spacing = new Vector2(10),
-        //             Children = new[]
-        //             {
-        //                 createPreviewSprite(name, HitResult.Perfect),
-        //                 createPreviewSprite(name, HitResult.Great),
-        //                 createPreviewSprite(name, HitResult.Good),
-        //                 createPreviewSprite(name, HitResult.Ok),
-        //                 createPreviewSprite(name, HitResult.Meh),
-        //                 createPreviewSprite(name, HitResult.Miss)
-        //             }
-        //         }
-        //     };
-        //
-        //     return container;
-        // }
-        //
-        // private Sprite createPreviewSprite(EzSelectorGameThemeSet name, HitResult result)
-        // {
-        //     string basePath = $@"EzResources/enumBase/enumJudgement/{name}";
-        //     var texture = textures.Get($"{basePath}.png");
-        //
-        //     return new Sprite
-        //     {
-        //         Texture = texture,
-        //         Size = new Vector2(50),
-        //         Alpha = 1
-        //     };
-        // }
 
         protected override void LoadComplete()
         {
@@ -154,7 +101,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             processor.NewJudgement += processorNewJudgement;
 
-            NameDropdown.BindValueChanged(_ =>
+            ThemeName.BindValueChanged(_ =>
             {
                 ClearInternal();
                 anime?.Invalidate();
@@ -201,10 +148,10 @@ namespace osu.Game.EzOsuGame.HUD
 
         protected Drawable CreateJudgementTexture(HitResult result)
         {
-            string resultName = getHitResultPath(result);
-            string name = NameDropdown.Value.ToString();
-            // TODO：应使用语法拼接路径，兼容不同平台
-            string baseDir = $@"EzResources/GameTheme/{name}/judgement";
+            string resultName = getHitResultToString(result);
+            string name = ThemeName.Value.ToString();
+
+            string baseDir = $@"EzResources/GameTheme/{name}/judgement/";
 
             // 尝试多种大小写变体以处理文件名大小写不确定性
             // 由于 TextureStore 的 Get 方法区分大小写，我们尝试常见变体：小写和大写
@@ -212,8 +159,8 @@ namespace osu.Game.EzOsuGame.HUD
 
             foreach (string rn in possibleResultNames)
             {
-                string path = $"{baseDir}/{rn}";
-                var singleTexture = textures.Get($"{path}");
+                string path = $@"{baseDir}{rn}";
+                var singleTexture = textures.Get(path);
 
                 if (singleTexture != null)
                 {
@@ -270,7 +217,7 @@ namespace osu.Game.EzOsuGame.HUD
             // 对于动画帧，也尝试多种大小写变体
             foreach (string rn in possibleResultNames)
             {
-                string path = $"{baseDir}/{rn}";
+                string path = $@"{baseDir}{rn}";
                 bool foundFrames = false;
 
                 for (int i = 0;; i++)
@@ -287,7 +234,7 @@ namespace osu.Game.EzOsuGame.HUD
                     break; // 如果找到帧，使用这个路径
             }
 
-            animation.DefaultFrameLength = 1000 / PlaybackFps.Value;
+            animation.DefaultFrameLength = 1000 / FPS.Value;
 
             PlayAnimationGif(result, animation);
 
@@ -301,14 +248,14 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         // 如果考虑拓展能力，则倾向nameof(HitResult)，并回退到这个方法
-        private string getHitResultPath(HitResult hitResult)
+        private string getHitResultToString(HitResult hitResult)
         {
             string resultName = hitResult switch
             {
-                HitResult.Poor => "Miss",
-                HitResult.Miss => "Miss",
-                HitResult.Meh => "Fail",
-                HitResult.Ok => "Fail",
+                HitResult.Poor => "Fail",
+                HitResult.Miss => "Fail",
+                HitResult.Meh => "Miss",
+                HitResult.Ok => "",
                 HitResult.Good => "Good",
                 HitResult.Great => "Cool",
                 HitResult.Perfect => "Kool",
@@ -398,7 +345,7 @@ namespace osu.Game.EzOsuGame.HUD
 
         public virtual void PlayAnimation(HitResult hitResult, Drawable drawable)
         {
-            double flashSpeed = PlaybackFps.Value * 2;
+            double flashSpeed = FPS.Value * 2;
             applyFadeEffect(hitResult, drawable, flashSpeed);
 
             switch (hitResult)
