@@ -9,8 +9,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Textures;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Scoring;
@@ -26,10 +26,10 @@ namespace osu.Game.EzOsuGame.HUD
     {
         public bool UsesFixedAnchor { get; set; }
 
-        [SettingSource("HitResult Text Font", "HitResult Text Font")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_LABEL), nameof(EzHUDStrings.HITRESULT_TEXT_FONT_DESCRIPTION))]
         public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
-        [SettingSource("Playback FPS", "The FPS value of this Animation")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.PLAYBACK_FPS_LABEL), nameof(EzHUDStrings.PLAYBACK_FPS_DESCRIPTION))]
         public BindableNumber<float> FPS { get; } = new BindableNumber<float>(60)
         {
             MinValue = 1,
@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.HUD
             Precision = 1f
         };
 
-        [SettingSource("Alpha", "The alpha value of this box")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ALPHA_LABEL), nameof(EzHUDStrings.ALPHA_DESCRIPTION))]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,

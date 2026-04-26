@@ -9,6 +9,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
@@ -34,10 +35,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             ModSuddenDeath,
         }
 
-        [SettingSource("Pill Sprite", "(药丸图)Pill Sprite")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.PILL_SPRITE_LABEL), nameof(EzHUDStrings.PILL_SPRITE_DESCRIPTION))]
         public Bindable<PillSprite> SpriteDropdown { get; } = new Bindable<PillSprite>(PillSprite.CheckCircle);
 
-        [SettingSource("Pill Direction", "(药丸方向)Pill Direction")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.FILL_DIRECTION_LABEL), nameof(EzHUDStrings.FILL_DIRECTION_DESCRIPTION))]
         public Bindable<FillDirection> PillFillDirection { get; } = new Bindable<FillDirection>(FillDirection.Vertical);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.CornerRadius), nameof(SkinnableComponentStrings.CornerRadiusDescription),
@@ -49,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.01f
         };
 
-        [SettingSource("Box Element Alpha", "The alpha value of background")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOX_ELEMENT_ALPHA_LABEL), nameof(EzHUDStrings.BOX_ELEMENT_ALPHA_DESCRIPTION))]
         public BindableNumber<float> BoxElementAlpha { get; } = new BindableNumber<float>(0.7f)
         {
             MinValue = 0,

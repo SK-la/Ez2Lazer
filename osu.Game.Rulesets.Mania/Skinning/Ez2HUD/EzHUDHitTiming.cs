@@ -10,8 +10,10 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Threading;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.EzMania.Localization;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osuTK;
 
@@ -19,19 +21,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
     public partial class EzHUDHitTiming : HitErrorMeter
     {
-        [SettingSource("Offset Number Font", "Offset Number Font", SettingControlType = typeof(EzSelectorEnumList))]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.OFFSET_NUMBER_FONT_LABEL), nameof(EzHUDManiaStrings.OFFSET_NUMBER_FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
         public Bindable<EzEnumGameThemeName> NumberFont { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
-        [SettingSource("Offset Text Font", "Offset Text Font", SettingControlType = typeof(OffsetTextNameSelector))]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.OFFSET_TEXT_FONT_LABEL), nameof(EzHUDManiaStrings.OFFSET_TEXT_FONT_DESCRIPTION), SettingControlType = typeof(OffsetTextNameSelector))]
         public Bindable<EzEnumGameThemeName> TextFont { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
-        [SettingSource("Single Show E/L", "Show only Early or: Late separately")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.SINGLE_SHOW_EL_LABEL), nameof(EzHUDManiaStrings.SINGLE_SHOW_EL_DESCRIPTION))]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
 
-        [SettingSource("Test Mode", "Show E/L on perfect hits for testing")]
-        public Bindable<bool> TestMode { get; } = new Bindable<bool>();
-
-        [SettingSource("(显示阈值) Displaying Threshold", "(显示阈值) Displaying Threshold")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.DISPLAYING_THRESHOLD_LABEL), nameof(EzHUDManiaStrings.DISPLAYING_THRESHOLD_DESCRIPTION))]
         public BindableNumber<double> Threshold { get; } = new BindableNumber<double>(22)
         {
             MinValue = 0.0,
@@ -39,7 +38,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1
         };
 
-        [SettingSource("(持续时间) Display Duration", "(持续时间) Duration disappears")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.DISPLAY_DURATION_LABEL), nameof(EzHUDManiaStrings.DISPLAY_DURATION_DESCRIPTION))]
         public BindableNumber<double> DisplayDuration { get; } = new BindableNumber<double>(300)
         {
             MinValue = 10,
@@ -47,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1, // 精度
         };
 
-        [SettingSource("(对称间距) Symmetrical spacing", "(对称间距) Symmetrical spacing")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.SYMMETRY_OFFSET_LABEL), nameof(EzHUDManiaStrings.SYMMETRY_OFFSET_DESCRIPTION))]
         public BindableNumber<float> SymmetryOffset { get; } = new BindableNumber<float>(60)
         {
             MinValue = 0,
@@ -55,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1,
         };
 
-        [SettingSource("Text Alpha", "The alpha value of this offset text")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.TEXT_ALPHA_LABEL), nameof(EzHUDManiaStrings.TEXT_ALPHA_DESCRIPTION))]
         public BindableNumber<float> TextAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,
@@ -63,7 +62,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.01f,
         };
 
-        [SettingSource("Number Alpha", "The alpha value of the offset number")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.NUMBER_ALPHA_LABEL), nameof(EzHUDManiaStrings.NUMBER_ALPHA_DESCRIPTION))]
         public BindableNumber<float> NumberAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,
@@ -73,6 +72,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.TEST_MODE_LABEL), nameof(EzHUDStrings.TEST_MODE_DESCRIPTION))]
+        public Bindable<bool> TestMode { get; } = new Bindable<bool>();
 
         private Container timingContainer = null!;
         private FillFlowContainer errorContainer = null!;

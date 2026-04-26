@@ -7,6 +7,9 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public static class EzHUDStrings
     {
+        public static readonly LocalisableString TEST_MODE_LABEL = new EzLocalizationManager.EzLocalisableString("测试模式", "Test Mode");
+        public static readonly LocalisableString TEST_MODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("强制显示内容，用于测试", "Force display content for testing.");
+
         public static readonly LocalisableString RADAR_BASE_LINE_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达底板线色", "Radar Base Line Colour");
 
         public static readonly LocalisableString RADAR_BASE_LINE_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("底板网格线和轴线的颜色", "Colour of base grid and axis lines.");
@@ -43,5 +46,37 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n注意这样并不可靠，只是提供一种视觉策略。",
             "When enabled, the result of each metric will be treated as a ratio and multiplied by xxySR to become a star rating metric."
             + "\nNote that this is not reliable and just provides a visual strategy.");
+
+        // 通用设置（所有模式共享）
+        public static readonly LocalisableString ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("透明度", "Alpha");
+        public static readonly LocalisableString ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("组件的透明度值", "The alpha value of this component.");
+
+        // EzComO2JamPillUI
+        public static readonly LocalisableString PILL_SPRITE_LABEL = new EzLocalizationManager.EzLocalisableString("药丸图标", "Pill Sprite");
+        public static readonly LocalisableString PILL_SPRITE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择药丸图标的样式", "Select the pill sprite style.");
+
+        public static readonly LocalisableString PILL_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("药丸方向", "Pill Direction");
+        public static readonly LocalisableString PILL_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择药丸排列的方向", "Select the pill arrangement direction.");
+
+        public static readonly LocalisableString BOX_ELEMENT_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("背景透明度", "Box Element Alpha");
+        public static readonly LocalisableString BOX_ELEMENT_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的透明度值", "The alpha value of background.");
+
+        // EzHUDAccuracyCounter
+        public static readonly LocalisableString FILL_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("排列方向", "Fill Direction");
+        public static readonly LocalisableString FILL_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择组件的排列方向", "Select the arrangement direction of components.");
+
+        public static readonly LocalisableString ACCURACY_DISPLAY_MODE_LABEL = new EzLocalizationManager.EzLocalisableString("准确率显示模式", "Accuracy Display Mode");
+        public static readonly LocalisableString ACCURACY_DISPLAY_MODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择准确率的显示方式", "Select how accuracy is displayed.");
+
+        // EzComHitResultScore
+        public static readonly LocalisableString HITRESULT_TEXT_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("判定文本字体", "HitResult Text Font");
+        public static readonly LocalisableString HITRESULT_TEXT_FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择判定文本的字体样式", "Select the font style for hit result text.");
+
+        public static readonly LocalisableString PLAYBACK_FPS_LABEL = new EzLocalizationManager.EzLocalisableString("播放帧率", "Playback FPS");
+        public static readonly LocalisableString PLAYBACK_FPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画的帧率值", "The FPS value of this animation.");
+
+        // EzHUDScoreCounter
+        public static readonly LocalisableString SCORE_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("分数文本字体", "Score Font");
+        public static readonly LocalisableString SCORE_FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择分数文本的字体样式", "Select the font style for score text.");
     }
 }

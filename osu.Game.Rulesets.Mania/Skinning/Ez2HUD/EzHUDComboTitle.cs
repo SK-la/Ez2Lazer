@@ -7,9 +7,11 @@ using osu.Framework.Graphics;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.EzMania.Localization;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osuTK;
@@ -18,20 +20,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
     public partial class EzHUDComboTitle : HitErrorMeter
     {
-        [SettingSource("Combo Text Font", "Combo Text Font", SettingControlType = typeof(EzSelectorEnumList))]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
         public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
-        [SettingSource("Effect Type", "Effect Type")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_TYPE_LABEL), nameof(EzHUDManiaStrings.EFFECT_TYPE_DESCRIPTION))]
         public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
 
-        [SettingSource("Effect Origin", "Effect Origin", SettingControlType = typeof(AnchorDropdown))]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_LABEL), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_DESCRIPTION), SettingControlType = typeof(AnchorDropdown))]
         public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
         {
             Default = Anchor.TopCentre,
             Value = Anchor.TopCentre
         };
 
-        [SettingSource("Effect Start Factor", "Effect Start Factor")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_START_FACTOR_LABEL), nameof(EzHUDManiaStrings.EFFECT_START_FACTOR_DESCRIPTION))]
         public BindableNumber<float> EffectStartFactor { get; } = new BindableNumber<float>(2f)
         {
             MinValue = 0.1f,
@@ -39,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.05f,
         };
 
-        [SettingSource("Effect Start Duration", "Effect Start Duration")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_START_DURATION_LABEL), nameof(EzHUDManiaStrings.EFFECT_START_DURATION_DESCRIPTION))]
         public BindableNumber<float> EffectStartTime { get; } = new BindableNumber<float>(10)
         {
             MinValue = 1,
@@ -47,7 +49,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1f,
         };
 
-        [SettingSource("Effect End Duration", "Effect End Duration")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_END_DURATION_LABEL), nameof(EzHUDManiaStrings.EFFECT_END_DURATION_DESCRIPTION))]
         public BindableNumber<float> EffectEndDuration { get; } = new BindableNumber<float>(300)
         {
             MinValue = 10,
@@ -55,7 +57,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 10f,
         };
 
-        [SettingSource("Alpha", "The alpha value of this box")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ALPHA_LABEL), nameof(EzHUDStrings.ALPHA_DESCRIPTION))]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,

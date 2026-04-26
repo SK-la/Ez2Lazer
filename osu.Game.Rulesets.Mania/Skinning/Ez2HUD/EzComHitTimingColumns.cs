@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
+using osu.Game.Rulesets.Mania.EzMania.Localization;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
@@ -22,10 +23,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
     public partial class EzComHitTimingColumns : HitErrorMeter
     {
-        [SettingSource("Minimum Hit Result", "Filter out judgments worse than this")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MINIMUM_HIT_RESULT_LABEL), nameof(EzHUDManiaStrings.MINIMUM_HIT_RESULT_DESCRIPTION))]
         public Bindable<HitResult> MinimumHitResult { get; } = new Bindable<HitResult>(HitResult.Good);
 
-        [SettingSource("Markers Height", "Markers Height")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MARKERS_HEIGHT_LABEL), nameof(EzHUDManiaStrings.MARKERS_HEIGHT_DESCRIPTION))]
         public BindableNumber<float> MarkerHeight { get; } = new BindableNumber<float>(2)
         {
             MinValue = 1,
@@ -33,7 +34,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1f,
         };
 
-        [SettingSource("Move Height", "Move Height")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MOVE_HEIGHT_LABEL), nameof(EzHUDManiaStrings.MOVE_HEIGHT_DESCRIPTION))]
         public BindableNumber<float> MoveHeight { get; } = new BindableNumber<float>(20)
         {
             MinValue = 1,
@@ -41,7 +42,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 1f,
         };
 
-        [SettingSource("Background Alpha", "Background Alpha")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.BACKGROUND_ALPHA_LABEL), nameof(EzHUDManiaStrings.BACKGROUND_ALPHA_DESCRIPTION))]
         public BindableNumber<float> BackgroundAlpha { get; } = new BindableNumber<float>(0.2f)
         {
             MinValue = 0,
@@ -49,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.1f,
         };
 
-        [SettingSource("Background Colour", "Background Colour")]
+        [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.BACKGROUND_COLOUR_LABEL), nameof(EzHUDManiaStrings.BACKGROUND_COLOUR_DESCRIPTION))]
         public BindableColour4 BackgroundColour { get; } = new BindableColour4(Colour4.Gray);
 
         private double[] floatingAverages = null!;

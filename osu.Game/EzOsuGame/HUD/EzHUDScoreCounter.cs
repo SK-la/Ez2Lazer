@@ -6,6 +6,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
@@ -16,13 +17,13 @@ namespace osu.Game.EzOsuGame.HUD
     {
         protected override double RollingDuration => 250;
 
-        [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_FONT_LABEL), nameof(EzHUDStrings.SCORE_FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
         public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
 
-        [SettingSource("Alpha", "The alpha value of this box")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ALPHA_LABEL), nameof(EzHUDStrings.ALPHA_DESCRIPTION))]
         public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,

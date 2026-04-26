@@ -9,6 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -40,19 +41,19 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Font))]
         public Bindable<Typeface> Font { get; } = new Bindable<Typeface>(Typeface.Torus);
 
-        [SettingSource("Fill Direction", "排列方向")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.FILL_DIRECTION_LABEL), nameof(EzHUDStrings.FILL_DIRECTION_DESCRIPTION))]
         public Bindable<Direction> FlowDirection { get; } = new Bindable<Direction>(Direction.Vertical);
 
-        [SettingSource("Accuracy1 display mode")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_LABEL), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_DESCRIPTION))]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay1 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.Standard);
 
-        [SettingSource("Accuracy2 display mode")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_LABEL), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_DESCRIPTION))]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay2 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.Classic);
 
-        [SettingSource("Accuracy3 display mode")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_LABEL), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_DESCRIPTION))]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay3 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.None);
 
-        [SettingSource("Accuracy4 display mode")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_LABEL), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_DESCRIPTION))]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay4 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.None);
 
         // [Resolved]
