@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DescriptionAttribute = System.ComponentModel.DescriptionAttribute;
@@ -13,16 +14,21 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Drawables.Cards;
 using osu.Game.Configuration;
 using osu.Game.Graphics.Sprites;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens;
+using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Screens.Footer;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
@@ -49,9 +55,14 @@ namespace osu.Game.EzOsuGame.HUD
     /// </summary>
     public partial class EzComRadarPanel : CompositeDrawable, ISerialisableDrawable
     {
-        private const float axis_label_padding = 52f;
-        private const float axis_label_offset = 16f;
+        // Layout constants
+        private const float chart_size = 144f;
+        private const float corner_radius = ScreenFooterButton.CORNER_RADIUS;
+        private const float axis_label_padding = 36f;
+        private const float axis_label_offset = 24f; // Offset from chart edge to label center
         private const float axis_label_alpha = 1f;
+
+        // Data normalization constants
         private const float key_pattern_full_score = 10f;
         private const float long_note_ratio_max = 100f;
 
@@ -84,6 +95,12 @@ namespace osu.Game.EzOsuGame.HUD
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_USE_ABSOLUTE_VALUE), nameof(EzHUDStrings.RADAR_USE_ABSOLUTE_VALUE_TOOLTIP))]
         public Bindable<bool> UseAbsoluteValue { get; } = new BindableBool();
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BOX_COLOUR), nameof(EzHUDStrings.RADAR_BOX_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 BoxColour { get; } = new BindableColour4(Colour4.FromHex("#23282a"));
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_LABEL_COLOUR), nameof(EzHUDStrings.RADAR_LABEL_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 LabelColour { get; } = new BindableColour4(new Color4(255, 230, 128, 255));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR), nameof(EzHUDStrings.RADAR_BASE_LINE_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 BaseLineColour { get; } = new BindableColour4(new Color4(255, 255, 210, 230));
@@ -122,6 +139,9 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         [Resolved]
+        private OverlayColourProvider? colourProvider { get; set; }
+
+        [Resolved]
         private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         [Resolved]
@@ -140,7 +160,8 @@ namespace osu.Game.EzOsuGame.HUD
 
         private Container? axisLabelContainer;
         private RadarChart? chart;
-        private OsuSpriteText[] axisTexts = Array.Empty<OsuSpriteText>();
+        private Box background = null!;
+        private FillFlowContainer[] axisLabelContainers = Array.Empty<FillFlowContainer>();
         private string[] activeAxisLabels = default_axis_labels;
         private string[] activeAxisFormats = default_axis_formats;
         private EzRulesetSpecificRadarResult? cachedRulesetSpecificRadarResult;
@@ -157,12 +178,28 @@ namespace osu.Game.EzOsuGame.HUD
         {
             InternalChildren = new Drawable[]
             {
+                new Container
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    RelativeSizeAxes = Axes.Both,
+                    Masking = true,
+                    CornerRadius = corner_radius,
+                    Children = new Drawable[]
+                    {
+                        background = new Box
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            Colour = BoxColour.Value,
+                        },
+                    },
+                },
                 chart = new RadarChart
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
                     AxisCount = parameterRatios.Length,
-                    Size = new Vector2(180),
+                    Size = new Vector2(chart_size),
                     GridLevels = 4,
                     GridColour = BaseLineColour.Value,
                     AxisColour = BaseLineColour.Value,
@@ -175,7 +212,7 @@ namespace osu.Game.EzOsuGame.HUD
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Size = new Vector2(180 + axis_label_padding * 2),
+                    Size = new Vector2(chart_size + axis_label_padding * 2),
                 },
             };
 
@@ -192,11 +229,22 @@ namespace osu.Game.EzOsuGame.HUD
             bindPreserveAlpha(BaseAreaColour);
             bindPreserveAlpha(DataLineColour);
             bindPreserveAlpha(DataAreaColour);
+            bindPreserveAlpha(BoxColour);
+            bindPreserveAlpha(LabelColour);
+
+            // Set default background colour using framework standard if not already set
+            if (colourProvider != null && BoxColour.IsDefault)
+                background.Colour = colourProvider.Background2;
 
             BaseLineColour.BindValueChanged(_ => applyChartColours(), true);
             BaseAreaColour.BindValueChanged(_ => applyChartColours(), true);
             DataLineColour.BindValueChanged(_ => applyChartColours(), true);
             DataAreaColour.BindValueChanged(_ => applyChartColours(), true);
+            BoxColour.BindValueChanged(e =>
+            {
+                background.Colour = e.NewValue;
+            }, true);
+            LabelColour.BindValueChanged(_ => applyChartColours(), true);
             RadarDisplayMode.BindValueChanged(_ =>
             {
                 if (RadarDisplayMode.Value == EzRadarDisplayMode.Metadate)
@@ -470,8 +518,11 @@ namespace osu.Game.EzOsuGame.HUD
             chart.DataFillColour = DataAreaColour.Value;
             chart.Invalidate(Invalidation.DrawNode);
 
-            foreach (var text in axisTexts)
-                text.Colour = withFixedAlpha(DataLineColour.Value);
+            foreach (var container in axisLabelContainers)
+            {
+                foreach (var text in container.OfType<OsuSpriteText>())
+                    text.Colour = withFixedAlpha(LabelColour.Value);
+            }
         }
 
         private void ensureAxisTexts()
@@ -480,33 +531,52 @@ namespace osu.Game.EzOsuGame.HUD
                 return;
 
             int axisCount = chart.AxisCount;
-            if (axisTexts.Length == axisCount)
+            if (axisLabelContainers.Length == axisCount)
                 return;
 
-            axisTexts = new OsuSpriteText[axisCount];
-            Drawable[] drawables = new Drawable[axisCount];
+            axisLabelContainers = new FillFlowContainer[axisCount];
 
             for (int i = 0; i < axisCount; i++)
             {
-                axisTexts[i] = new OsuSpriteText
+                // Create a FillFlowContainer to automatically stack label and value texts
+                axisLabelContainers[i] = new FillFlowContainer
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    Colour = withFixedAlpha(DataLineColour.Value),
+                    AutoSizeAxes = Axes.Both,
+                    Direction = FillDirection.Vertical,
+                    Spacing = new Vector2(0, 2), // Vertical spacing between lines
+                    Children = new Drawable[]
+                    {
+                        // Label text (top line)
+                        new OsuSpriteText
+                        {
+                            Name = "LabelText",
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Colour = withFixedAlpha(LabelColour.Value),
+                        },
+                        // Value text (bottom line)
+                        new OsuSpriteText
+                        {
+                            Name = "ValueText",
+                            Anchor = Anchor.TopCentre,
+                            Origin = Anchor.TopCentre,
+                            Colour = withFixedAlpha(LabelColour.Value),
+                        },
+                    },
                 };
-
-                drawables[i] = axisTexts[i];
             }
 
             axisLabelContainer.Clear();
 
-            foreach (var drawable in drawables)
-                axisLabelContainer.Add(drawable);
+            foreach (var container in axisLabelContainers)
+                axisLabelContainer.Add(container);
         }
 
         private void updateAxisTexts()
         {
-            if (axisTexts.Length == 0 || chart == null || axisLabelContainer == null)
+            if (axisLabelContainers.Length == 0 || chart == null || axisLabelContainer == null)
                 return;
 
             axisLabelContainer.Size = chart.Size + new Vector2(axis_label_padding * 2);
@@ -514,14 +584,24 @@ namespace osu.Game.EzOsuGame.HUD
             float radius = Math.Min(chart.Size.X, chart.Size.Y) * 0.5f * chart.RadiusRatio;
             int axisCount = Math.Max(3, chart.AxisCount);
 
-            for (int i = 0; i < axisCount && i < axisTexts.Length; i++)
+            for (int i = 0; i < axisCount && i < axisLabelContainers.Length; i++)
             {
                 float angle = MathHelper.DegreesToRadians(360f / axisCount * i - 90);
                 Vector2 direction = new Vector2((float)Math.Cos(angle), (float)Math.Sin(angle));
                 Vector2 position = direction * (radius + axis_label_offset);
 
-                axisTexts[i].Position = position;
-                axisTexts[i].Text = $"{getAxisLabel(i)}\n{formatAxisValue(i)}";
+                // Position the container at the calculated position
+                axisLabelContainers[i].Position = position;
+
+                // Update text content
+                var labelText = axisLabelContainers[i].OfType<OsuSpriteText>().FirstOrDefault(t => t.Name == "LabelText");
+                var valueText = axisLabelContainers[i].OfType<OsuSpriteText>().FirstOrDefault(t => t.Name == "ValueText");
+
+                if (labelText != null)
+                    labelText.Text = getAxisLabel(i);
+
+                if (valueText != null)
+                    valueText.Text = formatAxisValue(i);
             }
         }
 
@@ -546,21 +626,9 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (isDisposing)
             {
-                BaseLineColour.UnbindAll();
-                BaseAreaColour.UnbindAll();
-                DataLineColour.UnbindAll();
-                DataAreaColour.UnbindAll();
-                RadarDisplayMode.UnbindAll();
-                UseAbsoluteValue.UnbindAll();
-
-                beatmap.UnbindAll();
-                mods.UnbindAll();
-                ruleset.UnbindAll();
-
                 difficultyCancellationSource?.Cancel();
                 difficultyCancellationSource?.Dispose();
                 cancelRadarAnalysis();
-                difficultyBindable?.UnbindAll();
                 modSettingTracker?.Dispose();
             }
 

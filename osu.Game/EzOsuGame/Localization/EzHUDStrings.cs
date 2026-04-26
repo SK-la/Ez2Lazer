@@ -11,20 +11,22 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString TEST_MODE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("强制显示内容，用于测试", "Force display content for testing.");
 
         public static readonly LocalisableString RADAR_BASE_LINE_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达底板线色", "Radar Base Line Colour");
-
         public static readonly LocalisableString RADAR_BASE_LINE_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("底板网格线和轴线的颜色", "Colour of base grid and axis lines.");
 
         public static readonly LocalisableString RADAR_BASE_AREA_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达底板区色", "Radar Base Area Colour");
-
         public static readonly LocalisableString RADAR_BASE_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("底板填充区域的颜色", "Colour of base filled area.");
 
         public static readonly LocalisableString RADAR_DATA_LINE_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达数据线色", "Radar Data Line Colour");
-
         public static readonly LocalisableString RADAR_DATA_LINE_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("数据轮廓线和顶点标记的颜色", "Colour of data outline and point markers.");
 
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达数据区色", "Radar Data Area Colour");
-
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("数据填充区域的颜色", "Colour of data filled area.");
+
+        public static readonly LocalisableString RADAR_BOX_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达背景色", "Radar Background Colour");
+        public static readonly LocalisableString RADAR_BOX_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("雷达图圆角背景的颜色，设置为透明可隐藏背景", "Colour of radar chart rounded background. Set to transparent to hide background.");
+
+        public static readonly LocalisableString RADAR_LABEL_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达标签颜色", "Radar Label Colour");
+        public static readonly LocalisableString RADAR_LABEL_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("雷达图轴标签文字的颜色", "Colour of radar chart axis label text.");
 
         public static readonly LocalisableString RADAR_DISPLAY_MODE = new EzLocalizationManager.EzLocalisableString("雷达显示模式", "Radar Display Mode");
 
