@@ -48,7 +48,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                         case GlobalSkinnableContainers.MainHUDComponents:
                             return new DefaultSkinComponentsContainer(container =>
                             {
-                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().ToArray();
+                                var hitTiming = container.ChildrenOfType<EzHUDHitTiming>().ToArray();
 
                                 if (hitTiming.Length >= 2)
                                 {
@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     hitTiming2.AloneShow.Value = AloneShowMenu.Late;
                                 }
 
-                                var combo1 = container.OfType<EzComComboCounter>().FirstOrDefault();
+                                var combo1 = container.OfType<EzHUDComboCounter>().FirstOrDefault();
 
                                 if (combo1 != null)
                                 {
@@ -101,9 +101,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                 _ = container.OfType<YuComFastSlowDisplay>().FirstOrDefault();
                             })
                             {
-                                new EzComHitTiming(),
-                                new EzComHitTiming(),
-                                new EzComComboCounter(),
+                                new EzHUDHitTiming(),
+                                new EzHUDHitTiming(),
+                                new EzHUDComboCounter(),
                                 new BarHitErrorMeter(),
                             };
                     }

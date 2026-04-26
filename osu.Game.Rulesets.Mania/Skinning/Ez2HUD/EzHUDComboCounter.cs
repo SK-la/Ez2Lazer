@@ -17,10 +17,10 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
-    public partial class EzComComboCounter : ComboCounter
+    public partial class EzHUDComboCounter : ComboCounter
     {
         [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> NameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource("Effect Type", "Effect Type")]
         public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
@@ -104,7 +104,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
 
-            NameDropdown.BindValueChanged(e =>
+            Font.BindValueChanged(e =>
             {
                 Text.FontName.Value = e.NewValue;
                 Text.Invalidate(); // **强制刷新 EzCounterText**
@@ -143,7 +143,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         protected override IHasText CreateText()
         {
-            Text = new EzComboText(NameDropdown)
+            Text = new EzComboText(Font)
             {
                 Scale = new Vector2(1.8f),
             };

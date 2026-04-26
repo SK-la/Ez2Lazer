@@ -16,10 +16,10 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
-    public partial class EzComComboSprite : HitErrorMeter
+    public partial class EzHUDComboTitle : HitErrorMeter
     {
         [SettingSource("Combo Text Font", "Combo Text Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> NameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource("Effect Type", "Effect Type")]
         public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
@@ -70,7 +70,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         public Bindable<int> Current { get; } = new Bindable<int>();
 
-        public EzComComboSprite()
+        public EzHUDComboTitle()
         {
             // Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             InternalChildren = new Drawable[]
             {
-                Text = new EzComboText(NameDropdown)
+                Text = new EzComboText
                 {
                     Scale = new Vector2(0.8f),
                     Text = "c",
@@ -127,7 +127,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
                 Text.TextContainer.Anchor = EffectOrigin.Value;
             }, true);
-            NameDropdown.BindValueChanged(e =>
+            Font.BindValueChanged(e =>
             {
                 Text.FontName.Value = e.NewValue;
                 Text.Invalidate();

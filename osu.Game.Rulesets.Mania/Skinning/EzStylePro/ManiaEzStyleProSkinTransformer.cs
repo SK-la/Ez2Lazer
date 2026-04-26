@@ -25,16 +25,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private readonly IBindable<double> specialFactorBindable;
         private readonly IBindable<double> hitPosition;
 
-        //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
         public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
-
-            // if (GlobalConfigStore.EzConfig == null)
-            // {
-            //     Logger.Log("!GlobalConfigStore.EzConfig EzStyleProSkin", LoggingTarget.Runtime, LogLevel.Important);
-            // }
 
             ezSkinConfig = GlobalConfigStore.EzConfig;
 
@@ -56,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         case GlobalSkinnableContainers.MainHUDComponents:
                             return new DefaultSkinComponentsContainer(container =>
                             {
-                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().ToArray();
+                                var hitTiming = container.ChildrenOfType<EzHUDHitTiming>().ToArray();
 
                                 if (hitTiming.Length >= 2)
                                 {
@@ -77,16 +71,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     hitTiming2.AloneShow.Value = AloneShowMenu.Late;
                                 }
 
-                                var comboSprite = container.ChildrenOfType<EzComComboSprite>().FirstOrDefault();
+                                var comboTitle = container.ChildrenOfType<EzHUDComboTitle>().FirstOrDefault();
 
-                                if (comboSprite != null)
+                                if (comboTitle != null)
                                 {
-                                    comboSprite.Anchor = Anchor.TopCentre;
-                                    comboSprite.Origin = Anchor.Centre;
-                                    comboSprite.Y = 190;
+                                    comboTitle.Anchor = Anchor.TopCentre;
+                                    comboTitle.Origin = Anchor.Centre;
+                                    comboTitle.Y = 190;
                                 }
 
-                                var combos = container.ChildrenOfType<EzComComboCounter>().ToArray();
+                                var combos = container.ChildrenOfType<EzHUDComboCounter>().ToArray();
 
                                 if (combos.Length >= 2)
                                 {
@@ -157,15 +151,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                 var o2PillBar = container.OfType<O2PillBar>().FirstOrDefault();
                             })
                             {
-                                new EzComComboSprite(),
-                                new EzComComboCounter(),
-                                new EzComComboCounter(),
+                                new EzHUDComboTitle(),
+                                new EzHUDComboCounter(),
+                                new EzHUDComboCounter(),
                                 new EzComKeyCounterDisplay(),
                                 new EzComHitTimingColumns(),
                                 new BarHitErrorMeter(),
                                 new EzComHitResultScore(),
-                                new EzComHitTiming(),
-                                new EzComHitTiming(),
+                                new EzHUDHitTiming(),
+                                new EzHUDHitTiming(),
                                 new EzComO2JamPillUI
                                 {
                                     Anchor = Anchor.CentreRight,

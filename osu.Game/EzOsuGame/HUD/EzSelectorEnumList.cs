@@ -7,11 +7,9 @@ using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 
 namespace osu.Game.EzOsuGame.HUD

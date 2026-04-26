@@ -17,13 +17,13 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 {
-    public partial class EzComHitTiming : HitErrorMeter
+    public partial class EzHUDHitTiming : HitErrorMeter
     {
         [SettingSource("Offset Number Font", "Offset Number Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> NumberNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<EzEnumGameThemeName> NumberFont { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource("Offset Text Font", "Offset Text Font", SettingControlType = typeof(OffsetTextNameSelector))]
-        public Bindable<EzEnumGameThemeName> TextNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<EzEnumGameThemeName> TextFont { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource("Single Show E/L", "Show only Early or: Late separately")]
         public Bindable<AloneShowMenu> AloneShow { get; } = new Bindable<AloneShowMenu>(AloneShowMenu.None);
@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         private EzComboText offsetText = null!;
         private Box backgroundBox = null!;
 
-        public EzComHitTiming()
+        public EzHUDHitTiming()
         {
             Size = new Vector2(300, 80);
             Anchor = Anchor.Centre;
@@ -117,7 +117,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                             // Spacing = new Vector2(SymmetryOffset.Value),
                             Children = new Drawable[]
                             {
-                                timingTextL = new EzComboText(TextNameDropdown)
+                                timingTextL = new EzComboText
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -125,14 +125,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                                     Alpha = 1,
                                     Position = new Vector2(-SymmetryOffset.Value, 0)
                                 },
-                                timingText = new EzComboText(TextNameDropdown)
+                                timingText = new EzComboText
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
                                     Text = "e/l",
                                     Alpha = 0
                                 },
-                                timingTextR = new EzComboText(TextNameDropdown)
+                                timingTextR = new EzComboText
                                 {
                                     Anchor = Anchor.Centre,
                                     Origin = Anchor.Centre,
@@ -142,7 +142,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                                 },
                             }
                         },
-                        offsetText = new EzComboText(NumberNameDropdown)
+                        offsetText = new EzComboText
                         {
                             Anchor = Anchor.Centre,
                             Origin = Anchor.Centre,
@@ -162,20 +162,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             NumberAlpha.BindValueChanged(alpha => offsetText.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => errorContainer.Colour = AccentColour.Value, true);
 
-            NumberNameDropdown.BindValueChanged(e =>
+            NumberFont.BindValueChanged(e =>
             {
                 offsetText.FontName.Value = e.NewValue;
                 offsetText.Invalidate();
             }, true);
 
-            TextNameDropdown.BindValueChanged(e =>
+            TextFont.BindValueChanged(e =>
             {
                 timingText.FontName.Value = e.NewValue;
                 timingTextL.FontName.Value = e.NewValue;
                 timingTextR.FontName.Value = e.NewValue;
                 Invalidate();
-                // timingText1.Invalidate();
-                // timingText3.Invalidate();
             }, true);
 
             AloneShow.BindValueChanged(_ => updateAlpha(), true);

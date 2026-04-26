@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.IO;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -12,21 +14,17 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzComboText : CompositeDrawable, IHasText
     {
-        public readonly EzGetComboTexture TextPart;
+        private readonly EzComboSpriteText textPart;
         public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
         public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
 
         public FillFlowContainer TextContainer { get; private set; }
 
-        // public float DefaultWidth { get; set; } = 100; // 默认宽度
-
         public LocalisableString Text
         {
-            get => TextPart.Text;
-            set => TextPart.Text = value;
+            get => textPart.Text;
+            set => textPart.Text = value;
         }
-
-        // public object Spacing { get; set; }
 
         public EzComboText(Bindable<EzEnumGameThemeName>? externalFontName = null)
         {
@@ -37,7 +35,7 @@ namespace osu.Game.EzOsuGame.HUD
             if (externalFontName is not null)
                 FontName.BindTo(externalFontName);
 
-            TextPart = new EzGetComboTexture(textLookup, FontName);
+            textPart = new EzComboSpriteText(textLookup, FontName);
 
             InternalChildren = new Drawable[]
             {
@@ -51,7 +49,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                     Children = new Drawable[]
                     {
-                        TextPart
+                        textPart
                     }
                 },
             };
@@ -61,10 +59,6 @@ namespace osu.Game.EzOsuGame.HUD
         {
             switch (c)
             {
-                case '.': return @"dot";
-
-                case '%': return @"percentage";
-
                 case 'c': return @"Title";
 
                 case 'e': return @"Early";
@@ -81,36 +75,63 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
-            float scale = calculateScale(TextPart.Height);
-            TextPart.Scale = new Vector2(scale);
+            float scale = getUniformHeightScale(textPart.Height);
+            textPart.Scale = new Vector2(scale);
 
             FontName.BindValueChanged(e =>
             {
-                TextPart.FontName.Value = e.NewValue;
+                textPart.FontName.Value = e.NewValue;
                 // textPart.LoadAsync(); // **强制重新加载字体**
-                scale = calculateScale(TextPart.Height);
-                TextPart.Scale = new Vector2(scale);
-                TextPart.Invalidate(); // **确保 UI 立即刷新**
+                scale = getUniformHeightScale(textPart.Height);
+                textPart.Scale = new Vector2(scale);
+                textPart.Invalidate(); // **确保 UI 立即刷新**
             }, true);
         }
 
-        private float calculateScale(float textureHeight, float targetHeight = 25f)
-        {
-            if (textureHeight <= 0)
-                return 1;
+        private float getUniformHeightScale(float textureHeight, float targetHeight = 25f)
+            => textureHeight <= 0 ? 1 : targetHeight / textureHeight;
 
-            return targetHeight / textureHeight;
-        }
-
-        protected override void Dispose(bool isDisposing)
+        private partial class EzComboSpriteText : EzSpriteText
         {
-            if (isDisposing)
+            public EzComboSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> fontName)
+                : base(getLookup, fontName)
             {
-                FontName.UnbindAll();
-                UseLazerFont.UnbindAll();
             }
 
-            base.Dispose(isDisposing);
+            protected override char[] GetPreloadSpecialChars()
+                => new[] { 'c', 'e', 'l', 'j' };
+
+            protected override string[] GetPossiblePaths(string themeRoot, string lookup, char character)
+            {
+                switch (character)
+                {
+                    case 'e':
+                    case 'l':
+                        return new[]
+                        {
+                            Path.Combine(themeRoot, lookup)
+                        };
+
+                    case 'c':
+                        return new[]
+                        {
+                            Path.Combine(themeRoot, "combo", lookup)
+                        };
+
+                    case 'j':
+                        return new[]
+                        {
+                            Path.Combine(themeRoot, "judgement")
+                        };
+
+                    default:
+                        return new[]
+                        {
+                            Path.Combine(themeRoot, "combo", lookup),
+                            Path.Combine(themeRoot, "judgement", lookup)
+                        };
+                }
+            }
         }
     }
 }

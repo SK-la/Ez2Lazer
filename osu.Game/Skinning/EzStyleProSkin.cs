@@ -107,7 +107,7 @@ namespace osu.Game.Skinning
                             var mainHUDComponents = new DefaultSkinComponentsContainer(container =>
                             {
                                 var health = container.OfType<HealthDisplay>().FirstOrDefault();
-                                var score = container.OfType<EzComScoreCounter>().FirstOrDefault();
+                                var score = container.OfType<EzHUDScoreCounter>().FirstOrDefault();
                                 var acc = container.OfType<EzHUDAccuracyCounter>().FirstOrDefault();
                                 var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
                                 var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
@@ -201,7 +201,7 @@ namespace osu.Game.Skinning
                             {
                                 Children = new Drawable[]
                                 {
-                                    new EzComScoreCounter(),
+                                    new EzHUDScoreCounter(),
                                     new BeatmapAttributeText(),
                                     new BeatmapAttributeText(),
                                     new BeatmapAttributeText(),

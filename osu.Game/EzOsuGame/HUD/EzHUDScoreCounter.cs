@@ -12,12 +12,12 @@ using osu.Game.Skinning;
 
 namespace osu.Game.EzOsuGame.HUD
 {
-    public partial class EzComScoreCounter : GameplayScoreCounter, ISerialisableDrawable
+    public partial class EzHUDScoreCounter : GameplayScoreCounter, ISerialisableDrawable
     {
         protected override double RollingDuration => 250;
 
         [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> FontNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
@@ -44,7 +44,7 @@ namespace osu.Game.EzOsuGame.HUD
             BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
 
-            FontNameDropdown.BindValueChanged(e =>
+            Font.BindValueChanged(e =>
             {
                 Text.FontName.Value = e.NewValue;
                 Text.Invalidate(); // **强制刷新 EzCounterText**
@@ -67,7 +67,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (isDisposing)
             {
-                FontNameDropdown.UnbindAll();
+                Font.UnbindAll();
                 ShowLabel.UnbindAll();
                 BoxAlpha.UnbindAll();
                 AccentColour.UnbindAll();

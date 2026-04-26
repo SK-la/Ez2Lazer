@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         case GlobalSkinnableContainers.MainHUDComponents:
                             return new DefaultSkinComponentsContainer(container =>
                             {
-                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().ToArray();
+                                var hitTiming = container.ChildrenOfType<EzHUDHitTiming>().ToArray();
 
                                 if (hitTiming.Length >= 2)
                                 {
@@ -80,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     hitTiming2.AloneShow.Value = AloneShowMenu.Late;
                                 }
 
-                                var comboSprite = container.ChildrenOfType<EzComComboSprite>().FirstOrDefault();
+                                var comboSprite = container.ChildrenOfType<EzHUDComboTitle>().FirstOrDefault();
 
                                 if (comboSprite != null)
                                 {
@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     comboSprite.Y = 190;
                                 }
 
-                                var combos = container.ChildrenOfType<EzComComboCounter>().ToArray();
+                                var combos = container.ChildrenOfType<EzHUDComboCounter>().ToArray();
 
                                 if (combos.Length >= 2)
                                 {
@@ -158,15 +158,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 }
                             })
                             {
-                                new EzComComboSprite(),
-                                new EzComComboCounter(),
-                                new EzComComboCounter(),
+                                new EzHUDComboTitle(),
+                                new EzHUDComboCounter(),
+                                new EzHUDComboCounter(),
                                 new EzComKeyCounterDisplay(),
                                 new EzComHitTimingColumns(),
                                 new BarHitErrorMeter(),
                                 new EzComHitResultScore(),
-                                new EzComHitTiming(),
-                                new EzComHitTiming(),
+                                new EzHUDHitTiming(),
+                                new EzHUDHitTiming(),
                             };
                     }
 
