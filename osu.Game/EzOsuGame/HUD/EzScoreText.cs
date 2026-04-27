@@ -99,12 +99,11 @@ namespace osu.Game.EzOsuGame.HUD
 
             protected override string[] GetPossiblePaths(string themeRoot, string lookup, char character)
             {
-                // Score 纹理只查找数字相关路径
                 return new[]
                 {
-                    $@"score/{lookup}",
-                    $@"combo/{lookup}",
-                    $@"{lookup}",
+                    $@"{themeRoot}number/score/{lookup}",
+                    $@"{themeRoot}number/combo/{lookup}",
+                    $@"{themeRoot}number/{lookup}",
                 };
             }
         }

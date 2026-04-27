@@ -119,7 +119,7 @@ namespace osu.Game.EzOsuGame.HUD
                 if (textureName != null)
                 {
                     string textureNameReplace = textureName.Replace(" ", "_");
-                    string themeRoot = @$"EzResources/GameTheme/{textureNameReplace}/number/";
+                    string themeRoot = @$"GameTheme/{textureNameReplace}/";
 
                     // 通过子类提供的路径解析器获取可能路径
                     string[] possiblePaths = getPathResolver(themeRoot, lookup, character);

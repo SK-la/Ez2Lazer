@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.HUD
         {
             switch (c)
             {
-                case 'c': return @"Title";
+                case 't': return @"Title";
 
                 case 'e': return @"Early";
 
@@ -99,7 +99,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             protected override char[] GetPreloadSpecialChars()
-                => new[] { 'c', 'e', 'l', 'j' };
+                => new[] { 't', 'e', 'l' };
 
             protected override string[] GetPossiblePaths(string themeRoot, string lookup, char character)
             {
@@ -112,23 +112,17 @@ namespace osu.Game.EzOsuGame.HUD
                             Path.Combine(themeRoot, lookup)
                         };
 
-                    case 'c':
+                    case 't':
                         return new[]
                         {
                             Path.Combine(themeRoot, "combo", lookup)
                         };
 
-                    case 'j':
-                        return new[]
-                        {
-                            Path.Combine(themeRoot, "judgement")
-                        };
-
                     default:
+                        // 数字从 combo/number 目录读取
                         return new[]
                         {
-                            Path.Combine(themeRoot, "combo", lookup),
-                            Path.Combine(themeRoot, "judgement", lookup)
+                            Path.Combine(themeRoot, "combo", "number", lookup),
                         };
                 }
             }

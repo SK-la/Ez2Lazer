@@ -87,7 +87,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                 Text = new EzComboText
                 {
                     Scale = new Vector2(0.8f),
-                    Text = "c",
+                    Text = "t",
                     Alpha = 1
                 },
             };
@@ -169,7 +169,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             if (!judgement.IsHit)
                 return;
 
-            Text.Text = judgement.IsHit ? "c" : string.Empty;
+            Text.Text = judgement.IsHit ? "t" : string.Empty;
         }
 
         public override void Clear()

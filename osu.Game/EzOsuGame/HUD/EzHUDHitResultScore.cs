@@ -151,7 +151,7 @@ namespace osu.Game.EzOsuGame.HUD
             string resultName = getHitResultToString(result);
             string name = ThemeName.Value.ToString();
 
-            string baseDir = $@"EzResources/GameTheme/{name}/judgement/";
+            string baseDir = $@"GameTheme/{name}/judgement/";
 
             // 尝试多种大小写变体以处理文件名大小写不确定性
             // 由于 TextureStore 的 Get 方法区分大小写，我们尝试常见变体：小写和大写
@@ -280,14 +280,14 @@ namespace osu.Game.EzOsuGame.HUD
                         Origin = Anchor.Centre,
                         Scale = new Vector2(1.5f),
                         Alpha = 1,
-                        Texture = textures.Get(@$"{EzModifyPath.FULL_COMBO}/full-combo")
+                        Texture = textures.Get(@$"Modify/AllCombo/full-combo")
                     }
                 };
 
                 AddInternal(fullComboSprite);
                 fullComboSprite.FadeIn(50).Then().FadeOut(3000);
 
-                fullComboSound = sampleStore.Get(@$"{EzModifyPath.FULL_COMBO}/full-combo-sound");
+                fullComboSound = sampleStore.Get(@$"Modify/AllCombo/full-combo-sound");
                 fullComboSound?.Play();
             }
             else
