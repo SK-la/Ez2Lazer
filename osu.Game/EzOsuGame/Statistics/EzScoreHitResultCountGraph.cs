@@ -264,6 +264,7 @@ namespace osu.Game.EzOsuGame.Statistics
             // 按规则集提供的顺序排序（若可用），否则使用枚举上定义的展示顺序。
             // 另外，确保把统计中实际存在但规则集未列出的特殊判定也展示出来（例如 ComboBreak、Poor）。
             List<HitResult> results = RulesetInstance.GetValidHitResults()
+                                                     .Where(r => !r.ToString().Contains("Ignore"))
                                                      .Where(r => stats.Total.ContainsKey(r))
                                                      .OrderBy(r => r.GetIndexForOrderedDisplay())
                                                      .ToList();

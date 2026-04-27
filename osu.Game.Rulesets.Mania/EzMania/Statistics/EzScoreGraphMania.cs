@@ -145,7 +145,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // var judgementOrder = new[] { HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok, HitResult.Meh, HitResult.Miss };
             var rulesetInstance = Score.Ruleset.CreateInstance();
             List<HitResult> results = rulesetInstance.GetValidHitResults()
-                                                     .Where(r => r != HitResult.IgnoreHit)
+                                                     .Where(r => !r.ToString().Contains("Ignore"))
                                                      .OrderBy(r => r.GetIndexForOrderedDisplay())
                                                      .ToList();
 
