@@ -70,7 +70,7 @@ namespace osu.Game.Skinning
                         case GlobalSkinnableContainers.SongSelect:
                             var songSelectComponents = new DefaultSkinComponentsContainer(c =>
                             {
-                                var dim = c.OfType<EzComRadarPanel>().FirstOrDefault();
+                                var dim = c.OfType<EzHUDRadarPanel>().FirstOrDefault();
 
                                 if (dim != null)
                                 {

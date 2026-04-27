@@ -18,13 +18,13 @@ namespace osu.Game.EzOsuGame.HUD
         protected override double RollingDuration => 250;
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SCORE_FONT_LABEL), nameof(EzHUDStrings.SCORE_FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         public Bindable<bool> ShowLabel { get; } = new BindableBool();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ALPHA_LABEL), nameof(EzHUDStrings.ALPHA_DESCRIPTION))]
-        public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
+        public BindableNumber<float> AccentAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,
             MaxValue = 1,
@@ -42,10 +42,10 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
-            BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
+            AccentAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
 
-            Font.BindValueChanged(e =>
+            ThemeName.BindValueChanged(e =>
             {
                 Text.FontName.Value = e.NewValue;
                 Text.Invalidate(); // **强制刷新 EzCounterText**
@@ -68,9 +68,9 @@ namespace osu.Game.EzOsuGame.HUD
         {
             if (isDisposing)
             {
-                Font.UnbindAll();
+                ThemeName.UnbindAll();
                 ShowLabel.UnbindAll();
-                BoxAlpha.UnbindAll();
+                AccentAlpha.UnbindAll();
                 AccentColour.UnbindAll();
             }
 

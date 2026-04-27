@@ -53,7 +53,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// <summary>
     /// 雷达图面板，显示当前谱面参数的六边形图形化表示
     /// </summary>
-    public partial class EzComRadarPanel : CompositeDrawable, ISerialisableDrawable
+    public partial class EzHUDRadarPanel : CompositeDrawable, ISerialisableDrawable
     {
         // Layout constants
         private const float chart_size = 144f;
@@ -96,8 +96,8 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_USE_ABSOLUTE_VALUE), nameof(EzHUDStrings.RADAR_USE_ABSOLUTE_VALUE_TOOLTIP))]
         public Bindable<bool> UseAbsoluteValue { get; } = new BindableBool();
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_BOX_COLOUR), nameof(EzHUDStrings.RADAR_BOX_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
-        public BindableColour4 BoxColour { get; } = new BindableColour4(Colour4.FromHex("#23282a"));
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BACKGROUND_COLOUR), nameof(EzHUDStrings.RADAR_BOX_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
+        public BindableColour4 BackgroundColour { get; } = new BindableColour4(new Color4(35, 40, 42, 230));
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.RADAR_LABEL_COLOUR), nameof(EzHUDStrings.RADAR_LABEL_COLOUR_TOOLTIP), SettingControlType = typeof(EzSettingsColour))]
         public BindableColour4 LabelColour { get; } = new BindableColour4(new Color4(255, 230, 128, 255));
@@ -166,7 +166,7 @@ namespace osu.Game.EzOsuGame.HUD
         private string[] activeAxisFormats = default_axis_formats;
         private EzRulesetSpecificRadarResult? cachedRulesetSpecificRadarResult;
 
-        public EzComRadarPanel()
+        public EzHUDRadarPanel()
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
@@ -190,7 +190,7 @@ namespace osu.Game.EzOsuGame.HUD
                         background = new Box
                         {
                             RelativeSizeAxes = Axes.Both,
-                            Colour = BoxColour.Value,
+                            Colour = BackgroundColour.Value,
                         },
                     },
                 },
@@ -229,18 +229,18 @@ namespace osu.Game.EzOsuGame.HUD
             bindPreserveAlpha(BaseAreaColour);
             bindPreserveAlpha(DataLineColour);
             bindPreserveAlpha(DataAreaColour);
-            bindPreserveAlpha(BoxColour);
+            bindPreserveAlpha(BackgroundColour);
             bindPreserveAlpha(LabelColour);
 
             // Set default background colour using framework standard if not already set
-            if (colourProvider != null && BoxColour.IsDefault)
+            if (colourProvider != null && BackgroundColour.IsDefault)
                 background.Colour = colourProvider.Background2;
 
             BaseLineColour.BindValueChanged(_ => applyChartColours(), true);
             BaseAreaColour.BindValueChanged(_ => applyChartColours(), true);
             DataLineColour.BindValueChanged(_ => applyChartColours(), true);
             DataAreaColour.BindValueChanged(_ => applyChartColours(), true);
-            BoxColour.BindValueChanged(e =>
+            BackgroundColour.BindValueChanged(e =>
             {
                 background.Colour = e.NewValue;
             }, true);

@@ -195,7 +195,7 @@ namespace osu.Game.EzOsuGame.Screens
         {
             var scoreTexts = this.ChildrenOfType<EzScoreText>();
             var comboTexts = this.ChildrenOfType<EzComboText>();
-            var hitResultScores = this.ChildrenOfType<EzComHitResultScore>();
+            var hitResultScores = this.ChildrenOfType<EzHUDHitResultScore>();
 
             foreach (var scoreText in scoreTexts)
                 scoreText.FontName.Value = textureGameTheme;

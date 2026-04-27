@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达数据区色", "Radar Data Area Colour");
         public static readonly LocalisableString RADAR_DATA_AREA_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("数据填充区域的颜色", "Colour of data filled area.");
 
-        public static readonly LocalisableString RADAR_BOX_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达背景色", "Radar Background Colour");
+        public static readonly LocalisableString BACKGROUND_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达背景色", "Radar Background Colour");
         public static readonly LocalisableString RADAR_BOX_COLOUR_TOOLTIP = new EzLocalizationManager.EzLocalisableString("雷达图圆角背景的颜色，设置为透明可隐藏背景", "Colour of radar chart rounded background. Set to transparent to hide background.");
 
         public static readonly LocalisableString RADAR_LABEL_COLOUR = new EzLocalizationManager.EzLocalisableString("雷达标签颜色", "Radar Label Colour");
@@ -60,7 +60,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString PILL_DIRECTION_LABEL = new EzLocalizationManager.EzLocalisableString("药丸方向", "Pill Direction");
         public static readonly LocalisableString PILL_DIRECTION_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择药丸排列的方向", "Select the pill arrangement direction.");
 
-        public static readonly LocalisableString BOX_ELEMENT_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("背景透明度", "Box Element Alpha");
+        public static readonly LocalisableString BACKGROUND_ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("背景透明度", "Box Element Alpha");
         public static readonly LocalisableString BOX_ELEMENT_ALPHA_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("背景框的透明度值", "The alpha value of background.");
 
         // EzHUDAccuracyCounter

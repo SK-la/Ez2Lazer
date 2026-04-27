@@ -14,13 +14,13 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Overlays.Settings;
 using osuTK.Graphics;
 
-namespace osu.Game.EzOsuGame.HUD
+namespace osu.Game.EzOsuGame.Overlays
 {
     //TODO 代码不对, 无法加载, 用于缩略图选择纹理
     public partial class EzSelectorTextures : SettingsItem<string>

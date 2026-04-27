@@ -16,7 +16,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     public partial class EzHUDComboTitle : HitErrorMeter
     {

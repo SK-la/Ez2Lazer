@@ -3,7 +3,7 @@
 
 using osu.Framework.Bindables;
 
-namespace osu.Game.EzOsuGame.HUD
+namespace osu.Game.EzOsuGame.Overlays
 {
     /// <summary>
     /// 战未来预览组件接口，提供预览用的纹理信息

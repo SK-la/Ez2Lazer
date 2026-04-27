@@ -9,7 +9,7 @@ using osu.Framework.Utils;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     public abstract partial class PillDisplay : CompositeDrawable
     {

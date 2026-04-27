@@ -11,9 +11,9 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.Objects;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class Ez2SongProgressGraph : SegmentedGraph<int>
+    public partial class EzSongProgressGraph : SegmentedGraph<int>
     {
         private const int tier_count = 5;
 
@@ -55,7 +55,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             }
         }
 
-        public Ez2SongProgressGraph()
+        public EzSongProgressGraph()
             : base(tier_count)
         {
             var colours = new List<Colour4>();

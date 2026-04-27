@@ -35,11 +35,12 @@ namespace osu.Game.EzOsuGame.HUD
         // [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         // public Bindable<bool> ShowLabel { get; } = new BindableBool(true);
 
+        // 是否提供本地自定义图片支持待定。这种需求量很小。
         // [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
-        // public Bindable<EzEnumGameThemeName> FontNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        // public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Font))]
-        public Bindable<Typeface> Font { get; } = new Bindable<Typeface>(Typeface.Torus);
+        public Bindable<Typeface> FontType { get; } = new Bindable<Typeface>(Typeface.Torus);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.FILL_DIRECTION_LABEL), nameof(EzHUDStrings.FILL_DIRECTION_DESCRIPTION))]
         public Bindable<Direction> FlowDirection { get; } = new Bindable<Direction>(Direction.Vertical);
@@ -120,7 +121,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             FlowDirection.BindValueChanged(_ => counterFlow.Direction = getFillDirection(FlowDirection.Value), true);
-            Font.BindValueChanged(font =>
+            FontType.BindValueChanged(font =>
             {
                 for (int i = 0; i < 4; i++)
                 {
@@ -211,23 +212,23 @@ namespace osu.Game.EzOsuGame.HUD
                     return FillDirection.Vertical;
             }
         }
+    }
 
-        public enum EzAccuracyDisplayMode
-        {
-            [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeStandard))]
-            Standard,
+    public enum EzAccuracyDisplayMode
+    {
+        [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeStandard))]
+        Standard,
 
-            [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMax))]
-            MaximumAchievable,
+        [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMax))]
+        MaximumAchievable,
 
-            [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMin))]
-            MinimumAchievable,
+        [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMin))]
+        MinimumAchievable,
 
-            [Description("Mania V1")]
-            Classic,
+        [Description("Mania V1")]
+        Classic,
 
-            [Description("None")]
-            None
-        }
+        [Description("None")]
+        None
     }
 }

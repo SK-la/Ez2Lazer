@@ -14,13 +14,13 @@ using osu.Game.Rulesets.Objects;
 using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class Ez2SongProgress : SongProgress
+    public partial class EzHUDSongProgress : SongProgress
     {
         private readonly SongProgressInfo info;
-        private readonly Ez2SongProgressGraph graph;
-        private readonly Ez2SongProgressBar bar;
+        private readonly EzSongProgressGraph graph;
+        private readonly EzSongProgressBar bar;
         private readonly Container graphContainer;
         private readonly Container content;
 
@@ -41,7 +41,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [Resolved]
         private Player? player { get; set; }
 
-        public Ez2SongProgress()
+        public EzHUDSongProgress()
         {
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
@@ -64,7 +64,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                         RelativeSizeAxes = Axes.X,
                         ShowProgress = false
                     },
-                    bar = new Ez2SongProgressBar(bar_height)
+                    bar = new EzSongProgressBar(bar_height)
                     {
                         Name = "Seek bar",
                         Origin = Anchor.BottomLeft,
@@ -77,7 +77,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                         Origin = Anchor.BottomLeft,
                         Masking = true,
                         CornerRadius = 5,
-                        Child = graph = new Ez2SongProgressGraph
+                        Child = graph = new EzSongProgressGraph
                         {
                             Name = "Difficulty graph",
                             RelativeSizeAxes = Axes.Both,

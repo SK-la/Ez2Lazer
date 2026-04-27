@@ -16,7 +16,7 @@ using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     public partial class O2PillBar : PillDisplay, IHasAccentColour, ISerialisableDrawable
     {

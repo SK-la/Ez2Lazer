@@ -22,7 +22,7 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.HUD
 {
-    public partial class EzComHitResultScore : CompositeDrawable, ISerialisableDrawable //, IPreviewable //, IAnimatableJudgement
+    public partial class EzHUDHitResultScore : CompositeDrawable, ISerialisableDrawable //, IPreviewable //, IAnimatableJudgement
     {
         public bool UsesFixedAnchor { get; set; }
 
@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.HUD
         };
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ALPHA_LABEL), nameof(EzHUDStrings.ALPHA_DESCRIPTION))]
-        public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
+        public BindableNumber<float> AccentAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,
             MaxValue = 1,
@@ -80,7 +80,7 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private ISampleStore sampleStore { get; set; } = null!;
 
-        public EzComHitResultScore()
+        public EzHUDHitResultScore()
         {
             Size = new Vector2(200, 50);
             Anchor = Anchor.Centre;
@@ -107,7 +107,7 @@ namespace osu.Game.EzOsuGame.HUD
                 anime?.Invalidate();
             }, true);
 
-            BoxAlpha.BindValueChanged(alpha => Alpha = alpha.NewValue, true);
+            AccentAlpha.BindValueChanged(alpha => Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Colour = AccentColour.Value, true);
         }
 

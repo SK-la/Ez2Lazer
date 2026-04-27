@@ -17,15 +17,15 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     public partial class EzHUDComboCounter : ComboCounter
     {
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.FONT_LABEL), nameof(EzHUDManiaStrings.FONT_DESCRIPTION), SettingControlType = typeof(EzSelectorEnumList))]
-        public Bindable<EzEnumGameThemeName> Font { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_TYPE_LABEL), nameof(EzHUDManiaStrings.EFFECT_TYPE_DESCRIPTION))]
-        public Bindable<EzComEffectType> Effect { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
+        public Bindable<EzComEffectType> EffectType { get; } = new Bindable<EzComEffectType>(EzComEffectType.Scale);
 
         // [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_LABEL), nameof(EzHUDManiaStrings.EFFECT_ORIGIN_DESCRIPTION), SettingControlType = typeof(AnchorDropdown))]
         // public Bindable<Anchor> EffectOrigin { get; } = new Bindable<Anchor>(Anchor.TopCentre)
@@ -67,7 +67,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         };
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ALPHA_LABEL), nameof(EzHUDStrings.ALPHA_DESCRIPTION))]
-        public BindableNumber<float> BoxAlpha { get; } = new BindableNumber<float>(1)
+        public BindableNumber<float> AccentAlpha { get; } = new BindableNumber<float>(1)
         {
             MinValue = 0,
             MaxValue = 1,
@@ -103,10 +103,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         {
             base.LoadComplete();
 
-            BoxAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
+            AccentAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
 
-            Font.BindValueChanged(e =>
+            ThemeName.BindValueChanged(e =>
             {
                 Text.FontName.Value = e.NewValue;
                 Text.Invalidate(); // **强制刷新 EzCounterText**
@@ -115,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         private void applyAnimation(bool wasIncrease, bool wasMiss)
         {
-            switch (Effect.Value)
+            switch (EffectType.Value)
             {
                 case EzComEffectType.Scale:
                     EzEffectHelper.ApplyScaleAnimation(
@@ -145,7 +145,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         protected override IHasText CreateText()
         {
-            Text = new EzComboText(Font)
+            Text = new EzComboText(ThemeName)
             {
                 Scale = new Vector2(1.8f),
             };

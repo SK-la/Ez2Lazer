@@ -15,9 +15,9 @@ using osu.Game.Graphics;
 using osu.Game.Screens.Play.HUD;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class Ez2SongProgressBar : SongProgressBar, IHasTooltip
+    public partial class EzSongProgressBar : SongProgressBar, IHasTooltip
     {
         // Parent will handle restricting the area of valid input.
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => true;
@@ -56,7 +56,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             }
         }
 
-        public Ez2SongProgressBar(float barHeight)
+        public EzSongProgressBar(float barHeight)
         {
             RelativeSizeAxes = Axes.X;
             Height = this.barHeight = barHeight;

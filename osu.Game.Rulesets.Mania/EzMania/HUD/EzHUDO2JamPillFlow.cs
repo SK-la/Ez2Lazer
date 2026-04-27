@@ -18,14 +18,15 @@ using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     /// <summary>
     /// HUD 组件：显示 Pills（💊）图标数量，并提供两个下拉选项：Pill 精灵图选择 和 排列方向（横向/纵向）。
     /// 外部负责将游戏中的 PillCount 同步到此控件的 `UpdatePillCount(int)`。
     /// </summary>
-    public partial class EzComO2JamPillUI : CompositeDrawable, ISerialisableDrawable
+    public partial class EzHUDO2JamPillFlow : CompositeDrawable, ISerialisableDrawable
     {
+        // TODO: 未来考虑实现真正的药丸图。
         public enum PillSprite
         {
             CheckCircle,
@@ -36,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         }
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.PILL_SPRITE_LABEL), nameof(EzHUDStrings.PILL_SPRITE_DESCRIPTION))]
-        public Bindable<PillSprite> SpriteDropdown { get; } = new Bindable<PillSprite>(PillSprite.CheckCircle);
+        public Bindable<PillSprite> SpriteDropdown { get; } = new Bindable<PillSprite>();
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.FILL_DIRECTION_LABEL), nameof(EzHUDStrings.FILL_DIRECTION_DESCRIPTION))]
         public Bindable<FillDirection> PillFillDirection { get; } = new Bindable<FillDirection>(FillDirection.Vertical);
@@ -50,8 +51,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
             Precision = 0.01f
         };
 
-        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BOX_ELEMENT_ALPHA_LABEL), nameof(EzHUDStrings.BOX_ELEMENT_ALPHA_DESCRIPTION))]
-        public BindableNumber<float> BoxElementAlpha { get; } = new BindableNumber<float>(0.7f)
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.BACKGROUND_ALPHA_LABEL), nameof(EzHUDStrings.BOX_ELEMENT_ALPHA_DESCRIPTION))]
+        public BindableNumber<float> BackgroundAlpha { get; } = new BindableNumber<float>(0.7f)
         {
             MinValue = 0,
             MaxValue = 1,
@@ -82,7 +83,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         private bool rebuildScheduled;
         private bool layoutScheduled;
 
-        public EzComO2JamPillUI()
+        public EzHUDO2JamPillFlow()
         {
             AutoSizeAxes = Axes.Both;
         }
@@ -100,7 +101,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                     Size = new Vector2(60, 280), // 默认垂直形状
                     Masking = true,
                     CornerRadius = 8,
-                    Alpha = BoxElementAlpha.Value,
+                    Alpha = BackgroundAlpha.Value,
                     Children = new Drawable[]
                     {
                         new Box
@@ -135,7 +136,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
                 }
             };
 
-            BoxElementAlpha.BindValueChanged(value => requestAlphaUpdate(value.NewValue), true);
+            BackgroundAlpha.BindValueChanged(value => requestAlphaUpdate(value.NewValue), true);
             SpriteDropdown.BindValueChanged(_ => requestRebuild());
             PillFillDirection.BindValueChanged(_ => requestLayoutUpdate());
         }

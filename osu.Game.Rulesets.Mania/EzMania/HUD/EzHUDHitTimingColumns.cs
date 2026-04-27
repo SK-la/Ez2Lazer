@@ -12,6 +12,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania.EzMania.Localization;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD;
@@ -19,9 +20,9 @@ using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class EzComHitTimingColumns : HitErrorMeter
+    public partial class EzHUDHitTimingColumns : HitErrorMeter
     {
         [SettingSource(typeof(EzHUDManiaStrings), nameof(EzHUDManiaStrings.MINIMUM_HIT_RESULT_LABEL), nameof(EzHUDManiaStrings.MINIMUM_HIT_RESULT_DESCRIPTION))]
         public Bindable<HitResult> MinimumHitResult { get; } = new Bindable<HitResult>(HitResult.Good);

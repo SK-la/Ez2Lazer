@@ -4,9 +4,9 @@
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class YuComFastSlowDisplay
+    public partial class YuHUDFastSlowDisplay
     {
         public enum YuColumnPosition
         {

@@ -16,20 +16,19 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
-using osu.Game.Rulesets.Mania.EzMania;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
     /// <summary>
     /// 判定快慢显示 HUD 组件。可以自定义 表示Early/Late的字符
     /// 代码文件来自于 YuLiangSSS。
     /// </summary>
-    public partial class YuComFastSlowDisplay : HitErrorMeter
+    public partial class YuHUDFastSlowDisplay : HitErrorMeter
     {
         public const float DEFAULT_FONT_SIZE = 25f;
 
@@ -139,7 +138,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
 
         private (HitResult result, double length)[] hitWindows = null!;
 
-        public YuComFastSlowDisplay()
+        public YuHUDFastSlowDisplay()
         {
             AutoSizeAxes = Axes.Both;
         }

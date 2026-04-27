@@ -8,12 +8,13 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
+using osu.Game.Rulesets.Mania.EzMania.HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
+using YuHUDFastSlowDisplay = osu.Game.Rulesets.Mania.EzMania.HUD.YuHUDFastSlowDisplay;
 
 namespace osu.Game.Rulesets.Mania.Skinning.SbI
 {
@@ -78,7 +79,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     combo1.Anchor = Anchor.TopCentre;
                                     combo1.Origin = Anchor.Centre;
                                     combo1.Y = 200;
-                                    combo1.Effect.Value = EzComEffectType.None;
+                                    combo1.EffectType.Value = EzComEffectType.None;
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -98,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
                                     hitErrorMeter.LabelStyle.Value = BarHitErrorMeter.LabelStyles.None;
                                 }
 
-                                _ = container.OfType<YuComFastSlowDisplay>().FirstOrDefault();
+                                _ = container.OfType<YuHUDFastSlowDisplay>().FirstOrDefault();
                             })
                             {
                                 new EzHUDHitTiming(),

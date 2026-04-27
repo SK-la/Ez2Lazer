@@ -16,9 +16,13 @@ using osu.Game.Graphics.Sprites;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.EzOsuGame.HUD
+namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class EzComsPreviewOverlay : OverlayContainer
+    /// <summary>
+    /// 一个用于预览和选择纹理的覆盖层。它会扫描指定路径下的所有PNG文件，并将它们显示为可点击的预览图像。
+    /// </summary>
+    // TODO: 目前没有具体实现，过去尝试过遇到多次崩溃，需要重构和测试。
+    public partial class EzPreviewSelectOverlay : OverlayContainer
     {
         private FillFlowContainer previewList = null!;
         private readonly IPreviewable source;
@@ -26,7 +30,7 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private TextureStore textures { get; set; } = null!;
 
-        public EzComsPreviewOverlay(IPreviewable source)
+        public EzPreviewSelectOverlay(IPreviewable source)
         {
             this.source = source;
             RelativeSizeAxes = Axes.Both;

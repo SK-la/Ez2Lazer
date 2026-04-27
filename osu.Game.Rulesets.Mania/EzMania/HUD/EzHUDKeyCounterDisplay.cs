@@ -7,14 +7,14 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Mania.EzMania.HUD;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Skinning;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
+namespace osu.Game.Rulesets.Mania.EzMania.HUD
 {
-    public partial class EzComKeyCounterDisplay : Container, ISerialisableDrawable
+    public partial class EzHUDKeyCounterDisplay : Container, ISerialisableDrawable
     {
         private readonly FillFlowContainer<EzKeyCounter> keyFlow;
         private readonly IBindableList<InputTrigger> triggers = new BindableList<InputTrigger>();
@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2HUD
         [Resolved]
         private ISkinSource skin { get; set; } = null!;
 
-        public EzComKeyCounterDisplay()
+        public EzHUDKeyCounterDisplay()
         {
             AutoSizeAxes = Axes.Y;
 
