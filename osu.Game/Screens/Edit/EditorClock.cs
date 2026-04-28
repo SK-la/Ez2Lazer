@@ -30,7 +30,17 @@ namespace osu.Game.Screens.Edit
 
         private readonly Bindable<Track> track = new Bindable<Track>();
 
-        public double TrackLength => track.Value?.IsLoaded == true ? track.Value.Length : 60000;
+        // 主音频和谱面长度取长者。未来应该实现可以自己加长谱面时长，来提高全key音谱面制作能力。
+        public double TrackLength
+        {
+            get
+            {
+                double audioLength = track.Value?.IsLoaded == true ? track.Value.Length : 60000;
+                double beatmapLength = Beatmap.HitObjects.Any() ? Beatmap.GetLastObjectTime() : 0;
+
+                return Math.Max(audioLength, beatmapLength);
+            }
+        }
 
         public AudioAdjustments AudioAdjustments { get; } = new AudioAdjustments();
 
