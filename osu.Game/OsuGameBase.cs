@@ -556,18 +556,25 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Noto/Noto-Hangul");
             AddFont(Resources, @"Fonts/Noto/Noto-Thai");
 
-            AddFont(Resources, @"Fonts/Venera/Venera-Light");
-            AddFont(Resources, @"Fonts/Venera/Venera-Bold");
-            AddFont(Resources, @"Fonts/Venera/Venera-Black");
-
-            // Optional user-supplied emoji font.
-            // Expected files in the user storage root:
-            // Fonts/Emoji/Emoji.bin
-            // Fonts/Emoji/Emoji_00.png (and additional pages as needed)
-            // This allows quickly enabling monochrome emoji without repacking osu-resources.
+            // Try to load a built-in emoji bitmap font from resources first. This allows
+            // packaging a pre-generated emoji fnt/png (or .bin) inside osu-resources under
+            // Fonts/Emoji/Emoji.* so emoji glyphs can be used as a fallback for missing
+            // glyphs in the normal text fonts (for example Noto-Basic).
             try
             {
-                const string emoji_font_asset = @"Fonts/Emoji/Emoji";
+                AddFont(Resources, @"Fonts/Emoji/Noto-Emoji");
+                Logger.Log("Loaded built-in emoji font 'Fonts/Emoji/Noto-Emoji' from resources.");
+            }
+            catch
+            {
+                // It's okay if there is no embedded emoji font. The optional user-supplied
+                // emoji font loading below will attempt to load from user storage instead.
+            }
+
+            // Optional user-supplied emoji font.
+            try
+            {
+                const string emoji_font_asset = @"Fonts/Emoji/Noto-Emoji";
 
                 if (Storage.Exists($@"{emoji_font_asset}.bin") || Storage.Exists($@"{emoji_font_asset}.fnt"))
                 {
@@ -582,6 +589,10 @@ namespace osu.Game
             {
                 Logger.Error(ex, "Failed to initialise optional emoji font.");
             }
+
+            AddFont(Resources, @"Fonts/Venera/Venera-Light");
+            AddFont(Resources, @"Fonts/Venera/Venera-Bold");
+            AddFont(Resources, @"Fonts/Venera/Venera-Black");
 
             Fonts.AddStore(new OsuIcon.OsuIconStore(Textures));
         }
