@@ -684,7 +684,11 @@ namespace osu.Game.Graphics
                 return null;
             }
 
+            public ITexturedCharacterGlyph? Get(string? fontName, int codepoint)
+                => codepoint <= char.MaxValue ? Get(fontName, (char)codepoint) : null;
+
             public Task<ITexturedCharacterGlyph?> GetAsync(string fontName, char character) => Task.Run(() => Get(fontName, character));
+            public Task<ITexturedCharacterGlyph?> GetAsync(string fontName, int codepoint) => Task.Run(() => Get(fontName, codepoint));
 
             public Texture? Get(string name, WrapMode wrapModeS, WrapMode wrapModeT) => null;
 
@@ -704,6 +708,7 @@ namespace osu.Game.Graphics
                 public float YOffset => 0;
                 public float XAdvance => 0;
                 public float Baseline => 0;
+                public int Codepoint => 0;
                 public char Character => '\0';
 
                 public float GetKerning<T>(T lastGlyph) where T : ICharacterGlyph => throw new NotImplementedException();

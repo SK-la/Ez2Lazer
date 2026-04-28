@@ -557,6 +557,16 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Noto/Noto-Hangul");
             AddFont(Resources, @"Fonts/Noto/Noto-Thai");
 
+            // 加载内置emoji字体
+            try
+            {
+                Fonts.AddTextureSource(new GlyphStore(Resources, @"Fonts/Emoji/Noto-Emoji", Host.CreateTextureLoaderStore(Resources)));
+            }
+            catch
+            {
+                // It's fine if a candidate is not provided in resources.
+            }
+
             AddFont(Resources, @"Fonts/Venera/Venera-Light");
             AddFont(Resources, @"Fonts/Venera/Venera-Bold");
             AddFont(Resources, @"Fonts/Venera/Venera-Black");
