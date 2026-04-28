@@ -3,11 +3,10 @@
 
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.EzOsuGame;
 using osuTK;
 using osuTK.Graphics;
 
-namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
+namespace osu.Game.EzOsuGame.HUD.EzHealthDisplay
 {
     public partial class EzHealthDisplayBar : Container
     {

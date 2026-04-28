@@ -4,9 +4,9 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Game.EzOsuGame;
+using osu.Game.Screens.Play.HUD;
 
-namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
+namespace osu.Game.EzOsuGame.HUD.EzHealthDisplay
 {
     public abstract partial class EzHealthDisplayBase : HealthDisplay
     {

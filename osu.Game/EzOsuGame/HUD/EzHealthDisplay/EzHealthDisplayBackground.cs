@@ -2,9 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Graphics.Containers;
-using osu.Game.EzOsuGame;
 
-namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
+namespace osu.Game.EzOsuGame.HUD.EzHealthDisplay
 {
     public partial class EzHealthDisplayBackground : Container
     {

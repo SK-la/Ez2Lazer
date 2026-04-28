@@ -12,7 +12,7 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Skinning;
 using osuTK;
 
-namespace osu.Game.Screens.Play.HUD.EzHealthDisplay
+namespace osu.Game.EzOsuGame.HUD.EzHealthDisplay
 {
     public partial class EzHealthDisplay : EzHealthDisplayBase, ISerialisableDrawable
     {
