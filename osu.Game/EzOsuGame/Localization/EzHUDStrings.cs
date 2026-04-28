@@ -80,5 +80,8 @@ namespace osu.Game.EzOsuGame.Localization
         // EzHUDScoreCounter
         public static readonly LocalisableString SCORE_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("分数文本字体", "Score Font");
         public static readonly LocalisableString SCORE_FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择分数文本的字体样式", "Select the font style for score text.");
+
+        public static readonly LocalisableString SKIP_BETTER_JUDGEMENT = new EzLocalizationManager.EzLocalisableString(
+            "跳过更好的判定结果", "Skip Better Judgment");
     }
 }
