@@ -560,6 +560,29 @@ namespace osu.Game
             AddFont(Resources, @"Fonts/Venera/Venera-Bold");
             AddFont(Resources, @"Fonts/Venera/Venera-Black");
 
+            // Optional user-supplied emoji font.
+            // Expected files in the user storage root:
+            // Fonts/Emoji/Emoji.bin
+            // Fonts/Emoji/Emoji_00.png (and additional pages as needed)
+            // This allows quickly enabling monochrome emoji without repacking osu-resources.
+            try
+            {
+                const string emoji_font_asset = @"Fonts/Emoji/Emoji";
+
+                if (Storage.Exists($@"{emoji_font_asset}.bin") || Storage.Exists($@"{emoji_font_asset}.fnt"))
+                {
+                    var userResources = new ResourceStore<byte[]>();
+                    userResources.AddStore(new StorageBackedResourceStore(Storage));
+
+                    AddFont(userResources, emoji_font_asset);
+                    Logger.Log($"Loaded optional emoji font '{emoji_font_asset}' from user storage.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to initialise optional emoji font.");
+            }
+
             Fonts.AddStore(new OsuIcon.OsuIconStore(Textures));
         }
 
