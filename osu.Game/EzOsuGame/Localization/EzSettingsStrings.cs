@@ -33,7 +33,7 @@ namespace osu.Game.EzOsuGame.Localization
 
 #endregion
 
-        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez游玩设置", "Ez Gameplay Settings");
+        public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez游玩设置", "Ez Gameplay");
         public static readonly EzLocalizationManager.EzLocalisableString EZ_UI_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez 界面设置", "Ez UI Settings");
 
         public static readonly EzLocalizationManager.EzLocalisableString HIDE_MAIN_MENU_ONLINE_BANNER =
@@ -107,51 +107,36 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString HIT_MODE = new EzLocalizationManager.EzLocalisableString("Mania 判定系统", "Mania Hit Mode");
 
         public static readonly LocalisableString HIT_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "最大限度的获得不同音游的打击体验, 如 O2,BMS系 具备对应的特殊机制。\n"
-            + "305  | 300  | 200  | 100 | 50  | Miss | Poor   | (UI)\n"
-            + "———  ———  ———  ———  ———  ———  ———  ———\n"
-            + "Cool | ---- | Good  | --- | Bad | Miss | ----   | (映射)\n"
-            + "0.3% | ---- | 0.2%  | --- | 1%  | 5%   | ----   | O2 Easy\n"
-            + "0.2% | ---- | 0.1%  | --- | 7%  | 4%   | ----   | O2 Normal\n"
-            + "0.1% | ---- | 0.0%  | --- | 5%  | 3%   | ----   | O2 Hard\n"
-            + "———  ———  ———  ———  ———  ———  ———  ———\n"
-            + "Kool | Cool | Good  | --- | Bad | Poor | []Poor | (映射)\n"
-            + "16.7 | 33.3 | 116.7 | --- | 250 | 250  | 500    | IIDX\n"
-            + "15.0 | 30.0 | 60.0   | --- | 200 | 1000 | 1000   | LR2 Hard\n"
-            + "15.0 | 45.0 | 112.0 | --- | 165 | 500  | 500    | Raja Normal\n"
-            + "20.0 | 60.0 | 150.0 | --- | 500 | 500  | 500    | Raja Easy",
-            "Get different rhythm game hit experiences to the maximum extent, such as O2 and BMS systems with corresponding special mechanisms.\n"
-            + "305  | 300  | 200   | 100 | 50  | Miss | Poor   | (UI)\n"
-            + "———  | ———  | ———   | ——— | ——— | ———  | ———    —\n"
-            + "Cool | ---- | Good  | --- | Bad | Miss | ----   | (映射)\n"
-            + "0.3% | ---- | 0.2%  | --- | 1%  | 5%   | ----   | O2 Easy\n"
-            + "0.2% | ---- | 0.1%  | --- | 7%  | 4%   | ----   | O2 Normal\n"
-            + "0.1% | ---- | 0.0%  | --- | 5%  | 3%   | ----   | O2 Hard\n"
-            + "———  | ———  | ———   | ——— | ——— | ———  | ———    —\n"
-            + "Kool | Cool | Good  | --- | Bad | Poor | []Poor | (映射)\n"
-            + "16.7 | 33.3 | 116.7 | --- | 250 | 250  | 500    | IIDX\n"
-            + "15.0 | 30.0 | 60.0  | --- | 200 | 1000 | 1000   | LR2 Hard\n"
-            + "15.0 | 45.0 | 112.0 | --- | 165 | 500  | 500    | Raja Normal\n"
-            + "20.0 | 60.0 | 150.0 | --- | 500 | 500  | 500    | Raja Easy");
+            @"
+|  305 |  300 |  Good |   OK |  Meh |  Miss |   Poor |  MapTo |
+| ---- | ---- |  ---- | ---- | ---- |  ---- |   ---- |   ---- |
+| Cool |      |  Good |      |  Bad |  Miss |        | O2Jam |
+|  1/8 | -    |   3/8 | -   | 25/48 | NoHit | -      | BeatLength |
+| Kool | Cool |  Good |      |  Miss | Fail |        | Ez2Ac |
+| 1/60 | 2/60 |  5/60 | -    |  6/60 | 7/60 | -      | Frame |
+| Kool | Cool |  Good |      |  Bad |  Poor | []Poor |  BMS |
+| 16.7 | 33.3 | 116.7 | -    |  250 |   250 |    500 | IIDX |
+| 15.0 | 30.0 |  60.0 | -    |  200 |  1000 |   1000 | LR2 Hard |
+| 15.0 | 45.0 | 112.0 | -    |  165 |   500 |    500 | Raja Normal |
+| 20.0 | 60.0 | 150.0 | -    |  500 |   500 |    500 | Raja Easy |
+| Best | Cool |  Good |      |      |  Miss |        |  Malody |
+| 20.0 | 60.0 |  94.0 | -    | -    |   150 | -      | E(Hard) |
+| 44.0 | 84.0 | 118.0 | -    | -    |   150 | -      | B(Easy+) |");
 
         public static readonly LocalisableString HEALTH_MODE = new EzLocalizationManager.EzLocalisableString("Mania 血量系统", "Mania Health Mode");
 
         public static readonly LocalisableString HEALTH_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            ""
-            + "| 305  | 300  | 200  | 100 |   50  | Miss | Poor  | (UI)|\n"
-            + "| ——— | ——— | ——— | ——— | —— | ——— | ——— | ———|\n"
-            + "| 0.4% | 0.3% | 0.1% | ---  | -1% | -6%  | -0%    | Lazer|\n"
-            + "| ——— | ——— | ——— | ——— | —— | ——— | ——— | ———|\n"
-            + "| Cool | ---- |  Good | ---  | Bad | Miss |  ----   |\n"
-            + "| 0.3% | 0.0% | 0.2% | ---  | -1% | -5%  | -0%    | O2 Easy|\n"
-            + "| 0.2% | 0.0% | 0.1% | ---  | -7% | -4%  | -0%    | O2 Normal|\n"
-            + "| 0.1% | 0.0% | 0.0% | ---  | -5% | -3%  | -0%    | O2 Hard|\n"
-            + "| ——— | ——— | ——— | ——— | —— | ——— | ——— | ———|\n"
-            + "| Kool | Cool |  Good | ---  | Bad | Poor | []Poor |\n"
-            + "| 0.4% | 0.3% | 0.1% | ---  | -1% | -5%   | -5%    | Ez2Ac|\n"
-            + "| 1.6% | 1.6% | ----  | ---  | -5% | -9%   | -5%    | IIDX Hard|\n"
-            + "| 1.0% | 1.0% | 0.5% | ---  | -6% | -10% | -2%    | LR2 Hard|\n"
-            + "| 1.2% | 1.2% | 0.6% | ---  | -3% | -6%   | -2%    | Raja Normal|");
+            @"| 305 | 300 | 200 | 100 | 50 | Miss | Poor | MapTo |
+| ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| 0.4% | 0.3% | 0.1% |   -  |  -1% |  -6% |  -0% | Lazer|
+| Cool |      | Good |      |  Bad | Miss |      | O2Jam |
+| 0.3% | -    | 0.2% |    - |  -1% |  -5% |    - | O2 Easy
+| 0.2% | -    | 0.1% |    - |  -7% |  -4% |    - | O2 Normal |
+| 0.1% | -    | 0.0% |    - |  -5% |  -3% |    - | O2 Hard |
+| Kool | Cool | Good |      |  Bad | Poor | []Poor | BMS |
+| 1.6% | 1.6% |    - |   -  |  -5% |  -9% |  -5% | IIDX Hard |
+| 1.0% | 1.0% | 0.5% |   -  |  -6% | -10% |  -2% | LR2 Hard |
+| 1.2% | 1.2% | 0.6% |   -  |  -3% |  -6% |  -2% | Raja Normal |");
 
         public static readonly LocalisableString POOR_HIT_RESULT = new EzLocalizationManager.EzLocalisableString("增加 Poor 判定类型", "Additional Poor HitResult");
 

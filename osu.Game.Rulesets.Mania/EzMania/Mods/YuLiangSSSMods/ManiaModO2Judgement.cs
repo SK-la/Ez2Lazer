@@ -8,10 +8,10 @@ using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.Rulesets.Mania.EzMania.HUD;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Scoring;
-using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
@@ -97,12 +97,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             if (!PillMode.Value)
                 return;
 
-            var pillUI = new EzComO2JamPillUI
+            var pillUI = new EzHUDO2JamPillFlow
             {
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
             };
-            pillUI.BoxElementAlpha.Value = 0.7f;
+            pillUI.BackgroundAlpha.Value = 0.7f;
             overlay.Add(pillUI);
         }
     }

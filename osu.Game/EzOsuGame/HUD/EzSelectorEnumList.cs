@@ -3,24 +3,16 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Localisation;
-using osu.Framework.Logging;
-using osu.Framework.Platform;
-using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
+
+// ReSharper disable UnusedMember.Global
 
 namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzSelectorEnumList : SettingsDropdown<EzEnumGameThemeName>
     {
-        [Resolved]
-        private Storage storage { get; set; } = null!;
-
         // public const string DEFAULT_NAME = "Celeste_Lumiere";
         public const EzEnumGameThemeName DEFAULT_NAME = EzEnumGameThemeName.Celeste_Lumiere;
 
@@ -30,28 +22,6 @@ namespace osu.Game.EzOsuGame.HUD
             // 动态加载GameTheme文件夹
             // var availableThemes = loadAvailableThemes();
             Items = Enum.GetValues(typeof(EzEnumGameThemeName)).Cast<EzEnumGameThemeName>().ToList();
-        }
-
-        private List<string> loadAvailableThemes()
-        {
-            var themes = new List<string>();
-
-            try
-            {
-                string gameThemePath = storage.GetFullPath("EzResources/GameTheme");
-
-                if (Directory.Exists(gameThemePath))
-                {
-                    string[] directories = Directory.GetDirectories(gameThemePath);
-                    themes.AddRange(directories.Select(Path.GetFileName).Where(name => !string.IsNullOrEmpty(name))!);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Failed to load GameTheme folders: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-            }
-
-            return themes;
         }
     }
 

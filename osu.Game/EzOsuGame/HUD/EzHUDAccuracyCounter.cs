@@ -9,6 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -34,25 +35,26 @@ namespace osu.Game.EzOsuGame.HUD
         // [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.ShowLabel))]
         // public Bindable<bool> ShowLabel { get; } = new BindableBool(true);
 
+        // 是否提供本地自定义图片支持待定。这种需求量很小。
         // [SettingSource("Font", "Font", SettingControlType = typeof(EzSelectorEnumList))]
-        // public Bindable<EzEnumGameThemeName> FontNameDropdown { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+        // public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Font))]
-        public Bindable<Typeface> Font { get; } = new Bindable<Typeface>(Typeface.Torus);
+        public Bindable<Typeface> FontType { get; } = new Bindable<Typeface>(Typeface.Torus);
 
-        [SettingSource("Fill Direction", "排列方向")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.FILL_DIRECTION_LABEL), nameof(EzHUDStrings.FILL_DIRECTION_DESCRIPTION))]
         public Bindable<Direction> FlowDirection { get; } = new Bindable<Direction>(Direction.Vertical);
 
-        [SettingSource("Accuracy1 display mode")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_LABEL), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_DESCRIPTION))]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay1 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.Standard);
 
-        [SettingSource("Accuracy2 display mode")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_LABEL), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_DESCRIPTION))]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay2 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.Classic);
 
-        [SettingSource("Accuracy3 display mode")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_LABEL), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_DESCRIPTION))]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay3 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.None);
 
-        [SettingSource("Accuracy4 display mode")]
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_LABEL), nameof(EzHUDStrings.ACCURACY_DISPLAY_MODE_DESCRIPTION))]
         public Bindable<EzAccuracyDisplayMode> AccuracyDisplay4 { get; } = new Bindable<EzAccuracyDisplayMode>(EzAccuracyDisplayMode.None);
 
         // [Resolved]
@@ -119,7 +121,7 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             FlowDirection.BindValueChanged(_ => counterFlow.Direction = getFillDirection(FlowDirection.Value), true);
-            Font.BindValueChanged(font =>
+            FontType.BindValueChanged(font =>
             {
                 for (int i = 0; i < 4; i++)
                 {
@@ -210,23 +212,23 @@ namespace osu.Game.EzOsuGame.HUD
                     return FillDirection.Vertical;
             }
         }
+    }
 
-        public enum EzAccuracyDisplayMode
-        {
-            [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeStandard))]
-            Standard,
+    public enum EzAccuracyDisplayMode
+    {
+        [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeStandard))]
+        Standard,
 
-            [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMax))]
-            MaximumAchievable,
+        [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMax))]
+        MaximumAchievable,
 
-            [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMin))]
-            MinimumAchievable,
+        [LocalisableDescription(typeof(GameplayAccuracyCounterStrings), nameof(GameplayAccuracyCounterStrings.AccuracyDisplayModeMin))]
+        MinimumAchievable,
 
-            [Description("Mania V1")]
-            Classic,
+        [Description("Mania V1")]
+        Classic,
 
-            [Description("None")]
-            None
-        }
+        [Description("None")]
+        None
     }
 }

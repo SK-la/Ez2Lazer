@@ -9,7 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
+using osu.Game.Rulesets.Mania.EzMania.HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
 using osu.Game.Skinning;
@@ -21,26 +21,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
     {
         private readonly Ez2ConfigManager ezSkinConfig;
         private readonly ManiaBeatmap beatmap;
-        private readonly IBindable<double> columnWidthBindable;
-        private readonly IBindable<double> specialFactorBindable;
-        private readonly IBindable<double> hitPosition;
+        private readonly float columnWidth;
+        private readonly float specialFactor;
+        private readonly float hitPosition;
 
-        //EzSkinSettings即使不用也不能删，否则特殊列计算会出错
         public ManiaEzStyleProSkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
         {
             this.beatmap = (ManiaBeatmap)beatmap;
 
-            // if (GlobalConfigStore.EzConfig == null)
-            // {
-            //     Logger.Log("!GlobalConfigStore.EzConfig EzStyleProSkin", LoggingTarget.Runtime, LogLevel.Important);
-            // }
-
             ezSkinConfig = GlobalConfigStore.EzConfig;
 
-            columnWidthBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth);
-            specialFactorBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor);
-            hitPosition = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
+            columnWidth = (float)ezSkinConfig.Get<double>(Ez2Setting.ColumnWidth);
+            specialFactor = (float)ezSkinConfig.Get<double>(Ez2Setting.SpecialFactor);
+            hitPosition = (float)ezSkinConfig.Get<double>(Ez2Setting.HitPosition);
         }
 
         public override Drawable? GetDrawableComponent(ISkinComponentLookup lookup)
@@ -56,7 +50,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                         case GlobalSkinnableContainers.MainHUDComponents:
                             return new DefaultSkinComponentsContainer(container =>
                             {
-                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().ToArray();
+                                var hitTiming = container.ChildrenOfType<EzHUDHitTiming>().ToArray();
 
                                 if (hitTiming.Length >= 2)
                                 {
@@ -77,16 +71,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     hitTiming2.AloneShow.Value = AloneShowMenu.Late;
                                 }
 
-                                var comboSprite = container.ChildrenOfType<EzComComboSprite>().FirstOrDefault();
+                                var comboTitle = container.ChildrenOfType<EzHUDComboTitle>().FirstOrDefault();
 
-                                if (comboSprite != null)
+                                if (comboTitle != null)
                                 {
-                                    comboSprite.Anchor = Anchor.TopCentre;
-                                    comboSprite.Origin = Anchor.Centre;
-                                    comboSprite.Y = 190;
+                                    comboTitle.Anchor = Anchor.TopCentre;
+                                    comboTitle.Origin = Anchor.Centre;
+                                    comboTitle.Y = 190;
                                 }
 
-                                var combos = container.ChildrenOfType<EzComComboCounter>().ToArray();
+                                var combos = container.ChildrenOfType<EzHUDComboCounter>().ToArray();
 
                                 if (combos.Length >= 2)
                                 {
@@ -96,7 +90,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     combo1.Anchor = Anchor.TopCentre;
                                     combo1.Origin = Anchor.TopCentre;
                                     combo1.Y = 200;
-                                    combo1.BoxAlpha.Value = 0.8f;
+                                    combo1.AccentAlpha.Value = 0.8f;
                                     combo1.EffectStartFactor.Value = 1.5f;
                                     combo1.EffectEndFactor.Value = 1f;
                                     combo1.EffectStartTime.Value = 10;
@@ -105,28 +99,28 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     combo2.Anchor = Anchor.TopCentre;
                                     combo2.Origin = Anchor.TopCentre;
                                     combo2.Y = 200;
-                                    combo2.BoxAlpha.Value = 0.4f;
+                                    combo2.AccentAlpha.Value = 0.4f;
                                     combo2.EffectStartFactor.Value = 2.5f;
                                     combo2.EffectEndFactor.Value = 1f;
                                     combo2.EffectStartTime.Value = 10;
                                     combo2.EffectEndDuration.Value = 300;
                                 }
 
-                                var keyCounter = container.ChildrenOfType<EzComKeyCounterDisplay>().FirstOrDefault();
-                                var columnHitErrorMeter = container.OfType<EzComHitTimingColumns>().FirstOrDefault();
+                                var keyCounter = container.ChildrenOfType<EzHUDKeyCounterDisplay>().FirstOrDefault();
+                                var columnHitErrorMeter = container.OfType<EzHUDHitTimingColumns>().FirstOrDefault();
 
                                 if (keyCounter != null)
                                 {
                                     keyCounter.Anchor = Anchor.BottomCentre;
                                     keyCounter.Origin = Anchor.TopCentre;
-                                    keyCounter.Position = new Vector2(0, -(float)hitPosition.Value - stage_padding_bottom);
+                                    keyCounter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
                                 }
 
                                 if (columnHitErrorMeter != null)
                                 {
                                     columnHitErrorMeter.Anchor = Anchor.BottomCentre;
                                     columnHitErrorMeter.Origin = Anchor.Centre;
-                                    columnHitErrorMeter.Position = new Vector2(0, -(float)hitPosition.Value - stage_padding_bottom);
+                                    columnHitErrorMeter.Position = new Vector2(0, -hitPosition - stage_padding_bottom);
                                 }
 
                                 var hitErrorMeter = container.OfType<BarHitErrorMeter>().FirstOrDefault();
@@ -145,7 +139,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                     hitErrorMeter.LabelStyle.Value = BarHitErrorMeter.LabelStyles.None;
                                 }
 
-                                var judgementPiece = container.OfType<EzComHitResultScore>().FirstOrDefault();
+                                var judgementPiece = container.OfType<EzHUDHitResultScore>().FirstOrDefault();
 
                                 if (judgementPiece != null)
                                 {
@@ -157,16 +151,16 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                                 var o2PillBar = container.OfType<O2PillBar>().FirstOrDefault();
                             })
                             {
-                                new EzComComboSprite(),
-                                new EzComComboCounter(),
-                                new EzComComboCounter(),
-                                new EzComKeyCounterDisplay(),
-                                new EzComHitTimingColumns(),
+                                new EzHUDComboTitle(),
+                                new EzHUDComboCounter(),
+                                new EzHUDComboCounter(),
+                                new EzHUDKeyCounterDisplay(),
+                                new EzHUDHitTimingColumns(),
                                 new BarHitErrorMeter(),
-                                new EzComHitResultScore(),
-                                new EzComHitTiming(),
-                                new EzComHitTiming(),
-                                new EzComO2JamPillUI
+                                new EzHUDHitResultScore(),
+                                new EzHUDHitTiming(),
+                                new EzHUDHitTiming(),
+                                new EzHUDO2JamPillFlow
                                 {
                                     Anchor = Anchor.CentreRight,
                                     Origin = Anchor.CentreRight,
@@ -234,8 +228,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
 
         #region GetConfig
 
-        private float columnWidth;
-
         public override IBindable<TValue>? GetConfig<TLookup, TValue>(TLookup lookup)
         {
             if (lookup is ManiaSkinConfigurationLookup maniaLookup)
@@ -243,16 +235,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 int columnIndex = maniaLookup.ColumnIndex ?? 0;
                 var stage = beatmap.GetStageForColumnIndex(columnIndex);
                 bool isSpecialColumn = ezSkinConfig.IsSpecialColumnFast(stage.Columns, columnIndex);
-                columnWidth = (float)columnWidthBindable.Value * (isSpecialColumn ? (float)specialFactorBindable.Value : 1f);
-                // float hitPositionValue = (float)hitPosition.Value; // + (float)virtualHitPosition.Value - 110f;
+                float width = columnWidth * (isSpecialColumn ? specialFactor : 1f);
 
                 if (stage.Columns == 14 && columnIndex == 13)
-                    columnWidth = 0f;
+                    width = 0f;
 
                 switch (maniaLookup.Lookup)
                 {
                     case LegacyManiaSkinConfigurationLookups.ColumnWidth:
-                        return SkinUtils.As<TValue>(new Bindable<float>(columnWidth));
+                        return SkinUtils.As<TValue>(new Bindable<float>(width));
 
                     // case LegacyManiaSkinConfigurationLookups.HitPosition:
                     //     return SkinUtils.As<TValue>(new Bindable<float>(hitPositionValue));

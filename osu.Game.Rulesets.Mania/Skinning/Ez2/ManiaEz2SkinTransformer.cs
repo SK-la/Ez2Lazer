@@ -10,7 +10,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.EzMania;
-using osu.Game.Rulesets.Mania.Skinning.Ez2HUD;
+using osu.Game.Rulesets.Mania.EzMania.HUD;
 using osu.Game.Rulesets.Mania.Skinning.EzStylePro;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Screens.Play.HUD.HitErrorMeters;
@@ -59,7 +59,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                         case GlobalSkinnableContainers.MainHUDComponents:
                             return new DefaultSkinComponentsContainer(container =>
                             {
-                                var hitTiming = container.ChildrenOfType<EzComHitTiming>().ToArray();
+                                var hitTiming = container.ChildrenOfType<EzHUDHitTiming>().ToArray();
 
                                 if (hitTiming.Length >= 2)
                                 {
@@ -80,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     hitTiming2.AloneShow.Value = AloneShowMenu.Late;
                                 }
 
-                                var comboSprite = container.ChildrenOfType<EzComComboSprite>().FirstOrDefault();
+                                var comboSprite = container.ChildrenOfType<EzHUDComboTitle>().FirstOrDefault();
 
                                 if (comboSprite != null)
                                 {
@@ -89,7 +89,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     comboSprite.Y = 190;
                                 }
 
-                                var combos = container.ChildrenOfType<EzComComboCounter>().ToArray();
+                                var combos = container.ChildrenOfType<EzHUDComboCounter>().ToArray();
 
                                 if (combos.Length >= 2)
                                 {
@@ -99,7 +99,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo1.Anchor = Anchor.TopCentre;
                                     combo1.Origin = Anchor.TopCentre;
                                     combo1.Y = 200;
-                                    combo1.BoxAlpha.Value = 0.8f;
+                                    combo1.AccentAlpha.Value = 0.8f;
                                     combo1.EffectStartFactor.Value = 1.5f;
                                     combo1.EffectEndFactor.Value = 1f;
                                     combo1.EffectStartTime.Value = 10;
@@ -108,15 +108,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     combo2.Anchor = Anchor.TopCentre;
                                     combo2.Origin = Anchor.TopCentre;
                                     combo2.Y = 200;
-                                    combo2.BoxAlpha.Value = 0.4f;
+                                    combo2.AccentAlpha.Value = 0.4f;
                                     combo2.EffectStartFactor.Value = 3f;
                                     combo2.EffectEndFactor.Value = 1f;
                                     combo2.EffectStartTime.Value = 10;
                                     combo2.EffectEndDuration.Value = 300;
                                 }
 
-                                var keyCounter = container.ChildrenOfType<EzComKeyCounterDisplay>().FirstOrDefault();
-                                var columnHitErrorMeter = container.OfType<EzComHitTimingColumns>().FirstOrDefault();
+                                var keyCounter = container.ChildrenOfType<EzHUDKeyCounterDisplay>().FirstOrDefault();
+                                var columnHitErrorMeter = container.OfType<EzHUDHitTimingColumns>().FirstOrDefault();
 
                                 if (keyCounter != null)
                                 {
@@ -148,7 +148,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                     hitErrorMeter.LabelStyle.Value = BarHitErrorMeter.LabelStyles.None;
                                 }
 
-                                var judgementPiece = container.OfType<EzComHitResultScore>().FirstOrDefault();
+                                var judgementPiece = container.OfType<EzHUDHitResultScore>().FirstOrDefault();
 
                                 if (judgementPiece != null)
                                 {
@@ -158,15 +158,15 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                                 }
                             })
                             {
-                                new EzComComboSprite(),
-                                new EzComComboCounter(),
-                                new EzComComboCounter(),
-                                new EzComKeyCounterDisplay(),
-                                new EzComHitTimingColumns(),
+                                new EzHUDComboTitle(),
+                                new EzHUDComboCounter(),
+                                new EzHUDComboCounter(),
+                                new EzHUDKeyCounterDisplay(),
+                                new EzHUDHitTimingColumns(),
                                 new BarHitErrorMeter(),
-                                new EzComHitResultScore(),
-                                new EzComHitTiming(),
-                                new EzComHitTiming(),
+                                new EzHUDHitResultScore(),
+                                new EzHUDHitTiming(),
+                                new EzHUDHitTiming(),
                             };
                     }
 

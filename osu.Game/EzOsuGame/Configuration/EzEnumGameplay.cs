@@ -5,6 +5,8 @@ using System.ComponentModel;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 
+// ReSharper disable InconsistentNaming
+
 namespace osu.Game.EzOsuGame.Configuration
 {
     public enum ColumnWidthStyle
@@ -21,29 +23,32 @@ namespace osu.Game.EzOsuGame.Configuration
 
     public enum EzEnumHitMode
     {
-        [Description("Lazer Style")]
+        [Description("Lazer")]
         Lazer = 0,
 
-        [Description("EZ2AC Style")]
+        [Description("EZ2AC(Testing)")]
         EZ2AC = 1,
 
-        [Description("O2JAM Style")]
+        [Description("O2JAM")]
         O2Jam = 2,
 
-        [Description("IIDX Hard Style")]
+        [Description("IIDX")]
         IIDX_HD = 3,
 
-        [Description("LR2 Hard Style")]
+        [Description("LR2 Hard")]
         LR2_HD = 4,
 
-        [Description("Raja Hard Style")]
+        [Description("Raja Normal")]
         Raja_NM = 5,
 
-        [Description("")]
-        Malody = 6,
+        [Description("Malody E Judge")]
+        Malody_E = 6,
+
+        [Description("Malody B Judge")]
+        Malody_B = 7,
 
         [Description("")]
-        Classic = 7,
+        Classic = 8,
     }
 
     public enum EzEnumHealthMode
@@ -60,7 +65,7 @@ namespace osu.Game.EzOsuGame.Configuration
         [Description("O2Jam Hard")]
         O2JamHard = 3,
 
-        [Description("Ez2Ac(NoActive)")]
+        [Description("")]
         Ez2Ac = 4,
 
         [Description("IIDX Hard(Testing)")]

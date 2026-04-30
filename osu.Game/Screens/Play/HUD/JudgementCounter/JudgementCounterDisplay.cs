@@ -9,6 +9,8 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation.HUD;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
@@ -33,6 +35,9 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
 
         [SettingSource(typeof(JudgementCounterDisplayStrings), nameof(JudgementCounterDisplayStrings.ShowMaxJudgement))]
         public BindableBool ShowMaxJudgement { get; } = new BindableBool(true);
+
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.SKIP_BETTER_JUDGEMENT))]
+        public Bindable<EzEnumHitResult> SkipBetterJudgement { get; } = new Bindable<EzEnumHitResult>();
 
         [Resolved]
         private JudgementCountController judgementCountController { get; set; } = null!;
@@ -70,6 +75,7 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
 
             Mode.BindValueChanged(_ => updateDisplay());
             ShowMaxJudgement.BindValueChanged(_ => updateDisplay(), true);
+            SkipBetterJudgement.BindDisabledChanged(_ => updateDisplay(), true);
         }
 
         private void updateDisplay()
@@ -92,7 +98,10 @@ namespace osu.Game.Screens.Play.HUD.JudgementCounter
                 var hitResult = counter.Result.Types.First();
 
                 if (hitResult.IsBasic())
-                    return true;
+                {
+                    // 对比判定质量过滤
+                    return hitResult.GetIndexForOrderedDisplay() >= SkipBetterJudgement.Value.GetIndexForOrderedDisplay();
+                }
 
                 switch (Mode.Value)
                 {

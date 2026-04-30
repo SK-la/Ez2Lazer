@@ -248,10 +248,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         #endregion
 
-        #if DEBUG
+#if DEBUG
+
         [SettingSource("Test")]
         public BindableBool Test { get; } = new BindableBool();
-        # endif
+
+# endif
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -390,7 +392,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         {
             var maniaBeatmap = (ManiaBeatmap)beatmap;
 
-            #if DEBUG
+#if DEBUG
+
             if (Test.Value)
             {
                 var obj = maniaBeatmap;
@@ -401,32 +404,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                     Logger.Log($"Column {column.Key + 1}: {column.Count()} notes", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 //Logger.Log($"Test:\nThis beatmap has {obj.HitObjects.Count} HitObjects.\n", level: LogLevel.Important);
             }
-            # endif
+
+# endif
+
+            Seed.Value ??= RNG.Next();
+            var rng = new Random((int)Seed.Value);
+            int availableColumns = maniaBeatmap.TotalColumns;
 
             if (RandomColumn.Value)
             {
-                Seed.Value ??= RNG.Next();
-                var rng = new Random((int)Seed.Value);
-
-                int availableColumns = maniaBeatmap.TotalColumns;
                 var shuffledColumns = Enumerable.Range(0, availableColumns).OrderBy(_ => rng.Next()).ToList();
                 beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = shuffledColumns[h.Column]);
             }
 
             if (Mirror.Value)
             {
-                int availableColumns = maniaBeatmap.TotalColumns;
                 beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = availableColumns - 1 - h.Column);
             }
 
             if (RandomMirror.Value)
             {
-                Seed.Value ??= RNG.Next();
-                var rng = new Random((int)Seed.Value);
-
                 if (rng.Next() % 2 == 0)
                 {
-                    int availableColumns = maniaBeatmap.TotalColumns;
                     beatmap.HitObjects.OfType<ManiaHitObject>().ForEach(h => h.Column = availableColumns - 1 - h.Column);
                 }
             }
@@ -434,8 +433,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             if (TrueRandom.Value)
             {
                 Seed.Value ??= RNG.Next();
-                var rng = new Random((int)Seed.Value);
-                int availableColumns = maniaBeatmap.TotalColumns;
 
                 foreach (var obj in beatmap.HitObjects.OfType<ManiaHitObject>().GroupBy(c => c.StartTime))
                 {

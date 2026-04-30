@@ -249,12 +249,33 @@ namespace osu.Game.Overlays.SkinEditor
 
             float relativeSidebarWidth = (EditorSidebar.WIDTH + padding) / DrawWidth;
             float relativeToolbarHeight = (SkinEditorSceneLibrary.HEIGHT + SkinEditor.MENU_HEIGHT + padding) / DrawHeight;
+            // 宽度方向保持原样填满。
+            float relativeWidth = 1 - relativeSidebarWidth * 2;
+
+            // 保持场景与游戏窗口相同的宽高比。
+            float targetHeight = relativeWidth;
+
+            // 工具栏和边距后的可用垂直空间（高度的分数）。
+            float spaceHeight = 1f - relativeToolbarHeight - padding / DrawHeight;
+
+            // 如果目标高度（保持宽高比）大于可用空间，则限制它；否则在可用空间中垂直居中。
+            float offsetY;
+
+            if (targetHeight > spaceHeight)
+            {
+                targetHeight = spaceHeight;
+                offsetY = 0f;
+            }
+            else
+            {
+                offsetY = (spaceHeight - targetHeight) / 2f;
+            }
 
             var rect = new RectangleF(
                 relativeSidebarWidth,
-                relativeToolbarHeight,
-                1 - relativeSidebarWidth * 2,
-                1f - relativeToolbarHeight - padding / DrawHeight);
+                relativeToolbarHeight + offsetY,
+                relativeWidth,
+                targetHeight);
 
             scalingContainer.SetCustomRect(rect, true);
         }

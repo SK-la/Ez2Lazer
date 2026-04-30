@@ -12,8 +12,10 @@ using osuTK;
 
 namespace osu.Game.Graphics.UserInterfaceV2
 {
-    public partial class FormFieldCaption : CompositeDrawable, IHasTooltip
+    public partial class FormFieldCaption : CompositeDrawable, IHasTooltip, IHasCustomTooltip<LocalisableString>
     {
+        public override bool HandlePositionalInput => true;
+
         private OsuTextFlowContainer textFlow = null!;
 
         private LocalisableString caption;
@@ -80,5 +82,12 @@ namespace osu.Game.Graphics.UserInterfaceV2
                 });
             }
         }
+
+        ITooltip IHasCustomTooltip.GetCustomTooltip() => new MarkdownTooltip();
+
+        ITooltip<LocalisableString> IHasCustomTooltip<LocalisableString>.GetCustomTooltip() => new MarkdownTooltip();
+        object? IHasCustomTooltip.TooltipContent => TooltipText;
+
+        LocalisableString IHasCustomTooltip<LocalisableString>.TooltipContent => TooltipText;
     }
 }

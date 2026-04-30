@@ -113,7 +113,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.StagePanelEnabled, true);
 
             SetDefault(Ez2Setting.ColumnWidthStyle, ColumnWidthStyle.EzSkinOnly);
-            SetDefault(Ez2Setting.ColumnWidth, 75, 5, 400.0, 1.0);
+            SetDefault(Ez2Setting.ColumnWidth, 76, 5, 400.0, 1.0);
             SetDefault(Ez2Setting.SpecialFactor, 1.2, 0.5, 2.0, 0.1);
 
             SetDefault(Ez2Setting.HitPositionGlobalEnable, false);

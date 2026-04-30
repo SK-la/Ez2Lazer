@@ -70,7 +70,7 @@ namespace osu.Game.Skinning
                         case GlobalSkinnableContainers.SongSelect:
                             var songSelectComponents = new DefaultSkinComponentsContainer(c =>
                             {
-                                var dim = c.OfType<EzComRadarPanel>().FirstOrDefault();
+                                var dim = c.OfType<EzHUDRadarPanel>().FirstOrDefault();
 
                                 if (dim != null)
                                 {
@@ -87,12 +87,13 @@ namespace osu.Game.Skinning
                             var mainHUDComponents = new DefaultSkinComponentsContainer(container =>
                             {
                                 var health = container.OfType<HealthDisplay>().FirstOrDefault();
-                                var score = container.OfType<EzComScoreCounter>().FirstOrDefault();
+                                var score = container.OfType<EzHUDScoreCounter>().FirstOrDefault();
                                 var acc = container.OfType<ArgonAccuracyCounter>().FirstOrDefault();
                                 var pps = container.OfType<ArgonPerformancePointsCounter>().FirstOrDefault();
                                 var songProgress = container.OfType<ArgonSongProgress>().FirstOrDefault();
 
                                 const float x_offset = 20;
+                                const float padding = 10;
 
                                 if (health != null)
                                 {
@@ -105,83 +106,76 @@ namespace osu.Game.Skinning
                                     health.Rotation = -90;
                                     health.Position = new Vector2(0, 0);
 
-                                    if (score != null)
-                                    {
-                                        score.Anchor = Anchor.TopLeft;
-                                        score.Origin = Anchor.TopLeft;
-                                        score.Position = new Vector2(x_offset, 20);
-                                        score.ShowLabel.Value = false;
-                                        // score.FontNameDropdown =
-                                    }
-
                                     if (acc != null)
                                     {
-                                        acc.Position = new Vector2(-x_offset, 20);
+                                        acc.Position = new Vector2(-x_offset, x_offset);
                                         acc.Anchor = Anchor.TopRight;
                                         acc.Origin = Anchor.TopRight;
                                     }
 
-                                    if (pps != null && acc != null)
+                                    if (score != null)
                                     {
-                                        pps.Position = new Vector2(acc.X, acc.Y + acc.DrawHeight + 10);
-                                        pps.Anchor = Anchor.TopRight;
-                                        pps.Origin = Anchor.TopRight;
-                                        pps.Scale = new Vector2(0.8f);
-                                    }
-
-                                    if (songProgress != null)
-                                    {
-                                        const float padding = 10;
-                                        songProgress.Position = new Vector2(0, -padding);
-                                        songProgress.Scale = new Vector2(0.9f, 1);
+                                        score.Anchor = Anchor.TopLeft;
+                                        score.Origin = Anchor.TopLeft;
+                                        score.Position = new Vector2(x_offset, x_offset);
+                                        score.ShowLabel.Value = false;
+                                        score.ThemeName.Value = EzEnumGameThemeName.Celeste_Lumiere;
                                     }
 
                                     var attributeTexts = container.OfType<BeatmapAttributeText>().ToArray();
 
                                     if (attributeTexts.Length >= 4)
                                     {
-                                        var attributeText = attributeTexts[0];
-                                        var attributeText2 = attributeTexts[1];
-                                        var attributeText3 = attributeTexts[2];
-                                        var attributeText4 = attributeTexts[3];
+                                        var title = attributeTexts[0];
+                                        var artist = attributeTexts[1];
+                                        var diff = attributeTexts[2];
+                                        var sr = attributeTexts[3];
+
+                                        title.Anchor = Anchor.TopLeft;
+                                        title.Origin = Anchor.TopLeft;
+                                        title.Scale = new Vector2(0.65f);
+                                        title.Position = new Vector2(x_offset, 50 + 10);
+                                        title.Attribute.Value = BeatmapAttribute.Title;
+
+                                        artist.Anchor = Anchor.TopLeft;
+                                        artist.Origin = Anchor.TopLeft;
+                                        artist.Scale = new Vector2(0.65f);
+                                        artist.Position = new Vector2(x_offset, title.Y + title.DrawHeight * title.Scale.Y + 10);
+                                        artist.Attribute.Value = BeatmapAttribute.Artist;
+
+                                        diff.Anchor = Anchor.TopLeft;
+                                        diff.Origin = Anchor.TopLeft;
+                                        diff.Position = new Vector2(x_offset, artist.Y + artist.DrawHeight * artist.Scale.Y + 10);
+                                        diff.Scale = new Vector2(0.65f);
+                                        diff.Attribute.Value = BeatmapAttribute.DifficultyName;
+                                        diff.Template.Value = "{Value}";
+
+                                        sr.Anchor = Anchor.TopLeft;
+                                        sr.Origin = Anchor.TopLeft;
+                                        sr.Position = new Vector2(x_offset, diff.Y + diff.DrawHeight * diff.Scale.Y + 10);
+                                        sr.Scale = new Vector2(0.65f);
+                                        sr.Attribute.Value = BeatmapAttribute.StarRating;
 
                                         if (pps != null)
                                         {
-                                            attributeText.Anchor = Anchor.TopRight;
-                                            attributeText.Origin = Anchor.TopRight;
-                                            attributeText.Position = new Vector2(-x_offset, pps.Y + pps.DrawHeight * pps.Scale.Y + 10);
-                                            attributeText.Scale = new Vector2(0.65f);
-                                            attributeText.Attribute.Value = BeatmapAttribute.StarRating;
+                                            pps.Position = new Vector2(x_offset, sr.Y + sr.DrawHeight * sr.Scale.Y + 10);
+                                            pps.Anchor = Anchor.TopLeft;
+                                            pps.Origin = Anchor.TopLeft;
+                                            pps.Scale = new Vector2(0.8f);
                                         }
+                                    }
 
-                                        attributeText2.Anchor = Anchor.TopRight;
-                                        attributeText2.Origin = Anchor.TopRight;
-                                        attributeText2.Position = new Vector2(-x_offset, attributeText.Y + attributeText.DrawHeight * attributeText.Scale.Y + 10);
-                                        attributeText2.Scale = new Vector2(0.65f);
-                                        attributeText2.Attribute.Value = BeatmapAttribute.DifficultyName;
-                                        attributeText2.Template.Value = "{Value}";
-
-                                        if (score != null)
-                                        {
-                                            attributeText3.Anchor = Anchor.TopLeft;
-                                            attributeText3.Origin = Anchor.TopLeft;
-                                            attributeText3.Scale = new Vector2(0.65f);
-                                            attributeText3.Position = new Vector2(x_offset, score.Y + score.DrawHeight * score.Scale.Y + 10);
-                                            attributeText3.Attribute.Value = BeatmapAttribute.Artist;
-                                        }
-
-                                        attributeText4.Anchor = Anchor.TopLeft;
-                                        attributeText4.Origin = Anchor.TopLeft;
-                                        attributeText4.Scale = new Vector2(0.65f);
-                                        attributeText4.Position = new Vector2(x_offset, attributeText3.Y + attributeText3.DrawHeight * attributeText3.Scale.Y + 10);
-                                        attributeText4.Attribute.Value = BeatmapAttribute.Title;
+                                    if (songProgress != null)
+                                    {
+                                        songProgress.Position = new Vector2(0, -padding);
+                                        songProgress.Scale = new Vector2(0.9f, 1);
                                     }
                                 }
                             })
                             {
                                 Children = new Drawable[]
                                 {
-                                    new EzComScoreCounter(),
+                                    new EzHUDScoreCounter(),
                                     new BeatmapAttributeText(),
                                     new BeatmapAttributeText(),
                                     new BeatmapAttributeText(),

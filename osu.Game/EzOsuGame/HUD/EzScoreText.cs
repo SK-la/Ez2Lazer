@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -14,24 +15,21 @@ namespace osu.Game.EzOsuGame.HUD
 {
     public partial class EzScoreText : CompositeDrawable, IHasText
     {
+        private readonly EzScoreSpriteText textPart;
+
         [Resolved]
         private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
 
-        public readonly EzGetScoreTexture TextPart;
         public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
-        public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
+        public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>();
 
         public FillFlowContainer TextContainer { get; private set; }
 
-        // public float DefaultWidth { get; set; } = 100; // 默认宽度
-
         public LocalisableString Text
         {
-            get => TextPart.Text;
-            set => TextPart.Text = value;
+            get => textPart.Text;
+            set => textPart.Text = value;
         }
-
-        // public object Spacing { get; set; }
 
         public EzScoreText()
         {
@@ -39,7 +37,7 @@ namespace osu.Game.EzOsuGame.HUD
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            TextPart = new EzGetScoreTexture(textLookup, FontName);
+            textPart = new EzScoreSpriteText(textLookup, FontName);
 
             InternalChildren = new Drawable[]
             {
@@ -53,7 +51,7 @@ namespace osu.Game.EzOsuGame.HUD
 
                     Children = new Drawable[]
                     {
-                        TextPart
+                        textPart
                     }
                 },
             };
@@ -76,36 +74,38 @@ namespace osu.Game.EzOsuGame.HUD
             base.LoadComplete();
             FontName.BindTo(ezSkinConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName));
 
-            float scale = calculateScale(TextPart.Height);
-            TextPart.Scale = new Vector2(scale);
+            float scale = getUniformHeightScale(textPart.Height);
+            textPart.Scale = new Vector2(scale);
 
             FontName.BindValueChanged(e =>
             {
-                TextPart.FontName.Value = e.NewValue;
+                textPart.FontName.Value = e.NewValue;
                 // textPart.LoadAsync(); // **强制重新加载字体**
-                scale = calculateScale(TextPart.Height);
-                TextPart.Scale = new Vector2(scale);
-                TextPart.Invalidate(); // **确保 UI 立即刷新**
+                scale = getUniformHeightScale(textPart.Height);
+                textPart.Scale = new Vector2(scale);
+                textPart.Invalidate(); // **确保 UI 立即刷新**
             }, true);
         }
 
-        private float calculateScale(float textureHeight, float targetHeight = 35f)
-        {
-            if (textureHeight <= 0)
-                return 1;
+        private float getUniformHeightScale(float textureHeight, float targetHeight = 35f)
+            => textureHeight <= 0 ? 1 : targetHeight / textureHeight;
 
-            return targetHeight / textureHeight;
-        }
-
-        protected override void Dispose(bool isDisposing)
+        private partial class EzScoreSpriteText : EzSpriteText
         {
-            if (isDisposing)
+            public EzScoreSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> fontName)
+                : base(getLookup, fontName)
             {
-                FontName.UnbindAll();
-                UseLazerFont.UnbindAll();
             }
 
-            base.Dispose(isDisposing);
+            protected override string[] GetPossiblePaths(string themeRoot, string lookup, char character)
+            {
+                return new[]
+                {
+                    $@"{themeRoot}number/score/{lookup}",
+                    $@"{themeRoot}number/combo/{lookup}",
+                    $@"{themeRoot}number/{lookup}",
+                };
+            }
         }
     }
 }
