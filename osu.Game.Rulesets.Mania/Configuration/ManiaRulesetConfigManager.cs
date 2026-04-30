@@ -6,6 +6,7 @@ using osu.Game.Configuration;
 using osu.Game.Localisation;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Mania.EzMania;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.UI;
 
 namespace osu.Game.Rulesets.Mania.Configuration
@@ -31,6 +32,8 @@ namespace osu.Game.Rulesets.Mania.Configuration
             SetDefault(ManiaRulesetSetting.ScrollSpeed, 200, 1.0, 401.0, current_scroll_speed_precision);
             SetDefault(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
             SetDefault(ManiaRulesetSetting.TimingBasedNoteColouring, false);
+            SetDefault(ManiaRulesetSetting.TimingBasedNoteColouringTargetGrayscale, ManiaTimingBasedNoteColour.DEFAULT_TARGET_GRAYSCALE, 0.1, 2.0, 0.01);
+            SetDefault(ManiaRulesetSetting.TimingBasedNoteColouringColourAlpha, ManiaTimingBasedNoteColour.DEFAULT_COLOUR_ALPHA, 0.0, 1.0, 0.01);
             SetDefault(ManiaRulesetSetting.MobileLayout, ManiaMobileLayout.Portrait);
             SetDefault(ManiaRulesetSetting.TouchOverlay, false);
         }
@@ -74,6 +77,8 @@ namespace osu.Game.Rulesets.Mania.Configuration
         ScrollSpeed,
         ScrollDirection,
         TimingBasedNoteColouring,
+        TimingBasedNoteColouringTargetGrayscale,
+        TimingBasedNoteColouringColourAlpha,
         MobileLayout,
         TouchOverlay,
     }

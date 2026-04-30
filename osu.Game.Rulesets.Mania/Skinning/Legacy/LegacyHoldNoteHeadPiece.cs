@@ -47,7 +47,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         {
             // TODO: Should fallback to the head from default legacy skin instead of note.
             return GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage)
-                   ?? GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage);
+                   ?? GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage);
         }
 
         protected override void Dispose(bool isDisposing)

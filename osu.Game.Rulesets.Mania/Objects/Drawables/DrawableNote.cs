@@ -13,10 +13,10 @@ using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens.Edit;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
@@ -27,9 +27,6 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
     /// </summary>
     public partial class DrawableNote : DrawableManiaHitObject<Note>, IKeyBindingHandler<ManiaAction>
     {
-        private const float timing_based_target_grayscale = 1.5f;//0.72f;
-        private const float timing_based_colour_alpha = 0.8f;
-
         [Resolved]
         private OsuColour colours { get; set; }
 
@@ -37,11 +34,13 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private IBeatmap beatmap { get; set; }
 
         private readonly Bindable<bool> configTimingBasedNoteColouring = new Bindable<bool>();
+        private readonly Bindable<double> configTimingBasedNoteColouringTargetGrayscale = new Bindable<double>(ManiaTimingBasedNoteColour.DEFAULT_TARGET_GRAYSCALE);
+        private readonly Bindable<double> configTimingBasedNoteColouringColourAlpha = new Bindable<double>(ManiaTimingBasedNoteColour.DEFAULT_COLOUR_ALPHA);
 
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
+        protected virtual bool SupportsTimingBasedNoteColouring => true;
 
         private BufferedContainer headPieceColourContainer;
-        private Color4 timingBasedGrayscaleColour;
         private Color4 timingBasedOutputColour;
         private bool hasTimingBasedOutputColour;
         private double lastSnapDataStartTime = double.NaN;
@@ -63,12 +62,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private void load(ManiaRulesetConfigManager rulesetConfig)
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, configTimingBasedNoteColouring);
-
-            timingBasedGrayscaleColour = new Color4(
-                timing_based_target_grayscale,
-                timing_based_target_grayscale,
-                timing_based_target_grayscale,
-                1f);
+            rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouringTargetGrayscale, configTimingBasedNoteColouringTargetGrayscale);
+            rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouringColourAlpha, configTimingBasedNoteColouringColourAlpha);
 
             AddInternal(headPieceColourContainer = new BufferedContainer(cachedFrameBuffer: false, pixelSnapping: true)
             {
@@ -80,6 +75,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                     AutoSizeAxes = Axes.Y
                 }
             });
+
+            if (headPiece is SkinnableDrawable skinnableDrawable)
+                skinnableDrawable.OnSkinChanged += updateSnapColour;
         }
 
         protected override void LoadComplete()
@@ -88,15 +86,18 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             configTimingBasedNoteColouring.BindValueChanged(_ =>
             {
-                if (configTimingBasedNoteColouring.Value)
+                if (SupportsTimingBasedNoteColouring && configTimingBasedNoteColouring.Value)
                     updateSnapData();
 
                 updateSnapColour();
             });
 
+            configTimingBasedNoteColouringTargetGrayscale.BindValueChanged(_ => updateSnapDataAndColour());
+            configTimingBasedNoteColouringColourAlpha.BindValueChanged(_ => updateSnapDataAndColour());
+
             StartTimeBindable.BindValueChanged(_ =>
             {
-                if (configTimingBasedNoteColouring.Value)
+                if (SupportsTimingBasedNoteColouring && configTimingBasedNoteColouring.Value)
                     updateSnapData();
 
                 updateSnapColour();
@@ -107,7 +108,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.OnApply();
 
-            if (configTimingBasedNoteColouring.Value)
+            if (SupportsTimingBasedNoteColouring && configTimingBasedNoteColouring.Value)
                 updateSnapData();
 
             updateSnapColour();
@@ -165,7 +166,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         private void updateSnapColour()
         {
-            if (!hasTimingBasedOutputColour)
+            if (!SupportsTimingBasedNoteColouring || !hasTimingBasedOutputColour)
             {
                 headPieceColourContainer.GrayscaleStrength = 0;
                 headPieceColourContainer.Colour = Color4.White;
@@ -176,7 +177,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             if (configTimingBasedNoteColouring.Value)
             {
-                headPieceColourContainer.GrayscaleStrength = 1;
+                headPieceColourContainer.GrayscaleStrength = usesTimingColourTexture ? 0 : 1;
                 headPieceColourContainer.Colour = timingBasedOutputColour;
 
                 Colour = Color4.White;
@@ -187,6 +188,17 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 headPieceColourContainer.Colour = Color4.White;
 
                 Colour = Color4.White;
+            }
+        }
+
+        private bool usesTimingColourTexture
+        {
+            get
+            {
+                if (headPiece is SkinnableDrawable skinnableDrawable)
+                    return skinnableDrawable.Drawable is IManiaTimingColourTextureProvider { UsesTimingColourTexture: true };
+
+                return headPiece is IManiaTimingColourTextureProvider { UsesTimingColourTexture: true };
             }
         }
 
@@ -205,62 +217,26 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             if (hasTimingBasedOutputColour && lastSnapDataStartTime == startTime && ReferenceEquals(lastSnapDataBeatmap, beatmap))
                 return;
 
-            int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(startTime);
-
-            timingBasedOutputColour = getTimingBasedOutputColour(BindableBeatDivisor.GetColourFor(snapDivisor, colours));
+            timingBasedOutputColour = ManiaTimingBasedNoteColour.GetColourFor(
+                beatmap,
+                startTime,
+                colours,
+                configTimingBasedNoteColouringTargetGrayscale.Value,
+                configTimingBasedNoteColouringColourAlpha.Value);
             hasTimingBasedOutputColour = true;
             lastSnapDataStartTime = startTime;
             lastSnapDataBeatmap = beatmap;
         }
 
-        private Color4 getTimingBasedOutputColour(Color4 timingBasedColour)
+        private void updateSnapDataAndColour()
         {
-            // Equivalent to drawing an alpha-tinted layer on top of an opaque grayscale base,
-            // but computed directly to avoid a second proxy/container draw path.
-            return new Color4(
-                timingBasedGrayscaleColour.R + (timingBasedColour.R - timingBasedGrayscaleColour.R) * timing_based_colour_alpha,
-                timingBasedGrayscaleColour.G + (timingBasedColour.G - timingBasedGrayscaleColour.G) * timing_based_colour_alpha,
-                timingBasedGrayscaleColour.B + (timingBasedColour.B - timingBasedGrayscaleColour.B) * timing_based_colour_alpha,
-                1f);
-        }
+            lastSnapDataStartTime = double.NaN;
+            lastSnapDataBeatmap = null;
 
-        private static Color4 GetColourFor(int beatDivisor, OsuColour colours)
-        {
-            switch (beatDivisor)
-            {
-                case 1:
-                    return colours.Red;
+            if (SupportsTimingBasedNoteColouring && configTimingBasedNoteColouring.Value)
+                updateSnapData();
 
-                case 2:
-                    return colours.Blue;
-
-                case 4:
-                    return colours.YellowLight;
-
-                case 8:
-                    return colours.DarkOrange2;
-
-                case 16:
-                    return colours.Green;
-
-
-                case 3:
-                    return colours.Purple;
-
-                case 6:
-                    return colours.Pink;
-
-                case 12:
-                    return colours.BlueLight;
-
-                case 5:
-                case 7:
-                case 9:
-                    return Color4.White;
-
-                default:
-                    return Color4.White;
-            }
+            updateSnapColour();
         }
     }
 }

@@ -122,6 +122,28 @@ namespace osu.Game.Rulesets.Mania
                 {
                     Keywords = new[] { "color" },
                 },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = "Timing-based note target grayscale",
+                    HintText = "Brightness of the grayscale base used before applying timing-based note colours.",
+                    Current = config.GetBindable<double>(ManiaRulesetSetting.TimingBasedNoteColouringTargetGrayscale),
+                    KeyboardStep = 0.01f,
+                    LabelFormat = v => $"{v:0.00}x",
+                })
+                {
+                    Keywords = new[] { "color", "colour", "timing" },
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = "Timing-based note colour alpha",
+                    HintText = "Strength of the timing colour mixed into the grayscale note base.",
+                    Current = config.GetBindable<double>(ManiaRulesetSetting.TimingBasedNoteColouringColourAlpha),
+                    KeyboardStep = 0.01f,
+                    DisplayAsPercentage = true,
+                })
+                {
+                    Keywords = new[] { "color", "colour", "timing" },
+                },
             };
 
             Add(new SettingsItemV2(new FormCheckBox

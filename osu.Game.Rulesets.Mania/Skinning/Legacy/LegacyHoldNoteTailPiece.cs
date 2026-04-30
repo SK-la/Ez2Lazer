@@ -16,6 +16,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
     {
         private readonly IBindable<double?> missingStartTime = new Bindable<double?>();
 
+        public override bool UsesTimingColourTexture => false;
+
         [Resolved]
         private DrawableHitObject drawableObject { get; set; } = null!;
 
@@ -55,9 +57,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         protected override Drawable? GetAnimation(ISkinSource skin)
         {
             // TODO: Should fallback to the head from default legacy skin instead of note.
-            return GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.HoldNoteTailImage)
-                   ?? GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage)
-                   ?? GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage);
+            return GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.HoldNoteTailImage, false)
+                   ?? GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, false)
+                   ?? GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage, false);
         }
 
         protected override void Dispose(bool isDisposing)
