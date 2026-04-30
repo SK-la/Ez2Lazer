@@ -12,12 +12,40 @@ using osu.Framework.Input.Events;
 using osu.Game.Input.Bindings;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Types;
 using osuTK.Input;
 
 namespace osu.Game.Screens.Edit.Compose.Components.Timeline
 {
     internal partial class TimelineSelectionHandler : EditorSelectionHandler
     {
+        // 高亮框右上角显示 Column 列号
+        protected override void OnSelectionChanged()
+        {
+            base.OnSelectionChanged();
+            SelectionBox.SecondaryText = string.Empty;
+
+            int? selectedColumn = null;
+
+            foreach (var hitObject in SelectedItems)
+            {
+                if (hitObject is not IHasColumn hasColumn)
+                    return;
+
+                if (selectedColumn == null)
+                {
+                    selectedColumn = hasColumn.Column;
+                    continue;
+                }
+
+                if (selectedColumn.Value != hasColumn.Column)
+                    return;
+            }
+
+            if (selectedColumn != null)
+                SelectionBox.SecondaryText = (selectedColumn.Value + 1).ToString();
+        }
+
         // for now we always allow movement. snapping is provided by the Timeline's "distance" snap implementation
         public override bool HandleMovement(MoveSelectionEvent<HitObject> moveEvent) => true;
 

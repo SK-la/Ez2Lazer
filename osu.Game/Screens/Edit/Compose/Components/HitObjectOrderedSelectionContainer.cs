@@ -44,8 +44,12 @@ namespace osu.Game.Screens.Edit.Compose.Components
             var xObj = ((SelectionBlueprint<HitObject>)x).Item;
             var yObj = ((SelectionBlueprint<HitObject>)y).Item;
 
+            // 将选中note置顶
+            int result = x.Depth.CompareTo(y.Depth);
+            if (result != 0) return result;
+
             // Put earlier blueprints towards the end of the list, so they handle input first
-            int result = yObj.StartTime.CompareTo(xObj.StartTime);
+            result = yObj.StartTime.CompareTo(xObj.StartTime);
             if (result != 0) return result;
 
             // Fall back to end time if the start time is equal.

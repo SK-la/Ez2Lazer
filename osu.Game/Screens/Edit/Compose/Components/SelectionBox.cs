@@ -119,6 +119,23 @@ namespace osu.Game.Screens.Edit.Compose.Components
         private FillFlowContainer<SelectionBoxButton> buttons = null!;
 
         private OsuSpriteText? selectionDetailsText;
+        private OsuSpriteText? selectionDetailsSecondaryText;
+
+        private string secondaryText = string.Empty;
+
+        public string SecondaryText
+        {
+            get => secondaryText;
+            set
+            {
+                if (value == secondaryText)
+                    return;
+
+                secondaryText = value;
+                if (selectionDetailsSecondaryText != null)
+                    selectionDetailsSecondaryText.Text = value;
+            }
+        }
 
         [Resolved]
         private OsuColour colours { get; set; } = null!;
@@ -145,6 +162,28 @@ namespace osu.Game.Screens.Edit.Compose.Components
                             Colour = colours.Gray0,
                             Font = OsuFont.Default.With(size: 11),
                             Text = text,
+                        }
+                    }
+                },
+                new Container
+                {
+                    Name = "secondary info text",
+                    Anchor = Anchor.TopRight,
+                    Origin = Anchor.TopRight,
+                    AutoSizeAxes = Axes.Both,
+                    Children = new Drawable[]
+                    {
+                        new Box
+                        {
+                            Colour = colours.YellowDark,
+                            RelativeSizeAxes = Axes.Both,
+                        },
+                        selectionDetailsSecondaryText = new OsuSpriteText
+                        {
+                            Padding = new MarginPadding(2),
+                            Colour = colours.Gray0,
+                            Font = OsuFont.Default.With(size: 11),
+                            Text = secondaryText,
                         }
                     }
                 },
