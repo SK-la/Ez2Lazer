@@ -66,12 +66,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 c.Height = NoteHeight;
             }
         }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            animation = null;
-        }
     }
 }

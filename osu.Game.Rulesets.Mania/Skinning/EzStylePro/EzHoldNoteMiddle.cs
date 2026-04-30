@@ -285,17 +285,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             ClearTransforms();
             hittingLayer?.Recycle();
         }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                hittingLayer?.Expire();
-                topContainer?.Expire();
-                bodyContainer?.Expire();
-            }
-        }
     }
 }

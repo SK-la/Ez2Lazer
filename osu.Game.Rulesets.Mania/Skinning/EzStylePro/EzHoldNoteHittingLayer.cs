@@ -102,17 +102,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             float v = -(float)HitPosition.Value - NoteHeight / 2;
             Position = new Vector2(0, v);
         }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                HitPosition.UnbindBindings();
-            }
-
-            base.Dispose(isDisposing);
-
-            animation = null;
-        }
     }
 }

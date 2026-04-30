@@ -200,16 +200,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         }
 
         private static bool layoutChanged(float oldValue, float newValue) => float.IsNaN(oldValue) || MathF.Abs(oldValue - newValue) > 0.001f;
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            if (isDisposing)
-            {
-                topContainer?.Expire();
-                bodyContainer?.Expire();
-            }
-        }
     }
 }

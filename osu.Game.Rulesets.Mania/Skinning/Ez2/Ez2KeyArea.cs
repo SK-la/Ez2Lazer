@@ -236,18 +236,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         }
 
         private Color4 getLightingColour() => Interpolation.ValueAt(0.2f, accentColourLocal.Value, Color4.White, 0, 1);
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                // Unbind local bindables to avoid leaking subscriptions and avoid touching shared bindables.
-                accentColourLocal.UnbindBindings();
-                hitPositionLocal.UnbindBindings();
-                directionLocal.UnbindBindings();
-            }
-
-            base.Dispose(isDisposing);
-        }
     }
 }

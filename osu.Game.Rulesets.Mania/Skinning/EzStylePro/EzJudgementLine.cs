@@ -70,12 +70,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             sprite.Scale = new Vector2(scale);
             sprite.Y = 384f + ezConfig.DefaultHitPosition - (float)hitPositonBindable.Value;
         }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            base.Dispose(isDisposing);
-
-            container = null;
-        }
     }
 }

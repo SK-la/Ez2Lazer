@@ -96,15 +96,5 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
         {
             this.FadeOutFromOne(PoolableHitExplosion.DURATION, Easing.Out);
         }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                accentColourLocal.UnbindBindings();
-            }
-
-            base.Dispose(isDisposing);
-        }
     }
 }
