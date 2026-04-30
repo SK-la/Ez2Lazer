@@ -40,14 +40,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         private void load(IEzSkinInfo ezSkinInfo)
         {
             HitPosition = ezSkinInfo.HitPosition;
-            HitPosition.BindValueChanged(_ => UpdateDrawable());
+            HitPosition.BindValueChanged(_ => OnDrawableChanged());
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            Scheduler.AddOnce(UpdateDrawable);
+            Scheduler.AddOnce(OnDrawableChanged);
 
             if (animation == null)
                 UpdateTexture();

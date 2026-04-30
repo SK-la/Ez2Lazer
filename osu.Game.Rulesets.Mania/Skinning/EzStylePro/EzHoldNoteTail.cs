@@ -50,8 +50,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             tailAlpha = ezSkinInfo.HoldTailAlpha;
             tailMaskHeight = ezSkinInfo.HoldTailMaskHeight;
 
-            tailMaskHeight.BindValueChanged(_ => UpdateDrawable(), true);
-            tailAlpha.BindValueChanged(_ => UpdateColor(), true);
+            tailMaskHeight.BindValueChanged(_ => OnDrawableChanged(), true);
+            tailAlpha.BindValueChanged(_ => OnColourChanged(), true);
         }
 
         protected override void UpdateTexture()

@@ -60,9 +60,9 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
                 tailMaskHeight.BindValueChanged(e =>
                 {
                     cachedTailMaskHeight = (float)e.NewValue;
-                    UpdateDrawable();
+                    OnDrawableChanged();
                 }, true);
-                tailAlpha.BindValueChanged(_ => UpdateColor(), true);
+                tailAlpha.BindValueChanged(_ => OnColourChanged(), true);
             }
 
             holdNote = (DrawableHoldNote)drawableObject;
@@ -145,7 +145,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             OnLightChanged();
             resetLayoutCache();
             // 立即刷新 + 下一帧刷新，确保 HoldNote 布局稳定
-            Schedule(UpdateDrawable);
+            Schedule(OnDrawableChanged);
         }
 
         protected override void UpdateDrawable()

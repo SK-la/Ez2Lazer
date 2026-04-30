@@ -116,6 +116,7 @@ namespace osu.Game.Rulesets.Mania.UI
 
         // 缓存计算参数，避免闭包捕获
         public int KeyMode;
+        public bool ConfigTimingBasedNoteColouring;
 
         [BackgroundDependencyLoader]
         private void load(GameHost host, ManiaRulesetConfigManager? rulesetConfig, StageDefinition stageDefinition)
@@ -126,6 +127,8 @@ namespace osu.Game.Rulesets.Mania.UI
             EzNoteColourBindable = ezConfig.GetColumnColorBindable(KeyMode, Index);
             NoteSetNameBindable = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             ColorSettingsEnabledBindable = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
+
+            if (rulesetConfig != null) ConfigTimingBasedNoteColouring = rulesetConfig.Get<bool>(ManiaRulesetSetting.TimingBasedNoteColouring);
 
             SkinnableDrawable keyArea;
 

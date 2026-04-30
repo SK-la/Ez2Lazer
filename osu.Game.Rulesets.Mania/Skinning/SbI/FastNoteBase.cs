@@ -61,9 +61,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.SbI
         {
             get
             {
-                bool enable = EnabledColorBindable.Value;
-
-                if (!enable || !UseColorization)
+                if (!EnabledColorBindable.Value || !UseColorization || Column.ConfigTimingBasedNoteColouring)
                     return Colour4.White;
 
                 return NoteColourBindable.Value;

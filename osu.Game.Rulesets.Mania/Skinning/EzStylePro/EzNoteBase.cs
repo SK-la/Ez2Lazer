@@ -65,7 +65,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if (enabledColorBindable.Value && UseColorization)
+                if (enabledColorBindable.Value && UseColorization && !Column.ConfigTimingBasedNoteColouring)
                     return noteColourBindable.Value;
 
                 return Colour4.White;
@@ -80,7 +80,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             get
             {
-                if ((enabledColorBindable.Value && UseColorization) || !UseColorization) return "white";
+                if ((enabledColorBindable.Value && UseColorization) || !UseColorization || Column.ConfigTimingBasedNoteColouring) return "white";
 
                 return noteTypeBindable.Value switch
                 {
@@ -102,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             MainContainer.Colour = NoteColor;
         }
 
-        private void OnLoadChanged()
+        protected void OnLoadChanged()
         {
             if (!IsLoaded)
                 return;
@@ -113,14 +113,14 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             OnColourChanged();
         }
 
-        private void OnDrawableChanged()
+        protected void OnDrawableChanged()
         {
             UpdateDrawable();
         }
 
-        private void OnColourChanged()
+        protected void OnColourChanged()
         {
-            if (UseColorization)
+            if (UseColorization || !Column.ConfigTimingBasedNoteColouring)
                 UpdateColor();
         }
 
