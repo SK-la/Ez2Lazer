@@ -241,12 +241,12 @@ namespace osu.Game.EzOsuGame.Statistics
         private class ColumnStatistics
         {
             public readonly Dictionary<HitResult, int> Total = new Dictionary<HitResult, int>();
-            public readonly Dictionary<HitResult, int> Late = new Dictionary<HitResult, int>();
             public readonly Dictionary<HitResult, int> Early = new Dictionary<HitResult, int>();
+            public readonly Dictionary<HitResult, int> Late = new Dictionary<HitResult, int>();
 
             public int TotalAll;
-            public int TotalLateAll;
             public int TotalEarlyAll;
+            public int TotalLateAll;
         }
 
         /// <summary>
@@ -257,8 +257,8 @@ namespace osu.Game.EzOsuGame.Statistics
             var items = new List<SimpleStatisticItem<string>>
             {
                 makeSimpleStat(stats.TotalAll.ToString(), "Total", totalColour),
+                makeSimpleStat(stats.TotalEarlyAll.ToString(), "Total (Early)", ColourInfo.GradientVertical(Colour4.White, totalColour)),
                 makeSimpleStat(stats.TotalLateAll.ToString(), "Total (Late)", ColourInfo.GradientVertical(totalColour, Colour4.White)),
-                makeSimpleStat(stats.TotalEarlyAll.ToString(), "Total (Early)", ColourInfo.GradientVertical(Colour4.White, totalColour))
             };
 
             // 按规则集提供的顺序排序（若可用），否则使用枚举上定义的展示顺序。
@@ -275,14 +275,14 @@ namespace osu.Game.EzOsuGame.Statistics
                 string name = r.ToString(); // 直接使用枚举名称，避免某些规则集未提供显示名称导致的混乱。
 
                 stats.Total.TryGetValue(r, out int total);
-                stats.Late.TryGetValue(r, out int late);
                 stats.Early.TryGetValue(r, out int early);
+                stats.Late.TryGetValue(r, out int late);
 
                 var c = colours.ForHitResult(r);
 
                 items.Add(makeSimpleStat(total.ToString(), name, c));
-                items.Add(makeSimpleStat(late.ToString(), name + " (Late)", ColourInfo.GradientVertical(c, Colour4.White)));
                 items.Add(makeSimpleStat(early.ToString(), name + " (Early)", ColourInfo.GradientVertical(Colour4.White, c)));
+                items.Add(makeSimpleStat(late.ToString(), name + " (Late)", ColourInfo.GradientVertical(c, Colour4.White)));
             }
 
             return new SimpleStatisticTable(3, items.ToArray())
