@@ -53,5 +53,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString MULTI_SELECT_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "多选模式",
             "Multi-select mode");
+
+        public static readonly LocalisableString SELECTION_EZ_ANALYSIS = new EzLocalizationManager.EzLocalisableString(
+            "Ez分析",
+            "EzAnalysis");
     }
 }

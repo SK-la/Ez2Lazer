@@ -9,6 +9,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
@@ -155,6 +156,10 @@ namespace osu.Game.Screens.Select
                         configDetailTab.Value = mapLeaderboardScopeToDetailTab(scopeDropdown.Current.Value);
                         return;
 
+                    case Selection.EzAnalysis:
+                        // 此处不需要处理
+                        return;
+
                     default:
                         throw new ArgumentOutOfRangeException(nameof(tabControl.Current.Value), tabControl.Current.Value, null);
                 }
@@ -217,6 +222,9 @@ namespace osu.Game.Screens.Select
 
                 [LocalisableDescription(typeof(SongSelectStrings), nameof(SongSelectStrings.Ranking))]
                 Ranking,
+
+                [LocalisableDescription(typeof(EzSongSelectStrings), nameof(EzSongSelectStrings.SELECTION_EZ_ANALYSIS))]
+                EzAnalysis = 3,
             }
 
             private partial class ScopeDropdown : ShearedDropdown<BeatmapLeaderboardScope>
