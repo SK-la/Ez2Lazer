@@ -12,6 +12,7 @@ using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
@@ -37,9 +38,9 @@ namespace osu.Game.EzOsuGame.Overlays
         private const float panel_right_margin = 20;
         private const float default_panel_height = 340;
         private const float min_panel_width = 360;
-        private const float max_panel_width = 580;
+        private const float max_panel_width = 560;
         private const float min_panel_height = 180;
-        private const float max_panel_height = 800;
+        private const float max_panel_height = 560;
         private const float bottom_controls_height = 56;
         private const float resize_handle_height = 10;
         private const float resize_handle_width = 10;
@@ -209,12 +210,13 @@ namespace osu.Game.EzOsuGame.Overlays
                                             new Box
                                             {
                                                 RelativeSizeAxes = Axes.Both,
-                                                Colour = Color4.Black.Opacity(0.4f)
+                                                Alpha = 0,
+                                                // Colour = Color4.Black.Opacity(0.4f)
                                             },
                                             stageScaleContainer = new Container
                                             {
-                                                Anchor = Anchor.BottomLeft,
-                                                Origin = Anchor.BottomLeft,
+                                                Anchor = Anchor.Centre,
+                                                Origin = Anchor.Centre,
                                                 Size = new Vector2(640, 480),
                                             },
                                             stateText = new OsuSpriteText
@@ -947,14 +949,33 @@ namespace osu.Game.EzOsuGame.Overlays
             return Math.Clamp(height, min_panel_height, Math.Max(min_panel_height, maxHeight));
         }
 
-        private bool isWithinPanel(Vector2 screenSpacePosition)
-            => panelContainer.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
+        private bool isWithinPanel(Vector2 screenSpacePosition) => panelContainer.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
 
         private bool isWithinWidthResizeHandle(Vector2 screenSpacePosition)
-            => rightResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
+        {
+            var quad = rightResizeHandle.ScreenSpaceDrawQuad;
+            // 扩展检测区域到面板右边缘，补偿圆角裁剪
+            var expandedQuad = new Quad(
+                new Vector2(quad.TopLeft.X - resize_handle_width, quad.TopLeft.Y),
+                new Vector2(quad.TopRight.X + resize_handle_width, quad.TopRight.Y),
+                new Vector2(quad.BottomLeft.X - resize_handle_width, quad.BottomLeft.Y),
+                new Vector2(quad.BottomRight.X + resize_handle_width, quad.BottomRight.Y)
+            );
+            return expandedQuad.AABBFloat.Contains(screenSpacePosition);
+        }
 
         private bool isWithinHeightResizeHandle(Vector2 screenSpacePosition)
-            => topResizeHandle.ScreenSpaceDrawQuad.AABBFloat.Contains(screenSpacePosition);
+        {
+            var quad = topResizeHandle.ScreenSpaceDrawQuad;
+            // 扩展检测区域到面板左右边缘，补偿圆角裁剪
+            var expandedQuad = new Quad(
+                new Vector2(quad.TopLeft.X - resize_handle_width, quad.TopLeft.Y - resize_handle_height),
+                new Vector2(quad.TopRight.X + resize_handle_width, quad.TopRight.Y - resize_handle_height),
+                new Vector2(quad.BottomLeft.X - resize_handle_width, quad.BottomLeft.Y),
+                new Vector2(quad.BottomRight.X + resize_handle_width, quad.BottomRight.Y)
+            );
+            return expandedQuad.AABBFloat.Contains(screenSpacePosition);
+        }
 
         private double computeDefaultStartTime(IBeatmap playableBeatmap, RulesetInfo ruleset, double fallback)
         {
