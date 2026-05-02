@@ -77,6 +77,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString PLAYBACK_FPS_LABEL = new EzLocalizationManager.EzLocalisableString("播放帧率", "Playback FPS");
         public static readonly LocalisableString PLAYBACK_FPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画的帧率值", "The FPS value of this animation.");
 
+        public static readonly LocalisableString HITRESULT_BLENDING_LABEL = new EzLocalizationManager.EzLocalisableString("混合模式", "Blending Mode");
+        public static readonly LocalisableString HITRESULT_BLENDING_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("设置混合模式", "Set the blending mode.");
+
         // EzHUDScoreCounter
         public static readonly LocalisableString SCORE_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("分数文本字体", "Score Font");
         public static readonly LocalisableString SCORE_FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择分数文本的字体样式", "Select the font style for score text.");

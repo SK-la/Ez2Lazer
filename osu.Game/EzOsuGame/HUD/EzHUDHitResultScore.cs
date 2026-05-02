@@ -49,6 +49,14 @@ namespace osu.Game.EzOsuGame.HUD
         [SettingSource(typeof(SkinnableComponentStrings), nameof(SkinnableComponentStrings.Colour))]
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
+        [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_BLENDING_LABEL), nameof(EzHUDStrings.HITRESULT_BLENDING_DESCRIPTION))]
+        public Bindable<BlendingParameters> HitResultBlending { get; } = new Bindable<BlendingParameters>(new BlendingParameters
+        {
+            // 2. 加法混合（发光效果）
+            Source = BlendingType.SrcAlpha,
+            Destination = BlendingType.One
+        });
+
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
 
@@ -183,29 +191,8 @@ namespace osu.Game.EzOsuGame.HUD
                         Scale = new Vector2(0.5f),
                         Texture = singleTexture,
                         Alpha = 0,
-                        // 设置混合模式
-                        Blending = new BlendingParameters
-                        {
-                            // 1. 标准透明混合（最常用）
-                            Source = BlendingType.SrcAlpha,
-                            Destination = BlendingType.OneMinusSrcAlpha,
-
-                            // 2. 加法混合（发光效果）
-                            // Source = BlendingType.SrcAlpha,
-                            // Destination = BlendingType.One
-
-                            // 3. 减法混合（暗色透明）
-                            // Source = BlendingType.Zero,
-                            // Destination = BlendingType.OneMinusSrcColor,
-
-                            // 4. 纯色叠加（忽略黑色）
-                            // Source = BlendingType.One,
-                            // Destination = BlendingType.One,
-
-                            // 5. 柔和混合
-                            // Source = BlendingType.DstColor,
-                            // Destination = BlendingType.One,
-                        }
+                        // 使用可配置的混合模式
+                        Blending = HitResultBlending.Value
                     };
 
                     Schedule(() =>
