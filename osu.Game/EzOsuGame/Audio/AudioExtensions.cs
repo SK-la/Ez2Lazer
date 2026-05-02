@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework;
 using osu.Framework.Audio;
 using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;

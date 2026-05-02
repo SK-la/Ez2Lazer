@@ -6,7 +6,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Layout;
-using osu.Framework.Logging;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osuTK;

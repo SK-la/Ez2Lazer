@@ -36,7 +36,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics;

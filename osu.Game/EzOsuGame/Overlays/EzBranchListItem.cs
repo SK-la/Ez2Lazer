@@ -15,7 +15,6 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
-using osu.Game.Overlays.Dialog;
 using osuTK;
 using osuTK.Graphics;
 

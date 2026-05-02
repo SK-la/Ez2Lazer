@@ -12,7 +12,6 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Extensions;
 using osu.Game.IO;
-using osu.Game.IO.Archives;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;

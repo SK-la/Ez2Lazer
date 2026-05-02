@@ -7,7 +7,6 @@ using osu.Framework.Audio.EzLatency;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;

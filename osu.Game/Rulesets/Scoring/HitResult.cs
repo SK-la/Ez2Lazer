@@ -8,7 +8,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.Serialization;
 using osu.Framework.Extensions.EnumExtensions;
-using osu.Framework.Logging;
 using osu.Framework.Utils;
 
 namespace osu.Game.Rulesets.Scoring
