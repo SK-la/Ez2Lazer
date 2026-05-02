@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
     /// <summary>
     /// Krr随机增强RP Mod
     /// 支持5种随机模式、固定轨道、DP左右分区独立随机、自定义种子、应用顺序设置
-    /// 支持1~18键位：轨道 1~9,a~j 对应内部索引0~17
+    /// 支持1~18键位：轨道 1~9,a~i 对应内部索引0~17
     /// </summary>
     public class ManiaModKrrRandomPlus : Mod, IApplicableAfterBeatmapConversion, IEzApplyOrder, IHasSeed
     {
@@ -51,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public override string Name => "Krr Random Plus";
         public override string Acronym => "RP";
         public override double ScoreMultiplier => 1.0;
-        public override LocalisableString Description => "添加不同的随机模式，支持固定轨道，DP左右分区独立随机，自定义随机种子，应用顺序设置";
+        public override LocalisableString Description => "添加不同的随机模式，支持固定轨道，DP左右分区独立随机";
         public override IconUsage? Icon => FontAwesome.Solid.Random;
         public override ModType Type => ModType.LA_Mod;
         public override bool Ranked => false;
@@ -67,15 +67,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         public Bindable<RandomizationMode> MainMode { get; } = new Bindable<RandomizationMode>();
 
         /// <summary>Flip开关：左右交换</summary>
-        [SettingSource("Flip", "开启后左右两边轨道互换。偶数键：1234|5678→5678|1234；奇数键：1234|5|6789→6789|5|1234")]
+        [SettingSource("Flip", "左右轨道互换。偶数键：1234|5678→5678|1234；奇数键：1234|5|6789→6789|5|1234")]
         public BindableBool FlipEnabled { get; } = new BindableBool();
 
         /// <summary>带盘Flip开关：边缘包裹交换</summary>
-        [SettingSource("带盘Flip", "先交换最外两头，内部再互换。偶数键：1234|5678→8567|2341；奇数键：中间不动，两侧包裹交换")]
+        [SettingSource("带盘Flip", "单独交换最外侧轨道，内部左右轨道互换。偶数键：1234|5678→8567|2341；奇数键：中间不动，两侧包裹交换")]
         public BindableBool WrapFlipEnabled { get; } = new BindableBool();
 
         /// <summary>固定轨道输入框</summary>
-        [SettingSource("固定轨道", "输入轨道号，如57；1-9、a-j对应1~18键，固定轨道不参与随机")]
+        [SettingSource("固定轨道", "输入轨道号，如57；1-9、a-i对应1~18键，固定轨道不参与随机")]
         public Bindable<string> FixedColumnsInput { get; } = new Bindable<string>(string.Empty);
 
         /// <summary>DP左右分区开关</summary>
@@ -296,7 +296,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
         /// <summary>
         /// 解析固定轨道输入字符串
-        /// 规则：1-9→0~8  a-j→9~17  超出键数自动忽略
+        /// 规则：1-9→0~8  a-i→9~17  超出键数自动忽略
         /// </summary>
         private HashSet<int> ParseFixedColumnsInput(string input, int totalKeys)
         {
@@ -309,7 +309,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                 int colIndex = c switch
                 {
                     >= '1' and <= '9' => c - '1',
-                    >= 'a' and <= 'j' => 9 + (c - 'a'),
+                    >= 'a' and <= 'i' => 9 + (c - 'a'),
                     _ => -1
                 };
 
