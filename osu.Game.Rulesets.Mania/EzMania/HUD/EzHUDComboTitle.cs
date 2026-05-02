@@ -131,7 +131,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             }, true);
             Font.BindValueChanged(e =>
             {
-                Text.FontName.Value = e.NewValue;
+                Text.ThemeName.Value = e.NewValue;
                 Text.Invalidate();
             }, true);
         }

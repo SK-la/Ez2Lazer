@@ -11,7 +11,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
-using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
@@ -185,29 +184,8 @@ namespace osu.Game.EzOsuGame.Screens
             nameOfGameTheme.BindValueChanged(e =>
             {
                 ezSkinConfig.SetValue(Ez2Setting.GameThemeName, e.NewValue);
-                updateAllEzTextureNames(e.NewValue);
             });
         }
-
-        #region 刷新所有EzComponent的纹理名称
-
-        private void updateAllEzTextureNames(EzEnumGameThemeName textureGameTheme)
-        {
-            var scoreTexts = this.ChildrenOfType<EzScoreText>();
-            var comboTexts = this.ChildrenOfType<EzComboText>();
-            var hitResultScores = this.ChildrenOfType<EzHUDHitResultScore>();
-
-            foreach (var scoreText in scoreTexts)
-                scoreText.FontName.Value = textureGameTheme;
-
-            foreach (var comboText in comboTexts)
-                comboText.FontName.Value = textureGameTheme;
-
-            foreach (var hitResultScore in hitResultScores)
-                hitResultScore.ThemeName.Value = textureGameTheme;
-        }
-
-        #endregion
 
         private void loadFolderSets(string type)
         {

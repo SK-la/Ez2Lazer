@@ -8,6 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Text;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics.Sprites;
 
 namespace osu.Game.EzOsuGame.HUD
@@ -20,18 +21,22 @@ namespace osu.Game.EzOsuGame.HUD
     {
         protected override char FixedWidthReferenceCharacter => '5';
 
-        public Bindable<EzEnumGameThemeName> FontName { get; }
+        public Bindable<EzEnumGameThemeName> ThemeName { get; }
+        private Bindable<EzEnumGameThemeName> themeName = null!;
 
         private readonly Func<char, string> getLookup;
         private GlyphStore? glyphStore;
 
         [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
         private EzResourceProvider textures { get; set; } = null!;
 
-        protected EzSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> fontName)
+        protected EzSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
         {
             this.getLookup = getLookup;
-            FontName = fontName;
+            ThemeName = themeName;
 
             Shadow = false;
             UseFullGlyphHeight = false;
@@ -40,16 +45,21 @@ namespace osu.Game.EzOsuGame.HUD
         [BackgroundDependencyLoader]
         private void load()
         {
-            FontName.BindValueChanged(e =>
+            themeName = ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
+
+            themeName.BindValueChanged(e =>
             {
-                Font = new FontUsage(FontName.Value.ToString(), 1);
+                ThemeName.Value = e.NewValue;
+                Preload();
+            });
+
+            ThemeName.BindValueChanged(e =>
+            {
+                Font = new FontUsage(ThemeName.Value.ToString(), 1);
 
                 // 清理旧的 GlyphStore 缓存，防止每次切换字体时，缓存堆积
                 glyphStore?.ClearCache();
                 glyphStore = CreateGlyphStore(textures, getLookup);
-
-                // 预加载常用字符
-                PreloadCharacters(glyphStore, FontName.Value.ToString());
             }, true);
         }
 
@@ -74,6 +84,11 @@ namespace osu.Game.EzOsuGame.HUD
 
             for (int i = 0; i < 10; i++)
                 store.Get(fontName, (char)('0' + i));
+        }
+
+        public void Preload()
+        {
+            PreloadCharacters(glyphStore!, ThemeName.Value.ToString());
         }
 
         /// <summary>

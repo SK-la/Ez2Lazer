@@ -2,13 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Configuration;
 using osuTK;
 
 namespace osu.Game.EzOsuGame.HUD
@@ -17,11 +15,9 @@ namespace osu.Game.EzOsuGame.HUD
     {
         private readonly EzScoreSpriteText textPart;
 
-        [Resolved]
-        private Ez2ConfigManager ezSkinConfig { get; set; } = null!;
+        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
 
-        public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
-        public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>();
+        // public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>();
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -31,13 +27,16 @@ namespace osu.Game.EzOsuGame.HUD
             set => textPart.Text = value;
         }
 
-        public EzScoreText()
+        public EzScoreText(Bindable<EzEnumGameThemeName>? externalThemeName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            textPart = new EzScoreSpriteText(textLookup, FontName);
+            if (externalThemeName is not null)
+                ThemeName = externalThemeName;
+
+            textPart = new EzScoreSpriteText(textLookup, ThemeName);
 
             InternalChildren = new Drawable[]
             {
@@ -72,19 +71,22 @@ namespace osu.Game.EzOsuGame.HUD
         protected override void LoadComplete()
         {
             base.LoadComplete();
-            FontName.BindTo(ezSkinConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName));
 
-            float scale = getUniformHeightScale(textPart.Height);
-            textPart.Scale = new Vector2(scale);
-
-            FontName.BindValueChanged(e =>
+            ThemeName.BindValueChanged(e =>
             {
-                textPart.FontName.Value = e.NewValue;
-                // textPart.LoadAsync(); // **强制重新加载字体**
-                scale = getUniformHeightScale(textPart.Height);
+                textPart.ThemeName.Value = e.NewValue;
+                float scale = getUniformHeightScale(textPart.Height);
                 textPart.Scale = new Vector2(scale);
                 textPart.Invalidate(); // **确保 UI 立即刷新**
             }, true);
+
+            textPart.ThemeName.BindValueChanged(e =>
+            {
+                if (ThemeName.Value != e.NewValue)
+                {
+                    ThemeName.Value = e.NewValue;
+                }
+            });
         }
 
         private float getUniformHeightScale(float textureHeight, float targetHeight = 35f)
@@ -92,8 +94,8 @@ namespace osu.Game.EzOsuGame.HUD
 
         private partial class EzScoreSpriteText : EzSpriteText
         {
-            public EzScoreSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> fontName)
-                : base(getLookup, fontName)
+            public EzScoreSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
+                : base(getLookup, themeName)
             {
             }
 

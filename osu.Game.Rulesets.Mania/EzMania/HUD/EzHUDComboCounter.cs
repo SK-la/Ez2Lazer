@@ -97,20 +97,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             // {
             //     Text.TextPart.Origin = e.NewValue;
             // }, true);
-        }
-
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
 
             AccentAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
-
-            ThemeName.BindValueChanged(e =>
-            {
-                Text.FontName.Value = e.NewValue;
-                Text.Invalidate(); // **强制刷新 EzCounterText**
-            }, true);
         }
 
         private void applyAnimation(bool wasIncrease, bool wasMiss)
@@ -143,13 +132,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
         protected override LocalisableString FormatCount(int count) => DisplayXSymbol ? $@"{count}" : count.ToString();
 
-        protected override IHasText CreateText()
+        protected override IHasText CreateText() => Text = new EzComboText(ThemeName)
         {
-            Text = new EzComboText(ThemeName)
-            {
-                Scale = new Vector2(1.8f),
-            };
-            return Text;
-        }
+            Scale = new Vector2(1.8f),
+        };
     }
 }

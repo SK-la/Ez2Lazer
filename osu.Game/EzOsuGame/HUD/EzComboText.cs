@@ -15,8 +15,9 @@ namespace osu.Game.EzOsuGame.HUD
     public partial class EzComboText : CompositeDrawable, IHasText
     {
         private readonly EzComboSpriteText textPart;
-        public Bindable<EzEnumGameThemeName> FontName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
-        public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
+        public Bindable<EzEnumGameThemeName> ThemeName { get; } = new Bindable<EzEnumGameThemeName>(EzSelectorEnumList.DEFAULT_NAME);
+
+        // public Bindable<bool> UseLazerFont { get; } = new Bindable<bool>(false);
 
         public FillFlowContainer TextContainer { get; private set; }
 
@@ -26,16 +27,16 @@ namespace osu.Game.EzOsuGame.HUD
             set => textPart.Text = value;
         }
 
-        public EzComboText(Bindable<EzEnumGameThemeName>? externalFontName = null)
+        public EzComboText(Bindable<EzEnumGameThemeName>? externalThemeName = null)
         {
             AutoSizeAxes = Axes.Both;
             Anchor = Anchor.Centre;
             Origin = Anchor.Centre;
 
-            if (externalFontName is not null)
-                FontName.BindTo(externalFontName);
+            if (externalThemeName is not null)
+                ThemeName = externalThemeName;
 
-            textPart = new EzComboSpriteText(textLookup, FontName);
+            textPart = new EzComboSpriteText(textLookup, ThemeName);
 
             InternalChildren = new Drawable[]
             {
@@ -75,17 +76,23 @@ namespace osu.Game.EzOsuGame.HUD
         {
             base.LoadComplete();
 
-            float scale = getUniformHeightScale(textPart.Height);
-            textPart.Scale = new Vector2(scale);
-
-            FontName.BindValueChanged(e =>
+            ThemeName.BindValueChanged(e =>
             {
-                textPart.FontName.Value = e.NewValue;
-                // textPart.LoadAsync(); // **强制重新加载字体**
-                scale = getUniformHeightScale(textPart.Height);
+                textPart.ThemeName.Value = e.NewValue;
+                float scale = getUniformHeightScale(textPart.Height);
                 textPart.Scale = new Vector2(scale);
-                textPart.Invalidate(); // **确保 UI 立即刷新**
+                textPart.Invalidate(); // 确保 UI 立即刷新
             }, true);
+
+            // （可选）textPart.ThemeName 变化时（来自全局配置），反向更新 SettingSource 的 ThemeName
+            // 如果你不需要反向更新，可以注释掉这段代码
+            textPart.ThemeName.BindValueChanged(e =>
+            {
+                if (ThemeName.Value != e.NewValue)
+                {
+                    ThemeName.Value = e.NewValue;
+                }
+            });
         }
 
         private float getUniformHeightScale(float textureHeight, float targetHeight = 25f)
@@ -93,8 +100,8 @@ namespace osu.Game.EzOsuGame.HUD
 
         private partial class EzComboSpriteText : EzSpriteText
         {
-            public EzComboSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> fontName)
-                : base(getLookup, fontName)
+            public EzComboSpriteText(Func<char, string> getLookup, Bindable<EzEnumGameThemeName> themeName)
+                : base(getLookup, themeName)
             {
             }
 

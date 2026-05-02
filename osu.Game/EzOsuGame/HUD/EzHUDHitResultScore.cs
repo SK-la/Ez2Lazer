@@ -10,6 +10,7 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Rulesets.Judgements;
@@ -66,6 +67,9 @@ namespace osu.Game.EzOsuGame.HUD
         private Sample? fullComboSound;
 
         [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
         private EzResourceProvider textures { get; set; } = null!;
 
         [Resolved]
@@ -80,6 +84,8 @@ namespace osu.Game.EzOsuGame.HUD
         [Resolved]
         private ISampleStore sampleStore { get; set; } = null!;
 
+        private Bindable<EzEnumGameThemeName> themeName = null!;
+
         public EzHUDHitResultScore()
         {
             Size = new Vector2(200, 50);
@@ -91,15 +97,12 @@ namespace osu.Game.EzOsuGame.HUD
         private void load()
         {
             AlwaysPresent = true;
-        }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            gameplayClockContainer.OnSeek += Clear;
-
-            processor.NewJudgement += processorNewJudgement;
+            themeName = ezConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
+            themeName.BindValueChanged(e =>
+            {
+                ThemeName.Value = e.NewValue;
+            });
 
             ThemeName.BindValueChanged(_ =>
             {
@@ -109,6 +112,15 @@ namespace osu.Game.EzOsuGame.HUD
 
             AccentAlpha.BindValueChanged(alpha => Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Colour = AccentColour.Value, true);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            gameplayClockContainer.OnSeek += Clear;
+
+            processor.NewJudgement += processorNewJudgement;
         }
 
         private void processorNewJudgement(JudgementResult j)
@@ -280,14 +292,14 @@ namespace osu.Game.EzOsuGame.HUD
                         Origin = Anchor.Centre,
                         Scale = new Vector2(1.5f),
                         Alpha = 1,
-                        Texture = textures.Get(@$"Modify/AllCombo/full-combo")
+                        Texture = textures.Get(@$"Modify/FullCombo/full-combo")
                     }
                 };
 
                 AddInternal(fullComboSprite);
                 fullComboSprite.FadeIn(50).Then().FadeOut(3000);
 
-                fullComboSound = sampleStore.Get(@$"Modify/AllCombo/full-combo-sound");
+                fullComboSound = sampleStore.Get(@"Modify/FullCombo/full-combo-sound");
                 fullComboSound?.Play();
             }
             else

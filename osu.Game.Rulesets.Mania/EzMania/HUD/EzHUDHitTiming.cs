@@ -166,15 +166,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
 
             NumberFont.BindValueChanged(e =>
             {
-                offsetText.FontName.Value = e.NewValue;
+                offsetText.ThemeName.Value = e.NewValue;
                 offsetText.Invalidate();
             }, true);
 
             TextFont.BindValueChanged(e =>
             {
-                timingText.FontName.Value = e.NewValue;
-                timingTextL.FontName.Value = e.NewValue;
-                timingTextR.FontName.Value = e.NewValue;
+                timingText.ThemeName.Value = e.NewValue;
+                timingTextL.ThemeName.Value = e.NewValue;
+                timingTextR.ThemeName.Value = e.NewValue;
                 Invalidate();
             }, true);
 

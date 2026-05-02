@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
@@ -38,43 +39,21 @@ namespace osu.Game.EzOsuGame.HUD
         public EzScoreText Text = null!;
         protected override LocalisableString FormatCount(long count) => count.ToString();
 
-        protected override void LoadComplete()
+        [BackgroundDependencyLoader]
+        private void load()
         {
-            base.LoadComplete();
-
             AccentAlpha.BindValueChanged(alpha => Text.Alpha = alpha.NewValue, true);
             AccentColour.BindValueChanged(_ => Text.Colour = AccentColour.Value, true);
 
             ThemeName.BindValueChanged(e =>
             {
-                Text.FontName.Value = e.NewValue;
+                Text.ThemeName.Value = e.NewValue;
                 Text.Invalidate(); // **强制刷新 EzCounterText**
             }, true);
-
-            // Padding = new MarginPadding
-            // {
-            //     Left = 1,
-            //     Right = 1,
-            // };
         }
 
-        protected override IHasText CreateText()
+        protected override IHasText CreateText() => Text = new EzScoreText(ThemeName)
         {
-            Text = new EzScoreText();
-            return Text;
-        }
-
-        protected override void Dispose(bool isDisposing)
-        {
-            if (isDisposing)
-            {
-                ThemeName.UnbindAll();
-                ShowLabel.UnbindAll();
-                AccentAlpha.UnbindAll();
-                AccentColour.UnbindAll();
-            }
-
-            base.Dispose(isDisposing);
-        }
+        };
     }
 }
