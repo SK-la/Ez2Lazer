@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Audio;
 using osu.Game.Rulesets.Mania.Beatmaps;
-using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
+using osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp;
 using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Rulesets.Mania.EzMania.Mods.KrrConversion

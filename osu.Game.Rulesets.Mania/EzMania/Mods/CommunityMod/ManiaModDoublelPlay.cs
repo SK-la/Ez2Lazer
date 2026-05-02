@@ -15,7 +15,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ManiaModDoublePlay : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion
     {
@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public override IconUsage? Icon => FontAwesome.Solid.Sun;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
 
         public override LocalisableString Description => "Convert 4k to 8k (Double 4k).";
 

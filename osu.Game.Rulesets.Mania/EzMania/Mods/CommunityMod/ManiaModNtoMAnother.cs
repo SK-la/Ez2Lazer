@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ManiaModNtoMAnother : Mod, IApplicableToBeatmapConverter, IApplicableAfterBeatmapConversion, IHasSeed, IEzApplyOrder
     {
@@ -37,7 +37,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public override IconUsage? Icon => FontAwesome.Solid.CloudRain;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
 
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;

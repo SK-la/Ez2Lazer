@@ -11,7 +11,7 @@ using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ManiaModO2Health : ModFailCondition, IApplicableAfterBeatmapConversion
     {
@@ -51,7 +51,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             }
         }
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;

@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.IEnumerableExtensions;
@@ -20,16 +19,13 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
-using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
-using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public partial class ManiaModAdjust : ModRateAdjust,
                                           IApplicableAfterBeatmapConversion,
@@ -50,7 +46,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public override string Acronym => "AJ";
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
 
         public override IconUsage? Icon => FontAwesome.Solid.Atlas;
 

@@ -2,8 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp
 {
     public class Utils
     {

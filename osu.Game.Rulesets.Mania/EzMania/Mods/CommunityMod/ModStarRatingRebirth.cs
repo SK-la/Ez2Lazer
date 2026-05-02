@@ -15,7 +15,7 @@ using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Objects;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ModStarRatingRebirth : Mod, IApplicableAfterBeatmapConversion
     {
@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
 
         public override IEnumerable<(LocalisableString setting, LocalisableString value)> SettingDescription
         {
@@ -127,26 +127,26 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             double[] anchor = ComputeAnchor(key, keyUsage400, baseCorners);
 
             ComputeJbar(key, time, x, noteSeqByCol, baseCorners, out double[,] deltaKs, out double[] jBar);
-            double[] jBarInterp = Utils.InterpValues(allCorners, baseCorners, jBar);
+            double[] jBarInterp = ModHelp.Utils.InterpValues(allCorners, baseCorners, jBar);
 
             double[] xBar = ComputeXbar(key, time, x, noteSeqByCol, activeColumns, baseCorners);
-            double[] xBarInterp = Utils.InterpValues(allCorners, baseCorners, xBar);
+            double[] xBarInterp = ModHelp.Utils.InterpValues(allCorners, baseCorners, xBar);
 
             // 构建LN主体的稀疏表示
             LNBodiesCountSparseRepresentation(lnSeq, time, out int[] points, out double[] cumsum, out double[] values);
 
             double[] pBar = ComputePbar(key, time, x, noteSeq, points, cumsum, values, anchor, baseCorners);
-            double[] pBarInterp = Utils.InterpValues(allCorners, baseCorners, pBar);
+            double[] pBarInterp = ModHelp.Utils.InterpValues(allCorners, baseCorners, pBar);
 
             double[] aBar = ComputeAbar(key, time, x, noteSeqByCol, activeColumns, deltaKs, aCorners, baseCorners);
-            double[] aBarInterp = Utils.InterpValues(allCorners, aCorners, aBar);
+            double[] aBarInterp = ModHelp.Utils.InterpValues(allCorners, aCorners, aBar);
 
             double[] rBar = ComputeRbar(key, time, x, noteSeqByCol, tailSeq, baseCorners);
-            double[] rBarInterp = Utils.InterpValues(allCorners, baseCorners, rBar);
+            double[] rBarInterp = ModHelp.Utils.InterpValues(allCorners, baseCorners, rBar);
 
             ComputeCAndKs(key, time, noteSeq, keyUsage, baseCorners, out double[] cStep, out double[] ksStep);
-            double[] cArr = Utils.StepInterp(allCorners, baseCorners, cStep);
-            double[] ksArr = Utils.StepInterp(allCorners, baseCorners, ksStep);
+            double[] cArr = ModHelp.Utils.StepInterp(allCorners, baseCorners, cStep);
+            double[] ksArr = ModHelp.Utils.StepInterp(allCorners, baseCorners, ksStep);
 
             // === 最终计算 ===
             // 在all_corners上计算难度D
@@ -222,7 +222,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             double totalNotes = noteSeq.Length + 0.5 * lnSeq.Sum(ln => Math.Min(ln.Tail - ln.Head, 1000) / 200.0);
             sr *= totalNotes / (totalNotes + 60);
 
-            sr = Utils.RescaleHigh(sr);
+            sr = ModHelp.Utils.RescaleHigh(sr);
             sr *= 0.975;
 
             return sr;
@@ -252,8 +252,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 int high = s + 500;
 
                 // 使用二分查找计算区间内的音符数量
-                int highIdx = Utils.SearchSortedLeft(noteHitTimes, high);
-                int lowIdx = Utils.SearchSortedLeft(noteHitTimes, low);
+                int highIdx = ModHelp.Utils.SearchSortedLeft(noteHitTimes, high);
+                int lowIdx = ModHelp.Utils.SearchSortedLeft(noteHitTimes, low);
 
                 cStep[i] = highIdx - lowIdx;
             }
@@ -298,16 +298,16 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                     // 狄拉克增量情况：当音符同时出现时
                     // 在基准网格中的音符头部精确位置添加尖峰
                     double spike = 1000 * Math.Pow(0.02 * (4 / x - 24), 1.0 / 4);
-                    int leftIdx = Utils.SearchSortedLeft(baseCorners, hL);
-                    int rightIdx = Utils.SearchSortedRight(baseCorners, hL);
+                    int leftIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, hL);
+                    int rightIdx = ModHelp.Utils.SearchSortedRight(baseCorners, hL);
 
                     for (int idx = leftIdx; idx < rightIdx; idx++) pStep[idx] += spike;
                 }
                 else
                 {
                     // 对于delta_time > 0的常规情况，找出[h_l, h_r)范围内的基准网格索引
-                    int leftIdx = Utils.SearchSortedLeft(baseCorners, hL);
-                    int rightIdx = Utils.SearchSortedLeft(baseCorners, hR);
+                    int leftIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, hL);
+                    int rightIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, hR);
 
                     if (leftIdx >= rightIdx) continue;
 
@@ -325,7 +325,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 }
             }
 
-            double[] pBar = Utils.SmoothOnCorners(baseCorners, pStep, 500, 0.001, "sum");
+            double[] pBar = ModHelp.Utils.SmoothOnCorners(baseCorners, pStep, 500, 0.001, "sum");
             return pBar;
         }
 
@@ -359,7 +359,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             for (int i = 0; i < aCorners.Length; i++)
             {
                 int s = aCorners[i];
-                int idx = Utils.SearchSortedLeft(baseCorners, s);
+                int idx = ModHelp.Utils.SearchSortedLeft(baseCorners, s);
 
                 // 确保idx在有效范围内
                 if (idx >= baseCorners.Length) idx = baseCorners.Length - 1;
@@ -380,7 +380,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             }
 
             // 对A_step应用平滑操作得到Abar
-            double[] aBar = Utils.SmoothOnCorners(aCorners, aStep, 250, mode: "avg");
+            double[] aBar = ModHelp.Utils.SmoothOnCorners(aCorners, aStep, 250, mode: "avg");
             return aBar;
         }
 
@@ -403,7 +403,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 int tI = tailSeq[i].Tail;
 
                 // 找到同一列中的下一个音符
-                var nextNote = Utils.FindNextNoteInColumn(tailSeq[i], timesByColumn[k], noteSeqByColumn);
+                var nextNote = ModHelp.Utils.FindNextNoteInColumn(tailSeq[i], timesByColumn[k], noteSeqByColumn);
                 int hJ = nextNote.Head;
 
                 double iH = 0.001 * Math.Abs(tI - hI - 80) / x;
@@ -418,8 +418,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 int tStart = tailSeq[i].Tail;
                 int tEnd = tailSeq[i + 1].Tail;
 
-                int leftIdx = Utils.SearchSortedLeft(baseCorners, tStart);
-                int rightIdx = Utils.SearchSortedLeft(baseCorners, tEnd);
+                int leftIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, tStart);
+                int rightIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, tEnd);
 
                 if (leftIdx >= rightIdx) continue;
 
@@ -433,7 +433,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             }
 
             // 应用平滑操作得到Rbar
-            double[] rBar = Utils.SmoothOnCorners(baseCorners, rStep, 500, 0.001, "sum");
+            double[] rBar = ModHelp.Utils.SmoothOnCorners(baseCorners, rStep, 500, 0.001, "sum");
             return rBar;
         }
 
@@ -544,8 +544,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                     int start = notesInPair[i - 1].Head;
                     int end = notesInPair[i].Head;
 
-                    int idxStart = Utils.SearchSortedLeft(baseCorners, start);
-                    int idxEnd = Utils.SearchSortedLeft(baseCorners, end);
+                    int idxStart = ModHelp.Utils.SearchSortedLeft(baseCorners, start);
+                    int idxEnd = ModHelp.Utils.SearchSortedLeft(baseCorners, end);
 
                     if (idxStart >= idxEnd) continue;
 
@@ -584,7 +584,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             }
 
             // 应用平滑操作得到 Xbar
-            double[] xBar = Utils.SmoothOnCorners(baseCorners, xBase, 500, 0.001, "sum");
+            double[] xBar = ModHelp.Utils.SmoothOnCorners(baseCorners, xBase, 500, 0.001, "sum");
             return xBar;
         }
 
@@ -617,8 +617,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                     int start = notes[i].Head;
                     int end = notes[i + 1].Head;
 
-                    int leftIdx = Utils.SearchSortedLeft(baseCorners, start);
-                    int rightIdx = Utils.SearchSortedLeft(baseCorners, end);
+                    int leftIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, start);
+                    int rightIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, end);
 
                     if (leftIdx >= rightIdx) continue;
 
@@ -642,7 +642,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
                 double[] rowData = new double[cornersLength];
                 for (int i = 0; i < cornersLength; i++) rowData[i] = jKs[k, i];
 
-                double[] smoothed = Utils.SmoothOnCorners(baseCorners, rowData, 500, 0.001, "sum");
+                double[] smoothed = ModHelp.Utils.SmoothOnCorners(baseCorners, rowData, 500, 0.001, "sum");
 
                 for (int i = 0; i < cornersLength; i++) jBarKs[k, i] = smoothed[i];
             }
@@ -711,10 +711,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             {
                 int startTime = Math.Max(note.Head, 0);
                 int endTime = !note.IsLong ? note.Head : Math.Min(note.Tail, T - 1);
-                int left400Idx = Utils.SearchSortedLeft(baseCorners, startTime - 400);
-                int leftIdx = Utils.SearchSortedLeft(baseCorners, startTime);
-                int rightIdx = Utils.SearchSortedLeft(baseCorners, endTime);
-                int right400Idx = Utils.SearchSortedLeft(baseCorners, endTime + 400);
+                int left400Idx = ModHelp.Utils.SearchSortedLeft(baseCorners, startTime - 400);
+                int leftIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, startTime);
+                int rightIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, endTime);
+                int right400Idx = ModHelp.Utils.SearchSortedLeft(baseCorners, endTime + 400);
                 for (int i = leftIdx; i < rightIdx; i++) keyUsage400[note.Key, i] += 3.75 + Math.Min(endTime - startTime, 1500) / 150.0;
 
                 for (int i = left400Idx; i < leftIdx; i++)
@@ -736,8 +736,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
         internal static double LNSum(int a, int b, int[] points, double[] cumsum, double[] values)
         {
             // 定位包含 a 和 b 的分段
-            int i = Utils.SearchSortedRight(points, a) - 1;
-            int j = Utils.SearchSortedRight(points, b) - 1;
+            int i = ModHelp.Utils.SearchSortedRight(points, a) - 1;
+            int j = ModHelp.Utils.SearchSortedRight(points, b) - 1;
 
             double total = 0.0;
 
@@ -767,8 +767,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
             {
                 int startTime = Math.Max(note.Head - 150, 0);
                 int endTime = !note.IsLong ? note.Head + 150 : Math.Min(note.Tail + 150, T - 1);
-                int leftIdx = Utils.SearchSortedLeft(baseCorners, startTime);
-                int rightIdx = Utils.SearchSortedLeft(baseCorners, endTime);
+                int leftIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, startTime);
+                int rightIdx = ModHelp.Utils.SearchSortedLeft(baseCorners, endTime);
                 for (int i = leftIdx; i < rightIdx; i++) keyUsage[note.Key, i] = true;
             }
 

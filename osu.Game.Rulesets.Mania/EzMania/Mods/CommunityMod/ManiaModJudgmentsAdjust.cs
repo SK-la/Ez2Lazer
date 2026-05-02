@@ -12,7 +12,7 @@ using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ManiaModJudgmentsAdjust : Mod, IApplicableToDifficulty
     {
@@ -22,7 +22,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => JudgmentsAdjustStrings.JUDGMENTS_ADJUST_DESCRIPTION;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
 
         public override IconUsage? Icon => FontAwesome.Solid.Shower;
 

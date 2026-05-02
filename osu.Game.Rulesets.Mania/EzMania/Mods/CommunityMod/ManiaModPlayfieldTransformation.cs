@@ -17,7 +17,7 @@ using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osuTK;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public partial class ManiaModPlayfieldTransformation : Mod, IApplicableToPlayer, IUpdatableByPlayfield, IApplicableToScoreProcessor, IApplicableToDrawableRuleset<ManiaHitObject>
     {
@@ -29,7 +29,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public override double ScoreMultiplier => 1.0;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;

@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mods;
 
 // using osu.Framework.Logging;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ManiaModLNTransformer : ManiaModLNBase, IApplicableAfterBeatmapConversion
     {

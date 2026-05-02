@@ -9,7 +9,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
-using osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Objects;

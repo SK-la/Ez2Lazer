@@ -17,7 +17,7 @@ using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ManiaModNoteAdjust : Mod, IApplicableAfterBeatmapConversion, IHasSeed
     {
@@ -27,7 +27,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => NoteAdjustStrings.NOTE_ADJUST_DESCRIPTION;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
 
         public override IconUsage? Icon => FontAwesome.Solid.Brain;
 

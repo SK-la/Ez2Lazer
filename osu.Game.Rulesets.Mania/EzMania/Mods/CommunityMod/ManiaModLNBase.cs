@@ -10,7 +10,7 @@ using osu.Game.EzOsuGame.Localization;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mods;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ManiaModLNBase : Mod, IHasSeed, IEzApplyOrder
     {
@@ -24,7 +24,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public override IconUsage? Icon => FontAwesome.Solid.YinYang;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
         public override bool Ranked => false;
         public override bool ValidForMultiplayer => true;
         public override bool ValidForFreestyleAsRequiredMod => false;

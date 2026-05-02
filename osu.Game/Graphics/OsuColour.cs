@@ -200,7 +200,7 @@ namespace osu.Game.Graphics
                 case ModType.LA_Mod:
                     return BlueLight;
 
-                case ModType.YuLiangSSS_Mod:
+                case ModType.CommunityMod:
                     return Purple;
 
                 case ModType.Automation:

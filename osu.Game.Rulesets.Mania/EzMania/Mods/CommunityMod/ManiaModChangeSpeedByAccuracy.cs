@@ -15,7 +15,7 @@ using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 {
     public class ManiaModChangeSpeedByAccuracy : Mod, IUpdatableByPlayfield, IApplicableToScoreProcessor, IApplicableToRate
     {
@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods
 
         public override LocalisableString Description => ChangeSpeedByAccuracyStrings.CHANGE_SPEED_BY_ACCURACY_DESCRIPTION;
 
-        public override ModType Type => ModType.YuLiangSSS_Mod;
+        public override ModType Type => ModType.CommunityMod;
 
         public override IconUsage? Icon => FontAwesome.Solid.ChartLine;
 

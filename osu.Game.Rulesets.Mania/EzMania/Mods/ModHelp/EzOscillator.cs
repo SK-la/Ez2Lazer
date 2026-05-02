@@ -4,7 +4,7 @@
 using System;
 using System.ComponentModel;
 
-namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
+namespace osu.Game.Rulesets.Mania.EzMania.Mods.ModHelp
 {
     // 简单振荡器生成器，支持多种波形。
     // 默认正弦波，确定性输出。

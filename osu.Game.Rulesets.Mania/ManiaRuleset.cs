@@ -28,7 +28,7 @@ using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
 using osu.Game.Rulesets.Mania.EzMania.Analysis;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
-using osu.Game.Rulesets.Mania.EzMania.Mods.YuLiangSSSMods;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mania.Replays;
@@ -279,7 +279,7 @@ namespace osu.Game.Rulesets.Mania
                         new ManiaModSRAdjust(),
                     };
 
-                case ModType.YuLiangSSS_Mod:
+                case ModType.CommunityMod:
                     return new Mod[]
                     {
                         new ManiaModAdjust(),
