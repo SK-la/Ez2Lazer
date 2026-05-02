@@ -30,10 +30,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
     /// </summary>
     public partial class EzScoreGraphMania : EzScoreGraphBase
     {
-        private readonly ManiaHitWindows maniaHitWindows = new ManiaHitWindows();
-
-        private readonly CustomHitWindowsHelper hitWindowsV1;
-        private readonly CustomHitWindowsHelper hitWindowsV2;
+        private readonly ManiaHitWindows hitWindowsV2 = new ManiaHitWindows();
+        private readonly HitModeRangeSwitcher hitWindowsV1 = new HitModeRangeSwitcher();
 
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
         private Bindable<double> offsetPlusMania = new Bindable<double>(0);
@@ -47,16 +45,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         public EzScoreGraphMania(ScoreInfo score, IBeatmap beatmap)
             : base(score, beatmap, new ManiaHitWindows())
         {
-            maniaHitWindows.SetDifficulty(beatmap.Difficulty.OverallDifficulty);
-
-            // 在此初始化 helper（在基类构造完成并且静态 OD/HP 已设置之后）。
-            hitWindowsV1 = new CustomHitWindowsHelper { OverallDifficulty = OD };
-            hitWindowsV2 = new CustomHitWindowsHelper { OverallDifficulty = OD };
+            hitWindowsV2.SetDifficulty(OD);
+            hitWindowsV1.OverallDifficulty = OD;
         }
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
-            var events = Score.HitEvents.Where(e => maniaHitWindows.IsHitResultAllowed(e.Result));
+            var events = Score.HitEvents.Where(e => hitWindowsV2.IsHitResultAllowed(e.Result));
 
             // 如果未设置偏移，则直接返回原始事件以避免分配。
             if (offsetPlusMania.Value == 0)
@@ -68,7 +63,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override double UpdateBoundary(HitResult result)
         {
-            return maniaHitWindows.WindowFor(result);
+            return hitWindowsV2.WindowFor(result);
         }
 
         [BackgroundDependencyLoader]
@@ -79,11 +74,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             hitModeBindable.BindValueChanged(v =>
             {
                 hitWindowsV1.HitMode = v.NewValue;
-                hitWindowsV2.HitMode = v.NewValue;
 
                 // 确保 mania 判定窗口根据全局配置和难度重新计算。
-                maniaHitWindows.ResetRange();
-                maniaHitWindows.SetDifficulty(Beatmap.Difficulty.OverallDifficulty);
+                hitWindowsV2.ResetRange();
+                hitWindowsV2.SetDifficulty(Beatmap.Difficulty.OverallDifficulty);
 
                 // 重新计算并重绘。
                 Refresh();
@@ -101,7 +95,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)
         {
-            return maniaHitWindows.ResultFor(hitEvent.TimeOffset);
+            return hitWindowsV2.ResultFor(hitEvent.TimeOffset);
         }
 
         protected override void UpdateDisplay()
@@ -129,16 +123,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             var items = new List<SimpleStatisticItem>
             {
                 // Accuracy 使用蓝色，保持统一视觉
-                makeSimpleStat(scAcc.ToString("F1") + "%", "Acc Orig.", colours.Blue1),
-                makeSimpleStat((V2Accuracy * 100).ToString("F1") + "%", "Acc Now", colours.Blue1),
-                makeSimpleStat((V1Accuracy * 100).ToString("F1") + "%", "Acc v1", colours.Blue1),
+                makeSimpleStat(scAcc.ToString("F1") + "%", "Acc Original", colours.Blue1),
+                makeSimpleStat((V2Accuracy * 100).ToString("F1") + "%", "Acc Now Setting", colours.Blue1),
+                makeSimpleStat((V1Accuracy * 100).ToString("F1") + "%", "Acc v1 Algorithm", colours.Blue1),
 
                 // Score 使用橙色
-                makeSimpleStat((scScore / 1000.0).ToString("F0") + "k", "Scr Orig.", colours.Orange1),
-                makeSimpleStat((V2Score / 1000.0).ToString("F0") + "k", "Scr Now", colours.Orange1),
-                makeSimpleStat((V1Score / 1000.0).ToString("F0") + "k", "Scr v1", colours.Orange1),
+                makeSimpleStat((scScore / 1000.0).ToString("F0") + "k", "Score Original", colours.Orange1),
+                makeSimpleStat((V2Score / 1000.0).ToString("F0") + "k", "Score Now Setting", colours.Orange1),
+                makeSimpleStat((V1Score / 1000.0).ToString("F0") + "k", "Score v1 Algorithm", colours.Orange1),
 
-                makeSimpleStat(Score.Pauses.Count.ToString(), "Pauses")
+                makeSimpleStat(Score.Pauses.Count.ToString(), "Pauses"),
+                makeSimpleStat("Now | V1", "↓", colours.Gray8),
             };
 
             // 判定计数，使用 OsuColour 提供的判定色彩
@@ -158,7 +153,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
 
             // 左侧固定宽度容器，保持纵向单列排列。为判定标签预留一部分右侧宽度以避免重叠。
-            const float label_area_width = 48f;
+            const float label_area_width = 35f;
 
             var statsContent = new SimpleStatisticTable(1, items.ToArray())
             {

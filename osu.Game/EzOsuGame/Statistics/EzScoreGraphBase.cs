@@ -35,8 +35,8 @@ namespace osu.Game.EzOsuGame.Statistics
         protected static double HP;
         protected static double OD;
 
-        protected float LeftMarginConst { get; set; } = 158;
-        protected float RightMarginConst { get; set; } = 7;
+        protected float LeftMarginConst { get; set; } = 165;
+        protected float RightMarginConst { get; set; } = 10;
 
         private const int current_offset = 0;
         private const int time_bins = 50;
