@@ -74,7 +74,7 @@ namespace osu.Game.EzOsuGame.Configuration
         [Description("LR2 Hard(Testing)")]
         LR2_HD = 6,
 
-        [Description("raja normal(Testing)")]
-        Raja_NM = 7,
+        [Description("raja Hard(Testing)")]
+        Raja_HD = 7,
     }
 }

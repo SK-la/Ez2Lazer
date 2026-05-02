@@ -124,7 +124,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     case EzEnumHealthMode.IIDX_HD:
                     case EzEnumHealthMode.LR2_HD:
-                    case EzEnumHealthMode.Raja_NM:
+                    case EzEnumHealthMode.Raja_HD:
                         poorCheckBox.Show();
                         break;
 

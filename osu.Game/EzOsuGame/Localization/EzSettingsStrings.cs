@@ -133,10 +133,10 @@ namespace osu.Game.EzOsuGame.Localization
 | 0.3% | -    | 0.2% |    - |  -1% |  -5% |    - | O2 Easy
 | 0.2% | -    | 0.1% |    - |  -7% |  -4% |    - | O2 Normal |
 | 0.1% | -    | 0.0% |    - |  -5% |  -3% |    - | O2 Hard |
-| Kool | Cool | Good |      |  Bad | Poor | []Poor | BMS |
-| 1.6% | 1.6% |    - |   -  |  -5% |  -9% |  -5% | IIDX Hard |
-| 1.0% | 1.0% | 0.5% |   -  |  -6% | -10% |  -2% | LR2 Hard |
-| 1.2% | 1.2% | 0.6% |   -  |  -3% |  -6% |  -2% | Raja Normal |");
+|  Kool |  Cool |  Good |      |  Bad | Poor | []Poor | BMS |
+| 0.16% | 0.16% |     - |   -  |  -5% |  -9% |    -5% | IIDX Hard |
+| 0.10% | 0.10% | 0.05% |   -  |  -6% | -10% |    -2% | LR2 Hard |
+| 0.15% | 0.12% | 0.03% |   -  |  -5% | -10% |    -5% | Raja Hard |");
 
         public static readonly LocalisableString POOR_HIT_RESULT = new EzLocalizationManager.EzLocalisableString("增加 Poor 判定类型", "Additional Poor HitResult");
 

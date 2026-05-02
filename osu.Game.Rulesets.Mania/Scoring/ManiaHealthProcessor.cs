@@ -1,9 +1,10 @@
-// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
 using System.Collections.Generic;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Scoring;
@@ -12,37 +13,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 {
     public partial class ManiaHealthProcessor : LegacyDrainingHealthProcessor
     {
-        public static readonly double[,] HEALTH_SETTINGS =
-        {
-            //  305    300    200    100      50    Miss    Poor
-            { 0.004, 0.003, 0.001, 0.000, -0.010, -0.030, -0.000 }, // Lazer
-            // Cool          Good            Bad    Miss
-            { 0.003, 0.000, 0.002, 0.000, -0.010, -0.050, -0.000 }, // O2 Easy
-            { 0.002, 0.000, 0.001, 0.000, -0.007, -0.040, -0.000 }, // O2 Normal
-            { 0.001, 0.000, 0.000, 0.000, -0.005, -0.030, -0.000 }, // O2 Hard
-            // Kool   Cool   Good           Miss    Fail
-            { 0.004, 0.003, 0.001, 0.000, -0.030, -0.050, -0.020 }, // Ez2Ac
-            // Kool   Cool   Good            Bad    Poor  空 Poor
-            { 0.016, 0.016, 0.000, 0.000, -0.050, -0.090, -0.050 }, // IIDX
-            { 0.010, 0.010, 0.005, 0.000, -0.060, -0.100, -0.020 }, // LR2 Hard
-            { 0.012, 0.012, 0.006, 0.000, -0.030, -0.060, -0.020 }, // raja normal
-        };
-
-        /// <summary>
-        /// LR2 Hard模式低血量（≤30%）时的扣血折扣系数
-        /// 根据 <see href="https://iidx.org/misc/iidx_lr2_beatoraja_diff">IIDX LR2/Beatoraja 难度表</see>
-        /// </summary>
-        private const double lr2_low_health_discount = 0.6;
-
-        /// <summary>
-        /// raja/beatoraja模式的血量阈值配置
-        /// 根据 <see href="https://iidx.org/misc/iidx_lr2_beatoraja_diff">IIDX LR2/Beatoraja 难度表</see>
-        /// 50%以上使用正常扣血，50%-30%之间线性递减，30%以下保持最低值
-        /// </summary>
-        private const double raja_high_health_threshold = 0.5;
-
-        private const double raja_low_health_threshold = 0.3;
-
         private static EzEnumHealthMode mode = EzEnumHealthMode.Lazer;
         private static int row;
 
@@ -127,31 +97,31 @@ namespace osu.Game.Rulesets.Mania.Scoring
             switch (result)
             {
                 case HitResult.Poor:
-                    increase = HEALTH_SETTINGS[row, 6];
+                    increase = HealthModeHelper.HEALTH_MODE_MAP[row, 6];
                     break;
 
                 case HitResult.Miss:
-                    increase = HEALTH_SETTINGS[row, 5];
+                    increase = HealthModeHelper.HEALTH_MODE_MAP[row, 5];
                     break;
 
                 case HitResult.Meh:
-                    increase = HEALTH_SETTINGS[row, 4];
+                    increase = HealthModeHelper.HEALTH_MODE_MAP[row, 4];
                     break;
 
                 case HitResult.Ok:
-                    increase = HEALTH_SETTINGS[row, 3];
+                    increase = HealthModeHelper.HEALTH_MODE_MAP[row, 3];
                     break;
 
                 case HitResult.Good:
-                    increase = HEALTH_SETTINGS[row, 2];
+                    increase = HealthModeHelper.HEALTH_MODE_MAP[row, 2];
                     break;
 
                 case HitResult.Great:
-                    increase = HEALTH_SETTINGS[row, 1];
+                    increase = HealthModeHelper.HEALTH_MODE_MAP[row, 1];
                     break;
 
                 case HitResult.Perfect:
-                    increase = HEALTH_SETTINGS[row, 0];
+                    increase = HealthModeHelper.HEALTH_MODE_MAP[row, 0];
                     break;
             }
 
@@ -171,23 +141,22 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     // LR2 Hard模式：血量≤30%时扣血×0.6（60%折扣）
                     if (Health.Value <= 0.3)
                     {
-                        increase *= lr2_low_health_discount;
+                        increase *= 0.6;
                     }
                 }
-                else if (mode == EzEnumHealthMode.Raja_NM)
+                else if (mode == EzEnumHealthMode.Raja_HD)
                 {
-                    // raja normal模式：50%-30%之间线性插值递减
-                    if (Health.Value <= raja_low_health_threshold)
+                    // raja Hard模式：50%-30%之间线性插值递减
+                    if (Health.Value <= 0.3)
                     {
                         // ≤30%：使用最低扣血（60%折扣）
                         increase *= 0.6;
                     }
-                    else if (Health.Value < raja_high_health_threshold)
+                    else if (Health.Value < 0.5)
                     {
                         // 30%-50%之间：线性插值
                         // t = (health - 0.3) / (0.5 - 0.3)，范围从0到1
-                        double t = (Health.Value - raja_low_health_threshold) /
-                                   (raja_high_health_threshold - raja_low_health_threshold);
+                        double t = (Health.Value - 0.3) / (0.5 - 0.3);
 
                         // 折扣系数从0.6（30%时）线性增加到1.0（50%时）
                         double discount = 0.6 + t * 0.4;
@@ -196,10 +165,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 }
             }
 
-            double scaled = Math.Clamp(increase, -0.00001, 0.01);
+            // 约束血量变化幅度
+            double scaled = Math.Clamp(increase, -0.2, 0.2);
 
-            // Suppress extremely small floating-point changes which are noise
-            // and can cause issues (e.g. infinite loading) when treated as non-zero.
             const double epsilon = 1e-6;
 
             if (Math.Abs(scaled) < epsilon)
@@ -220,7 +188,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             int idx = (int)mode;
 
-            if (idx < 0 || idx >= HEALTH_SETTINGS.GetLength(0))
+            if (idx < 0 || idx >= HealthModeHelper.HEALTH_MODE_MAP.GetLength(0))
                 idx = 0;
 
             return idx;
