@@ -213,6 +213,8 @@ namespace osu.Game.EzOsuGame.HUD
                 Loop = false
             };
 
+            bool hasFrames = false;
+
             // 对于动画帧，也尝试多种大小写变体
             foreach (string rn in possibleResultNames)
             {
@@ -227,21 +229,25 @@ namespace osu.Game.EzOsuGame.HUD
 
                     animation.AddFrame(texture);
                     foundFrames = true;
+                    hasFrames = true;
                 }
 
                 if (foundFrames)
                     break; // 如果找到帧，使用这个路径
             }
 
-            animation.DefaultFrameLength = 1000 / FPS.Value;
-
-            PlayAnimationGif(result, animation);
-
-            animation.OnUpdate += _ =>
+            // 只有在有帧的情况下才播放动画
+            if (hasFrames)
             {
-                if (animation.CurrentFrameIndex == animation.FrameCount - 1)
-                    animation.Expire();
-            };
+                animation.DefaultFrameLength = 1000 / FPS.Value;
+                PlayAnimationGif(result, animation);
+
+                animation.OnUpdate += _ =>
+                {
+                    if (animation.CurrentFrameIndex == animation.FrameCount - 1)
+                        animation.Expire();
+                };
+            }
 
             return animation;
         }
@@ -295,15 +301,20 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
-        public virtual void PlayAnimationGif(HitResult hitResult, Drawable drawable)
+        public virtual void PlayAnimationGif(HitResult hitResult, Drawable? drawable)
         {
+            // 防止空引用异常
+            if (drawable == null)
+                return;
+
             const float flash_speed = 60f;
             applyFadeEffect(hitResult, drawable, flash_speed);
         }
 
-        private void applyFadeEffect(HitResult hitResult, Drawable drawable, double flashSpeed)
+        private void applyFadeEffect(HitResult hitResult, Drawable? drawable, double flashSpeed)
         {
-            if (!drawable.IsLoaded)
+            // 防止空引用异常
+            if (drawable == null || !drawable.IsLoaded)
                 return;
 
             var colors = hitResult switch
@@ -342,8 +353,11 @@ namespace osu.Game.EzOsuGame.HUD
             }
         }
 
-        public virtual void PlayAnimation(HitResult hitResult, Drawable drawable)
+        public virtual void PlayAnimation(HitResult hitResult, Drawable? drawable)
         {
+            // 防止空引用异常
+            if (drawable == null) return;
+
             double flashSpeed = FPS.Value * 2;
             applyFadeEffect(hitResult, drawable, flashSpeed);
 
