@@ -9,6 +9,7 @@ using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Game.EzOsuGame.Extensions;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Rulesets;
@@ -272,7 +273,7 @@ namespace osu.Game.EzOsuGame.Statistics
             foreach (HitResult r in results)
             {
                 // string name = RulesetInstance.GetDisplayNameForHitResult(r).ToString();
-                string name = r.ToString(); // 直接使用枚举名称，避免某些规则集未提供显示名称导致的混乱。
+                string name = r.GetHitModeDisplayName().ToString();
 
                 stats.Total.TryGetValue(r, out int total);
                 stats.Early.TryGetValue(r, out int early);

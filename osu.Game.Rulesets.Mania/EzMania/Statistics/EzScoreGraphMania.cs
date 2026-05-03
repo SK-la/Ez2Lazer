@@ -14,6 +14,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Screens.Ranking.Statistics;
 using osu.Framework.Graphics.Colour;
+using osu.Game.EzOsuGame.Extensions;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
@@ -69,14 +70,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         [BackgroundDependencyLoader]
         private void load()
         {
-            // 绑定全局打击模式设置，以便切换模式时更新 helper 并重绘。
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
-                // 确保 mania 判定窗口根据全局配置和难度重新计算。
-                hitWindowsV2.ResetRange();
-                hitWindowsV2.SetDifficulty(OD);
-
                 // 重新计算并重绘。
                 Refresh();
             }, true);
@@ -144,7 +140,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             foreach (var r in results)
             {
-                string name = HitModeHelper.GetDisplayNameForHitResult(r).ToString();
+                string name = r.GetHitModeDisplayName().ToString();
                 string display = $"{V2Counts.GetValueOrDefault(r, 0)} | {V1Counts.GetValueOrDefault(r, 0)}";
                 var c = colours.ForHitResult(r);
                 items.Add(makeSimpleStat(display, name, c));

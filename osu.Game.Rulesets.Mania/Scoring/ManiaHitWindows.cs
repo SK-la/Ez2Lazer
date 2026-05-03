@@ -120,7 +120,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         /// <summary>
         /// 用于静态Mod覆写，设置后切换自定义判定区间
-        /// <see cref="WindowFor"/>将返回这些值，不受实例级计算影响。
         /// </summary>
         private static ManiaModifyHitRange? modOverride;
 
@@ -308,6 +307,19 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 default:
                     throw new ArgumentOutOfRangeException(nameof(result), result, null);
             }
+        }
+
+        /// <summary>
+        /// Get window for a specific result and direction (early/late) for asymmetric windows
+        /// </summary>
+        public double WindowFor(HitResult result, bool isEarly)
+        {
+            return helper.WindowFor(result);
+        }
+
+        public HitResult ResultFor(double timeOffset, bool isEarly)
+        {
+            return helper.ResultFor(timeOffset);
         }
     }
 }

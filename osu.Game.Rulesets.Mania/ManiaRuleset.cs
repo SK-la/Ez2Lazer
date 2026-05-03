@@ -13,6 +13,7 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
@@ -26,7 +27,6 @@ using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
 using osu.Game.Rulesets.Mania.EzMania.Analysis;
-using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
@@ -459,7 +459,7 @@ namespace osu.Game.Rulesets.Mania
         public override LocalisableString GetDisplayNameForHitResult(HitResult result)
         {
             // 获取对应 HitMode 的显示名称
-            return HitModeHelper.GetDisplayNameForHitResult(result);
+            return result.GetHitModeDisplayName();
         }
 
         public override StatisticItem[] CreateStatisticsForScore(ScoreInfo score, IBeatmap playableBeatmap) => new[]
@@ -557,7 +557,7 @@ namespace osu.Game.Rulesets.Mania
                 AdditionalMetrics = hitWindows.GetAllAvailableWindows()
                                               .Reverse()
                                               .Select(window => new RulesetBeatmapAttribute.AdditionalMetric(
-                                                  $"{HitModeHelper.GetDisplayNameForHitResult(window.result).ToString().ToUpperInvariant()} hit window",
+                                                  $"{window.result.GetHitModeDisplayName().ToString().ToUpperInvariant()} hit window",
                                                   LocalisableString.Interpolate($@"±{hitWindows.WindowFor(window.result):0.##} ms"),
                                                   colours.ForHitResult(window.result)
                                               )).ToArray()
