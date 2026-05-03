@@ -146,6 +146,20 @@ namespace osu.Game.EzOsuGame.Localization
             "The Poor HitResult type only takes effect under the BMS Health Mode, used for strict health deduction, does not affect Combo or Score\n"
             + "One note can trigger multiple Poor hit results, and it will only trigger if it is earlier than Miss, there is no late Poor");
 
+        public static readonly LocalisableString JUDGE_PRECEDENCE = new EzLocalizationManager.EzLocalisableString(
+            "判定优先级",
+            "Judge Precedence");
+
+        public static readonly LocalisableString JUDGE_PRECEDENCE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "设置优先级算法。当按键点在多个note的判定重叠区时，选择如何计算判定。"
+            + "\n Combo优先(LR2风格): 选择对score有利的note进行判定；"
+            + "\n 时差优先(raja风格): 根据按键时间点，选择距离最近的note进行判定；"
+            + "\n 最早note优先(osu风格): 选择重叠区时间最靠前的note进行判定。(注意可能因连续Late,导致极易出大量poor判而暴毙)",
+            "Set the judge precedence algorithm. When the key press point overlaps with multiple notes, how to calculate the judge."
+            + "\n Combo Priority (LR2 Style): Select the note that is most advantageous for score; "
+            + "\n Duration Priority (Raja Style): Select the note closest to the key press time; "
+            + "\n Earliest Note Priority (osu Style): Select the note with the earliest overlap time. (Note: This may result in a large number of poor judgments due to consecutive late notes, leading to a quick loss.)");
+
 #endregion
 
 #region 音频设备设置

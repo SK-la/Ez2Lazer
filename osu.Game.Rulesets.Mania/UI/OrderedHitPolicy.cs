@@ -3,6 +3,8 @@
 
 using System.Collections.Generic;
 using osu.Framework.Extensions.IEnumerableExtensions;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -16,10 +18,12 @@ namespace osu.Game.Rulesets.Mania.UI
     public class OrderedHitPolicy
     {
         private readonly HitObjectContainer hitObjectContainer;
+        private readonly OrderedHitPolicyHelper helper;
 
         public OrderedHitPolicy(HitObjectContainer hitObjectContainer)
         {
             this.hitObjectContainer = hitObjectContainer;
+            helper = new OrderedHitPolicyHelper(hitObjectContainer);
         }
 
         /// <summary>
@@ -33,6 +37,10 @@ namespace osu.Game.Rulesets.Mania.UI
         /// <returns>Whether <paramref name="hitObject"/> can be hit at the given <paramref name="time"/>.</returns>
         public bool IsHittable(DrawableHitObject hitObject, double time)
         {
+            // 非Earliest模式下，允许独立的优先级算法。
+            if (GlobalConfigStore.EzConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence) != EzEnumJudgePrecedence.Earliest)
+                return helper.IsHittableWithPrecedence(hitObject, time);
+
             var nextObject = hitObjectContainer.AliveObjects.GetNext(hitObject);
             return nextObject == null || time < nextObject.HitObject.StartTime;
         }

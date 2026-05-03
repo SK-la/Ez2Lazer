@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Configuration
         [Description("Lazer")]
         Lazer = 0,
 
-        [Description("EZ2AC(Testing)")]
+        [Description("EZ2AC: FNEX")]
         EZ2AC = 1,
 
         [Description("O2JAM")]
@@ -76,5 +76,20 @@ namespace osu.Game.EzOsuGame.Configuration
 
         [Description("raja Hard(Testing)")]
         Raja_HD = 7,
+    }
+
+    public enum EzEnumJudgePrecedence
+    {
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.JUDGE_PRECEDENCE_COMBO))]
+        Combo = 0,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.JUDGE_PRECEDENCE_DURATION))]
+        Duration = 1,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.JUDGE_PRECEDENCE_EARLIEST))]
+        Earliest = 2,
+
+        // [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.JUDGE_PRECEDENCE_SCORE))]
+        // Score = 3,
     }
 }
