@@ -197,7 +197,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        private static readonly CustomHitWindowsHelper custom_helper = new CustomHitWindowsHelper();
+        private static readonly HitModeHelper helper = new HitModeHelper();
 
         private bool setHitMode()
         {
@@ -207,11 +207,11 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 return false;
 
             if (hitMode == EzEnumHitMode.O2Jam)
-                custom_helper.BPM = BPM;
+                helper.BPM = BPM;
 
-            custom_helper.HitMode = hitMode;
+            helper.HitMode = hitMode;
 
-            modifyManiaHitRange(custom_helper.GetHitRangeList);
+            modifyManiaHitRange(helper.GetHitRangeList);
 
             return true;
         }

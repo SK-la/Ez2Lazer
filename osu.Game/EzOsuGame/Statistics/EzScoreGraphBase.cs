@@ -110,9 +110,9 @@ namespace osu.Game.EzOsuGame.Statistics
         protected virtual void CalculateV1Accuracy()
         {
             var v1ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
+            v1ScoreProcessor.ApplyBeatmap(Beatmap);
             v1ScoreProcessor.IsLegacyScore = true;
             v1ScoreProcessor.Mods.Value = Score.Mods;
-            v1ScoreProcessor.ApplyBeatmap(Beatmap);
 
             var v1Counts = new Dictionary<HitResult, int>();
 
@@ -162,8 +162,9 @@ namespace osu.Game.EzOsuGame.Statistics
         {
             // Create a fresh ScoreProcessor for V2 calculation (V1 already used one)
             var v2ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
-            v2ScoreProcessor.Mods.Value = Score.Mods;
             v2ScoreProcessor.ApplyBeatmap(Beatmap);
+            v2ScoreProcessor.Mods.Value = Score.Mods;
+
             var v2Counts = new Dictionary<HitResult, int>();
 
             foreach (var hitEvent in HitEvents)

@@ -113,7 +113,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             // if (!IsLegacyScore) return;
 
-            var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
+            var hitWindows = new HitModeHelper(EzEnumHitMode.Classic)
             {
                 OverallDifficulty = calOD
             };
@@ -152,7 +152,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override void RemoveScoreChange(JudgementResult judgement)
         {
-            var hitWindows = new CustomHitWindowsHelper(EzEnumHitMode.Classic)
+            var hitWindows = new HitModeHelper(EzEnumHitMode.Classic)
             {
                 OverallDifficulty = calOD
             };

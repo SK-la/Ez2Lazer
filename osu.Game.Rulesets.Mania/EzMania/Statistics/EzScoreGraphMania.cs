@@ -31,7 +31,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
     public partial class EzScoreGraphMania : EzScoreGraphBase
     {
         private readonly ManiaHitWindows hitWindowsV2 = new ManiaHitWindows();
-        private readonly HitModeRangeSwitcher hitWindowsV1 = new HitModeRangeSwitcher();
+        private readonly HitModeHelper hitWindowsV1 = new HitModeHelper(EzEnumHitMode.Classic);
 
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
         private Bindable<double> offsetPlusMania = new Bindable<double>(0);
@@ -73,11 +73,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
-                hitWindowsV1.HitMode = v.NewValue;
-
                 // 确保 mania 判定窗口根据全局配置和难度重新计算。
                 hitWindowsV2.ResetRange();
-                hitWindowsV2.SetDifficulty(Beatmap.Difficulty.OverallDifficulty);
+                hitWindowsV2.SetDifficulty(OD);
 
                 // 重新计算并重绘。
                 Refresh();

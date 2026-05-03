@@ -9,7 +9,7 @@ using osu.Game.Rulesets.Scoring;
 namespace osu.Game.Rulesets.Mania.EzMania.Helper
 {
     // NOTE: 当前模式数量很少，优先保持 switch/数组索引与低分配路径，收益通常高于引入 FrozenDictionary。
-    public class CustomHitWindowsHelper
+    public class HitModeHelper
     {
         private static readonly double[,] hit_range_bms =
         {
@@ -86,12 +86,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         private static readonly DifficultyRange miss_window_range = new DifficultyRange(188, 173, 158);
         private const double poor_offset = 150.0;
 
-        public CustomHitWindowsHelper()
+        public HitModeHelper()
             : this(GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode))
         {
         }
 
-        public CustomHitWindowsHelper(EzEnumHitMode hitMode)
+        public HitModeHelper(EzEnumHitMode hitMode)
         {
             HitMode = hitMode;
         }
@@ -111,66 +111,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             return new[] { Range305, Range300, Range200, Range100, Range050, Range000, Range000 };
         }
 
-        // public double[] GetHitWindowsO2Jam(double setBpm)
-        // {
-        //     bpm = setBpm;
-        //     Range305 = 7500.0 / bpm * TotalMultiplier;
-        //     Range300 = Range305;
-        //     Range200 = 22500.0 / bpm * TotalMultiplier;
-        //     Range100 = Range200;
-        //     Range050 = 31250.0 / bpm * TotalMultiplier;
-        //     Range000 = Range050;
-        //     PoorRange = Range000 + poor_offset;
-        //
-        //     return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
-        // }
-        //
-        // public double[] GetHitWindowsEZ2AC()
-        // {
-        //     Range305 = 16.67 * TotalMultiplier;
-        //     Range300 = 33.33 * TotalMultiplier;
-        //     Range200 = 83.33 * TotalMultiplier;
-        //     Range100 = 83.33 * TotalMultiplier;
-        //     Range050 = 100.0 * TotalMultiplier;
-        //     Range000 = 116.67 * TotalMultiplier;
-        //     PoorRange = poor_offset;
-        //
-        //     return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
-        // }
-        //
-        // public double[] GetHitWindowsBMS(EzEnumHitMode mode)
-        // {
-        //     int row = 0;
-        //
-        //     switch (mode)
-        //     {
-        //         case EzEnumHitMode.IIDX_HD:
-        //             row = 0;
-        //             break;
-        //
-        //         case EzEnumHitMode.LR2_HD:
-        //             row = 1;
-        //             break;
-        //
-        //         case EzEnumHitMode.Raja_NM:
-        //             row = 2;
-        //             break;
-        //     }
-        //
-        //     Range305 = hit_range_bms[row, 0] * TotalMultiplier;
-        //     Range300 = hit_range_bms[row, 1] * TotalMultiplier;
-        //     Range200 = hit_range_bms[row, 2] * TotalMultiplier;
-        //     Range100 = hit_range_bms[row, 3] * TotalMultiplier;
-        //     Range050 = hit_range_bms[row, 4] * TotalMultiplier;
-        //     Range000 = hit_range_bms[row, 5] * TotalMultiplier;
-        //     PoorRange = hit_range_bms[row, 6] * TotalMultiplier;
-        //
-        //     return new[] { Range305, Range300, Range200, Range100, Range050, Range000, PoorRange };
-        // }
-
         private void updateRanges()
         {
-            switch (HitMode)
+            switch (hitMode)
             {
                 case EzEnumHitMode.Lazer:
                     double perfect = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, perfect_window_range) * TotalMultiplier) + 0.5;
@@ -206,8 +149,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 case EzEnumHitMode.IIDX_HD:
                 case EzEnumHitMode.LR2_HD:
                 case EzEnumHitMode.Raja_NM:
-                    int row = HitMode == EzEnumHitMode.LR2_HD ? 1
-                        : HitMode == EzEnumHitMode.Raja_NM ? 2
+                    int row = hitMode == EzEnumHitMode.LR2_HD ? 1
+                        : hitMode == EzEnumHitMode.Raja_NM ? 2
                         : 0;
 
                     Range305 = hit_range_bms[row, 0] * TotalMultiplier;
