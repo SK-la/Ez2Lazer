@@ -140,8 +140,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             foreach (var r in results)
             {
+                int v2Count = V2Counts.GetValueOrDefault(r, 0);
+                int v1Count = V1Counts.GetValueOrDefault(r, 0);
+
+                // 如果两个值都为0，跳过这个判定的显示
+                if (v2Count == 0 && v1Count == 0)
+                    continue;
+
                 string name = r.GetHitModeDisplayName().ToString();
-                string display = $"{V2Counts.GetValueOrDefault(r, 0)} | {V1Counts.GetValueOrDefault(r, 0)}";
+                string display = $"{v2Count} | {v1Count}";
                 var c = colours.ForHitResult(r);
                 items.Add(makeSimpleStat(display, name, c));
             }
