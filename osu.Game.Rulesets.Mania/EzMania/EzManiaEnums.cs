@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System.ComponentModel;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 
@@ -45,29 +44,5 @@ namespace osu.Game.Rulesets.Mania.EzMania
         public static readonly LocalisableString SCROLL_TIME_FOR_SCREEN_BOTTOM = new EzLocalizationManager.EzLocalisableString(
             "(ms) 相对于到屏幕底部的时间",
             "(ms) Relative to screen bottom");
-    }
-
-    public enum ManiaHitResult
-    {
-        [Description("Poor")]
-        Poor,
-
-        [Description("Miss")]
-        Miss,
-
-        [Description("50")]
-        Meh,
-
-        [Description("100")]
-        Ok,
-
-        [Description("200")]
-        Good,
-
-        [Description("300")]
-        Great,
-
-        [Description("Perfect")]
-        Perfect
     }
 }

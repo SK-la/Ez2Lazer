@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
@@ -42,7 +43,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         private IBindable<WorkingBeatmap> beatmap { get; set; } = null!;
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.SHOW_JUDGEMENT), nameof(FastSlowDisplayStrings.SHOW_STYLE_DESCRIPTION))]
-        public Bindable<ManiaHitResult> Judgement { get; } = new Bindable<ManiaHitResult>(ManiaHitResult.Perfect);
+        public Bindable<EzEnumHitResult> Judgement { get; } = new Bindable<EzEnumHitResult>();
 
         [SettingSource(typeof(FastSlowDisplayStrings), nameof(FastSlowDisplayStrings.GAP), nameof(FastSlowDisplayStrings.GAP_DESCRIPTION))]
         public BindableNumber<float> Gap { get; } = new BindableNumber<float>(50)

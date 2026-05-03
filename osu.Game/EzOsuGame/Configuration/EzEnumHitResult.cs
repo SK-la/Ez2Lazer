@@ -1,18 +1,29 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.ComponentModel;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.EzOsuGame.Configuration
 {
     public enum EzEnumHitResult
     {
+        [Description("Perfect")]
         Perfect,
+
+        [Description("Great")]
         Great,
+
+        [Description("Good")]
         Good,
-        Ok,
+
+        [Description("Meh")]
         Meh,
+
+        [Description("Miss")]
         Miss,
+
+        [Description("KPoor")]
         Poor,
     }
 
@@ -25,7 +36,6 @@ namespace osu.Game.EzOsuGame.Configuration
                 EzEnumHitResult.Perfect => HitResult.Perfect,
                 EzEnumHitResult.Great => HitResult.Great,
                 EzEnumHitResult.Good => HitResult.Good,
-                EzEnumHitResult.Ok => HitResult.Ok,
                 EzEnumHitResult.Meh => HitResult.Meh,
                 EzEnumHitResult.Miss => HitResult.Miss,
                 EzEnumHitResult.Poor => HitResult.Poor,
@@ -40,7 +50,6 @@ namespace osu.Game.EzOsuGame.Configuration
                 HitResult.Perfect => EzEnumHitResult.Perfect,
                 HitResult.Great => EzEnumHitResult.Great,
                 HitResult.Good => EzEnumHitResult.Good,
-                HitResult.Ok => EzEnumHitResult.Ok,
                 HitResult.Meh => EzEnumHitResult.Meh,
                 HitResult.Miss => EzEnumHitResult.Miss,
                 _ => EzEnumHitResult.Poor
@@ -57,7 +66,6 @@ namespace osu.Game.EzOsuGame.Configuration
                 EzEnumHitResult.Perfect => 0,
                 EzEnumHitResult.Great => 1,
                 EzEnumHitResult.Good => 2,
-                EzEnumHitResult.Ok => 3,
                 EzEnumHitResult.Meh => 4,
                 EzEnumHitResult.Miss => 5,
                 EzEnumHitResult.Poor => 6,
