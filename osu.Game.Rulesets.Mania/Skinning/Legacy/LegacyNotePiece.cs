@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
 using osuTK;
@@ -23,6 +24,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         private Drawable noteAnimation = null!;
 
         private float? widthForNoteHeightScale;
+        private string index = "1";
 
         public LegacyNotePiece()
         {
@@ -31,8 +33,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource skin, IScrollingInfo scrollingInfo)
+        private void load(ISkinSource skin, IScrollingInfo scrollingInfo, ManiaRulesetConfigManager? config)
         {
+            bool baseColor = config != null && config.Get<bool>(ManiaRulesetSetting.TimingBasedNoteColouring);
+            index = baseColor ? "1" : FallbackColumnIndex;
+
             widthForNoteHeightScale = skin.GetConfig<ManiaSkinConfigurationLookup, float>(new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale))?.Value;
 
             InternalChild = directionContainer = new Container
@@ -97,7 +102,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             }
 
             string noteImage = GetColumnSkinConfig<string>(skin, lookup)?.Value
-                               ?? $"mania-note{FallbackColumnIndex}{suffix}";
+                               ?? $"mania-note{index}{suffix}";
 
             return skin.GetAnimation(noteImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
         }
