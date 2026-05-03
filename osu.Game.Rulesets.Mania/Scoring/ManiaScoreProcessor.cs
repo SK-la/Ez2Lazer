@@ -111,8 +111,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         protected override void ApplyScoreChange(JudgementResult judgement)
         {
-            // if (!IsLegacyScore) return;
-
             var hitWindows = new HitModeHelper(EzEnumHitMode.Classic)
             {
                 OverallDifficulty = calOD
@@ -127,22 +125,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
             else if (hitObject is TailNote)
             {
-                ClassicMaxBaseScore += 300;
+                ClassicMaxBaseScore += HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, HitResult.Perfect);
                 ClassicBaseScore += hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
             {
-                ClassicMaxBaseScore += 300;
-                ClassicBaseScore += result switch
-                {
-                    HitResult.Perfect => 300,
-                    HitResult.Great => 300,
-                    HitResult.Good => 200,
-                    HitResult.Ok => 100,
-                    HitResult.Meh => 50,
-                    _ => 0
-                };
+                ClassicMaxBaseScore += HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, HitResult.Perfect);
+                ClassicBaseScore += HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, result);
             }
 
             UpdateScoreClassic();
@@ -166,22 +156,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
             else if (hitObject is TailNote)
             {
-                ClassicMaxBaseScore -= 300;
+                ClassicMaxBaseScore -= HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, HitResult.Perfect);
                 ClassicBaseScore -= hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
             {
-                ClassicMaxBaseScore -= 300;
-                ClassicBaseScore -= result switch
-                {
-                    HitResult.Perfect => 300,
-                    HitResult.Great => 300,
-                    HitResult.Good => 200,
-                    HitResult.Ok => 100,
-                    HitResult.Meh => 50,
-                    _ => 0
-                };
+                ClassicMaxBaseScore -= HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, HitResult.Perfect);
+                ClassicBaseScore -= HitModeHelper.GetBaseScoreForResult(EzEnumHitMode.Classic, result);
             }
 
             UpdateScoreClassic();

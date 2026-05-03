@@ -248,6 +248,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
+#region 分数
+
         /// <summary>
         /// Compute LN (long note) tail score given head and tail offsets using this helper's ranges.
         /// </summary>
@@ -279,6 +281,51 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
             return 0;
         }
+
+        private const int score_base = 300;
+        private const int score_good = 200;
+        private const int score_ok = 100;
+        private const int score_meh = 50;
+
+        /// <summary>
+        /// 根据判定模式获取基础分数
+        /// </summary>
+        public static int GetBaseScoreForResult(EzEnumHitMode hitMode, HitResult result)
+        {
+            switch (hitMode)
+            {
+                case EzEnumHitMode.Classic:
+                    return getClassicBaseScore(result);
+
+                default:
+                    return 0;
+            }
+        }
+
+        // Stable经典模式
+        private static int getClassicBaseScore(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                case HitResult.Great:
+                    return score_base;
+
+                case HitResult.Good:
+                    return score_good;
+
+                case HitResult.Ok:
+                    return score_ok;
+
+                case HitResult.Meh:
+                    return score_meh;
+
+                default:
+                    return 0;
+            }
+        }
+
+#endregion
 
 #region 判定文本显示 & 公共静态工具
 
