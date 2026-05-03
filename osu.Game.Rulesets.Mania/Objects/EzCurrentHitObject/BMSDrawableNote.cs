@@ -1,47 +1,60 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 {
+    /// <summary>
+    /// BMS专用Note规则，注意查阅网站时，BMS的正负偏移与osu定义是相反的
+    /// <para></para>1. Perfect>Great>Good>Bad>Poor>見逃しPOOR>KPoor(无note空按)
+    /// <para>2. Poor判属于常规判定，只判按早的情况</para>
+    /// 3. 見逃しPOOR不属于常规判定结果, 无判定区间。定义是Bad区间结束后都没有按的判定
+    /// <para>4. KPoor不属于常规判定结果，不断Combo。定义是在没有note时按的判定</para>
+    /// 5. 综合2~4可以简化为，当按键在Bad区间外，符合早按区间为Poor，没按为見逃しPOOR，其他情况为KPoor
+    /// </summary>
+    public static partial class BMSJudgeMapping
+    {
+        // 映射使用Meh时，需要特殊
+        public static HitResult Bad => HitResult.Meh;
+        public static HitResult Poor => HitResult.Miss; //普通Poor, 见逃しPOOR
+        public static HitResult KPoor => HitResult.Poor; //KPoor对应None，原则上要求无note
+
+        // BMS不适用下面这种方法，CaBeHit会按判定区间检查，这与bms不同
+        // if (!HitObject.HitWindows.CanBeHit(timeOffset))
+        //     ApplyMinResult();
+    }
+
     public partial class BMSDrawableNote : DrawableNote
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            var helper = HitObject.HitWindows as ManiaHitWindows;
+            double badLate = helper!.WindowFor(BMSJudgeMapping.Bad, false);
+
             if (!userTriggered)
             {
-                if (!HitObject.HitWindows.CanBeHit(timeOffset))
-                    ApplyResult(HitResult.Miss);
+                if (!HitObject.HitWindows.CanBeHit(timeOffset) && timeOffset > badLate)
+                    ApplyResult(BMSJudgeMapping.Poor); // 见逃し KPoor
 
                 return;
             }
 
-            var result = HitObject.HitWindows.ResultFor(timeOffset);
-            double adjustedOffset = Math.Abs(timeOffset);
-
-            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
-                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
-            {
-                ApplyResult(HitResult.Miss);
-                return;
-            }
-
-            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
-                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
-                result = HitResult.Poor;
+            var result = helper.ResultFor(timeOffset);
 
             if (result == HitResult.None)
-                result = HitResult.Poor;
-
-            if (result == HitResult.Poor)
             {
-                if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
+                result = BMSJudgeMapping.KPoor; // 伪 KPoor
+            }
+
+            if (result == BMSJudgeMapping.KPoor)
+            {
+                if (!HitObject.HitWindows.IsHitResultAllowed(BMSJudgeMapping.KPoor))
                     return;
 
-                DispatchNewResult(HitResult.Poor);
+                DispatchNewResult(BMSJudgeMapping.KPoor);
                 return;
             }
 
@@ -53,54 +66,36 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                     r.IsComboHit = false;
             }, result);
         }
-
-        // public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
-        // {
-        //     if (e.Action != Action.Value)
-        //         return false;
-        //
-        //     if (CheckHittable?.Invoke(this, Time.Current) == false)
-        //         return UpdateResult(false);
-        //
-        //     return UpdateResult(true);
-        // }
     }
 
     public partial class BMSDrawableHoldNoteHead : DrawableHoldNoteHead
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            var helper = HitObject.HitWindows as ManiaHitWindows;
+            double badLate = helper!.WindowFor(BMSJudgeMapping.Bad, false);
+
             if (!userTriggered)
             {
-                if (!HitObject.HitWindows.CanBeHit(timeOffset))
-                    ApplyResult(HitResult.Miss);
+                if (!HitObject.HitWindows.CanBeHit(timeOffset) && timeOffset > badLate)
+                    ApplyResult(BMSJudgeMapping.Poor); // 见逃し KPoor
 
                 return;
             }
 
-            var result = HitObject.HitWindows.ResultFor(timeOffset);
-            double adjustedOffset = Math.Abs(timeOffset);
-
-            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
-                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
-            {
-                ApplyResult(HitResult.Miss);
-                return;
-            }
-
-            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
-                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
-                result = HitResult.None;
+            var result = helper.ResultFor(timeOffset);
 
             if (result == HitResult.None)
-                result = HitResult.Poor;
-
-            if (result == HitResult.Poor)
             {
-                if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
+                result = BMSJudgeMapping.KPoor; // 伪 KPoor
+            }
+
+            if (result == BMSJudgeMapping.KPoor)
+            {
+                if (!HitObject.HitWindows.IsHitResultAllowed(BMSJudgeMapping.KPoor))
                     return;
 
-                DispatchNewResult(HitResult.Poor);
+                DispatchNewResult(BMSJudgeMapping.KPoor);
                 return;
             }
 
@@ -116,49 +111,39 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public partial class BMSDrawableHoldNoteTail : DrawableHoldNoteTail
     {
-        public override bool DisplayResult => false;
+        public override bool DisplayResult => true;
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
+            var helper = HitObject.HitWindows as ManiaHitWindows;
+            double badLate = helper!.WindowFor(BMSJudgeMapping.Bad, false);
+
             if (!userTriggered)
             {
-                if (!HitObject.HitWindows.CanBeHit(timeOffset))
-                    ApplyMinResult(); // 待定
+                if (!HitObject.HitWindows.CanBeHit(timeOffset) && timeOffset > badLate)
+                    ApplyResult(BMSJudgeMapping.Poor); // 见逃し KPoor
 
                 return;
             }
 
-            var result = HitObject.HitWindows.ResultFor(timeOffset);
-            double adjustedOffset = Math.Abs(timeOffset);
-
-            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh) &&
-                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Miss))
-            {
-                ApplyResult(HitResult.Miss);
-                return;
-            }
-
-            if (adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Miss) &&
-                adjustedOffset < HitObject.HitWindows.WindowFor(HitResult.Poor))
-                result = HitResult.Poor;
+            var result = helper.ResultFor(timeOffset);
 
             if (result == HitResult.None)
                 return;
 
+            // LN特殊规则
             if (HoldNote.Body.HasHoldBreak)
-                result = HitResult.Poor;
+                result = BMSJudgeMapping.Poor;
 
-            if (HoldNote.IsHolding.Value && adjustedOffset > HitObject.HitWindows.WindowFor(HitResult.Meh))
-                result = HitResult.Poor;
+            if (HoldNote.IsHolding.Value && timeOffset > badLate)
+                result = BMSJudgeMapping.Poor;
 
-            // If the computed result is Poor, mark it temporarily but don't apply a final result.
-            // Also populate RawTime and dispatch OnNewResult so processors (score/health) can count it.
-            if (result == HitResult.Poor)
+            if (result == BMSJudgeMapping.KPoor)
             {
-                if (!HitObject.HitWindows.IsHitResultAllowed(HitResult.Poor))
+                if (!HitObject.HitWindows.IsHitResultAllowed(BMSJudgeMapping.KPoor))
                     return;
 
-                DispatchNewResult(HitResult.Poor);
+                DispatchNewResult(BMSJudgeMapping.KPoor);
                 return;
             }
 
@@ -171,67 +156,5 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                     r.IsComboHit = false;
             }, result);
         }
-    }
-
-    public partial class BMSDrawableHoldNote : DrawableHoldNote
-    {
-        protected override void CheckForResult(bool userTriggered, double timeOffset)
-        {
-            if (Tail.AllJudged)
-            {
-                if (Tail.IsHit)
-                {
-                    bool breakComboFromTailMeh = Tail.Result.Type == HitResult.Meh;
-
-                    ApplyResult(static (r, breakCombo) =>
-                    {
-                        r.Type = r.Judgement.MaxResult;
-
-                        if (breakCombo)
-                            r.IsComboHit = false;
-                    }, breakComboFromTailMeh);
-                }
-                else
-                    MissForcefully();
-
-                // Make sure that the hold note is fully judged by giving the body a judgement.
-                if (!Body.AllJudged)
-                    Body.TriggerResult(Tail.IsHit);
-
-                // Important that this is always called when a result is applied.
-                Result.ReportHoldState(Time.Current, false);
-            }
-        }
-
-        // private Func<DrawableHitObject, double, bool>? originalCheckHittable;
-
-        // protected override void Update()
-        // {
-        //     base.Update();
-        //
-        //     // 如果 Body 已断连且尚未到达尾点，强制锁定 IsHolding 状态。
-        //     if (Body != null && Tail != null && Body.HasHoldBreak && Time.Current < Tail.HitObject.StartTime)
-        //     {
-        //         if (IsHolding is Bindable<bool> b)
-        //             b.Value = false;
-        //     }
-        //     else
-        //     {
-        //         // 当不处于锁定期，恢复可能被替换的 CheckHittable
-        //         if (originalCheckHittable != null)
-        //         {
-        //             CheckHittable = originalCheckHittable;
-        //             originalCheckHittable = null;
-        //         }
-        //     }
-        //
-        //     // 在锁定期，确保输入不可命中
-        //     if (Body != null && Tail != null && Body.HasHoldBreak && Time.Current < Tail.HitObject.StartTime)
-        //     {
-        //         originalCheckHittable ??= CheckHittable;
-        //
-        //         CheckHittable = (d, t) => false;
-        //     }
-        // }
     }
 }

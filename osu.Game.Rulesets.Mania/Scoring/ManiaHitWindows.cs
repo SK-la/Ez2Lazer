@@ -202,13 +202,16 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             EzEnumHitMode hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
 
-            if (hitMode == EzEnumHitMode.Lazer)
-                return false;
+            // 需要先更新属性，保证数值同步
+            helper.HitMode = hitMode;
+            helper.OverallDifficulty = overallDifficulty;
+            helper.TotalMultiplier = totalMultiplier;
 
             if (hitMode == EzEnumHitMode.O2Jam)
                 helper.BPM = BPM;
 
-            helper.HitMode = hitMode;
+            if (hitMode == EzEnumHitMode.Lazer)
+                return false;
 
             modifyManiaHitRange(helper.GetHitRangeList);
 
@@ -317,9 +320,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
             return helper.WindowFor(result);
         }
 
-        public HitResult ResultFor(double timeOffset, bool isEarly)
+        public HitResult ResultFor(double timeOffset, bool? useHelper = null)
         {
-            return helper.ResultFor(timeOffset);
+            bool shouldUseHelper = useHelper ?? (GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode) != EzEnumHitMode.Lazer);
+            return shouldUseHelper ? helper.ResultFor(timeOffset) : base.ResultFor(timeOffset);
         }
     }
 }

@@ -187,12 +187,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
                 hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, target.StartTime, hitMode);
 
-                double missWindow = getWindowFor(target, hitWindowHelper, hitMode, HitResult.Miss) * lenienceFactor;
-                double searchWindow = getSearchWindow(target, hitWindowHelper, hitMode, poorEnabled) * lenienceFactor;
+                double missWindow = hitWindowHelper.WindowFor(HitResult.Miss) * lenienceFactor;
 
                 List<double> times = isTail ? releaseTimesByColumn[column] : pressTimesByColumn[column];
 
-                int idx = times.FindIndex(t => t >= target.StartTime - searchWindow && t <= target.StartTime + searchWindow);
+                int idx = times.FindIndex(t => t >= target.StartTime - missWindow && t <= target.StartTime + missWindow);
 
                 double timeOffsetForJudgement = 0;
                 HitResult result;
@@ -217,7 +216,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     if (target is TailNote tail && headByTail.TryGetValue(tail, out var headNote))
                         headHit = headWasHit.TryGetValue(headNote, out bool wasHit) && wasHit;
 
-                    result = evaluateResult(target, hitWindowHelper, hitMode, poorEnabled, timeOffsetForJudgement, rawOffset, missWindow, holdBreak, headHit,
+                    result = evaluateResult(target, hitWindowHelper, hitMode, poorEnabled, timeOffsetForJudgement, rawOffset, holdBreak, headHit,
                         playableBeatmap, eventTime, pillModeEnabled, ref o2PillCount, ref o2CoolCombo);
 
                     if (target is HeadNote head)
@@ -239,8 +238,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return hitEvents;
         }
 
+        // TODO: Ez2Ac没有实现
         private static HitResult evaluateResult(HitObject target, HitModeHelper hitModeHelper, EzEnumHitMode hitMode, bool poorEnabled,
-                                                double timeOffsetForJudgement, double rawOffset, double missWindow, bool holdBreak, bool headHit,
+                                                double timeOffsetForJudgement, double rawOffset, bool holdBreak, bool headHit,
                                                 IBeatmap playableBeatmap, double eventTime, bool pillModeEnabled, ref int o2PillCount, ref int o2CoolCombo)
         {
             double absOffset = Math.Abs(timeOffsetForJudgement);
@@ -261,24 +261,15 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             if (isBmsLike(hitMode))
             {
-                double mehWindow = hitModeHelper.WindowFor(HitResult.Meh);
-                double poorWindow = poorEnabled && hitModeHelper.IsHitResultAllowed(HitResult.Poor)
-                    ? hitModeHelper.WindowFor(HitResult.Poor)
-                    : missWindow;
-
-                if (absOffset > mehWindow && absOffset < missWindow)
-                    return HitResult.Miss;
-
-                if (poorEnabled && absOffset > missWindow && absOffset <= poorWindow)
-                    return HitResult.Poor;
+                double badLate = hitModeHelper.WindowFor(BMSJudgeMapping.Bad);
 
                 HitResult result = hitModeHelper.ResultFor(timeOffsetForJudgement);
 
-                if (result == HitResult.None)
-                    result = HitResult.Miss;
+                if (poorEnabled && result == HitResult.None)
+                    result = BMSJudgeMapping.KPoor;
 
-                if (isTail && (holdBreak || !headHit || absOffset > mehWindow))
-                    return poorEnabled ? HitResult.Poor : HitResult.Miss;
+                if (result == HitResult.None && (absOffset > badLate || (isTail && holdBreak)))
+                    return BMSJudgeMapping.Poor;
 
                 return result;
             }
@@ -362,25 +353,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         private static bool usesTailReleaseLenience(EzEnumHitMode hitMode)
             => hitMode == EzEnumHitMode.Lazer || hitMode == EzEnumHitMode.Classic;
-
-        private static double getSearchWindow(HitObject target, HitModeHelper hitModeHelper, EzEnumHitMode hitMode, bool poorEnabled)
-        {
-            if (hitMode == EzEnumHitMode.Lazer)
-                return target.HitWindows?.WindowFor(HitResult.Miss) ?? 0;
-
-            if (poorEnabled && (isBmsLike(hitMode) || hitMode == EzEnumHitMode.EZ2AC) && hitModeHelper.IsHitResultAllowed(HitResult.Poor))
-                return hitModeHelper.WindowFor(HitResult.Poor);
-
-            return hitModeHelper.WindowFor(HitResult.Miss);
-        }
-
-        private static double getWindowFor(HitObject target, HitModeHelper hitModeHelper, EzEnumHitMode hitMode, HitResult result)
-        {
-            if (hitMode == EzEnumHitMode.Lazer)
-                return target.HitWindows?.WindowFor(result) ?? 0;
-
-            return hitModeHelper.WindowFor(result);
-        }
 
         private static double getBpmAtTime(IBeatmap beatmap, double time, EzEnumHitMode hitMode)
         {
