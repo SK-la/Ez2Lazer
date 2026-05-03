@@ -261,7 +261,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             if (isBmsLike(hitMode))
             {
-                double badLate = hitModeHelper.WindowFor(BMSJudgeMapping.Bad);
+                double badLate = hitModeHelper.WindowFor(BMSJudgeMapping.Bad, false);
 
                 HitResult result = hitModeHelper.ResultFor(timeOffsetForJudgement);
 

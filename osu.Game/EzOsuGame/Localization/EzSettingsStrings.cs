@@ -114,11 +114,11 @@ namespace osu.Game.EzOsuGame.Localization
 |  1/8 | -    |   3/8 | -   | 25/48 | NoHit | -      | BeatLength |
 | Kool | Cool |  Good |      |  Miss | Fail |        | Ez2Ac |
 | 1/60 | 2/60 |  5/60 | -    |  6/60 | 7/60 | -      | Frame |
-| Kool | Cool |  Good |      |  Bad |  Poor | []Poor |  BMS |
-| 16.7 | 33.3 | 116.7 | -    |  250 |   250 |    500 | IIDX |
-| 15.0 | 30.0 |  60.0 | -    |  200 |  1000 |   1000 | LR2 Hard |
-| 15.0 | 45.0 | 112.0 | -    |  165 |   500 |    500 | Raja Normal |
-| 20.0 | 60.0 | 150.0 | -    |  500 |   500 |    500 | Raja Easy |
+| Kool | Cool |  Good |      | Bad       |      Poor | KPoor  |  BMS |
+| 16.7 | 33.3 | 116.7 | -    | ±250      | -500/+150 | NoNote | IIDX |
+| 15.0 | 30.0 |  60.0 | -    | ±200      |     -1000 | NoNote | LR2 Hard |
+| 15.0 | 45.0 | 112.0 | -    | -165/+210 | -500/+150 | NoNote | Raja Normal |
+| 20.0 | 60.0 | 150.0 | -    | -220/+280 | -500/+150 | NoNote | Raja Easy |
 | Best | Cool |  Good |      |      |  Miss |        |  Malody |
 | 20.0 | 60.0 |  94.0 | -    | -    |   150 | -      | E(Hard) |
 | 44.0 | 84.0 | 118.0 | -    | -    |   150 | -      | B(Easy+) |");

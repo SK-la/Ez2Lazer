@@ -24,10 +24,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         {
             //  305  300    200     100     50e  Miss  Poor
             // Kool  Cool   Good    -       Bad  Poor  KPoor
-            { 16.67, 33.33, 116.67, 116.67, 250, 300,  300 }, // IIDX
-            { 15.00, 30.00, 060.00, 060.00, 200, 300,  300 }, // LR2 Hard, TODO:此处poor范围过大，前后LN首尾间隙可能被覆盖，导致下一个note提前被结束。
-            { 15.00, 45.00, 112.00, 112.00, 165, 300,  300 }, // raja normal (75%)
-            { 20.00, 60.00, 150.00, 150.00, 220, 300,  300 }, // raja easy (100%)
+            { 16.67, 33.33, 116.67, 116.67, 250, 500,  1000 }, // IIDX
+            { 15.00, 30.00, 060.00, 060.00, 200, 1000, 1000 }, // LR2 Hard, TODO:此处poor范围过大，前后LN首尾间隙可能被覆盖，导致下一个note提前被结束。
+            { 15.00, 45.00, 112.00, 112.00, 165, 500,  1000 }, // raja normal (75%)
+            { 20.00, 60.00, 150.00, 150.00, 220, 500,  1000 }, // raja easy (100%)
+        };
+
+        private static readonly double[,] hit_range_bms_late =
+        {
+            //  305    300     200     100   50l Miss   Poor
+            // Kool   Cool    Good       -  Bad  Poor  KPoor
+            { 16.67, 33.33, 116.67, 116.67, 250, 250, 0 }, // IIDX
+            { 15.00, 30.00, 060.00,  60.00, 200, 200, 0 }, // LR2 Hard
+            { 15.00, 45.00, 112.00, 112.00, 210, 210, 0 }, // raja normal
+            { 20.00, 60.00, 150.00, 150.00, 280, 280, 0 }, // raja easy (100%)
         };
 
         private static readonly DifficultyRange perfect_window_range = new DifficultyRange(22.4D, 19.4D, 13.9D);
@@ -108,7 +118,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             HitMode = hitMode;
         }
 
-        public double[] GetHitRangeList => new[] { Range305, Range300, Range200, Range100, Range050, Range000, RangePoor };
+        public double[] GetHitRangeList => new[] { Range305, Range300, Range200, Range100, Range050, Range000 };
 
         private void updateRanges()
         {
@@ -146,6 +156,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range050 = hit_range_bms[row, 4] * TotalMultiplier;
                     Range000 = hit_range_bms[row, 5];
                     RangePoor = hit_range_bms[row, 6];
+
+                    double badEarly = hit_range_bms[row, 4] * TotalMultiplier;
+                    double badLate = hit_range_bms_late[row, 4] * TotalMultiplier;
+                    RangeBD = (badEarly, badLate);
+
+                    double poorEarly = hit_range_bms[row, 5] * TotalMultiplier;
+                    double poorLate = hit_range_bms_late[row, 5] * TotalMultiplier;
+                    RangePR = (poorEarly, poorLate);
+
+                    double kPoorEarly = hit_range_bms[row, 6] * TotalMultiplier;
+                    double kPoorLate = hit_range_bms_late[row, 6] * TotalMultiplier;
+                    RangeKPR = (kPoorEarly, kPoorLate);
                     break;
 
                 case EzEnumHitMode.Malody_E:
@@ -217,14 +239,24 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             if (absOffset <= Range300) return HitResult.Great;
             if (absOffset <= Range200) return HitResult.Good;
             if (absOffset <= Range100) return HitResult.Ok;
-            if (absOffset <= Range050) return HitResult.Meh;
-            if (absOffset <= Range000) return HitResult.Miss;
-            if (absOffset <= RangePoor) return HitResult.Poor;
+
+            if (IsInRange(timeOffset, RangeBD, Range050)) return HitResult.Meh;
+            if (IsInRange(timeOffset, RangePR, Range000)) return HitResult.Miss;
+            if (IsInRange(timeOffset, RangeKPR, RangePoor)) return HitResult.Poor;
 
             return HitResult.None;
         }
 
-        public double WindowFor(HitResult result)
+        public bool IsInRange(double timeOffset, (double early, double late) range, double fallback)
+        {
+            bool isEarly = timeOffset < 0;
+            double early = range.early != 0 ? range.early : fallback;
+            double late = range.late != 0 ? range.late : fallback;
+            double mehWindow = isEarly ? early : late;
+            return timeOffset <= mehWindow;
+        }
+
+        public double WindowFor(HitResult result, bool? isEarly = null)
         {
             switch (result)
             {
@@ -236,11 +268,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
                 case HitResult.Ok: return Range100;
 
-                case HitResult.Meh: return Range050;
+                case HitResult.Meh:
+                    if (isEarly == null) return Range050;
 
-                case HitResult.Poor: return RangePoor;
+                    double mehRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
+                    return mehRange > 0 ? mehRange : Range050;
 
-                case HitResult.Miss: return Range000;
+                case HitResult.Poor:
+                    if (isEarly == null) return RangePoor;
+
+                    double poorRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
+                    return poorRange > 0 ? poorRange : RangePoor;
+
+                case HitResult.Miss:
+                    if (isEarly == null) return Range000;
+
+                    double missRange = (bool)isEarly ? RangePR.early : RangePR.late;
+                    return missRange > 0 ? missRange : Range000;
 
                 default: throw new ArgumentOutOfRangeException(nameof(result), result, null);
             }

@@ -9,7 +9,7 @@ using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
 {
-    public readonly record struct ManiaModifyHitRange(double Perfect, double Great, double Good, double Ok, double Meh, double Miss, double Poor = 0);
+    public readonly record struct ManiaModifyHitRange(double Perfect, double Great, double Good, double Ok, double Meh, double Miss);
 
     /// <summary>
     /// 提供给Mod，实现自定义判定区间后刷新显示
@@ -37,7 +37,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
         public static double OkRange;
         public static double MehRange;
         public static double MissRange;
-        public static double PoorRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -132,7 +131,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double ok;
         private double meh;
         private double miss;
-        private double poor;
 
         private static double bpm;
 
@@ -187,7 +185,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
             OkRange = difficultyRangeArray[3];
             MehRange = difficultyRangeArray[4];
             MissRange = difficultyRangeArray[5];
-            PoorRange = difficultyRangeArray[6] == 0 ? MissRange : difficultyRangeArray[6];
         }
 
         public void ResetRange()
@@ -228,7 +225,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 ok = OkRange;
                 meh = MehRange;
                 miss = MissRange;
-                poor = PoorRange;
                 return;
             }
 
@@ -268,12 +264,10 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public override double WindowFor(HitResult result)
         {
-            // Mod override takes absolute priority — survives per-HitObject instance re-creation.
             if (modOverride is { } mo)
             {
                 return result switch
                 {
-                    HitResult.Poor => mo.Poor,
                     HitResult.Perfect => mo.Perfect,
                     HitResult.Great => mo.Great,
                     HitResult.Good => mo.Good,
@@ -286,9 +280,6 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
             switch (result)
             {
-                case HitResult.Poor:
-                    return poor;
-
                 case HitResult.Perfect:
                     return perfect;
 
@@ -317,7 +308,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// </summary>
         public double WindowFor(HitResult result, bool isEarly)
         {
-            return helper.WindowFor(result);
+            return helper.WindowFor(result, isEarly);
         }
 
         public HitResult ResultFor(double timeOffset, bool? useHelper = null)

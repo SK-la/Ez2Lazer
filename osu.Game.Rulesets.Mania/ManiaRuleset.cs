@@ -556,11 +556,29 @@ namespace osu.Game.Rulesets.Mania
                 Description = "Affects timing requirements for notes.",
                 AdditionalMetrics = hitWindows.GetAllAvailableWindows()
                                               .Reverse()
-                                              .Select(window => new RulesetBeatmapAttribute.AdditionalMetric(
-                                                  $"{window.result.GetHitModeDisplayName().ToString().ToUpperInvariant()} hit window",
-                                                  LocalisableString.Interpolate($@"±{hitWindows.WindowFor(window.result):0.##} ms"),
-                                                  colours.ForHitResult(window.result)
-                                              )).ToArray()
+                                              .Select(window =>
+                                              {
+                                                  LocalisableString windowText;
+
+                                                  // Check if using asymmetric windows by comparing early/late values
+                                                  double earlyWindow = hitWindows.WindowFor(window.result, true);
+                                                  double lateWindow = hitWindows.WindowFor(window.result, false);
+
+                                                  if (Math.Abs(earlyWindow - lateWindow) > 0.01)
+                                                  {
+                                                      windowText = $@"-{earlyWindow:0.##}/+{lateWindow:0.##} ms";
+                                                  }
+                                                  else
+                                                  {
+                                                      windowText = $@"±{earlyWindow:0.##} ms";
+                                                  }
+
+                                                  return new RulesetBeatmapAttribute.AdditionalMetric(
+                                                      $"{window.result.GetHitModeDisplayName().ToString().ToUpperInvariant()} hit window",
+                                                      windowText,
+                                                      colours.ForHitResult(window.result)
+                                                  );
+                                              }).ToArray()
             };
 
             yield return new RulesetBeatmapAttribute(SongSelectStrings.HPDrain, @"HP", originalDifficulty.DrainRate, adjustedDifficulty.DrainRate, 10)
