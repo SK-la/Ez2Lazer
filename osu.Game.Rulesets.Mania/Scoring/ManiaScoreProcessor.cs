@@ -144,7 +144,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 OverallDifficulty = calOD
             };
             double offset = Math.Abs(judgement.TimeOffset);
-            var result = hitWindows.ResultFor(offset);
+            var result = hitWindows.ResultForClassic(offset);
             var hitObject = (ManiaHitObject)judgement.HitObject;
 
             if (hitObject is HeadNote)
@@ -175,7 +175,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 OverallDifficulty = calOD
             };
             double offset = Math.Abs(judgement.TimeOffset);
-            var result = hitWindows.ResultFor(offset);
+            var result = hitWindows.ResultForClassic(offset);
             var hitObject = (ManiaHitObject)judgement.HitObject;
 
             if (hitObject is HeadNote)

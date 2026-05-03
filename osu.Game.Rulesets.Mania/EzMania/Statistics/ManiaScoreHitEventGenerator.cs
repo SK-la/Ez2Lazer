@@ -9,7 +9,6 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
-using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Objects;
@@ -62,15 +61,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             Replay replay = score.Replay;
             EzEnumHitMode hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            bool poorEnabled = GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
-            bool pillModeEnabled = score.ScoreInfo.Mods.OfType<ManiaModO2Judgement>().Any(mod => mod.PillMode.Value);
+            EzEnumHealthMode healthMode = GlobalConfigStore.EzConfig.Get<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
+            bool poorEnabled = HealthModeHelper.IsBMSHealthMode(healthMode) && GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
+            bool pillModeEnabled = healthMode.ToString().Contains("O2Jam");
 
-            var frames = replay.Frames.Cast<ManiaReplayFrame>().OrderBy(f => f.Time).ToList();
             var hitWindowHelper = new HitModeHelper(hitMode)
             {
                 OverallDifficulty = playableBeatmap.Difficulty.OverallDifficulty,
-                BPM = getBpmAtTime(playableBeatmap, 0, hitMode),
+                BPM = getBpmAtTime(playableBeatmap, 0),
             };
+
+            var frames = replay.Frames.Cast<ManiaReplayFrame>().OrderBy(f => f.Time).ToList();
 
             // Build per-column input transitions.
             var pressTimesByColumn = new List<double>[32];
@@ -185,7 +186,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 bool useTailReleaseLenience = isTail && usesTailReleaseLenience(hitMode);
                 double lenienceFactor = useTailReleaseLenience ? TailNote.RELEASE_WINDOW_LENIENCE : 1;
 
-                hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, target.StartTime, hitMode);
+                hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, target.StartTime);
 
                 double missWindow = hitWindowHelper.WindowFor(HitResult.Miss) * lenienceFactor;
 
@@ -204,10 +205,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     times.RemoveAt(idx);
 
                     double rawOffset = eventTime - target.StartTime;
-                    if (isTail && rawOffset < 0)
+                    if (isTail && rawOffset < -missWindow)
                         holdBreak = true;
 
-                    hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, eventTime, hitMode);
+                    hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, eventTime);
 
                     timeOffsetForJudgement = useTailReleaseLenience ? rawOffset / TailNote.RELEASE_WINDOW_LENIENCE : rawOffset;
 
@@ -218,6 +219,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
                     result = evaluateResult(target, hitWindowHelper, hitMode, poorEnabled, timeOffsetForJudgement, rawOffset, holdBreak, headHit,
                         playableBeatmap, eventTime, pillModeEnabled, ref o2PillCount, ref o2CoolCombo);
+
+                    // Lazer 模式下，如果结果为 None（超出判定窗口），跳过该对象不计入统计
+                    if (hitMode == EzEnumHitMode.Lazer && result == HitResult.None)
+                        continue;
 
                     if (target is HeadNote head)
                         headWasHit[head] = result.IsHit();
@@ -250,9 +255,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             {
                 HitResult result = target.HitWindows?.ResultFor(timeOffsetForJudgement) ?? HitResult.None;
 
-                if (result == HitResult.None)
-                    result = HitResult.Miss;
-
                 if (isTail && result > HitResult.Meh && (!headHit || holdBreak))
                     result = HitResult.Meh;
 
@@ -278,11 +280,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             {
                 HitResult result = hitModeHelper.ResultFor(timeOffsetForJudgement);
 
-                if (result == HitResult.None)
-                    result = HitResult.Miss;
-
                 if (pillModeEnabled)
-                    applyO2PillLogic(Math.Abs(rawOffset), getBpmAtTime(playableBeatmap, eventTime, hitMode), ref o2PillCount, ref o2CoolCombo, ref result);
+                    applyO2PillLogic(Math.Abs(rawOffset), getBpmAtTime(playableBeatmap, eventTime), ref o2PillCount, ref o2CoolCombo, ref result);
 
                 if (isTail && (holdBreak || !headHit))
                     result = HitResult.Miss;
@@ -301,9 +300,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             }
 
             HitResult defaultResult = hitModeHelper.ResultFor(timeOffsetForJudgement);
-
-            if (defaultResult == HitResult.None)
-                defaultResult = HitResult.Miss;
 
             if (isTail && defaultResult > HitResult.Meh && (!headHit || holdBreak))
                 defaultResult = HitResult.Meh;
@@ -354,7 +350,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private static bool usesTailReleaseLenience(EzEnumHitMode hitMode)
             => hitMode == EzEnumHitMode.Lazer || hitMode == EzEnumHitMode.Classic;
 
-        private static double getBpmAtTime(IBeatmap beatmap, double time, EzEnumHitMode hitMode)
+        private static double getBpmAtTime(IBeatmap beatmap, double time)
         {
             double bpm = beatmap.ControlPointInfo.TimingPointAt(time).BPM;
 
@@ -363,9 +359,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             if (bpm <= 0)
                 bpm = 120;
-
-            if (hitMode == EzEnumHitMode.O2Jam)
-                return Math.Max(bpm, 75.0);
 
             return bpm;
         }

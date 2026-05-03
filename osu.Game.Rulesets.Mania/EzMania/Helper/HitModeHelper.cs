@@ -111,11 +111,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         public HitModeHelper()
             : this(GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode))
         {
+            updateRanges();
         }
 
         public HitModeHelper(EzEnumHitMode hitMode)
         {
             HitMode = hitMode;
+            updateRanges();
         }
 
         public double[] GetHitRangeList => new[] { Range305, Range300, Range200, Range100, Range050, Range000 };
@@ -224,16 +226,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 case HitResult.Miss:
                     return true;
 
-                case HitResult.Poor:
-                    return AllowPoorEnabled;
-
                 default:
                     return false;
             }
         }
 
+        public HitResult ResultForClassic(double timeOffset)
+        {
+            timeOffset = Math.Abs(timeOffset);
+
+            for (var result = HitResult.Perfect; result >= HitResult.Poor; --result)
+            {
+                if (IsHitResultAllowed(result) && timeOffset <= WindowFor(result))
+                    return result;
+            }
+
+            return HitResult.None;
+        }
+
         public HitResult ResultFor(double timeOffset)
         {
+            if (hitMode == EzEnumHitMode.Classic) return ResultForClassic(timeOffset);
+
             double absOffset = Math.Abs(timeOffset);
             if (absOffset <= Range305) return HitResult.Perfect;
             if (absOffset <= Range300) return HitResult.Great;
@@ -274,17 +288,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     double mehRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
                     return mehRange > 0 ? mehRange : Range050;
 
-                case HitResult.Poor:
-                    if (isEarly == null) return RangePoor;
-
-                    double poorRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
-                    return poorRange > 0 ? poorRange : RangePoor;
-
                 case HitResult.Miss:
                     if (isEarly == null) return Range000;
 
                     double missRange = (bool)isEarly ? RangePR.early : RangePR.late;
                     return missRange > 0 ? missRange : Range000;
+
+                // case HitResult.Poor:
+                //     if (isEarly == null) return RangePoor;
+                //
+                //     double poorRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
+                //     return poorRange > 0 ? poorRange : RangePoor;
 
                 default: throw new ArgumentOutOfRangeException(nameof(result), result, null);
             }
