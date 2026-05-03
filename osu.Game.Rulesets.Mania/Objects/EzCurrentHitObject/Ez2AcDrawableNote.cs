@@ -24,8 +24,6 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             if (result == HitResult.None)
                 return;
 
-            result = GetCappedResult(result);
-
             ApplyResult(static (r, state) =>
             {
                 r.Type = state;
@@ -53,12 +51,12 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             if (result == HitResult.None)
                 return;
 
-            // 提前按住的情况, 先给Fail，然后给Good.
-            if (timeOffset < 0 && result == HitResult.Miss)
-            {
-                ApplyResult(HitResult.Miss);
-                return;
-            }
+            // // 提前按住的情况, 先给Fail，然后给Good.
+            // if (timeOffset < 0 && result == HitResult.Miss)
+            // {
+            //     ApplyResult(HitResult.Miss);
+            //     return;
+            // }
 
             // 放宽1级
             switch (result)
@@ -90,8 +88,13 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     {
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (timeOffset < 0)
-                return;
+            // if (!userTriggered && timeOffset >= 0)
+            // {
+            //     if (!HitObject.HitWindows.CanBeHit(timeOffset))
+            //         ApplyMinResult();
+            //
+            //     return;
+            // }
 
             // 无论用户是否触发，都进行判定
             var result = HitObject.HitWindows.ResultFor(timeOffset);
