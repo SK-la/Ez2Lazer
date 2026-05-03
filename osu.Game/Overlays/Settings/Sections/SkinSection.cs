@@ -85,6 +85,15 @@ namespace osu.Game.Overlays.Settings.Sections
                     Text = SkinSettingsStrings.SkinLayoutEditor,
                     Action = () => skinEditor?.ToggleVisibility(),
                 },
+                new SettingsButtonV2
+                {
+                    Text = "Note Editor(Testing)",
+                    TooltipText = "(画饼)长期施工中，目标："
+                                  + "\n1.游戏内完整Skin.ini编辑"
+                                  + "\n2.实现完整Ez特有皮肤设置，并可覆写进Skin.ini"
+                                  + "\n3.游戏内PS、图片导出(包括渐变动画)",
+                    Action = () => skinEditor?.ToggleEzSkinEditor(),
+                },
             };
         }
 

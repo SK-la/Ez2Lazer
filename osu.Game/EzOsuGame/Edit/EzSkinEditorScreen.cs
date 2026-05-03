@@ -21,6 +21,18 @@ using osuTK.Graphics;
 
 namespace osu.Game.EzOsuGame.Edit
 {
+    //TODO: 重排布局，增加普通note的前后对比
+    // 1.游戏内完整Skin.ini编辑
+    // 2.实现完整Ez特有皮肤设置，并可覆写进Skin.ini
+    // 3.游戏内PS、图片导出(包括渐变动画)
+    // 4.设计原则 & 禁止：
+    // 4.1 多参数设置使用string?类型，mania的多列用","分隔符, 输入时自动替换到英文字符。
+    // 4.2 包裹导出方法，覆写前备份，所有皮肤源文件备份到皮肤文件夹SkinName/Backup/路径下。
+    // 4.3 禁止使用自定义的Skin.ini，使用系统自带的。
+    // 4.4 未来考虑在皮肤中增加EzSkin.json或ini，自定义映射不同的Skin{#}.ini
+    // 4.5 note编辑，等待着色功能，导出使用文件名模版，悬浮时提示note1优先用白色，可以提供按小节线染色功能。
+    // 4.6 这个场景中，未来可以考虑按谱面编辑器的皮肤面板绘制，然后在EzSkin.json中自定义各种颜色模版，小节线颜色，UI组件显示等。
+
     /// <summary>
     /// Ez皮肤编辑界面，提供预览和参数调整功能。通过按钮打开，该场景应与GameplayScreen和SongSelect并列存在，以同样的形式进行切换。
     /// <para>分为三个区域：</para>

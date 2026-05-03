@@ -165,15 +165,12 @@ namespace osu.Game.Overlays.SkinEditor
         }
 
         /// <summary>
-        /// 在皮肤编辑器内切换 EzSkinEditorScreen。
+        /// 直接进入全屏 EzSkinEditorScreen。
         /// </summary>
         public void ToggleEzSkinEditor()
         {
             performer?.PerformFromScreen(screen =>
             {
-                if (State.Value != Visibility.Visible)
-                    return;
-
                 if (screen is EzSkinEditorScreen)
                     return;
 
