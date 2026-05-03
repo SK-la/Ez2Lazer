@@ -24,10 +24,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         {
             //  305  300    200     100     50e  Miss  Poor
             // Kool  Cool   Good    -       Bad  Poor  KPoor
-            { 16.67, 33.33, 116.67, 116.67, 250, 250,  500 }, // IIDX
-            { 15.00, 30.00, 060.00, 060.00, 200, 1000, 1000 }, // LR2 Hard, TODO:此处poor范围过大，前后LN首尾间隙可能被覆盖，导致下一个note提前被结束。
-            { 15.00, 45.00, 112.00, 112.00, 165, 500,  500 }, // raja normal (75%)
-            { 20.00, 60.00, 150.00, 150.00, 220, 500,  500 }, // raja easy (100%)
+            { 16.67, 33.33, 116.67, 116.67, 250, 300,  300 }, // IIDX
+            { 15.00, 30.00, 060.00, 060.00, 200, 300,  300 }, // LR2 Hard, TODO:此处poor范围过大，前后LN首尾间隙可能被覆盖，导致下一个note提前被结束。
+            { 15.00, 45.00, 112.00, 112.00, 165, 300,  300 }, // raja normal (75%)
+            { 20.00, 60.00, 150.00, 150.00, 220, 300,  300 }, // raja easy (100%)
         };
 
         private static readonly DifficultyRange perfect_window_range = new DifficultyRange(22.4D, 19.4D, 13.9D);
@@ -216,7 +216,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             if (absOffset <= Range305) return HitResult.Perfect;
             if (absOffset <= Range300) return HitResult.Great;
             if (absOffset <= Range200) return HitResult.Good;
-            // if (absOffset <= Range100) return HitResult.Ok;
+            if (absOffset <= Range100) return HitResult.Ok;
             if (absOffset <= Range050) return HitResult.Meh;
             if (absOffset <= Range000) return HitResult.Miss;
             if (absOffset <= RangePoor) return HitResult.Poor;
@@ -281,9 +281,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         private const int score_base = 300;
-        private const int score_good = 200;
-        private const int score_ok = 100;
-        private const int score_meh = 50;
 
         /// <summary>
         /// 根据判定模式获取基础分数
@@ -294,6 +291,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             {
                 case EzEnumHitMode.Classic:
                     return getClassicBaseScore(result);
+
+                case EzEnumHitMode.EZ2AC:
+                    return getEZ2ACBaseScore(result);
+
+                case EzEnumHitMode.O2Jam:
+                    return getO2JamBaseScore(result);
+
+                case EzEnumHitMode.IIDX_HD:
+                case EzEnumHitMode.LR2_HD:
+                case EzEnumHitMode.Raja_NM:
+                    return getExScore(result);
+
+                case EzEnumHitMode.Malody_E:
+                    return getMalodyBaseScore(result, 1.2);
+
+                case EzEnumHitMode.Malody_B:
+                    return getMalodyBaseScore(result, 0.85);
 
                 default:
                     return 0;
@@ -310,13 +324,79 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     return score_base;
 
                 case HitResult.Good:
-                    return score_good;
+                    return 200;
 
                 case HitResult.Ok:
-                    return score_ok;
+                    return 100;
 
                 case HitResult.Meh:
-                    return score_meh;
+                    return 50;
+
+                default:
+                    return 0;
+            }
+        }
+
+        private static int getEZ2ACBaseScore(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                    return 300;  // Kool
+
+                case HitResult.Great:
+                    return 150;  // Cool
+
+                case HitResult.Good:
+                    return 41;  // Good
+
+                default:
+                    return 0;
+            }
+        }
+
+        private static int getO2JamBaseScore(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                    return score_base;  // Cool
+
+                case HitResult.Good:
+                    return (int)(score_base * 0.5);  // Good
+
+                default:
+                    return 0;
+            }
+        }
+
+        private static int getExScore(HitResult result)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                    return score_base;
+
+                case HitResult.Great:
+                    return (int)(score_base * 0.5);
+
+                default:
+                    return 0;
+            }
+        }
+
+        private static int getMalodyBaseScore(HitResult result, double scoreMultiplier = 1.0)
+        {
+            switch (result)
+            {
+                case HitResult.Perfect:
+                    return (int)(score_base * scoreMultiplier);  // Best
+
+                case HitResult.Great:
+                    return (int)(score_base * scoreMultiplier * 0.75);  // Cool
+
+                case HitResult.Good:
+                    return (int)(score_base * scoreMultiplier * 0.4);  // Good
 
                 default:
                     return 0;

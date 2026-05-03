@@ -128,11 +128,10 @@ namespace osu.Game.EzOsuGame.Statistics
             }
 
             double accuracy = v1ScoreProcessor.AccuracyClassic.Value;
-            long totalScore = v1ScoreProcessor.TotalScore.Value;
+            long totalScore = v1ScoreProcessor.TotalScoreWithoutMods.Value;
 
-            Logger.Log($"[V1 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            // Logger.Log($"[V1 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-            // Set properties instead of returning
             V1Accuracy = accuracy;
             V1Score = totalScore;
             V1Counts = v1Counts;
@@ -154,13 +153,17 @@ namespace osu.Game.EzOsuGame.Statistics
             return HitWindows.ResultFor(hitEvent.TimeOffset);
         }
 
+        protected virtual double UpdateBoundary(HitResult result)
+        {
+            return HitWindows.WindowFor(result);
+        }
+
         /// <summary>
         /// 计算 V2 准确率。子类可覆写以定制计算逻辑。
         /// 将结果设置到 V2Accuracy、V2Score 和 V2Counts 属性，而不是通过返回值提供。
         /// </summary>
         protected virtual void CalculateV2Accuracy()
         {
-            // Create a fresh ScoreProcessor for V2 calculation (V1 already used one)
             var v2ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
             v2ScoreProcessor.ApplyBeatmap(Beatmap);
             v2ScoreProcessor.Mods.Value = Score.Mods;
@@ -181,9 +184,8 @@ namespace osu.Game.EzOsuGame.Statistics
             double accuracy = v2ScoreProcessor.Accuracy.Value;
             long totalScore = v2ScoreProcessor.TotalScore.Value;
 
-            Logger.Log($"[V2 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            // Logger.Log($"[V2 ScoreProcessor] {accuracy * 100:F2}%, Score: {totalScore / 10000}w", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
-            // Set properties instead of returning
             V2Accuracy = accuracy;
             V2Score = totalScore;
             V2Counts = v2Counts;
@@ -275,11 +277,6 @@ namespace osu.Game.EzOsuGame.Statistics
         protected void Refresh()
         {
             Scheduler.AddOnce(UpdateDisplay);
-        }
-
-        protected virtual double UpdateBoundary(HitResult result)
-        {
-            return HitWindows.WindowFor(result);
         }
 
         private void drawHealthLine(List<HitEvent> sortedHitEvents)

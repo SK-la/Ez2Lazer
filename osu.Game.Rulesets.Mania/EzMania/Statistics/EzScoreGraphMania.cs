@@ -62,11 +62,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return events.Select(e => new HitEvent(e.TimeOffset + offsetPlusMania.Value, e.GameplayRate, e.Result, e.HitObject, e.LastHitObject, e.Position)).ToList();
         }
 
-        protected override double UpdateBoundary(HitResult result)
-        {
-            return hitWindowsV2.WindowFor(result);
-        }
-
         [BackgroundDependencyLoader]
         private void load()
         {
@@ -80,6 +75,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             // 绑定 OffsetPlusMania，以便分析反映运行时校正并在更改时重绘。
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetPlusMania.BindValueChanged(_ => Refresh(), true);
+        }
+
+        protected override double UpdateBoundary(HitResult result)
+        {
+            return hitWindowsV2.WindowFor(result);
         }
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
