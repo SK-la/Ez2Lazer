@@ -124,9 +124,9 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "Timing-based note target grayscale",
-                    HintText = "Brightness of the grayscale base used before applying timing-based note colours.",
-                    Current = config.GetBindable<double>(ManiaRulesetSetting.TimingBasedNoteColouringTargetGrayscale),
+                    Caption = EzManiaSettingsStrings.TIMING_BASED_NOTE_TARGET_GRAYSCALE,
+                    HintText = EzManiaSettingsStrings.TIMING_BASED_NOTE_TARGET_GRAYSCALE_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.TimingBasedNoteColouringTargetGrayscale),
                     KeyboardStep = 0.01f,
                     LabelFormat = v => $"{v:0.00}x",
                 })
@@ -135,9 +135,9 @@ namespace osu.Game.Rulesets.Mania
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
-                    Caption = "Timing-based note colour alpha",
-                    HintText = "Strength of the timing colour mixed into the grayscale note base.",
-                    Current = config.GetBindable<double>(ManiaRulesetSetting.TimingBasedNoteColouringColourAlpha),
+                    Caption = EzManiaSettingsStrings.TIMING_BASED_NOTE_COLOUR_ALPHA,
+                    HintText = EzManiaSettingsStrings.TIMING_BASED_NOTE_COLOUR_ALPHA_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.TimingBasedNoteColouringColourAlpha),
                     KeyboardStep = 0.01f,
                     DisplayAsPercentage = true,
                 })

@@ -16,8 +16,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
     {
         private readonly IBindable<double?> missingStartTime = new Bindable<double?>();
 
-        public override bool UsesTimingColourTexture => false;
-
         [Resolved]
         private DrawableHitObject drawableObject { get; set; } = null!;
 

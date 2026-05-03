@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -7,10 +7,10 @@ using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -34,17 +34,12 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private IBeatmap beatmap { get; set; }
 
         private readonly Bindable<bool> configTimingBasedNoteColouring = new Bindable<bool>();
-        private readonly Bindable<double> configTimingBasedNoteColouringTargetGrayscale = new Bindable<double>(ManiaTimingBasedNoteColour.DEFAULT_TARGET_GRAYSCALE);
-        private readonly Bindable<double> configTimingBasedNoteColouringColourAlpha = new Bindable<double>(ManiaTimingBasedNoteColour.DEFAULT_COLOUR_ALPHA);
+        private readonly Bindable<double> timingBasedNoteColouringTargetGrayscale = new Bindable<double>(Ez2ConfigManager.DEFAULT_TIMING_BASED_NOTE_TARGET_GRAYSCALE);
+        private readonly Bindable<double> timingBasedNoteColouringColourAlpha = new Bindable<double>(Ez2ConfigManager.DEFAULT_TIMING_BASED_NOTE_COLOUR_ALPHA);
 
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
         protected virtual bool SupportsTimingBasedNoteColouring => true;
 
-        private BufferedContainer headPieceColourContainer;
-        private Color4 timingBasedOutputColour;
-        private bool hasTimingBasedOutputColour;
-        private double lastSnapDataStartTime = double.NaN;
-        private IBeatmap lastSnapDataBeatmap;
         private Drawable headPiece;
 
         public DrawableNote()
@@ -59,57 +54,32 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(ManiaRulesetConfigManager rulesetConfig)
+        private void load(ManiaRulesetConfigManager rulesetConfig, Ez2ConfigManager ezConfig)
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, configTimingBasedNoteColouring);
-            rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouringTargetGrayscale, configTimingBasedNoteColouringTargetGrayscale);
-            rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouringColourAlpha, configTimingBasedNoteColouringColourAlpha);
+            ezConfig?.BindWith(Ez2Setting.TimingBasedNoteColouringTargetGrayscale, timingBasedNoteColouringTargetGrayscale);
+            ezConfig?.BindWith(Ez2Setting.TimingBasedNoteColouringColourAlpha, timingBasedNoteColouringColourAlpha);
 
-            AddInternal(headPieceColourContainer = new BufferedContainer(cachedFrameBuffer: false, pixelSnapping: true)
+            AddInternal(headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
             {
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
-                Child = headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
-                {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y
-                }
             });
-
-            if (headPiece is SkinnableDrawable skinnableDrawable)
-                skinnableDrawable.OnSkinChanged += updateSnapColour;
         }
 
         protected override void LoadComplete()
         {
             base.LoadComplete();
 
-            configTimingBasedNoteColouring.BindValueChanged(_ =>
-            {
-                if (SupportsTimingBasedNoteColouring && configTimingBasedNoteColouring.Value)
-                    updateSnapData();
-
-                updateSnapColour();
-            });
-
-            configTimingBasedNoteColouringTargetGrayscale.BindValueChanged(_ => updateSnapDataAndColour());
-            configTimingBasedNoteColouringColourAlpha.BindValueChanged(_ => updateSnapDataAndColour());
-
-            StartTimeBindable.BindValueChanged(_ =>
-            {
-                if (SupportsTimingBasedNoteColouring && configTimingBasedNoteColouring.Value)
-                    updateSnapData();
-
-                updateSnapColour();
-            }, true);
+            configTimingBasedNoteColouring.BindValueChanged(_ => updateSnapColour());
+            timingBasedNoteColouringTargetGrayscale.BindValueChanged(_ => updateSnapColour());
+            timingBasedNoteColouringColourAlpha.BindValueChanged(_ => updateSnapColour());
+            StartTimeBindable.BindValueChanged(_ => updateSnapColour(), true);
         }
 
         protected override void OnApply()
         {
             base.OnApply();
-
-            if (SupportsTimingBasedNoteColouring && configTimingBasedNoteColouring.Value)
-                updateSnapData();
 
             updateSnapColour();
         }
@@ -118,9 +88,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         {
             base.OnDirectionChanged(e);
 
-            Anchor anchor = e.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
-
-            headPieceColourContainer.Anchor = headPieceColourContainer.Origin = anchor;
+            headPiece.Anchor = headPiece.Origin = e.NewValue == ScrollingDirection.Up ? Anchor.TopCentre : Anchor.BottomCentre;
         }
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
@@ -166,77 +134,18 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         private void updateSnapColour()
         {
-            if (!SupportsTimingBasedNoteColouring || !hasTimingBasedOutputColour)
+            if (!SupportsTimingBasedNoteColouring || !configTimingBasedNoteColouring.Value || beatmap == null || HitObject == null)
             {
-                headPieceColourContainer.GrayscaleStrength = 0;
-                headPieceColourContainer.Colour = Color4.White;
-
-                Colour = Color4.White;
+                headPiece.Colour = Color4.White;
                 return;
             }
 
-            if (configTimingBasedNoteColouring.Value)
-            {
-                headPieceColourContainer.GrayscaleStrength = usesTimingColourTexture ? 0 : 1;
-                headPieceColourContainer.Colour = timingBasedOutputColour;
-
-                Colour = Color4.White;
-            }
-            else
-            {
-                headPieceColourContainer.GrayscaleStrength = 0;
-                headPieceColourContainer.Colour = Color4.White;
-
-                Colour = Color4.White;
-            }
-        }
-
-        private bool usesTimingColourTexture
-        {
-            get
-            {
-                if (headPiece is SkinnableDrawable skinnableDrawable)
-                    return skinnableDrawable.Drawable is IManiaTimingColourTextureProvider { UsesTimingColourTexture: true };
-
-                return headPiece is IManiaTimingColourTextureProvider { UsesTimingColourTexture: true };
-            }
-        }
-
-        private void updateSnapData()
-        {
-            if (beatmap == null || HitObject == null)
-            {
-                hasTimingBasedOutputColour = false;
-                lastSnapDataStartTime = double.NaN;
-                lastSnapDataBeatmap = null;
-                return;
-            }
-
-            double startTime = HitObject.StartTime;
-
-            if (hasTimingBasedOutputColour && lastSnapDataStartTime == startTime && ReferenceEquals(lastSnapDataBeatmap, beatmap))
-                return;
-
-            timingBasedOutputColour = ManiaTimingBasedNoteColour.GetColourFor(
+            headPiece.Colour = ManiaTimingBasedNoteColour.GetColourFor(
                 beatmap,
-                startTime,
+                HitObject.StartTime,
                 colours,
-                configTimingBasedNoteColouringTargetGrayscale.Value,
-                configTimingBasedNoteColouringColourAlpha.Value);
-            hasTimingBasedOutputColour = true;
-            lastSnapDataStartTime = startTime;
-            lastSnapDataBeatmap = beatmap;
-        }
-
-        private void updateSnapDataAndColour()
-        {
-            lastSnapDataStartTime = double.NaN;
-            lastSnapDataBeatmap = null;
-
-            if (SupportsTimingBasedNoteColouring && configTimingBasedNoteColouring.Value)
-                updateSnapData();
-
-            updateSnapColour();
+                timingBasedNoteColouringTargetGrayscale.Value,
+                timingBasedNoteColouringColourAlpha.Value);
         }
     }
 }

@@ -13,6 +13,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Localization
         public static readonly LocalisableString MANIA_BAR_LINES_BOOL_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "强制显示Mania小节线功能的开关, 关闭后仅由皮肤控制", "Toggle to force display of bar lines, when off only controlled by skin");
 
+        public static readonly LocalisableString TIMING_BASED_NOTE_TARGET_GRAYSCALE = new EzLocalizationManager.EzLocalisableString(
+            "Timing着色目标灰度亮度", "Timing-based note target grayscale");
+
+        public static readonly LocalisableString TIMING_BASED_NOTE_TARGET_GRAYSCALE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "应用Timing着色前使用的灰度基底亮度。", "Brightness of the grayscale base used before applying timing-based note colours.");
+
+        public static readonly LocalisableString TIMING_BASED_NOTE_COLOUR_ALPHA = new EzLocalizationManager.EzLocalisableString(
+            "Timing着色颜色强度", "Timing-based note colour alpha");
+
+        public static readonly LocalisableString TIMING_BASED_NOTE_COLOUR_ALPHA_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "混入灰度note基底的Timing颜色强度。", "Strength of the timing colour mixed into the grayscale note base.");
+
         public static readonly LocalisableString SCROLLING_STYLE = new EzLocalizationManager.EzLocalisableString("滚动速度风格", "Scrolling Style");
 
         public static readonly LocalisableString SCROLLING_STYLE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(

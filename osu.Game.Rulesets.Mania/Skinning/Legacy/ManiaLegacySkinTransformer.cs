@@ -236,28 +236,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             registerNoteTimingColourTextureGroup(LegacyNotePiece.CreateTimingColourTextureGroupName(beatmap.TotalColumns, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage), LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, LegacyManiaSkinConfigurationLookups.NoteImage);
 
             void registerNoteTimingColourTextureGroup(string groupName, params LegacyManiaSkinConfigurationLookups[] lookupFallbacks)
-                => legacySkin.RegisterManiaTimingColourTextureGroup(groupName, getTextureNamesForLookups(lookupFallbacks));
+                => legacySkin.RegisterManiaTimingColourTextureGroup(groupName, getTextureNameFallbacksForLookups(lookupFallbacks));
         }
 
-        private IEnumerable<string> getTextureNamesForLookups(params LegacyManiaSkinConfigurationLookups[] lookupFallbacks)
+        private IEnumerable<IEnumerable<string>> getTextureNameFallbacksForLookups(params LegacyManiaSkinConfigurationLookups[] lookupFallbacks)
         {
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
             for (int column = 0; column < beatmap.TotalColumns; column++)
-            {
-                foreach (var lookup in lookupFallbacks)
-                {
-                    string textureName = getTextureNameForLookup(column, lookup);
-
-                    if (hasAnyTexture(textureName))
-                    {
-                        addTextureNames(names, textureName);
-                        break;
-                    }
-                }
-            }
-
-            return names;
+                yield return lookupFallbacks.Select(lookup => getTextureNameForLookup(column, lookup));
         }
 
         private string getTextureNameForLookup(int column, LegacyManiaSkinConfigurationLookups lookup)
@@ -283,28 +268,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
 
             return this.GetManiaSkinConfig<string>(lookup, column)?.Value
                    ?? $"mania-note{fallbackColumnIndex}{suffix}";
-        }
-
-        private bool hasAnyTexture(string textureName)
-            => Skin.GetTexture($"{textureName}-0") != null || Skin.GetTexture(textureName) != null;
-
-        private void addTextureNames(HashSet<string> names, string textureName)
-        {
-            bool hasFrames = false;
-
-            for (int i = 0; ; i++)
-            {
-                string frameName = $"{textureName}-{i}";
-
-                if (Skin.GetTexture(frameName) == null)
-                    break;
-
-                names.Add(frameName);
-                hasFrames = true;
-            }
-
-            if (!hasFrames)
-                names.Add(textureName);
         }
     }
 }

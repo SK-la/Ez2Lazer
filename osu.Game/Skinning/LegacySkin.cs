@@ -62,8 +62,8 @@ namespace osu.Game.Skinning
         protected override IResourceStore<TextureUpload> CreateTextureLoaderStore(IStorageResourceProvider resources, IResourceStore<byte[]> storage)
             => legacyTextureLoaderStore = new LegacyTextureLoaderStore(base.CreateTextureLoaderStore(resources, storage));
 
-        public void RegisterManiaTimingColourTextureGroup(string groupName, IEnumerable<string> sourceTextureNames)
-            => legacyTextureLoaderStore?.RegisterManiaTimingColourTextureGroup(groupName, sourceTextureNames);
+        public void RegisterManiaTimingColourTextureGroup(string groupName, IEnumerable<IEnumerable<string>> sourceTextureNameFallbacks)
+            => legacyTextureLoaderStore?.RegisterManiaTimingColourTextureGroup(groupName, sourceTextureNameFallbacks);
 
         protected override void ParseConfigurationStream(Stream stream)
         {

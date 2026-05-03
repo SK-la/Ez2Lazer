@@ -16,7 +16,7 @@ using osuTK;
 
 namespace osu.Game.Rulesets.Mania.Skinning.Legacy
 {
-    public partial class LegacyNotePiece : LegacyManiaColumnElement, IManiaTimingColourTextureProvider
+    public partial class LegacyNotePiece : LegacyManiaColumnElement
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
         private readonly Bindable<bool> timingBasedNoteColouring = new Bindable<bool>();
@@ -26,11 +26,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         private Drawable noteAnimation = null!;
         private ISkinSource skin = null!;
         private int timingColourTextureKeyMode;
-        private bool currentAnimationUsesTimingColourTexture;
 
         private float? widthForNoteHeightScale;
-
-        public virtual bool UsesTimingColourTexture => currentAnimationUsesTimingColourTexture;
 
         public LegacyNotePiece()
         {
@@ -104,7 +101,6 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             if (directionContainer == null)
                 return;
 
-            currentAnimationUsesTimingColourTexture = false;
             directionContainer.Child = noteAnimation = GetAnimation(skin) ?? Empty();
         }
 
@@ -119,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
 
         protected Drawable? GetAnimationFromLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup, LegacyManiaSkinConfigurationLookups timingColourTextureGroupLookup, bool useTimingColourTexture)
         {
-            string noteImage = getTextureNameForLookup(skin, lookup);
+            string noteImage = GetTextureNameForLookup(skin, lookup);
             ISkin? source = findAnimationProvider(skin, noteImage);
 
             if (source == null)
@@ -131,10 +127,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 var timingColourTextureAnimation = source.GetAnimation(timingColourTextureImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
 
                 if (timingColourTextureAnimation != null)
-                {
-                    currentAnimationUsesTimingColourTexture = true;
                     return timingColourTextureAnimation;
-                }
             }
 
             return source.GetAnimation(noteImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
@@ -152,7 +145,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             => skin.GetTexture($"{componentName}-0", WrapMode.ClampToEdge, WrapMode.ClampToEdge) != null
                || skin.GetTexture(componentName, WrapMode.ClampToEdge, WrapMode.ClampToEdge) != null;
 
-        protected string getTextureNameForLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup)
+        protected string GetTextureNameForLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup)
         {
             string suffix = lookup switch
             {

@@ -43,19 +43,22 @@ namespace osu.Game.Skinning
                 : textureUpload;
         }
 
-        public Task<TextureUpload> GetAsync(string name, CancellationToken cancellationToken = new CancellationToken())
+        public async Task<TextureUpload> GetAsync(string name, CancellationToken cancellationToken = new CancellationToken())
         {
             if (tryGetManiaTimingColourTexture(name, out var processedTexture))
-                return Task.FromResult(processedTexture);
+                return processedTexture;
 
-            var textureUpload = wrappedStore?.Get(name);
+            if (wrappedStore == null)
+                return null!;
+
+            var textureUpload = await wrappedStore.GetAsync(name, cancellationToken).ConfigureAwait(false);
 
             if (textureUpload == null)
                 return null!;
 
             return shouldConvertToGrayscale(name)
-                ? Task.Run(() => convertToGrayscale(textureUpload), cancellationToken)
-                : Task.FromResult(textureUpload);
+                ? await Task.Run(() => convertToGrayscale(textureUpload), cancellationToken).ConfigureAwait(false)
+                : textureUpload;
         }
 
         private bool tryGetManiaTimingColourTexture(string name, out TextureUpload textureUpload)
@@ -65,19 +68,21 @@ namespace osu.Game.Skinning
             if (!TryParseManiaTimingColourTextureName(name, out string groupName, out string sourceName))
                 return false;
 
+            ManiaTimingColourTextureGroup? group;
+
             lock (maniaTimingColourLock)
             {
-                if (!maniaTimingColourTextureGroups.TryGetValue(groupName, out var group))
+                if (!maniaTimingColourTextureGroups.TryGetValue(groupName, out group))
                     return false;
-
-                var processedTexture = group.GetProcessedTexture(sourceName, wrappedStore);
-
-                if (processedTexture == null)
-                    return false;
-
-                textureUpload = processedTexture;
-                return true;
             }
+
+            var processedTexture = group.GetProcessedTexture(sourceName, wrappedStore);
+
+            if (processedTexture == null)
+                return false;
+
+            textureUpload = processedTexture;
+            return true;
         }
 
         public static string CreateManiaTimingColourTextureName(string groupName, string sourceName)
@@ -102,14 +107,20 @@ namespace osu.Game.Skinning
             return true;
         }
 
-        public void RegisterManiaTimingColourTextureGroup(string groupName, IEnumerable<string> sourceTextureNames)
+        public void RegisterManiaTimingColourTextureGroup(string groupName, IEnumerable<IEnumerable<string>> sourceTextureNameFallbacks)
         {
             lock (maniaTimingColourLock)
             {
                 if (maniaTimingColourTextureGroups.ContainsKey(groupName))
                     return;
+            }
 
-                maniaTimingColourTextureGroups[groupName] = new ManiaTimingColourTextureGroup(sourceTextureNames, wrappedStore);
+            var group = new ManiaTimingColourTextureGroup(sourceTextureNameFallbacks, wrappedStore);
+
+            lock (maniaTimingColourLock)
+            {
+                if (!maniaTimingColourTextureGroups.ContainsKey(groupName))
+                    maniaTimingColourTextureGroups[groupName] = group;
             }
         }
 
@@ -160,21 +171,30 @@ namespace osu.Game.Skinning
             private readonly Dictionary<string, TextureInfo> textureInfos = new Dictionary<string, TextureInfo>(StringComparer.OrdinalIgnoreCase);
             private readonly float targetBaseLuminance;
 
-            public ManiaTimingColourTextureGroup(IEnumerable<string> sourceTextureNames, IResourceStore<TextureUpload>? wrappedStore)
+            public ManiaTimingColourTextureGroup(IEnumerable<IEnumerable<string>> sourceTextureNameFallbacks, IResourceStore<TextureUpload>? wrappedStore)
             {
-                foreach (string sourceTextureName in sourceTextureNames.Distinct(StringComparer.OrdinalIgnoreCase))
+                var availableResources = new HashSet<string>(wrappedStore?.GetAvailableResources() ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+                var analysedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var fallbackNames in sourceTextureNameFallbacks)
                 {
-                    if (!tryGetUploadForAnalysis(sourceTextureName, wrappedStore, out string actualSourceName, out var upload))
-                        continue;
+                    foreach (string sourceTextureName in getExistingTextureNames(fallbackNames, availableResources))
+                    {
+                        if (!analysedNames.Add(sourceTextureName))
+                            continue;
 
-                    using var image = Image.LoadPixelData(upload.Data, upload.Width, upload.Height);
-                    var info = analyseTexture(image);
+                        if (!tryGetUploadForAnalysis(sourceTextureName, wrappedStore, out string actualSourceName, out var upload))
+                            continue;
 
-                    addTextureInfo(sourceTextureName, info);
-                    addTextureInfo(actualSourceName, info);
-                    addTextureInfo(stripHighResolutionSuffix(sourceTextureName), info);
-                    addTextureInfo(stripHighResolutionSuffix(actualSourceName), info);
-                    upload.Dispose();
+                        using var image = Image.LoadPixelData(upload.Data, upload.Width, upload.Height);
+                        var info = analyseTexture(image);
+
+                        addTextureInfo(sourceTextureName, info);
+                        addTextureInfo(actualSourceName, info);
+                        addTextureInfo(stripHighResolutionSuffix(sourceTextureName), info);
+                        addTextureInfo(stripHighResolutionSuffix(actualSourceName), info);
+                        upload.Dispose();
+                    }
                 }
 
                 targetBaseLuminance = 0;
@@ -197,8 +217,53 @@ namespace osu.Game.Skinning
                 using var image = Image.LoadPixelData(upload.Data, upload.Width, upload.Height);
                 upload.Dispose();
 
-                var processed = processTexture(image, info.BaseLuminance, targetBaseLuminance);
-                return processed;
+                return processTexture(image, info.BaseLuminance, targetBaseLuminance);
+            }
+
+            private static IEnumerable<string> getExistingTextureNames(IEnumerable<string> fallbackNames, HashSet<string> availableResources)
+            {
+                foreach (string fallbackName in fallbackNames.Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    var frameNames = getExistingFrameNames(fallbackName, availableResources).ToArray();
+
+                    if (frameNames.Length > 0)
+                    {
+                        foreach (string frameName in frameNames)
+                            yield return frameName;
+
+                        yield break;
+                    }
+
+                    if (hasResource(fallbackName, availableResources))
+                    {
+                        yield return fallbackName;
+                        yield break;
+                    }
+                }
+            }
+
+            private static IEnumerable<string> getExistingFrameNames(string sourceName, HashSet<string> availableResources)
+            {
+                for (int i = 0; ; i++)
+                {
+                    string frameName = $"{sourceName}-{i}";
+
+                    if (!hasResource(frameName, availableResources))
+                        yield break;
+
+                    yield return frameName;
+                }
+            }
+
+            private static bool hasResource(string sourceName, HashSet<string> availableResources)
+            {
+                if (availableResources.Contains(sourceName) || availableResources.Contains(getHighResolutionName(sourceName)))
+                    return true;
+
+                string sourceNameWithoutExtension = Path.ChangeExtension(sourceName, null);
+                return availableResources.Any(resource =>
+                    string.Equals(Path.ChangeExtension(resource, null), sourceNameWithoutExtension, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Path.ChangeExtension(stripHighResolutionSuffix(resource), null), sourceNameWithoutExtension, StringComparison.OrdinalIgnoreCase));
             }
 
             private static bool tryGetUploadForAnalysis(string sourceName, IResourceStore<TextureUpload>? wrappedStore, out string actualSourceName, out TextureUpload upload)

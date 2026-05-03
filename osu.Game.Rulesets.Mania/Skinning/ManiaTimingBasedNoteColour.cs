@@ -8,11 +8,8 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.Mania.Skinning
 {
-    internal static class ManiaTimingBasedNoteColour
+    public static class ManiaTimingBasedNoteColour
     {
-        public const double DEFAULT_TARGET_GRAYSCALE = 1.5;
-        public const double DEFAULT_COLOUR_ALPHA = 0.8;
-
         public static Color4 GetColourFor(IBeatmap beatmap, double startTime, OsuColour colours, double targetGrayscale, double colourAlpha)
         {
             int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(startTime);
