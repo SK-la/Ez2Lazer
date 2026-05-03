@@ -22,6 +22,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         public readonly IBindable<double?> MissingStartTime = new Bindable<double?>();
 
         protected override ManiaSkinComponents Component => ManiaSkinComponents.HoldNoteTail;
+        protected override bool SupportsTimingBasedNoteColouring => false;
 
         protected internal DrawableHoldNote HoldNote => (DrawableHoldNote)ParentHitObject;
 

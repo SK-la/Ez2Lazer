@@ -65,6 +65,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
 
         private readonly ManiaBeatmap beatmap;
         private readonly bool isBeatmapConverted;
+        private readonly Lazy<bool> noteTimingColourTextureGroupsRegistered;
 
         public ManiaLegacySkinTransformer(ISkin skin, IBeatmap beatmap)
             : base(skin)
@@ -77,6 +78,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             {
                 string keyImage = this.GetManiaSkinConfig<string>(LegacyManiaSkinConfigurationLookups.KeyImage, 0)?.Value ?? "mania-key1";
                 return this.GetAnimation(keyImage, true, true) != null;
+            });
+
+            noteTimingColourTextureGroupsRegistered = new Lazy<bool>(() =>
+            {
+                registerNoteTimingColourTextureGroups();
+                return true;
             });
         }
 
@@ -141,6 +148,8 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 case ManiaSkinComponentLookup maniaComponent:
                     if (!isLegacySkin.Value || !hasKeyTexture.Value)
                         return null;
+
+                    _ = noteTimingColourTextureGroupsRegistered.Value;
 
                     switch (maniaComponent.Component)
                     {
@@ -216,6 +225,49 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             }
 
             return base.GetConfig<TLookup, TValue>(lookup);
+        }
+
+        private void registerNoteTimingColourTextureGroups()
+        {
+            if (Skin is not LegacySkin legacySkin)
+                return;
+
+            registerNoteTimingColourTextureGroup(LegacyNotePiece.CreateTimingColourTextureGroupName(beatmap.TotalColumns, LegacyManiaSkinConfigurationLookups.NoteImage), LegacyManiaSkinConfigurationLookups.NoteImage);
+            registerNoteTimingColourTextureGroup(LegacyNotePiece.CreateTimingColourTextureGroupName(beatmap.TotalColumns, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage), LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage, LegacyManiaSkinConfigurationLookups.NoteImage);
+
+            void registerNoteTimingColourTextureGroup(string groupName, params LegacyManiaSkinConfigurationLookups[] lookupFallbacks)
+                => legacySkin.RegisterManiaTimingColourTextureGroup(groupName, getTextureNameFallbacksForLookups(lookupFallbacks));
+        }
+
+        private IEnumerable<IEnumerable<string>> getTextureNameFallbacksForLookups(params LegacyManiaSkinConfigurationLookups[] lookupFallbacks)
+        {
+            for (int column = 0; column < beatmap.TotalColumns; column++)
+                yield return lookupFallbacks.Select(lookup => getTextureNameForLookup(column, lookup));
+        }
+
+        private string getTextureNameForLookup(int column, LegacyManiaSkinConfigurationLookups lookup)
+        {
+            string suffix = lookup switch
+            {
+                LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage => "H",
+                LegacyManiaSkinConfigurationLookups.HoldNoteTailImage => "T",
+                _ => string.Empty
+            };
+
+            string fallbackColumnIndex;
+            var stage = beatmap.GetStageForColumnIndex(column);
+
+            if (stage.IsSpecialColumn(column % stage.Columns))
+                fallbackColumnIndex = "S";
+            else
+            {
+                int columnInStage = column % stage.Columns;
+                int distanceToEdge = Math.Min(columnInStage, stage.Columns - 1 - columnInStage);
+                fallbackColumnIndex = distanceToEdge % 2 == 0 ? "1" : "2";
+            }
+
+            return this.GetManiaSkinConfig<string>(lookup, column)?.Value
+                   ?? $"mania-note{fallbackColumnIndex}{suffix}";
         }
     }
 }

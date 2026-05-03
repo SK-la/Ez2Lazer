@@ -39,6 +39,7 @@ namespace osu.Game.Skinning
         protected virtual bool UseCustomSampleBanks => false;
 
         private readonly Dictionary<int, LegacyManiaSkinConfiguration> maniaConfigurations = new Dictionary<int, LegacyManiaSkinConfiguration>();
+        private LegacyTextureLoaderStore? legacyTextureLoaderStore;
 
         [UsedImplicitly(ImplicitUseKindFlags.InstantiatedWithFixedConstructorSignature)]
         public LegacySkin(SkinInfo skin, IStorageResourceProvider resources)
@@ -59,7 +60,10 @@ namespace osu.Game.Skinning
         }
 
         protected override IResourceStore<TextureUpload> CreateTextureLoaderStore(IStorageResourceProvider resources, IResourceStore<byte[]> storage)
-            => new LegacyTextureLoaderStore(base.CreateTextureLoaderStore(resources, storage));
+            => legacyTextureLoaderStore = new LegacyTextureLoaderStore(base.CreateTextureLoaderStore(resources, storage));
+
+        public void RegisterManiaTimingColourTextureGroup(string groupName, IEnumerable<IEnumerable<string>> sourceTextureNameFallbacks)
+            => legacyTextureLoaderStore?.RegisterManiaTimingColourTextureGroup(groupName, sourceTextureNameFallbacks);
 
         protected override void ParseConfigurationStream(Stream stream)
         {

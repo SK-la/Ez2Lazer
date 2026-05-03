@@ -46,8 +46,10 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         protected override Drawable? GetAnimation(ISkinSource skin)
         {
             // TODO: Should fallback to the head from default legacy skin instead of note.
+            // When the head image falls back to the note image, keep it in the head luminance group
+            // so LN heads are normalised independently from regular notes.
             return GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage)
-                   ?? GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage);
+                   ?? GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage, LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage);
         }
 
         protected override void Dispose(bool isDisposing)

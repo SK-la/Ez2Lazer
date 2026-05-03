@@ -19,6 +19,8 @@ namespace osu.Game.EzOsuGame.Configuration
     public class Ez2ConfigManager : IniConfigManager<Ez2Setting>, IGameplaySettings
     {
         public static readonly string LOGGER_NAME = "ez_runtime";
+        public const double DEFAULT_TIMING_BASED_NOTE_TARGET_GRAYSCALE = 1.5;
+        public const double DEFAULT_TIMING_BASED_NOTE_COLOUR_ALPHA = 0.8;
         protected override string Filename => "EzSkinSettings.ini";
         private readonly int[] commonKeyModes = { 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18 };
         public float DefaultHitPosition = 180f;
@@ -196,6 +198,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ManiaBarLinesBool, true);
 
             SetDefault(Ez2Setting.ManiaPseudo3DRotation, 0.0, 0.0, 75.0, 1.0);
+            SetDefault(Ez2Setting.TimingBasedNoteColouringTargetGrayscale, DEFAULT_TIMING_BASED_NOTE_TARGET_GRAYSCALE, 0.1, 2.0, 0.01);
+            SetDefault(Ez2Setting.TimingBasedNoteColouringColourAlpha, DEFAULT_TIMING_BASED_NOTE_COLOUR_ALPHA, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.ManiaHoldTailAlpha, 1.0, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.ManiaHoldTailMaskGradientHeight, 0.0, 0.0, 100.0, 1.0);
             SetDefault(Ez2Setting.ManiaLNGradientEnable, true);
@@ -782,6 +786,8 @@ namespace osu.Game.EzOsuGame.Configuration
 
         ManiaBarLinesBool,
         ManiaPseudo3DRotation,
+        TimingBasedNoteColouringTargetGrayscale,
+        TimingBasedNoteColouringColourAlpha,
 
         ManiaHoldTailAlpha,
         ManiaHoldTailMaskGradientHeight, // 投皮面尾

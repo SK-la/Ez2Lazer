@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 #nullable disable
@@ -10,12 +10,13 @@ using osu.Framework.Graphics;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.Skinning;
 using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI.Scrolling;
-using osu.Game.Screens.Edit;
 using osu.Game.Skinning;
 using osuTK.Graphics;
 
@@ -33,8 +34,11 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private IBeatmap beatmap { get; set; }
 
         private readonly Bindable<bool> configTimingBasedNoteColouring = new Bindable<bool>();
+        private readonly Bindable<double> timingBasedNoteColouringTargetGrayscale = new Bindable<double>(Ez2ConfigManager.DEFAULT_TIMING_BASED_NOTE_TARGET_GRAYSCALE);
+        private readonly Bindable<double> timingBasedNoteColouringColourAlpha = new Bindable<double>(Ez2ConfigManager.DEFAULT_TIMING_BASED_NOTE_COLOUR_ALPHA);
 
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
+        protected virtual bool SupportsTimingBasedNoteColouring => true;
 
         private Drawable headPiece;
 
@@ -50,14 +54,16 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         }
 
         [BackgroundDependencyLoader(true)]
-        private void load(ManiaRulesetConfigManager rulesetConfig)
+        private void load(ManiaRulesetConfigManager rulesetConfig, Ez2ConfigManager ezConfig)
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, configTimingBasedNoteColouring);
+            ezConfig?.BindWith(Ez2Setting.TimingBasedNoteColouringTargetGrayscale, timingBasedNoteColouringTargetGrayscale);
+            ezConfig?.BindWith(Ez2Setting.TimingBasedNoteColouringColourAlpha, timingBasedNoteColouringColourAlpha);
 
             AddInternal(headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
             {
                 RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y
+                AutoSizeAxes = Axes.Y,
             });
         }
 
@@ -66,12 +72,15 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
             base.LoadComplete();
 
             configTimingBasedNoteColouring.BindValueChanged(_ => updateSnapColour());
+            timingBasedNoteColouringTargetGrayscale.BindValueChanged(_ => updateSnapColour());
+            timingBasedNoteColouringColourAlpha.BindValueChanged(_ => updateSnapColour());
             StartTimeBindable.BindValueChanged(_ => updateSnapColour(), true);
         }
 
         protected override void OnApply()
         {
             base.OnApply();
+
             updateSnapColour();
         }
 
@@ -125,11 +134,18 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         private void updateSnapColour()
         {
-            if (beatmap == null || HitObject == null) return;
+            if (!SupportsTimingBasedNoteColouring || !configTimingBasedNoteColouring.Value || beatmap == null || HitObject == null)
+            {
+                headPiece.Colour = Color4.White;
+                return;
+            }
 
-            int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(HitObject.StartTime);
-
-            Colour = configTimingBasedNoteColouring.Value ? BindableBeatDivisor.GetColourFor(snapDivisor, colours) : Color4.White;
+            headPiece.Colour = ManiaTimingBasedNoteColour.GetColourFor(
+                beatmap,
+                HitObject.StartTime,
+                colours,
+                timingBasedNoteColouringTargetGrayscale.Value,
+                timingBasedNoteColouringColourAlpha.Value);
         }
     }
 }

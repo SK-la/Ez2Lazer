@@ -8,6 +8,8 @@ using osu.Framework.Graphics.Animations;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
 using osuTK;
@@ -17,10 +19,13 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
     public partial class LegacyNotePiece : LegacyManiaColumnElement
     {
         private readonly IBindable<ScrollingDirection> direction = new Bindable<ScrollingDirection>();
+        private readonly Bindable<bool> timingBasedNoteColouring = new Bindable<bool>();
 
         private Container directionContainer = null!;
 
         private Drawable noteAnimation = null!;
+        private ISkinSource skin = null!;
+        private int timingColourTextureKeyMode;
 
         private float? widthForNoteHeightScale;
 
@@ -30,9 +35,12 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             AutoSizeAxes = Axes.Y;
         }
 
-        [BackgroundDependencyLoader]
-        private void load(ISkinSource skin, IScrollingInfo scrollingInfo)
+        [BackgroundDependencyLoader(true)]
+        private void load(ISkinSource skin, IScrollingInfo scrollingInfo, ManiaRulesetConfigManager? rulesetConfig, ManiaPlayfield? playfield)
         {
+            this.skin = skin;
+            timingColourTextureKeyMode = playfield?.TotalColumns ?? Column.KeyMode;
+            rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, timingBasedNoteColouring);
             widthForNoteHeightScale = skin.GetConfig<ManiaSkinConfigurationLookup, float>(new ManiaSkinConfigurationLookup(LegacyManiaSkinConfigurationLookups.WidthForNoteHeightScale))?.Value;
 
             InternalChild = directionContainer = new Container
@@ -40,11 +48,18 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
                 Origin = Anchor.BottomCentre,
                 RelativeSizeAxes = Axes.X,
                 AutoSizeAxes = Axes.Y,
-                Child = noteAnimation = GetAnimation(skin) ?? Empty()
             };
 
+            reloadAnimation();
             direction.BindTo(scrollingInfo.Direction);
             direction.BindValueChanged(OnDirectionChanged, true);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            timingBasedNoteColouring.BindValueChanged(_ => reloadAnimation());
         }
 
         protected override void Update()
@@ -81,25 +96,69 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
 
         protected virtual Drawable? GetAnimation(ISkinSource skin) => GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage);
 
-        protected Drawable? GetAnimationFromLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup)
+        private void reloadAnimation()
         {
-            string suffix = string.Empty;
+            if (directionContainer == null)
+                return;
 
-            switch (lookup)
+            directionContainer.Child = noteAnimation = GetAnimation(skin) ?? Empty();
+        }
+
+        protected Drawable? GetAnimationFromLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup)
+            => GetAnimationFromLookup(skin, lookup, lookup);
+
+        protected Drawable? GetAnimationFromLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup, bool useTimingColourTexture)
+            => GetAnimationFromLookup(skin, lookup, lookup, useTimingColourTexture);
+
+        protected Drawable? GetAnimationFromLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup, LegacyManiaSkinConfigurationLookups timingColourTextureGroupLookup)
+            => GetAnimationFromLookup(skin, lookup, timingColourTextureGroupLookup, timingBasedNoteColouring.Value);
+
+        protected Drawable? GetAnimationFromLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup, LegacyManiaSkinConfigurationLookups timingColourTextureGroupLookup, bool useTimingColourTexture)
+        {
+            string noteImage = GetTextureNameForLookup(skin, lookup);
+            ISkin? source = findAnimationProvider(skin, noteImage);
+
+            if (source == null)
+                return null;
+
+            if (useTimingColourTexture && lookup != LegacyManiaSkinConfigurationLookups.HoldNoteTailImage)
             {
-                case LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage:
-                    suffix = "H";
-                    break;
+                string timingColourTextureImage = LegacyTextureLoaderStore.CreateManiaTimingColourTextureName(CreateTimingColourTextureGroupName(timingColourTextureKeyMode, timingColourTextureGroupLookup), noteImage);
+                var timingColourTextureAnimation = source.GetAnimation(timingColourTextureImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
 
-                case LegacyManiaSkinConfigurationLookups.HoldNoteTailImage:
-                    suffix = "T";
-                    break;
+                if (timingColourTextureAnimation != null)
+                    return timingColourTextureAnimation;
             }
 
-            string noteImage = GetColumnSkinConfig<string>(skin, lookup)?.Value
-                               ?? $"mania-note{FallbackColumnIndex}{suffix}";
-
-            return skin.GetAnimation(noteImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
+            return source.GetAnimation(noteImage, WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
         }
+
+        private static ISkin? findAnimationProvider(ISkin skin, string componentName)
+        {
+            if (skin is ISkinSource source)
+                return source.FindProvider(s => hasAnimation(s, componentName));
+
+            return hasAnimation(skin, componentName) ? skin : null;
+        }
+
+        private static bool hasAnimation(ISkin skin, string componentName)
+            => skin.GetTexture($"{componentName}-0", WrapMode.ClampToEdge, WrapMode.ClampToEdge) != null
+               || skin.GetTexture(componentName, WrapMode.ClampToEdge, WrapMode.ClampToEdge) != null;
+
+        protected string GetTextureNameForLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup)
+        {
+            string suffix = lookup switch
+            {
+                LegacyManiaSkinConfigurationLookups.HoldNoteHeadImage => "H",
+                LegacyManiaSkinConfigurationLookups.HoldNoteTailImage => "T",
+                _ => string.Empty
+            };
+
+            return GetColumnSkinConfig<string>(skin, lookup)?.Value
+                   ?? $"mania-note{FallbackColumnIndex}{suffix}";
+        }
+
+        public static string CreateTimingColourTextureGroupName(int keyMode, LegacyManiaSkinConfigurationLookups lookup)
+            => $"keys-{keyMode}-{lookup}";
     }
 }

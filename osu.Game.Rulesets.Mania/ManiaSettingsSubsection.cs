@@ -122,6 +122,28 @@ namespace osu.Game.Rulesets.Mania
                 {
                     Keywords = new[] { "color" },
                 },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzManiaSettingsStrings.TIMING_BASED_NOTE_TARGET_GRAYSCALE,
+                    HintText = EzManiaSettingsStrings.TIMING_BASED_NOTE_TARGET_GRAYSCALE_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.TimingBasedNoteColouringTargetGrayscale),
+                    KeyboardStep = 0.01f,
+                    LabelFormat = v => $"{v:0.00}x",
+                })
+                {
+                    Keywords = new[] { "color", "colour", "timing" },
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzManiaSettingsStrings.TIMING_BASED_NOTE_COLOUR_ALPHA,
+                    HintText = EzManiaSettingsStrings.TIMING_BASED_NOTE_COLOUR_ALPHA_TOOLTIP,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.TimingBasedNoteColouringColourAlpha),
+                    KeyboardStep = 0.01f,
+                    DisplayAsPercentage = true,
+                })
+                {
+                    Keywords = new[] { "color", "colour", "timing" },
+                },
             };
 
             Add(new SettingsItemV2(new FormCheckBox
