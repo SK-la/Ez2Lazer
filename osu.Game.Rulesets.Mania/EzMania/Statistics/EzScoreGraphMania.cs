@@ -144,7 +144,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             foreach (var r in results)
             {
-                string name = r.ToString();
+                string name = HitModeHelper.GetDisplayNameForHitResult(r).ToString();
                 string display = $"{V2Counts.GetValueOrDefault(r, 0)} | {V1Counts.GetValueOrDefault(r, 0)}";
                 var c = colours.ForHitResult(r);
                 items.Add(makeSimpleStat(display, name, c));

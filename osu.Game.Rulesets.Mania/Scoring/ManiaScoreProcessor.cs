@@ -128,7 +128,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore += 300;
-                ClassicBaseScore += hitWindows.GetLNScore(headOffsets[hitObject.Column], offset);
+                ClassicBaseScore += hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)
@@ -167,7 +167,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             else if (hitObject is TailNote)
             {
                 ClassicMaxBaseScore -= 300;
-                ClassicBaseScore -= hitWindows.GetLNScore(headOffsets[hitObject.Column], offset);
+                ClassicBaseScore -= hitWindows.GetClassicLNScore(headOffsets[hitObject.Column], offset);
                 headOffsets[hitObject.Column] = 0;
             }
             else if (hitObject is Note)

@@ -4,10 +4,12 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Play.PlayerSettings;
 
@@ -44,10 +46,16 @@ namespace osu.Game.EzOsuGame.Overlays
 
             Children = new Drawable[]
             {
-                new SettingsNote
+                new Container
                 {
                     RelativeSizeAxes = Axes.X,
-                    Current = { BindTarget = warningNote },
+                    AutoSizeAxes = Axes.Y,
+                    Padding = SettingsPanel.CONTENT_PADDING,
+                    Child = new SettingsNote
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Current = { BindTarget = warningNote },
+                    },
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
@@ -132,10 +140,11 @@ namespace osu.Game.EzOsuGame.Overlays
                         poorCheckBox.Hide();
                         break;
                 }
+
+                Schedule(updateScoreSubmitWarning);
             }, true);
 
             maniaHitModeBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
-            maniaHealthModeBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
             aAcc.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
             sAcc.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
             offsetManiaBindable.BindValueChanged(_ => Schedule(updateScoreSubmitWarning));
