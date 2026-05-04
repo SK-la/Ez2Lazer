@@ -63,7 +63,8 @@ namespace osu.Game.EzOsuGame.Statistics
 
         private readonly IReadOnlyList<HitEvent> originalHitEvents;
 
-        protected IReadOnlyList<HitEvent> HitEvents => FilterHitEvents();
+        protected IReadOnlyList<HitEvent> HitEvents => GetDisplayHitEvents();
+        protected IReadOnlyList<HitEvent> OriginalHitEvents => originalHitEvents;
 
         /// <summary>
         /// 继承类应 HitWindows.IsHitResultAllowed 等方式过滤出有效的 HitEvent。
@@ -73,6 +74,21 @@ namespace osu.Game.EzOsuGame.Statistics
         {
             return originalHitEvents.Where(e => e.Result.IsBasic()).ToList();
         }
+
+        /// <summary>
+        /// 当前图表展示使用的事件集合（通常随当前设置变化）。
+        /// </summary>
+        protected virtual IReadOnlyList<HitEvent> GetDisplayHitEvents() => FilterHitEvents();
+
+        /// <summary>
+        /// V1(Classic) 重算使用的事件集合。默认与展示集合一致，派生类可覆写为固定路线。
+        /// </summary>
+        protected virtual IReadOnlyList<HitEvent> GetV1HitEvents() => GetDisplayHitEvents();
+
+        /// <summary>
+        /// V2(Now) 重算使用的事件集合。默认与展示集合一致。
+        /// </summary>
+        protected virtual IReadOnlyList<HitEvent> GetV2HitEvents() => GetDisplayHitEvents();
 
         protected EzScoreGraphBase(ScoreInfo score, IBeatmap beatmap, HitWindows hitWindows)
         {
@@ -88,14 +104,16 @@ namespace osu.Game.EzOsuGame.Statistics
         [BackgroundDependencyLoader]
         private void load()
         {
-            if (HitEvents.Count == 0)
+            var displayEvents = GetDisplayHitEvents();
+
+            if (displayEvents.Count == 0)
                 return;
 
-            binSize = Math.Ceiling(HitEvents.Max(e => e.HitObject.StartTime) / time_bins);
+            binSize = Math.Ceiling(displayEvents.Max(e => e.HitObject.StartTime) / time_bins);
             binSize = Math.Max(1, binSize);
 
-            maxTime = HitEvents.Count > 0 ? HitEvents.Max(e => e.HitObject.StartTime) : 1;
-            minTime = HitEvents.Count > 0 ? HitEvents.Min(e => e.HitObject.StartTime) : 0;
+            maxTime = displayEvents.Count > 0 ? displayEvents.Max(e => e.HitObject.StartTime) : 1;
+            minTime = displayEvents.Count > 0 ? displayEvents.Min(e => e.HitObject.StartTime) : 0;
             timeRange = maxTime - minTime;
 
             Scheduler.AddOnce(UpdateDisplay);
@@ -108,13 +126,17 @@ namespace osu.Game.EzOsuGame.Statistics
         protected virtual void CalculateV1Accuracy()
         {
             var v1ScoreProcessor = Score.Ruleset.CreateInstance().CreateScoreProcessor();
-            v1ScoreProcessor.ApplyBeatmap(Beatmap);
+
+            // 必须在 ApplyBeatmap() 前设置 Legacy 标记：
+            // ManiaScoreProcessor 会在 ApplyBeatmap() 内缓存 hitMode，
+            // 若顺序反了就会把当前 hitmode 当成 V1 路线，导致 classic 结果随 hitmode 改变。
             v1ScoreProcessor.IsLegacyScore = true;
+            v1ScoreProcessor.ApplyBeatmap(Beatmap);
             v1ScoreProcessor.Mods.Value = Score.Mods;
 
             var v1Counts = new Dictionary<HitResult, int>();
 
-            foreach (var hitEvent in HitEvents)
+            foreach (var hitEvent in GetV1HitEvents())
             {
                 var recalculated = RecalculateV1Result(hitEvent);
                 v1Counts[recalculated] = v1Counts.GetValueOrDefault(recalculated, 0) + 1;
@@ -168,7 +190,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
             var v2Counts = new Dictionary<HitResult, int>();
 
-            foreach (var hitEvent in HitEvents)
+            foreach (var hitEvent in GetV2HitEvents())
             {
                 var recalculated = RecalculateV2Result(hitEvent);
                 v2Counts[recalculated] = v2Counts.GetValueOrDefault(recalculated, 0) + 1;
@@ -227,7 +249,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 drawBoundaryLine(-boundary, result);
             }
 
-            var sortedHitEvents = HitEvents.OrderBy(e => e.HitObject.StartTime).ToList();
+            var sortedHitEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
 
             drawHealthLine(sortedHitEvents);
             drawPointsGraph(sortedHitEvents);

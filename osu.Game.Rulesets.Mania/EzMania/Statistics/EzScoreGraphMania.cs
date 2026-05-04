@@ -54,14 +54,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
             var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
-            var events = Score.HitEvents.Where(e => validResults.Contains(e.Result));
+            return Score.HitEvents.Where(e => validResults.Contains(e.Result)).ToList();
+        }
 
-            // 如果未设置偏移，则直接返回原始事件以避免分配。
-            if (offsetPlusMania.Value == 0)
-                return events.ToList();
-
-            // 否则返回一个新的列表，调整 TimeOffset 以使可视化（点云）反映校正结果。
-            return events.Select(e => new HitEvent(e.TimeOffset + offsetPlusMania.Value, e.GameplayRate, e.Result, e.HitObject, e.LastHitObject, e.Position)).ToList();
+        protected override IReadOnlyList<HitEvent> GetV1HitEvents()
+        {
+            // Classic 路线固定使用原始基础事件，不受当前 hitmode 可见结果集合影响。
+            return OriginalHitEvents.Where(e => e.Result.IsBasic()).ToList();
         }
 
         [BackgroundDependencyLoader]
@@ -87,12 +86,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
         {
-            // Miss/Poor 属于事件语义（常见于无输入 miss 或 BMS 特殊判定），
-            // 不能仅靠 timeOffset 重算，否则会被“洗回”高判定。
-            if (hitEvent.Result is HitResult.Miss or HitResult.Poor)
-                return hitEvent.Result;
-
-            return hitWindowsV1.ResultFor(hitEvent.TimeOffset);
+            // Classic 路线应独立于当前 hitmode 的结果标签，仅依据 offset 重算。
+            // 对于超窗返回 None 的情况，回落为 Miss（该事件本身已经是一个可判对象）。
+            HitResult result = hitWindowsV1.ResultFor(hitEvent.TimeOffset);
+            return result == HitResult.None ? HitResult.Miss : result;
         }
 
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)
@@ -141,13 +138,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 makeSimpleStat("Now | V1", "↓", colours.Gray8),
             };
 
-            // 判定计数，使用 OsuColour 提供的判定色彩
-            // var judgementOrder = new[] { HitResult.Perfect, HitResult.Great, HitResult.Good, HitResult.Ok, HitResult.Meh, HitResult.Miss };
-            var rulesetInstance = Score.Ruleset.CreateInstance();
-            List<HitResult> results = rulesetInstance.GetValidHitResults()
-                                                     .Where(r => !r.ToString().Contains("Ignore"))
-                                                     .OrderBy(r => r.GetIndexForOrderedDisplay())
-                                                     .ToList();
+            // 判定计数行使用 V1/V2 的并集，避免当前 hitmode 的可见判定集合把 classic 行“隐藏掉”。
+            List<HitResult> results = V2Counts.Keys
+                                              .Concat(V1Counts.Keys)
+                                              .Distinct()
+                                              .Where(r => r.IsBasic() || r == HitResult.Poor)
+                                              .OrderBy(r => r.GetIndexForOrderedDisplay())
+                                              .ToList();
 
             foreach (var r in results)
             {
