@@ -1,7 +1,8 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
@@ -154,6 +155,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public override bool IsHitResultAllowed(HitResult result)
         {
+            // 先检查基础判定是否允许
             switch (result)
             {
                 case HitResult.Perfect:
@@ -162,13 +164,18 @@ namespace osu.Game.Rulesets.Mania.Scoring
                 case HitResult.Ok:
                 case HitResult.Meh:
                 case HitResult.Miss:
-                    return true;
+                    break;
 
                 case HitResult.Poor:
                     return AllowPoorEnabled;
+
+                default:
+                    return false;
             }
 
-            return false;
+            // 使用HitModeHelper中定义的有效判定列表
+            var validResults = HitModeHelper.GetHitModeValidHitResults();
+            return validResults.Contains(result);
         }
 
         public override void SetDifficulty(double difficulty)

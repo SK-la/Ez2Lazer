@@ -25,20 +25,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         {
             //  305  300    200     100     50e  Miss  Poor
             // Kool  Cool   Good    -       Bad  Poor  KPoor
-            { 16.67, 33.33, 116.67, 116.67, 250, 500,  1000 }, // IIDX
-            { 15.00, 30.00, 060.00, 060.00, 200, 1000, 1000 }, // LR2 Hard, TODO:此处poor范围过大，前后LN首尾间隙可能被覆盖，导致下一个note提前被结束。
-            { 15.00, 45.00, 112.00, 112.00, 165, 500,  1000 }, // raja normal (75%)
-            { 20.00, 60.00, 150.00, 150.00, 220, 500,  1000 }, // raja easy (100%)
+            { 16.67, 33.33, 116.67, 116.67, 250, 500 }, // IIDX
+            { 15.00, 30.00, 060.00, 060.00, 200, 1000 }, // LR2 Hard, TODO:此处poor范围过大，前后LN首尾间隙可能被覆盖，导致下一个note提前被结束。
+            { 15.00, 45.00, 112.00, 112.00, 165, 500 }, // raja normal (75%)
+            { 20.00, 60.00, 150.00, 150.00, 220, 500 }, // raja easy (100%)
         };
 
         private static readonly double[,] hit_range_bms_late =
         {
             //  305    300     200     100   50l Miss   Poor
             // Kool   Cool    Good       -  Bad  Poor  KPoor
-            { 16.67, 33.33, 116.67, 116.67, 250, 250, 0 }, // IIDX
-            { 15.00, 30.00, 060.00,  60.00, 200, 200, 0 }, // LR2 Hard
-            { 15.00, 45.00, 112.00, 112.00, 210, 210, 0 }, // raja normal
-            { 20.00, 60.00, 150.00, 150.00, 280, 280, 0 }, // raja easy (100%)
+            { 16.67, 33.33, 116.67, 116.67, 250, 250 }, // IIDX
+            { 15.00, 30.00, 060.00,  60.00, 200, 200 }, // LR2 Hard
+            { 15.00, 45.00, 112.00, 112.00, 210, 210 }, // raja normal
+            { 20.00, 60.00, 150.00, 150.00, 280, 280 }, // raja easy (100%)
         };
 
         private static readonly DifficultyRange perfect_window_range = new DifficultyRange(22.4D, 19.4D, 13.9D);
@@ -54,11 +54,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         public double Range100 { get; private set; }
         public double Range050 { get; private set; }
         public double Range000 { get; private set; }
-        public double RangePoor { get; private set; }
 
-        public (double early, double late) RangeBD { get; private set; }
+        // public double RangePoor { get; private set; }
+
+        // public (double early, double late) RangeKPR { get; private set; }
         public (double early, double late) RangePR { get; private set; }
-        public (double early, double late) RangeKPR { get; private set; }
+        public (double early, double late) RangeBD { get; private set; }
 
         private EzEnumHitMode hitMode = EzEnumHitMode.Classic;
 
@@ -140,7 +141,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range305 = 16.67 * TotalMultiplier;
                     Range300 = 33.33 * TotalMultiplier;
                     Range200 = 83.33 * TotalMultiplier;
-                    Range100 = 83.33 * TotalMultiplier;
+                    Range100 = Range200;
                     Range050 = 100.0 * TotalMultiplier;
                     Range000 = 116.67 * TotalMultiplier;
                     break;
@@ -158,7 +159,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range100 = hit_range_bms[row, 3] * TotalMultiplier;
                     Range050 = hit_range_bms[row, 4] * TotalMultiplier;
                     Range000 = hit_range_bms[row, 5];
-                    RangePoor = hit_range_bms[row, 6];
 
                     double badEarly = hit_range_bms[row, 4] * TotalMultiplier;
                     double badLate = hit_range_bms_late[row, 4] * TotalMultiplier;
@@ -168,17 +168,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     double poorLate = hit_range_bms_late[row, 5] * TotalMultiplier;
                     RangePR = (poorEarly, poorLate);
 
-                    double kPoorEarly = hit_range_bms[row, 6] * TotalMultiplier;
-                    double kPoorLate = hit_range_bms_late[row, 6] * TotalMultiplier;
-                    RangeKPR = (kPoorEarly, kPoorLate);
+                    // RangePoor = hit_range_bms[row, 6];
+                    // double kPoorEarly = hit_range_bms[row, 6] * TotalMultiplier;
+                    // double kPoorLate = hit_range_bms_late[row, 6] * TotalMultiplier;
+                    // RangeKPR = (kPoorEarly, kPoorLate);
                     break;
 
                 case EzEnumHitMode.Malody_E:
                     Range305 = 20.0 * TotalMultiplier;
                     Range300 = 60.0 * TotalMultiplier;
                     Range200 = 94.0 * TotalMultiplier;
-                    Range100 = 94.0 * TotalMultiplier;
-                    Range050 = 94.0 * TotalMultiplier;
+                    Range100 = Range200;
+                    Range050 = Range200;
                     Range000 = 150.0 * TotalMultiplier;
                     break;
 
@@ -186,8 +187,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range305 = 44.0 * TotalMultiplier;
                     Range300 = 84.0 * TotalMultiplier;
                     Range200 = 118.0 * TotalMultiplier;
-                    Range100 = 118.0 * TotalMultiplier;
-                    Range050 = 118.0 * TotalMultiplier;
+                    Range100 = Range200;
+                    Range050 = Range200;
                     Range000 = 150.0 * TotalMultiplier;
                     break;
 
@@ -213,7 +214,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             }
         }
 
-        public virtual bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
+        // public virtual bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
 
         public virtual bool IsHitResultAllowed(HitResult result)
         {
@@ -257,7 +258,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
             if (IsInRange(timeOffset, RangeBD, Range050)) return HitResult.Meh;
             if (IsInRange(timeOffset, RangePR, Range000)) return HitResult.Miss;
-            if (IsInRange(timeOffset, RangeKPR, RangePoor)) return HitResult.Poor;
+            // if (IsInRange(timeOffset, RangeKPR, RangePoor)) return HitResult.Poor;
 
             return HitResult.None;
         }

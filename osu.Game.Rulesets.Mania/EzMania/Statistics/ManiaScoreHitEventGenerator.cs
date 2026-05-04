@@ -248,7 +248,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                                                 double timeOffsetForJudgement, double rawOffset, bool holdBreak, bool headHit,
                                                 IBeatmap playableBeatmap, double eventTime, bool pillModeEnabled, ref int o2PillCount, ref int o2CoolCombo)
         {
-            double absOffset = Math.Abs(timeOffsetForJudgement);
             bool isTail = target is TailNote;
 
             if (hitMode == EzEnumHitMode.Lazer)
@@ -270,7 +269,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 if (poorEnabled && result == HitResult.None)
                     result = BMSJudgeMapping.KPoor;
 
-                if (result == HitResult.None && (absOffset > badLate || (isTail && holdBreak)))
+                if (result == HitResult.None && (timeOffsetForJudgement > badLate || (isTail && holdBreak)))
                     return BMSJudgeMapping.Poor;
 
                 return result;

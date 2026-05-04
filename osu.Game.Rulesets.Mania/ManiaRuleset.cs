@@ -13,6 +13,7 @@ using osu.Game.Beatmaps.Legacy;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Localisation;
@@ -536,10 +537,16 @@ namespace osu.Game.Rulesets.Mania
                 Description = "Affects the number of key columns on the playfield."
             };
 
-            var hitWindows = new ManiaHitWindows { BPM = beatmapInfo.BPM };
+            var hitWindows = new ManiaHitWindows();
             hitWindows.SetDifficulty(adjustedDifficulty.OverallDifficulty);
             hitWindows.IsConvert = !beatmapInfo.Ruleset.Equals(RulesetInfo);
             hitWindows.ClassicModActive = mods.Any(m => m is ManiaModClassic);
+            hitWindows.BPM = beatmapInfo.BPM;
+
+            // 获取当前HitMode
+            var currentHitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            bool isBMSMode = HitModeHelper.IsBMSHitMode(currentHitMode);
+
             yield return new RulesetBeatmapAttribute(SongSelectStrings.Accuracy, @"OD", originalDifficulty.OverallDifficulty, adjustedDifficulty.OverallDifficulty, 10)
             {
                 Description = "Affects timing requirements for notes.",
@@ -549,17 +556,22 @@ namespace osu.Game.Rulesets.Mania
                                               {
                                                   LocalisableString windowText;
 
-                                                  // Check if using asymmetric windows by comparing early/late values
-                                                  double earlyWindow = hitWindows.WindowFor(window.result, true);
-                                                  double lateWindow = hitWindows.WindowFor(window.result, false);
-
-                                                  if (Math.Abs(earlyWindow - lateWindow) > 0.01)
+                                                  if (isBMSMode)
                                                   {
-                                                      windowText = $@"-{earlyWindow:0.##}/+{lateWindow:0.##} ms";
+                                                      // BMS模式：根据数值是否相等选择显示格式
+                                                      double earlyWindow = hitWindows.WindowFor(window.result, true);
+                                                      double lateWindow = hitWindows.WindowFor(window.result, false);
+
+                                                      if (Math.Abs(earlyWindow - lateWindow) > 0.01)
+                                                          windowText = $@"-{earlyWindow:0.##}/+{lateWindow:0.##} ms";
+                                                      else
+                                                          windowText = $@"±{earlyWindow:0.##} ms";
                                                   }
                                                   else
                                                   {
-                                                      windowText = $@"±{earlyWindow:0.##} ms";
+                                                      // 非BMS模式：显示对称格式
+                                                      double d = hitWindows.WindowFor(window.result);
+                                                      windowText = $@"±{d:0.##} ms";
                                                   }
 
                                                   return new RulesetBeatmapAttribute.AdditionalMetric(
