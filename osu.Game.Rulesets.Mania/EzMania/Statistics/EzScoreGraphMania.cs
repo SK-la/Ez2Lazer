@@ -35,6 +35,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         private readonly HitModeHelper hitWindowsV1 = new HitModeHelper(EzEnumHitMode.Classic);
 
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
+        private EzEnumHitMode currentHitMode;
         private Bindable<double> offsetPlusMania = new Bindable<double>(0);
 
         [Resolved]
@@ -52,7 +53,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
-            var events = Score.HitEvents.Where(e => hitWindowsV2.IsHitResultAllowed(e.Result));
+            var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
+            var events = Score.HitEvents.Where(e => validResults.Contains(e.Result));
 
             // 如果未设置偏移，则直接返回原始事件以避免分配。
             if (offsetPlusMania.Value == 0)
@@ -68,6 +70,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
+                currentHitMode = v.NewValue;
                 // 重新计算并重绘。
                 Refresh();
             }, true);

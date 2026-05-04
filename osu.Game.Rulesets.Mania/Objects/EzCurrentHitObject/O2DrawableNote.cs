@@ -4,6 +4,7 @@
 using System;
 using osu.Framework.Bindables;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 
@@ -32,6 +33,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 return;
             }
 
+            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
             var result = HitObject.HitWindows.ResultFor(timeOffset);
 
             if (result == HitResult.None)
@@ -74,6 +76,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 return;
             }
 
+            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
             var result = HitObject.HitWindows.ResultFor(timeOffset);
 
             if (result == HitResult.None)
@@ -119,6 +122,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 return;
             }
 
+            (HitObject.HitWindows as ManiaHitWindows)?.UpdateO2JamBpmFromTime(Time.Current);
             var result = HitObject.HitWindows.ResultFor(adjustedOffset);
 
             if (result == HitResult.None)

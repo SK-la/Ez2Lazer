@@ -129,11 +129,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             switch (hitMode)
             {
                 case EzEnumHitMode.O2Jam:
-                    Range305 = 7500.0 / bpm * TotalMultiplier;
+                    double safeBpm = double.IsFinite(bpm) && bpm > 0 ? bpm : 75.0;
+                    Range305 = 7500.0 / safeBpm * TotalMultiplier;
                     Range300 = Range305;
-                    Range200 = 22500.0 / bpm * TotalMultiplier;
+                    Range200 = 22500.0 / safeBpm * TotalMultiplier;
                     Range100 = Range200;
-                    Range050 = 31250.0 / bpm * TotalMultiplier;
+                    Range050 = 31250.0 / safeBpm * TotalMultiplier;
                     Range000 = Range050;
                     break;
 
@@ -483,10 +484,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                    hitMode == EzEnumHitMode.Raja_NM;
         }
 
-        public static IEnumerable<HitResult> GetHitModeValidHitResults()
+        public static IEnumerable<HitResult> GetHitModeValidHitResults(EzEnumHitMode mode)
         {
-            var mode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-
             switch (mode)
             {
                 case EzEnumHitMode.O2Jam:
@@ -558,6 +557,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                         HitResult.IgnoreMiss,
                     };
             }
+        }
+
+        public static IEnumerable<HitResult> GetHitModeValidHitResults()
+        {
+            var mode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            return GetHitModeValidHitResults(mode);
         }
 
 #endregion

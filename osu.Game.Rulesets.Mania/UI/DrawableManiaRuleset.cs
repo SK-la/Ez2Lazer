@@ -84,6 +84,8 @@ namespace osu.Game.Rulesets.Mania.UI
         private RealmAccess realm { get; set; } = null!;
 
         private readonly Bindable<EzEnumHitMode> hitModeBindable = new Bindable<EzEnumHitMode>();
+        private EzEnumHitMode gameplayHitMode;
+        private bool suppressHitModeRevert;
         private readonly Bindable<EzManiaScrollingStyle> scrollingStyle = new Bindable<EzManiaScrollingStyle>();
         private readonly BindableDouble configBaseMs = new BindableDouble();
         private readonly BindableDouble configTimePerSpeed = new BindableDouble();
@@ -167,8 +169,30 @@ namespace osu.Game.Rulesets.Mania.UI
         {
             base.LoadComplete();
 
+            gameplayHitMode = hitModeBindable.Value;
+
             hitModeBindable.BindValueChanged(h =>
             {
+                // 游戏中途修改判定模式将回退到开局时的设置
+                if (h.NewValue != gameplayHitMode)
+                {
+                    if (suppressHitModeRevert)
+                        return;
+
+                    suppressHitModeRevert = true;
+
+                    try
+                    {
+                        hitModeBindable.Value = gameplayHitMode;
+                    }
+                    finally
+                    {
+                        suppressHitModeRevert = false;
+                    }
+
+                    return;
+                }
+
                 O2HitModeExtension.PILL_COUNT.Value = 0;
 
                 if (h.NewValue == EzEnumHitMode.O2Jam)

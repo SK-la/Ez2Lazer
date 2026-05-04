@@ -6,6 +6,7 @@ using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.Mania.Scoring
@@ -32,12 +33,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private double speedMultiplier = 1;
 
-        public static double PerfectRange;
-        public static double GreatRange;
-        public static double GoodRange;
-        public static double OkRange;
-        public static double MehRange;
-        public static double MissRange;
+        private double perfectRange;
+        private double greatRange;
+        private double goodRange;
+        private double okRange;
+        private double mehRange;
+        private double missRange;
 
         /// <summary>
         /// Multiplier used to compensate for the playback speed of the track speeding up or slowing down.
@@ -133,7 +134,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private double meh;
         private double miss;
 
-        private static double bpm;
+        private double bpm;
 
         public double BPM
         {
@@ -148,8 +149,13 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
 
-        public ManiaHitWindows()
+        private EzEnumHitMode hitMode;
+        private readonly HitModeHelper helper;
+
+        public ManiaHitWindows(EzEnumHitMode? hitModeOverride = null)
         {
+            hitMode = hitModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            helper = new HitModeHelper(hitMode);
             updateWindows();
         }
 
@@ -173,8 +179,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     return false;
             }
 
-            // 使用HitModeHelper中定义的有效判定列表
-            var validResults = HitModeHelper.GetHitModeValidHitResults();
+            // 使用当前实例的 HitMode 判定列表，只允许有判定区间的结果。
+            var validResults = HitModeHelper.GetHitModeValidHitResults(hitMode);
             return validResults.Contains(result);
         }
 
@@ -186,12 +192,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         private void modifyManiaHitRange(double[] difficultyRangeArray)
         {
-            PerfectRange = difficultyRangeArray[0];
-            GreatRange = difficultyRangeArray[1];
-            GoodRange = difficultyRangeArray[2];
-            OkRange = difficultyRangeArray[3];
-            MehRange = difficultyRangeArray[4];
-            MissRange = difficultyRangeArray[5];
+            perfectRange = difficultyRangeArray[0];
+            greatRange = difficultyRangeArray[1];
+            goodRange = difficultyRangeArray[2];
+            okRange = difficultyRangeArray[3];
+            mehRange = difficultyRangeArray[4];
+            missRange = difficultyRangeArray[5];
         }
 
         public void ResetRange()
@@ -200,12 +206,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
             updateWindows();
         }
 
-        private static readonly HitModeHelper helper = new HitModeHelper();
-
         private bool setHitMode()
         {
-            EzEnumHitMode hitMode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-
             // 需要先更新属性，保证数值同步
             helper.HitMode = hitMode;
             helper.OverallDifficulty = overallDifficulty;
@@ -226,12 +228,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             if (setHitMode() && !HasReset)
             {
-                perfect = PerfectRange;
-                great = GreatRange;
-                good = GoodRange;
-                ok = OkRange;
-                meh = MehRange;
-                miss = MissRange;
+                perfect = perfectRange;
+                great = greatRange;
+                good = goodRange;
+                ok = okRange;
+                meh = mehRange;
+                miss = missRange;
                 return;
             }
 
@@ -320,8 +322,25 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public HitResult ResultFor(double timeOffset, bool? useHelper = null)
         {
-            bool shouldUseHelper = useHelper ?? (GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode) != EzEnumHitMode.Lazer);
+            bool shouldUseHelper = useHelper ?? (hitMode != EzEnumHitMode.Lazer);
             return shouldUseHelper ? helper.ResultFor(timeOffset) : base.ResultFor(timeOffset);
+        }
+
+        public void SetHitMode(EzEnumHitMode mode)
+        {
+            if (hitMode == mode)
+                return;
+
+            hitMode = mode;
+            updateWindows();
+        }
+
+        public void UpdateO2JamBpmFromTime(double time)
+        {
+            if (hitMode != EzEnumHitMode.O2Jam)
+                return;
+
+            BPM = O2HitModeExtension.GetBPMAtTime(time);
         }
     }
 }
