@@ -149,13 +149,17 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public bool AllowPoorEnabled => GlobalConfigStore.EzConfig.Get<bool>(Ez2Setting.BmsPoorHitResultEnable);
 
-        private EzEnumHitMode hitMode;
+        /// <summary>
+        /// 当前 Mania 判定模式（统计与窗口逻辑会依赖此值）。
+        /// </summary>
+        public EzEnumHitMode ActiveHitMode { get; private set; }
+
         private readonly HitModeHelper helper;
 
         public ManiaHitWindows(EzEnumHitMode? hitModeOverride = null)
         {
-            hitMode = hitModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            helper = new HitModeHelper(hitMode);
+            ActiveHitMode = hitModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            helper = new HitModeHelper(ActiveHitMode);
             updateWindows();
         }
 
@@ -180,7 +184,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
             }
 
             // 使用当前实例的 HitMode 判定列表，只允许有判定区间的结果。
-            var validResults = HitModeHelper.GetHitModeValidHitResults(hitMode);
+            var validResults = HitModeHelper.GetHitModeValidHitResults(ActiveHitMode);
             return validResults.Contains(result);
         }
 
@@ -209,14 +213,14 @@ namespace osu.Game.Rulesets.Mania.Scoring
         private bool setHitMode()
         {
             // 需要先更新属性，保证数值同步
-            helper.HitMode = hitMode;
+            helper.HitMode = ActiveHitMode;
             helper.OverallDifficulty = overallDifficulty;
             helper.TotalMultiplier = totalMultiplier;
 
-            if (hitMode == EzEnumHitMode.O2Jam)
+            if (ActiveHitMode == EzEnumHitMode.O2Jam)
                 helper.BPM = BPM;
 
-            if (hitMode == EzEnumHitMode.Lazer)
+            if (ActiveHitMode == EzEnumHitMode.Lazer)
                 return false;
 
             modifyManiaHitRange(helper.GetHitRangeList);
@@ -322,22 +326,22 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
         public HitResult ResultFor(double timeOffset, bool? useHelper = null)
         {
-            bool shouldUseHelper = useHelper ?? (hitMode != EzEnumHitMode.Lazer);
+            bool shouldUseHelper = useHelper ?? (ActiveHitMode != EzEnumHitMode.Lazer);
             return shouldUseHelper ? helper.ResultFor(timeOffset) : base.ResultFor(timeOffset);
         }
 
         public void SetHitMode(EzEnumHitMode mode)
         {
-            if (hitMode == mode)
+            if (ActiveHitMode == mode)
                 return;
 
-            hitMode = mode;
+            ActiveHitMode = mode;
             updateWindows();
         }
 
         public void UpdateO2JamBpmFromTime(double time)
         {
-            if (hitMode != EzEnumHitMode.O2Jam)
+            if (ActiveHitMode != EzEnumHitMode.O2Jam)
                 return;
 
             BPM = O2HitModeExtension.GetBPMAtTime(time);

@@ -25,20 +25,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         {
             //  305  300    200     100     50e  Miss  Poor
             // Kool  Cool   Good    -       Bad  Poor  KPoor
-            { 16.67, 33.33, 116.67, 116.67, 250, 500 }, // IIDX
-            { 15.00, 30.00, 060.00, 060.00, 200, 1000 }, // LR2 Hard
-            { 15.00, 45.00, 112.00, 112.00, 165, 500 }, // raja normal (75%)
-            { 20.00, 60.00, 150.00, 150.00, 220, 500 }, // raja easy (100%)
+            { 16.67, 33.33, 116.67, 116.67, 250, 250,  500 }, // IIDX
+            { 15.00, 30.00, 060.00, 060.00, 200, 200,  1000 }, // LR2 Hard
+            { 15.00, 45.00, 112.00, 112.00, 165, 165,  500 }, // raja normal (75%)
+            { 20.00, 60.00, 150.00, 150.00, 220, 220,  500 }, // raja easy (100%)
         };
 
         private static readonly double[,] hit_range_bms_late =
         {
             //  305    300     200     100   50l Miss   Poor
             // Kool   Cool    Good       -  Bad  Poor  KPoor
-            { 16.67, 33.33, 116.67, 116.67, 250, 250 }, // IIDX
-            { 15.00, 30.00, 060.00,  60.00, 200, 200 }, // LR2 Hard
-            { 15.00, 45.00, 112.00, 112.00, 210, 210 }, // raja normal
-            { 20.00, 60.00, 150.00, 150.00, 280, 280 }, // raja easy (100%)
+            { 16.67, 33.33, 116.67, 116.67, 250, 250,  150 }, // IIDX
+            { 15.00, 30.00, 060.00, 060.00, 200, 200,  150 }, // LR2 Hard
+            { 15.00, 45.00, 112.00, 112.00, 210, 210,  150 }, // raja normal
+            { 20.00, 60.00, 150.00, 150.00, 280, 280,  150 }, // raja easy (100%)
         };
 
         private static readonly DifficultyRange perfect_window_range = new DifficultyRange(22.4D, 19.4D, 13.9D);
@@ -57,8 +57,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         // public double RangePoor { get; private set; }
 
-        // public (double early, double late) RangeKPR { get; private set; }
-        public (double early, double late) RangePR { get; private set; }
+        public (double early, double late) RangeKPR { get; private set; }
         public (double early, double late) RangeBD { get; private set; }
 
         private EzEnumHitMode hitMode = EzEnumHitMode.Classic;
@@ -126,6 +125,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
         private void updateRanges()
         {
+            RangeBD = (0, 0);
+            RangeKPR = (0, 0);
+
             switch (hitMode)
             {
                 case EzEnumHitMode.O2Jam:
@@ -159,20 +161,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range200 = hit_range_bms[row, 2] * TotalMultiplier;
                     Range100 = hit_range_bms[row, 3] * TotalMultiplier;
                     Range050 = hit_range_bms[row, 4] * TotalMultiplier;
-                    Range000 = hit_range_bms[row, 5] * TotalMultiplier;
 
                     double badEarly = hit_range_bms[row, 4] * TotalMultiplier;
                     double badLate = hit_range_bms_late[row, 4] * TotalMultiplier;
                     RangeBD = (badEarly, badLate);
 
-                    double poorEarly = hit_range_bms[row, 5] * TotalMultiplier;
-                    double poorLate = hit_range_bms_late[row, 5] * TotalMultiplier;
-                    RangePR = (poorEarly, poorLate);
+                    // BMS：不按单独 MS 档分支；Poor/Miss 窗与 Bad 对齐，区间 Miss 由 Drawable 逻辑处理。
+                    Range000 = Range050;
 
-                    // RangePoor = hit_range_bms[row, 6];
-                    // double kPoorEarly = hit_range_bms[row, 6] * TotalMultiplier;
-                    // double kPoorLate = hit_range_bms_late[row, 6] * TotalMultiplier;
-                    // RangeKPR = (kPoorEarly, kPoorLate);
+                    double kPoorEarly = hit_range_bms[row, 6] * TotalMultiplier;
+                    double kPoorLate = hit_range_bms_late[row, 6] * TotalMultiplier;
+                    RangeKPR = (kPoorEarly, kPoorLate);
                     break;
 
                 case EzEnumHitMode.Malody_E:
@@ -210,7 +209,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range100 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, ok_window_range) * TotalMultiplier) + 0.5;
                     Range050 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, meh_window_range) * TotalMultiplier) + 0.5;
                     Range000 = Math.Floor(IBeatmapDifficultyInfo.DifficultyRange(OverallDifficulty, miss_window_range) * TotalMultiplier) + 0.5;
-
                     break;
             }
         }
@@ -258,7 +256,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             if (absOffset <= Range100) return HitResult.Ok;
 
             if (IsInRange(timeOffset, RangeBD, Range050)) return HitResult.Meh;
-            if (IsInRange(timeOffset, RangePR, Range000)) return HitResult.Miss;
+            if (absOffset <= Range000) return HitResult.Miss;
             // if (IsInRange(timeOffset, RangeKPR, RangePoor)) return HitResult.Poor;
 
             return HitResult.None;
@@ -303,8 +301,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 case HitResult.Miss:
                     if (isEarly == null) return Range000;
 
-                    double missRange = (bool)isEarly ? RangePR.early : RangePR.late;
+                    double missRange = (bool)isEarly ? RangeBD.early : RangeBD.late;
                     return missRange > 0 ? missRange : Range000;
+
+                case HitResult.Poor:
+                    if (isEarly == null) return RangeKPR.early > 0 ? RangeKPR.early : Range000;
+
+                    double kPoorRange = (bool)isEarly ? RangeKPR.early : RangeKPR.late;
+                    return kPoorRange > 0 ? kPoorRange : Range000;
 
                 // case HitResult.Poor:
                 //     if (isEarly == null) return RangePoor;
@@ -482,6 +486,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             return hitMode == EzEnumHitMode.IIDX_HD ||
                    hitMode == EzEnumHitMode.LR2_HD ||
                    hitMode == EzEnumHitMode.Raja_NM;
+        }
+
+        /// <summary>
+        /// 早按侧 KPoor（空出し）：是否仍在机台规定的「note 判定时刻前可识别」范围内。
+        /// osu 中 <paramref name="timeOffsetFromHit"/> = 当前时间 - 物件判定时刻，负值为提前按下。
+        /// IIDX 无提前上限；LR2 为判定时刻前 1000ms 内；Raja 为前 500ms 内。
+        /// 晚按侧 KPoor 不由本方法约束，由 Bad 外与 <c>badLate</c> 衔接的逻辑单独处理。
+        /// </summary>
+        public static bool IsWithinEarlyKPoorRecognitionWindow(EzEnumHitMode mode, double timeOffsetFromHit)
+        {
+            if (timeOffsetFromHit >= 0)
+                return true;
+
+            if (!IsBMSHitMode(mode))
+                return true;
+
+            double maxEarlyMs = mode switch
+            {
+                EzEnumHitMode.LR2_HD => 1000,
+                EzEnumHitMode.Raja_NM => 500,
+                _ => double.PositiveInfinity,
+            };
+
+            return timeOffsetFromHit >= -maxEarlyMs;
         }
 
         public static IEnumerable<HitResult> GetHitModeValidHitResults(EzEnumHitMode mode)

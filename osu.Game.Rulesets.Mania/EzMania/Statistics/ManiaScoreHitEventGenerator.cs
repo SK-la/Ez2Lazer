@@ -344,13 +344,25 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             HitResult result = hitModeHelper.ResultFor(timeOffsetForJudgement);
 
-            if (modeUnit.PoorEnabled && result == HitResult.None)
-                result = BMSJudgeMapping.KPoor;
+            if (result != HitResult.None)
+                return result;
 
-            if (result == HitResult.None && (timeOffsetForJudgement > badLate || (isTail && holdBreak)))
+            if (BMSJudgeMapping.IsLateOutsideBad(timeOffsetForJudgement, badLate))
                 return BMSJudgeMapping.Poor;
 
-            return result;
+            if (isTail && holdBreak)
+                return BMSJudgeMapping.Poor;
+
+            if (!modeUnit.PoorEnabled)
+                return HitResult.None;
+
+            double badEarly = hitModeHelper.WindowFor(BMSJudgeMapping.Bad, true);
+            double kPoorEarly = hitModeHelper.WindowFor(BMSJudgeMapping.KPoor, true);
+
+            if (kPoorEarly > badEarly && timeOffsetForJudgement < -badEarly && timeOffsetForJudgement >= -kPoorEarly)
+                return BMSJudgeMapping.KPoor;
+
+            return HitResult.None;
         }
 
         private static HitResult evaluateO2JamResult(HitModeHelper hitModeHelper, double timeOffsetForJudgement, double rawOffset, bool isTail, bool holdBreak,
@@ -468,7 +480,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 bool shouldReplace = modeUnit.JudgePrecedence switch
                 {
                     EzEnumJudgePrecedence.Combo => compareCombo(selected, candidate, playableBeatmap, inputTime, hitWindowHelper),
-                    EzEnumJudgePrecedence.Duration => Math.Abs(selected.Target.StartTime - inputTime) > Math.Abs(candidate.Target.StartTime - inputTime),
+                    EzEnumJudgePrecedence.Duration => Math.Abs(selected.Target.GetEndTime() - inputTime) > Math.Abs(candidate.Target.GetEndTime() - inputTime),
                     _ => false
                 };
 
@@ -479,18 +491,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return selected;
         }
 
+        /// <summary>
+        /// Combo 优先级：当前选中的 note 已偏早越过 Good 早界，且候选仍在 Good 晚界内时，把路由让给候选（与具体 BMS 引擎无关的通用启发式）。
+        /// </summary>
         private static bool compareCombo(TargetState t1, TargetState t2, IBeatmap playableBeatmap, double inputTime, HitModeHelper hitWindowHelper)
         {
             hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, inputTime);
-            double t1GoodLate = getDirectionalWindow(hitWindowHelper, HitResult.Good, false);
+            double goodEarly = getDirectionalWindow(hitWindowHelper, HitResult.Good, true);
+            double goodLate = getDirectionalWindow(hitWindowHelper, HitResult.Good, false);
 
-            hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, inputTime);
-            double t2GoodEarly = getDirectionalWindow(hitWindowHelper, HitResult.Good, true);
+            double t1Time = t1.Target.GetEndTime();
+            double t2Time = t2.Target.GetEndTime();
 
-            bool t1BeyondGoodLate = t1.Target.StartTime < inputTime - t1GoodLate;
-            bool t2WithinGoodEarly = t2.Target.StartTime <= inputTime + t2GoodEarly;
-
-            return t1BeyondGoodLate && t2WithinGoodEarly;
+            return t1Time < inputTime - goodEarly && t2Time <= inputTime + goodLate;
         }
 
         private static double getDirectionalWindow(HitModeHelper hitWindowHelper, HitResult result, bool isEarly)
