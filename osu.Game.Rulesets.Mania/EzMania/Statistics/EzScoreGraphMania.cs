@@ -87,11 +87,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override HitResult RecalculateV1Result(HitEvent hitEvent)
         {
+            // Miss/Poor 属于事件语义（常见于无输入 miss 或 BMS 特殊判定），
+            // 不能仅靠 timeOffset 重算，否则会被“洗回”高判定。
+            if (hitEvent.Result is HitResult.Miss or HitResult.Poor)
+                return hitEvent.Result;
+
             return hitWindowsV1.ResultFor(hitEvent.TimeOffset);
         }
 
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)
         {
+            if (hitEvent.Result is HitResult.Miss or HitResult.Poor)
+                return hitEvent.Result;
+
             return hitWindowsV2.ResultFor(hitEvent.TimeOffset);
         }
 

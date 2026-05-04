@@ -244,6 +244,25 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 if (modeUnit.HitMode == EzEnumHitMode.Lazer && result == HitResult.None)
                     continue;
 
+                // BMS 的 KPoor 在 Drawable 中是“产生判定但不终结对象”的结果：
+                // - 晚按区间每个对象最多 1 次；
+                // - 早按（空按模拟）可重复触发。
+                if (isBmsLikeMode(modeUnit.HitMode) && result == BMSJudgeMapping.KPoor)
+                {
+                    double badLate = hitWindowHelper.WindowFor(BMSJudgeMapping.Bad, false);
+                    bool isLatePress = timeOffsetForJudgement > badLate;
+
+                    if (isLatePress && selected.HasLateKPoor)
+                        continue;
+
+                    if (isLatePress)
+                        selected.HasLateKPoor = true;
+
+                    hitEvents.Add(new HitEvent(timeOffsetForJudgement, gameplayRate, result, target, lastHitObject, null));
+                    lastHitObject = target;
+                    continue;
+                }
+
                 selected.Judged = true;
                 selected.TimeOffset = timeOffsetForJudgement;
                 selected.Result = result;
@@ -259,8 +278,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
                 if (!state.Judged)
                 {
-                    state.TimeOffset = 0;
                     state.Result = HitResult.Miss;
+                    state.TimeOffset = estimateUnjudgedMissOffset(target, playableBeatmap, hitWindowHelper, modeUnit.HitMode);
 
                     if (target is HeadNote head)
                         headWasHit[head] = false;
@@ -476,6 +495,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return hitWindowHelper.WindowFor(result, isEarly);
         }
 
+        private static double estimateUnjudgedMissOffset(HitObject target, IBeatmap playableBeatmap, HitModeHelper hitWindowHelper, EzEnumHitMode hitMode)
+        {
+            bool useTailReleaseLenience = target is TailNote && usesTailReleaseLenience(hitMode);
+            double lenienceFactor = useTailReleaseLenience ? TailNote.RELEASE_WINDOW_LENIENCE : 1;
+
+            hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, target.StartTime);
+            double missLate = getDirectionalWindow(hitWindowHelper, HitResult.Miss, false) * lenienceFactor;
+
+            // 保持在 miss 判定窗口内，避免后续按 offset 重算时被降级为更高判定或 None。
+            return Math.Max(0, missLate - 0.01);
+        }
+
         private static double getBpmAtTime(IBeatmap beatmap, double time)
         {
             double bpm = beatmap.ControlPointInfo.TimingPointAt(time).BPM;
@@ -488,6 +519,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             return bpm;
         }
+
+        private static bool isBmsLikeMode(EzEnumHitMode hitMode)
+            => hitMode is EzEnumHitMode.IIDX_HD or EzEnumHitMode.LR2_HD or EzEnumHitMode.Raja_NM;
 
         private static void collectJudgementTargets(HitObject hitObject, List<HitObject> targets, CancellationToken cancellationToken)
         {
@@ -505,6 +539,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             public readonly HitObject Target;
             public readonly bool IsTail;
             public bool Judged;
+            public bool HasLateKPoor;
             public double TimeOffset;
             public HitResult Result;
 
