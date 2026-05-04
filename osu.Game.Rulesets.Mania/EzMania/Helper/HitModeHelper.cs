@@ -159,7 +159,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     Range200 = hit_range_bms[row, 2] * TotalMultiplier;
                     Range100 = hit_range_bms[row, 3] * TotalMultiplier;
                     Range050 = hit_range_bms[row, 4] * TotalMultiplier;
-                    Range000 = hit_range_bms[row, 5];
+                    Range000 = hit_range_bms[row, 5] * TotalMultiplier;
 
                     double badEarly = hit_range_bms[row, 4] * TotalMultiplier;
                     double badLate = hit_range_bms_late[row, 4] * TotalMultiplier;

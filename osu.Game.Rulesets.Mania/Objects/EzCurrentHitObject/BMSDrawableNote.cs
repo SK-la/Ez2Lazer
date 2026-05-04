@@ -20,7 +20,7 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
         // 映射使用Meh时，需要特殊
         public static HitResult Bad => HitResult.Meh;
         public static HitResult Poor => HitResult.Miss; //普通Poor, 见逃しPOOR
-        public static HitResult KPoor => HitResult.Poor; //KPoor对应None，原则上要求无note
+        public static HitResult KPoor => HitResult.Poor; //KPoor在无note时按下发生，在比note晚发生时只会出现1次
 
         // BMS不适用下面这种方法，CaBeHit会按判定区间检查，这与bms不同
         // if (!HitObject.HitWindows.CanBeHit(timeOffset))
@@ -29,14 +29,17 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public partial class BMSDrawableNote : DrawableNote
     {
+        private bool hasKPoor;
+
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
             var helper = HitObject.HitWindows as ManiaHitWindows;
             double badLate = helper!.WindowFor(BMSJudgeMapping.Bad, false);
+            bool isWithinJudgementWindow = helper.ResultFor(timeOffset) != HitResult.None;
 
             if (!userTriggered)
             {
-                if (!HitObject.HitWindows.CanBeHit(timeOffset) && timeOffset > badLate)
+                if (!isWithinJudgementWindow && timeOffset > badLate)
                     ApplyResult(BMSJudgeMapping.Poor); // 见逃し KPoor
 
                 return;
@@ -44,9 +47,9 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             var result = helper.ResultFor(timeOffset);
 
-            if (result == HitResult.None)
+            if (!isWithinJudgementWindow)
             {
-                result = BMSJudgeMapping.KPoor; // 伪 KPoor
+                result = BMSJudgeMapping.KPoor;
             }
 
             if (result == BMSJudgeMapping.KPoor)
@@ -54,7 +57,17 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(BMSJudgeMapping.KPoor))
                     return;
 
-                DispatchNewResult(BMSJudgeMapping.KPoor);
+                // 晚按时，最多只判 1 次 KPoor；早按（空按模拟）允许多次。
+                bool isLatePress = timeOffset > badLate;
+
+                if (!isLatePress || !hasKPoor)
+                    DispatchNewResult(BMSJudgeMapping.KPoor);
+
+                if (isLatePress)
+                    hasKPoor = true;
+                else
+                    hasKPoor = false;
+
                 return;
             }
 
@@ -70,14 +83,17 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public partial class BMSDrawableHoldNoteHead : DrawableHoldNoteHead
     {
+        private bool hasKPoor;
+
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
             var helper = HitObject.HitWindows as ManiaHitWindows;
             double badLate = helper!.WindowFor(BMSJudgeMapping.Bad, false);
+            bool isWithinJudgementWindow = helper.ResultFor(timeOffset) != HitResult.None;
 
             if (!userTriggered)
             {
-                if (!HitObject.HitWindows.CanBeHit(timeOffset) && timeOffset > badLate)
+                if (!isWithinJudgementWindow && timeOffset > badLate)
                     ApplyResult(BMSJudgeMapping.Poor); // 见逃し KPoor
 
                 return;
@@ -85,9 +101,10 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
             var result = helper.ResultFor(timeOffset);
 
-            if (result == HitResult.None)
+            // 只要不在正常可判定区（CanBeHit返回false），就按了给KPoor
+            if (!isWithinJudgementWindow)
             {
-                result = BMSJudgeMapping.KPoor; // 伪 KPoor
+                result = BMSJudgeMapping.KPoor;
             }
 
             if (result == BMSJudgeMapping.KPoor)
@@ -95,7 +112,17 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(BMSJudgeMapping.KPoor))
                     return;
 
-                DispatchNewResult(BMSJudgeMapping.KPoor);
+                // 晚按时，最多只判 1 次 KPoor；早按（空按模拟）允许多次。
+                bool isLatePress = timeOffset > badLate;
+
+                if (!isLatePress || !hasKPoor)
+                    DispatchNewResult(BMSJudgeMapping.KPoor);
+
+                if (isLatePress)
+                    hasKPoor = true;
+                else
+                    hasKPoor = false;
+
                 return;
             }
 
@@ -111,22 +138,30 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
     public partial class BMSDrawableHoldNoteTail : DrawableHoldNoteTail
     {
+        private bool hasKPoor;
         public override bool DisplayResult => true;
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
             var helper = HitObject.HitWindows as ManiaHitWindows;
             double badLate = helper!.WindowFor(BMSJudgeMapping.Bad, false);
+            bool isWithinJudgementWindow = helper.ResultFor(timeOffset) != HitResult.None;
 
             if (!userTriggered)
             {
-                if (!HitObject.HitWindows.CanBeHit(timeOffset) && timeOffset > badLate)
+                if (!isWithinJudgementWindow && timeOffset > badLate)
                     ApplyResult(BMSJudgeMapping.Poor); // 见逃し KPoor
 
                 return;
             }
 
             var result = helper.ResultFor(timeOffset);
+
+            // 只要不在正常可判定区（CanBeHit返回false），就按了给KPoor
+            if (!isWithinJudgementWindow)
+            {
+                result = BMSJudgeMapping.KPoor;
+            }
 
             if (result == HitResult.None)
                 return;
@@ -143,7 +178,17 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 if (!HitObject.HitWindows.IsHitResultAllowed(BMSJudgeMapping.KPoor))
                     return;
 
-                DispatchNewResult(BMSJudgeMapping.KPoor);
+                // 晚按时，最多只判 1 次 KPoor；早按（空按模拟）允许多次。
+                bool isLatePress = timeOffset > badLate;
+
+                if (!isLatePress || !hasKPoor)
+                    DispatchNewResult(BMSJudgeMapping.KPoor);
+
+                if (isLatePress)
+                    hasKPoor = true;
+                else
+                    hasKPoor = false;
+
                 return;
             }
 
