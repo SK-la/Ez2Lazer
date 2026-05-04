@@ -27,6 +27,7 @@ using osu.Game.Rulesets.Mania.Difficulty;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Edit.Setup;
 using osu.Game.Rulesets.Mania.EzMania.Analysis;
+using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods;
 using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.EzMania.Statistics;
@@ -441,19 +442,7 @@ namespace osu.Game.Rulesets.Mania
 
         public override IEnumerable<HitResult> GetValidHitResults()
         {
-            return new[]
-            {
-                HitResult.Perfect,
-                HitResult.Great,
-                HitResult.Good,
-                HitResult.Ok,
-                HitResult.Meh,
-                HitResult.Miss,
-                HitResult.Poor,
-                HitResult.IgnoreHit,
-                HitResult.ComboBreak,
-                HitResult.IgnoreMiss,
-            };
+            return HitModeHelper.GetHitModeValidHitResults();
         }
 
         public override LocalisableString GetDisplayNameForHitResult(HitResult result)

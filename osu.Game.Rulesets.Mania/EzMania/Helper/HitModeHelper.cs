@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Scoring;
@@ -479,6 +480,83 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             return hitMode == EzEnumHitMode.IIDX_HD ||
                    hitMode == EzEnumHitMode.LR2_HD ||
                    hitMode == EzEnumHitMode.Raja_NM;
+        }
+
+        public static IEnumerable<HitResult> GetHitModeValidHitResults()
+        {
+            var mode = GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+
+            switch (mode)
+            {
+                case EzEnumHitMode.O2Jam:
+                    return new[]
+                    {
+                        HitResult.Perfect,
+                        HitResult.Good,
+                        HitResult.Meh,
+                        HitResult.Miss,
+                        HitResult.IgnoreHit,
+                        HitResult.ComboBreak,
+                        HitResult.IgnoreMiss,
+                    };
+
+                case EzEnumHitMode.EZ2AC:
+                    return new[]
+                    {
+                        HitResult.Perfect,
+                        HitResult.Great,
+                        HitResult.Good,
+                        HitResult.Meh,
+                        HitResult.Miss,
+                        HitResult.IgnoreHit,
+                        HitResult.ComboBreak,
+                        HitResult.IgnoreMiss,
+                    };
+
+                case EzEnumHitMode.IIDX_HD:
+                case EzEnumHitMode.LR2_HD:
+                case EzEnumHitMode.Raja_NM:
+                    return new[]
+                    {
+                        HitResult.Perfect,
+                        HitResult.Great,
+                        HitResult.Good,
+                        HitResult.Meh,
+                        HitResult.Miss,
+                        HitResult.Poor,
+                        HitResult.IgnoreHit,
+                        HitResult.ComboBreak,
+                        HitResult.IgnoreMiss,
+                    };
+
+                case EzEnumHitMode.Malody_E:
+                case EzEnumHitMode.Malody_B:
+                    return new[]
+                    {
+                        HitResult.Perfect,
+                        HitResult.Great,
+                        HitResult.Good,
+                        HitResult.Miss,
+                        HitResult.IgnoreHit,
+                        HitResult.ComboBreak,
+                        HitResult.IgnoreMiss,
+                    };
+
+                default:
+                    return new[]
+                    {
+                        HitResult.Perfect,
+                        HitResult.Great,
+                        HitResult.Good,
+                        HitResult.Ok,
+                        HitResult.Meh,
+                        HitResult.Miss,
+                        HitResult.Poor,
+                        HitResult.IgnoreHit,
+                        HitResult.ComboBreak,
+                        HitResult.IgnoreMiss,
+                    };
+            }
         }
 
 #endregion
