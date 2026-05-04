@@ -13,11 +13,9 @@ using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input.Events;
-using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Extensions;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -136,17 +134,19 @@ namespace osu.Game.Screens.Ranking.Statistics
 
                     if (databasedScore != null)
                     {
-                        Logger.Log($"[EzScore] Score null: {newScore.OnlineID} ({databasedScore.ScoreInfo.HitEvents.Count}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-
                         // try
                         // {
                         //     generatedHitEvents = analysisHost.GenerateAsync(databasedScore, loadCancellation.Token).GetResultSafely();
+                        //     if (generatedHitEvents != null)
+                        //         Logger.Log($"[EzScore] Score From analysisHost.GenerateAsync", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                         // }
-                        // catch
+                        // catch (Exception ex)
                         // {
+                        //     Logger.Error(ex, "[EzScore] analysisHost.GenerateAsync failed; skipping fallback generator.", Ez2ConfigManager.LOGGER_NAME);
+                        // }
+
                         EzScoreReloadBridge.InitializeAllGenerators();
                         generatedHitEvents = EzScoreReloadBridge.TryGenerate(databasedScore, playable, loadCancellation.Token);
-                        // }
                     }
 
                     if (generatedHitEvents != null)

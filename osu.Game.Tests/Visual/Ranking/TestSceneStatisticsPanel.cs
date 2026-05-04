@@ -116,6 +116,29 @@ namespace osu.Game.Tests.Visual.Ranking
             loadPanel(score);
 
             AddUntilStep("score hit events generated", () => score.HitEvents.Count > 0);
+            AddUntilStep("statistics rows displayed", () => this.ChildrenOfType<StatisticItemContainer>().Any());
+        }
+
+        [Test]
+        public void TestEzScoreServerReturnsValidHitEvents()
+        {
+            EzScoreServer.AnalysisHost analysisHost = null!;
+            ScoreInfo score = null!;
+            Score databasedScore = null!;
+            List<HitEvent> generatedHitEvents = null!;
+
+            AddStep("create analysis host", () => Add(analysisHost = new EzScoreServer.AnalysisHost()));
+            AddUntilStep("analysis host loaded", () => analysisHost.IsLoaded);
+
+            AddStep("create replay-backed score", () => score = createReplayBackedScore());
+            AddStep("resolve databased score", () => databasedScore = scoreManager.GetScore(score));
+            AddAssert("databased score exists", () => databasedScore != null);
+
+            AddStep("start analysis", () => generatedHitEvents = analysisHost.GenerateAsync(databasedScore!).GetResultSafely());
+
+            AddAssert("returned hit events", () => generatedHitEvents.Count > 0);
+            AddAssert("returned positions are present", () => generatedHitEvents.All(e => e.Position != null));
+            AddAssert("returned hit objects are present", () => generatedHitEvents.All(e => e.HitObject != null));
         }
 
         [Test]
