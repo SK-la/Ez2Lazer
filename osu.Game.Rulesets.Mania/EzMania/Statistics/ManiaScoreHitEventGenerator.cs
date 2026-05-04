@@ -72,6 +72,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 PoorEnabled: poorEnabled,
                 PillModeEnabled: healthMode.ToString().Contains("O2Jam"));
 
+            // 与 DrawableHitObject.UpdateResult() 对齐：mania 使用 OffsetPlusMania 直接修正 timeOffset。
+            double offsetPlusMania = GlobalConfigStore.EzConfig.Get<double>(Ez2Setting.OffsetPlusMania);
+
             var hitWindowHelper = new HitModeHelper(hitMode)
             {
                 OverallDifficulty = playableBeatmap.Difficulty.OverallDifficulty,
@@ -227,7 +230,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 double lenienceFactor = useTailReleaseLenience ? TailNote.RELEASE_WINDOW_LENIENCE : 1;
 
                 hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, inputEvent.Time);
-                double rawOffset = inputEvent.Time - target.StartTime;
+                double rawOffset = inputEvent.Time - target.StartTime + offsetPlusMania;
                 double missWindow = getDirectionalWindow(hitWindowHelper, HitResult.Miss, rawOffset < 0) * lenienceFactor;
                 bool holdBreak = isTail && rawOffset < -missWindow;
                 double timeOffsetForJudgement = useTailReleaseLenience ? rawOffset / TailNote.RELEASE_WINDOW_LENIENCE : rawOffset;
