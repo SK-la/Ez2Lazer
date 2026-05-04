@@ -22,12 +22,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             { 0.003, 0.000, 0.002,   0, -0.010, -0.050, -0.00 }, // O2 Easy
             { 0.002, 0.000, 0.001,   0, -0.007, -0.040, -0.00 }, // O2 Normal
             { 0.001, 0.000, 0.000,   0, -0.005, -0.030, -0.00 }, // O2 Hard
-            // Kool   Cool   Good         Miss    Fail
-            { 0.004, 0.003, 0.001,   0, -0.030, -0.050, -0.02 }, // Ez2Ac
-            // Kool   Cool   Good         Bad    Poor  空 Poor
-            { 0.0016, 0.0016, 0.000, 0,  -0.05,  -0.09, -0.05 }, // IIDX
-            { 0.0010, 0.0010, 0.005, 0,  -0.06,  -0.10, -0.02 }, // LR2 Hard
-            { 0.0015, 0.0012, 0.003, 0,  -0.05,  -0.10, -0.05 }, // raja Hard
+            // Kool   Cool    Good       Miss   Fail
+            { 0.004,  0.003,  0.001,  0, -0.03, -0.05, -0.02 }, // Ez2Ac
+            // Kool   Cool   Good        Bad    Poor   KPoor
+            { 0.0016, 0.0016, 0.0000, 0, -0.05, -0.09, -0.05 }, // IIDX
+            { 0.0010, 0.0010, 0.0005, 0, -0.06, -0.10, -0.02 }, // LR2 Hard
+            { 0.0015, 0.0012, 0.0003, 0, -0.05, -0.10, -0.05 }, // raja Hard
         };
 
         public static bool IsBMSHealthMode(EzEnumHealthMode hitMode)
