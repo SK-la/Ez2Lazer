@@ -266,8 +266,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             bool isEarly = timeOffset < 0;
             double early = range.early != 0 ? range.early : fallback;
             double late = range.late != 0 ? range.late : fallback;
-            double mehWindow = isEarly ? early : late;
-            return timeOffset <= mehWindow;
+
+            if (isEarly)
+            {
+                // Early判定：timeOffset是负数，需要在[-early, 0]范围内
+                return timeOffset >= -early;
+            }
+            else
+            {
+                // Late判定：timeOffset是正数，需要在[0, late]范围内
+                return timeOffset <= late;
+            }
         }
 
         public double WindowFor(HitResult result, bool? isEarly = null)
