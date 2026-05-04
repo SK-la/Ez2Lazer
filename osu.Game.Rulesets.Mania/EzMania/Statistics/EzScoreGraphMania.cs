@@ -54,13 +54,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         protected override IReadOnlyList<HitEvent> FilterHitEvents()
         {
             var validResults = HitModeHelper.GetHitModeValidHitResults(currentHitMode).ToHashSet();
-            return Score.HitEvents.Where(e => validResults.Contains(e.Result)).ToList();
+            var filtered = Score.HitEvents.Where(e => validResults.Contains(e.Result));
+            return applyFakeOffset(filtered);
         }
 
         protected override IReadOnlyList<HitEvent> GetV1HitEvents()
         {
             // Classic 路线固定使用原始基础事件，不受当前 hitmode 可见结果集合影响。
-            return OriginalHitEvents.Where(e => e.Result.IsBasic()).ToList();
+            return applyFakeOffset(OriginalHitEvents.Where(e => e.Result.IsBasic()));
         }
 
         [BackgroundDependencyLoader]
@@ -98,6 +99,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 return hitEvent.Result;
 
             return hitWindowsV2.ResultFor(hitEvent.TimeOffset);
+        }
+
+        private IReadOnlyList<HitEvent> applyFakeOffset(IEnumerable<HitEvent> events)
+        {
+            var list = events.ToList();
+
+            if (offsetPlusMania.Value == 0)
+                return list;
+
+            return list.Select(e => new HitEvent(
+                    e.TimeOffset + offsetPlusMania.Value,
+                    e.GameplayRate,
+                    e.Result,
+                    e.HitObject,
+                    e.LastHitObject,
+                    e.Position))
+                .ToList();
         }
 
         protected override void UpdateDisplay()

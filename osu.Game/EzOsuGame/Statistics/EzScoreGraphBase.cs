@@ -179,6 +179,12 @@ namespace osu.Game.EzOsuGame.Statistics
         }
 
         /// <summary>
+        /// 图表展示阶段用于着色和血量推演的判定结果。
+        /// 默认使用当前 V2 重算结果，保证图形与当前设置一致。
+        /// </summary>
+        protected virtual HitResult GetDisplayResult(HitEvent hitEvent) => RecalculateV2Result(hitEvent);
+
+        /// <summary>
         /// 计算 V2 准确率。子类可覆写以定制计算逻辑。
         /// 将结果设置到 V2Accuracy、V2Score 和 V2Counts 属性，而不是通过返回值提供。
         /// </summary>
@@ -267,11 +273,12 @@ namespace osu.Game.EzOsuGame.Statistics
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
                 float yPosition = (float)(e.TimeOffset + current_offset);
+                var displayResult = GetDisplayResult(e);
 
                 float x = xPosition * availableWidth;
                 float y = centerY + yPosition;
 
-                pointList.Add((new Vector2(x, y), colours.ForHitResult(e.Result)));
+                pointList.Add((new Vector2(x, y), colours.ForHitResult(displayResult)));
             }
 
             if (pointList.Count > 0)
@@ -309,7 +316,7 @@ namespace osu.Game.EzOsuGame.Statistics
             foreach (var e in sortedHitEvents)
             {
                 var judgement = e.HitObject.CreateJudgement();
-                var judgementResult = new JudgementResult(e.HitObject, judgement) { Type = e.Result };
+                var judgementResult = new JudgementResult(e.HitObject, judgement) { Type = GetDisplayResult(e) };
                 double healthIncrease = judgement.HealthIncreaseFor(judgementResult);
                 currentHealth = Math.Clamp(currentHealth + healthIncrease, 0, 1);
 
