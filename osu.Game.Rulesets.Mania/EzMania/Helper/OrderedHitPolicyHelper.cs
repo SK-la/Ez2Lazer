@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -68,10 +69,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
                 double startTime = obj.HitObject.StartTime;
                 double endTime = obj.HitObject.GetEndTime();
-                double window = hitWindow.WindowFor(HitResult.Miss);
+                double earlyWindow = hitWindow.WindowFor(HitResult.Miss);
+                double lateWindow = hitWindow.WindowFor(HitResult.Miss);
+
+                if (hitWindow is ManiaHitWindows maniaHitWindow)
+                {
+                    earlyWindow = maniaHitWindow.WindowFor(HitResult.Miss, true);
+                    lateWindow = maniaHitWindow.WindowFor(HitResult.Miss, false);
+                }
 
                 // 检查时间是否落在此对象的判定窗口内
-                if (time >= startTime - window && time <= endTime + window)
+                if (time >= startTime - earlyWindow && time <= endTime + lateWindow)
                 {
                     yield return obj;
                 }
@@ -146,25 +154,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// </summary>
         private bool compareCombo(DrawableHitObject t1, DrawableHitObject t2, double ptime)
         {
-            var hitWindows = t1.HitObject.HitWindows;
-            if (hitWindows == null)
+            var t1Windows = t1.HitObject.HitWindows;
+            var t2Windows = t2.HitObject.HitWindows;
+            if (t1Windows == null || t2Windows == null)
                 return false;
 
-            // 获取 GOOD 窗口（beatoraja 中的 judgetable[2]）
-            // 在 osu! 中，我们使用 HitResult.Good 作为参考
-            double goodWindow = hitWindows.WindowFor(HitResult.Good);
+            double t1GoodLate = t1Windows.WindowFor(HitResult.Good);
+            double t2GoodEarly = t2Windows.WindowFor(HitResult.Good);
 
-            // 检查 t1 是否超出 GOOD 窗口（太早或太晚无法获得 Good 或更好的判定）
-            // beatoraja: t1.getMicroTime() < ptime + judgetable[2][0]
-            // 这意味着 t1 早于 (ptime + goodWindow.Late)，即太早/太晚
-            bool t1BeyondGood = t1.HitObject.StartTime < ptime - goodWindow;
+            if (t1Windows is ManiaHitWindows t1ManiaWindows)
+                t1GoodLate = t1ManiaWindows.WindowFor(HitResult.Good, false);
 
-            // 检查 t2 是否在 GOOD 窗口内
-            // beatoraja: t2.getMicroTime() <= ptime + judgetable[2][1]
-            bool t2InGood = Math.Abs(t2.HitObject.StartTime - ptime) <= goodWindow;
+            if (t2Windows is ManiaHitWindows t2ManiaWindows)
+                t2GoodEarly = t2ManiaWindows.WindowFor(HitResult.Good, true);
 
-            // 如果 t1 超出 GOOD 但 t2 仍在 GOOD 内，则用 t2 替换 t1
-            return t1BeyondGood && t2InGood;
+            // 对齐 beatoraja:
+            // t1.getMicroTime() < ptime + judgetable[2][0] (GOOD 的 late 下界，通常为负值)
+            // 等价于：t1Start < ptime - goodLate
+            bool t1BeyondGoodLate = t1.HitObject.StartTime < ptime - t1GoodLate;
+
+            // t2.getMicroTime() <= ptime + judgetable[2][1] (GOOD 的 early 上界)
+            bool t2WithinGoodEarly = t2.HitObject.StartTime <= ptime + t2GoodEarly;
+
+            // 如果 t1 已经晚过 GOOD，而 t2 仍在 GOOD 的 early 窗内，则切到 t2。
+            return t1BeyondGoodLate && t2WithinGoodEarly;
         }
 
         /// <summary>

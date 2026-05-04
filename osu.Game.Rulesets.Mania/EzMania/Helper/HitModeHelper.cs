@@ -26,7 +26,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             //  305  300    200     100     50e  Miss  Poor
             // Kool  Cool   Good    -       Bad  Poor  KPoor
             { 16.67, 33.33, 116.67, 116.67, 250, 500 }, // IIDX
-            { 15.00, 30.00, 060.00, 060.00, 200, 1000 }, // LR2 Hard, TODO:此处poor范围过大，前后LN首尾间隙可能被覆盖，导致下一个note提前被结束。
+            { 15.00, 30.00, 060.00, 060.00, 200, 1000 }, // LR2 Hard
             { 15.00, 45.00, 112.00, 112.00, 165, 500 }, // raja normal (75%)
             { 20.00, 60.00, 150.00, 150.00, 220, 500 }, // raja easy (100%)
         };
