@@ -218,6 +218,41 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     continue;
 
                 var candidates = collectCandidatesForInput(laneStates, playableBeatmap, inputEvent.Time, hitWindowHelper, hitMode).ToList();
+                hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, inputEvent.Time);
+
+                if (inputEvent.IsPress && isBmsLikeMode(modeUnit.HitMode))
+                {
+                    var postBadCandidate = laneStates
+                                           .Where(s => s.Judged && s.CanRouteToKPoor && isWithinMissWindow(hitWindowHelper, s.Target.StartTime, inputEvent.Time))
+                                           .OrderBy(s => distanceToNonBadWindow(s.Target.StartTime, inputEvent.Time, hitWindowHelper))
+                                           .ThenBy(s => s.Target.StartTime)
+                                           .FirstOrDefault();
+
+                    if (postBadCandidate != null)
+                    {
+                        double postBadDistance = distanceToNonBadWindow(postBadCandidate.Target.StartTime, inputEvent.Time, hitWindowHelper);
+
+                        double unjudgedDistance = candidates
+                                                  .Where(s => !s.Judged)
+                                                  .Select(s => distanceToNonBadWindow(s.Target.StartTime, inputEvent.Time, hitWindowHelper))
+                                                  .DefaultIfEmpty(double.PositiveInfinity)
+                                                  .Min();
+
+                        if (postBadDistance <= unjudgedDistance)
+                        {
+                            if (postBadCandidate.HasLateKPoor)
+                                continue;
+
+                            postBadCandidate.HasLateKPoor = true;
+                            postBadCandidate.CanRouteToKPoor = false;
+                            hitEvents.Add(new HitEvent(inputEvent.Time - postBadCandidate.Target.StartTime + offsetPlusMania, gameplayRate, BMSJudgeMapping.KPoor,
+                                postBadCandidate.Target, lastHitObject, null));
+                            lastHitObject = postBadCandidate.Target;
+                            continue;
+                        }
+                    }
+                }
+
                 if (candidates.Count == 0)
                     continue;
 
@@ -230,7 +265,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 bool useTailReleaseLenience = isTail && usesTailReleaseLenience(modeUnit.HitMode);
                 double lenienceFactor = useTailReleaseLenience ? TailNote.RELEASE_WINDOW_LENIENCE : 1;
 
-                hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, inputEvent.Time);
                 double rawOffset = inputEvent.Time - target.StartTime + offsetPlusMania;
                 double missWindow = getDirectionalWindow(hitWindowHelper, HitResult.Miss, rawOffset < 0) * lenienceFactor;
                 bool holdBreak = isTail && rawOffset < -missWindow;
@@ -270,6 +304,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 selected.Judged = true;
                 selected.TimeOffset = timeOffsetForJudgement;
                 selected.Result = result;
+
+                selected.CanRouteToKPoor = isBmsLikeMode(modeUnit.HitMode) && result == BMSJudgeMapping.Bad && timeOffsetForJudgement < 0;
 
                 if (target is HeadNote head)
                     headWasHit[head] = result.IsHit();
@@ -540,6 +576,29 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return hitWindowHelper.WindowFor(result, isEarly);
         }
 
+        private static bool isWithinMissWindow(HitModeHelper hitWindowHelper, double noteTime, double inputTime)
+        {
+            double early = getDirectionalWindow(hitWindowHelper, HitResult.Miss, true);
+            double late = getDirectionalWindow(hitWindowHelper, HitResult.Miss, false);
+            return inputTime >= noteTime - early && inputTime <= noteTime + late;
+        }
+
+        private static double distanceToNonBadWindow(double noteTime, double inputTime, HitModeHelper hitWindowHelper)
+        {
+            double early = getDirectionalWindow(hitWindowHelper, HitResult.Good, true);
+            double late = getDirectionalWindow(hitWindowHelper, HitResult.Good, false);
+            double start = noteTime - early;
+            double end = noteTime + late;
+
+            if (inputTime < start)
+                return start - inputTime;
+
+            if (inputTime > end)
+                return inputTime - end;
+
+            return 0;
+        }
+
         private static double estimateUnjudgedMissOffset(HitObject target, IBeatmap playableBeatmap, HitModeHelper hitWindowHelper, EzEnumHitMode hitMode)
         {
             bool useTailReleaseLenience = target is TailNote && usesTailReleaseLenience(hitMode);
@@ -585,6 +644,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             public readonly bool IsTail;
             public bool Judged;
             public bool HasLateKPoor;
+            public bool CanRouteToKPoor;
             public double TimeOffset;
             public HitResult Result;
 

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -37,6 +38,30 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         public bool IsHittableWithPrecedence(DrawableHitObject hitObject, double time)
         {
             var judgePrecedence = ezConfig.Get<EzEnumJudgePrecedence>(Ez2Setting.JudgePrecedence);
+
+            if (isBMS())
+            {
+                var postJudged = getPostBadJudgedObjects(time).ToList();
+
+                if (postJudged.Count > 0)
+                {
+                    var nearestPostJudged = postJudged
+                                            .OrderBy(o => distanceToNonBadWindow(o, time))
+                                            .ThenBy(o => o.HitObject.StartTime)
+                                            .First();
+
+                    double postJudgedDistance = distanceToNonBadWindow(nearestPostJudged, time);
+
+                    double nearestUnjudgedDistance = getOverlappingObjects(time)
+                                                     .Where(o => !o.Judged)
+                                                     .Select(o => distanceToNonBadWindow(o, time))
+                                                     .DefaultIfEmpty(double.PositiveInfinity)
+                                                     .Min();
+
+                    if (postJudgedDistance <= nearestUnjudgedDistance)
+                        return hitObject == nearestPostJudged;
+                }
+            }
 
             // 获取所有与当前时间重叠的活跃对象
             var overlappingObjects = getOverlappingObjects(time).ToList();
@@ -103,6 +128,73 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     yield return obj;
                 }
             }
+        }
+
+        private IEnumerable<DrawableHitObject> getPostBadJudgedObjects(double time)
+        {
+            foreach (var obj in hitObjectContainer.AliveObjects)
+            {
+                if (!obj.Judged || !isWithinMissWindow(obj, time))
+                    continue;
+
+                if (isPostBadKPoorRoutable(obj))
+                    yield return obj;
+            }
+        }
+
+        private static bool isPostBadKPoorRoutable(DrawableHitObject obj)
+            => obj switch
+            {
+                BMSDrawableNote note => note.CanRouteToKPoor,
+                BMSDrawableHoldNoteHead head => head.CanRouteToKPoor,
+                BMSDrawableHoldNoteTail tail => tail.CanRouteToKPoor,
+                _ => false
+            };
+
+        private static bool isWithinMissWindow(DrawableHitObject obj, double time)
+        {
+            var hitWindow = obj.HitObject.HitWindows;
+            if (hitWindow == null || hitWindow.WindowFor(HitResult.Miss) == 0)
+                return false;
+
+            double startTime = obj.HitObject.StartTime;
+            double earlyWindow = hitWindow.WindowFor(HitResult.Miss);
+            double lateWindow = hitWindow.WindowFor(HitResult.Miss);
+
+            if (hitWindow is ManiaHitWindows maniaHitWindow)
+            {
+                earlyWindow = maniaHitWindow.WindowFor(HitResult.Miss, true);
+                lateWindow = maniaHitWindow.WindowFor(HitResult.Miss, false);
+            }
+
+            return time >= startTime - earlyWindow && time <= startTime + lateWindow;
+        }
+
+        private static double distanceToNonBadWindow(DrawableHitObject obj, double pressTime)
+        {
+            var windows = obj.HitObject.HitWindows;
+            if (windows == null)
+                return double.PositiveInfinity;
+
+            double early = windows.WindowFor(HitResult.Good);
+            double late = windows.WindowFor(HitResult.Good);
+
+            if (windows is ManiaHitWindows maniaWindows)
+            {
+                early = maniaWindows.WindowFor(HitResult.Good, true);
+                late = maniaWindows.WindowFor(HitResult.Good, false);
+            }
+
+            double start = obj.HitObject.StartTime - early;
+            double end = obj.HitObject.StartTime + late;
+
+            if (pressTime < start)
+                return start - pressTime;
+
+            if (pressTime > end)
+                return pressTime - end;
+
+            return 0;
         }
 
         /// <summary>

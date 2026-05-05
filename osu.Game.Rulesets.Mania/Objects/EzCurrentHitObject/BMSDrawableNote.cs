@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
@@ -107,6 +108,23 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     public partial class BMSDrawableNote : DrawableNote
     {
         private bool hasKPoor;
+        public bool CanRouteToKPoor { get; private set; }
+
+        public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
+        {
+            if (e.Action != Action.Value)
+                return false;
+
+            // 二次判定。晚按时，最多只判 1 次 KPoor；早按（空按模拟）允许多次。
+            if (CanRouteToKPoor && HitObject.HitWindows!.IsHitResultAllowed(BMSJudgeMapping.KPoor))
+            {
+                DispatchNewResult(BMSJudgeMapping.KPoor);
+                CanRouteToKPoor = false;
+                return true;
+            }
+
+            return base.OnPressed(e);
+        }
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
@@ -143,6 +161,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
 
                 return;
             }
+
+            CanRouteToKPoor = userTriggered && result == BMSJudgeMapping.Bad && timeOffset < 0;
 
             ApplyResult(static (r, state) =>
             {
@@ -157,6 +177,22 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     public partial class BMSDrawableHoldNoteHead : DrawableHoldNoteHead
     {
         private bool hasKPoor;
+        public bool CanRouteToKPoor { get; private set; }
+
+        public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
+        {
+            if (e.Action != Action.Value)
+                return false;
+
+            if (CanRouteToKPoor && HitObject.HitWindows!.IsHitResultAllowed(BMSJudgeMapping.KPoor))
+            {
+                DispatchNewResult(BMSJudgeMapping.KPoor);
+                CanRouteToKPoor = false;
+                return true;
+            }
+
+            return base.OnPressed(e);
+        }
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
@@ -194,6 +230,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
                 return;
             }
 
+            CanRouteToKPoor = userTriggered && result == BMSJudgeMapping.Bad && timeOffset < 0;
+
             ApplyResult(static (r, state) =>
             {
                 r.Type = state;
@@ -207,7 +245,23 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
     public partial class BMSDrawableHoldNoteTail : DrawableHoldNoteTail
     {
         private bool hasKPoor;
+        public bool CanRouteToKPoor { get; private set; }
         public override bool DisplayResult => true;
+
+        public override bool OnPressed(KeyBindingPressEvent<ManiaAction> e)
+        {
+            if (e.Action != Action.Value)
+                return false;
+
+            if (CanRouteToKPoor && HitObject.HitWindows!.IsHitResultAllowed(BMSJudgeMapping.KPoor))
+            {
+                DispatchNewResult(BMSJudgeMapping.KPoor);
+                CanRouteToKPoor = false;
+                return true;
+            }
+
+            return base.OnPressed(e);
+        }
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
@@ -253,6 +307,8 @@ namespace osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject
             }
 
             // Logger.Log($"Tail result: {result}, IsHolding: {HoldNote.IsHolding.Value}, HasHoldBreak: {HoldNote.Body.HasHoldBreak}");
+            CanRouteToKPoor = userTriggered && result == BMSJudgeMapping.Bad && timeOffset < 0;
+
             ApplyResult(static (r, state) =>
             {
                 r.Type = state;
