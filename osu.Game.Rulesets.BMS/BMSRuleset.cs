@@ -7,21 +7,18 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Localisation;
-using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Graphics;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
-using osu.Game.Rulesets.BMS.Difficulty;
 using osu.Game.Rulesets.BMS.Mods;
 using osu.Game.Rulesets.BMS.Scoring;
 using osu.Game.Rulesets.BMS.UI;
-using osu.Game.Rulesets.BMS.UI.SongSelect;
-using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Difficulty;
+using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -36,26 +33,19 @@ namespace osu.Game.Rulesets.BMS
 
         public override string PlayingVerb => "Playing BMS";
 
-        public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
-            => new DrawableBMSRuleset(this, beatmap, mods);
+        public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) => new DrawableBMSRuleset(this, beatmap, mods);
 
-        public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap)
-            => new BMSBeatmapConverter(beatmap, this);
+        public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap) => new BMSBeatmapConverter(beatmap, this);
 
-        public override DifficultyCalculator CreateDifficultyCalculator(IWorkingBeatmap beatmap)
-            => new BMSDifficultyCalculator(RulesetInfo, beatmap);
+        public override DifficultyCalculator CreateDifficultyCalculator(IWorkingBeatmap beatmap) => new BMSDifficultyCalculator(RulesetInfo, beatmap);
 
-        public override ScoreProcessor CreateScoreProcessor()
-            => new BMSScoreProcessor();
+        public override ScoreProcessor CreateScoreProcessor() => new BMSScoreProcessor();
 
-        public override HealthProcessor CreateHealthProcessor(double drainStartTime)
-            => new DrainingHealthProcessor(drainStartTime);
+        public override HealthProcessor CreateHealthProcessor(double drainStartTime) => new DrainingHealthProcessor(drainStartTime);
 
-        public override IRulesetConfigManager CreateConfig(SettingsStore? settings)
-            => new BMSRulesetConfigManager(settings, RulesetInfo);
+        public override IRulesetConfigManager CreateConfig(SettingsStore? settings) => new BMSRulesetConfigManager(settings, RulesetInfo);
 
-        public override RulesetSettingsSubsection CreateSettings()
-            => new BMSSettingsSubsection(this);
+        public override RulesetSettingsSubsection CreateSettings() => new BMSSettingsSubsection(this);
 
         public override IEnumerable<Mod> GetModsFor(ModType type)
         {

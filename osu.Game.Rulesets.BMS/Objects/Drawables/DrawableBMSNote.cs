@@ -6,8 +6,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Rulesets.Mania.Skinning;
-using osu.Game.Rulesets.BMS.UI;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -58,6 +56,7 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
                 {
                     ApplyMinResult();
                 }
+
                 return;
             }
 

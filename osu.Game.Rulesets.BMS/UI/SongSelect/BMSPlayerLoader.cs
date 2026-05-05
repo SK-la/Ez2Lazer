@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Graphics;
@@ -13,7 +14,6 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BMS.Beatmaps;
-using osu.Game.Rulesets.BMS.UI;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
@@ -138,7 +138,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     PushPlayer();
                 }, 500);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to load BMS beatmap for play");
                 statusText.Text = $"加载失败: {ex.Message}";
@@ -161,7 +161,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 var playerLoader = new PlayerLoader(() => new BmsPlayer());
                 this.Push(playerLoader);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to push BMS player");
                 statusText.Text = $"启动游戏失败: {ex.Message}";

@@ -2,18 +2,16 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Bindables;
-using osu.Framework.Graphics;
 using osu.Framework.Logging;
 using osu.Game.Audio;
 using osu.Game.Rulesets.BMS.Audio;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Objects;
-using osu.Game.Rulesets.Configuration;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Screens.Play;
 
@@ -126,7 +124,7 @@ namespace osu.Game.Rulesets.BMS.UI
             keysoundManager.Update(currentTime);
         }
 
-        private void onNewResult(osu.Game.Rulesets.Judgements.JudgementResult result)
+        private void onNewResult(JudgementResult result)
         {
             if (keysoundManager == null)
                 return;
@@ -173,5 +171,3 @@ namespace osu.Game.Rulesets.BMS.UI
         }
     }
 }
-
-

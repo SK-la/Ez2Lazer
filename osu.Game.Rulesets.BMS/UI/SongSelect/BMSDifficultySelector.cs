@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -8,7 +9,6 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Graphics.Containers;
-using osu.Game.Overlays;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osuTK;
 
@@ -68,7 +68,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             if (chartList.Count > 0)
             {
-                SelectedChart.Value = chartList.FirstOrDefault(chart => string.Equals(chart.Md5Hash, SelectedChart.Value?.Md5Hash, System.StringComparison.OrdinalIgnoreCase))
+                SelectedChart.Value = chartList.FirstOrDefault(chart => string.Equals(chart.Md5Hash, SelectedChart.Value?.Md5Hash, StringComparison.OrdinalIgnoreCase))
                                       ?? chartList.First();
             }
         }

@@ -11,7 +11,6 @@ using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Audio;
-using osu.Game.IO;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.Objects;
@@ -173,7 +172,8 @@ namespace osu.Game.Rulesets.BMS.Audio
                 if (keysoundCache.Count <= 5)
                 {
                     Logger.Log($"{BMS_LOG_PREFIX} ✓ Loaded #{keysoundCache.Count}: {filename} -> {foundFilename}", LoggingTarget.Runtime, LogLevel.Important);
-                    Logger.Log($"{BMS_LOG_PREFIX}    Sample info: {sample != null}, Has volume: {sample?.Volume != null}, Volume value: {sample?.Volume?.Value ?? -1:F2}", LoggingTarget.Runtime, LogLevel.Important);
+                    Logger.Log($"{BMS_LOG_PREFIX}    Sample info: {sample != null}, Has volume: {sample?.Volume != null}, Volume value: {sample?.Volume?.Value ?? -1:F2}", LoggingTarget.Runtime,
+                        LogLevel.Important);
                 }
                 else if (keysoundCache.Count == 10)
                 {
@@ -211,7 +211,8 @@ namespace osu.Game.Rulesets.BMS.Audio
                     // Log detailed playback info for first few triggers
                     if (nextBackgroundIndex < 5 || gameplayTime < 10000)
                     {
-                        Logger.Log($"{BMS_LOG_PREFIX} ▶ Playing: {filename} at {gameplayTime:F0}ms - Channel: {channel != null}, Volume: {sample.Volume?.Value ?? -1}", LoggingTarget.Runtime, LogLevel.Important);
+                        Logger.Log($"{BMS_LOG_PREFIX} ▶ Playing: {filename} at {gameplayTime:F0}ms - Channel: {channel != null}, Volume: {sample.Volume?.Value ?? -1}", LoggingTarget.Runtime,
+                            LogLevel.Important);
                     }
                 }
                 catch (Exception ex)
@@ -240,6 +241,7 @@ namespace osu.Game.Rulesets.BMS.Audio
                     Logger.Log($"{BMS_LOG_PREFIX} Update called but no background events loaded", LoggingTarget.Runtime, LogLevel.Debug);
                     loggedMissingBackgroundEvents = true;
                 }
+
                 return;
             }
 
@@ -258,6 +260,7 @@ namespace osu.Game.Rulesets.BMS.Audio
             }
 
             int eventsTriggered = 0;
+
             while (nextBackgroundIndex < backgroundEvents.Count)
             {
                 var evt = backgroundEvents[nextBackgroundIndex];

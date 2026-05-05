@@ -5,8 +5,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Rulesets.Mania;
-using osu.Game.Rulesets.Mania.Skinning;
-using osu.Game.Rulesets.Mania.Skinning.Default;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.UI.Scrolling;
 using osu.Game.Skinning;
@@ -75,13 +73,13 @@ namespace osu.Game.Rulesets.BMS.UI
             // Standard BMS color scheme
             return columnIndex switch
             {
-                0 => new Color4(255, 0, 0, 255),     // Scratch - Red
+                0 => new Color4(255, 0, 0, 255), // Scratch - Red
                 1 => new Color4(255, 255, 255, 255), // White
-                2 => new Color4(0, 150, 255, 255),   // Blue
+                2 => new Color4(0, 150, 255, 255), // Blue
                 3 => new Color4(255, 255, 255, 255), // White
-                4 => new Color4(0, 150, 255, 255),   // Blue
+                4 => new Color4(0, 150, 255, 255), // Blue
                 5 => new Color4(255, 255, 255, 255), // White
-                6 => new Color4(0, 150, 255, 255),   // Blue
+                6 => new Color4(0, 150, 255, 255), // Blue
                 7 => new Color4(255, 255, 255, 255), // White
                 _ => new Color4(200, 200, 200, 255), // Default gray
             };

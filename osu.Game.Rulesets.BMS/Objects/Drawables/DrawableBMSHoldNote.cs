@@ -7,8 +7,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
-using osu.Game.Rulesets.Mania.Skinning;
-using osu.Game.Rulesets.BMS.UI;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;

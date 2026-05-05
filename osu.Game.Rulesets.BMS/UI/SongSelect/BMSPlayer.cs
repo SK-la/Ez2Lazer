@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -17,7 +18,6 @@ using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
-using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
 using osu.Game.Screens;
@@ -110,7 +110,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
                 debugText.Text = $"Notes: {maniaBeatmap.HitObjects.Count} | Using Mania renderer | Press ESC to exit";
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 debugText.Text = $"Failed to create ruleset: {ex.Message}";
             }
@@ -123,10 +123,12 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             // Determine column count from difficulty settings or hit objects
             int columnCount = (int)bmsBeatmap.Difficulty.CircleSize;
+
             if (columnCount <= 0)
             {
                 columnCount = bmsBeatmap.HitObjects.OfType<BMSHitObject>().Select(h => h.Column).DefaultIfEmpty(0).Max() + 1;
             }
+
             if (columnCount <= 0) columnCount = 7;
 
             var maniaBeatmap = new ManiaBeatmap(new StageDefinition(columnCount));
