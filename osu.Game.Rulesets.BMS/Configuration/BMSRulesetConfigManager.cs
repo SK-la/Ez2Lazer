@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Configuration;
@@ -26,6 +25,7 @@ namespace osu.Game.Rulesets.BMS.Configuration
             SetDefault(BMSRulesetSetting.ScrollSpeed, 25.0, 1.0, 40.0, 1.0);
             SetDefault(BMSRulesetSetting.AutoPreloadKeysounds, true);
             SetDefault(BMSRulesetSetting.KeysoundVolume, 1.0, 0.0, 1.0, 0.01);
+            SetDefault(BMSRulesetSetting.DpStageSpacing, 0.0, 0.0, 200.0, 1.0);
         }
 
         public static IReadOnlyList<string> ParseLibraryPaths(string? rawPaths, string? legacyRootPath = null)
@@ -38,7 +38,7 @@ namespace osu.Game.Rulesets.BMS.Configuration
 
                 try
                 {
-                    if (trimmed.StartsWith("[", StringComparison.Ordinal))
+                    if (trimmed.StartsWith('['))
                     {
                         List<string>? deserialised = JsonSerializer.Deserialize<List<string>>(trimmed);
 
@@ -91,5 +91,6 @@ namespace osu.Game.Rulesets.BMS.Configuration
         ScrollSpeed,
         AutoPreloadKeysounds,
         KeysoundVolume,
+        DpStageSpacing,
     }
 }

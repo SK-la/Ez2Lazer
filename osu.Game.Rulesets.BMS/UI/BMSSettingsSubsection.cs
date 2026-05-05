@@ -41,7 +41,8 @@ namespace osu.Game.Rulesets.BMS.UI
         private Bindable<string> legacyRootPathBindable = null!;
 
         private OsuTextFlowContainer pathDisplay = null!;
-        private OsuTextFlowContainer statusDisplay = null!;
+        private SettingsNote cacheStatusNote = null!;
+        private SettingsNote speedNote = null!;
         private Bindable<double>? maniaScrollSpeed;
         private Bindable<double>? maniaBaseSpeed;
         private Bindable<double>? maniaTimePerSpeed;
@@ -79,22 +80,16 @@ namespace osu.Game.Rulesets.BMS.UI
 
             Children = new Drawable[]
             {
-                new SettingsButton
+                new SettingsButtonV2
                 {
                     Text = "进入 BMS 专用选歌界面（辅助入口）",
                     Action = openBmsSongSelect,
                 },
-                new SettingsButton
+                new SettingsButtonV2
                 {
                     Text = "打开 BMS 曲库设置向导",
                     Action = selectPath,
                 },
-                new SettingsItemV2(new FormTextBox
-                {
-                    Caption = "滚速说明",
-                    Current = new Bindable<string>("BMS 当前直接复用 mania 的滚速参数、方向和快捷键（含 LAlt 加速步进）。"),
-                    ReadOnly = true,
-                }),
                 new Container
                 {
                     RelativeSizeAxes = Axes.X,
@@ -114,12 +109,11 @@ namespace osu.Game.Rulesets.BMS.UI
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
-                    Padding = new MarginPadding { Left = SettingsPanel.CONTENT_MARGINS, Right = SettingsPanel.CONTENT_MARGINS, Top = 4, Bottom = 6 },
-                    Child = statusDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 12))
+                    Padding = SettingsPanel.CONTENT_PADDING,
+                    Child = cacheStatusNote = new SettingsNote
                     {
                         RelativeSizeAxes = Axes.X,
-                        AutoSizeAxes = Axes.Y,
-                    }
+                    },
                 },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
@@ -134,6 +128,16 @@ namespace osu.Game.Rulesets.BMS.UI
                         return RulesetSettingsStrings.ScrollSpeedTooltip(computedTime, v).ToString();
                     }
                 }),
+                new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
+                    Padding = SettingsPanel.CONTENT_PADDING,
+                    Child = speedNote = new SettingsNote
+                    {
+                        RelativeSizeAxes = Axes.X,
+                    },
+                },
                 new SettingsItemV2(new FormCheckBox
                 {
                     Caption = "自动预加载 Keysound",
@@ -145,6 +149,14 @@ namespace osu.Game.Rulesets.BMS.UI
                     Current = bmsConfig.GetBindable<double>(BMSRulesetSetting.KeysoundVolume),
                     KeyboardStep = 0.01f,
                     LabelFormat = v => $"{v:P0}",
+                }),
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = "DP-Stage 间距",
+                    HintText = "DP模式(10k+)，控制左右面板之间的间距。",
+                    Current = bmsConfig.GetBindable<double>(BMSRulesetSetting.DpStageSpacing),
+                    KeyboardStep = 1,
+                    LabelFormat = v => $"{v:0}",
                 }),
             };
         }
@@ -168,10 +180,12 @@ namespace osu.Game.Rulesets.BMS.UI
             libraryPathsBindable.BindValueChanged(_ => updatePathDisplay(), true);
             legacyRootPathBindable.BindValueChanged(_ => updatePathDisplay());
 
+            speedNote.Current.Value = new SettingsNote.Data("BMS 复用 mania 设置及快捷键（含 LAlt 加速步进）。", SettingsNote.Type.Informational);
+
             // Show initial cache status
             if (beatmapManager?.LibraryCache != null)
             {
-                statusDisplay.Text = $"已缓存 {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面";
+                cacheStatusNote.Current.Value = new SettingsNote.Data($"已缓存 {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面", SettingsNote.Type.Informational);
             }
         }
 
@@ -227,7 +241,7 @@ namespace osu.Game.Rulesets.BMS.UI
                 return;
             }
 
-            statusDisplay.Text = "正在扫描...";
+            cacheStatusNote.Current.Value = new SettingsNote.Data("正在扫描...", SettingsNote.Type.Informational);
 
             var notification = new ProgressNotification
             {
@@ -261,7 +275,7 @@ namespace osu.Game.Rulesets.BMS.UI
 
                         if (beatmapManager.LibraryCache != null)
                         {
-                            statusDisplay.Text = $"扫描完成! {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面";
+                            cacheStatusNote.Current.Value = new SettingsNote.Data($"扫描完成! {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面", SettingsNote.Type.Informational);
                         }
                     });
                 }
@@ -270,7 +284,7 @@ namespace osu.Game.Rulesets.BMS.UI
                     Schedule(() =>
                     {
                         notification.State = ProgressNotificationState.Cancelled;
-                        statusDisplay.Text = $"扫描失败: {ex.Message}";
+                        cacheStatusNote.Current.Value = new SettingsNote.Data($"扫描失败: {ex.Message}", SettingsNote.Type.Critical);
                     });
                 }
             });
