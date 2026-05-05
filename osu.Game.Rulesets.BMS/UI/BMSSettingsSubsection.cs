@@ -273,15 +273,23 @@ namespace osu.Game.Rulesets.BMS.UI
 
                     Schedule(() =>
                     {
-                        // 确保进度条达到 100%
-                        notification.Progress = 1.0f;
-                        notification.State = ProgressNotificationState.Completed;
-
-                        BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
-
-                        if (beatmapManager.LibraryCache != null)
+                        try
                         {
-                            cacheStatusNote.Current.Value = new SettingsNote.Data($"扫描完成! {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面", SettingsNote.Type.Informational);
+                            BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
+
+                            // 确保进度条达到 100%
+                            notification.Progress = 1.0f;
+                            notification.State = ProgressNotificationState.Completed;
+
+                            if (beatmapManager.LibraryCache != null)
+                            {
+                                cacheStatusNote.Current.Value = new SettingsNote.Data($"扫描完成! {beatmapManager.LibraryCache.Songs.Count} 首歌曲, {beatmapManager.LibraryCache.TotalCharts} 张谱面", SettingsNote.Type.Informational);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            notification.State = ProgressNotificationState.Cancelled;
+                            cacheStatusNote.Current.Value = new SettingsNote.Data($"同步失败: {ex.Message}", SettingsNote.Type.Critical);
                         }
                     });
                 }

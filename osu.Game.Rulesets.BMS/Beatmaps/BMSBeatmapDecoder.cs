@@ -124,22 +124,32 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     string header = line.Substring(1, spaceIndex - 1).Trim();
                     string value = line.Substring(spaceIndex + 1).Trim();
 
-                    string command = header;
+                    string upperHeader = header.ToUpperInvariant();
+                    string command = upperHeader;
                     string index = string.Empty;
 
-                    if (header.Length > 2)
+                    if (upperHeader.StartsWith("WAV", StringComparison.Ordinal) && upperHeader.Length > 3)
                     {
-                        string possibleIndex = header.Substring(header.Length - 2, 2);
-                        string possibleCommand = header.Substring(0, header.Length - 2);
-
-                        if (possibleIndex.All(char.IsLetterOrDigit) && possibleCommand.All(char.IsLetter))
-                        {
-                            command = possibleCommand;
-                            index = possibleIndex;
-                        }
+                        command = "WAV";
+                        index = upperHeader.Substring(3);
+                    }
+                    else if (upperHeader.StartsWith("BMP", StringComparison.Ordinal) && upperHeader.Length > 3)
+                    {
+                        command = "BMP";
+                        index = upperHeader.Substring(3);
+                    }
+                    else if (upperHeader.StartsWith("STOP", StringComparison.Ordinal) && upperHeader.Length > 4)
+                    {
+                        command = "STOP";
+                        index = upperHeader.Substring(4);
+                    }
+                    else if (upperHeader.StartsWith("BPM", StringComparison.Ordinal) && upperHeader.Length > 3)
+                    {
+                        command = "BPM";
+                        index = upperHeader.Substring(3);
                     }
 
-                    parseHeader(command.ToUpperInvariant(), index, value);
+                    parseHeader(command, index, value);
                     return;
                 }
             }
