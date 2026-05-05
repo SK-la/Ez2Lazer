@@ -263,7 +263,7 @@ namespace osu.Game.EzOsuGame.Statistics
             AddInternal(graphContainer);
 
             // 背景中心线（表示 0 ms）
-            float centerY = DrawHeight / 2f;
+            float centerY = projectOffsetToY(0, minTime);
             graphContainer.Add(new Box
             {
                 Anchor = Anchor.TopLeft,
@@ -276,7 +276,8 @@ namespace osu.Game.EzOsuGame.Statistics
                 Y = centerY
             });
 
-            foreach (HitResult result in Enum.GetValues(typeof(HitResult)).Cast<HitResult>().Where(r => r <= HitResult.Perfect && r >= HitResult.Meh))
+            foreach (HitResult result in Enum.GetValues(typeof(HitResult)).Cast<HitResult>()
+                                             .Where(r => r <= HitResult.Perfect && r >= HitResult.Meh && HitWindows.IsHitResultAllowed(r)))
             {
                 drawBoundaryLine(result, isNegative: false);
                 drawBoundaryLine(result, isNegative: true);
@@ -299,11 +300,10 @@ namespace osu.Game.EzOsuGame.Statistics
             {
                 double time = e.HitObject.StartTime;
                 float xPosition = timeRange > 0 ? (float)((time - minTime) / timeRange) : 0;
-                float yPosition = (float)(e.TimeOffset + current_offset);
                 var displayResult = GetDisplayResult(e);
 
                 float x = xPosition * availableWidth;
-                float y = centerY + yPosition;
+                float y = projectOffsetToY(e.TimeOffset, time);
 
                 pointList.Add((new Vector2(x, y), colours.ForHitResult(displayResult)));
             }
@@ -370,7 +370,6 @@ namespace osu.Game.EzOsuGame.Statistics
 
         private void drawBoundaryLine(HitResult result, bool isNegative)
         {
-            float centerY = DrawHeight / 2f;
             float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
             int sampleCount = Math.Max(2, Math.Min(240, (int)Math.Ceiling(availableWidth / 8f)));
             double sign = isNegative ? -1 : 1;
@@ -382,7 +381,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 double time = minTime + timeRange * ratio;
                 double boundary = UpdateBoundary(result, time);
                 float x = (float)(ratio * availableWidth);
-                float y = centerY + (float)(sign * boundary + current_offset);
+                float y = projectOffsetToY(sign * boundary, time);
                 vertices.Add(new Vector2(x, y));
             }
 
@@ -403,7 +402,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 Text = $"{firstBoundary:+0.##;-0.##}",
                 Font = OsuFont.GetFont(size: 12),
                 Colour = Color4.White,
-                Y = centerY + (float)(firstBoundary + current_offset),
+                Y = projectOffsetToY(firstBoundary, minTime),
             };
 
             if (LeftLabelContainer != null)
@@ -422,6 +421,14 @@ namespace osu.Game.EzOsuGame.Statistics
                 label.X = LeftMarginConst - 25;
                 AddInternal(label);
             }
+        }
+
+        private float projectOffsetToY(double offset, double? time)
+        {
+            double miss = Math.Max(1, UpdateBoundary(HitResult.Miss, time));
+            double normalized = (offset + current_offset) / miss;
+            float y = (float)((normalized + 1) * 0.5 * DrawHeight);
+            return Math.Clamp(y, 0, DrawHeight);
         }
     }
 }
