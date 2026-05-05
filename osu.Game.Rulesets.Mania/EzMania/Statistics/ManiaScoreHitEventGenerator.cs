@@ -54,7 +54,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         /// <summary>
-        /// Instance implementation of generator.
+        /// 生成器的实例实现。
         /// </summary>
         public List<HitEvent> Generate(Score score, IBeatmap playableBeatmap, CancellationToken cancellationToken = default)
         {
@@ -84,7 +84,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             var frames = replay.Frames.Cast<ManiaReplayFrame>().OrderBy(f => f.Time).ToList();
 
-            // Build per-column input transitions and unified input event timeline.
+            // 构建每列的输入转换和统一的输入事件时间线。
             var inputEvents = new List<InputEvent>(frames.Count * 2);
 
             HashSet<ManiaAction> lastActions = new HashSet<ManiaAction>();
@@ -118,7 +118,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 lastActions = current;
             }
 
-            // If keys are still held at the end of replay, treat them as released at the last frame time.
+            // 如果在回放结束时按键仍处于按下状态，则在最后一帧的时间点视为释放。
             if (lastActions.Count > 0)
             {
                 double endTime = frames[^1].Time;
@@ -131,7 +131,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 }
             }
 
-            // Same-frame processing in gameplay checks key-down before key-up.
+            // 与游戏玩法中同一帧的处理一致：先检查按键按下，再检查按键释放。
             inputEvents.Sort((a, b) =>
             {
                 int timeComparison = a.Time.CompareTo(b.Time);
@@ -144,7 +144,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 return a.IsPress ? -1 : 1;
             });
 
-            // Map tail -> head to support capping (combo-break conditions).
+            // 映射尾部到头部以支持截断（连击中断条件）。
             var headByTail = new Dictionary<TailNote, HeadNote>();
 
             foreach (var hitObject in playableBeatmap.HitObjects)
@@ -163,7 +163,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 collectJudgementTargets(hitObject, targets, cancellationToken);
             }
 
-            // Ensure deterministic ordering.
+            // 确保确定性排序。
             targets.Sort((a, b) =>
             {
                 int timeComparison = a.StartTime.CompareTo(b.StartTime);
@@ -180,7 +180,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             var targetStates = targets.Select(t => new TargetState(t)).ToList();
             var statesByObject = targetStates.ToDictionary(s => s.Target, s => s);
 
-            // Build lookup by column and input type.
+            // 按列和输入类型构建查找表。
             var statesByColumnForPress = new Dictionary<int, List<TargetState>>();
             var statesByColumnForRelease = new Dictionary<int, List<TargetState>>();
 
@@ -203,8 +203,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
             var hitEvents = new List<HitEvent>(targets.Count);
             HitObject? lastHitObject = null;
+            var keyHeldByColumn = new Dictionary<int, bool>();
 
-            // Track head hit results for later tail capping.
+            // 跟踪头部判定结果以供后续尾部截断使用。
             var headWasHit = new Dictionary<HeadNote, bool>();
             int o2PillCount = 0;
             int o2CoolCombo = 0;
@@ -212,6 +213,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             foreach (var inputEvent in inputEvents)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                bool wasHoldingBeforeEvent = keyHeldByColumn.TryGetValue(inputEvent.Column, out bool held) && held;
+                keyHeldByColumn[inputEvent.Column] = inputEvent.IsPress;
 
                 var perColumnDict = inputEvent.IsPress ? statesByColumnForPress : statesByColumnForRelease;
                 if (!perColumnDict.TryGetValue(inputEvent.Column, out var laneStates))
@@ -275,7 +278,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 if (target is TailNote tail && headByTail.TryGetValue(tail, out var headNote))
                     headHit = headWasHit.TryGetValue(headNote, out bool wasHit) && wasHit;
 
+                if (!inputEvent.IsPress && isTail && headHit && wasHoldingBeforeEvent && rawOffset < 0)
+                    selected.HoldBroken = true;
+
                 HitResult result = evaluateResult(target, hitWindowHelper, modeUnit, timeOffsetForJudgement, rawOffset, holdBreak, headHit,
+                    selected.HoldBroken, wasHoldingBeforeEvent,
                     playableBeatmap, inputEvent.Time, ref o2PillCount, ref o2CoolCombo);
 
                 // Lazer 模式下，None 表示此次输入不应判定当前对象，保留对象待后续输入/超时 Miss。
@@ -311,7 +318,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     headWasHit[head] = result.IsHit();
             }
 
-            // Emit in deterministic object order.
+            // 按确定性对象顺序输出。
             foreach (var target in targets)
             {
                 var state = statesByObject[target];
@@ -332,9 +339,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return hitEvents;
         }
 
-        // TODO: Ez2Ac没有实现
         private static HitResult evaluateResult(HitObject target, HitModeHelper hitModeHelper, HitModeDataUnit modeUnit,
                                                 double timeOffsetForJudgement, double rawOffset, bool holdBreak, bool headHit,
+                                                bool holdBroken, bool wasHoldingBeforeRelease,
                                                 IBeatmap playableBeatmap, double eventTime, ref int o2PillCount, ref int o2CoolCombo)
         {
             bool isTail = target is TailNote;
@@ -345,8 +352,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                     return evaluateLazerResult(target, timeOffsetForJudgement, isTail, holdBreak, headHit);
 
                 case EzEnumHitMode.O2Jam:
-                    return evaluateO2JamResult(hitModeHelper, timeOffsetForJudgement, rawOffset, isTail, holdBreak, headHit, playableBeatmap, eventTime, modeUnit,
+                    return evaluateO2JamResult(hitModeHelper, timeOffsetForJudgement, rawOffset, isTail, holdBreak, headHit, holdBroken, playableBeatmap, eventTime, modeUnit,
                         ref o2PillCount, ref o2CoolCombo);
+
+                case EzEnumHitMode.EZ2AC:
+                    return evaluateEz2AcResult(hitModeHelper, timeOffsetForJudgement, target, holdBreak, headHit, holdBroken);
 
                 case EzEnumHitMode.Malody_E:
                 case EzEnumHitMode.Malody_B:
@@ -358,7 +368,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 case EzEnumHitMode.IIDX_HD:
                 case EzEnumHitMode.LR2_HD:
                 case EzEnumHitMode.Raja_NM:
-                    return evaluateBmsLikeResult(hitModeHelper, modeUnit, timeOffsetForJudgement, isTail, holdBreak);
+                    return evaluateBmsLikeResult(hitModeHelper, modeUnit, timeOffsetForJudgement, isTail, holdBreak, holdBroken, wasHoldingBeforeRelease);
 
                 default:
                     return evaluateCommonResult(hitModeHelper, timeOffsetForJudgement, isTail, holdBreak, headHit);
@@ -375,7 +385,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             return result;
         }
 
-        private static HitResult evaluateBmsLikeResult(HitModeHelper hitModeHelper, HitModeDataUnit modeUnit, double timeOffsetForJudgement, bool isTail, bool holdBreak)
+        private static HitResult evaluateBmsLikeResult(HitModeHelper hitModeHelper, HitModeDataUnit modeUnit, double timeOffsetForJudgement, bool isTail,
+                                                       bool holdBreak, bool holdBroken, bool wasHoldingBeforeRelease)
         {
             double badLate = hitModeHelper.WindowFor(BMSJudgeMapping.Bad, false);
 
@@ -385,6 +396,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 return result;
 
             if (BMSJudgeMapping.IsLateOutsideBad(timeOffsetForJudgement, badLate))
+                return BMSJudgeMapping.Poor;
+
+            if (isTail && holdBroken)
+                return BMSJudgeMapping.Poor;
+
+            if (isTail && wasHoldingBeforeRelease && BMSJudgeMapping.IsLateOutsideBad(timeOffsetForJudgement, badLate))
                 return BMSJudgeMapping.Poor;
 
             if (isTail && holdBreak)
@@ -403,7 +420,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         private static HitResult evaluateO2JamResult(HitModeHelper hitModeHelper, double timeOffsetForJudgement, double rawOffset, bool isTail, bool holdBreak,
-                                                     bool headHit, IBeatmap playableBeatmap, double eventTime, HitModeDataUnit modeUnit,
+                                                     bool headHit, bool holdBroken, IBeatmap playableBeatmap, double eventTime, HitModeDataUnit modeUnit,
                                                      ref int o2PillCount, ref int o2CoolCombo)
         {
             HitResult result = hitModeHelper.ResultFor(timeOffsetForJudgement);
@@ -411,11 +428,40 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             if (modeUnit.PillModeEnabled)
                 applyO2PillLogic(Math.Abs(rawOffset), getBpmAtTime(playableBeatmap, eventTime), ref o2PillCount, ref o2CoolCombo, ref result);
 
-            if (isTail && (holdBreak || !headHit))
+            if (isTail && holdBroken && rawOffset < 0)
+                return HitResult.None;
+
+            if (isTail && (holdBreak || !headHit || holdBroken))
                 result = HitResult.Miss;
 
             return result;
         }
+
+        private static HitResult evaluateEz2AcResult(HitModeHelper hitModeHelper, double timeOffsetForJudgement, HitObject target, bool holdBreak, bool headHit, bool holdBroken)
+        {
+            HitResult result = hitModeHelper.ResultFor(timeOffsetForJudgement);
+            if (result == HitResult.None)
+                return HitResult.None;
+
+            // Align with Ez2AcDrawableLNeHead / Ez2AcDrawableLNTail: LN head/tail are softened by one level.
+            if (target is HeadNote or TailNote)
+                result = softenEz2AcLnResult(result);
+
+            // Align with Ez2AcDrawableLNTail: on head miss or body break, tail is capped to Good.
+            if (target is TailNote && result > HitResult.Meh && (!headHit || holdBreak || holdBroken))
+                result = HitResult.Good;
+
+            return result;
+        }
+
+        private static HitResult softenEz2AcLnResult(HitResult result)
+            => result switch
+            {
+                HitResult.Great => HitResult.Perfect,
+                HitResult.Good => HitResult.Great,
+                HitResult.Meh => HitResult.Good,
+                _ => result
+            };
 
         private static HitResult evaluateMalodyTailResult(HitModeHelper hitModeHelper, double rawOffset, bool headHit)
         {
@@ -645,6 +691,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
             public bool Judged;
             public bool HasLateKPoor;
             public bool CanRouteToKPoor;
+            public bool HoldBroken;
             public double TimeOffset;
             public HitResult Result;
 
