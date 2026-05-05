@@ -467,19 +467,60 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             var notification = new ProgressNotification
             {
                 Text = "正在扫描 BMS 曲库...",
+                Progress = 0,
             };
 
             notifications?.Post(notification);
 
-            _ = beatmapManager.ScanLibraryAsync(beatmapManager.RootPaths).ContinueWith(_ =>
+            Action<ValueChangedEvent<double>> onProgress = e => Schedule(() => notification.Progress = (float)e.NewValue);
+            Action<ValueChangedEvent<string>> onStatus = e => Schedule(() => notification.Text = e.NewValue);
+            beatmapManager.ScanProgress.BindValueChanged(onProgress, true);
+            beatmapManager.StatusMessage.BindValueChanged(onStatus, true);
+
+            _ = System.Threading.Tasks.Task.Run(async () =>
             {
-                Schedule(() =>
+                try
                 {
-                    loadingSpinner.Hide();
-                    notification.State = ProgressNotificationState.Completed;
-                    BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
-                    refreshSongList();
-                });
+                    await beatmapManager.ScanLibraryAsync(beatmapManager.RootPaths).ConfigureAwait(false);
+
+                    Schedule(() =>
+                    {
+                        try
+                        {
+                            BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
+                            notification.Progress = 1f;
+                            notification.State = ProgressNotificationState.Completed;
+                            refreshSongList();
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error(ex, "BMS synchronize failed after scan");
+                            notification.State = ProgressNotificationState.Cancelled;
+                            notifications?.Post(new SimpleNotification
+                            {
+                                Text = $"同步失败: {ex.Message}",
+                                Icon = FontAwesome.Solid.ExclamationTriangle,
+                            });
+                        }
+                        finally
+                        {
+                            loadingSpinner.Hide();
+                            beatmapManager.ScanProgress.ValueChanged -= onProgress;
+                            beatmapManager.StatusMessage.ValueChanged -= onStatus;
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Schedule(() =>
+                    {
+                        Logger.Error(ex, "BMS library scan failed");
+                        loadingSpinner.Hide();
+                        notification.State = ProgressNotificationState.Cancelled;
+                        beatmapManager.ScanProgress.ValueChanged -= onProgress;
+                        beatmapManager.StatusMessage.ValueChanged -= onStatus;
+                    });
+                }
             });
         }
 

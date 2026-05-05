@@ -124,7 +124,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         protected override bool OnClick(ClickEvent e)
         {
             SelectedChart.Value = chart;
-            return base.OnClick(e);
+            Action?.Invoke();
+            return true;
         }
 
         /// <summary>

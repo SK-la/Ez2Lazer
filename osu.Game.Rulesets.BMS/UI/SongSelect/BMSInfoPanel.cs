@@ -168,7 +168,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 }
             };
 
-            difficultySelector.SelectedChart.BindTo(SelectedChart);
+            difficultySelector.SelectedChart.BindTarget = SelectedChart;
 
             SelectedSong.BindValueChanged(onSongChanged, true);
             SelectedChart.BindValueChanged(onChartChanged, true);
