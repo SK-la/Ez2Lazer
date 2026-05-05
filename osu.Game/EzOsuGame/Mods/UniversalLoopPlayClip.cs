@@ -84,14 +84,20 @@ namespace osu.Game.EzOsuGame.Mods
                 breakTime = 250 * Math.Max(1, breakQuarter);
             }
 
-            var selectedPart = beatmap.HitObjects.Where(h => h.StartTime >= cutTimeStart && h.GetEndTime() <= cutTimeEnd).ToList();
+            const double boundary_epsilon = 0.5;
+
+            // 以“开始时间落在切片内”为主进行筛选，并加入边界容差。
+            // 旧逻辑要求 EndTime <= cutTimeEnd，会把跨边界长物件或边界浮点误差物件直接丢弃。
+            var selectedPart = beatmap.HitObjects
+                                      .Where(h => h.StartTime >= cutTimeStart - boundary_epsilon && h.StartTime <= cutTimeEnd + boundary_epsilon)
+                                      .ToList();
 
             // 保留原始 HitObject 列表，后续按原始对象深克隆并应用时间偏移
             var sourceObjects = selectedPart;
 
             var newPart = new List<HitObject>();
 
-            double length = cutTimeEnd - cutTimeStart;
+            double length = Math.Max(0, cutTimeEnd - cutTimeStart);
 
             // 防护：避免在 selectedPart 较大时通过 loopCount 复制产生过多 HitObject 导致内存暴涨。
             const int max_total_hitobjects = 200_000;
@@ -107,9 +113,33 @@ namespace osu.Game.EzOsuGame.Mods
                 }
             }
 
+            double snappedLoopSpan = length + breakTime;
+
+            try
+            {
+                var timing = beatmap.ControlPointInfo.TimingPointAt(cutTimeStart);
+                double beatLength = timing.BeatLength;
+
+                // 将循环跨度吸附到 1/2 拍，减少每轮循环的微小累积误差，避免“回到开头瞬移感”。
+                if (beatLength > 0)
+                {
+                    double halfBeat = beatLength / 2.0;
+
+                    if (halfBeat > 0)
+                    {
+                        snappedLoopSpan = Math.Max(length, Math.Round((length + breakTime) / halfBeat) * halfBeat);
+                        breakTime = Math.Max(0, snappedLoopSpan - length);
+                    }
+                }
+            }
+            catch
+            {
+                // 保持原始长度与休息时长。
+            }
+
             for (int timeIndex = 0; timeIndex < loopCount; timeIndex++)
             {
-                double offset = timeIndex * (breakTime + length);
+                double offset = timeIndex * snappedLoopSpan;
 
                 foreach (var note in sourceObjects)
                 {
@@ -133,9 +163,9 @@ namespace osu.Game.EzOsuGame.Mods
             {
                 for (int i = 0; i < loopCount - 1; i++)
                 {
-                    double loopStart = cutTimeStart + i * (length + breakTime);
+                    double loopStart = cutTimeStart + i * snappedLoopSpan;
                     double loopEnd = loopStart + length;
-                    double nextLoopStart = cutTimeStart + (i + 1) * (length + breakTime);
+                    double nextLoopStart = cutTimeStart + (i + 1) * snappedLoopSpan;
 
                     double bStart = Math.Max(0, loopEnd);
                     double bEnd = Math.Max(bStart, nextLoopStart);
