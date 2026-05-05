@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
+using osu.Game.Beatmaps;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
@@ -59,6 +60,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         private readonly string cacheDirectory;
         private readonly List<string> rootPaths = new List<string>();
+        private readonly Dictionary<Guid, BMSSourceReference> beatmapSourceMap = new Dictionary<Guid, BMSSourceReference>();
 
         /// <summary>
         ///     Get the cache file path.
@@ -265,7 +267,114 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
 
-        private static bool IsNoteChannel(string channel)
+        /// <summary>
+        /// Build a virtual beatmap catalog view that mirrors osu!'s BeatmapSetInfo/BeatmapInfo model.
+        /// This does not persist into realm yet, but provides stable IDs and source mapping.
+        /// </summary>
+        public IReadOnlyList<BeatmapSetInfo> BuildVirtualBeatmapCatalog(RulesetInfo bmsRulesetInfo)
+        {
+            List<BeatmapSetInfo> result = new List<BeatmapSetInfo>();
+            beatmapSourceMap.Clear();
+
+            if (LibraryCache == null)
+                return result;
+
+            foreach (BMSSongCache song in LibraryCache.Songs)
+            {
+                if (song.Charts.Count == 0)
+                    continue;
+
+                var beatmapSet = new BeatmapSetInfo
+                {
+                    ID = createDeterministicGuid($"bms:set:{song.FolderPath}"),
+                    DateAdded = song.LastModified,
+                    Hash = song.FolderPath,
+                };
+
+                foreach (BMSChartCache chart in song.Charts.OrderBy(c => c.PlayLevel).ThenBy(c => c.FileName, StringComparer.OrdinalIgnoreCase))
+                {
+                    string chartPath = chart.FullPath;
+                    var metadata = new BeatmapMetadata
+                    {
+                        Title = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
+                        TitleUnicode = string.IsNullOrWhiteSpace(chart.Title) ? song.Title : chart.Title,
+                        Artist = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
+                        ArtistUnicode = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
+                        Source = "BMS",
+                        Tags = buildTags(chart),
+                        AudioFile = chart.PreviewFile ?? chart.AudioFile ?? string.Empty,
+                        PreviewTime = chart.PreviewTime,
+                    };
+
+                    var beatmapInfo = new BeatmapInfo(bmsRulesetInfo, new BeatmapDifficulty(), metadata)
+                    {
+                        ID = createDeterministicGuid($"bms:chart:{chartPath}:{chart.Md5Hash}"),
+                        DifficultyName = !string.IsNullOrWhiteSpace(chart.SubTitle) ? chart.SubTitle : Path.GetFileNameWithoutExtension(chart.FileName),
+                        BPM = chart.Bpm,
+                        Length = chart.Duration,
+                        Hash = chart.Md5Hash,
+                        MD5Hash = chart.Md5Hash,
+                        TotalObjectCount = chart.TotalNotes,
+                        EndTimeObjectCount = chart.TotalNotes,
+                        BeatmapSet = beatmapSet,
+                        Difficulty =
+                        {
+                            CircleSize = chart.KeyCount,
+                            OverallDifficulty = mapRankToOD(chart.Rank),
+                            DrainRate = 7
+                        }
+                    };
+
+                    beatmapSet.Beatmaps.Add(beatmapInfo);
+
+                    beatmapSourceMap[beatmapInfo.ID] = new BMSSourceReference
+                    {
+                        BeatmapId = beatmapInfo.ID,
+                        FolderPath = chart.FolderPath,
+                        ChartPath = chartPath,
+                        Md5Hash = chart.Md5Hash,
+                    };
+                }
+
+                result.Add(beatmapSet);
+            }
+
+            return result;
+        }
+
+        public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference sourceReference)
+            => beatmapSourceMap.TryGetValue(beatmapId, out sourceReference!);
+
+        private static float mapRankToOD(int bmsRank)
+            => bmsRank switch
+            {
+                0 => 9f,
+                1 => 8f,
+                2 => 7f,
+                3 => 5f,
+                _ => 7f
+            };
+
+        private static string buildTags(BMSChartCache chart)
+        {
+            List<string> tags = new List<string> { "bms", $"key{Math.Max(1, chart.KeyCount)}" };
+
+            if (chart.HasScratch) tags.Add("scratch");
+            if (chart.HasLongNotes) tags.Add("ln");
+            if (chart.HasStopSequence) tags.Add("stop");
+            if (chart.HasScrollChanges) tags.Add("scroll");
+            if (chart.HasBgaLayer) tags.Add("bga");
+
+            return string.Join(' ', tags);
+        }
+
+        private static Guid createDeterministicGuid(string input)
+        {
+            byte[] bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
+            return new Guid(bytes);
+        }
+
+        private static bool isNoteChannel(string channel)
         {
             // 1P visible: 11-19, 2P visible: 21-29
             // 1P LN: 51-59, 2P LN: 61-69
@@ -282,12 +391,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return false;
         }
 
-        private static bool IsScratchChannel(string channel)
+        private static bool isScratchChannel(string channel)
         {
             return channel == "16" || channel == "26" || channel == "56" || channel == "66";
         }
 
-        private static bool IsLongNoteChannel(string channel)
+        private static bool isLongNoteChannel(string channel)
         {
             if (channel.Length != 2) return false;
 
@@ -312,15 +421,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return result;
         }
 
-        private static bool IsBackgroundSoundChannel(string channel)
+        private static bool isBackgroundSoundChannel(string channel)
         {
-            if (IsNoteChannel(channel))
+            if (isNoteChannel(channel))
                 return false;
 
             return channel is not "02" and not "03" and not "04" and not "06" and not "07" and not "08" and not "09";
         }
 
-        private static int CountNotes(string data)
+        private static int countNotes(string data)
         {
             // Each note is 2 characters, "00" means no note
             int count = 0;
@@ -334,7 +443,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return count;
         }
 
-        private static (string Key, double Position)? FindFirstObjectKey(string data)
+        private static (string Key, double Position)? findFirstObjectKey(string data)
         {
             int objectCount = data.Length / 2;
 
@@ -372,7 +481,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return noteChannels.Count(c => c[0] is '1' or '5' && c[1] is not '6' and not '7');
         }
 
-        private static string[] ReadBmsLines(string filePath)
+        private static string[] readBmsLines(string filePath)
         {
             // Try different encodings
             try
@@ -395,7 +504,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
 
-        private static string ComputeMd5Hash(string filePath)
+        private static string computeMd5Hash(string filePath)
         {
             using var md5 = MD5.Create();
             using var stream = File.OpenRead(filePath);
@@ -403,7 +512,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
 
-        private static string? FindImageFile(string folderPath, params string[] patterns)
+        private static string? findImageFile(string folderPath, params string[] patterns)
         {
             string[] imageExtensions = new[] { ".png", ".jpg", ".jpeg", ".bmp" };
 
@@ -462,8 +571,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
 
             // Look for banner/stagefile
-            songCache.BannerPath = FindImageFile(folderPath, "banner", "bn");
-            songCache.StageFilePath = FindImageFile(folderPath, "stagefile", "stage", "bg");
+            songCache.BannerPath = findImageFile(folderPath, "banner", "bn");
+            songCache.StageFilePath = findImageFile(folderPath, "stagefile", "stage", "bg");
 
             return songCache;
         }
@@ -486,11 +595,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     FolderPath = fileInfo.DirectoryName ?? string.Empty,
                     FileSize = fileInfo.Length,
                     LastModified = fileInfo.LastWriteTime,
-                    Md5Hash = ComputeMd5Hash(filePath)
+                    Md5Hash = computeMd5Hash(filePath)
                 };
 
                 // Parse the BMS file for metadata
-                string[] lines = ReadBmsLines(filePath);
+                string[] lines = readBmsLines(filePath);
                 var keysoundFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var wavDefinitions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var noteChannels = new HashSet<string>();
@@ -617,22 +726,22 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         string channelStr = line.Substring(4, 2);
 
                         // Note channels
-                        if (IsNoteChannel(channelStr))
+                        if (isNoteChannel(channelStr))
                         {
                             noteChannels.Add(channelStr);
                             string data = line.Substring(7);
-                            int notesInChannel = CountNotes(data);
+                            int notesInChannel = countNotes(data);
                             noteCount += notesInChannel;
 
-                            if (IsScratchChannel(channelStr))
+                            if (isScratchChannel(channelStr))
                                 hasScratch = true;
 
-                            if (IsLongNoteChannel(channelStr))
+                            if (isLongNoteChannel(channelStr))
                                 hasLongNotes = true;
                         }
-                        else if (IsBackgroundSoundChannel(channelStr))
+                        else if (isBackgroundSoundChannel(channelStr))
                         {
-                            var firstObject = FindFirstObjectKey(line.Substring(7));
+                            var firstObject = findFirstObjectKey(line.Substring(7));
 
                             if (firstObject.HasValue
                                 && wavDefinitions.TryGetValue(firstObject.Value.Key, out string? audioFile)
@@ -676,5 +785,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 return cache;
             }, token);
         }
+    }
+
+    public struct BMSSourceReference
+    {
+        public Guid BeatmapId { get; set; }
+        public string FolderPath { get; set; }
+        public string ChartPath { get; set; }
+        public string Md5Hash { get; set; }
     }
 }
