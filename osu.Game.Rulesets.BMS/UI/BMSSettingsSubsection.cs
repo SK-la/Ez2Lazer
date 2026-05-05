@@ -16,6 +16,7 @@ using osu.Framework.Screens;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Database;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
@@ -52,6 +53,9 @@ namespace osu.Game.Rulesets.BMS.UI
 
         [Resolved]
         private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
 
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
@@ -272,6 +276,8 @@ namespace osu.Game.Rulesets.BMS.UI
                         // 确保进度条达到 100%
                         notification.Progress = 1.0f;
                         notification.State = ProgressNotificationState.Completed;
+
+                        BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
 
                         if (beatmapManager.LibraryCache != null)
                         {

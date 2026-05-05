@@ -294,4 +294,43 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
         }
     }
+
+    /// <summary>
+    /// Persistent external-link mapping from virtual beatmap identities to BMS source files.
+    /// </summary>
+    [Serializable]
+    public class BMSExternalLinkIndex
+    {
+        public int Version { get; set; } = 1;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public List<BMSSourceReference> Sources { get; set; } = new();
+
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        };
+
+        public void Save(string filePath)
+        {
+            string json = JsonSerializer.Serialize(this, JsonOptions);
+            File.WriteAllText(filePath, json);
+        }
+
+        public static BMSExternalLinkIndex? Load(string filePath)
+        {
+            if (!File.Exists(filePath))
+                return null;
+
+            try
+            {
+                string json = File.ReadAllText(filePath);
+                return JsonSerializer.Deserialize<BMSExternalLinkIndex>(json, JsonOptions);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    }
 }
