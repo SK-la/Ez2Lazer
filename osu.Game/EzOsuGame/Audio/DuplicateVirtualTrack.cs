@@ -68,6 +68,8 @@ namespace osu.Game.EzOsuGame.Audio
         private int lastResolvedLoopIndex = -1;
         private double lastDriftCorrectionGameplayTime = double.NegativeInfinity;
         private readonly List<LoopScheduleEntry> loopSchedule = new List<LoopScheduleEntry>();
+        private bool nextLoopPrimedInBreak;
+        private int primedLoopIndex = -1;
 
         private readonly struct LoopScheduleEntry
         {
@@ -315,6 +317,8 @@ namespace osu.Game.EzOsuGame.Audio
                 loopSyncBaseGameplayTime = gameplayClock.CurrentTime;
                 lastResolvedLoopIndex = -1;
                 currentlyInBreakWindow = false;
+                nextLoopPrimedInBreak = false;
+                primedLoopIndex = -1;
                 synchroniseTrackToGameplayTimeline(forceSeek: true);
             };
 
@@ -509,6 +513,8 @@ namespace osu.Game.EzOsuGame.Audio
             currentlyInBreakWindow = false;
             lastResolvedLoopIndex = -1;
             lastDriftCorrectionGameplayTime = double.NegativeInfinity;
+            nextLoopPrimedInBreak = false;
+            primedLoopIndex = -1;
             loopSchedule.Clear();
 
             // (已在停止前尝试恢复底层 track.Looping 与移除候选静音调整)
@@ -571,6 +577,8 @@ namespace osu.Game.EzOsuGame.Audio
                 currentlyInBreakWindow = false;
                 lastResolvedLoopIndex = -1;
                 lastDriftCorrectionGameplayTime = double.NegativeInfinity;
+                nextLoopPrimedInBreak = false;
+                primedLoopIndex = -1;
             }
         }
 
@@ -705,6 +713,21 @@ namespace osu.Game.EzOsuGame.Audio
                 {
                     activeCandidateTrack.Stop();
                     currentlyInBreakWindow = true;
+
+                    int nextIndex = activeEntry.Index + 1;
+
+                    if (nextIndex >= 0 && nextIndex < loopSchedule.Count)
+                    {
+                        var nextEntry = loopSchedule[nextIndex];
+                        activeCandidateTrack.Seek(nextEntry.AudioStart);
+                        nextLoopPrimedInBreak = true;
+                        primedLoopIndex = nextEntry.Index;
+                    }
+                    else
+                    {
+                        nextLoopPrimedInBreak = false;
+                        primedLoopIndex = -1;
+                    }
                 }
 
                 return;
@@ -716,9 +739,12 @@ namespace osu.Game.EzOsuGame.Audio
             bool leavingBreak = currentlyInBreakWindow;
 
             // 只在边界事件（新循环 / 休息段结束）执行硬同步，避免每帧 seek 导致音频撕裂。
+            bool canUsePrimedStart = leavingBreak && nextLoopPrimedInBreak && primedLoopIndex == activeEntry.Index;
+
             if (forceSeek || loopChanged || leavingBreak)
             {
-                activeCandidateTrack.Seek(desiredTrackTime);
+                if (!canUsePrimedStart || forceSeek)
+                    activeCandidateTrack.Seek(desiredTrackTime);
                 activeCandidateTrack.Start();
             }
             else
@@ -736,6 +762,8 @@ namespace osu.Game.EzOsuGame.Audio
             }
 
             currentlyInBreakWindow = false;
+            nextLoopPrimedInBreak = false;
+            primedLoopIndex = -1;
             lastResolvedLoopIndex = activeEntry.Index;
         }
     }
