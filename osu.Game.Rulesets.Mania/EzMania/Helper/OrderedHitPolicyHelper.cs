@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Scoring;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
@@ -51,6 +50,27 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         /// <summary>
+        /// <see cref="EzEnumJudgePrecedence.Combo"/> 的固定比较定义。
+        /// 当前候选在连击最低可保持窗口晚界内，且上一候选已经越过该窗口早界时返回 true。
+        /// </summary>
+        internal static bool CompareComboByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime, ManiaHitWindows windows)
+        {
+            double comboEarly = windows.WindowFor(HitResult.Good, true);
+            double comboLate = windows.WindowFor(HitResult.Good, false);
+            return CompareComboByPrecedence(t1NoteTime, t2NoteTime, pressTime, comboEarly, comboLate);
+        }
+
+        internal static bool CompareComboByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime, double comboEarly, double comboLate)
+            => t1NoteTime < pressTime - comboEarly && t2NoteTime <= pressTime + comboLate;
+
+        /// <summary>
+        /// <see cref="EzEnumJudgePrecedence.Duration"/> 的固定比较定义。
+        /// 当前候选更接近输入时间时返回 true。
+        /// </summary>
+        internal static bool CompareDurationByPrecedence(double t1NoteTime, double t2NoteTime, double pressTime)
+            => Math.Abs(t1NoteTime - pressTime) > Math.Abs(t2NoteTime - pressTime);
+
+        /// <summary>
         /// 获取所有判定窗口与给定时间重叠的活跃击打对象。
         /// </summary>
         /// <param name="time">检查重叠对象的时间点。</param>
@@ -68,7 +88,6 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                     continue;
 
                 double startTime = obj.HitObject.StartTime;
-                double endTime = obj.HitObject.GetEndTime();
                 double earlyWindow = hitWindow.WindowFor(HitResult.Miss);
                 double lateWindow = hitWindow.WindowFor(HitResult.Miss);
 
@@ -79,7 +98,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 }
 
                 // 检查时间是否落在此对象的判定窗口内
-                if (time >= startTime - earlyWindow && time <= endTime + lateWindow)
+                if (time >= startTime - earlyWindow && time <= startTime + lateWindow)
                 {
                     yield return obj;
                 }
@@ -87,8 +106,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         }
 
         /// <summary>
-        /// 根据优先级策略选择可击中的对象。
-        /// 实现 beatoraja 的 JudgeAlgorithm 逻辑来处理 note lock 场景。
+        /// 根据优先级策略选择当前输入应命中的对象。
+        /// BMS 模式走折叠比较；其它模式走通用优先级。
         /// </summary>
         /// <param name="candidates">候选击打对象列表。</param>
         /// <param name="time">当前时间（按键时间）。</param>
@@ -104,94 +123,163 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             if (candidateList.Count == 1)
                 return candidateList[0];
 
-            // 按开始时间排序（最早的在前）以模拟 t1、t2 比较
-            var sortedCandidates = candidateList.OrderBy(obj => obj.HitObject.StartTime).ToList();
-
-            // 从第一个候选作为选中对象开始
-            DrawableHitObject selected = sortedCandidates[0];
-
-            // 将每个后续候选与当前选择进行比较
-            for (int i = 1; i < sortedCandidates.Count; i++)
+            // 全量候选统一决策，避免“链式替换”带来的顺序偏差。
+            switch (precedence)
             {
-                DrawableHitObject candidate = sortedCandidates[i];
+                case EzEnumJudgePrecedence.Duration:
+                    if (isBMS())
+                    {
+                        var orderedD = candidateList.OrderBy(c => c.HitObject.StartTime).ToList();
+                        var pickedD = SelectFoldDrawable(orderedD, time, comboAlgorithm: false);
+                        return pickedD ?? orderedD[0];
+                    }
 
-                bool shouldReplace;
+                    return candidateList
+                           .OrderBy(c => Math.Abs(c.HitObject.StartTime - time))
+                           .ThenBy(c => c.HitObject.StartTime)
+                           .First();
 
-                switch (precedence)
+                case EzEnumJudgePrecedence.Combo:
+                    if (isBMS())
+                    {
+                        var orderedC = candidateList.OrderBy(c => c.HitObject.StartTime).ToList();
+                        var pickedC = SelectFoldDrawable(orderedC, time, comboAlgorithm: true);
+                        return pickedC ?? orderedC[0];
+                    }
+
+                    var orderedCombo = candidateList.OrderBy(c => c.HitObject.StartTime).ToList();
+                    var selectedCombo = orderedCombo[0];
+
+                    for (int i = 1; i < orderedCombo.Count; i++)
+                    {
+                        var candidate = orderedCombo[i];
+                        if (compareComboByPrecedence(selectedCombo, candidate, time))
+                            selectedCombo = candidate;
+                    }
+
+                    return selectedCombo;
+
+                case EzEnumJudgePrecedence.Earliest:
+                default:
+                    return candidateList.OrderBy(c => c.HitObject.StartTime).First();
+            }
+        }
+
+        private bool isBMS()
+        {
+            var mode = ezConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
+            return HitModeHelper.IsBMSHitMode(mode);
+        }
+
+        internal static DrawableHitObject? SelectFoldDrawable(IReadOnlyList<DrawableHitObject> sortedByStartTime, double pressTime, bool comboAlgorithm)
+        {
+            return SelectFold(
+                sortedByStartTime,
+                d => d.Judged,
+                d => d.HitObject.StartTime,
+                d => d.HitObject.HitWindows as ManiaHitWindows,
+                pressTime,
+                comboAlgorithm);
+        }
+
+        internal static T? SelectFold<T>(
+            IReadOnlyList<T> sortedCandidates,
+            Func<T, bool> isJudged,
+            Func<T, double> noteTime,
+            Func<T, ManiaHitWindows?> windows,
+            double pressTime,
+            bool comboAlgorithm) where T : class
+        {
+            T? tNote = null;
+
+            foreach (var judgeNote in sortedCandidates)
+            {
+                if (isJudged(judgeNote))
+                    continue;
+
+                var w = windows(judgeNote);
+                if (w == null)
+                    continue;
+
+                double t2 = noteTime(judgeNote);
+                bool enterOuter = tNote == null
+                                  || isJudged(tNote)
+                                  || (comboAlgorithm
+                                      ? CompareComboByPrecedence(noteTime(tNote), t2, pressTime, w)
+                                      : CompareDurationByPrecedence(noteTime(tNote), t2, pressTime));
+
+                if (!enterOuter)
+                    continue;
+
+                double offset = pressTime - t2;
+                int newRank = JudgementRankForRouting(w.ResultFor(offset));
+
+                if (newRank == int.MaxValue)
                 {
-                    case EzEnumJudgePrecedence.Combo:
-                        // Combo 算法：如果选中对象超出 GOOD 窗口但候选在窗口内，则优先选择候选
-                        shouldReplace = compareCombo(selected, candidate, time);
-                        break;
-
-                    case EzEnumJudgePrecedence.Duration:
-                        // Duration 算法：如果候选离按键时间更近，则优先选择
-                        shouldReplace = compareDuration(selected, candidate, time);
-                        break;
-
-                    case EzEnumJudgePrecedence.Earliest:
-                        shouldReplace = false;
-                        break;
-
-                    default:
-                        shouldReplace = false;
-                        break;
+                    tNote = null;
+                    continue;
                 }
 
-                if (shouldReplace)
+                if (tNote == null)
                 {
-                    selected = candidate;
+                    tNote = judgeNote;
+                    continue;
                 }
+
+                var tw = windows(tNote);
+
+                if (tw == null)
+                {
+                    tNote = judgeNote;
+                    continue;
+                }
+
+                double t1 = noteTime(tNote);
+                int oldRank = JudgementRankForRouting(tw.ResultFor(pressTime - t1));
+
+                if (oldRank == int.MaxValue)
+                {
+                    tNote = judgeNote;
+                    continue;
+                }
+
+                if (newRank < oldRank || (newRank == oldRank && Math.Abs(t2 - pressTime) < Math.Abs(t1 - pressTime)))
+                    tNote = judgeNote;
             }
 
-            return selected;
+            return tNote;
         }
 
-        /// <summary>
-        /// Combo 算法比较（beatoraja 风格）。
-        /// 如果 t2 应该替换 t1 则返回 true。
-        /// 逻辑：t1 超出 GOOD 窗口（太晚），但 t2 仍在 GOOD 窗口内。
-        /// </summary>
-        private bool compareCombo(DrawableHitObject t1, DrawableHitObject t2, double ptime)
+        internal static int JudgementRankForRouting(HitResult result)
         {
-            var t1Windows = t1.HitObject.HitWindows;
-            var t2Windows = t2.HitObject.HitWindows;
-            if (t1Windows == null || t2Windows == null)
+            if (result == HitResult.None)
+                return int.MaxValue;
+
+            int i = result.GetIndexForOrderedDisplay();
+            return i < 0 ? int.MaxValue : i;
+        }
+
+        private static bool compareComboByPrecedence(DrawableHitObject t1, DrawableHitObject t2, double pressTime)
+        {
+            var windows = t2.HitObject.HitWindows;
+            if (windows == null)
                 return false;
 
-            double t1GoodLate = t1Windows.WindowFor(HitResult.Good);
-            double t2GoodEarly = t2Windows.WindowFor(HitResult.Good);
+            double comboEarly = windows.WindowFor(HitResult.Good);
+            double comboLate = windows.WindowFor(HitResult.Good);
 
-            if (t1Windows is ManiaHitWindows t1ManiaWindows)
-                t1GoodLate = t1ManiaWindows.WindowFor(HitResult.Good, false);
+            if (windows is ManiaHitWindows maniaWindows)
+            {
+                comboEarly = maniaWindows.WindowFor(HitResult.Good, true);
+                comboLate = maniaWindows.WindowFor(HitResult.Good, false);
+            }
 
-            if (t2Windows is ManiaHitWindows t2ManiaWindows)
-                t2GoodEarly = t2ManiaWindows.WindowFor(HitResult.Good, true);
-
-            // 对齐 beatoraja:
-            // t1.getMicroTime() < ptime + judgetable[2][0] (GOOD 的 late 下界，通常为负值)
-            // 等价于：t1Start < ptime - goodLate
-            bool t1BeyondGoodLate = t1.HitObject.StartTime < ptime - t1GoodLate;
-
-            // t2.getMicroTime() <= ptime + judgetable[2][1] (GOOD 的 early 上界)
-            bool t2WithinGoodEarly = t2.HitObject.StartTime <= ptime + t2GoodEarly;
-
-            // 如果 t1 已经晚过 GOOD，而 t2 仍在 GOOD 的 early 窗内，则切到 t2。
-            return t1BeyondGoodLate && t2WithinGoodEarly;
-        }
-
-        /// <summary>
-        /// Duration 算法比较（beatoraja 风格）。
-        /// 如果 t2 应该替换 t1 则返回 true。
-        /// 逻辑：|t1.time - ptime| > |t2.time - ptime|（t2 离按键时间更近）
-        /// </summary>
-        private bool compareDuration(DrawableHitObject t1, DrawableHitObject t2, double ptime)
-        {
-            double timeDiff1 = Math.Abs(t1.HitObject.StartTime - ptime);
-            double timeDiff2 = Math.Abs(t2.HitObject.StartTime - ptime);
-
-            // 如果 t2 比 t1 离按键时间更近，则替换
-            return timeDiff1 > timeDiff2;
+            return CompareComboByPrecedence(
+                t1.HitObject.StartTime,
+                t2.HitObject.StartTime,
+                pressTime,
+                comboEarly,
+                comboLate);
         }
     }
 }

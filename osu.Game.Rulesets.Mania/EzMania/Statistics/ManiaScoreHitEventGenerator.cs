@@ -10,6 +10,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Statistics;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Replays;
@@ -472,6 +473,29 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 return null;
 
             candidates.Sort((a, b) => a.Target.StartTime.CompareTo(b.Target.StartTime));
+
+            if (HitModeHelper.IsBMSHitMode(modeUnit.HitMode))
+            {
+                return modeUnit.JudgePrecedence switch
+                {
+                    EzEnumJudgePrecedence.Combo => OrderedHitPolicyHelper.SelectFold(
+                        candidates,
+                        s => s.Judged,
+                        s => s.Target.StartTime,
+                        s => s.Target.HitWindows as ManiaHitWindows,
+                        inputTime,
+                        comboAlgorithm: true),
+                    EzEnumJudgePrecedence.Duration => OrderedHitPolicyHelper.SelectFold(
+                        candidates,
+                        s => s.Judged,
+                        s => s.Target.StartTime,
+                        s => s.Target.HitWindows as ManiaHitWindows,
+                        inputTime,
+                        comboAlgorithm: false),
+                    _ => candidates[0]
+                } ?? candidates[0];
+            }
+
             TargetState selected = candidates[0];
 
             for (int i = 1; i < candidates.Count; i++)
@@ -480,7 +504,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 bool shouldReplace = modeUnit.JudgePrecedence switch
                 {
                     EzEnumJudgePrecedence.Combo => compareCombo(selected, candidate, playableBeatmap, inputTime, hitWindowHelper),
-                    EzEnumJudgePrecedence.Duration => Math.Abs(selected.Target.GetEndTime() - inputTime) > Math.Abs(candidate.Target.GetEndTime() - inputTime),
+                    EzEnumJudgePrecedence.Duration => OrderedHitPolicyHelper.CompareDurationByPrecedence(
+                        selected.Target.StartTime,
+                        candidate.Target.StartTime,
+                        inputTime),
                     _ => false
                 };
 
@@ -492,18 +519,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         }
 
         /// <summary>
-        /// Combo 优先级：当前选中的 note 已偏早越过 Good 早界，且候选仍在 Good 晚界内时，把路由让给候选（与具体 BMS 引擎无关的通用启发式）。
+        /// Combo 优先级：当前选中的 note 已偏早越过连击最低可保持窗口早界，且候选仍在晚界内时，把路由让给候选。
         /// </summary>
         private static bool compareCombo(TargetState t1, TargetState t2, IBeatmap playableBeatmap, double inputTime, HitModeHelper hitWindowHelper)
         {
             hitWindowHelper.BPM = getBpmAtTime(playableBeatmap, inputTime);
-            double goodEarly = getDirectionalWindow(hitWindowHelper, HitResult.Good, true);
-            double goodLate = getDirectionalWindow(hitWindowHelper, HitResult.Good, false);
+            double comboEarly = getDirectionalWindow(hitWindowHelper, HitResult.Good, true);
+            double comboLate = getDirectionalWindow(hitWindowHelper, HitResult.Good, false);
 
-            double t1Time = t1.Target.GetEndTime();
-            double t2Time = t2.Target.GetEndTime();
-
-            return t1Time < inputTime - goodEarly && t2Time <= inputTime + goodLate;
+            return OrderedHitPolicyHelper.CompareComboByPrecedence(
+                t1.Target.StartTime,
+                t2.Target.StartTime,
+                inputTime,
+                comboEarly,
+                comboLate);
         }
 
         private static double getDirectionalWindow(HitModeHelper hitWindowHelper, HitResult result, bool isEarly)
