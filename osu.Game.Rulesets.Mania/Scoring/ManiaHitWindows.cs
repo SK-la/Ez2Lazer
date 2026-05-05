@@ -154,12 +154,12 @@ namespace osu.Game.Rulesets.Mania.Scoring
         /// </summary>
         public EzEnumHitMode ActiveHitMode { get; private set; }
 
-        private readonly HitModeHelper helper;
+        private readonly HitModeHelper helper = new HitModeHelper();
 
         public ManiaHitWindows(EzEnumHitMode? hitModeOverride = null)
         {
             ActiveHitMode = hitModeOverride ?? GlobalConfigStore.EzConfig.Get<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
-            helper = new HitModeHelper(ActiveHitMode);
+            helper.HitMode = ActiveHitMode;
             updateWindows();
         }
 
@@ -287,6 +287,7 @@ namespace osu.Game.Rulesets.Mania.Scoring
                     HitResult.Ok => mo.Ok,
                     HitResult.Meh => mo.Meh,
                     HitResult.Miss => mo.Miss,
+                    HitResult.Poor => helper.WindowFor(HitResult.Poor),
                     _ => throw new ArgumentOutOfRangeException(nameof(result), result, null)
                 };
             }
@@ -310,6 +311,9 @@ namespace osu.Game.Rulesets.Mania.Scoring
 
                 case HitResult.Miss:
                     return miss;
+
+                case HitResult.Poor:
+                    return helper.WindowFor(HitResult.Poor);
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(result), result, null);

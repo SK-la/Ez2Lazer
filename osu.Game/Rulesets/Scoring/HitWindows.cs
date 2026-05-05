@@ -54,6 +54,10 @@ namespace osu.Game.Rulesets.Scoring
         /// </summary>
         public IEnumerable<(HitResult result, double length)> GetAllAvailableWindows()
         {
+            // 补充显示区间
+            if (IsHitResultAllowed(HitResult.Poor))
+                yield return (HitResult.Poor, WindowFor(HitResult.Poor));
+
             for (var result = HitResult.Miss; result <= HitResult.Perfect; ++result)
             {
                 if (IsHitResultAllowed(result))
