@@ -52,6 +52,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public BMSLibraryCache? LibraryCache { get; private set; }
 
         private const string cache_filename = "bms_library_cache.json";
+        private const string source_map_filename = "bms_source_map.json";
 
         /// <summary>
         ///     Supported BMS file extensions.
@@ -66,6 +67,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         ///     Get the cache file path.
         /// </summary>
         private string cacheFilePath => Path.Combine(cacheDirectory, cache_filename);
+        private string sourceMapFilePath => Path.Combine(cacheDirectory, source_map_filename);
 
         private CancellationTokenSource? scanCts;
 
@@ -96,6 +98,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public void LoadCache()
         {
             LibraryCache = BMSLibraryCache.Load(cacheFilePath);
+            loadSourceMap();
 
             if (LibraryCache != null)
             {
@@ -117,6 +120,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public void SaveCache()
         {
             LibraryCache?.Save(cacheFilePath);
+            saveSourceMap();
         }
 
         /// <summary>
@@ -339,11 +343,88 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 result.Add(beatmapSet);
             }
 
+            saveSourceMap();
             return result;
         }
 
         public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference sourceReference)
-            => beatmapSourceMap.TryGetValue(beatmapId, out sourceReference!);
+        {
+            if (beatmapSourceMap.TryGetValue(beatmapId, out sourceReference!))
+                return true;
+
+            loadSourceMap();
+            return beatmapSourceMap.TryGetValue(beatmapId, out sourceReference!);
+        }
+
+        public bool TryGetSourceReferenceByHash(string md5Hash, out BMSSourceReference sourceReference)
+        {
+            foreach (BMSSourceReference reference in beatmapSourceMap.Values)
+            {
+                if (string.Equals(reference.Md5Hash, md5Hash, StringComparison.OrdinalIgnoreCase))
+                {
+                    sourceReference = reference;
+                    return true;
+                }
+            }
+
+            loadSourceMap();
+
+            foreach (BMSSourceReference reference in beatmapSourceMap.Values)
+            {
+                if (string.Equals(reference.Md5Hash, md5Hash, StringComparison.OrdinalIgnoreCase))
+                {
+                    sourceReference = reference;
+                    return true;
+                }
+            }
+
+            sourceReference = default;
+            return false;
+        }
+
+        public Dictionary<Guid, BMSSourceReference> GetCurrentSourceMap()
+            => new Dictionary<Guid, BMSSourceReference>(beatmapSourceMap);
+
+        private void saveSourceMap()
+        {
+            try
+            {
+                var index = new BMSExternalLinkIndex
+                {
+                    UpdatedAt = DateTime.UtcNow,
+                    Sources = beatmapSourceMap.Values.OrderBy(reference => reference.BeatmapId).ToList(),
+                };
+
+                index.Save(sourceMapFilePath);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to save BMS external source map");
+            }
+        }
+
+        private void loadSourceMap()
+        {
+            try
+            {
+                var index = BMSExternalLinkIndex.Load(sourceMapFilePath);
+
+                if (index == null)
+                    return;
+
+                beatmapSourceMap.Clear();
+
+                foreach (BMSSourceReference reference in index.Sources)
+                {
+                    if (reference.BeatmapId != Guid.Empty && !string.IsNullOrWhiteSpace(reference.ChartPath))
+                        beatmapSourceMap[reference.BeatmapId] = reference;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to load BMS external source map");
+            }
+        }
 
         private static float mapRankToOD(int bmsRank)
             => bmsRank switch

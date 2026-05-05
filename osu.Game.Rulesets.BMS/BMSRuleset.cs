@@ -27,6 +27,11 @@ namespace osu.Game.Rulesets.BMS
 {
     public class BMSRuleset : Ruleset
     {
+        static BMSRuleset()
+        {
+            BMSBeatmapDecoder.Register();
+        }
+
         public override string Description => "BMS - Be-Music Source";
 
         public override string ShortName => "bms";

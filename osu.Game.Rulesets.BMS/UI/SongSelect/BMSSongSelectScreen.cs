@@ -18,6 +18,8 @@ using osu.Framework.Input.Events;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
+using osu.Game.Beatmaps;
+using osu.Game.Database;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -69,6 +71,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         private readonly Bindable<BMSSongCache?> selectedSong = new Bindable<BMSSongCache?>();
         private readonly Bindable<BMSChartCache?> selectedChart = new Bindable<BMSChartCache?>();
+        private readonly Dictionary<string, BeatmapInfo> virtualBeatmapByHash = new Dictionary<string, BeatmapInfo>(StringComparer.OrdinalIgnoreCase);
+        private BeatmapInfo? selectedVirtualBeatmap;
         private Bindable<string> libraryPathsBindable = null!;
         private Bindable<string> legacyRootPathBindable = null!;
 
@@ -80,6 +84,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         [Resolved]
         private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
         private INotificationOverlay? notifications { get; set; }
@@ -287,7 +294,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             // Bind events
             searchBox.Current.BindValueChanged(e => filterSongs(e.NewValue));
-            selectedChart.BindValueChanged(e => updatePreviewTrack(e.NewValue), true);
+            selectedChart.BindValueChanged(e =>
+            {
+                selectedVirtualBeatmap = e.NewValue != null && virtualBeatmapByHash.TryGetValue(e.NewValue.Md5Hash, out BeatmapInfo? beatmapInfo)
+                    ? beatmapInfo
+                    : null;
+                updatePreviewTrack(e.NewValue);
+            }, true);
 
             // Load songs
             refreshSongList();
@@ -366,6 +379,8 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             syncConfiguredPaths();
             songList.Clear();
+            rebuildVirtualCatalog();
+            BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
 
             if (beatmapManager.LibraryCache == null || beatmapManager.LibraryCache.Songs.Count == 0)
             {
@@ -424,6 +439,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             else
             {
                 selectedChart.Value = null;
+                selectedVirtualBeatmap = null;
             }
 
             // Update song card selection state
@@ -461,6 +477,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 {
                     loadingSpinner.Hide();
                     notification.State = ProgressNotificationState.Completed;
+                    BMSOsuLibrarySynchronizer.Synchronize(beatmapManager, storage, realm, new BMSRuleset().RulesetInfo);
                     refreshSongList();
                 });
             });
@@ -480,11 +497,15 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             try
             {
-                var workingBeatmap = new BMSWorkingBeatmap(
-                    selectedChart.Value.FullPath,
-                    audioManager,
-                    textures,
-                    selectedChart.Value);
+                BMSChartCache chart = selectedChart.Value;
+                string chartPath = chart.FullPath;
+
+                if (selectedVirtualBeatmap != null && beatmapManager.TryGetSourceReference(selectedVirtualBeatmap.ID, out BMSSourceReference sourceReference))
+                    chartPath = sourceReference.ChartPath;
+                else if (beatmapManager.TryGetSourceReferenceByHash(chart.Md5Hash, out BMSSourceReference sourceByHash))
+                    chartPath = sourceByHash.ChartPath;
+
+                var workingBeatmap = new BMSWorkingBeatmap(chartPath, audioManager, textures, chart);
 
                 // Push to player
                 this.Push(new BMSPlayerLoader(workingBeatmap));
@@ -497,6 +518,23 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                     Text = $"加载谱面失败: {ex.Message}",
                     Icon = FontAwesome.Solid.ExclamationTriangle,
                 });
+            }
+        }
+
+        private void rebuildVirtualCatalog()
+        {
+            virtualBeatmapByHash.Clear();
+
+            var rulesetInfo = new BMSRuleset().RulesetInfo;
+            var virtualSets = beatmapManager.BuildVirtualBeatmapCatalog(rulesetInfo);
+
+            foreach (BeatmapSetInfo set in virtualSets)
+            {
+                foreach (BeatmapInfo beatmap in set.Beatmaps)
+                {
+                    if (!string.IsNullOrWhiteSpace(beatmap.MD5Hash))
+                        virtualBeatmapByHash[beatmap.MD5Hash] = beatmap;
+                }
             }
         }
 
