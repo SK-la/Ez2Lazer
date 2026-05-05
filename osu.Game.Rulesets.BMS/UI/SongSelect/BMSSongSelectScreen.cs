@@ -7,13 +7,13 @@ using System.IO;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
+using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.IO.Stores;
 using osu.Framework.Input.Events;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -28,12 +28,9 @@ using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
-using osu.Game.Rulesets.Configuration;
 using osu.Game.Screens;
-using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
 using osuTK;
-using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
@@ -68,6 +65,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private SearchTextBox searchBox = null!;
         private EzPreviewTrackManager previewManager = null!;
         private BMSWorkingBeatmap? previewBeatmap;
+        private Track? fallbackPreviewTrack;
 
         private readonly Bindable<BMSSongCache?> selectedSong = new Bindable<BMSSongCache?>();
         private readonly Bindable<BMSChartCache?> selectedChart = new Bindable<BMSChartCache?>();
@@ -317,6 +315,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private void updatePreviewTrack(BMSChartCache? chart)
         {
             previewManager.StopPreview();
+            stopFallbackPreviewTrack();
             previewBeatmap = null;
 
             if (chart == null)
@@ -327,12 +326,40 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 previewBeatmap = new BMSWorkingBeatmap(chart.FullPath, audioManager, textures, chart);
                 previewBeatmap.LoadTrack();
                 previewManager.OverridePreviewStartTime = chart.PreviewTime >= 0 ? chart.PreviewTime : 0;
-                previewManager.StartPreview(previewBeatmap, true);
+                bool enhancedStarted = previewManager.StartPreview(previewBeatmap, true);
+
+                if (!enhancedStarted)
+                    startFallbackPreviewTrack(previewBeatmap, chart);
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to start BMS enhanced preview");
             }
+        }
+
+        private void startFallbackPreviewTrack(BMSWorkingBeatmap beatmap, BMSChartCache chart)
+        {
+            fallbackPreviewTrack = beatmap.Track;
+
+            if (fallbackPreviewTrack == null)
+                return;
+
+            beatmap.PrepareTrackForPreview(true);
+
+            double startTime = chart.PreviewTime >= 0 ? chart.PreviewTime : 0;
+            fallbackPreviewTrack.Seek(startTime);
+            fallbackPreviewTrack.RestartPoint = startTime;
+            fallbackPreviewTrack.Looping = true;
+            fallbackPreviewTrack.Start();
+        }
+
+        private void stopFallbackPreviewTrack()
+        {
+            if (fallbackPreviewTrack == null)
+                return;
+
+            fallbackPreviewTrack.Stop();
+            fallbackPreviewTrack = null;
         }
 
         private void refreshSongList()
@@ -483,6 +510,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         public override bool OnExiting(ScreenExitEvent e)
         {
             previewManager.StopPreview();
+            stopFallbackPreviewTrack();
             previewBeatmap = null;
             this.FadeOut(200);
             return base.OnExiting(e);
@@ -733,10 +761,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             if (song.Charts.Count == 0)
                 return "暂无难度";
 
-            return $"{song.Charts.Count} 难度 | {GetLevelRangeText(song.Charts)} | {GetModeSummaryText(song.Charts)}";
+            return $"{song.Charts.Count} 难度 | {getLevelRangeText(song.Charts)} | {getModeSummaryText(song.Charts)}";
         }
 
-        private static string GetLevelRangeText(IEnumerable<BMSChartCache> charts)
+        private static string getLevelRangeText(IEnumerable<BMSChartCache> charts)
         {
             List<int> levels = charts.Select(chart => chart.PlayLevel).Where(level => level > 0).OrderBy(level => level).ToList();
 
@@ -746,7 +774,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             return levels[0] == levels[^1] ? $"Lv {levels[0]}" : $"Lv {levels[0]}-{levels[^1]}";
         }
 
-        private static string GetModeSummaryText(IEnumerable<BMSChartCache> charts)
+        private static string getModeSummaryText(IEnumerable<BMSChartCache> charts)
             => string.Join("/", charts.Select(GetModeText).Distinct());
     }
 }

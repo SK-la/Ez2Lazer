@@ -16,13 +16,16 @@ using osu.Framework.Platform;
 using osu.Framework.Screens;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
+using osu.Game.Localisation;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Configuration;
+using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.BMS.UI.SongSelect;
 using osu.Game.Screens;
 using osuTK;
@@ -39,6 +42,9 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private OsuTextFlowContainer pathDisplay = null!;
         private OsuTextFlowContainer statusDisplay = null!;
+        private Bindable<double>? maniaScrollSpeed;
+        private Bindable<double>? maniaBaseSpeed;
+        private Bindable<double>? maniaTimePerSpeed;
 
         [Resolved]
         private OsuGame? game { get; set; }
@@ -48,6 +54,9 @@ namespace osu.Game.Rulesets.BMS.UI
 
         [Resolved]
         private Storage storage { get; set; } = null!;
+
+        [Resolved]
+        private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
 
         private BMSBeatmapManager? beatmapManager;
 
@@ -66,6 +75,7 @@ namespace osu.Game.Rulesets.BMS.UI
             string cacheDir = storage.GetFullPath("bms_cache");
             beatmapManager = BMSBeatmapManager.GetShared(cacheDir);
             beatmapManager.SetRootPaths(getConfiguredPaths());
+            bindManiaScrollSettings();
 
             Children = new Drawable[]
             {
@@ -79,36 +89,76 @@ namespace osu.Game.Rulesets.BMS.UI
                     Text = "打开 BMS 曲库设置向导",
                     Action = selectPath,
                 },
-                pathDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 14))
+                new SettingsItemV2(new FormTextBox
+                {
+                    Caption = "滚速说明",
+                    Current = new Bindable<string>("BMS 当前直接复用 mania 的滚速参数、方向和快捷键（含 LAlt 加速步进）。"),
+                    ReadOnly = true,
+                }),
+                new Container
+                {
+                    RelativeSizeAxes = Axes.X,
+                    Height = 110,
+                    Padding = new MarginPadding { Left = SettingsPanel.CONTENT_MARGINS, Right = SettingsPanel.CONTENT_MARGINS, Top = 6 },
+                    Child = new OsuScrollContainer
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Child = pathDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 13))
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                        }
+                    }
+                },
+                new Container
                 {
                     RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
-                    Padding = new MarginPadding { Left = SettingsPanel.CONTENT_MARGINS, Right = SettingsPanel.CONTENT_MARGINS },
+                    Padding = new MarginPadding { Left = SettingsPanel.CONTENT_MARGINS, Right = SettingsPanel.CONTENT_MARGINS, Top = 4, Bottom = 6 },
+                    Child = statusDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 12))
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                    }
                 },
-                statusDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 12))
+                new SettingsItemV2(new FormSliderBar<double>
                 {
-                    RelativeSizeAxes = Axes.X,
-                    AutoSizeAxes = Axes.Y,
-                    Padding = new MarginPadding { Left = SettingsPanel.CONTENT_MARGINS, Right = SettingsPanel.CONTENT_MARGINS, Top = 5 },
-                },
-                new SettingsSlider<double>
-                {
-                    LabelText = "滚动速度",
-                    Current = bmsConfig.GetBindable<double>(BMSRulesetSetting.ScrollSpeed),
+                    Caption = RulesetSettingsStrings.ScrollSpeed,
+                    Current = maniaScrollSpeed ?? new BindableDouble(200),
                     KeyboardStep = 1,
-                },
-                new SettingsCheckbox
+                    LabelFormat = v =>
+                    {
+                        double baseSpeed = maniaBaseSpeed?.Value ?? 500;
+                        double timePerSpeed = maniaTimePerSpeed?.Value ?? 5;
+                        int computedTime = (int)DrawableManiaRuleset.ComputeScrollTime(v, baseSpeed, timePerSpeed);
+                        return RulesetSettingsStrings.ScrollSpeedTooltip(computedTime, v).ToString();
+                    }
+                }),
+                new SettingsItemV2(new FormCheckBox
                 {
-                    LabelText = "自动预加载 Keysound",
+                    Caption = "自动预加载 Keysound",
                     Current = bmsConfig.GetBindable<bool>(BMSRulesetSetting.AutoPreloadKeysounds),
-                },
-                new SettingsSlider<double>
+                }),
+                new SettingsItemV2(new FormSliderBar<double>
                 {
-                    LabelText = "Keysound 音量",
+                    Caption = "Keysound 音量",
                     Current = bmsConfig.GetBindable<double>(BMSRulesetSetting.KeysoundVolume),
-                    DisplayAsPercentage = true,
-                },
+                    KeyboardStep = 0.01f,
+                    LabelFormat = v => $"{v:P0}",
+                }),
             };
+        }
+
+        private void bindManiaScrollSettings()
+        {
+            var maniaConfig = rulesetConfigCache.GetConfigFor(new ManiaRuleset()) as ManiaRulesetConfigManager;
+
+            if (maniaConfig == null)
+                return;
+
+            maniaScrollSpeed = maniaConfig.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed);
+            maniaBaseSpeed = maniaConfig.GetBindable<double>(ManiaRulesetSetting.ScrollBaseSpeed);
+            maniaTimePerSpeed = maniaConfig.GetBindable<double>(ManiaRulesetSetting.ScrollTimePerSpeed);
         }
 
         protected override void LoadComplete()
