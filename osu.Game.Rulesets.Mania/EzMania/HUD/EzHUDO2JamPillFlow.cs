@@ -11,6 +11,7 @@ using osu.Framework.Graphics.Sprites;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
@@ -26,18 +27,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
     /// </summary>
     public partial class EzHUDO2JamPillFlow : CompositeDrawable, ISerialisableDrawable
     {
-        // TODO: 未来考虑实现真正的药丸图。
+        private const int max_pill_count = 5;
+        private const float pill_slot_size = 48;
+        private const float pill_spacing = 6;
+        private const float background_padding = 8;
+
         public enum PillSprite
         {
-            CheckCircle,
-            Heart,
-            Star,
-            ThumbsUp,
-            ModSuddenDeath,
+            Pills = 0, // 以后需要考虑彩色
+            CheckCircle = 1,
+            Heart = 2,
+            Star = 3,
+            ThumbsUp = 4,
+            ModSuddenDeath = 5,
         }
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.PILL_SPRITE_LABEL), nameof(EzHUDStrings.PILL_SPRITE_DESCRIPTION))]
-        public Bindable<PillSprite> SpriteDropdown { get; } = new Bindable<PillSprite>();
+        public Bindable<PillSprite> SpriteDropdown { get; } = new Bindable<PillSprite>(PillSprite.Pills);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.FILL_DIRECTION_LABEL), nameof(EzHUDStrings.FILL_DIRECTION_DESCRIPTION))]
         public Bindable<FillDirection> PillFillDirection { get; } = new Bindable<FillDirection>(FillDirection.Vertical);
@@ -86,6 +92,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         public EzHUDO2JamPillFlow()
         {
             AutoSizeAxes = Axes.Both;
+            Anchor = Anchor.CentreRight;
+            Origin = Anchor.CentreRight;
         }
 
         [BackgroundDependencyLoader]
@@ -93,52 +101,41 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
         {
             Masking = true;
 
-            InternalChildren = new Drawable[]
+            InternalChild = backgroundContainer = new Container
             {
-                // 半透明背景底框
-                backgroundContainer = new Container
+                Masking = true,
+                CornerRadius = 8,
+                Alpha = BackgroundAlpha.Value,
+                Children = new Drawable[]
                 {
-                    Size = new Vector2(60, 280), // 默认垂直形状
-                    Masking = true,
-                    CornerRadius = 8,
-                    Alpha = BackgroundAlpha.Value,
-                    Children = new Drawable[]
+                    new Box
                     {
-                        new Box
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Colour = Color4.Black,
-                            Alpha = 0.7f,
-                        },
-                        new Box
-                        {
-                            RelativeSizeAxes = Axes.Both,
-                            Colour = Color4.White,
-                            Alpha = 0.3f,
-                        }
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.Black,
+                        Alpha = 0.7f,
+                    },
+                    new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = Color4.White,
+                        Alpha = 0.3f,
+                    },
+                    pillContainer = new FillFlowContainer
+                    {
+                        Name = "pills",
+                        RelativeSizeAxes = Axes.Both,
+                        Padding = new MarginPadding(background_padding),
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(pill_spacing),
                     }
-                },
-                pillContainer = new FillFlowContainer
-                {
-                    Name = "pills",
-                    RelativeSizeAxes = Axes.Both,
-                    Margin = new MarginPadding(5),
-                    Direction = FillDirection.Vertical,
-                    Spacing = new Vector2(5),
-                    // Children = new Drawable[]
-                    // {
-                    //     new OsuSpriteText
-                    //     {
-                    //         Text = "💊",
-                    //         Font = new FontUsage(null, 40),
-                    //     }
-                    // }
                 }
             };
 
+            updateBackgroundSize();
+
             BackgroundAlpha.BindValueChanged(value => requestAlphaUpdate(value.NewValue), true);
-            SpriteDropdown.BindValueChanged(_ => requestRebuild());
-            PillFillDirection.BindValueChanged(_ => requestLayoutUpdate());
+            SpriteDropdown.BindValueChanged(_ => requestRebuild(), true);
+            PillFillDirection.BindValueChanged(_ => requestLayoutUpdate(), true);
         }
 
         private void requestAlphaUpdate(float alpha)
@@ -168,12 +165,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
                     return;
 
                 pillContainer.Direction = PillFillDirection.Value;
-                backgroundContainer.Size = PillFillDirection.Value == FillDirection.Vertical
-                    ? new Vector2(60, 280)
-                    : new Vector2(280, 60);
+                updateBackgroundSize();
 
                 requestRebuild();
             });
+        }
+
+        private void updateBackgroundSize()
+        {
+            const float main_axis = max_pill_count * pill_slot_size + (max_pill_count - 1) * pill_spacing;
+            const float cross_axis = pill_slot_size;
+
+            backgroundContainer.Size = PillFillDirection.Value == FillDirection.Vertical
+                ? new Vector2(cross_axis, main_axis) + new Vector2(background_padding * 2)
+                : new Vector2(main_axis, cross_axis) + new Vector2(background_padding * 2);
         }
 
         private void requestRebuild()
@@ -199,22 +204,40 @@ namespace osu.Game.Rulesets.Mania.EzMania.HUD
             pillContainer.Clear();
 
             for (int i = 0; i < currentPillCount; i++)
+                pillContainer.Add(createPillDrawable());
+        }
+
+        private Drawable createPillDrawable()
+        {
+            Drawable iconDrawable;
+
+            if (SpriteDropdown.Value == PillSprite.Pills)
             {
-                pillContainer.Add(
-                    new SpriteIcon
-                    {
-                        Anchor = Anchor.TopLeft,
-                        Origin = Anchor.TopLeft,
-                        Size = new Vector2(50, 50),
-                        Icon = pill_sprites[(int)SpriteDropdown.Value],
-                        Colour = Color4.White
-                    });
-                // new OsuSpriteText
-                // {
-                //     Text = "💊",
-                //     Font = new FontUsage(null, 40),
-                // });
+                iconDrawable = new OsuSpriteText
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Text = "💊",
+                    Font = new FontUsage(null, 46),
+                };
             }
+            else
+            {
+                iconDrawable = new SpriteIcon
+                {
+                    Anchor = Anchor.Centre,
+                    Origin = Anchor.Centre,
+                    Size = new Vector2(pill_slot_size),
+                    Icon = pill_sprites[(int)SpriteDropdown.Value],
+                    Colour = Color4.White
+                };
+            }
+
+            return new Container
+            {
+                Size = new Vector2(pill_slot_size),
+                Child = iconDrawable
+            };
         }
 
         protected override void LoadComplete()
