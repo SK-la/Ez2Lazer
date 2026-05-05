@@ -17,11 +17,11 @@ using osu.Framework.Platform;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.IO;
-using osu.Game.Rulesets.BMS;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
 using osu.Game.Skinning;
 using osu.Game.Storyboards;
+using FileInfo = System.IO.FileInfo;
 
 namespace osu.Game.Rulesets.BMS.Beatmaps
 {
@@ -54,7 +54,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             : base(CreateBeatmapInfo(bmsFilePath, chartCache), audioManager)
         {
             this.bmsFilePath = bmsFilePath;
-            this.folderPath = Path.GetDirectoryName(bmsFilePath) ?? string.Empty;
+            folderPath = Path.GetDirectoryName(bmsFilePath) ?? string.Empty;
             this.audioManager = audioManager;
             this.textures = textures;
             this.chartCache = chartCache;
@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// </summary>
         private static BeatmapInfo CreateBeatmapInfo(string bmsFilePath, BMSChartCache? chartCache)
         {
-            var fileInfo = new System.IO.FileInfo(bmsFilePath);
+            var fileInfo = new FileInfo(bmsFilePath);
 
             string title = chartCache?.Title;
             if (string.IsNullOrWhiteSpace(title))
@@ -290,6 +290,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 foreach (var ext in extensions)
                 {
                     string testPath = Path.Combine(folderPath, baseName + ext);
+
                     if (File.Exists(testPath))
                     {
                         fullPath = testPath;
@@ -326,6 +327,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             {
                 track?.Dispose();
             }
+
             keysoundCache.Clear();
         }
 
@@ -354,8 +356,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             foreach (string extension in new[] { "*.ogg", "*.mp3", "*.wav", "*.flac" })
             {
                 string? fallback = Directory.GetFiles(folderPath, extension, SearchOption.TopDirectoryOnly)
-                                          .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
-                                          .FirstOrDefault();
+                                            .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
+                                            .FirstOrDefault();
 
                 if (fallback != null)
                     return fallback;

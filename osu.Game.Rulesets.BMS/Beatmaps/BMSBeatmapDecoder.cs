@@ -12,7 +12,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.IO;
-using osu.Game.Rulesets.BMS;
 using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.Objects.Legacy;
 
@@ -426,8 +425,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             };
         }
 
-        private List<TimingPointData> createTimingPointsFromTimeline(TimelineData timeline)
-            => timeline.TimingPoints;
+        private List<TimingPointData> createTimingPointsFromTimeline(TimelineData timeline) => timeline.TimingPoints;
 
         private void advanceTimeline(ref double currentTime, ref int currentMeasure, ref double currentPositionInMeasure, int targetMeasure, double targetPositionInMeasure, double bpm)
         {

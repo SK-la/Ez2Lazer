@@ -6,7 +6,6 @@ using System.Linq;
 using osu.Framework.Input.StateChanges;
 using osu.Game.Beatmaps;
 using osu.Game.Replays;
-using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.Replays;
 
