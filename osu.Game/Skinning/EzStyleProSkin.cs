@@ -97,6 +97,14 @@ namespace osu.Game.Skinning
                                     r2.Position = new Vector2(r1.DrawWidth - 2, -65);
                                     r2.RadarDisplayMode.Value = EzRadarDisplayMode.KeyPattern;
                                 }
+
+                                var p = c.OfType<EzHUDSpritePlus>().FirstOrDefault();
+
+                                if (p != null)
+                                {
+                                    p.ModifyPath.Value = "Tachie";
+                                    p.SpriteName.Value = "plus";
+                                }
                             })
                             {
                                 Children = new Drawable[]

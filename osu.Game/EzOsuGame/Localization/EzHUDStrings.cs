@@ -86,5 +86,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SKIP_BETTER_JUDGEMENT = new EzLocalizationManager.EzLocalisableString(
             "跳过更好的判定结果", "Skip Better Judgment");
+
+        // EzHUDSpritePlus
+        public static readonly LocalisableString SPRITE_PLUS_PATH_LABEL = new EzLocalizationManager.EzLocalisableString("路径", "Path");
+        public static readonly LocalisableString SPRITE_PLUS_PATH_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("相对 Modify 的路径。留空表示 Modify 根目录。", "Path relative to Modify. Leave empty to use Modify root.");
+
+        public static readonly LocalisableString SPRITE_PLUS_FRAME_TEMPLATE_LABEL = new EzLocalizationManager.EzLocalisableString("动画帧模板", "Frame Template");
+        public static readonly LocalisableString SPRITE_PLUS_FRAME_TEMPLATE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("默认 {0}。示例：{0}、{000}、{1}。不使用 {} 时按普通后缀处理。", "Default is {0}. Examples: {0}, {000}, {1}. Without {}, it is treated as a normal suffix.");
     }
 }
