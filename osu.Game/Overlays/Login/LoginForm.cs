@@ -30,7 +30,7 @@ namespace osu.Game.Overlays.Login
         private TextBox username = null!;
         private TextBox password = null!;
         private ShakeContainer shakeSignIn = null!;
-        private Bindable<bool> localAccountBindable;
+        private Bindable<bool> localAccountBindable = null!;
 
         [Resolved]
         private IAPIProvider api { get; set; } = null!;

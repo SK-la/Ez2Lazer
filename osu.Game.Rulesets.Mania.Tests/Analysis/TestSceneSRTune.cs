@@ -25,12 +25,12 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
         private readonly Dictionary<string, double> current = new Dictionary<string, double>();
 
         // exposed tuning parameters (initialized from Tunables defaults)
-        private double ln_weight = SRCalculatorTunable.Tunables.FinalLNToNotesFactor; // 0.0 - 1.0
-        private double ln_len_cap = SRCalculatorTunable.Tunables.FinalLNLenCap; // ms, 100 - 2000
-        private double totalnotes_offset = SRCalculatorTunable.Tunables.TotalNotesOffset; // 0 - 500
-        private double pbar_ln_coeff = SRCalculatorTunable.Tunables.PBarLnMultiplier; // 0.0 - 0.02
-        private double jack_multiplier = SRCalculatorTunable.Tunables.JackPenaltyMultiplier; // 10 - 40
-        private double final_scale = SRCalculatorTunable.Tunables.FinalScale; // 0.9 - 1.05
+        private double lnWeight = SRCalculatorTunable.Tunables.FinalLNToNotesFactor; // 0.0 - 1.0
+        private double lnLenCap = SRCalculatorTunable.Tunables.FinalLNLenCap; // ms, 100 - 2000
+        private double totalnotesOffset = SRCalculatorTunable.Tunables.TotalNotesOffset; // 0 - 500
+        private double pbarLNCoeff = SRCalculatorTunable.Tunables.PBarLnMultiplier; // 0.0 - 0.02
+        private double jackMultiplier = SRCalculatorTunable.Tunables.JackPenaltyMultiplier; // 10 - 40
+        private double finalScale = SRCalculatorTunable.Tunables.FinalScale; // 0.9 - 1.05
 
         private IBeatmap[] sampleBeatmaps = Array.Empty<IBeatmap>();
 
@@ -129,7 +129,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             // try load canonical test beatmap resource first
             try
             {
-                string resourcePath = @"Resources/Testing/Beatmaps/4869637.osu";
+                // string resourcePath = @"Resources/Testing/Beatmaps/4869637.osu";
 
                 // prefer a set of deterministic half-hold beatmaps for side-by-side tuning
                 sampleBeatmaps = HalfHoldBeatmapSets.CreateTen(4, 32);
@@ -174,12 +174,12 @@ namespace osu.Game.Rulesets.Mania.Tests.Analysis
             foreach (var s in sliders)
             {
                 // decide by Width positions we set earlier
-                if (s.Width == 0.28f) ln_weight = s.Current.Value;
-                else if (s.Width == 0.2f) ln_len_cap = s.Current.Value;
-                else if (s.Width == 0.16f) totalnotes_offset = s.Current.Value;
-                else if (s.Width == 0.22f) pbar_ln_coeff = s.Current.Value;
-                else if (s.Width == 0.18f) jack_multiplier = s.Current.Value;
-                else if (s.Width == 0.12f) final_scale = s.Current.Value;
+                if (s.Width == 0.28f) lnWeight = s.Current.Value;
+                else if (s.Width == 0.2f) lnLenCap = s.Current.Value;
+                else if (s.Width == 0.16f) totalnotesOffset = s.Current.Value;
+                else if (s.Width == 0.22f) pbarLNCoeff = s.Current.Value;
+                else if (s.Width == 0.18f) jackMultiplier = s.Current.Value;
+                else if (s.Width == 0.12f) finalScale = s.Current.Value;
             }
 
             // propagate slider values into SRCalculatorTunable.Tunables

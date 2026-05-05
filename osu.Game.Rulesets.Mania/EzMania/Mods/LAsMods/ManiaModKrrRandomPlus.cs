@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
@@ -208,14 +209,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     // 应用带盘 Flip（边缘包裹）
                     else if (WrapFlipEnabled.Value)
                     {
-                        var wrapMap = BuildWrapFlipMapping(totalKeys);
+                        int[] wrapMap = buildWrapFlipMapping(totalKeys);
                         foreach (var note in maniaBeatmap.HitObjects.OfType<ManiaHitObject>())
                             note.Column = wrapMap[note.Column];
                     }
                 }
 
                 // 第二步：解析固定轨道（此时 Note 已经根据 Flip 移动到了新位置）
-                var fixedCols = ParseFixedColumnsInput(FixedColumnsInput.Value, totalKeys);
+                var fixedCols = parseFixedColumnsInput(FixedColumnsInput.Value, totalKeys);
 
                 // 标记所有位于固定轨道的 Note（全程免疫后续操作）
                 var lockedNotes = new HashSet<ManiaHitObject>();
@@ -242,8 +243,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     else
                     {
                         int midIndex = totalKeys / 2;
-                        var fixedColsWithMiddle = new HashSet<int>(fixedCols);
-                        fixedColsWithMiddle.Add(midIndex);
+                        var fixedColsWithMiddle = new HashSet<int>(fixedCols) { midIndex };
 
                         if (midIndex > 0)
                             processRegions.Add(new ProcessingRegion(0, midIndex - 1, MainMode.Value, fixedColsWithMiddle));
@@ -264,19 +264,19 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
                     switch (region.Mode)
                     {
                         case RandomizationMode.Mirror:
-                            ApplyMirror(maniaBeatmap, region, lockedNotes);
+                            applyMirror(maniaBeatmap, region, lockedNotes);
                             break;
 
                         case RandomizationMode.Random:
-                            ApplyRandom(maniaBeatmap, region, rng, lockedNotes);
+                            applyRandom(maniaBeatmap, region, rng, lockedNotes);
                             break;
 
                         case RandomizationMode.RRandom:
-                            ApplyRRandom(maniaBeatmap, region, rng, lockedNotes);
+                            applyRRandom(maniaBeatmap, region, rng, lockedNotes);
                             break;
 
                         case RandomizationMode.SRandom:
-                            ApplySRandom(maniaBeatmap, region, rng, lockedNotes);
+                            applySRandom(maniaBeatmap, region, rng, lockedNotes);
                             break;
                     }
                 }
@@ -298,13 +298,13 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// 解析固定轨道输入字符串
         /// 规则：1-9→0~8  a-i→9~17  超出键数自动忽略
         /// </summary>
-        private HashSet<int> ParseFixedColumnsInput(string input, int totalKeys)
+        private HashSet<int> parseFixedColumnsInput(string input, int totalKeys)
         {
             var result = new HashSet<int>();
             if (string.IsNullOrWhiteSpace(input))
                 return result;
 
-            foreach (char c in input.ToLower())
+            foreach (char c in input.ToLower(CultureInfo.CurrentCulture))
             {
                 int colIndex = c switch
                 {
@@ -330,7 +330,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// 偶数键：12345678 → 8(234|567 Flip)1 → 85672341
         /// 奇数键：1234567 → 7(23|4|56 Flip)1 → 7564231
         /// </summary>
-        private int[] BuildWrapFlipMapping(int totalKeys)
+        private int[] buildWrapFlipMapping(int totalKeys)
         {
             int[] map = new int[totalKeys];
             for (int i = 0; i < totalKeys; i++) map[i] = i; // 初始化为自身
@@ -342,9 +342,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             map[totalKeys - 1] = 0;
 
             // 第二步：对内部剩余部分执行标准 Flip（左右互换）
-            int innerStart = 1;
+            const int inner_start = 1;
             int innerEnd = totalKeys - 2;
-            int innerCount = innerEnd - innerStart + 1; // 内部轨道数量
+            int innerCount = innerEnd - inner_start + 1; // 内部轨道数量
 
             if (innerCount <= 0) return map; // 没有内部轨道
 
@@ -355,20 +355,20 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                 for (int i = 0; i < midSplit; i++)
                 {
-                    map[innerStart + i] = innerStart + i + midSplit;
-                    map[innerStart + i + midSplit] = innerStart + i;
+                    map[inner_start + i] = inner_start + i + midSplit;
+                    map[inner_start + i + midSplit] = inner_start + i;
                 }
             }
             else
             {
                 // 奇数个内部轨道：中间固定，左右互换
-                int midIndex = innerStart + innerCount / 2;
+                int midIndex = inner_start + innerCount / 2;
                 map[midIndex] = midIndex; // 中间不动
 
-                for (int i = innerStart; i < midIndex; i++)
+                for (int i = inner_start; i < midIndex; i++)
                 {
-                    map[i] = midIndex + 1 + (i - innerStart);
-                    map[midIndex + 1 + (i - innerStart)] = i;
+                    map[i] = midIndex + 1 + (i - inner_start);
+                    map[midIndex + 1 + (i - inner_start)] = i;
                 }
             }
 
@@ -382,7 +382,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// <summary>
         /// Mirror 模式：区域镜像翻转
         /// </summary>
-        private void ApplyMirror(ManiaBeatmap beatmap, ProcessingRegion region, HashSet<ManiaHitObject> lockedNotes)
+        private void applyMirror(ManiaBeatmap beatmap, ProcessingRegion region, HashSet<ManiaHitObject> lockedNotes)
         {
             var activeCols = region.GetActiveColumnList().ToList();
             if (activeCols.Count <= 1) return;
@@ -407,13 +407,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// <summary>
         /// Random 模式：区域完全随机打乱
         /// </summary>
-        private void ApplyRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        private void applyRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
         {
             var activeCols = region.GetActiveColumnList().ToList();
             if (activeCols.Count <= 1) return;
 
             var movableNotes = beatmap.HitObjects
-                                      .OfType<ManiaHitObject>()
                                       .Where(n => region.StartCol <= n.Column && n.Column <= region.EndCol &&
                                                   activeCols.Contains(n.Column) && !lockedNotes.Contains(n))
                                       .ToList();
@@ -431,7 +430,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// <summary>
         /// R-Random 模式：区域循环滚动偏移
         /// </summary>
-        private void ApplyRRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        private void applyRRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
         {
             var activeCols = region.GetActiveColumnList().ToList();
             if (activeCols.Count <= 1) return;
@@ -457,15 +456,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
         /// <summary>
         /// S-Random 模式：滑动窗口行内随机
         /// </summary>
-        private void ApplySRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        private void applySRandom(ManiaBeatmap beatmap, ProcessingRegion region, Random rng, HashSet<ManiaHitObject> lockedNotes)
         {
             var activeCols = region.GetActiveColumnList().ToList();
             if (activeCols.Count <= 1) return;
 
-            const double windowInterval = 80;
+            const double window_interval = 80;
 
             var allNotes = beatmap.HitObjects
-                                  .OfType<ManiaHitObject>()
                                   .Where(n => region.StartCol <= n.Column && n.Column <= region.EndCol)
                                   .OrderBy(n => n.StartTime)
                                   .ToList();
@@ -478,10 +476,10 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
             {
                 if (note is HoldNote holdNote)
                 {
-                    int startWindow = (int)Math.Floor(holdNote.StartTime / windowInterval);
-                    int endWindow = (int)Math.Floor(holdNote.EndTime / windowInterval);
+                    int startWindow = (int)Math.Floor(holdNote.StartTime / window_interval);
+                    int endWindow = (int)Math.Floor(holdNote.EndTime / window_interval);
 
-                    if (Math.Abs(holdNote.EndTime - endWindow * windowInterval) < 0.001)
+                    if (Math.Abs(holdNote.EndTime - endWindow * window_interval) < 0.001)
                         endWindow += 1;
 
                     holdNoteWindows.Add((startWindow, endWindow));
@@ -492,7 +490,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
             foreach (var note in allNotes)
             {
-                int windowIndex = (int)Math.Floor(note.StartTime / windowInterval);
+                int windowIndex = (int)Math.Floor(note.StartTime / window_interval);
                 if (!windowGroups.ContainsKey(windowIndex))
                     windowGroups[windowIndex] = new List<ManiaHitObject>();
                 windowGroups[windowIndex].Add(note);
@@ -506,27 +504,28 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.LAsMods
 
                 for (int w = startWin; w <= endWin; w++)
                 {
-                    if (windowGroups.ContainsKey(w))
+                    if (windowGroups.TryGetValue(w, out var value))
                     {
-                        combinedNotes.AddRange(windowGroups[w]);
+                        combinedNotes.AddRange(value);
                         mergedWindows.Add(w);
                     }
                 }
 
-                ShuffleWindowNotes(combinedNotes, activeCols, rng, lockedNotes);
+                shuffleWindowNotes(combinedNotes, activeCols, rng, lockedNotes);
             }
 
             foreach (var kvp in windowGroups)
             {
                 if (mergedWindows.Contains(kvp.Key)) continue;
-                ShuffleWindowNotes(kvp.Value, activeCols, rng, lockedNotes);
+
+                shuffleWindowNotes(kvp.Value, activeCols, rng, lockedNotes);
             }
         }
 
         /// <summary>
         /// 窗口内 Note 随机打乱
         /// </summary>
-        private void ShuffleWindowNotes(List<ManiaHitObject> notes, List<int> activeCols, Random rng, HashSet<ManiaHitObject> lockedNotes)
+        private void shuffleWindowNotes(List<ManiaHitObject> notes, List<int> activeCols, Random rng, HashSet<ManiaHitObject> lockedNotes)
         {
             if (notes.Count == 0) return;
 
