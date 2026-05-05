@@ -61,10 +61,8 @@ namespace osu.Game.EzOsuGame.Statistics
         protected long V2Score { get; set; }
         protected Dictionary<HitResult, int> V2Counts { get; set; } = new Dictionary<HitResult, int>();
 
-        private readonly IReadOnlyList<HitEvent> originalHitEvents;
-
         protected IReadOnlyList<HitEvent> HitEvents => GetDisplayHitEvents();
-        protected IReadOnlyList<HitEvent> OriginalHitEvents => originalHitEvents;
+        protected IReadOnlyList<HitEvent> OriginalHitEvents { get; }
 
         /// <summary>
         /// 继承类应 HitWindows.IsHitResultAllowed 等方式过滤出有效的 HitEvent。
@@ -72,7 +70,7 @@ namespace osu.Game.EzOsuGame.Statistics
         /// <returns>应当返回与当前规则集HitWindows匹配的 HitEvent</returns>
         protected virtual IReadOnlyList<HitEvent> FilterHitEvents()
         {
-            return originalHitEvents.Where(e => e.Result.IsBasic()).ToList();
+            return OriginalHitEvents.Where(e => e.Result.IsBasic()).ToList();
         }
 
         /// <summary>
@@ -94,7 +92,7 @@ namespace osu.Game.EzOsuGame.Statistics
         {
             Score = score;
             HitWindows = hitWindows;
-            originalHitEvents = score.HitEvents;
+            OriginalHitEvents = score.HitEvents;
             Beatmap = beatmap;
 
             HP = beatmap.Difficulty.DrainRate;
@@ -173,7 +171,7 @@ namespace osu.Game.EzOsuGame.Statistics
             return HitWindows.ResultFor(hitEvent.TimeOffset);
         }
 
-        protected virtual double UpdateBoundary(HitResult result)
+        protected virtual double UpdateBoundary(HitResult result, double? time = null)
         {
             return HitWindows.WindowFor(result);
         }
@@ -183,6 +181,22 @@ namespace osu.Game.EzOsuGame.Statistics
         /// 默认使用当前 V2 重算结果，保证图形与当前设置一致。
         /// </summary>
         protected virtual HitResult GetDisplayResult(HitEvent hitEvent) => RecalculateV2Result(hitEvent);
+
+        /// <summary>
+        /// 图表血量起始值。默认按游戏内从满血开始。
+        /// </summary>
+        protected virtual double GetInitialHealth() => 1.0;
+
+        /// <summary>
+        /// 图表血量推演使用的单次血量变化。
+        /// 默认使用 Judgement 的血量变化逻辑，规则集可覆写以对齐自定义血量模式。
+        /// </summary>
+        protected virtual double GetDisplayHealthIncrease(HitEvent hitEvent, HitResult displayResult, double currentHealth)
+        {
+            var judgement = hitEvent.HitObject.CreateJudgement();
+            var judgementResult = new JudgementResult(hitEvent.HitObject, judgement) { Type = displayResult };
+            return judgement.HealthIncreaseFor(judgementResult);
+        }
 
         /// <summary>
         /// 计算 V2 准确率。子类可覆写以定制计算逻辑。
@@ -248,11 +262,24 @@ namespace osu.Game.EzOsuGame.Statistics
 
             AddInternal(graphContainer);
 
+            // 背景中心线（表示 0 ms）
+            float centerY = DrawHeight / 2f;
+            graphContainer.Add(new Box
+            {
+                Anchor = Anchor.TopLeft,
+                Origin = Anchor.CentreLeft,
+                RelativeSizeAxes = Axes.X,
+                Height = 1,
+                Width = 1,
+                Alpha = 0.1f,
+                Colour = Color4.Gray,
+                Y = centerY
+            });
+
             foreach (HitResult result in Enum.GetValues(typeof(HitResult)).Cast<HitResult>().Where(r => r <= HitResult.Perfect && r >= HitResult.Meh))
             {
-                double boundary = UpdateBoundary(result);
-                drawBoundaryLine(boundary, result);
-                drawBoundaryLine(-boundary, result);
+                drawBoundaryLine(result, isNegative: false);
+                drawBoundaryLine(result, isNegative: true);
             }
 
             var sortedHitEvents = GetDisplayHitEvents().OrderBy(e => e.HitObject.StartTime).ToList();
@@ -308,16 +335,15 @@ namespace osu.Game.EzOsuGame.Statistics
 
         private void drawHealthLine(List<HitEvent> sortedHitEvents)
         {
-            double currentHealth = 0.0;
             List<Vector2> healthPoints = new List<Vector2>();
+            double currentHealth = GetInitialHealth();
 
             float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
 
             foreach (var e in sortedHitEvents)
             {
-                var judgement = e.HitObject.CreateJudgement();
-                var judgementResult = new JudgementResult(e.HitObject, judgement) { Type = GetDisplayResult(e) };
-                double healthIncrease = judgement.HealthIncreaseFor(judgementResult);
+                var displayResult = GetDisplayResult(e);
+                double healthIncrease = GetDisplayHealthIncrease(e, displayResult, currentHealth);
                 currentHealth = Math.Clamp(currentHealth + healthIncrease, 0, 1);
 
                 double time = e.HitObject.StartTime;
@@ -342,43 +368,42 @@ namespace osu.Game.EzOsuGame.Statistics
             }
         }
 
-        private void drawBoundaryLine(double boundary, HitResult result)
+        private void drawBoundaryLine(HitResult result, bool isNegative)
         {
             float centerY = DrawHeight / 2f;
+            float availableWidth = DrawWidth - LeftMarginConst - RightMarginConst;
+            int sampleCount = Math.Max(2, Math.Min(240, (int)Math.Ceiling(availableWidth / 8f)));
+            double sign = isNegative ? -1 : 1;
+            var vertices = new List<Vector2>(sampleCount);
 
-            // 背景中心线（表示 0 ms）
-            graphContainer.Add(new Box
+            for (int i = 0; i < sampleCount; i++)
+            {
+                double ratio = sampleCount == 1 ? 0 : i / (double)(sampleCount - 1);
+                double time = minTime + timeRange * ratio;
+                double boundary = UpdateBoundary(result, time);
+                float x = (float)(ratio * availableWidth);
+                float y = centerY + (float)(sign * boundary + current_offset);
+                vertices.Add(new Vector2(x, y));
+            }
+
+            graphContainer.Add(new Path
             {
                 Anchor = Anchor.TopLeft,
-                Origin = Anchor.CentreLeft,
-                RelativeSizeAxes = Axes.X,
-                Height = 1,
-                Width = 1,
-                Alpha = 0.1f,
-                Colour = Color4.Gray,
-                Y = centerY
-            });
-
-            // 有色判定边界线
-            graphContainer.Add(new Box
-            {
-                Anchor = Anchor.TopLeft,
-                Origin = Anchor.CentreLeft,
-                RelativeSizeAxes = Axes.X,
-                Height = 1,
-                Width = 1,
-                Alpha = 0.1f,
+                Origin = Anchor.TopLeft,
+                PathRadius = 1,
                 Colour = colours.ForHitResult(result),
-                Y = centerY + (float)(boundary + current_offset)
+                Alpha = 0.1f,
+                Vertices = vertices.ToArray()
             });
 
             // 在左侧标签区域绘制判定标签（优先使用 LeftLabelContainer）
+            double firstBoundary = UpdateBoundary(result, minTime) * sign;
             var label = new OsuSpriteText
             {
-                Text = $"{boundary:+0.##;-0.##}",
+                Text = $"{firstBoundary:+0.##;-0.##}",
                 Font = OsuFont.GetFont(size: 12),
                 Colour = Color4.White,
-                Y = centerY + (float)(boundary + current_offset),
+                Y = centerY + (float)(firstBoundary + current_offset),
             };
 
             if (LeftLabelContainer != null)

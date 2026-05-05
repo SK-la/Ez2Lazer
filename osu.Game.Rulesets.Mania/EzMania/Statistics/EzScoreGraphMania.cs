@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
@@ -16,6 +17,8 @@ using osu.Game.Screens.Ranking.Statistics;
 using osu.Framework.Graphics.Colour;
 using osu.Game.EzOsuGame.Extensions;
 using osu.Game.Rulesets.Mania.EzMania.Helper;
+using osu.Game.Rulesets.Mania.Objects;
+using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -36,6 +39,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         private Bindable<EzEnumHitMode> hitModeBindable = null!;
         private EzEnumHitMode currentHitMode;
+        private Bindable<EzEnumHealthMode> healthModeBindable = null!;
+        private EzEnumHealthMode currentHealthMode;
         private Bindable<double> offsetPlusMania = new Bindable<double>(0);
 
         [Resolved]
@@ -67,6 +72,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
         [BackgroundDependencyLoader]
         private void load()
         {
+            O2HitModeExtension.SetControlPoints(Beatmap.ControlPointInfo);
+            O2HitModeExtension.SetOriginalBPM(Beatmap.BeatmapInfo.BPM);
+
             hitModeBindable = ezConfig.GetBindable<EzEnumHitMode>(Ez2Setting.ManiaHitMode);
             hitModeBindable.BindValueChanged(v =>
             {
@@ -75,13 +83,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 Refresh();
             }, true);
 
+            healthModeBindable = ezConfig.GetBindable<EzEnumHealthMode>(Ez2Setting.ManiaHealthMode);
+            healthModeBindable.BindValueChanged(v =>
+            {
+                currentHealthMode = v.NewValue;
+                Refresh();
+            }, true);
+
             // 绑定 OffsetPlusMania，以便分析反映运行时校正并在更改时重绘。
             offsetPlusMania = ezConfig.GetBindable<double>(Ez2Setting.OffsetPlusMania);
             offsetPlusMania.BindValueChanged(_ => Refresh(), true);
         }
 
-        protected override double UpdateBoundary(HitResult result)
+        protected override double UpdateBoundary(HitResult result, double? time = null)
         {
+            if (currentHitMode == EzEnumHitMode.O2Jam && time.HasValue)
+                hitWindowsV2.UpdateO2JamBpmFromTime(time.Value);
+
             return hitWindowsV2.WindowFor(result);
         }
 
@@ -95,10 +113,70 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
 
         protected override HitResult RecalculateV2Result(HitEvent hitEvent)
         {
+            if (currentHitMode == EzEnumHitMode.O2Jam)
+                hitWindowsV2.UpdateO2JamBpmFromTime(hitEvent.HitObject.StartTime);
+
             if (hitEvent.Result is HitResult.Miss or HitResult.Poor)
                 return hitEvent.Result;
 
             return hitWindowsV2.ResultFor(hitEvent.TimeOffset);
+        }
+
+        protected override double GetDisplayHealthIncrease(HitEvent hitEvent, HitResult displayResult, double currentHealth)
+        {
+            if (currentHealthMode == EzEnumHealthMode.Lazer)
+                return base.GetDisplayHealthIncrease(hitEvent, displayResult, currentHealth);
+
+            if (currentHealthMode is EzEnumHealthMode.O2JamEasy or EzEnumHealthMode.O2JamNormal or EzEnumHealthMode.O2JamHard)
+            {
+                if (hitEvent.HitObject is HoldNoteBody)
+                    return 0;
+            }
+
+            int row = (int)currentHealthMode;
+            row = Math.Clamp(row, 0, HealthModeHelper.HEALTH_MODE_MAP.GetLength(0) - 1);
+
+            double increase = displayResult switch
+            {
+                HitResult.Perfect => HealthModeHelper.HEALTH_MODE_MAP[row, 0],
+                HitResult.Great => HealthModeHelper.HEALTH_MODE_MAP[row, 1],
+                HitResult.Good => HealthModeHelper.HEALTH_MODE_MAP[row, 2],
+                HitResult.Ok => HealthModeHelper.HEALTH_MODE_MAP[row, 3],
+                HitResult.Meh => HealthModeHelper.HEALTH_MODE_MAP[row, 4],
+                HitResult.Miss => HealthModeHelper.HEALTH_MODE_MAP[row, 5],
+                HitResult.Poor => HealthModeHelper.HEALTH_MODE_MAP[row, 6],
+                _ => 0
+            };
+
+            if (increase < 0 && currentHealth <= 0.5)
+            {
+                if (currentHealthMode == EzEnumHealthMode.IIDX_HD)
+                {
+                    if (currentHealth <= 0.3)
+                        increase *= 0.5;
+                }
+                else if (currentHealthMode == EzEnumHealthMode.LR2_HD)
+                {
+                    if (currentHealth <= 0.3)
+                        increase *= 0.6;
+                }
+                else if (currentHealthMode == EzEnumHealthMode.Raja_HD)
+                {
+                    if (currentHealth <= 0.3)
+                    {
+                        increase *= 0.6;
+                    }
+                    else if (currentHealth < 0.5)
+                    {
+                        double t = (currentHealth - 0.3) / 0.2;
+                        double discount = 0.6 + t * 0.4;
+                        increase *= discount;
+                    }
+                }
+            }
+
+            double scaled = Math.Clamp(increase, -0.2, 0.2);
+            return Math.Abs(scaled) < 1e-6 ? 0 : scaled;
         }
 
         private IReadOnlyList<HitEvent> applyFakeOffset(IEnumerable<HitEvent> events)
@@ -109,13 +187,12 @@ namespace osu.Game.Rulesets.Mania.EzMania.Statistics
                 return list;
 
             return list.Select(e => new HitEvent(
-                    e.TimeOffset + offsetPlusMania.Value,
-                    e.GameplayRate,
-                    e.Result,
-                    e.HitObject,
-                    e.LastHitObject,
-                    e.Position))
-                .ToList();
+                e.TimeOffset + offsetPlusMania.Value,
+                e.GameplayRate,
+                e.Result,
+                e.HitObject,
+                e.LastHitObject,
+                e.Position)).ToList();
         }
 
         protected override void UpdateDisplay()
