@@ -497,9 +497,13 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 var bpmValues = new List<double>();
                 bool hasLongNotes = false;
                 bool hasScratch = false;
+                bool hasStopSequence = false;
+                bool hasScrollChanges = false;
+                bool hasBgaLayer = false;
                 int noteCount = 0;
                 int maxMeasure = 0;
                 string? previewAudioFile = null;
+                string? explicitPreviewFile = null;
                 int previewMeasure = int.MaxValue;
                 double previewPosition = double.MaxValue;
 
@@ -585,7 +589,20 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         }
                     }
                     else if (upperLine.StartsWith("#LNTYPE ", StringComparison.Ordinal) || upperLine.StartsWith("#LNOBJ ", StringComparison.Ordinal))
+                    {
                         hasLongNotes = true;
+                        if (upperLine.StartsWith("#LNTYPE ", StringComparison.Ordinal)
+                            && int.TryParse(line.Substring(8).Trim(), out int lnType))
+                            cache.LnType = lnType;
+                    }
+                    else if (upperLine.StartsWith("#PREVIEW ", StringComparison.Ordinal))
+                    {
+                        explicitPreviewFile = line.Substring(9).Trim();
+                    }
+                    else if (upperLine.StartsWith("#SCROLL", StringComparison.Ordinal))
+                    {
+                        hasScrollChanges = true;
+                    }
                     // Parse channel data for note count and max measure
                     else if (line.Length > 6 && line[6] == ':')
                     {
@@ -626,6 +643,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                                 previewAudioFile = audioFile;
                             }
                         }
+
+                        if (channelStr == "09")
+                            hasStopSequence = true;
+                        else if (channelStr is "04" or "06" or "07")
+                            hasBgaLayer = true;
                     }
                 }
 
@@ -635,8 +657,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 cache.TotalNotes = noteCount;
                 cache.HasScratch = hasScratch;
                 cache.HasLongNotes = hasLongNotes;
+                cache.HasStopSequence = hasStopSequence;
+                cache.HasScrollChanges = hasScrollChanges;
+                cache.HasBgaLayer = hasBgaLayer;
                 cache.KeysoundFiles = keysoundFiles.ToList();
                 cache.AudioFile = previewAudioFile;
+                cache.PreviewFile = explicitPreviewFile;
 
                 // Calculate duration from max measure and BPM
                 // Standard: 4 beats per measure, duration = measures * 4 * 60000 / BPM

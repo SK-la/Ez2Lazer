@@ -23,8 +23,9 @@ using osuTK.Graphics;
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
     /// <summary>
-    /// Loader screen that prepares and starts BMS gameplay using Mania's standard Player.
-    /// Converts BMS beatmap to Mania format and uses osu!'s standard Player flow.
+    /// Loader screen that prepares and starts BMS gameplay.
+    /// Rendering/skin path is delegated to Mania ruleset for compatibility,
+    /// while timing/audio triggering remains BMS chart-driven via BmsPlayer/BmsKeysoundManager.
     /// </summary>
     public partial class BMSPlayerLoader : OsuScreen
     {
@@ -150,6 +151,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             try
             {
+                // Keep Mania ruleset path to guarantee existing Mania skin system is used.
                 var maniaWorkingBeatmap = new ManiaConvertedWorkingBeatmap(workingBeatmap, audioManager);
                 var maniaRuleset = new ManiaRuleset();
 

@@ -71,7 +71,7 @@ namespace osu.Game.Rulesets.BMS.UI
             {
                 new SettingsButton
                 {
-                    Text = "进入 BMS 特殊选歌界面",
+                    Text = "进入 BMS 专用选歌界面（辅助入口）",
                     Action = openBmsSongSelect,
                 },
                 new SettingsButton
@@ -142,7 +142,7 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             game?.PerformFromScreen(screen =>
             {
-                screen.Push(new BMSSongSelectScreen(BMSSongSelectScreenMode.SpecialEntry));
+                screen.Push(new BMSSongSelectScreen(BMSSongSelectScreenMode.RulesetEntry));
             });
         }
 

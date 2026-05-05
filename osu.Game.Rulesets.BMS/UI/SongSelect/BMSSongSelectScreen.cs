@@ -326,6 +326,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 previewBeatmap = new BMSWorkingBeatmap(chart.FullPath, audioManager, textures, chart);
                 previewBeatmap.LoadTrack();
+                previewManager.OverridePreviewStartTime = chart.PreviewTime >= 0 ? chart.PreviewTime : 0;
                 previewManager.StartPreview(previewBeatmap, true);
             }
             catch (Exception ex)
@@ -671,6 +672,15 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             if (chart.HasLongNotes)
                 flags.Add("LN");
+
+            if (chart.HasStopSequence)
+                flags.Add("STOP");
+
+            if (chart.HasScrollChanges)
+                flags.Add("SCROLL");
+
+            if (chart.HasBgaLayer)
+                flags.Add("BGA");
 
             if (flags.Count == 0)
                 flags.Add("标准");

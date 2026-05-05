@@ -94,7 +94,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     Title = title,
                     Artist = artist,
                     Source = "BMS Import",
-                    AudioFile = chartCache?.AudioFile ?? string.Empty,
+                    AudioFile = chartCache?.PreviewFile ?? chartCache?.AudioFile ?? string.Empty,
                 },
                 DifficultyName = difficultyName,
                 Difficulty = new BeatmapDifficulty

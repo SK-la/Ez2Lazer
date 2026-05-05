@@ -55,6 +55,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private int totalKeys = 7;
         private bool hasLongNotes;
         private int lnType = 1; // 1 = LN, 2 = CN, 3 = HCN
+        private int eventSequence;
 
         // Metadata
         private string title = string.Empty;
@@ -90,6 +91,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             stopDefinitions.Clear();
             measureLengths.Clear();
             events.Clear();
+            eventSequence = 0;
 
             Logger.Log($"{BMS_LOG_PREFIX} Starting BMS beatmap decoding");
 
@@ -274,6 +276,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                 events.Add(new BMSEvent
                 {
+                    Sequence = eventSequence++,
                     Measure = measure,
                     Channel = channel,
                     Position = position,
@@ -301,20 +304,21 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             if (!string.IsNullOrEmpty(stageFile))
                 beatmap.BeatmapInfo.Metadata.BackgroundFile = stageFile;
 
-            // Calculate timing
-            var timingPoints = calculateTimingPoints();
+            // Calculate chart timeline once and re-use for all generated objects/events.
+            var timeline = buildTimeline();
+            var timingPoints = createTimingPointsFromTimeline(timeline);
             foreach (var tp in timingPoints)
                 beatmap.ControlPointInfo.Add(tp.Time, tp.ControlPoint);
 
             // Create hit objects
-            var hitObjects = createHitObjects(timingPoints);
+            var hitObjects = createHitObjects(timeline.EventTimes);
             beatmap.HitObjects.AddRange(hitObjects);
 
             // Store background (non-note) sound events
             if (beatmap is BMSBeatmap bmsBeatmap)
             {
                 bmsBeatmap.TotalColumns = totalKeys;
-                var backgroundEvents = createBackgroundSoundEvents(timingPoints);
+                var backgroundEvents = createBackgroundSoundEvents(timeline.EventTimes);
                 bmsBeatmap.BackgroundSoundEvents.AddRange(backgroundEvents);
 
                 if (backgroundEvents.Count > 0)
@@ -368,11 +372,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             };
         }
 
-        private List<TimingPointData> calculateTimingPoints()
+        private TimelineData buildTimeline()
         {
-            var result = new List<TimingPointData>
+            var timingPoints = new List<TimingPointData>
             {
-                // Add initial BPM
                 new TimingPointData
                 {
                     Time = 0,
@@ -380,70 +383,96 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 }
             };
 
-            // Sort events by time
             var sortedEvents = events
                                .OrderBy(e => e.Measure)
                                .ThenBy(e => e.Position)
+                               .ThenBy(e => e.Sequence)
                                .ToList();
 
-            // Process BPM changes
-            foreach (var evt in sortedEvents)
-            {
-                if (evt.Channel == channel_bpm_change)
-                {
-                    // Direct BPM value (hex)
-                    double bpm = Convert.ToInt32(evt.Value, 16);
-                    double time = calculateTime(evt.Measure, evt.Position, result);
+            var eventTimes = new Dictionary<BMSEvent, double>();
 
-                    result.Add(new TimingPointData
+            double currentTime = 0;
+            double currentBpm = initialBpm;
+            int currentMeasure = 0;
+            double currentPositionInMeasure = 0;
+
+            foreach (var evt in sortedEvents.OrderBy(e => e.Measure).ThenBy(e => e.Position).ThenBy(e => e.Sequence))
+            {
+                double targetPositionInMeasure = Math.Clamp(evt.Position, 0, 1);
+                advanceTimeline(ref currentTime, ref currentMeasure, ref currentPositionInMeasure, evt.Measure, targetPositionInMeasure, currentBpm);
+                eventTimes[evt] = currentTime;
+
+                if (tryGetBpmChange(evt, out double bpm) && bpm > 0)
+                {
+                    currentBpm = bpm;
+                    timingPoints.Add(new TimingPointData
                     {
-                        Time = time,
+                        Time = currentTime,
                         ControlPoint = new TimingControlPoint { BeatLength = 60000 / bpm }
                     });
                 }
-                else if (evt.Channel == channel_extended_bpm)
-                {
-                    // Extended BPM reference
-                    if (bpmDefinitions.TryGetValue(evt.Value, out double bpm))
-                    {
-                        double time = calculateTime(evt.Measure, evt.Position, result);
 
-                        result.Add(new TimingPointData
-                        {
-                            Time = time,
-                            ControlPoint = new TimingControlPoint { BeatLength = 60000 / bpm }
-                        });
-                    }
+                if (evt.Channel == channel_stop && stopDefinitions.TryGetValue(evt.Value, out double stopValue) && stopValue > 0)
+                {
+                    // In BMS, STOP units are based on 1/192 measure (== 1/48 beat at 4/4).
+                    currentTime += stopValue * (60000 / currentBpm) / 48.0;
                 }
             }
 
-            return result.OrderBy(t => t.Time).ToList();
+            return new TimelineData
+            {
+                TimingPoints = timingPoints.OrderBy(t => t.Time).ToList(),
+                EventTimes = eventTimes
+            };
         }
 
-        private double calculateTime(int measure, double position, List<TimingPointData> timingPoints)
-        {
-            double time = 0;
-            double currentBpm = initialBpm;
-            int lastMeasure = 0;
-            double lastPosition = 0;
+        private List<TimingPointData> createTimingPointsFromTimeline(TimelineData timeline)
+            => timeline.TimingPoints;
 
-            // Calculate time up to the target measure/position
-            foreach (var tp in timingPoints.Where(t => t.Time < double.MaxValue).OrderBy(t => t.Time))
+        private void advanceTimeline(ref double currentTime, ref int currentMeasure, ref double currentPositionInMeasure, int targetMeasure, double targetPositionInMeasure, double bpm)
+        {
+            if (targetMeasure < currentMeasure || targetMeasure == currentMeasure && targetPositionInMeasure < currentPositionInMeasure)
+                return;
+
+            while (currentMeasure < targetMeasure)
             {
-                currentBpm = 60000 / tp.ControlPoint.BeatLength;
+                double remainingPortion = 1 - currentPositionInMeasure;
+                currentTime += beatLengthForMeasure(currentMeasure, bpm) * remainingPortion;
+                currentMeasure++;
+                currentPositionInMeasure = 0;
             }
 
-            // Simple calculation: assume 4/4 time signature and constant BPM for now
-            double measureLength = measureLengths.GetValueOrDefault(measure, 1.0);
-            double beatsPerMeasure = 4.0 * measureLength;
-            double msPerBeat = 60000 / currentBpm;
+            if (targetPositionInMeasure > currentPositionInMeasure)
+                currentTime += beatLengthForMeasure(currentMeasure, bpm) * (targetPositionInMeasure - currentPositionInMeasure);
 
-            time = measure * 4 * msPerBeat + position * beatsPerMeasure * msPerBeat;
-
-            return time;
+            currentPositionInMeasure = targetPositionInMeasure;
         }
 
-        private List<BMSHitObject> createHitObjects(List<TimingPointData> timingPoints)
+        private bool tryGetBpmChange(BMSEvent evt, out double bpm)
+        {
+            bpm = 0;
+
+            if (evt.Channel == channel_bpm_change)
+            {
+                bpm = Convert.ToInt32(evt.Value, 16);
+                return bpm > 0;
+            }
+
+            if (evt.Channel == channel_extended_bpm && bpmDefinitions.TryGetValue(evt.Value, out bpm))
+                return bpm > 0;
+
+            return false;
+        }
+
+        private double beatLengthForMeasure(int measure, double bpm)
+        {
+            double measureLength = measureLengths.GetValueOrDefault(measure, 1.0);
+            double beatsPerMeasure = 4.0 * measureLength;
+            double msPerBeat = 60000 / bpm;
+            return beatsPerMeasure * msPerBeat;
+        }
+
+        private List<BMSHitObject> createHitObjects(Dictionary<BMSEvent, double> eventTimes)
         {
             var result = new List<BMSHitObject>();
             var activeHolds = new Dictionary<int, BMSEvent>(); // For LN processing
@@ -461,7 +490,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 int column = getColumn(evt.Channel);
                 bool isScratch = isScratchChannel(evt.Channel);
                 bool isLongNote = isLongNoteChannel(evt.Channel);
-                double time = calculateTime(evt.Measure, evt.Position, timingPoints);
+                double time = eventTimes[evt];
 
                 // Get keysound sample
                 var samples = new List<HitSampleInfo>();
@@ -476,7 +505,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     // LN processing: pair start and end
                     if (activeHolds.TryGetValue(column, out var startEvent))
                     {
-                        double startTime = calculateTime(startEvent.Measure, startEvent.Position, timingPoints);
+                        double startTime = eventTimes[startEvent];
 
                         result.Add(new BMSHoldNote
                         {
@@ -522,7 +551,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return result;
         }
 
-        private List<BmsBackgroundSoundEvent> createBackgroundSoundEvents(List<TimingPointData> timingPoints)
+        private List<BmsBackgroundSoundEvent> createBackgroundSoundEvents(Dictionary<BMSEvent, double> eventTimes)
         {
             var result = new List<BmsBackgroundSoundEvent>();
 
@@ -537,7 +566,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 if (!wavDefinitions.TryGetValue(evt.Value, out string? wavFile))
                     continue;
 
-                double time = calculateTime(evt.Measure, evt.Position, timingPoints);
+                double time = eventTimes[evt];
                 result.Add(new BmsBackgroundSoundEvent(time, wavFile));
             }
 
@@ -619,10 +648,17 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         private class BMSEvent
         {
+            public int Sequence { get; set; }
             public int Measure { get; set; }
             public int Channel { get; set; }
             public double Position { get; set; }
             public string Value { get; set; } = string.Empty;
+        }
+
+        private class TimelineData
+        {
+            public List<TimingPointData> TimingPoints { get; set; } = new List<TimingPointData>();
+            public Dictionary<BMSEvent, double> EventTimes { get; set; } = new Dictionary<BMSEvent, double>();
         }
 
         private class TimingPointData

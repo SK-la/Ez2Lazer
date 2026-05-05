@@ -105,11 +105,18 @@ namespace osu.Game.Rulesets.BMS.UI
             if (!IsLoaded)
                 return;
 
-            double currentTime = GameplayClockContainer?.CurrentTime ?? Clock.CurrentTime;
+            if (GameplayClockContainer == null)
+            {
+                if (updateCount++ < 3)
+                    Logger.Log($"{BMS_LOG_PREFIX} GameplayClockContainer is null, skip keysound update.", LoggingTarget.Runtime, LogLevel.Debug);
+                return;
+            }
+
+            double currentTime = GameplayClockContainer.CurrentTime;
 
             // Log first few updates
             if (updateCount++ < 5)
-                Logger.Log($"{BMS_LOG_PREFIX} Update #{updateCount}: currentTime={currentTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+                Logger.Log($"{BMS_LOG_PREFIX} Update #{updateCount}: chartClock={currentTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
 
             // Only update after the game has started (after intro)
             if (currentTime < 0)

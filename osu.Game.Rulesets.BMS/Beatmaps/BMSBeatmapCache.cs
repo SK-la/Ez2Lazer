@@ -149,6 +149,11 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public int PreviewTime { get; set; } = -1;
 
         /// <summary>
+        /// Optional preview audio file from #PREVIEW.
+        /// </summary>
+        public string? PreviewFile { get; set; }
+
+        /// <summary>
         /// Whether this chart has scratch lane.
         /// </summary>
         public bool HasScratch { get; set; }
@@ -157,6 +162,26 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         /// Whether this chart has long notes.
         /// </summary>
         public bool HasLongNotes { get; set; }
+
+        /// <summary>
+        /// Whether this chart contains STOP sequence events.
+        /// </summary>
+        public bool HasStopSequence { get; set; }
+
+        /// <summary>
+        /// Whether this chart contains scroll speed changes.
+        /// </summary>
+        public bool HasScrollChanges { get; set; }
+
+        /// <summary>
+        /// Whether this chart references BGA/layer channels.
+        /// </summary>
+        public bool HasBgaLayer { get; set; }
+
+        /// <summary>
+        /// Parsed LNTYPE value if available.
+        /// </summary>
+        public int LnType { get; set; } = 1;
 
         /// <summary>
         /// Total note count.
