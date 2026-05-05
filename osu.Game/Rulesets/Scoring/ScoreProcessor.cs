@@ -1,4 +1,4 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
@@ -257,12 +257,13 @@ namespace osu.Game.Rulesets.Scoring
 
             if (result.Type.AffectsCombo())
             {
+                // 显式 IsComboHit == false 时必须优先于 IncreasesCombo()（例如 O2/BMS 的 Bad/Meh 需断连但 Type 仍属 IsHit）
                 bool isComboHit = result.IsComboHit ?? result.Type.IsHit();
 
-                if (result.Type.IncreasesCombo() || isComboHit)
-                    Combo.Value++;
-                else if (result.Type.BreaksCombo() || !isComboHit)
+                if (!isComboHit || result.Type.BreaksCombo())
                     Combo.Value = 0;
+                else if (result.Type.IncreasesCombo() || isComboHit)
+                    Combo.Value++;
             }
 
             HighestCombo.Value = Math.Max(HighestCombo.Value, Combo.Value);
