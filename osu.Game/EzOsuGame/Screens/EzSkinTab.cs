@@ -9,11 +9,16 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Overlays;
+using osu.Game.Graphics;
+using osu.Game.Graphics.Sprites;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Settings;
 using osu.Game.Screens.Edit.Components;
 using osuTK;
@@ -27,6 +32,9 @@ namespace osu.Game.EzOsuGame.Screens
 
         [Resolved]
         private Storage storage { get; set; } = null!;
+
+        [Resolved(CanBeNull = true)]
+        private IEzResourcePickerOverlay? resourcePickerOverlay { get; set; }
 
         public EzSkinTab()
             : base("Ez Skin Settings") { }
@@ -56,121 +64,144 @@ namespace osu.Game.EzOsuGame.Screens
             nameOfStage = ezSkinConfig.GetBindable<string>(Ez2Setting.StageName);
             nameOfGameTheme = ezSkinConfig.GetBindable<EzEnumGameThemeName>(Ez2Setting.GameThemeName);
 
-            InternalChild = new FillFlowContainer
+            InternalChild = new Container
             {
-                RelativeSizeAxes = Axes.X,
-                AutoSizeAxes = Axes.Y,
-                Direction = FillDirection.Vertical,
-                Spacing = new Vector2(10),
-                Children = new Drawable[]
+                RelativeSizeAxes = Axes.Both,
+                Children = new[]
                 {
-                    new SettingsEnumDropdown<EzEnumGameThemeName>
+                    new FillFlowContainer
                     {
-                        LabelText = EzSkinStrings.GLOBAL_TEXTURE_NAME,
-                        TooltipText = EzSkinStrings.GLOBAL_TEXTURE_NAME_TOOLTIP,
-                        Current = nameOfGameTheme,
-                    },
-                    new SettingsDropdown<string>
-                    {
-                        LabelText = EzSkinStrings.STAGE_SET,
-                        TooltipText = EzSkinStrings.STAGE_SET_TOOLTIP,
-                        Current = nameOfStage,
-                        Items = availableStageSets,
-                    },
-                    new SettingsDropdown<string>
-                    {
-                        LabelText = EzSkinStrings.NOTE_SET,
-                        TooltipText = EzSkinStrings.NOTE_SET_TOOLTIP,
-                        Current = nameOfNote,
-                        Items = availableNoteSets,
-                    },
-                    new SettingsEnumDropdown<ColumnWidthStyle>
-                    {
-                        LabelText = EzSkinStrings.COLUMN_WIDTH_STYLE,
-                        TooltipText = EzSkinStrings.COLUMN_WIDTH_STYLE_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle),
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.COLUMN_WIDTH,
-                        TooltipText = EzSkinStrings.COLUMN_WIDTH_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth),
-                        KeyboardStep = 1.0f,
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.SPECIAL_FACTOR,
-                        TooltipText = EzSkinStrings.SPECIAL_FACTOR_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor),
-                        KeyboardStep = 0.1f,
-                    },
-                    new SettingsCheckbox
-                    {
-                        LabelText = EzSkinStrings.GLOBAL_HIT_POSITION,
-                        TooltipText = EzSkinStrings.GLOBAL_HIT_POSITION_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.HitPositionGlobalEnable),
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.HIT_POSITION,
-                        TooltipText = EzSkinStrings.HIT_POSITION_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition),
-                        KeyboardStep = 1f,
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.HIT_TARGET_FLOAT_FIXED,
-                        TooltipText = EzSkinStrings.HIT_TARGET_FLOAT_FIXED_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed),
-                        KeyboardStep = 0.1f,
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.HIT_TARGET_ALPHA,
-                        TooltipText = EzSkinStrings.HIT_TARGET_ALPHA_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha),
-                        KeyboardStep = 0.01f,
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.NOTE_HEIGHT_SCALE,
-                        TooltipText = EzSkinStrings.NOTE_HEIGHT_SCALE_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth),
-                        KeyboardStep = 0.1f,
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.NOTE_CORNER_RADIUS,
-                        TooltipText = EzSkinStrings.NOTE_CORNER_RADIUS_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteCornerRadius),
-                        KeyboardStep = 1.0f,
-                    },
-                    new SettingsCheckbox
-                    {
-                        LabelText = EzSkinStrings.MANIA_LN_GRADIENT_ENABLE,
-                        TooltipText = EzSkinStrings.MANIA_LN_GRADIENT_ENABLE_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.ManiaLNGradientEnable),
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT,
-                        TooltipText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight),
-                        KeyboardStep = 1.0f,
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.LN_TAIL_ALPHA,
-                        TooltipText = EzSkinStrings.LN_TAIL_ALPHA_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha),
-                        KeyboardStep = 0.1f,
-                    },
-                    new SettingsSlider<double>
-                    {
-                        LabelText = EzSkinStrings.NOTE_TRACK_LINE,
-                        TooltipText = EzSkinStrings.NOTE_TRACK_LINE_TOOLTIP,
-                        Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight),
-                    },
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Direction = FillDirection.Vertical,
+                        Spacing = new Vector2(10),
+                        Children = new Drawable[]
+                        {
+                            new SettingsEnumDropdown<EzEnumGameThemeName>
+                            {
+                                LabelText = EzSkinStrings.GLOBAL_TEXTURE_NAME,
+                                TooltipText = EzSkinStrings.GLOBAL_TEXTURE_NAME_TOOLTIP,
+                                Current = nameOfGameTheme,
+                            },
+                            new SettingsDropdown<string>
+                            {
+                                LabelText = EzSkinStrings.STAGE_SET,
+                                TooltipText = EzSkinStrings.STAGE_SET_TOOLTIP,
+                                Current = nameOfStage,
+                                Items = availableStageSets,
+                            },
+                            new SettingsDropdown<string>
+                            {
+                                LabelText = EzSkinStrings.NOTE_SET,
+                                TooltipText = EzSkinStrings.NOTE_SET_TOOLTIP,
+                                Current = nameOfNote,
+                                Items = availableNoteSets,
+                            },
+                            new FillFlowContainer
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                AutoSizeAxes = Axes.Y,
+                                Direction = FillDirection.Vertical,
+                                Spacing = new Vector2(0, 6),
+                                Children = new[]
+                                {
+                                    createVisualPickerButton(EzSkinStrings.VISUAL_PICKER_GAME_THEME_BUTTON, () =>
+                                        presentPicker(EzResourcePickerDescriptor.ForGameTheme(storage, nameOfGameTheme))),
+                                    createVisualPickerButton(EzSkinStrings.VISUAL_PICKER_NOTE_SET_BUTTON, () =>
+                                        presentPicker(EzResourcePickerDescriptor.ForNoteSet(storage, nameOfNote))),
+                                    createVisualPickerButton(EzSkinStrings.VISUAL_PICKER_STAGE_BUTTON, () =>
+                                        presentPicker(EzResourcePickerDescriptor.ForStage(storage, nameOfStage))),
+                                }
+                            },
+                            new SettingsEnumDropdown<ColumnWidthStyle>
+                            {
+                                LabelText = EzSkinStrings.COLUMN_WIDTH_STYLE,
+                                TooltipText = EzSkinStrings.COLUMN_WIDTH_STYLE_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<ColumnWidthStyle>(Ez2Setting.ColumnWidthStyle),
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.COLUMN_WIDTH,
+                                TooltipText = EzSkinStrings.COLUMN_WIDTH_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColumnWidth),
+                                KeyboardStep = 1.0f,
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.SPECIAL_FACTOR,
+                                TooltipText = EzSkinStrings.SPECIAL_FACTOR_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.SpecialFactor),
+                                KeyboardStep = 0.1f,
+                            },
+                            new SettingsCheckbox
+                            {
+                                LabelText = EzSkinStrings.GLOBAL_HIT_POSITION,
+                                TooltipText = EzSkinStrings.GLOBAL_HIT_POSITION_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.HitPositionGlobalEnable),
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.HIT_POSITION,
+                                TooltipText = EzSkinStrings.HIT_POSITION_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition),
+                                KeyboardStep = 1f,
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.HIT_TARGET_FLOAT_FIXED,
+                                TooltipText = EzSkinStrings.HIT_TARGET_FLOAT_FIXED_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetFloatFixed),
+                                KeyboardStep = 0.1f,
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.HIT_TARGET_ALPHA,
+                                TooltipText = EzSkinStrings.HIT_TARGET_ALPHA_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.HitTargetAlpha),
+                                KeyboardStep = 0.01f,
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.NOTE_HEIGHT_SCALE,
+                                TooltipText = EzSkinStrings.NOTE_HEIGHT_SCALE_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteHeightScaleToWidth),
+                                KeyboardStep = 0.1f,
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.NOTE_CORNER_RADIUS,
+                                TooltipText = EzSkinStrings.NOTE_CORNER_RADIUS_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteCornerRadius),
+                                KeyboardStep = 1.0f,
+                            },
+                            new SettingsCheckbox
+                            {
+                                LabelText = EzSkinStrings.MANIA_LN_GRADIENT_ENABLE,
+                                TooltipText = EzSkinStrings.MANIA_LN_GRADIENT_ENABLE_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<bool>(Ez2Setting.ManiaLNGradientEnable),
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT,
+                                TooltipText = EzSkinStrings.LN_GRADIENT_TAIL_HEIGHT_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailMaskGradientHeight),
+                                KeyboardStep = 1.0f,
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.LN_TAIL_ALPHA,
+                                TooltipText = EzSkinStrings.LN_TAIL_ALPHA_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ManiaHoldTailAlpha),
+                                KeyboardStep = 0.1f,
+                            },
+                            new SettingsSlider<double>
+                            {
+                                LabelText = EzSkinStrings.NOTE_TRACK_LINE,
+                                TooltipText = EzSkinStrings.NOTE_TRACK_LINE_TOOLTIP,
+                                Current = ezSkinConfig.GetBindable<double>(Ez2Setting.NoteTrackLineHeight),
+                            },
+                        }
+                    }
                 }
             };
         }
@@ -185,6 +216,33 @@ namespace osu.Game.EzOsuGame.Screens
             {
                 ezSkinConfig.SetValue(Ez2Setting.GameThemeName, e.NewValue);
             });
+        }
+
+        private Drawable createVisualPickerButton(LocalisableString label, Action action) =>
+            new OsuAnimatedButton
+            {
+                RelativeSizeAxes = Axes.X,
+                Height = 36,
+                Action = action,
+            }.With(b => b.Add(new OsuSpriteText
+            {
+                Anchor = Anchor.Centre,
+                Origin = Anchor.Centre,
+                Text = label,
+                Font = OsuFont.GetFont(size: 14, weight: FontWeight.SemiBold),
+            }));
+
+        private void presentPicker(EzResourcePickerDescriptor descriptor)
+        {
+            var picker = resourcePickerOverlay;
+
+            if (picker == null)
+            {
+                Logger.Log("EzSkinTab picker is not resolved from dependency container.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
+                return;
+            }
+
+            picker.Present(descriptor);
         }
 
         private void loadFolderSets(string type)

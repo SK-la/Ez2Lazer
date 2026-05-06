@@ -11,7 +11,6 @@ using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osuTK;
@@ -21,7 +20,7 @@ namespace osu.Game.EzOsuGame.Overlays
     /// <summary>
     /// Ez 资源大图选择覆盖层（GameTheme / NoteSet / Stage）。
     /// </summary>
-    public partial class EzPreviewSelectOverlay : OsuFocusedOverlayContainer, IEzResourcePickerOverlay
+    public partial class EzPreviewSelectOverlay : OverlayContainer, IEzResourcePickerOverlay
     {
         private const float cell_w = 108;
         private const float cell_h = 128;
@@ -313,7 +312,6 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override void PopOut()
         {
-            base.PopOut();
             this.FadeOut(200, Easing.OutQuint);
         }
 
