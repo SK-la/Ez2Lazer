@@ -62,6 +62,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         private readonly string cacheDirectory;
         private readonly List<string> rootPaths = new List<string>();
         private readonly Dictionary<Guid, BMSSourceReference> beatmapSourceMap = new Dictionary<Guid, BMSSourceReference>();
+        private readonly object sourceMapLock = new object();
 
         /// <summary>
         ///     Get the cache file path.
@@ -279,7 +280,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         public IReadOnlyList<BeatmapSetInfo> BuildVirtualBeatmapCatalog(RulesetInfo bmsRulesetInfo)
         {
             List<BeatmapSetInfo> result = new List<BeatmapSetInfo>();
-            beatmapSourceMap.Clear();
+            Dictionary<Guid, BMSSourceReference> newSourceMap = new Dictionary<Guid, BMSSourceReference>();
 
             if (LibraryCache == null)
                 return result;
@@ -332,7 +333,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                     beatmapSet.Beatmaps.Add(beatmapInfo);
 
-                    beatmapSourceMap[beatmapInfo.ID] = new BMSSourceReference
+                    newSourceMap[beatmapInfo.ID] = new BMSSourceReference
                     {
                         BeatmapId = beatmapInfo.ID,
                         FolderPath = chart.FolderPath,
@@ -344,56 +345,56 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 result.Add(beatmapSet);
             }
 
-            saveSourceMap();
+            replaceSourceMap(newSourceMap);
+            saveSourceMap(newSourceMap.Values);
             return result;
         }
 
         public bool TryGetSourceReference(Guid beatmapId, out BMSSourceReference sourceReference)
         {
-            if (beatmapSourceMap.TryGetValue(beatmapId, out sourceReference!))
+            if (tryGetSourceReferenceCore(beatmapId, out sourceReference))
                 return true;
 
             loadSourceMap();
-            return beatmapSourceMap.TryGetValue(beatmapId, out sourceReference!);
+            return tryGetSourceReferenceCore(beatmapId, out sourceReference);
         }
 
         public bool TryGetSourceReferenceByHash(string md5Hash, out BMSSourceReference sourceReference)
         {
-            foreach (BMSSourceReference reference in beatmapSourceMap.Values)
-            {
-                if (string.Equals(reference.Md5Hash, md5Hash, StringComparison.OrdinalIgnoreCase))
-                {
-                    sourceReference = reference;
-                    return true;
-                }
-            }
+            if (tryGetSourceReferenceByHashCore(md5Hash, out sourceReference))
+                return true;
 
             loadSourceMap();
 
-            foreach (BMSSourceReference reference in beatmapSourceMap.Values)
-            {
-                if (string.Equals(reference.Md5Hash, md5Hash, StringComparison.OrdinalIgnoreCase))
-                {
-                    sourceReference = reference;
-                    return true;
-                }
-            }
-
-            sourceReference = default;
-            return false;
+            return tryGetSourceReferenceByHashCore(md5Hash, out sourceReference);
         }
 
         public Dictionary<Guid, BMSSourceReference> GetCurrentSourceMap()
-            => new Dictionary<Guid, BMSSourceReference>(beatmapSourceMap);
+        {
+            lock (sourceMapLock)
+                return new Dictionary<Guid, BMSSourceReference>(beatmapSourceMap);
+        }
 
-        private void saveSourceMap()
+        private void saveSourceMap(IEnumerable<BMSSourceReference>? sourceSnapshot = null)
         {
             try
             {
+                List<BMSSourceReference> sources;
+
+                if (sourceSnapshot != null)
+                {
+                    sources = sourceSnapshot.OrderBy(reference => reference.BeatmapId).ToList();
+                }
+                else
+                {
+                    lock (sourceMapLock)
+                        sources = beatmapSourceMap.Values.OrderBy(reference => reference.BeatmapId).ToList();
+                }
+
                 var index = new BMSExternalLinkIndex
                 {
                     UpdatedAt = DateTime.UtcNow,
-                    Sources = beatmapSourceMap.Values.OrderBy(reference => reference.BeatmapId).ToList(),
+                    Sources = sources,
                 };
 
                 index.Save(sourceMapFilePath);
@@ -413,18 +414,55 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 if (index == null)
                     return;
 
-                beatmapSourceMap.Clear();
+                Dictionary<Guid, BMSSourceReference> loadedMap = new Dictionary<Guid, BMSSourceReference>();
 
                 foreach (BMSSourceReference reference in index.Sources)
                 {
                     if (reference.BeatmapId != Guid.Empty && !string.IsNullOrWhiteSpace(reference.ChartPath))
-                        beatmapSourceMap[reference.BeatmapId] = reference;
+                        loadedMap[reference.BeatmapId] = reference;
                 }
+
+                replaceSourceMap(loadedMap);
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to load BMS external source map");
             }
+        }
+
+        private void replaceSourceMap(Dictionary<Guid, BMSSourceReference> newMap)
+        {
+            lock (sourceMapLock)
+            {
+                beatmapSourceMap.Clear();
+
+                foreach ((Guid key, BMSSourceReference value) in newMap)
+                    beatmapSourceMap[key] = value;
+            }
+        }
+
+        private bool tryGetSourceReferenceCore(Guid beatmapId, out BMSSourceReference sourceReference)
+        {
+            lock (sourceMapLock)
+                return beatmapSourceMap.TryGetValue(beatmapId, out sourceReference);
+        }
+
+        private bool tryGetSourceReferenceByHashCore(string md5Hash, out BMSSourceReference sourceReference)
+        {
+            lock (sourceMapLock)
+            {
+                foreach (BMSSourceReference reference in beatmapSourceMap.Values)
+                {
+                    if (string.Equals(reference.Md5Hash, md5Hash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        sourceReference = reference;
+                        return true;
+                    }
+                }
+            }
+
+            sourceReference = default;
+            return false;
         }
 
         private static float mapRankToOD(int bmsRank)

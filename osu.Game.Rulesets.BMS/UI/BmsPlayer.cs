@@ -28,6 +28,7 @@ namespace osu.Game.Rulesets.BMS.UI
         private int updateCount = 0;
         private int triggerCount = 0;
         private Bindable<double>? bmsKeysoundVolume;
+        private bool isDisposed;
 
         [Resolved]
         private IRulesetConfigCache rulesetConfigCache { get; set; } = null!;
@@ -58,9 +59,9 @@ namespace osu.Game.Rulesets.BMS.UI
                     keysoundManager.SetBackgroundSoundEvents(bmsBeatmap.BackgroundSoundEvents);
                 }
             }
-            else if (Beatmap.Value is ManiaConvertedWorkingBeatmap maniaConverted)
+            else
             {
-                keysoundManager = maniaConverted.KeysoundManager;
+                Logger.Log($"{BMS_LOG_PREFIX} Unexpected working beatmap type: {Beatmap.Value?.GetType().Name}", LoggingTarget.Runtime, LogLevel.Error);
             }
 
             var bmsConfig = rulesetConfigCache.GetConfigFor(new BMSRuleset()) as BMSRulesetConfigManager;
@@ -74,7 +75,11 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private void onKeysoundVolumeChanged(ValueChangedEvent<double> volume)
         {
-            keysoundManager?.SetVolume(volume.NewValue);
+            var manager = keysoundManager;
+            if (isDisposed || manager == null || manager.IsDisposed)
+                return;
+
+            manager.SetVolume(volume.NewValue);
         }
 
         protected override void LoadComplete()
@@ -93,7 +98,8 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             base.Update();
 
-            if (keysoundManager == null)
+            var manager = keysoundManager;
+            if (isDisposed || manager == null || manager.IsDisposed)
             {
                 if (++updateCount == 1)
                     Logger.Log($"{BMS_LOG_PREFIX} Update: keysoundManager is null", LoggingTarget.Runtime, LogLevel.Error);
@@ -121,12 +127,13 @@ namespace osu.Game.Rulesets.BMS.UI
                 return;
 
             // Update keysound manager with current time - THIS PLAYS BACKGROUND SOUNDS
-            keysoundManager.Update(currentTime);
+            manager.Update(currentTime);
         }
 
         private void onNewResult(JudgementResult result)
         {
-            if (keysoundManager == null)
+            var manager = keysoundManager;
+            if (isDisposed || manager == null || manager.IsDisposed)
                 return;
 
             // Only trigger keysounds on successful hits (not miss)
@@ -152,7 +159,7 @@ namespace osu.Game.Rulesets.BMS.UI
                     triggerCount++;
                     if (triggerCount <= 10)
                         Logger.Log($"{BMS_LOG_PREFIX} Hit trigger #{triggerCount}: {fileSample.Filename} - {result.Type}", LoggingTarget.Runtime, LogLevel.Debug);
-                    keysoundManager.TriggerKeysound(fileSample.Filename);
+                    manager.TriggerKeysound(fileSample.Filename);
                     break;
                 }
             }
@@ -160,6 +167,8 @@ namespace osu.Game.Rulesets.BMS.UI
 
         protected override void Dispose(bool isDisposing)
         {
+            isDisposed = true;
+
             if (DrawableRuleset != null)
                 DrawableRuleset.NewResult -= onNewResult;
 
@@ -167,6 +176,7 @@ namespace osu.Game.Rulesets.BMS.UI
                 bmsKeysoundVolume.ValueChanged -= onKeysoundVolumeChanged;
 
             keysoundManager?.Dispose();
+            keysoundManager = null;
             base.Dispose(isDisposing);
         }
     }

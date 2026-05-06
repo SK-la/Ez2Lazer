@@ -95,6 +95,15 @@ namespace osu.Game.Rulesets.BMS.UI
                 case BMSHoldNote holdNote:
                     return new DrawableBMSHoldNote(holdNote);
 
+                case BMSHoldNoteHead holdHead:
+                    return new DrawableBMSHoldNoteHead(holdHead);
+
+                case BMSHoldNoteTail holdTail:
+                    return new DrawableBMSHoldNoteTail(holdTail);
+
+                case BMSHoldNoteBody holdBody:
+                    return new DrawableBMSHoldNoteBody(holdBody);
+
                 case BMSNote note:
                     return new DrawableBMSNote(note);
             }

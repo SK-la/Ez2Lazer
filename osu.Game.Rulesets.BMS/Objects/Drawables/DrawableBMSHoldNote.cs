@@ -8,6 +8,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Skinning;
@@ -28,6 +29,9 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
         private Drawable noteTail = null!;
 
         private bool isHolding;
+        private DrawableBMSHoldNoteHead? head;
+        private DrawableBMSHoldNoteBody? body;
+        private DrawableBMSHoldNoteTail? tail;
 
         public DrawableBMSHoldNote()
             : this(null!)
@@ -96,22 +100,83 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
 
         protected override void CheckForResult(bool userTriggered, double timeOffset)
         {
-            if (Time.Current < HitObject.EndTime)
+            if (tail == null)
                 return;
 
-            // Simple hold note logic: check if held through the entire duration
-            ApplyResult(isHolding ? HitResult.Great : HitResult.Miss);
+            if (!tail.AllJudged && Time.Current >= HitObject.EndTime)
+                tail.TriggerUpdate(false);
+
+            if (!tail.AllJudged)
+                return;
+
+            ApplyResult(tail.IsHit ? HitResult.Great : HitResult.Miss);
+        }
+
+        protected override DrawableHitObject CreateNestedHitObject(HitObject hitObject)
+        {
+            switch (hitObject)
+            {
+                case BMSHoldNoteHead holdHead:
+                    return new DrawableBMSHoldNoteHead(holdHead);
+
+                case BMSHoldNoteTail holdTail:
+                    return new DrawableBMSHoldNoteTail(holdTail);
+
+                case BMSHoldNoteBody holdBody:
+                    return new DrawableBMSHoldNoteBody(holdBody);
+            }
+
+            return base.CreateNestedHitObject(hitObject);
+        }
+
+        protected override void AddNestedHitObject(DrawableHitObject hitObject)
+        {
+            base.AddNestedHitObject(hitObject);
+
+            switch (hitObject)
+            {
+                case DrawableBMSHoldNoteHead nestedHead:
+                    head = nestedHead;
+                    break;
+
+                case DrawableBMSHoldNoteBody nestedBody:
+                    body = nestedBody;
+                    break;
+
+                case DrawableBMSHoldNoteTail nestedTail:
+                    tail = nestedTail;
+                    break;
+            }
+        }
+
+        protected override void ClearNestedHitObjects()
+        {
+            base.ClearNestedHitObjects();
+            head = null;
+            body = null;
+            tail = null;
         }
 
         public bool OnPressed(KeyBindingPressEvent<BMSAction> e)
         {
+            if (AllJudged)
+                return false;
+
             if (e.Action == stageLayout.ActionFor(HitObject))
             {
                 if (CheckHittable?.Invoke(this, Time.Current) == false)
                     return false;
 
-                isHolding = true;
-                return true;
+                if (head == null || tail == null)
+                    return false;
+
+                // Do not begin holds deep into the tail miss-lenience window.
+                if (Time.Current > tail.HitObject.StartTime && !tail.HitObject.HitWindows.CanBeHit(Time.Current - tail.HitObject.StartTime))
+                    return false;
+
+                bool consumed = head.TriggerUpdate(true);
+                isHolding = head.IsHit;
+                return consumed;
             }
 
             return false;
@@ -119,16 +184,26 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
 
         public void OnReleased(KeyBindingReleaseEvent<BMSAction> e)
         {
+            if (AllJudged)
+                return;
+
             if (e.Action == stageLayout.ActionFor(HitObject))
             {
-                isHolding = false;
+                if (!isHolding || tail == null)
+                    return;
 
-                // If released before the tail, miss
-                if (Time.Current < HitObject.EndTime - HitObject.HitWindows.WindowFor(HitResult.Good))
-                {
-                    ApplyMinResult();
-                }
+                tail.TriggerUpdate(false);
+                isHolding = false;
             }
+        }
+
+        public override void MissForcefully()
+        {
+            isHolding = false;
+            head?.MissForcefully();
+            body?.MissForcefully();
+            tail?.MissForcefully();
+            base.MissForcefully();
         }
 
         protected override void UpdateHitStateTransforms(ArmedState state)
@@ -144,6 +219,42 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
                     this.FadeOut(100);
                     break;
             }
+        }
+    }
+
+    public partial class DrawableBMSHoldNoteHead : DrawableBMSNote
+    {
+        public DrawableBMSHoldNoteHead(BMSHoldNoteHead hitObject)
+            : base(hitObject)
+        {
+            Alpha = 0;
+        }
+
+        public bool TriggerUpdate(bool userTriggered) => UpdateResult(userTriggered);
+    }
+
+    public partial class DrawableBMSHoldNoteTail : DrawableBMSNote
+    {
+        public DrawableBMSHoldNoteTail(BMSHoldNoteTail hitObject)
+            : base(hitObject)
+        {
+            Alpha = 0;
+        }
+
+        public bool TriggerUpdate(bool userTriggered) => UpdateResult(userTriggered);
+    }
+
+    public partial class DrawableBMSHoldNoteBody : DrawableBMSHitObject<BMSHoldNoteBody>
+    {
+        public DrawableBMSHoldNoteBody(BMSHoldNoteBody hitObject)
+            : base(hitObject)
+        {
+            Alpha = 0;
+            RelativeSizeAxes = Axes.X;
+        }
+
+        protected override void CheckForResult(bool userTriggered, double timeOffset)
+        {
         }
     }
 }
