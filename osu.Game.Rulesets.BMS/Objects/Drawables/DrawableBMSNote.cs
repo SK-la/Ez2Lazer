@@ -37,17 +37,10 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
         [BackgroundDependencyLoader]
         private void load()
         {
-            AddInternal(noteBody = new Box
-            {
-                RelativeSizeAxes = Axes.Both,
-            });
-
             noteBody = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.Note), _ => new Box
             {
                 RelativeSizeAxes = Axes.Both,
             });
-
-            ClearInternal();
             AddInternal(noteBody);
         }
 
