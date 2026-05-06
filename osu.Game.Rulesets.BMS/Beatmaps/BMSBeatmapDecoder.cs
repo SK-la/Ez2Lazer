@@ -20,6 +20,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// <summary>
     /// Decoder for BMS/BME/BML/PMS file formats.
     /// </summary>
+    /// <remarks>
+    /// Scratch channels map to mania columns via a single global scheme (e.g. 16/56 → lane 0); keep converter, decoder and
+    /// <see cref="UI.BMSColumn"/> input bindings aligned when changing mapping. Mirror and DP are handled outside the decoder.
+    /// </remarks>
     public class BMSBeatmapDecoder : Decoder<Beatmap>
     {
         private const string BMS_LOG_PREFIX = "[BMS]";

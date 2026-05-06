@@ -67,6 +67,10 @@ namespace osu.Game.Rulesets.BMS.Mods
         }
     }
 
+    /// <summary>
+    /// Horizontal mirror for BMS. Lane groups are split at scratch columns so non-scratch lanes can mirror without moving scratch
+    /// (BMS-specific: preserve scratch while mirroring the key body, or extend later with scratch-only placement modes).
+    /// </summary>
     public class BMSModMirror : ModMirror, IApplicableAfterBeatmapConversion
     {
         public override LocalisableString Description => "Flip the playfield horizontally.";
@@ -88,6 +92,11 @@ namespace osu.Game.Rulesets.BMS.Mods
         }
     }
 
+    /// <summary>
+    /// Splits mania columns into contiguous segments separated by scratch columns (see <see cref="BmsManiaNote.IsScratch"/>).
+    /// Used so mirror/random can affect only "本体" key lanes. Scratch column index comes from global BMS→mania mapping.
+    /// Future: optional mode to relocate only scratch to far left/right without permuting key columns.
+    /// </summary>
     internal static class BMSStageModHelper
     {
         public static IEnumerable<int[]> GetRegularLaneGroups(ManiaBeatmap beatmap)
