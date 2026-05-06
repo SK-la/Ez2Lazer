@@ -44,5 +44,35 @@ namespace osu.Game.Rulesets.BMS.Tests
             Assert.That(beatmap.BeatmapInfo.Metadata.Tags, Does.Contain("stop"));
             Assert.That(beatmap.BeatmapInfo.Metadata.Tags, Does.Contain("scroll"));
         }
+
+        [Test]
+        public void TestDecodeTenPlusTwoChartCompactsToTwelveColumns()
+        {
+            const string bms = """
+                               #TITLE 10+2
+                               #WAV01 hit.wav
+                               #00111:01
+                               #00112:01
+                               #00113:01
+                               #00114:01
+                               #00115:01
+                               #00116:01
+                               #00121:01
+                               #00122:01
+                               #00123:01
+                               #00124:01
+                               #00125:01
+                               #00126:01
+                               """;
+
+            var decoder = new BMSBeatmapDecoder();
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(bms));
+            using var reader = new LineBufferedReader(stream);
+
+            var beatmap = decoder.Decode(reader);
+            int columns = beatmap.HitObjects.OfType<BMSHitObject>().Select(h => h.Column).DefaultIfEmpty(-1).Max() + 1;
+
+            Assert.That(columns, Is.EqualTo(12));
+        }
     }
 }

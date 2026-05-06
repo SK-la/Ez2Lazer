@@ -36,12 +36,42 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return beatmap;
         }
 
+        protected override Beatmap<BMSHitObject> ConvertBeatmap(IBeatmap original, CancellationToken cancellationToken)
+        {
+            var converted = base.ConvertBeatmap(original, cancellationToken);
+            converted.HitObjects = converted.HitObjects.Select(cloneBmsHitObject).ToList();
+            return converted;
+        }
+
         protected override IEnumerable<BMSHitObject> ConvertHitObject(HitObject original, IBeatmap beatmap, CancellationToken cancellationToken)
         {
             if (original is BMSHitObject bmsObject)
+                yield return cloneBmsHitObject(bmsObject);
+        }
+
+        private static BMSHitObject cloneBmsHitObject(BMSHitObject source)
+        {
+            BMSHitObject clone = source switch
             {
-                yield return bmsObject;
-            }
+                BMSHoldNote hold => new BMSHoldNote
+                {
+                    Duration = hold.Duration
+                },
+                BMSHoldNoteHead => new BMSHoldNoteHead(),
+                BMSHoldNoteTail => new BMSHoldNoteTail(),
+                BMSHoldNoteBody body => new BMSHoldNoteBody
+                {
+                    Duration = body.Duration
+                },
+                BMSNote => new BMSNote(),
+                _ => throw new System.ArgumentOutOfRangeException(nameof(source), source.GetType(), @"Unsupported BMS hitobject type"),
+            };
+
+            clone.StartTime = source.StartTime;
+            clone.Column = source.Column;
+            clone.IsScratch = source.IsScratch;
+            clone.Samples = source.Samples.ToList();
+            return clone;
         }
     }
 }

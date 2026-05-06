@@ -49,26 +49,19 @@ namespace osu.Game.Rulesets.BMS
         }
 
         /// <summary>
-        /// Map column + scratch flag to key / scratch actions (supports scratch-left or scratch-right via column indices).
+        /// Map BMS lane directly to a mania-like contiguous input sequence.
         /// </summary>
+        /// <remarks>
+        /// This keeps scratch lanes in the same ordinal flow as normal keys (column 0 -> key1, column 1 -> key2, ...),
+        /// preventing off-by-one key requests when reusing mania visuals / key counters.
+        /// </remarks>
         public BMSAction ActionFor(BMSHitObject hitObject)
         {
-            if (hitObject.IsScratch)
-            {
-                int idx = indexOfScratchColumn(hitObject.Column);
-                return idx <= 0 ? BMSAction.Scratch1 : BMSAction.Scratch2;
-            }
+            int clamped = Math.Clamp(hitObject.Column, 0, 15);
+            if (clamped <= 13)
+                return (BMSAction)((int)BMSAction.Key1 + clamped);
 
-            var keyColumns = Enumerable.Range(0, TotalColumns)
-                                       .Where(c => !ScratchColumnIndices.Contains(c))
-                                       .OrderBy(c => c)
-                                       .ToList();
-
-            int keyIndex = keyColumns.IndexOf(hitObject.Column);
-            if (keyIndex < 0 || keyIndex > 13)
-                return BMSAction.Key1;
-
-            return (BMSAction)((int)BMSAction.Key1 + keyIndex);
+            return clamped == 14 ? BMSAction.Scratch1 : BMSAction.Scratch2;
         }
 
         /// <summary>
@@ -78,20 +71,9 @@ namespace osu.Game.Rulesets.BMS
         /// </summary>
         public static ManiaAction ManiaSkinActionForColumn(int columnIndex)
         {
-            int max = (int)ManiaAction.Key20;
+            const int max = (int)ManiaAction.Key20;
             int clamped = Math.Clamp(columnIndex, 0, max);
             return (ManiaAction)clamped;
-        }
-
-        private int indexOfScratchColumn(int column)
-        {
-            for (int i = 0; i < ScratchColumnIndices.Count; i++)
-            {
-                if (ScratchColumnIndices[i] == column)
-                    return i;
-            }
-
-            return -1;
         }
     }
 }

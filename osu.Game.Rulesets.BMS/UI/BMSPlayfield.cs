@@ -22,8 +22,8 @@ namespace osu.Game.Rulesets.BMS.UI
     [Cached]
     public partial class BMSPlayfield : ScrollingPlayfield
     {
-        public const float COLUMN_WIDTH = 60f;
-        public const float SCRATCH_WIDTH = 80f;
+        public const float COLUMN_WIDTH = Mania.UI.Column.COLUMN_WIDTH;
+        public const float SCRATCH_WIDTH = Mania.UI.Column.SPECIAL_COLUMN_WIDTH;
 
         /// <summary>
         /// Required for <see cref="Mania.UI.Column"/> load (match key count for mania skin / config).

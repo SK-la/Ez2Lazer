@@ -34,14 +34,14 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
-        public void TestSevenKeyVariantContainsScratchBinding()
+        public void TestVariantUsesGivenLaneCount()
         {
             var ruleset = new BMSRuleset();
 
-            var bindings = ruleset.GetDefaultKeyBindings(7).ToList();
+            var bindings = ruleset.GetDefaultKeyBindings(12).ToList();
 
-            Assert.That(bindings.Count, Is.EqualTo(8));
-            Assert.That(bindings.Any(b => b.Action.ToString() == "Scratch1"), Is.True);
+            Assert.That(bindings.Count, Is.EqualTo(12));
+            Assert.That(bindings.Any(b => b.Action.ToString() == "Key12"), Is.True);
         }
     }
 }
