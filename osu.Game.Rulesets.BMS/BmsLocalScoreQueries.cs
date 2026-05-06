@@ -54,11 +54,13 @@ namespace osu.Game.Rulesets.BMS
                 if (bm == null)
                     return new List<ScoreInfo>();
 
+                // Realm does not support translating Take() on this collection query path.
+                // Materialise first, then apply ordering/Take in-memory.
                 return bm.Scores
+                         .AsEnumerable()
                          .Where(s => !s.DeletePending)
                          .OrderByDescending(s => s.TotalScore)
                          .Take(take)
-                         .AsEnumerable()
                          .Select(s => s.Detach())
                          .ToList();
             });
