@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.TypeExtensions;
@@ -252,15 +253,38 @@ namespace osu.Game.Skinning
             // If deserialisation using SkinLayoutInfo fails, attempt to deserialise using the old naked list.
             if (layout == null)
             {
-                var deserializedContent = JsonConvert.DeserializeObject<IEnumerable<SerialisedDrawableInfo>>(jsonContent);
-                if (deserializedContent == null)
-                    return null;
+                try
+                {
+                    var deserializedContent = JsonConvert.DeserializeObject<IEnumerable<SerialisedDrawableInfo>>(jsonContent)?.ToArray();
 
-                layout = new SkinLayoutInfo { Version = 0 };
-                layout.Update(null, deserializedContent.ToArray());
+                    if (deserializedContent != null)
+                    {
+                        layout = new SkinLayoutInfo { Version = 0 };
+                        layout.Update(null, deserializedContent);
 
-                Logger.Log($"Ferrying {deserializedContent.Count()} components in {target} to global section of new {nameof(SkinLayoutInfo)} format");
+                        Logger.Log($"Ferrying {deserializedContent.Length} components in {target} to global section of new {nameof(SkinLayoutInfo)} format");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Deserialising skin layout to {nameof(SerialisedDrawableInfo)}[] failed. Attempting object migration fallback.\nDetails: {ex}");
+                }
             }
+
+            if (layout == null)
+            {
+                try
+                {
+                    layout = tryParseLegacyObjectLayout(jsonContent, target);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Object migration fallback for skin layout failed.\nDetails: {ex}");
+                }
+            }
+
+            if (layout == null)
+                return null;
 
             for (int i = layout.Version + 1; i <= SkinLayoutInfo.LATEST_VERSION; i++)
                 applyMigration(layout, target, i);
@@ -276,6 +300,55 @@ namespace osu.Game.Skinning
                 }
             }
 
+            return layout;
+        }
+
+        private static SkinLayoutInfo? tryParseLegacyObjectLayout(string jsonContent, GlobalSkinnableContainers target)
+        {
+            var root = JObject.Parse(jsonContent);
+
+            var layout = new SkinLayoutInfo
+            {
+                Version = root.Value<int?>("Version") ?? 0
+            };
+
+            // Some historical formats may store drawable arrays directly under "DrawableInfo" as an array.
+            if (root.TryGetValue("DrawableInfo", out var drawableInfoToken))
+            {
+                if (drawableInfoToken is JArray globalArray)
+                {
+                    var globalDrawables = globalArray.ToObject<SerialisedDrawableInfo[]>();
+                    if (globalDrawables != null)
+                        layout.Update(null, globalDrawables);
+                }
+                else if (drawableInfoToken is JObject drawableMap)
+                {
+                    foreach ((string key, JToken value) in drawableMap)
+                    {
+                        var drawables = value.ToObject<SerialisedDrawableInfo[]>();
+                        if (drawables != null)
+                            layout.DrawableInfo[key] = drawables;
+                    }
+                }
+            }
+            else
+            {
+                // Legacy object style: { "Version": 1, "global": [...], "osu": [...] }.
+                foreach ((string key, JToken value) in root)
+                {
+                    if (key == "Version" || value is not JArray array)
+                        continue;
+
+                    var drawables = array.ToObject<SerialisedDrawableInfo[]>();
+                    if (drawables != null)
+                        layout.DrawableInfo[key] = drawables;
+                }
+            }
+
+            if (layout.DrawableInfo.Count == 0)
+                return null;
+
+            Logger.Log($"Ferrying {layout.AllDrawables.Count()} components in {target} via object migration fallback");
             return layout;
         }
 
