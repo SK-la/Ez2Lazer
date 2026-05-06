@@ -53,12 +53,18 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         private readonly Dictionary<int, double> measureLengths = new Dictionary<int, double>();
         private readonly List<BMSEvent> events = new List<BMSEvent>();
+        private readonly HashSet<string> lnObjectKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         private double initialBpm = 130;
         private int totalKeys = 7;
-        private bool hasLongNotes;
-        private int lnType = 1; // 1 = LN, 2 = CN, 3 = HCN
+
+        /// <summary>1 = LN channel (51+), 2 = charge/note-based LN (+ optional LNOBJ), 3 = hell charge — generation matches 2 when LNOBJ set.</summary>
+        private int lnType = 1;
+
         private int eventSequence;
+
+        /// <summary>Chart references #SCROLL (not measure channel).</summary>
+        private bool chartHasScrollDirective;
 
         // Metadata
         private string title = string.Empty;
@@ -94,7 +100,10 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             stopDefinitions.Clear();
             measureLengths.Clear();
             events.Clear();
+            lnObjectKeys.Clear();
             eventSequence = 0;
+            chartHasScrollDirective = false;
+            lnType = 1;
 
             Logger.Log($"{bms_log_prefix} Starting BMS beatmap decoding");
 
@@ -117,6 +126,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         private void parseLine(string line)
         {
+            if (line.StartsWith("#SCROLL", StringComparison.OrdinalIgnoreCase)
+                && !Regex.IsMatch(line, @"^#\d{3}\d{2}:"))
+            {
+                chartHasScrollDirective = true;
+            }
+
             // Match header commands like #TITLE, #ARTIST, #WAV01/#WAVAA, etc.
             // BMS uses base36 (0-9, A-Z) indices, but many headers have no index.
             if (line.StartsWith('#'))
@@ -252,11 +267,16 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                 case "LNTYPE":
                     int.TryParse(value, out lnType);
-                    hasLongNotes = true;
                     break;
 
                 case "LNOBJ":
-                    hasLongNotes = true;
+                    foreach (string part in value.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        string p = part.Trim();
+                        if (p.Length >= 2)
+                            lnObjectKeys.Add(p[..2]);
+                    }
+
                     break;
 
                 case "PLAYER":
@@ -310,7 +330,6 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             beatmap.BeatmapInfo.Metadata.ArtistUnicode = artist;
             beatmap.BeatmapInfo.Metadata.Author.Username = "Ez2Lazer BMSDecoder";
             beatmap.BeatmapInfo.Metadata.Source = "BMS Import";
-            beatmap.BeatmapInfo.Metadata.Tags = $"bms {genre}";
             beatmap.BeatmapInfo.Ruleset = new BMSRuleset().RulesetInfo;
             beatmap.BeatmapInfo.DifficultyName = getDifficultyName();
 
@@ -326,6 +345,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             // Create hit objects
             var hitObjects = createHitObjects(timeline.EventTimes);
             beatmap.HitObjects.AddRange(hitObjects);
+            beatmap.BeatmapInfo.Metadata.Tags = buildFeatureTags(hitObjects);
 
             // Store background (non-note) sound events
             if (beatmap is BMSBeatmap bmsBeatmap)
@@ -352,6 +372,31 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             beatmap.Difficulty.OverallDifficulty = mapRankToOD(rank);
             beatmap.Difficulty.DrainRate = 7;
         }
+
+        private string buildFeatureTags(List<BMSHitObject> notes)
+        {
+            var tags = new List<string> { "bms" };
+
+            if (!string.IsNullOrWhiteSpace(genre))
+                tags.Add(genre.Trim());
+
+            if (notes.Exists(static n => n is BMSHoldNote))
+                tags.Add("ln");
+
+            if (events.Exists(e => e.Channel == channel_stop && isNonEmptyObjectValue(e.Value)))
+                tags.Add("stop");
+
+            if (chartHasScrollDirective)
+                tags.Add("scroll");
+
+            if (events.Exists(static e => e.Channel is channel_bga_base or channel_bga_poor or channel_bga_layer))
+                tags.Add("bga");
+
+            return string.Join(' ', tags);
+        }
+
+        private static bool isNonEmptyObjectValue(string valueKey)
+            => valueKey.Length >= 2 && valueKey != "00";
 
         private string getDifficultyName()
         {
@@ -497,11 +542,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             Logger.Log($"{bms_log_prefix} Found {noteEvents.Count} note events", LoggingTarget.Runtime, LogLevel.Debug);
 
+            bool longNotesFromVisibleWithLnObj = lnObjectKeys.Count > 0 && (lnType == 2 || lnType == 3);
+
             foreach (var evt in noteEvents)
             {
                 int column = getColumn(evt.Channel);
                 bool isScratch = BmsLaneMapping.IsScratchChannel(evt.Channel);
-                bool isLongNote = isLongNoteChannel(evt.Channel);
+                bool isLongNote = isLongNoteChannel(evt.Channel)
+                                  || longNotesFromVisibleWithLnObj && isVisiblePlayerNoteChannel(evt.Channel) && lnObjectKeys.Contains(evt.Value);
                 double time = eventTimes[evt];
 
                 // Get keysound sample
@@ -619,6 +667,9 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return channel >= 51 && channel <= 59 ||
                    channel >= 61 && channel <= 69;
         }
+
+        private static bool isVisiblePlayerNoteChannel(int channel) =>
+            channel is >= 11 and <= 19 or >= 21 and <= 29;
 
         private int getColumn(int channel) => BmsLaneMapping.ChannelToColumn(channel);
 

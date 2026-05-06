@@ -789,6 +789,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             if (chart.HasLongNotes)
                 flags.Add("LN");
 
+            if (chart.LnType >= 2)
+                flags.Add($"LNT{chart.LnType}");
+
             if (chart.HasStopSequence)
                 flags.Add("STOP");
 
