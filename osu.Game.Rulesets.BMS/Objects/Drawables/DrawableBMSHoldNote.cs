@@ -107,6 +107,9 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
         {
             if (e.Action == stageLayout.ActionFor(HitObject))
             {
+                if (CheckHittable?.Invoke(this, Time.Current) == false)
+                    return false;
+
                 isHolding = true;
                 return true;
             }

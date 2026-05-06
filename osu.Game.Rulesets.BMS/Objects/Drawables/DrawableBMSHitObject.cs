@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -12,6 +13,11 @@ namespace osu.Game.Rulesets.BMS.Objects.Drawables
     public abstract partial class DrawableBMSHitObject : DrawableHitObject<BMSHitObject>
     {
         protected readonly IBindable<ScrollingDirection> Direction = new Bindable<ScrollingDirection>();
+
+        /// <summary>
+        /// When set, judgements are ignored while this returns false (note lock / judge precedence).
+        /// </summary>
+        public Func<DrawableHitObject, double, bool>? CheckHittable;
 
         protected DrawableBMSHitObject(BMSHitObject? hitObject)
             : base(hitObject!)
