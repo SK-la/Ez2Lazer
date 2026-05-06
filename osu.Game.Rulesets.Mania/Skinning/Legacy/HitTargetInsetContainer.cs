@@ -30,17 +30,17 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         }
 
         [BackgroundDependencyLoader]
-        private void load(ISkinSource skin, Ez2ConfigManager ezSkinConfig, IScrollingInfo scrollingInfo)
+        private void load(ISkinSource skin, IScrollingInfo scrollingInfo, Ez2ConfigManager ezSkinConfig)
         {
-            direction.BindTo(scrollingInfo.Direction);
-            direction.BindValueChanged(onDirectionChanged, true);
-
             globalHitPosition = ezSkinConfig.GetBindable<bool>(Ez2Setting.HitPositionGlobalEnable);
             hitPositonBindable = ezSkinConfig.GetBindable<double>(Ez2Setting.HitPosition);
 
             hitPosition = globalHitPosition.Value
                 ? (float)hitPositonBindable.Value
                 : skin.GetManiaSkinConfig<float>(LegacyManiaSkinConfigurationLookups.HitPosition)?.Value ?? (float)hitPositonBindable.Value;
+
+            direction.BindTo(scrollingInfo.Direction);
+            direction.BindValueChanged(onDirectionChanged, true);
         }
 
         private void onDirectionChanged(ValueChangedEvent<ScrollingDirection> direction)
