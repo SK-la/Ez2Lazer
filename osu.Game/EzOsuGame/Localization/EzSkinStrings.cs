@@ -29,6 +29,15 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString NOTE_SET = new EzLocalizationManager.EzLocalisableString(
             "[EzPro] Note Set", "[EzPro] Note Set");
 
+        public static readonly LocalisableString VISUAL_PICKER_GAME_THEME_BUTTON = new EzLocalizationManager.EzLocalisableString(
+            "大图选择：全局纹理主题", "Visual picker: global GameTheme");
+
+        public static readonly LocalisableString VISUAL_PICKER_NOTE_SET_BUTTON = new EzLocalizationManager.EzLocalisableString(
+            "大图选择：Note Set", "Visual picker: Note Set");
+
+        public static readonly LocalisableString VISUAL_PICKER_STAGE_BUTTON = new EzLocalizationManager.EzLocalisableString(
+            "大图选择：Stage Set", "Visual picker: Stage Set");
+
         public static readonly LocalisableString NOTE_SET_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "修改EzPro皮肤中的整套note, 含所有note和打击光效。"
             + "\n在本地EzResources/note中，支持自定义子文件夹增减修改, 选项会在重载时重新读取文件夹名称。"

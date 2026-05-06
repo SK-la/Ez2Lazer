@@ -74,6 +74,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString HITRESULT_TEXT_FONT_LABEL = new EzLocalizationManager.EzLocalisableString("判定文本字体", "HitResult Text Font");
         public static readonly LocalisableString HITRESULT_TEXT_FONT_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("选择判定文本的字体样式", "Select the font style for hit result text.");
 
+        public static readonly LocalisableString HITRESULT_VISUAL_THEME_PICK_LABEL = new EzLocalizationManager.EzLocalisableString("大图选择主题", "Visual theme picker");
+        public static readonly LocalisableString HITRESULT_VISUAL_THEME_PICK_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "打开覆盖层预览并切换全局 GameTheme（与 Ez 皮肤纹理一致）。", "Opens the visual picker overlay to change global GameTheme (Ez skin textures).");
+
         public static readonly LocalisableString PLAYBACK_FPS_LABEL = new EzLocalizationManager.EzLocalisableString("播放帧率", "Playback FPS");
         public static readonly LocalisableString PLAYBACK_FPS_DESCRIPTION = new EzLocalizationManager.EzLocalisableString("动画的帧率值", "The FPS value of this animation.");
 
