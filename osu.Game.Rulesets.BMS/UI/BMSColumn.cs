@@ -7,7 +7,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
+using osu.Game.Rulesets.BMS.Objects.Drawables;
+using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mania.UI.Components;
 using osu.Game.Rulesets.UI.Scrolling;
@@ -34,10 +37,13 @@ namespace osu.Game.Rulesets.BMS.UI
         private readonly SkinnableDrawable skinColumnBackground;
         private readonly SkinnableDrawable skinHitTarget;
         private readonly SkinnableDrawable skinKeyArea;
+        private readonly BMSOrderedHitPolicy hitPolicy;
 
         public BMSColumn(int columnIndex, bool isScratch)
         {
             ColumnIndex = columnIndex;
+
+            hitPolicy = new BMSOrderedHitPolicy(HitObjectContainer);
 
             RelativeSizeAxes = Axes.Y;
             Anchor = Anchor.TopLeft;
@@ -95,6 +101,32 @@ namespace osu.Game.Rulesets.BMS.UI
             skinColumnBackground.ApplyGameWideClock(host);
             skinHitTarget.ApplyGameWideClock(host);
             skinKeyArea.ApplyGameWideClock(host);
+        }
+
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+            NewResult += onOrderedHitNewResult;
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            NewResult -= onOrderedHitNewResult;
+            base.Dispose(isDisposing);
+        }
+
+        private void onOrderedHitNewResult(DrawableHitObject judgedObject, JudgementResult result)
+        {
+            if (result.IsHit)
+                hitPolicy.HandleHit(judgedObject);
+        }
+
+        protected override void OnNewDrawableHitObject(DrawableHitObject drawableHitObject)
+        {
+            base.OnNewDrawableHitObject(drawableHitObject);
+
+            if (drawableHitObject is DrawableBMSHitObject bms)
+                bms.CheckHittable = hitPolicy.IsHittable;
         }
 
         public static Color4 GetColumnColour(int columnIndex)
