@@ -59,6 +59,10 @@ namespace osu.Game.Rulesets.BMS.UI
                     keysoundManager.SetBackgroundSoundEvents(bmsBeatmap.BackgroundSoundEvents);
                 }
             }
+            else if (Beatmap.Value is ManiaConvertedWorkingBeatmap maniaConverted)
+            {
+                keysoundManager = maniaConverted.KeysoundManager;
+            }
             else
             {
                 Logger.Log($"{BMS_LOG_PREFIX} Unexpected working beatmap type: {Beatmap.Value?.GetType().Name}", LoggingTarget.Runtime, LogLevel.Error);

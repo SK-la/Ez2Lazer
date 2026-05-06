@@ -221,7 +221,7 @@ namespace osu.Game.Rulesets.BMS.UI
             // Allow opening from main menu or song select (settings is often opened on top of either).
             runner.PerformFromScreen(screen =>
             {
-                screen.Push(new BmsUiSongSelect.BMSSongSelectScreen(BmsUiSongSelect.BMSSongSelectScreenMode.RulesetEntry));
+                screen.Push(new BmsUiSongSelect.BMSSongSelectScreen(BmsUiSongSelect.BMSSongSelectScreenMode.SpecialEntry));
             }, new[] { typeof(MainMenu), typeof(OsuSongSelect) });
         }
 

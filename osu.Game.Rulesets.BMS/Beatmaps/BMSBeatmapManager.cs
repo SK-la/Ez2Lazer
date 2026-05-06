@@ -308,7 +308,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         ArtistUnicode = string.IsNullOrWhiteSpace(chart.Artist) ? song.Artist : chart.Artist,
                         Source = "BMS",
                         Tags = buildTags(chart),
-                        AudioFile = chart.PreviewFile ?? chart.AudioFile ?? string.Empty,
+                        AudioFile = sanitiseAudioReference(chart.PreviewFile ?? chart.AudioFile, chart.FolderPath) ?? string.Empty,
                         PreviewTime = chart.PreviewTime,
                     };
 
@@ -474,6 +474,37 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 3 => 5f,
                 _ => 7f
             };
+
+        private static string? sanitiseAudioReference(string? raw, string? baseFolder)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            string trimmed = raw.Trim();
+            trimmed = trimmed.Replace('\\', '/');
+
+            if (!Path.IsPathRooted(trimmed))
+                return trimmed;
+
+            if (!string.IsNullOrWhiteSpace(baseFolder))
+            {
+                try
+                {
+                    string fullBase = Path.GetFullPath(baseFolder);
+                    string fullPath = Path.GetFullPath(trimmed);
+                    string relative = Path.GetRelativePath(fullBase, fullPath);
+
+                    if (!relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
+                        return relative.Replace('\\', '/');
+                }
+                catch
+                {
+                    // Fall back to file name below.
+                }
+            }
+
+            return Path.GetFileName(trimmed);
+        }
 
         private static string buildTags(BMSChartCache chart)
         {
@@ -890,8 +921,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 cache.HasScrollChanges = hasScrollChanges;
                 cache.HasBgaLayer = hasBgaLayer;
                 cache.KeysoundFiles = keysoundFiles.ToList();
-                cache.AudioFile = previewAudioFile;
-                cache.PreviewFile = explicitPreviewFile;
+                cache.AudioFile = sanitiseAudioReference(previewAudioFile, cache.FolderPath);
+                cache.PreviewFile = sanitiseAudioReference(explicitPreviewFile, cache.FolderPath);
 
                 // Calculate duration from max measure and BPM
                 // Standard: 4 beats per measure, duration = measures * 4 * 60000 / BPM

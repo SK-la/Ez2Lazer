@@ -24,8 +24,12 @@ namespace osu.Game.Rulesets.BMS
 
             return realm.Run(r =>
             {
+                var bmsRuleset = r.Find<osu.Game.Rulesets.RulesetInfo>(bms_ruleset_short_name);
+                if (bmsRuleset == null)
+                    return null;
+
                 BeatmapInfo? bm = r.All<BeatmapInfo>()
-                                   .FirstOrDefault(b => b.MD5Hash == beatmapMd5 && b.Ruleset.ShortName == bms_ruleset_short_name);
+                                   .FirstOrDefault(b => b.MD5Hash == beatmapMd5 && b.Ruleset == bmsRuleset);
                 if (bm == null)
                     return null;
 
@@ -41,8 +45,12 @@ namespace osu.Game.Rulesets.BMS
 
             return realm.Run(r =>
             {
+                var bmsRuleset = r.Find<osu.Game.Rulesets.RulesetInfo>(bms_ruleset_short_name);
+                if (bmsRuleset == null)
+                    return new List<ScoreInfo>();
+
                 BeatmapInfo? bm = r.All<BeatmapInfo>()
-                                   .FirstOrDefault(b => b.MD5Hash == beatmapMd5 && b.Ruleset.ShortName == bms_ruleset_short_name);
+                                   .FirstOrDefault(b => b.MD5Hash == beatmapMd5 && b.Ruleset == bmsRuleset);
                 if (bm == null)
                     return new List<ScoreInfo>();
 

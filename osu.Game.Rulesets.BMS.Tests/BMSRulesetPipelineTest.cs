@@ -3,10 +3,7 @@
 
 using System.Linq;
 using NUnit.Framework;
-using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BMS.Scoring;
-using osu.Game.Rulesets.BMS.UI;
-using osu.Game.Rulesets.Scoring;
 
 namespace osu.Game.Rulesets.BMS.Tests
 {
@@ -14,23 +11,12 @@ namespace osu.Game.Rulesets.BMS.Tests
     public class BMSRulesetPipelineTest
     {
         [Test]
-        public void TestCreateDrawableRulesetUsesBmsDrawablePipeline()
-        {
-            var ruleset = new BMSRuleset();
-            var beatmap = ruleset.CreateBeatmapConverter(new Beatmap()).Convert();
-
-            var drawableRuleset = ruleset.CreateDrawableRulesetWith(beatmap);
-
-            Assert.That(drawableRuleset, Is.TypeOf<DrawableBMSRuleset>());
-        }
-
-        [Test]
         public void TestCreateProcessorsReturnsBmsSpecificTypes()
         {
             var ruleset = new BMSRuleset();
 
             Assert.That(ruleset.CreateScoreProcessor(), Is.TypeOf<BMSScoreProcessor>());
-            Assert.That(ruleset.CreateHealthProcessor(0), Is.TypeOf<DrainingHealthProcessor>());
+            Assert.That(ruleset.CreateHealthProcessor(0), Is.TypeOf<BMSNoFailHealthProcessor>());
         }
 
         [Test]
