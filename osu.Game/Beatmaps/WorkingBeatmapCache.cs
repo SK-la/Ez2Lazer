@@ -241,13 +241,19 @@ namespace osu.Game.Beatmaps
 
                 try
                 {
+                    if (tryGetAbsoluteTrack(Metadata.AudioFile, out var absoluteTrack))
+                        return absoluteTrack;
+
+                    if (tryGetExternalTrack(Metadata.AudioFile, out var externalTrack))
+                        return externalTrack;
+
                     string fileStorePath = BeatmapSetInfo.GetPathForFile(Metadata.AudioFile);
                     var track = resources.Tracks.Get(fileStorePath);
 
                     if (track == null)
                     {
-                        if (tryResolveExternalPath(Metadata.AudioFile, out string externalPath))
-                            track = resources.Tracks.Get(externalPath);
+                        if (tryGetExternalTrack(Metadata.AudioFile, out externalTrack))
+                            track = externalTrack;
                     }
 
                     if (track == null)
@@ -265,6 +271,69 @@ namespace osu.Game.Beatmaps
                 }
             }
 
+            private bool tryGetAbsoluteTrack(string audioReference, out Track track)
+            {
+                track = null;
+
+                if (!Path.IsPathRooted(audioReference) || !File.Exists(audioReference))
+                    return false;
+
+                string folder = Path.GetDirectoryName(audioReference);
+                string fileName = Path.GetFileName(audioReference);
+
+                if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(fileName))
+                    return false;
+
+                var fileStore = new StorageBackedResourceStore(new NativeStorage(folder));
+
+                if (resources.AudioManager != null)
+                {
+                    var trackStore = resources.AudioManager.GetTrackStore(fileStore);
+                    track = trackStore.Get(fileName.Replace('\\', '/'));
+                }
+
+                return track != null;
+            }
+
+            private bool tryGetExternalTrack(string audioReference, out Track track)
+            {
+                track = null;
+
+                if (!isBmsExternalBeatmap() || !tryGetExternalFolderPath(out string folderPath))
+                    return false;
+
+                string normalisedReference = audioReference.Replace('/', Path.DirectorySeparatorChar);
+
+                if (Path.IsPathRooted(normalisedReference))
+                {
+                    try
+                    {
+                        string fullBase = Path.GetFullPath(folderPath);
+                        string fullPath = Path.GetFullPath(normalisedReference);
+                        string relative = Path.GetRelativePath(fullBase, fullPath);
+
+                        if (!relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
+                            normalisedReference = relative;
+                        else
+                            return false;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+
+                var fileStore = new StorageBackedResourceStore(new NativeStorage(folderPath));
+
+                if (resources.AudioManager != null)
+                {
+                    var trackStore = resources.AudioManager.GetTrackStore(fileStore);
+                    track = trackStore.Get(normalisedReference.Replace('\\', '/'));
+                }
+
+                return track != null;
+            }
+
             protected override Waveform GetWaveform()
             {
                 if (string.IsNullOrEmpty(Metadata?.AudioFile))
@@ -275,6 +344,9 @@ namespace osu.Game.Beatmaps
 
                 try
                 {
+                    if (Path.IsPathRooted(Metadata.AudioFile) && File.Exists(Metadata.AudioFile))
+                        return new Waveform(File.OpenRead(Metadata.AudioFile));
+
                     string fileStorePath = BeatmapSetInfo.GetPathForFile(Metadata.AudioFile);
 
                     Stream trackData = !string.IsNullOrEmpty(fileStorePath) ? GetStream(fileStorePath) : null;
@@ -416,8 +488,8 @@ namespace osu.Game.Beatmaps
             }
 
             private bool isBmsExternalBeatmap()
-                => string.Equals(BeatmapInfo?.Ruleset?.ShortName, "bms", StringComparison.OrdinalIgnoreCase)
-                   && BeatmapSetInfo?.Hash?.StartsWith(bms_external_hash_prefix, StringComparison.Ordinal) == true;
+                => string.Equals(BeatmapInfo?.Ruleset.ShortName, "bms", StringComparison.OrdinalIgnoreCase)
+                   && BeatmapSetInfo?.Hash.StartsWith(bms_external_hash_prefix, StringComparison.Ordinal) == true;
 
             private bool tryGetExternalFolderPath(out string folderPath)
             {
