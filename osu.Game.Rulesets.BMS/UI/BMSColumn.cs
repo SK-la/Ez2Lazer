@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Pooling;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
@@ -37,6 +38,8 @@ namespace osu.Game.Rulesets.BMS.UI
         private readonly SkinnableDrawable skinColumnBackground;
         private readonly SkinnableDrawable skinHitTarget;
         private readonly SkinnableDrawable skinKeyArea;
+        private readonly Container explosionContainer;
+        private readonly DrawablePool<PoolableHitExplosion> hitExplosionPool;
         private readonly BMSOrderedHitPolicy hitPolicy;
 
         public BMSColumn(int columnIndex, bool isScratch)
@@ -91,6 +94,11 @@ namespace osu.Game.Rulesets.BMS.UI
                     Alpha = 0.15f,
                 },
                 HitObjectContainer,
+                explosionContainer = new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                },
+                hitExplosionPool = new DrawablePool<PoolableHitExplosion>(5),
             };
         }
 
@@ -119,6 +127,11 @@ namespace osu.Game.Rulesets.BMS.UI
         {
             if (result.IsHit)
                 hitPolicy.HandleHit(judgedObject);
+
+            if (!result.IsHit || !judgedObject.DisplayResult || !DisplayJudgements.Value)
+                return;
+
+            explosionContainer.Add(hitExplosionPool.Get(e => e.Apply(result)));
         }
 
         protected override void OnNewDrawableHitObject(DrawableHitObject drawableHitObject)
@@ -126,7 +139,10 @@ namespace osu.Game.Rulesets.BMS.UI
             base.OnNewDrawableHitObject(drawableHitObject);
 
             if (drawableHitObject is DrawableBMSHitObject bms)
+            {
+                bms.AccentColour.BindTo(skinDependencyColumn.AccentColour);
                 bms.CheckHittable = hitPolicy.IsHittable;
+            }
         }
 
         public static Color4 GetColumnColour(int columnIndex)
