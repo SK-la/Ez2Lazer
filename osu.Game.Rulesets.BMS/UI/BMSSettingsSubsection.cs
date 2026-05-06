@@ -13,8 +13,6 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Framework.Screens;
-using osu.Game.Graphics;
-using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Database;
 using osu.Game.Overlays;
@@ -41,7 +39,7 @@ namespace osu.Game.Rulesets.BMS.UI
         private Bindable<string> libraryPathsBindable = null!;
         private Bindable<string> legacyRootPathBindable = null!;
 
-        private OsuTextFlowContainer pathDisplay = null!;
+        // private OsuTextFlowContainer pathDisplay = null!;
         private SettingsNote cacheStatusNote = null!;
         private SettingsNote speedNote = null!;
         private Bindable<double>? maniaScrollSpeed;
@@ -100,21 +98,6 @@ namespace osu.Game.Rulesets.BMS.UI
                 new Container
                 {
                     RelativeSizeAxes = Axes.X,
-                    Height = 110,
-                    Padding = new MarginPadding { Left = SettingsPanel.CONTENT_MARGINS, Right = SettingsPanel.CONTENT_MARGINS, Top = 6 },
-                    Child = new OsuScrollContainer
-                    {
-                        RelativeSizeAxes = Axes.Both,
-                        Child = pathDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 13))
-                        {
-                            RelativeSizeAxes = Axes.X,
-                            AutoSizeAxes = Axes.Y,
-                        }
-                    }
-                },
-                new Container
-                {
-                    RelativeSizeAxes = Axes.X,
                     AutoSizeAxes = Axes.Y,
                     Padding = SettingsPanel.CONTENT_PADDING,
                     Child = cacheStatusNote = new SettingsNote
@@ -122,6 +105,21 @@ namespace osu.Game.Rulesets.BMS.UI
                         RelativeSizeAxes = Axes.X,
                     },
                 },
+                // new Container
+                // {
+                //     RelativeSizeAxes = Axes.X,
+                //     Height = 110,
+                //     Padding = new MarginPadding { Left = SettingsPanel.CONTENT_MARGINS, Right = SettingsPanel.CONTENT_MARGINS, Top = 6 },
+                //     Child = new OsuScrollContainer
+                //     {
+                //         RelativeSizeAxes = Axes.Both,
+                //         Child = pathDisplay = new OsuTextFlowContainer(cp => cp.Font = OsuFont.Default.With(size: 13))
+                //         {
+                //             RelativeSizeAxes = Axes.X,
+                //             AutoSizeAxes = Axes.Y,
+                //         }
+                //     }
+                // },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
                     Caption = RulesetSettingsStrings.ScrollSpeed,
@@ -201,17 +199,18 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private void updatePathDisplay()
         {
-            IReadOnlyList<string> paths = getConfiguredPaths();
-
-            if (paths.Count == 0)
-                pathDisplay.Text = "未设置路径";
-            else
-                pathDisplay.Text = $"当前路径 ({paths.Count}):{Environment.NewLine}{string.Join(Environment.NewLine, paths.Select(path => $"- {path}"))}";
+            // IReadOnlyList<string> paths = getConfiguredPaths();
+            //
+            // if (paths.Count == 0)
+            //     pathDisplay.Text = "未设置路径";
+            // else
+            //     pathDisplay.Text = $"当前路径 ({paths.Count}):{Environment.NewLine}{string.Join(Environment.NewLine, paths.Select(path => $"- {path}"))}";
         }
 
         private void openBmsSongSelect()
         {
             var runner = performFromScreen ?? game;
+
             if (runner == null)
             {
                 notificationOverlay?.Post(new SimpleErrorNotification { Text = "无法打开 BMS 选歌界面（未找到屏幕导航器）。" });
@@ -228,6 +227,7 @@ namespace osu.Game.Rulesets.BMS.UI
         private void selectPath()
         {
             var runner = performFromScreen ?? game;
+
             if (runner == null)
             {
                 notificationOverlay?.Post(new SimpleErrorNotification { Text = "无法打开向导（未找到屏幕导航器）。" });
