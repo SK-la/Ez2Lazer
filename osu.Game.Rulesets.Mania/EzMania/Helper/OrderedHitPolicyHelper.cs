@@ -4,8 +4,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Logging;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
+using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -21,6 +23,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
     {
         private readonly HitObjectContainer hitObjectContainer;
         private readonly Ez2ConfigManager ezConfig;
+        private const string log_prefix = "[JudgeDiag][PolicyHelper]";
 
         public OrderedHitPolicyHelper(HitObjectContainer hitObjectContainer)
         {
@@ -52,8 +55,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
 
                     double postJudgedDistance = distanceToNonBadWindow(nearestPostJudged, time);
 
-                    double nearestUnjudgedDistance = getOverlappingObjects(time)
-                                                     .Where(o => !o.Judged)
+                        double nearestUnjudgedDistance = getOverlappingCandidates(time)
+                                                     .Where(o => !o.IsJudged)
                                                      .Select(o => distanceToNonBadWindow(o, time))
                                                      .DefaultIfEmpty(double.PositiveInfinity)
                                                      .Min();
@@ -63,15 +66,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 }
             }
 
-            // 获取所有与当前时间重叠的活跃对象
-            var overlappingObjects = getOverlappingObjects(time).ToList();
+            // 获取所有与当前时间重叠的活跃路由候选。
+            var overlappingCandidates = getOverlappingCandidates(time).ToList();
 
-            if (overlappingObjects.Count == 0)
+            if (overlappingCandidates.Count == 0)
+            {
+                logDiag($"t={time:F3} no-overlap target={describe(hitObject)}");
                 return true;
+            }
 
             // 应用优先级策略来确定哪个对象应该被击中
-            var selectedObject = selectByPrecedence(overlappingObjects, time, judgePrecedence);
-            return selectedObject == hitObject;
+            var selected = selectByPrecedence(overlappingCandidates, time, judgePrecedence, allowFallbackToEarliest: isBMS());
+            logDiag(
+                $"t={time:F3} mode={(isBMS() ? "bms" : "non-bms")} precedence={judgePrecedence} target={describe(hitObject)} " +
+                $"overlap=[{string.Join(", ", overlappingCandidates.Select(describe))}] selected={describe(selected)}");
+            return selected?.RoutedObject == hitObject;
         }
 
         /// <summary>
@@ -100,34 +109,51 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// </summary>
         /// <param name="time">检查重叠对象的时间点。</param>
         /// <returns>重叠的可绘制击打对象的可枚举集合。</returns>
-        private IEnumerable<DrawableHitObject> getOverlappingObjects(double time)
+        private IEnumerable<PrecedenceCandidate> getOverlappingCandidates(double time)
         {
             foreach (var obj in hitObjectContainer.AliveObjects)
             {
-                if (obj.Judged)
+                if (!tryCreatePressCandidate(obj, out var candidate))
                     continue;
 
-                // 检查对象的判定窗口是否与时间重叠
-                var hitWindow = obj.HitObject.HitWindows;
-                if (hitWindow == null || hitWindow.WindowFor(HitResult.Miss) == 0)
-                    continue;
-
-                double startTime = obj.HitObject.StartTime;
-                double earlyWindow = hitWindow.WindowFor(HitResult.Miss);
-                double lateWindow = hitWindow.WindowFor(HitResult.Miss);
-
-                if (hitWindow is ManiaHitWindows maniaHitWindow)
-                {
-                    earlyWindow = maniaHitWindow.WindowFor(HitResult.Miss, true);
-                    lateWindow = maniaHitWindow.WindowFor(HitResult.Miss, false);
-                }
+                double earlyWindow = candidate.Windows.WindowFor(HitResult.Miss, true);
+                double lateWindow = candidate.Windows.WindowFor(HitResult.Miss, false);
 
                 // 检查时间是否落在此对象的判定窗口内
-                if (time >= startTime - earlyWindow && time <= startTime + lateWindow)
-                {
-                    yield return obj;
-                }
+                if (time >= candidate.StartTime - earlyWindow && time <= candidate.StartTime + lateWindow)
+                    yield return candidate;
             }
+        }
+
+        private static bool tryCreatePressCandidate(DrawableHitObject obj, out PrecedenceCandidate candidate)
+        {
+            candidate = null!;
+
+            // Nested LN head/tail are judged through DrawableHoldNote.OnPressed().
+            // The routable object must therefore be the parent hold note, while timing/windows come from the head.
+            if (obj is DrawableHoldNoteHead or DrawableHoldNoteTail)
+                return false;
+
+            if (obj is DrawableHoldNote hold)
+            {
+                if (hold.Judged || hold.Head.Judged)
+                    return false;
+
+                if (hold.Head.HitObject.HitWindows is not ManiaHitWindows headWindows || headWindows.WindowFor(HitResult.Miss) == 0)
+                    return false;
+
+                candidate = new PrecedenceCandidate(hold, hold.Head, hold.Head.HitObject.StartTime, headWindows);
+                return true;
+            }
+
+            if (obj.Judged)
+                return false;
+
+            if (obj.HitObject.HitWindows is not ManiaHitWindows windows || windows.WindowFor(HitResult.Miss) == 0)
+                return false;
+
+            candidate = new PrecedenceCandidate(obj, obj, obj.HitObject.StartTime, windows);
+            return true;
         }
 
         private IEnumerable<DrawableHitObject> getPostBadJudgedObjects(double time)
@@ -197,6 +223,23 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             return 0;
         }
 
+        private static double distanceToNonBadWindow(PrecedenceCandidate candidate, double pressTime)
+        {
+            double early = candidate.Windows.WindowFor(HitResult.Good, true);
+            double late = candidate.Windows.WindowFor(HitResult.Good, false);
+
+            double start = candidate.StartTime - early;
+            double end = candidate.StartTime + late;
+
+            if (pressTime < start)
+                return start - pressTime;
+
+            if (pressTime > end)
+                return pressTime - end;
+
+            return 0;
+        }
+
         /// <summary>
         /// 根据优先级策略选择当前输入应命中的对象。
         /// BMS 模式走折叠比较；其它模式走通用优先级。
@@ -204,8 +247,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
         /// <param name="candidates">候选击打对象列表。</param>
         /// <param name="time">当前时间（按键时间）。</param>
         /// <param name="precedence">要使用的优先级策略。</param>
+        /// <param name="allowFallbackToEarliest">没有候选能产生常规判定时，是否回退到最早候选。</param>
         /// <returns>选中的击打对象，如果没有候选则返回 null。</returns>
-        private DrawableHitObject? selectByPrecedence(IEnumerable<DrawableHitObject> candidates, double time, EzEnumJudgePrecedence precedence)
+        private PrecedenceCandidate? selectByPrecedence(IEnumerable<PrecedenceCandidate> candidates, double time, EzEnumJudgePrecedence precedence, bool allowFallbackToEarliest)
         {
             var candidateList = candidates.ToList();
 
@@ -219,41 +263,18 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             switch (precedence)
             {
                 case EzEnumJudgePrecedence.Duration:
-                    if (isBMS())
-                    {
-                        var orderedD = candidateList.OrderBy(c => c.HitObject.StartTime).ToList();
-                        var pickedD = SelectFoldDrawable(orderedD, time, comboAlgorithm: false);
-                        return pickedD ?? orderedD[0];
-                    }
-
-                    return candidateList
-                           .OrderBy(c => Math.Abs(c.HitObject.StartTime - time))
-                           .ThenBy(c => c.HitObject.StartTime)
-                           .First();
+                    var orderedD = candidateList.OrderBy(c => c.StartTime).ToList();
+                    var pickedD = SelectFoldCandidate(orderedD, time, comboAlgorithm: false);
+                    return pickedD ?? (allowFallbackToEarliest ? orderedD[0] : null);
 
                 case EzEnumJudgePrecedence.Combo:
-                    if (isBMS())
-                    {
-                        var orderedC = candidateList.OrderBy(c => c.HitObject.StartTime).ToList();
-                        var pickedC = SelectFoldDrawable(orderedC, time, comboAlgorithm: true);
-                        return pickedC ?? orderedC[0];
-                    }
-
-                    var orderedCombo = candidateList.OrderBy(c => c.HitObject.StartTime).ToList();
-                    var selectedCombo = orderedCombo[0];
-
-                    for (int i = 1; i < orderedCombo.Count; i++)
-                    {
-                        var candidate = orderedCombo[i];
-                        if (compareComboByPrecedence(selectedCombo, candidate, time))
-                            selectedCombo = candidate;
-                    }
-
-                    return selectedCombo;
+                    var orderedC = candidateList.OrderBy(c => c.StartTime).ToList();
+                    var pickedC = SelectFoldCandidate(orderedC, time, comboAlgorithm: true);
+                    return pickedC ?? (allowFallbackToEarliest ? orderedC[0] : null);
 
                 case EzEnumJudgePrecedence.Earliest:
                 default:
-                    return candidateList.OrderBy(c => c.HitObject.StartTime).First();
+                    return candidateList.OrderBy(c => c.StartTime).First();
             }
         }
 
@@ -270,6 +291,17 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 d => d.Judged,
                 d => d.HitObject.StartTime,
                 d => d.HitObject.HitWindows as ManiaHitWindows,
+                pressTime,
+                comboAlgorithm);
+        }
+
+        private static PrecedenceCandidate? SelectFoldCandidate(IReadOnlyList<PrecedenceCandidate> sortedByStartTime, double pressTime, bool comboAlgorithm)
+        {
+            return SelectFold(
+                sortedByStartTime,
+                c => c.IsJudged,
+                c => c.StartTime,
+                c => c.Windows,
                 pressTime,
                 comboAlgorithm);
         }
@@ -372,6 +404,70 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
                 pressTime,
                 comboEarly,
                 comboLate);
+        }
+
+        internal static bool IsUserTriggerJudgeableNow(DrawableHitObject obj, double time)
+        {
+            if (obj.HitObject.HitWindows == null)
+                return false;
+
+            // Keep consistent with DrawableHoldNote.OnPressed guard:
+            // start is judged on head timing and cannot start in tail late-lenience-only region.
+            if (obj is DrawableHoldNote hold)
+            {
+                if (!hold.Head.HitObject.HitWindows.CanBeHit(time - hold.Head.HitObject.StartTime))
+                    return false;
+
+                if (time > hold.Tail.HitObject.StartTime
+                    && !hold.Tail.HitObject.HitWindows.CanBeHit(time - hold.Tail.HitObject.StartTime))
+                    return false;
+
+                return true;
+            }
+
+            return obj.HitObject.HitWindows.CanBeHit(time - obj.HitObject.StartTime);
+        }
+
+        private void logDiag(string message)
+        {
+            if (!ezConfig.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled))
+                return;
+
+            Logger.Log($"{log_prefix} {message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+        }
+
+        private static string describe(DrawableHitObject? obj)
+        {
+            if (obj == null)
+                return "null";
+
+            return $"{obj.GetType().Name}@{obj.HitObject.StartTime:F3} judged={obj.Judged}";
+        }
+
+        private static string describe(PrecedenceCandidate? candidate)
+        {
+            if (candidate == null)
+                return "null";
+
+            return $"route={describe(candidate.RoutedObject)} judge={describe(candidate.JudgementObject)}";
+        }
+
+        private sealed class PrecedenceCandidate
+        {
+            public readonly DrawableHitObject RoutedObject;
+            public readonly DrawableHitObject JudgementObject;
+            public readonly double StartTime;
+            public readonly ManiaHitWindows Windows;
+
+            public PrecedenceCandidate(DrawableHitObject routedObject, DrawableHitObject judgementObject, double startTime, ManiaHitWindows windows)
+            {
+                RoutedObject = routedObject;
+                JudgementObject = judgementObject;
+                StartTime = startTime;
+                Windows = windows;
+            }
+
+            public bool IsJudged => RoutedObject.Judged || JudgementObject.Judged;
         }
     }
 }
