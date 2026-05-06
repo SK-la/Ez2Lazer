@@ -27,14 +27,14 @@ namespace osu.Game.Rulesets.BMS.Tests
         }
 
         [Test]
-        public void TestActionForMapsScratchAndKeys()
+        public void TestActionForUsesContiguousManiaLikeLaneOrder()
         {
             var layout = new BMSStageLayout(9, new[] { 0, 8 });
 
-            Assert.That(layout.ActionFor(new BMSNote { Column = 0, IsScratch = true }), Is.EqualTo(BMSAction.Scratch1));
-            Assert.That(layout.ActionFor(new BMSNote { Column = 8, IsScratch = true }), Is.EqualTo(BMSAction.Scratch2));
-            Assert.That(layout.ActionFor(new BMSNote { Column = 1 }), Is.EqualTo(BMSAction.Key1));
-            Assert.That(layout.ActionFor(new BMSNote { Column = 7 }), Is.EqualTo(BMSAction.Key7));
+            Assert.That(layout.ActionFor(new BMSNote { Column = 0, IsScratch = true }), Is.EqualTo(BMSAction.Key1));
+            Assert.That(layout.ActionFor(new BMSNote { Column = 1 }), Is.EqualTo(BMSAction.Key2));
+            Assert.That(layout.ActionFor(new BMSNote { Column = 7 }), Is.EqualTo(BMSAction.Key8));
+            Assert.That(layout.ActionFor(new BMSNote { Column = 8, IsScratch = true }), Is.EqualTo(BMSAction.Key9));
         }
 
         [Test]

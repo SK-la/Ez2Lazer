@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Bindings;
@@ -14,14 +15,19 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.BMS.Mods;
+using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.BMS.Scoring;
 using osu.Game.Rulesets.BMS.UI;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Beatmaps;
+using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Configuration;
 using osu.Game.Rulesets.Difficulty;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
+using osu.Game.Skinning;
 
 namespace osu.Game.Rulesets.BMS
 {
@@ -41,6 +47,36 @@ namespace osu.Game.Rulesets.BMS
         public override DrawableRuleset CreateDrawableRulesetWith(IBeatmap beatmap, IReadOnlyList<Mod>? mods = null) => new DrawableBMSRuleset(this, beatmap, mods);
 
         public override IBeatmapConverter CreateBeatmapConverter(IBeatmap beatmap) => new BMSBeatmapConverter(beatmap, this);
+
+        public override ISkin? CreateSkinTransformer(ISkin skin, IBeatmap beatmap)
+        {
+            var maniaRuleset = new ManiaRuleset();
+
+            try
+            {
+                return maniaRuleset.CreateSkinTransformer(skin, beatmap) ?? base.CreateSkinTransformer(skin, beatmap);
+            }
+            catch (InvalidCastException) when (beatmap is not ManiaBeatmap)
+            {
+                // Some mania transformers assume ManiaBeatmap; provide an adapted beatmap for BMS.
+                var adaptedBeatmap = createManiaSkinBeatmap(beatmap);
+
+                try
+                {
+                    return maniaRuleset.CreateSkinTransformer(skin, adaptedBeatmap) ?? base.CreateSkinTransformer(skin, beatmap);
+                }
+                catch
+                {
+                    // Transformer-specific assumptions may still fail (e.g. custom skin configs).
+                    return base.CreateSkinTransformer(skin, beatmap);
+                }
+            }
+            catch
+            {
+                // Never let skin transformer failures crash BMS gameplay startup.
+                return base.CreateSkinTransformer(skin, beatmap);
+            }
+        }
 
         public override DifficultyCalculator CreateDifficultyCalculator(IWorkingBeatmap beatmap) => new BMSDifficultyCalculator(RulesetInfo, beatmap);
 
@@ -99,94 +135,39 @@ namespace osu.Game.Rulesets.BMS
             }
         }
 
-        public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0) => variant switch
+        public override IEnumerable<KeyBinding> GetDefaultKeyBindings(int variant = 0)
         {
-            // 5 Keys
-            5 => new[]
-            {
-                new KeyBinding(InputKey.A, BMSAction.Key1),
-                new KeyBinding(InputKey.S, BMSAction.Key2),
-                new KeyBinding(InputKey.D, BMSAction.Key3),
-                new KeyBinding(InputKey.F, BMSAction.Key4),
-                new KeyBinding(InputKey.G, BMSAction.Key5),
-                new KeyBinding(InputKey.Shift, BMSAction.Scratch1),
-            },
-            // 7 Keys (default)
-            7 => new[]
-            {
-                new KeyBinding(InputKey.A, BMSAction.Key1),
-                new KeyBinding(InputKey.S, BMSAction.Key2),
-                new KeyBinding(InputKey.D, BMSAction.Key3),
-                new KeyBinding(InputKey.Space, BMSAction.Key4),
-                new KeyBinding(InputKey.J, BMSAction.Key5),
-                new KeyBinding(InputKey.K, BMSAction.Key6),
-                new KeyBinding(InputKey.L, BMSAction.Key7),
-                new KeyBinding(InputKey.Shift, BMSAction.Scratch1),
-            },
-            // 9 Keys (PMS)
-            9 => new[]
-            {
-                new KeyBinding(InputKey.A, BMSAction.Key1),
-                new KeyBinding(InputKey.S, BMSAction.Key2),
-                new KeyBinding(InputKey.D, BMSAction.Key3),
-                new KeyBinding(InputKey.F, BMSAction.Key4),
-                new KeyBinding(InputKey.Space, BMSAction.Key5),
-                new KeyBinding(InputKey.J, BMSAction.Key6),
-                new KeyBinding(InputKey.K, BMSAction.Key7),
-                new KeyBinding(InputKey.L, BMSAction.Key8),
-                new KeyBinding(InputKey.Semicolon, BMSAction.Key9),
-            },
-            // 10 Keys + 2 Scratch (Double Play)
-            10 => new[]
-            {
-                new KeyBinding(InputKey.A, BMSAction.Key1),
-                new KeyBinding(InputKey.S, BMSAction.Key2),
-                new KeyBinding(InputKey.D, BMSAction.Key3),
-                new KeyBinding(InputKey.F, BMSAction.Key4),
-                new KeyBinding(InputKey.G, BMSAction.Key5),
-                new KeyBinding(InputKey.Shift, BMSAction.Scratch1),
-                new KeyBinding(InputKey.Keypad7, BMSAction.Key8),
-                new KeyBinding(InputKey.Keypad8, BMSAction.Key9),
-                new KeyBinding(InputKey.Keypad9, BMSAction.Key10),
-                new KeyBinding(InputKey.Keypad4, BMSAction.Key11),
-                new KeyBinding(InputKey.Keypad5, BMSAction.Key12),
-                new KeyBinding(InputKey.Control, BMSAction.Scratch2),
-            },
-            // 14 Keys + 2 Scratch (Double Play)
-            14 => new[]
-            {
-                // 1P side
-                new KeyBinding(InputKey.A, BMSAction.Key1),
-                new KeyBinding(InputKey.S, BMSAction.Key2),
-                new KeyBinding(InputKey.D, BMSAction.Key3),
-                new KeyBinding(InputKey.F, BMSAction.Key4),
-                new KeyBinding(InputKey.G, BMSAction.Key5),
-                new KeyBinding(InputKey.H, BMSAction.Key6),
-                new KeyBinding(InputKey.J, BMSAction.Key7),
-                new KeyBinding(InputKey.Shift, BMSAction.Scratch1),
-                // 2P side
-                new KeyBinding(InputKey.Keypad7, BMSAction.Key8),
-                new KeyBinding(InputKey.Keypad8, BMSAction.Key9),
-                new KeyBinding(InputKey.Keypad9, BMSAction.Key10),
-                new KeyBinding(InputKey.Keypad4, BMSAction.Key11),
-                new KeyBinding(InputKey.Keypad5, BMSAction.Key12),
-                new KeyBinding(InputKey.Keypad6, BMSAction.Key13),
-                new KeyBinding(InputKey.Keypad1, BMSAction.Key14),
-                new KeyBinding(InputKey.Control, BMSAction.Scratch2),
-            },
-            _ => GetDefaultKeyBindings(7),
-        };
+            int totalColumns = Math.Clamp(variant <= 0 ? 8 : variant, 1, 16);
 
-        public override IEnumerable<int> AvailableVariants => new[] { 5, 7, 9, 10, 14 };
+            var maniaRuleset = new ManiaRuleset();
+            var maniaBindings = maniaRuleset.GetDefaultKeyBindings((int)PlayfieldType.Single + totalColumns);
+
+            foreach (var binding in maniaBindings)
+            {
+                if (binding.Action is not ManiaAction maniaAction)
+                    continue;
+                if (binding.KeyCombination.Equals(InputKey.None))
+                    continue;
+
+                int index = (int)maniaAction;
+                BMSAction mapped = index switch
+                {
+                    <= 13 => (BMSAction)((int)BMSAction.Key1 + index),
+                    14 => BMSAction.Scratch1,
+                    15 => BMSAction.Scratch2,
+                    _ => BMSAction.Scratch2
+                };
+
+                yield return new KeyBinding(binding.KeyCombination, mapped);
+            }
+        }
+
+        public override IEnumerable<int> AvailableVariants => Enumerable.Range(1, 16);
 
         public override LocalisableString GetVariantName(int variant) => variant switch
         {
-            5 => "5K1S",
-            7 => "7K1S",
-            9 => "9K",
-            10 => "10K2S",
-            14 => "14K2S",
-            _ => $"{variant}K"
+            > 0 => $"{variant}K",
+            _ => "8K"
         };
 
         public override Drawable CreateIcon() => new SpriteIcon
@@ -195,5 +176,46 @@ namespace osu.Game.Rulesets.BMS
         };
 
         public override string RulesetAPIVersionSupported => CURRENT_RULESET_API_VERSION;
+
+        private static ManiaBeatmap createManiaSkinBeatmap(IBeatmap beatmap)
+        {
+            int totalColumns = Math.Max(1, getManiaSkinTotalColumns(beatmap));
+            var maniaBeatmap = new ManiaBeatmap(new StageDefinition(totalColumns))
+            {
+                BeatmapInfo = beatmap.BeatmapInfo,
+                ControlPointInfo = beatmap.ControlPointInfo,
+            };
+
+            foreach (BMSHitObject obj in beatmap.HitObjects.OfType<BMSHitObject>())
+            {
+                ManiaHitObject converted = obj switch
+                {
+                    BMSHoldNote hold => new HoldNote
+                    {
+                        StartTime = hold.StartTime,
+                        Duration = hold.Duration,
+                        Column = hold.Column
+                    },
+                    _ => new Note
+                    {
+                        StartTime = obj.StartTime,
+                        Column = obj.Column
+                    }
+                };
+
+                maniaBeatmap.HitObjects.Add(converted);
+            }
+
+            return maniaBeatmap;
+        }
+
+        private static int getManiaSkinTotalColumns(IBeatmap beatmap)
+        {
+            int fromLayout = BMSStageLayout.FromBeatmap(beatmap).TotalColumns;
+            int fromBeatmap = beatmap is BMSBeatmap bmsBeatmap ? bmsBeatmap.TotalColumns : 0;
+            int fromDifficulty = (int)Math.Round(beatmap.Difficulty.CircleSize);
+            int fromHitObjects = beatmap.HitObjects.OfType<BMSHitObject>().Select(h => h.Column + 1).DefaultIfEmpty(0).Max();
+            return Math.Max(Math.Max(fromLayout, fromBeatmap), Math.Max(fromDifficulty, fromHitObjects));
+        }
     }
 }

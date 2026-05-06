@@ -595,6 +595,8 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 }
             }
 
+            compactColumns(result);
+
             // Update total keys based on used columns
             if (result.Count > 0)
             {
@@ -609,6 +611,29 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Compress sparse decoder columns to contiguous lanes (0..N-1).
+        /// Prevents panel inflation when channel mapping leaves gaps (e.g. 10+2 charts).
+        /// </summary>
+        private static void compactColumns(List<BMSHitObject> hitObjects)
+        {
+            if (hitObjects.Count == 0)
+                return;
+
+            int[] used = hitObjects.Select(h => h.Column)
+                                   .Distinct()
+                                   .OrderBy(c => c)
+                                   .ToArray();
+
+            var remap = new Dictionary<int, int>(used.Length);
+
+            for (int i = 0; i < used.Length; i++)
+                remap[used[i]] = i;
+
+            foreach (var hitObject in hitObjects)
+                hitObject.Column = remap[hitObject.Column];
         }
 
         private List<BmsBackgroundSoundEvent> createBackgroundSoundEvents(Dictionary<BMSEvent, double> eventTimes)

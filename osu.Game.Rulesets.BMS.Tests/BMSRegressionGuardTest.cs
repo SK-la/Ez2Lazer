@@ -3,9 +3,11 @@
 
 using System.Reflection;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.Rulesets.BMS.Beatmaps;
 using osu.Game.Rulesets.BMS.Objects;
 using osu.Game.Rulesets.BMS.Objects.Drawables;
+using osu.Game.Rulesets.Mania.Beatmaps;
 
 namespace osu.Game.Rulesets.BMS.Tests
 {
@@ -43,6 +45,31 @@ namespace osu.Game.Rulesets.BMS.Tests
             MethodInfo loadMethod = typeof(DrawableBMSNote).GetMethod("load", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
             TestDelegate action = () => loadMethod.Invoke(drawable, null);
+
+            Assert.That(action, Throws.Nothing);
+        }
+
+        [Test]
+        public void TestManiaSkinBeatmapAdapterUsesBeatmapColumnCount()
+        {
+            var beatmap = new Beatmap<BMSHitObject>
+            {
+                Difficulty =
+                {
+                    CircleSize = 14
+                }
+            };
+            beatmap.HitObjects.Add(new BMSNote
+            {
+                StartTime = 1000,
+                Column = 0,
+                IsScratch = true
+            });
+
+            MethodInfo adapter = typeof(BMSRuleset).GetMethod("createManiaSkinBeatmap", BindingFlags.Static | BindingFlags.NonPublic)!;
+            var maniaBeatmap = (ManiaBeatmap)adapter.Invoke(null, new object[] { beatmap })!;
+
+            TestDelegate action = () => maniaBeatmap.GetStageForColumnIndex(13);
 
             Assert.That(action, Throws.Nothing);
         }

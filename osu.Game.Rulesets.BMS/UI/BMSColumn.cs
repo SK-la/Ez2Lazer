@@ -5,7 +5,6 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Pooling;
-using osu.Framework.Graphics.Shapes;
 using osu.Framework.Platform;
 using osu.Game.Extensions;
 using osu.Game.Rulesets.BMS.Objects.Drawables;
@@ -65,16 +64,6 @@ namespace osu.Game.Rulesets.BMS.UI
                 skinColumnBackground = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.ColumnBackground), _ => new DefaultColumnBackground())
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Alpha = 0.3f,
-                },
-                new Box
-                {
-                    RelativeSizeAxes = Axes.Y,
-                    Width = 1,
-                    Colour = Color4.White,
-                    Alpha = 0.2f,
-                    Anchor = Anchor.TopRight,
-                    Origin = Anchor.TopRight,
                 },
                 new Container
                 {
@@ -82,7 +71,6 @@ namespace osu.Game.Rulesets.BMS.UI
                     Height = 20,
                     Anchor = Anchor.BottomCentre,
                     Origin = Anchor.BottomCentre,
-                    Y = -100,
                     Child = skinHitTarget = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.HitTarget), _ => new DefaultHitTarget())
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -91,7 +79,6 @@ namespace osu.Game.Rulesets.BMS.UI
                 skinKeyArea = new SkinnableDrawable(new ManiaSkinComponentLookup(ManiaSkinComponents.KeyArea), _ => new DefaultKeyArea())
                 {
                     RelativeSizeAxes = Axes.Both,
-                    Alpha = 0.15f,
                 },
                 HitObjectContainer,
                 explosionContainer = new Container
