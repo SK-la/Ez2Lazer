@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Input;
@@ -28,7 +27,13 @@ namespace osu.Game.Rulesets.BMS.UI
     {
         private const double default_time_range = 1500;
 
-        private int? cachedTotalColumns;
+        private BMSStageLayout? layoutCache;
+
+        /// <summary>
+        /// Stage layout for this beatmap (mods applied). Safe from <see cref="CreateInputManager"/> onward once <see cref="Beatmap"/> is set.
+        /// </summary>
+        private BMSStageLayout layout => layoutCache ??= BMSStageLayout.FromBeatmap(Beatmap);
+
         private readonly BindableDouble maniaScrollSpeed = new BindableDouble();
         private readonly BindableDouble maniaBaseSpeed = new BindableDouble();
         private readonly BindableDouble maniaTimePerSpeed = new BindableDouble();
@@ -36,25 +41,20 @@ namespace osu.Game.Rulesets.BMS.UI
 
         protected override bool RelativeScaleBeatLengths => true;
 
-        public int TotalColumns
-        {
-            get
-            {
-                if (cachedTotalColumns.HasValue)
-                    return cachedTotalColumns.Value;
-
-                // Calculate from hit objects
-                int maxColumn = Beatmap.HitObjects.Select(h => h.Column).DefaultIfEmpty(0).Max();
-                cachedTotalColumns = maxColumn + 1;
-                return cachedTotalColumns.Value;
-            }
-        }
+        public int TotalColumns => layout.TotalColumns;
 
         public DrawableBMSRuleset(Ruleset ruleset, IBeatmap beatmap, IReadOnlyList<Mod>? mods = null)
             : base(ruleset, beatmap, mods)
         {
             Direction.Value = ScrollingDirection.Down;
             TimeRange.Value = default_time_range;
+        }
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+            dependencies.CacheAs(layout);
+            return dependencies;
         }
 
         [BackgroundDependencyLoader]
@@ -83,7 +83,7 @@ namespace osu.Game.Rulesets.BMS.UI
             TimeRange.Value = DrawableManiaRuleset.ComputeScrollTime(maniaScrollSpeed.Value, maniaBaseSpeed.Value, maniaTimePerSpeed.Value);
         }
 
-        protected override Playfield CreatePlayfield() => new BMSPlayfield(TotalColumns);
+        protected override Playfield CreatePlayfield() => new BMSPlayfield(layout);
 
         protected override ReplayInputHandler CreateReplayInputHandler(Replay replay)
             => new BMSFramedReplayInputHandler(replay);
@@ -103,7 +103,7 @@ namespace osu.Game.Rulesets.BMS.UI
         }
 
         protected override PassThroughInputManager CreateInputManager() =>
-            new BMSInputManager(Ruleset.RulesetInfo, TotalColumns, SimultaneousBindingMode.Unique);
+            new BMSInputManager(Ruleset.RulesetInfo, layout.TotalColumns, SimultaneousBindingMode.Unique);
 
         protected override void AdjustScrollSpeed(int amount) => maniaScrollSpeed.Value += amount;
     }

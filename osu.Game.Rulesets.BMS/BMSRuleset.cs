@@ -88,6 +88,7 @@ namespace osu.Game.Rulesets.BMS
                     {
                         new BMSModRandom(),
                         new BMSModMirror(),
+                        new BMSModScratchLaneRight(),
                     };
 
                 case ModType.Fun:
