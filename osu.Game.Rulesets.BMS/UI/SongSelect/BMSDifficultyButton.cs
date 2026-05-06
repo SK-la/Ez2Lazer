@@ -7,6 +7,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -26,11 +27,15 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private Box background = null!;
         private TruncatingSpriteText difficultyText = null!;
         private Container clearLamp = null!;
+        private Box clearLampBox = null!;
 
         public readonly Bindable<BMSChartCache?> SelectedChart = new Bindable<BMSChartCache?>();
 
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
 
         public BMSDifficultyButton(BMSChartCache chart)
         {
@@ -67,10 +72,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                             Margin = new MarginPadding { Vertical = 5 },
                             CornerRadius = 2,
                             Masking = true,
-                            Child = new Box
+                            Child = clearLampBox = new Box
                             {
                                 RelativeSizeAxes = Axes.Both,
-                                Colour = getClearLampColour(),
+                                Colour = BmsClearLampColour.ForBestScore(null),
                             }
                         },
                         new FillFlowContainer
@@ -107,6 +112,17 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }, true);
         }
 
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (!string.IsNullOrEmpty(chart.Md5Hash))
+            {
+                var best = BmsLocalScoreQueries.GetBestLocalScore(realm, chart.Md5Hash);
+                clearLampBox.Colour = BmsClearLampColour.ForBestScore(best);
+            }
+        }
+
         protected override bool OnHover(HoverEvent e)
         {
             if (SelectedChart.Value != chart)
@@ -126,25 +142,6 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             SelectedChart.Value = chart;
             Action?.Invoke();
             return true;
-        }
-
-        /// <summary>
-        /// 根据Clear等级返回对应的颜色
-        /// TODO: 从实际成绩数据获取Clear等级
-        /// </summary>
-        private Color4 getClearLampColour()
-        {
-            // 暂时返回默认灰色，后续根据成绩数据设置
-            // Clear等级颜色参考：
-            // - No Play: Gray
-            // - Failed: Red
-            // - Assist Clear: Purple
-            // - Easy Clear: Green
-            // - Clear: Blue
-            // - Hard Clear: Orange
-            // - Full Combo: Yellow/Gold
-            // - Perfect: Rainbow/Cyan
-            return Color4.Gray;
         }
     }
 }
