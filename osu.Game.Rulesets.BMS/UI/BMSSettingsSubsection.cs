@@ -26,7 +26,10 @@ using osu.Game.Rulesets.BMS.Configuration;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Rulesets.BMS.UI.SongSelect;
+using osu.Game.Screens;
+using osu.Game.Screens.Menu;
+using BmsUiSongSelect = osu.Game.Rulesets.BMS.UI.SongSelect;
+using OsuSongSelect = osu.Game.Screens.Select.SongSelect;
 
 namespace osu.Game.Rulesets.BMS.UI
 {
@@ -45,8 +48,11 @@ namespace osu.Game.Rulesets.BMS.UI
         private Bindable<double>? maniaBaseSpeed;
         private Bindable<double>? maniaTimePerSpeed;
 
-        [Resolved]
+        [Resolved(canBeNull: true)]
         private OsuGame? game { get; set; }
+
+        [Resolved(canBeNull: true)]
+        private IPerformFromScreenRunner? performFromScreen { get; set; }
 
         [Resolved]
         private INotificationOverlay? notificationOverlay { get; set; }
@@ -205,18 +211,33 @@ namespace osu.Game.Rulesets.BMS.UI
 
         private void openBmsSongSelect()
         {
-            game?.PerformFromScreen(screen =>
+            var runner = performFromScreen ?? game;
+            if (runner == null)
             {
-                screen.Push(new BMSSongSelectScreen(BMSSongSelectScreenMode.RulesetEntry));
-            });
+                notificationOverlay?.Post(new SimpleErrorNotification { Text = "无法打开 BMS 选歌界面（未找到屏幕导航器）。" });
+                return;
+            }
+
+            // Allow opening from main menu or song select (settings is often opened on top of either).
+            runner.PerformFromScreen(screen =>
+            {
+                screen.Push(new BmsUiSongSelect.BMSSongSelectScreen(BmsUiSongSelect.BMSSongSelectScreenMode.RulesetEntry));
+            }, new[] { typeof(MainMenu), typeof(OsuSongSelect) });
         }
 
         private void selectPath()
         {
-            game?.PerformFromScreen(screen =>
+            var runner = performFromScreen ?? game;
+            if (runner == null)
+            {
+                notificationOverlay?.Post(new SimpleErrorNotification { Text = "无法打开向导（未找到屏幕导航器）。" });
+                return;
+            }
+
+            runner.PerformFromScreen(screen =>
             {
                 screen.Push(new BMSDirectorySelectScreen(libraryPathsBindable, legacyRootPathBindable, applyPathsAndScan));
-            });
+            }, new[] { typeof(MainMenu), typeof(OsuSongSelect) });
         }
 
         private void applyPathsAndScan(IReadOnlyList<string> paths)

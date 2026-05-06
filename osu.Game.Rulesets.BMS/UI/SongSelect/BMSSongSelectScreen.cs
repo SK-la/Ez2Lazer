@@ -540,11 +540,20 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 BMSChartCache chart = selectedChart.Value;
                 string chartPath = chart.FullPath;
+                string resolveSource = "direct-chart-path";
 
                 if (selectedVirtualBeatmap != null && beatmapManager.TryGetSourceReference(selectedVirtualBeatmap.ID, out BMSSourceReference sourceReference))
+                {
                     chartPath = sourceReference.ChartPath;
+                    resolveSource = $"source-map-by-id:{selectedVirtualBeatmap.ID}";
+                }
                 else if (beatmapManager.TryGetSourceReferenceByHash(chart.Md5Hash, out BMSSourceReference sourceByHash))
+                {
                     chartPath = sourceByHash.ChartPath;
+                    resolveSource = $"source-map-by-hash:{chart.Md5Hash}";
+                }
+
+                Logger.Log($"[BMS] StartGame chart resolve: title={chart.Title}, file={chart.FileName}, md5={chart.Md5Hash}, mode={BMSChartDisplayFormatter.GetModeText(chart)}, source={resolveSource}, path={chartPath}", LoggingTarget.Runtime, LogLevel.Debug);
 
                 var workingBeatmap = new BMSWorkingBeatmap(chartPath, audioManager, textures, chart);
 
