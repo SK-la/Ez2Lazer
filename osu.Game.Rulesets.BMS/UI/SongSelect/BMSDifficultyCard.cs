@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
+using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
@@ -37,6 +38,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
 
         public BMSDifficultyCard(BMSChartCache chart)
         {
@@ -68,7 +72,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                         {
                             Width = clear_lamp_width,
                             RelativeSizeAxes = Axes.Y,
-                            Colour = getClearLampColour(),
+                            Colour = BmsClearLampColour.ForBestScore(null),
                         },
                         // 内容区域
                         new FillFlowContainer
@@ -140,6 +144,17 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             }, true);
         }
 
+        protected override void LoadComplete()
+        {
+            base.LoadComplete();
+
+            if (!string.IsNullOrEmpty(chart.Md5Hash))
+            {
+                var best = BmsLocalScoreQueries.GetBestLocalScore(realm, chart.Md5Hash);
+                clearLamp.Colour = BmsClearLampColour.ForBestScore(best);
+            }
+        }
+
         protected override bool OnHover(HoverEvent e)
         {
             if (SelectedChart.Value != chart)
@@ -168,26 +183,6 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         {
             SelectedChart.Value = chart;
             return base.OnClick(e);
-        }
-
-        /// <summary>
-        /// 根据Clear等级返回对应的颜色
-        /// TODO: 从实际成绩数据获取Clear等级
-        /// </summary>
-        private Color4 getClearLampColour()
-        {
-            // Clear等级颜色定义：
-            // - No Play: #404040 (深灰)
-            // - Failed: #FF4040 (红)
-            // - Assist Clear: #C040FF (紫)
-            // - Easy Clear: #40FF40 (绿)
-            // - Clear: #4080FF (蓝)
-            // - Hard Clear: #FF8040 (橙)
-            // - Full Combo: #FFD700 (金)
-            // - Perfect: #00FFFF (青)
-
-            // 暂时返回默认深灰色，表示No Play
-            return new Color4(64, 64, 64, 255);
         }
     }
 }

@@ -1,11 +1,13 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
+using osu.Game.Database;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Overlays;
@@ -35,6 +37,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         [Resolved]
         private OverlayColourProvider colourProvider { get; set; } = null!;
+
+        [Resolved]
+        private RealmAccess realm { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -218,19 +223,47 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             chartStatsText.Text = $"{chart.TotalNotes} Notes | Keysounds {chart.KeysoundFiles.Count} | Total {chart.Total:F0}";
             chartExtraText.Text = $"时长: {BMSChartDisplayFormatter.GetDurationText(chart.Duration)} | {BMSChartDisplayFormatter.GetFlagsText(chart)} | 文件: {chart.FileName}";
 
-            // TODO: 加载并显示该难度的成绩
             updateScores(chart);
         }
 
         private void updateScores(BMSChartCache chart)
         {
-            // TODO: 实现成绩显示
-            // 这里需要从成绩数据库或文件中加载该难度的历史成绩
+            if (string.IsNullOrEmpty(chart.Md5Hash))
+            {
+                setScorePlaceholder("无法匹配成绩（缺少 MD5）");
+                return;
+            }
+
+            var scores = BmsLocalScoreQueries.GetTopLocalScores(realm, chart.Md5Hash, 5);
+
+            if (scores.Count == 0)
+            {
+                setScorePlaceholder("暂无本地成绩");
+                return;
+            }
+
+            scoreContainer.Child = new FillFlowContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = FillDirection.Vertical,
+                Spacing = new Vector2(0, 4),
+                Children = scores.Select((s, i) => new OsuSpriteText
+                {
+                    Font = OsuFont.GetFont(size: 13),
+                    Colour = colourProvider.Content1,
+                    Text = $"#{i + 1}  {s.TotalScore:N0}  ·  {s.Accuracy:P1}  ·  {s.Rank}",
+                }).ToArray()
+            };
+        }
+
+        private void setScorePlaceholder(string message)
+        {
             scoreContainer.Child = new OsuSpriteText
             {
                 Font = OsuFont.GetFont(size: 14),
                 Colour = colourProvider.Content2,
-                Text = "No scores yet",
+                Text = message,
             };
         }
     }
