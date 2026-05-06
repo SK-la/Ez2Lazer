@@ -5,7 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
+using System.Text;
+using osu.Framework.Extensions;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
@@ -26,8 +27,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
             IReadOnlyList<BeatmapSetInfo> virtualSets = manager.BuildVirtualBeatmapCatalog(bmsRulesetInfo);
             Dictionary<Guid, BMSSourceReference> sourceMap = manager.GetCurrentSourceMap();
+
+            var realmFileStore = new RealmFileStore(realm, storage);
             int importedSets = 0;
             int importedBeatmaps = 0;
+            int removedSets = 0;
+            int skippedSets = 0;
 
             realm.Write(r =>
             {
@@ -36,20 +41,42 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 if (managedRuleset == null)
                     throw new InvalidOperationException("BMS ruleset is not available in realm.");
 
-                foreach (BeatmapSetInfo oldSet in r.All<BeatmapSetInfo>().Where(set => set.Hash.StartsWith(bms_set_hash_prefix)).ToList())
-                    removeSet(r, oldSet);
+                Dictionary<Guid, BeatmapSetInfo> existingSets = r.All<BeatmapSetInfo>()
+                                                                 .Where(set => set.Hash.StartsWith(bms_set_hash_prefix))
+                                                                 .ToDictionary(set => set.ID);
+                HashSet<Guid> targetSetIds = virtualSets.Select(set => set.ID).ToHashSet();
+
+                foreach ((Guid setId, BeatmapSetInfo oldSet) in existingSets)
+                {
+                    if (!targetSetIds.Contains(setId))
+                    {
+                        removeSet(r, oldSet);
+                        removedSets++;
+                    }
+                }
 
                 foreach (BeatmapSetInfo virtualSet in virtualSets)
                 {
+                    if (existingSets.TryGetValue(virtualSet.ID, out BeatmapSetInfo? existingSet)
+                        && setMatches(existingSet, virtualSet))
+                    {
+                        skippedSets++;
+                        continue;
+                    }
+
+                    if (existingSet != null)
+                    {
+                        removeSet(r, existingSet);
+                        removedSets++;
+                    }
+
                     var newSet = new BeatmapSetInfo
                     {
                         ID = virtualSet.ID,
                         DateAdded = virtualSet.DateAdded,
-                        Hash = virtualSet.Hash.StartsWith(bms_set_hash_prefix, StringComparison.Ordinal) ? virtualSet.Hash : $"{bms_set_hash_prefix}{virtualSet.ID:N}",
+                        Hash = createExternalHash(virtualSet.Hash),
                         Status = BeatmapOnlineStatus.LocallyModified,
                     };
-
-                    HashSet<string> addedHashes = new HashSet<string>(StringComparer.Ordinal);
 
                     foreach (BeatmapInfo virtualBeatmap in virtualSet.Beatmaps)
                     {
@@ -59,12 +86,12 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                         if (!File.Exists(sourceRef.ChartPath))
                             continue;
 
-                        mirrorFolderFiles(storage, r, newSet, sourceRef.FolderPath, addedHashes);
+                        registerExternalChartFile(realmFileStore, r, newSet, sourceRef.ChartPath);
 
                         string chartFilename = Path.GetFileName(sourceRef.ChartPath);
                         RealmNamedFileUsage? chartFileUsage = newSet.GetFile(chartFilename);
 
-                        if (chartFileUsage == null)
+                        if (chartFileUsage is null)
                             continue;
 
                         var beatmap = new BeatmapInfo(managedRuleset, virtualBeatmap.Difficulty.Clone(), virtualBeatmap.Metadata.DeepClone())
@@ -93,43 +120,65 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                 }
             });
 
-            Logger.Log($"[BMS] External library sync finished: {importedSets} sets, {importedBeatmaps} beatmaps imported.");
+            Logger.Log($"[BMS] External library sync finished: imported {importedSets} sets/{importedBeatmaps} beatmaps, removed {removedSets} sets, skipped {skippedSets} unchanged sets.");
         }
 
-        private static void mirrorFolderFiles(Storage storage, Realm realm, BeatmapSetInfo set, string folderPath, HashSet<string> addedHashes)
+        private static bool setMatches(BeatmapSetInfo existingSet, BeatmapSetInfo targetSet)
         {
-            if (!Directory.Exists(folderPath))
+            if (!string.Equals(existingSet.Hash, createExternalHash(targetSet.Hash), StringComparison.Ordinal))
+                return false;
+
+            // Legacy sync registered every file in the folder; re-import so Files only lists chart entries.
+            if (existingSet.Hash.StartsWith(bms_set_hash_prefix, StringComparison.Ordinal)
+                && existingSet.Files.Count > existingSet.Beatmaps.Count)
+                return false;
+
+            if (existingSet.Beatmaps.Count != targetSet.Beatmaps.Count)
+                return false;
+
+            Dictionary<Guid, BeatmapInfo> existingBeatmaps = existingSet.Beatmaps.ToDictionary(beatmap => beatmap.ID);
+
+            foreach (BeatmapInfo targetBeatmap in targetSet.Beatmaps)
+            {
+                if (!existingBeatmaps.TryGetValue(targetBeatmap.ID, out BeatmapInfo? existingBeatmap))
+                    return false;
+
+                if (!string.Equals(existingBeatmap.MD5Hash, targetBeatmap.MD5Hash, StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                if (!string.Equals(existingBeatmap.DifficultyName, targetBeatmap.DifficultyName, StringComparison.Ordinal))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static string createExternalHash(string folderPath)
+        {
+            string encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(folderPath));
+            return bms_set_hash_prefix + encoded;
+        }
+
+        /// <summary>
+        /// Only the chart file is registered in Realm: <see cref="BeatmapInfo"/> links via <see cref="BeatmapInfo.Hash"/> / <see cref="BeatmapInfo.File"/>.
+        /// Audio, BGA and keysounds stay on disk and are resolved through <c>bms-ext:set:</c> + original folder in working beatmap.
+        /// </summary>
+        private static void registerExternalChartFile(RealmFileStore realmFileStore, Realm realm, BeatmapSetInfo set, string chartPath)
+        {
+            string chartFilename = Path.GetFileName(chartPath);
+
+            if (string.IsNullOrEmpty(chartFilename))
                 return;
 
-            foreach (string filePath in Directory.GetFiles(folderPath, "*", SearchOption.AllDirectories))
+            if (set.GetFile(chartFilename) != null)
+                return;
+
+            using (Stream stream = File.OpenRead(chartPath))
             {
-                string relativeName = Path.GetRelativePath(folderPath, filePath).Replace('\\', '/');
-
-                if (string.IsNullOrWhiteSpace(relativeName))
-                    continue;
-
-                byte[] bytes = File.ReadAllBytes(filePath);
-                string hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-
-                if (!addedHashes.Add(hash))
-                    continue;
-
-                string storagePath = toStoragePath(hash);
-                string fullStoragePath = storage.GetFullPath(storagePath);
-                string? parent = Path.GetDirectoryName(fullStoragePath);
-
-                if (!string.IsNullOrEmpty(parent))
-                    Directory.CreateDirectory(parent);
-
-                if (!File.Exists(fullStoragePath))
-                    File.WriteAllBytes(fullStoragePath, bytes);
-
-                RealmFile realmFile = realm.Find<RealmFile>(hash) ?? realm.Add(new RealmFile { Hash = hash }, update: true);
-                set.Files.Add(new RealmNamedFileUsage(realmFile, relativeName));
+                RealmFile file = realmFileStore.RegisterExternalHash(stream.ComputeSHA2Hash(), realm);
+                set.Files.Add(new RealmNamedFileUsage(file, chartFilename));
             }
         }
-
-        private static string toStoragePath(string hash) => Path.Combine(hash.Substring(0, 1), hash.Substring(0, 2), hash);
 
         private static void removeSet(Realm realm, BeatmapSetInfo set)
         {
