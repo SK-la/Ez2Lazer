@@ -30,6 +30,8 @@ namespace osu.Game.Online.API
 {
     public partial class APIAccess : CompositeComponent, IAPIProvider
     {
+        private const string local_token_marker = "__local__";
+
         private readonly OsuGameBase game;
         private readonly OsuConfigManager config;
 
@@ -95,11 +97,20 @@ namespace osu.Game.Online.API
             log.Add($@"API request version: {APIVersion}");
 
             ProvidedUsername = config.Get<string>(OsuSetting.Username);
-
-            authentication.TokenString = config.Get<string>(OsuSetting.Token);
+            string configuredToken = config.Get<string>(OsuSetting.Token);
+            authentication.TokenString = configuredToken;
             authentication.Token.ValueChanged += onTokenChanged;
 
             AddInternal(localUserState = new LocalUserState(this, config));
+
+            if (isPersistedLocalSession(ProvidedUsername, configuredToken))
+            {
+                password = local_token_marker;
+                IsLocalOnly = true;
+                state.Value = APIState.Online;
+                localUserState.SetPlaceholderLocalUser(ProvidedUsername, true);
+                return;
+            }
 
             if (HasLogin)
             {
@@ -400,8 +411,12 @@ namespace osu.Game.Online.API
             NotificationsClient.Disconnect();
 
             ProvidedUsername = username;
-            password = "__local__";
+            password = local_token_marker;
             IsLocalOnly = true;
+
+            // Persist local account session so restart can directly restore local login state.
+            config.SetValue(OsuSetting.Username, ProvidedUsername);
+            config.SetValue(OsuSetting.Token, createLocalTokenString());
 
             Schedule(() => localUserState.SetPlaceholderLocalUser(ProvidedUsername, true));
             LastLoginError = null;
@@ -637,6 +652,20 @@ namespace osu.Game.Online.API
                 : base($@"Request failed from flush operation (state {state})")
             {
             }
+        }
+
+        private static string createLocalTokenString()
+            => $@"{local_token_marker}|{DateTimeOffset.UtcNow.AddYears(10).ToUnixTimeSeconds()}|{local_token_marker}";
+
+        private static bool isPersistedLocalSession(string username, string token)
+        {
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(token))
+                return false;
+
+            OAuthToken parsed = OAuthToken.Parse(token);
+            return parsed != null
+                   && string.Equals(parsed.AccessToken, local_token_marker, StringComparison.Ordinal)
+                   && string.Equals(parsed.RefreshToken, local_token_marker, StringComparison.Ordinal);
         }
     }
 
