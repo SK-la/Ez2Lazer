@@ -2,7 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Bindables;
-using osu.Game.Rulesets.BMS.Scoring;
+using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 using osu.Game.Rulesets.Scoring;
@@ -32,6 +32,8 @@ namespace osu.Game.Rulesets.BMS.Objects
         /// </summary>
         public bool IsScratch { get; set; }
 
-        protected override HitWindows CreateHitWindows() => new BMSHitWindows();
+        /// <inheritdoc />
+        /// <remarks>Borrows osu mania Ez hit-mode / window tables (<see cref="ManiaHitWindows"/>) via global <c>ManiaHitMode</c>; no bespoke BMS skin timing.</remarks>
+        protected override HitWindows CreateHitWindows() => new ManiaHitWindows();
     }
 }
