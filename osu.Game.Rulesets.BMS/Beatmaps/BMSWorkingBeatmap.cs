@@ -94,7 +94,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     Title = title,
                     Artist = artist,
                     Source = "BMS Import",
-                    AudioFile = chartCache?.PreviewFile ?? chartCache?.AudioFile ?? string.Empty,
+                    AudioFile = sanitiseAudioReference(chartCache?.PreviewFile ?? chartCache?.AudioFile, chartCache?.FolderPath ?? fileInfo.DirectoryName) ?? string.Empty,
                 },
                 DifficultyName = difficultyName,
                 Difficulty = new BeatmapDifficulty
@@ -122,6 +122,37 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
             return beatmapInfo;
         }
 
+        private static string? sanitiseAudioReference(string? raw, string? baseFolder)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            string trimmed = raw.Trim();
+            trimmed = trimmed.Replace('\\', '/');
+
+            if (!Path.IsPathRooted(trimmed))
+                return trimmed;
+
+            if (!string.IsNullOrWhiteSpace(baseFolder))
+            {
+                try
+                {
+                    string fullBase = Path.GetFullPath(baseFolder);
+                    string fullPath = Path.GetFullPath(trimmed);
+                    string relative = Path.GetRelativePath(fullBase, fullPath);
+
+                    if (!relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative))
+                        return relative.Replace('\\', '/');
+                }
+                catch
+                {
+                    // Fall back to file name below.
+                }
+            }
+
+            return Path.GetFileName(trimmed);
+        }
+
         protected override IBeatmap GetBeatmap()
         {
             if (cachedBeatmap != null)
@@ -142,7 +173,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
                     BeatmapInfo.Metadata.Title = cachedBeatmap.BeatmapInfo.Metadata.Title;
                     BeatmapInfo.Metadata.Artist = cachedBeatmap.BeatmapInfo.Metadata.Artist;
                     BeatmapInfo.Metadata.Source = "BMS Import";
-                    BeatmapInfo.Metadata.AudioFile = cachedBeatmap.BeatmapInfo.Metadata.AudioFile;
+                    BeatmapInfo.Metadata.AudioFile = sanitiseAudioReference(cachedBeatmap.BeatmapInfo.Metadata.AudioFile, folderPath) ?? string.Empty;
                     BeatmapInfo.Metadata.BackgroundFile = cachedBeatmap.BeatmapInfo.Metadata.BackgroundFile;
                     BeatmapInfo.Metadata.PreviewTime = cachedBeatmap.BeatmapInfo.Metadata.PreviewTime;
                     BeatmapInfo.DifficultyName = cachedBeatmap.BeatmapInfo.DifficultyName;

@@ -3,6 +3,7 @@
 
 using System;
 using osu.Framework.Allocation;
+using osu.Framework.Audio;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
@@ -14,6 +15,7 @@ using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BMS.Beatmaps;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
@@ -21,6 +23,12 @@ using osuTK.Graphics;
 
 namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
+    public enum BMSGameplayRoute
+    {
+        ManiaCompatibility,
+        BmsNative
+    }
+
     /// <summary>
     /// Loader screen that prepares and starts BMS gameplay.
     /// Uses BMS ruleset gameplay pipeline directly.
@@ -32,6 +40,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         protected override bool InitialBackButtonVisibility => false;
 
         private readonly BMSWorkingBeatmap workingBeatmap;
+        private readonly BMSGameplayRoute gameplayRoute;
         private LoadingSpinner loadingSpinner = null!;
         private OsuSpriteText statusText = null!;
         private OsuSpriteText titleText = null!;
@@ -39,9 +48,13 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private ScheduledDelegate? scheduledPushPlayer;
         private ScheduledDelegate? scheduledExit;
 
-        public BMSPlayerLoader(BMSWorkingBeatmap workingBeatmap)
+        [Resolved]
+        private AudioManager audioManager { get; set; } = null!;
+
+        public BMSPlayerLoader(BMSWorkingBeatmap workingBeatmap, BMSGameplayRoute gameplayRoute = BMSGameplayRoute.ManiaCompatibility)
         {
             this.workingBeatmap = workingBeatmap;
+            this.gameplayRoute = gameplayRoute;
         }
 
         [BackgroundDependencyLoader]
@@ -158,8 +171,17 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
             try
             {
-                Beatmap.Value = workingBeatmap;
-                Ruleset.Value = new BMSRuleset().RulesetInfo;
+                if (gameplayRoute == BMSGameplayRoute.BmsNative)
+                {
+                    Beatmap.Value = workingBeatmap;
+                    Ruleset.Value = new BMSNativeRuleset().RulesetInfo;
+                }
+                else
+                {
+                    var maniaWorkingBeatmap = new ManiaConvertedWorkingBeatmap(workingBeatmap, audioManager);
+                    Beatmap.Value = maniaWorkingBeatmap;
+                    Ruleset.Value = new ManiaRuleset().RulesetInfo;
+                }
 
                 var playerLoader = new PlayerLoader(() => new BmsPlayer());
                 this.Push(playerLoader);

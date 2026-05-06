@@ -558,7 +558,10 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 var workingBeatmap = new BMSWorkingBeatmap(chartPath, audioManager, textures, chart);
 
                 // Push to player
-                this.Push(new BMSPlayerLoader(workingBeatmap));
+                var route = mode == BMSSongSelectScreenMode.SpecialEntry
+                    ? BMSGameplayRoute.BmsNative
+                    : BMSGameplayRoute.ManiaCompatibility;
+                this.Push(new BMSPlayerLoader(workingBeatmap, route));
             }
             catch (Exception ex)
             {

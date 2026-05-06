@@ -148,6 +148,14 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
                 if (!string.Equals(existingBeatmap.DifficultyName, targetBeatmap.DifficultyName, StringComparison.Ordinal))
                     return false;
+
+                // Force reimport of legacy entries that stored absolute audio paths.
+                if (Path.IsPathRooted(existingBeatmap.Metadata.AudioFile))
+                    return false;
+
+                // Keep metadata in sync so audio path fixes (including subdirectories) are propagated.
+                if (!string.Equals(existingBeatmap.Metadata.AudioFile, targetBeatmap.Metadata.AudioFile, StringComparison.OrdinalIgnoreCase))
+                    return false;
             }
 
             return true;
