@@ -84,8 +84,8 @@ namespace osu.Game.Overlays.SkinEditor
 
         private Container? content;
 
-        private EditorSidebar componentsSidebar = null!;
-        private EzEditorSidebar settingsSidebar = null!;
+        private EzSkinComponentsSidebar componentsSidebar = null!;
+        private EzSkinSettingsSidebar settingsSidebar = null!;
 
         private SkinEditorChangeHandler? changeHandler;
 
@@ -223,13 +223,13 @@ namespace osu.Game.Overlays.SkinEditor
                                     {
                                         new Drawable[]
                                         {
-                                            componentsSidebar = new EditorSidebar(),
+                                            componentsSidebar = new EzSkinComponentsSidebar(),
                                             content = new Container
                                             {
                                                 Depth = float.MaxValue,
                                                 RelativeSizeAxes = Axes.Both,
                                             },
-                                            settingsSidebar = new EzEditorSidebar(),
+                                            settingsSidebar = new EzSkinSettingsSidebar(),
                                         }
                                     }
                                 }
@@ -399,7 +399,7 @@ namespace osu.Game.Overlays.SkinEditor
 
             content.Child = new SkinBlueprintContainer(skinComponentsContainer);
 
-            componentsSidebar.Children = new[]
+            var selectSections = new List<EditorSidebarSection>
             {
                 new EditorSidebarSection(SkinEditorStrings.CurrentWorkingLayer)
                 {
@@ -411,23 +411,25 @@ namespace osu.Game.Overlays.SkinEditor
                             Current = selectedTarget,
                         }
                     }
-                },
+                }
             };
 
             // If the new target has a ruleset, let's show ruleset-specific items at the top, and the rest below.
             if (target.NewValue.Ruleset != null)
             {
-                componentsSidebar.Add(new SkinComponentToolbox(skinComponentsContainer, target.NewValue.Ruleset)
+                selectSections.Add(new SkinComponentToolbox(skinComponentsContainer, target.NewValue.Ruleset)
                 {
                     RequestPlacement = requestPlacement
                 });
             }
 
             // Remove the ruleset from the lookup to get base components.
-            componentsSidebar.Add(new SkinComponentToolbox(skinComponentsContainer, null)
+            selectSections.Add(new SkinComponentToolbox(skinComponentsContainer, null)
             {
                 RequestPlacement = requestPlacement
             });
+
+            componentsSidebar.SetSelectSections(selectSections);
 
             void onComponentsLoaded(Drawable d)
             {
