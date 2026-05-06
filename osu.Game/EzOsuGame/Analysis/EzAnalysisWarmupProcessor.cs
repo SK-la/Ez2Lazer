@@ -176,6 +176,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     totalBeatmaps++;
 
                     bool isMania = b.Ruleset.OnlineID == 3;
+                    bool isBms = string.Equals(b.Ruleset.ShortName, "bms", StringComparison.OrdinalIgnoreCase);
 
                     if (isMania)
                     {
@@ -192,6 +193,11 @@ namespace osu.Game.EzOsuGame.Analysis
                     }
 
                     if (b.BeatmapSet == null)
+                        continue;
+
+                    // External BMS libraries are volatile by nature (sync/relink), and forcing sqlite backfill
+                    // every startup is noisy and expensive. BMS keeps runtime analysis on-demand.
+                    if (isBms)
                         continue;
 
                     totalWithSet++;

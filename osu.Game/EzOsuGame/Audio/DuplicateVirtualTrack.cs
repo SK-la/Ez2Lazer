@@ -2,13 +2,16 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.IO;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
+using osu.Framework.Platform;
 using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
@@ -354,20 +357,31 @@ namespace osu.Game.EzOsuGame.Audio
                 standardisedFileStorePath = standardisedFileStorePath.ToStandardisedPath();
 
             bool hasBeatmapTrackStore = beatmapManager?.BeatmapTrackStore != null;
+            Track? absolutePathTrack = tryGetAbsolutePathTrack(audioFile);
 
             // Candidates: prefer beatmap store, then global store (raw/standardised), then try direct audio filename fallbacks.
             Track?[] candidates = new[]
             {
                 hasBeatmapTrackStore && !string.IsNullOrEmpty(rawFileStorePath) ? beatmapManager!.BeatmapTrackStore.Get(rawFileStorePath) : null,
                 hasBeatmapTrackStore && !string.IsNullOrEmpty(standardisedFileStorePath) ? beatmapManager!.BeatmapTrackStore.Get(standardisedFileStorePath) : null,
-                !string.IsNullOrEmpty(rawFileStorePath) ? audioManager?.Tracks.Get(rawFileStorePath) : null,
-                !string.IsNullOrEmpty(standardisedFileStorePath) ? audioManager?.Tracks.Get(standardisedFileStorePath) : null,
+                !string.IsNullOrEmpty(rawFileStorePath) ? tryGetTrackFromGlobalStore(rawFileStorePath) : null,
+                !string.IsNullOrEmpty(standardisedFileStorePath) ? tryGetTrackFromGlobalStore(standardisedFileStorePath) : null,
                 // Fallback: try loading by audio filename directly (some beatmaps only store filename)
-                !string.IsNullOrEmpty(audioFile) ? audioManager?.Tracks.Get(audioFile) : null,
-                !string.IsNullOrEmpty(audioFile) ? audioManager?.Tracks.Get(audioFile.Replace('\\', '/')) : null,
+                !string.IsNullOrEmpty(audioFile) && !Path.IsPathRooted(audioFile) ? tryGetTrackFromGlobalStore(audioFile) : null,
+                !string.IsNullOrEmpty(audioFile) && !Path.IsPathRooted(audioFile) ? tryGetTrackFromGlobalStore(audioFile.Replace('\\', '/')) : null,
+                absolutePathTrack,
             };
 
-            string[] candidateNames = new[] { "beatmapStoreRaw", "beatmapStoreStandardised", "globalStoreRaw", "globalStoreStandardised" };
+            string[] candidateNames = new[]
+            {
+                "beatmapStoreRaw",
+                "beatmapStoreStandardised",
+                "globalStoreRaw",
+                "globalStoreStandardised",
+                "globalByAudioFile",
+                "globalByAudioFileStandardised",
+                "absolutePathStore"
+            };
 
             // Try candidates: ensure length populated first (lazy-load), prefer Length>0
             for (int i = 0; i < candidates.Length; i++)
@@ -453,6 +467,46 @@ namespace osu.Game.EzOsuGame.Audio
 
             log("no candidate found, using beatmap.Track");
             return null;
+        }
+
+        private Track? tryGetTrackFromGlobalStore(string path)
+        {
+            if (audioManager == null || string.IsNullOrWhiteSpace(path))
+                return null;
+
+            try
+            {
+                return audioManager.Tracks.Get(path);
+            }
+            catch (Exception ex)
+            {
+                log($"global track lookup failed for '{path}': {ex.Message}");
+                return null;
+            }
+        }
+
+        private Track? tryGetAbsolutePathTrack(string audioFile)
+        {
+            if (audioManager == null || string.IsNullOrWhiteSpace(audioFile) || !Path.IsPathRooted(audioFile) || !File.Exists(audioFile))
+                return null;
+
+            try
+            {
+                string folder = Path.GetDirectoryName(audioFile) ?? string.Empty;
+                string fileName = Path.GetFileName(audioFile);
+
+                if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(fileName))
+                    return null;
+
+                var store = new StorageBackedResourceStore(new NativeStorage(folder));
+                var trackStore = audioManager.GetTrackStore(store);
+                return trackStore.Get(fileName.Replace('\\', '/'));
+            }
+            catch (Exception ex)
+            {
+                log($"absolute path track lookup failed for '{audioFile}': {ex.Message}");
+                return null;
+            }
         }
 
         private void stopPreviewInternal(string reason)
