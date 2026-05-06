@@ -25,9 +25,11 @@ namespace osu.Game.Rulesets.BMS.Audio
     public class BmsKeysoundManager
     {
         private const string BMS_LOG_PREFIX = "[BMS]";
+        private const int max_background_triggers_per_update = 32;
+        private const double stale_background_event_threshold = 250;
 
         private readonly AudioManager audioManager;
-        private readonly ISampleStore sampleStore;
+        private readonly ISampleStore? sampleStore;
         private readonly string bmsFolder;
         private readonly Dictionary<string, ISample> keysoundCache = new Dictionary<string, ISample>();
         private readonly Dictionary<string, double> keysoundPlayTimes = new Dictionary<string, double>(); // filename -> scheduled play time
@@ -39,6 +41,8 @@ namespace osu.Game.Rulesets.BMS.Audio
         private double lastBackgroundUpdateTime = double.MinValue;
         private bool loggedMissingBackgroundEvents;
         private bool loggedFirstBackgroundUpdate;
+        private bool isDisposed;
+        public bool IsDisposed => isDisposed;
 
         public BmsKeysoundManager(AudioManager audioManager, string bmsFolder)
         {
@@ -51,7 +55,6 @@ namespace osu.Game.Rulesets.BMS.Audio
             sampleStore = audioManager.GetSampleStore(resourceStore);
 
             Logger.Log($"{BMS_LOG_PREFIX} Keysound manager created - AudioManager: {audioManager != null}, Folder: {bmsFolder}", LoggingTarget.Runtime, LogLevel.Important);
-            Logger.Log($"{BMS_LOG_PREFIX} Audio volumes - Samples: {audioManager.Samples.Volume.Value:F2}, Tracks: {audioManager.Tracks.Volume.Value:F2}", LoggingTarget.Runtime, LogLevel.Important);
             Logger.Log($"{BMS_LOG_PREFIX} Created SampleStore for BMS folder: {sampleStore != null}", LoggingTarget.Runtime, LogLevel.Important);
         }
 
@@ -60,6 +63,9 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void PreloadKeysounds(IEnumerable<HitObject> hitObjects)
         {
+            if (isDisposed)
+                return;
+
             var keysoundFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var hitObject in hitObjects)
@@ -97,6 +103,9 @@ namespace osu.Game.Rulesets.BMS.Audio
 
         public void SetBackgroundSoundEvents(IReadOnlyList<BmsBackgroundSoundEvent> events)
         {
+            if (isDisposed)
+                return;
+
             backgroundEvents = events
                                .OrderBy(e => e.Time)
                                .ToList();
@@ -113,6 +122,9 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public ISample? LoadKeysound(string filename)
         {
+            if (isDisposed)
+                return null;
+
             if (string.IsNullOrEmpty(filename))
                 return null;
 
@@ -165,6 +177,9 @@ namespace osu.Game.Rulesets.BMS.Audio
 
             try
             {
+                if (sampleStore == null)
+                    return null;
+
                 var sample = sampleStore.Get(foundFilename);
                 keysoundCache[cacheKey] = sample;
 
@@ -194,6 +209,9 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void TriggerKeysound(string filename)
         {
+            if (isDisposed)
+                return;
+
             if (string.IsNullOrEmpty(filename))
                 return;
 
@@ -231,6 +249,9 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void Update(double currentGameplayTime)
         {
+            if (isDisposed)
+                return;
+
             gameplayTime = currentGameplayTime;
 
             if (backgroundEvents.Count == 0)
@@ -260,6 +281,7 @@ namespace osu.Game.Rulesets.BMS.Audio
             }
 
             int eventsTriggered = 0;
+            int discardedEvents = 0;
 
             while (nextBackgroundIndex < backgroundEvents.Count)
             {
@@ -269,13 +291,27 @@ namespace osu.Game.Rulesets.BMS.Audio
                 if (currentGameplayTime < scheduledTime)
                     break;
 
+                if (currentGameplayTime - scheduledTime > stale_background_event_threshold)
+                {
+                    discardedEvents++;
+                    nextBackgroundIndex++;
+                    continue;
+                }
+
                 TriggerKeysound(evt.Filename);
                 eventsTriggered++;
                 nextBackgroundIndex++;
+
+                if (eventsTriggered >= max_background_triggers_per_update)
+                    break;
             }
 
             if (eventsTriggered > 0)
                 Logger.Log($"{BMS_LOG_PREFIX} Triggered {eventsTriggered} background sound events at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+            if (discardedEvents > 0)
+                Logger.Log($"{BMS_LOG_PREFIX} Discarded {discardedEvents} stale background events at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
+            if (eventsTriggered >= max_background_triggers_per_update && nextBackgroundIndex < backgroundEvents.Count)
+                Logger.Log($"{BMS_LOG_PREFIX} Background trigger cap reached ({max_background_triggers_per_update}) at time={currentGameplayTime:F1}ms", LoggingTarget.Runtime, LogLevel.Debug);
 
             lastBackgroundUpdateTime = currentGameplayTime;
         }
@@ -286,11 +322,17 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void SetOffset(double offsetMs)
         {
+            if (isDisposed)
+                return;
+
             currentOffset = offsetMs;
         }
 
         public void SetVolume(double volume)
         {
+            if (isDisposed)
+                return;
+
             sampleVolume = Math.Clamp(volume, 0, 1);
         }
 
@@ -299,12 +341,19 @@ namespace osu.Game.Rulesets.BMS.Audio
         /// </summary>
         public void Dispose()
         {
+            if (isDisposed)
+                return;
+
+            isDisposed = true;
+
             foreach (var sample in keysoundCache.Values)
             {
                 (sample as IDisposable)?.Dispose();
             }
 
             keysoundCache.Clear();
+            keysoundPlayTimes.Clear();
+            backgroundEvents.Clear();
         }
     }
 }

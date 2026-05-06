@@ -3,18 +3,17 @@
 
 using System;
 using osu.Framework.Allocation;
-using osu.Framework.Audio;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
+using osu.Framework.Threading;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Rulesets.BMS.Beatmaps;
-using osu.Game.Rulesets.Mania;
 using osu.Game.Screens;
 using osu.Game.Screens.Play;
 using osuTK;
@@ -24,8 +23,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 {
     /// <summary>
     /// Loader screen that prepares and starts BMS gameplay.
-    /// Rendering/skin path is delegated to Mania ruleset for compatibility,
-    /// while timing/audio triggering remains BMS chart-driven via BmsPlayer/BmsKeysoundManager.
+    /// Uses BMS ruleset gameplay pipeline directly.
     /// </summary>
     public partial class BMSPlayerLoader : OsuScreen
     {
@@ -37,9 +35,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
         private LoadingSpinner loadingSpinner = null!;
         private OsuSpriteText statusText = null!;
         private OsuSpriteText titleText = null!;
-
-        [Resolved]
-        private AudioManager audioManager { get; set; } = null!;
+        private ScheduledDelegate? scheduledLoadBeatmap;
+        private ScheduledDelegate? scheduledPushPlayer;
+        private ScheduledDelegate? scheduledExit;
 
         public BMSPlayerLoader(BMSWorkingBeatmap workingBeatmap)
         {
@@ -106,11 +104,14 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             base.LoadComplete();
 
             // Start loading after a brief delay
-            Scheduler.AddDelayed(LoadBeatmap, 100);
+            scheduledLoadBeatmap = Scheduler.AddDelayed(LoadBeatmap, 100);
         }
 
         private void LoadBeatmap()
         {
+            if (!this.IsCurrentScreen())
+                return;
+
             try
             {
                 statusText.Text = "正在解析谱面...";
@@ -122,7 +123,7 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 {
                     statusText.Text = "错误: 谱面加载失败或没有音符";
                     loadingSpinner.Hide();
-                    Scheduler.AddDelayed(() => this.Exit(), 2000);
+                    scheduleExit(2000);
                     return;
                 }
 
@@ -132,8 +133,11 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 statusText.Text = $"加载完成! {beatmap.HitObjects.Count} 个音符";
 
                 // Small delay then push to player
-                Scheduler.AddDelayed(() =>
+                scheduledPushPlayer = Scheduler.AddDelayed(() =>
                 {
+                    if (!this.IsCurrentScreen())
+                        return;
+
                     loadingSpinner.Hide();
                     PushPlayer();
                 }, 500);
@@ -143,20 +147,19 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 Logger.Error(ex, "Failed to load BMS beatmap for play");
                 statusText.Text = $"加载失败: {ex.Message}";
                 loadingSpinner.Hide();
-                Scheduler.AddDelayed(() => this.Exit(), 3000);
+                scheduleExit(3000);
             }
         }
 
         private void PushPlayer()
         {
+            if (!this.IsCurrentScreen())
+                return;
+
             try
             {
-                // Keep Mania ruleset path to guarantee existing Mania skin system is used.
-                var maniaWorkingBeatmap = new ManiaConvertedWorkingBeatmap(workingBeatmap, audioManager);
-                var maniaRuleset = new ManiaRuleset();
-
-                Beatmap.Value = maniaWorkingBeatmap;
-                Ruleset.Value = maniaRuleset.RulesetInfo;
+                Beatmap.Value = workingBeatmap;
+                Ruleset.Value = new BMSRuleset().RulesetInfo;
 
                 var playerLoader = new PlayerLoader(() => new BmsPlayer());
                 this.Push(playerLoader);
@@ -165,8 +168,18 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
             {
                 Logger.Error(ex, "Failed to push BMS player");
                 statusText.Text = $"启动游戏失败: {ex.Message}";
-                Scheduler.AddDelayed(() => this.Exit(), 3000);
+                scheduleExit(3000);
             }
+        }
+
+        private void scheduleExit(double delay)
+        {
+            scheduledExit?.Cancel();
+            scheduledExit = Scheduler.AddDelayed(() =>
+            {
+                if (this.IsCurrentScreen())
+                    this.Exit();
+            }, delay);
         }
 
         public override void OnEntering(ScreenTransitionEvent e)
@@ -177,6 +190,9 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
 
         public override bool OnExiting(ScreenExitEvent e)
         {
+            scheduledLoadBeatmap?.Cancel();
+            scheduledPushPlayer?.Cancel();
+            scheduledExit?.Cancel();
             this.FadeOut(200);
             return base.OnExiting(e);
         }

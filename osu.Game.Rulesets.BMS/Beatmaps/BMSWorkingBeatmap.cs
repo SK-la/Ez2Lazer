@@ -75,15 +75,15 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
         {
             var fileInfo = new FileInfo(bmsFilePath);
 
-            string title = chartCache?.Title;
+            string? title = chartCache?.Title;
             if (string.IsNullOrWhiteSpace(title))
                 title = fileInfo.Name;
 
-            string artist = chartCache?.Artist;
+            string? artist = chartCache?.Artist;
             if (string.IsNullOrWhiteSpace(artist))
                 artist = "BMS";
 
-            string difficultyName = chartCache?.SubTitle;
+            string? difficultyName = chartCache?.SubTitle;
             if (string.IsNullOrWhiteSpace(difficultyName))
                 difficultyName = Path.GetFileNameWithoutExtension(bmsFilePath);
 
