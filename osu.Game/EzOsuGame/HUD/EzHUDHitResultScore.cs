@@ -50,12 +50,21 @@ namespace osu.Game.EzOsuGame.HUD
         public BindableColour4 AccentColour { get; } = new BindableColour4(Colour4.White);
 
         [SettingSource(typeof(EzHUDStrings), nameof(EzHUDStrings.HITRESULT_BLENDING_LABEL), nameof(EzHUDStrings.HITRESULT_BLENDING_DESCRIPTION))]
-        public Bindable<BlendingParameters> HitResultBlending { get; } = new Bindable<BlendingParameters>(new BlendingParameters
+        public Bindable<EzBlendMode> HitResultBlendModeSetting { get; } = new Bindable<EzBlendMode>(EzBlendMode.Additive);
+
+        private Bindable<BlendingParameters> hitResultBlending { get; } = new Bindable<BlendingParameters>(new BlendingParameters
         {
             // 2. 加法混合（发光效果）
             Source = BlendingType.SrcAlpha,
             Destination = BlendingType.One
         });
+
+        public enum EzBlendMode
+        {
+            Additive,
+            Alpha,
+            Multiply,
+        }
 
         // private EzComsPreviewOverlay previewOverlay = null!;
         // private IconButton previewButton = null!;
@@ -116,6 +125,28 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 ClearInternal();
                 anime?.Invalidate();
+            }, true);
+
+            HitResultBlendModeSetting.BindValueChanged(mode =>
+            {
+                hitResultBlending.Value = mode.NewValue switch
+                {
+                    EzBlendMode.Alpha => new BlendingParameters
+                    {
+                        Source = BlendingType.SrcAlpha,
+                        Destination = BlendingType.OneMinusSrcAlpha
+                    },
+                    EzBlendMode.Multiply => new BlendingParameters
+                    {
+                        Source = BlendingType.DstColor,
+                        Destination = BlendingType.Zero
+                    },
+                    _ => new BlendingParameters
+                    {
+                        Source = BlendingType.SrcAlpha,
+                        Destination = BlendingType.One
+                    }
+                };
             }, true);
 
             AccentAlpha.BindValueChanged(alpha => Alpha = alpha.NewValue, true);
@@ -192,7 +223,7 @@ namespace osu.Game.EzOsuGame.HUD
                         Texture = singleTexture,
                         Alpha = 0,
                         // 使用可配置的混合模式
-                        Blending = HitResultBlending.Value
+                        Blending = hitResultBlending.Value
                     };
 
                     Schedule(() =>
