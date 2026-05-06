@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mania.Objects.EzCurrentHitObject;
+using osu.Game.Rulesets.Mania.Objects.Drawables;
 using osu.Game.Rulesets.Mania.Scoring;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Scoring;
@@ -105,6 +106,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.Helper
             foreach (var obj in hitObjectContainer.AliveObjects)
             {
                 if (obj.Judged)
+                    continue;
+
+                // Keep parity with beatoraja key-press candidate extraction:
+                // LN tail (end note) is not a press-routing candidate.
+                if (obj is DrawableHoldNoteTail)
                     continue;
 
                 // 检查对象的判定窗口是否与时间重叠
